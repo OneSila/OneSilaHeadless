@@ -1,0 +1,11 @@
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0  # Use the ref you want to point at
+    hooks:
+    -   id: check-yaml
+    -   id: end-of-file-fixer
+    -   id: trailing-whitespace
+-   repo: https://github.com/pre-commit/mirrors-autopep8
+    rev: 'v2.0.4'  # Use the sha / tag you want to point at
+    hooks:
+    -   id: autopep8
