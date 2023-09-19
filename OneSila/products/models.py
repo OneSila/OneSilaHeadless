@@ -1,0 +1,141 @@
+from django.db import models, IntegrityError
+from core.models import TimeStampMixin
+from django.utils.translation import gettext_lazy as _
+
+from django_shared_multi_tenant.models import MultiTenantAwareMixin
+from translations.models import TranslationFieldsMixin
+from taxes.models import Tax
+
+from .managers import ProductManger, UmbrellaManager, BundleManager, VariationManager
+
+
+class Product(TimeStampMixin, MultiTenantAwareMixin, models.Model):
+    VARIATION = 'VARIATION'
+    BUNDLE = 'BUNDLE'
+    UMBRELLA = 'UMBRELLA'
+
+    PRODUCT_TYPE_CHOICES = (
+        (VARIATION, _('Product Variation')),
+        (BUNDLE, _('Bundle Product')),
+        (UMBRELLA, _('Umbrella Product')),
+    )
+
+    sku = models.CharField(max_length=100, unique=True, db_index=True)
+    active = models.BooleanField(default=False)
+    type = models.CharField(max_length=9, choices=PRODUCT_TYPE_CHOICES)
+    tax_rate = models.ForeignKey(Tax, on_delete=models.PROTECT)
+
+    umbrella_variations = models.ManyToManyField('self',
+        through='UmbrellaVariation',
+        # through_fields=['umbrella', 'variation'],
+        symmetrical=False,
+        blank=True,
+        related_name='umbrellas')
+
+    bundle_variations = models.ManyToManyField('self',
+        through='BundleVariation',
+        # through_fields=['umbrella', 'variation'],
+        symmetrical=False,
+        blank=True,
+        related_name='bundles')
+
+    objects = ProductManger()
+    variations = VariationManager()
+    bundles = BundleManager()
+    umbrellas = UmbrellaManager()
+
+    def __str__(self):
+        return f"{self.name} <{self.sku}>"
+
+    def set_active(self):
+        self.active = True
+        self.save()
+
+    def set_inactive(self):
+        self.active = False
+        self.save()
+
+    def is_umbrella(self):
+        return self.type == self.UMBRELLA
+
+    def is_not_umbrella(self):
+        return self.type != self.UMBRELLA
+
+    def is_bundle(self):
+        return self.type == self.BUNDLE
+
+    def is_not_bundle(self):
+        return self.type != self.BUNDLE
+
+    def is_variation(self):
+        return self.type == self.VARIATION
+
+    def is_not_variations(self):
+        return self.type != self.VARIATION
+
+
+class BundleProduct(Product):
+    objects = BundleManager()
+
+    class Meta:
+        proxy = True
+
+
+class UmbrellaProduct(Product):
+    objects = UmbrellaManager()
+
+    class Meta:
+        proxy = True
+
+
+class ProductVariation(Product):
+    objects = VariationManager()
+
+    class Meta:
+        proxy = True
+
+
+class ProductTranslation(TranslationFieldsMixin, MultiTenantAwareMixin, models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations")
+
+    name = models.CharField(max_length=100)
+    short_description = models.TextField()
+    description = models.TextField()
+
+    def __str__(self):
+        return f"{self.product} <{self.get_language_display()}>"
+
+
+class UmbrellaVariation(MultiTenantAwareMixin, models.Model):
+    umbrella = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="umbrellavariation_umbrellas")
+    variation = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="umbrellavariation_variations")
+
+    def save(self, *args, **kwargs):
+        if self.umbrella.is_not_umbrella():
+            raise IntegrityError(_("umbrella needs to a product of type UMBRELLA. Not %s" % (self.umbrella.type)))
+
+        if self.variation.is_umbrella():
+            raise IntegrityError(_("variation needs to a product of type BUNDLE or VARIATION. Not %s" % (self.umbrella.type)))
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.umbrella} x {self.variation}"
+
+
+class BundleVariation(MultiTenantAwareMixin, models.Model):
+    umbrella = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_umbrellas")
+    variation = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_variations")
+    quantity = models.IntegerField(default=1)
+
+    def __str__(self):
+        return f"{self.umbrella} x {self.quantity} {self.variation}"
+
+    def save(self, *args, **kwargs):
+        if self.umbrella.is_not_bundle():
+            raise IntegrityError(_("umbrella needs to a product of type BUNDLE. Not %s" % (self.umbrella.type)))
+
+        if self.variation.is_umbrella():
+            raise IntegrityError(_("variation needs to a product of type BUNDLE or VARIATION. Not %s" % (self.umbrella.type)))
+
+        super().save(*args, **kwargs)
