@@ -17,12 +17,6 @@ from django.utils.translation import gettext_lazy as _
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure--u%ynrwkf&0o4$m4akawbp+)!m-u#kt7@u$h)in8&dzm4k&u$u'
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -91,17 +85,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'OneSila.wsgi.application'
-
-
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
 
 
 # Password validation
