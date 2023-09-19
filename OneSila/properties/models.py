@@ -58,8 +58,8 @@ class ProductProperty(models.Model):
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
     value = models.CharField(max_length=20)
-    value_select = models.ForeignKey(PropertySelectValue, on_delete=models.CASCADE)
-    value_multi_select = models.ManyToManyField(PropertySelectValue)
+    value_select = models.ForeignKey(PropertySelectValue, on_delete=models.CASCADE, related_name='value_select_set')
+    value_multi_select = models.ManyToManyField(PropertySelectValue, related_name='value_multi_select_set')
 
     def __str__(self):
         return f"{self.product} <{self.property}>"

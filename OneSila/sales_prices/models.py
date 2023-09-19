@@ -112,7 +112,7 @@ class SalesPriceListItem(models.Model):
 
 class SalesPriceListAssign(models.Model):
     salespricelist = models.ForeignKey(SalesPriceList, on_delete=models.PROTECT)
-    contact = models.OneToOneField('contacts.Contact', on_delete=models.CASCADE)
+    customer = models.OneToOneField('contacts.Customer', on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.contact} > {self.salespricelist}"

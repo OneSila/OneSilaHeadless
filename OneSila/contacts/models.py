@@ -116,9 +116,9 @@ class Address(models.Model):
     is_invoice_address = models.BooleanField(default=False)
     is_shipping_address = models.BooleanField(default=False)
 
-    def __str__(self):
-        d = [self.contact, self.company]
-        return " - ".join(d)
+    # def __str__(self):
+    #     d = [self.contact, self.company]
+    #     return " - ".join(d)
 
 
 class ShippingAddress(Address):

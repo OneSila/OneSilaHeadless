@@ -43,8 +43,8 @@ class PurchaseOrder(models.Model):
     order_reference = models.CharField(max_length=100)
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
 
-    invoice_address = models.ForeignKey(InternalCompany, on_delete=models.PROTECT)
-    delivery_address = models.ForeignKey(ShippingAddress, on_delete=models.PROTECT)
+    invoice_address = models.ForeignKey(InternalCompany, on_delete=models.PROTECT, related_name="invoice_address_set")
+    delivery_address = models.ForeignKey(ShippingAddress, on_delete=models.PROTECT, related_name="delivery_address_set")
 
     def reference(self):
         return f"PO{self.id}"
