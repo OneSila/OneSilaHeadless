@@ -1,10 +1,9 @@
-from django.db import models
-from django_shared_multi_tenant.models import MultiTenantAwareMixin
+from core import models
 from django.utils.translation import gettext_lazy as _
 from translations.models import TranslationFieldsMixin
 
 
-class Property(MultiTenantAwareMixin, models.Model):
+class Property(models.Model):
     """https://github.com/TweaveTech/django-classifier/blob/master/classifier/models.py"""
     class TYPES:
         INT = 'INT'
@@ -42,14 +41,12 @@ class Property(MultiTenantAwareMixin, models.Model):
         return self.name
 
 
-class PropertyTranslations(MultiTenantAwareMixin, TranslationFieldsMixin, models.Model)
+class PropertyTranslations(TranslationFieldsMixin, models.Model):
+    property = models.ForeignKey(Property, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200, unique=True, verbose_name=_('Name'))
 
 
-property = models.ForeignKey(Property)
-name = models.CharField(max_length=200, unique=True, verbose_name=_('Name'))
-
-
-class PropertySelectValue(MultiTenantAwareMixin, models.Model):
+class PropertySelectValue(models.Model):
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
     value = models.CharField(max_length=100)
 
@@ -57,7 +54,7 @@ class PropertySelectValue(MultiTenantAwareMixin, models.Model):
         return f"{self.value} <{self.property}>"
 
 
-class ProductProperty(MultiTenantAwareMixin, models.Model):
+class ProductProperty(models.Model):
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
     value = models.CharField(max_length=20)

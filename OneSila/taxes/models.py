@@ -1,8 +1,7 @@
 from django.db import models
-from django_shared_multi_tenant.models import MultiTenantAwareMixin
 
 
-class Tax(MultiTenantAwareMixin, models.Model):
+class Tax(models.Model):
     '''
     Tax value class to assign taxes to products.  Will most likely
     only contain one value.  But should be here none the less.

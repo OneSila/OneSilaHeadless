@@ -1,7 +1,6 @@
-from core.db import models
+from core import models
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from django_shared_multi_tenant.models import MultiTenantAwareModel
 from contacts.models import Supplier, InternalCompany, ShippingAddress
 from products.models import ProductVariation
 
@@ -54,7 +53,7 @@ class PurchaseOrder(models.Model):
         return self.reference()
 
 
-class PurchaseOrderItem(MultiTenantAwareMixin, models.Model):
+class PurchaseOrderItem(models.Model):
     """
     Items being purchased from through a given purchase order
     """

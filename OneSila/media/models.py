@@ -1,4 +1,4 @@
-from django.db import models
+from core import models
 from django.utils.translation import gettext_lazy as _
 from django_shared_multi_tenant.models import MultiTenantAwareMixin
 
@@ -18,7 +18,7 @@ import os
 # Models #
 ##########
 
-class Media(MultiTenantAwareMixin, models.Model):
+class Media(models.Model):
     '''
     Class to store Images
     '''
@@ -89,7 +89,7 @@ class Video(Media):
         proxy = True
 
 
-class MediaProductThrough(MultiTenantAwareMixin, models.Model):
+class MediaProductThrough(models.Model):
     '''Assign an image to a product,and set its sorting-order '''
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
     media = models.ForeignKey(Media, on_delete=models.CASCADE)

@@ -1,10 +1,10 @@
-from django.db import models, IntegrityError
-from django_shared_multi_tenant.models import MultiTenantAwareMixin
+from core import models
+from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from .managers import SalesPriceManager, SalesPriceListItemManager
 
 
-class SalesPrice(MultiTenantAwareMixin, models.Model):
+class SalesPrice(models.Model):
     '''
     Once a price for a product is created, the 'children' will be created automaically.
 
@@ -68,7 +68,7 @@ class SalesPrice(MultiTenantAwareMixin, models.Model):
         unique_together = ('product', 'currency')
 
 
-class SalesPriceList(MultiTenantAwareMixin, models.Model):
+class SalesPriceList(models.Model):
     """
     The Sales Price Lists are used to assign bespoke prices to specific customers.
     For example retail-customers or wholesale customers.
@@ -86,7 +86,7 @@ class SalesPriceList(MultiTenantAwareMixin, models.Model):
         return '{} {}'.format(self.name, self.currency)
 
 
-class SalesPriceListItem(MultiTenantAwareMixin, models.Model):
+class SalesPriceListItem(models.Model):
     salespricelist = models.ForeignKey(SalesPriceList, on_delete=models.CASCADE)
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
     salesprice = models.FloatField()
@@ -110,7 +110,7 @@ class SalesPriceListItem(MultiTenantAwareMixin, models.Model):
         unique_together = ('product', 'salespricelist')
 
 
-class SalesPriceListAssign(MultiTenantAwareMixin, models.Model):
+class SalesPriceListAssign(models.Model):
     salespricelist = models.ForeignKey(SalesPriceList, on_delete=models.PROTECT)
     contact = models.OneToOneField('contacts.Contact', on_delete=models.CASCADE)
 

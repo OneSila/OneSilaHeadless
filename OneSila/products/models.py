@@ -1,5 +1,5 @@
-from django.db import models, IntegrityError
-from core.models import TimeStampMixin
+from core import models
+from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 
 from django_shared_multi_tenant.models import MultiTenantAwareMixin
@@ -9,7 +9,7 @@ from taxes.models import Tax
 from .managers import ProductManger, UmbrellaManager, BundleManager, VariationManager
 
 
-class Product(TimeStampMixin, MultiTenantAwareMixin, models.Model):
+class Product(models.Model):
     VARIATION = 'VARIATION'
     BUNDLE = 'BUNDLE'
     UMBRELLA = 'UMBRELLA'
@@ -95,7 +95,7 @@ class ProductVariation(Product):
         proxy = True
 
 
-class ProductTranslation(TranslationFieldsMixin, MultiTenantAwareMixin, models.Model):
+class ProductTranslation(TranslationFieldsMixin, models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations")
 
     name = models.CharField(max_length=100)
@@ -106,7 +106,7 @@ class ProductTranslation(TranslationFieldsMixin, MultiTenantAwareMixin, models.M
         return f"{self.product} <{self.get_language_display()}>"
 
 
-class UmbrellaVariation(MultiTenantAwareMixin, models.Model):
+class UmbrellaVariation(models.Model):
     umbrella = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="umbrellavariation_umbrellas")
     variation = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="umbrellavariation_variations")
 
@@ -123,7 +123,7 @@ class UmbrellaVariation(MultiTenantAwareMixin, models.Model):
         return f"{self.umbrella} x {self.variation}"
 
 
-class BundleVariation(MultiTenantAwareMixin, models.Model):
+class BundleVariation(models.Model):
     umbrella = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_umbrellas")
     variation = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_variations")
     quantity = models.IntegerField(default=1)

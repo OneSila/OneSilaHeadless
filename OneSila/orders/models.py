@@ -1,4 +1,4 @@
-from django.db import models
+from core import models
 from django.dispatch import receiver
 from django.db.models.signals import post_save, pre_save
 from django.utils.translation import gettext_lazy as _
@@ -10,7 +10,7 @@ from currency_converter import CurrencyConverter, RateNotFoundError
 from .managers import OrderItemManager, OrderManager, OrderReportManager
 
 
-class Order(MultiTenantAwareMixin, models.Model):
+class Order(models.Model):
     DRAFT = 'DRAFT'
     PENDING = 'PENDING'
     PENDING_INVENTORY = 'PENDING_INVENTORY'
@@ -140,7 +140,7 @@ class Order(MultiTenantAwareMixin, models.Model):
         return self.status == self.DONE
 
 
-class OrderItem(MultiTenantAwareMixin, models.Model):
+class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.PROTECT)
 
     product = models.ForeignKey('products.Product', on_delete=models.PROTECT)
@@ -184,7 +184,7 @@ class OrderItem(MultiTenantAwareMixin, models.Model):
         return price * self.quantity
 
 
-class OrderNote(MultiTenantAwareMixin, models.Model):
+class OrderNote(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE)
     note = models.TextField()
 

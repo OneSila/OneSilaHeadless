@@ -1,10 +1,10 @@
-from django.db import models
+from core import models
 from django_shared_multi_tenant.models import MultiTenantAwareMixin
 
 from .managers import ProductStockManager
 
 
-class ProductStock(MultiTenantAwareMixin, models.Model):
+class ProductStock(models.Model):
     '''
     Class to store quantity of proudcts
     '''
@@ -27,11 +27,11 @@ class ProductStock(MultiTenantAwareMixin, models.Model):
             raise IntegrityError(_("Inventory can only be attached to a VARIATION. Not a {}".format(self.product.type)))
 
 
-class Warehouse(MultiTenantAwareMixin, models.Model):
+class Warehouse(models.Model):
     name = models.CharField(max_length=100)
 
 
-class StockLocation(MultiTenantAwareMixin, models.Model):
+class StockLocation(models.Model):
     '''
     Class to keep track of stock-locations.   These can be used in many was:
     - Physical location / address or warehouse
@@ -45,7 +45,7 @@ class StockLocation(MultiTenantAwareMixin, models.Model):
         return self.name
 
 
-class MinimumStock(MultiTenantAwareMixin, models.Model):
+class MinimumStock(models.Model):
     '''
     Class to set an expected minimum-stock for a given product.
     '''

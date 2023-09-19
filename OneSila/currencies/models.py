@@ -1,10 +1,10 @@
-from django.db import models
+from core import models
 from django.db.models import Q
 from django_shared_multi_tenant.models import MultiTenantAwareMixin
 from django.utils.translation import gettext_lazy as _
 
 
-class Currency(MultiTenantAwareMixin, models.Model):
+class Currency(models.Model):
     '''
     Currencies determin the final price.
 

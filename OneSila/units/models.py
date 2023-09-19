@@ -1,8 +1,7 @@
-from django.db import models
-from django_shared_multi_tenant.models import MultiTenantAwareMixin
+from core import models
 
 
-class Unit(MultiTenantAwareMixin, models.Model):
+class Unit(models.Model):
     name = models.CharField(max_length=100)
     unit = models.CharField(max_length=5)
 

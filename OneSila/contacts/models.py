@@ -1,4 +1,4 @@
-from django.db import models
+from core import models
 from django_shared_multi_tenant.models import MultiTenantAwareMixin
 from django_shared_multi_tenant.validators import phone_regex
 
@@ -6,7 +6,7 @@ from .managers import SupplierManager, CustomerManager, InfluencerManager, \
     InvoiceAddressManager, ShippingAddressManager, InternalCompanyManager
 
 
-class Company(MultiTenantAwareMixin, models.Model):
+class Company(models.Model):
     """
     An Company is essentially customer, supplier, influencers, any of the above.
     And sometimes they relate to each other for whatever reason like various branches or departments.
@@ -75,7 +75,7 @@ class InternalCompany(Company):
         proxy = True
 
 
-class Person(MultiTenantAwareMixin, models.Model):
+class Person(models.Model):
     """
     A person is someone attached to a contact.
     """
@@ -96,7 +96,7 @@ class Person(MultiTenantAwareMixin, models.Model):
         return self.name()
 
 
-class Address(MultiTenantAwareMixin, models.Model):
+class Address(models.Model):
     """
     An address to be used by entities
     """

@@ -1,12 +1,12 @@
-from django.db import models, IntegrityError
-from django_shared_multi_tenant.models import MultiTenantAwareMixin
+from core import models
+from django.db import IntegrityError
 from products.models import Product
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class EanCode(MultiTenantAwareMixin, models.Model):
+class EanCode(models.Model):
     """
     Ean-codes are designed to be kept track of, for whoever buys their own codes.
     """
