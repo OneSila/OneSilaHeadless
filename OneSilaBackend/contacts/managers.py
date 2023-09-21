@@ -55,10 +55,10 @@ class InternalCompanyManager(CompanyManager):
 
 class AddressQuerySet(QuerySet):
     def filter_shippingaddress(self):
-        return self.filter(is_shippingaddress=True)
+        return self.filter(is_shipping_address=True)
 
     def filter_invoiceaddress(self):
-        return self.filter(is_invoiceaddress=True)
+        return self.filter(is_invoice_address=True)
 
 
 class ShippingAddressManager(Manager):

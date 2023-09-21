@@ -37,7 +37,7 @@ class ContactsQuery:
     addresses: ListConnectionWithTotalCount[AddressType] = strawberry_django.connection(extensions=[IsAuthenticated()])
 
     shipping_address: ShippingAddressType = strawberry_django.field(extensions=[IsAuthenticated()])
-    shipping_addressese: ListConnectionWithTotalCount[ShippingAddressType] = strawberry_django.connection(extensions=[IsAuthenticated()])
+    shipping_addresses: ListConnectionWithTotalCount[ShippingAddressType] = strawberry_django.connection(extensions=[IsAuthenticated()])
 
     invoice_address: InvoiceAddressType = strawberry_django.field(extensions=[IsAuthenticated()])
     invoice_addresses: ListConnectionWithTotalCount[InvoiceAddressType] = strawberry_django.connection(extensions=[IsAuthenticated()])
