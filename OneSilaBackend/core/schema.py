@@ -1,0 +1,1 @@
+from django_shared_multi_tenant.schema import StrawberryMultitenantMixin

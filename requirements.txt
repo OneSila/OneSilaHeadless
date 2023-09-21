@@ -4,12 +4,14 @@ Pillow>=10.0.0
 CurrencyConverter
 pre-commit>=3.4.0
 psycopg2-binary>=2.9.7
-ipython
 model_bakery>=1.15.0
 huey==2.4.5
 django-redis>=5.3.0
 django-select2==8.1.2
 django-model-utils>=4.3.1
+strawberry-graphql-django==0.17.2
+
+ipython
 
 git+ssh://git@github.com/TweaveTech/django_getuitkit.git@v0.4.5
 git+ssh://git@github.com/TweaveTech/django_get_absolute_url.git@v0.2
