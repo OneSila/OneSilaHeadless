@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.conf import settings
 
 import strawberry
 import strawberry_django
@@ -36,7 +37,5 @@ class Mutation(ContactsMutation):
 schema = strawberry.Schema(
     query=Query,
     mutation=Mutation,
-    extensions=[
-        DjangoOptimizerExtension,
-    ]
+    extensions=[DjangoOptimizerExtension()]
 )

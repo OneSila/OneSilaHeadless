@@ -26,8 +26,8 @@ from strawberry_django import NodeInput
 class ContactsMutation:
     create_company: CompanyType = CreateMutation(CompanyInput, extensions=[IsAuthenticated()])
     create_companies: List[CompanyType] = CreateMutation(CompanyInput, extensions=[IsAuthenticated()])
-    update_company: List[CompanyType] = UpdateMutation(CompanyPartialInput, extensions=[IsAuthenticated()])
-    delete_company: CompanyType = DeleteMutation(NodeInput, extensions=[IsAuthenticated()])
+    update_company: CompanyType = UpdateMutation(CompanyPartialInput, extensions=[IsAuthenticated()])
+    delete_company: CompanyType = DeleteMutation(NodeInput)
     delete_companies: List[CompanyType] = DeleteMutation(NodeInput, extensions=[IsAuthenticated()])
 
     create_supplier: SupplierType = CreateMutation(SupplierInput, extensions=[IsAuthenticated()])

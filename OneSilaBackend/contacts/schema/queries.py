@@ -15,7 +15,7 @@ from .types.types import CompanyType, SupplierType, CustomerType, \
 
 @strawberry.type(name="Query")
 class ContactsQuery:
-    company: CompanyType = strawberry_django.field(extensions=[IsAuthenticated()])
+    company: CompanyType = strawberry_django.node(extensions=[IsAuthenticated()])
     companies: ListConnectionWithTotalCount[CompanyType] = strawberry_django.connection(extensions=[IsAuthenticated()])
 
     supplier: SupplierType = strawberry_django.field(extensions=[IsAuthenticated()])

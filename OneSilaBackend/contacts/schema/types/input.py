@@ -9,203 +9,91 @@ from contacts.models import Company, Supplier, Customer, \
     ShippingAddress, InvoiceAddress
 
 
-@strawberry_django.input(Company)
+@strawberry_django.input(Company, fields="__all__")
 class CompanyInput:
-    id: auto
-    name: auto
-    vat_number: auto
-    eori_number: auto
-    related_companies: auto
-
-    is_supplier: auto
-    is_customer: auto
-    is_influencer: auto
-    is_internal_company: auto
+    pass
 
 
-@strawberry_django.partial(Company)
+@strawberry_django.partial(Company, fields="__all__")
 class CompanyPartialInput(NodeInput):
-    id: auto
-    name: auto
-    vat_number: auto
-    eori_number: auto
-    related_companies: auto
-
-    is_supplier: auto
-    is_customer: auto
-    is_influencer: auto
-    is_internal_company: auto
+    pass
 
 
-@strawberry_django.input(Supplier)
+@strawberry_django.input(Supplier, fields="__all__")
 class SupplierInput:
-    id: auto
-    name: auto
-    vat_number: auto
-    eori_number: auto
-    related_companies: auto
+    pass
 
 
-@strawberry_django.input(Supplier)
+@strawberry_django.input(Supplier, fields="__all__")
 class SupplierPartialInput:
-    id: auto
-    name: auto
-    vat_number: auto
-    eori_number: auto
-    related_companies: auto
+    pass
 
 
-@strawberry_django.input(Customer)
+@strawberry_django.input(Customer, fields="__all__")
 class CustomerInput:
-    id: auto
-    name: auto
-    vat_number: auto
-    eori_number: auto
-    related_companies: auto
+    pass
 
 
-@strawberry_django.input(Customer)
+@strawberry_django.input(Customer, fields="__all__")
 class CustomerPartialInput:
-    id: auto
-    name: auto
-    vat_number: auto
-    eori_number: auto
-    related_companies: auto
+    pass
 
 
-@strawberry_django.input(Influencer)
+@strawberry_django.input(Influencer, fields="__all__")
 class InfluencerInput:
-    id: auto
-    name: auto
-    vat_number: auto
-    related_companies: auto
+    pass
 
 
-@strawberry_django.input(Influencer)
+@strawberry_django.input(Influencer, fields="__all__")
 class InfluencerPartialInput:
-    id: auto
-    name: auto
-    vat_number: auto
-    related_companies: auto
+    pass
 
 
-@strawberry_django.input(InternalCompany)
+@strawberry_django.input(InternalCompany, fields="__all__")
 class InternalCompanyInput:
-    id: auto
-    name: auto
-    vat_number: auto
-    eori_number: auto
-    related_companies: auto
+    pass
 
 
-@strawberry_django.input(InternalCompany)
+@strawberry_django.input(InternalCompany, fields="__all__")
 class InternalCompanyPartialInput:
-    id: auto
-    name: auto
-    vat_number: auto
-    eori_number: auto
-    related_companies: auto
+    pass
 
 
-@strawberry_django.input(Person)
+@strawberry_django.input(Person, fields="__all__")
 class PersonInput:
-    id: auto
-    first_name: auto
-    last_name: auto
-    company: auto
-    phone: auto
-    email: auto
-    language: auto
+    pass
 
 
-@strawberry_django.input(Person)
+@strawberry_django.input(Person, fields="__all__")
 class PersonPartialInput:
-    id: auto
-    first_name: auto
-    last_name: auto
-    company: auto
-    phone: auto
-    email: auto
-    language: auto
+    pass
 
 
-@strawberry_django.input(Address)
+@strawberry_django.input(Address, fields="__all__")
 class AddressInput:
-    id: auto
-    contact: auto
-    company: auto
-    address1: auto
-    address2: auto
-    address3: auto
-    postcode: auto
-    city: auto
-    country: auto
-    is_invoice_address: auto
-    is_shipping_address: auto
+    pass
 
 
-@strawberry_django.input(Address)
+@strawberry_django.input(Address, fields="__all__")
 class AddressPartialInput:
-    id: auto
-    contact: auto
-    company: auto
-    address1: auto
-    address2: auto
-    address3: auto
-    postcode: auto
-    city: auto
-    country: auto
-    is_invoice_address: auto
-    is_shipping_address: auto
+    pass
 
 
-@strawberry_django.input(ShippingAddress)
+@strawberry_django.input(ShippingAddress, fields="__all__")
 class ShippingAddressInput:
-    id: auto
-    contact: auto
-    company: auto
-    address1: auto
-    address2: auto
-    address3: auto
-    postcode: auto
-    city: auto
-    country: auto
+    pass
 
 
-@strawberry_django.input(ShippingAddress)
+@strawberry_django.input(ShippingAddress, fields="__all__")
 class ShippingAddressPartialInput:
-    id: auto
-    contact: auto
-    company: auto
-    address1: auto
-    address2: auto
-    address3: auto
-    postcode: auto
-    city: auto
-    country: auto
+    pass
 
 
-@strawberry_django.input(InvoiceAddress)
+@strawberry_django.input(InvoiceAddress, fields="__all__")
 class InvoiceAddressInput:
-    id: auto
-    contact: auto
-    company: auto
-    address1: auto
-    address2: auto
-    address3: auto
-    postcode: auto
-    city: auto
-    country: auto
+    pass
 
 
-@strawberry_django.input(InvoiceAddress)
+@strawberry_django.input(InvoiceAddress, fields="__all__")
 class InvoiceAddressPartialInput:
-    id: auto
-    contact: auto
-    company: auto
-    address1: auto
-    address2: auto
-    address3: auto
-    postcode: auto
-    city: auto
-    country: auto
+    pass
