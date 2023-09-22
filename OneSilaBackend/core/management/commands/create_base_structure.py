@@ -73,9 +73,14 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         for app_name in options["app_names"]:
-            create_structure(app_name)
-            set_receiver_code(app_name)
+            if not os.path.exists(app_name):
+                self.stdout.write(
+                    self.style.ERROR(f"No such app: {app_name}")
+                )
+            else:
+                create_structure(app_name)
+                set_receiver_code(app_name)
 
-            self.stdout.write(
-                self.style.SUCCESS('Created base file and folder structure for "%s"' % app_name)
-            )
+                self.stdout.write(
+                    self.style.SUCCESS('Created base file and folder structure for "%s"' % app_name)
+                )
