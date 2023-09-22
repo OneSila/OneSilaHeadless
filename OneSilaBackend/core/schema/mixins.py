@@ -1,5 +1,4 @@
 from strawberry.types import Info
-from django_shared_multi_tenant.schema import StrawberryMultitenantMixin
 
 
 class GetMultiTenantCompanyMixin:
@@ -7,5 +6,7 @@ class GetMultiTenantCompanyMixin:
         return info.context.request.user.multi_tenant_company
 
 
-class TypeMultiTenantFilterMixin(StrawberryMultitenantMixin):
-    pass
+class GetQuerysetMultiTenantMixin:
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return queryset.filter(multi_tenant_company=info.context.request.user.multi_tenant_company)

@@ -1,11 +1,5 @@
-import strawberry
-import strawberry_django
-
-from core.schema.mutations import create, update, delete
-
-from typing import List
-from strawberry_django import mutations
-from strawberry_django.permissions import IsAuthenticated
+from core.schema.mutations import type
+from core.schema.mutations import create, update, delete, type, List
 
 from .types.types import CompanyType, SupplierType, CustomerType, \
     InfluencerType, InternalCompanyType, PersonType, AddressType, \
@@ -19,7 +13,7 @@ from .types.input import CompanyInput, CompanyPartialInput, \
     InvoiceAddressInput, InvoiceAddressPartialInput
 
 
-@strawberry.type(name="Mutation")
+@type(name="Mutation")
 class ContactsMutation:
     create_company: CompanyType = create(CompanyInput)
     create_companies: List[CompanyType] = create(CompanyInput)

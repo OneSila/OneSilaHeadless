@@ -1,9 +1,9 @@
-import strawberry_django
-from strawberry import auto
+from core.schema.types.ordering import order
+from core.schema.types.types import auto
 
 from contacts.models import Company
 
 
-@strawberry_django.ordering.order(Company)
+@order(Company)
 class CompanyOrder:
     name: auto

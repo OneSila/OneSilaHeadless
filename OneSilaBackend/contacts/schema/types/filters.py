@@ -1,10 +1,10 @@
-import strawberry_django
-from strawberry import auto
+from core.schema.types.types import auto
+from core.schema.types.filters import filter
 
 from contacts.models import Company, Address, Person
 
 
-@strawberry_django.filters.filter(Company, lookups=True)
+@filter(Company, lookups=True)
 class CompanyFilter:
     id: auto
     name: auto
@@ -17,7 +17,7 @@ class CompanyFilter:
     is_internal_company: auto
 
 
-@strawberry_django.filters.filter(Person, lookups=True)
+@filter(Person, lookups=True)
 class PersonFilter:
     first_name: auto
     last_name: auto
@@ -25,7 +25,7 @@ class PersonFilter:
     company: CompanyFilter
 
 
-@strawberry_django.filters.filter(Address, lookups=True)
+@filter(Address, lookups=True)
 class AddressFilter:
     company: CompanyFilter
     is_invoice_address: auto

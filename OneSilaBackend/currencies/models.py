@@ -10,7 +10,7 @@ class Currency(models.Model):
 
     Every price generated will be based on the inheritance, exchange rate and round_price_to.
     '''
-    iso_code = models.CharField(max_length=3, primary_key=True)
+    iso_code = models.CharField(max_length=3)
     name = models.CharField(max_length=30)
     symbol = models.CharField(max_length=3)
 

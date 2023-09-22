@@ -1,44 +1,38 @@
-import strawberry
-import strawberry_django
-from strawberry.relay import ListConnection
-from strawberry_django.permissions import IsAuthenticated
-from strawberry_django.relay import ListConnectionWithTotalCount
-
-from core.schema.queries import field, connection
+from core.schema.queries import node, connection, ListConnectionWithTotalCount, type
 from contacts.models import Company
-from django.db.models import QuerySet
 
 from typing import List
+
 from .types.types import CompanyType, SupplierType, CustomerType, \
     InfluencerType, InternalCompanyType, PersonType, AddressType, \
     ShippingAddressType, InvoiceAddressType
 
 
-@strawberry.type(name="Query")
+@type(name="Query")
 class ContactsQuery:
-    company: CompanyType = field()
+    company: CompanyType = node()
     companies: ListConnectionWithTotalCount[CompanyType] = connection()
 
-    supplier: SupplierType = field()
+    supplier: SupplierType = node()
     suppliers: ListConnectionWithTotalCount[SupplierType] = connection()
 
-    customer: CustomerType = field()
+    customer: CustomerType = node()
     customers: ListConnectionWithTotalCount[CustomerType] = connection()
 
-    influencer: InfluencerType = field()
+    influencer: InfluencerType = node()
     influencers: ListConnectionWithTotalCount[InfluencerType] = connection()
 
-    internal_company: InternalCompanyType = field()
+    internal_company: InternalCompanyType = node()
     internal_companies: ListConnectionWithTotalCount[InternalCompanyType] = connection()
 
-    person: PersonType = field()
+    person: PersonType = node()
     people: ListConnectionWithTotalCount[PersonType] = connection()
 
-    address: AddressType = field()
+    address: AddressType = node()
     addresses: ListConnectionWithTotalCount[AddressType] = connection()
 
-    shipping_address: ShippingAddressType = field()
+    shipping_address: ShippingAddressType = node()
     shipping_addresses: ListConnectionWithTotalCount[ShippingAddressType] = connection()
 
-    invoice_address: InvoiceAddressType = field()
+    invoice_address: InvoiceAddressType = node()
     invoice_addresses: ListConnectionWithTotalCount[InvoiceAddressType] = connection()
