@@ -1,7 +1,7 @@
 import strawberry
 import strawberry_django
 
-from core.schema import create, update, delete
+from core.schema.mutations import create, update, delete
 
 from typing import List
 from strawberry_django import mutations

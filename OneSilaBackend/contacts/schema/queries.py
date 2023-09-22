@@ -4,7 +4,7 @@ from strawberry.relay import ListConnection
 from strawberry_django.permissions import IsAuthenticated
 from strawberry_django.relay import ListConnectionWithTotalCount
 
-from core.schema import field, connection
+from core.schema.queries import field, connection
 from contacts.models import Company
 from django.db.models import QuerySet
 

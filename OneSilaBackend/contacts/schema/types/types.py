@@ -1,4 +1,4 @@
-from core.schema import TypeMultiTenantFilterMixin
+from core.schema.mixins import TypeMultiTenantFilterMixin
 
 import strawberry
 import strawberry_django
