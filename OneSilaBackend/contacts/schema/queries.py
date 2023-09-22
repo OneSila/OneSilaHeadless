@@ -4,6 +4,7 @@ from strawberry.relay import ListConnection
 from strawberry_django.permissions import IsAuthenticated
 from strawberry_django.relay import ListConnectionWithTotalCount
 
+from core.schema import field, connection
 from contacts.models import Company
 from django.db.models import QuerySet
 
@@ -15,29 +16,29 @@ from .types.types import CompanyType, SupplierType, CustomerType, \
 
 @strawberry.type(name="Query")
 class ContactsQuery:
-    company: CompanyType = strawberry_django.node(extensions=[IsAuthenticated()])
-    companies: ListConnectionWithTotalCount[CompanyType] = strawberry_django.connection(extensions=[IsAuthenticated()])
+    company: CompanyType = field()
+    companies: ListConnectionWithTotalCount[CompanyType] = connection()
 
-    supplier: SupplierType = strawberry_django.field(extensions=[IsAuthenticated()])
-    suppliers: ListConnectionWithTotalCount[SupplierType] = strawberry_django.connection(extensions=[IsAuthenticated()])
+    supplier: SupplierType = field()
+    suppliers: ListConnectionWithTotalCount[SupplierType] = connection()
 
-    customer: CustomerType = strawberry_django.field(extensions=[IsAuthenticated()])
-    customers: ListConnectionWithTotalCount[CustomerType] = strawberry_django.connection(extensions=[IsAuthenticated()])
+    customer: CustomerType = field()
+    customers: ListConnectionWithTotalCount[CustomerType] = connection()
 
-    influencer: InfluencerType = strawberry_django.field(extensions=[IsAuthenticated()])
-    influencers: ListConnectionWithTotalCount[InfluencerType] = strawberry_django.connection(extensions=[IsAuthenticated()])
+    influencer: InfluencerType = field()
+    influencers: ListConnectionWithTotalCount[InfluencerType] = connection()
 
-    internal_company: InternalCompanyType = strawberry_django.field(extensions=[IsAuthenticated()])
-    internal_companies: ListConnectionWithTotalCount[InternalCompanyType] = strawberry_django.connection(extensions=[IsAuthenticated()])
+    internal_company: InternalCompanyType = field()
+    internal_companies: ListConnectionWithTotalCount[InternalCompanyType] = connection()
 
-    person: PersonType = strawberry_django.field(extensions=[IsAuthenticated()])
-    people: ListConnectionWithTotalCount[PersonType] = strawberry_django.connection(extensions=[IsAuthenticated()])
+    person: PersonType = field()
+    people: ListConnectionWithTotalCount[PersonType] = connection()
 
-    address: AddressType = strawberry_django.field(extensions=[IsAuthenticated()])
-    addresses: ListConnectionWithTotalCount[AddressType] = strawberry_django.connection(extensions=[IsAuthenticated()])
+    address: AddressType = field()
+    addresses: ListConnectionWithTotalCount[AddressType] = connection()
 
-    shipping_address: ShippingAddressType = strawberry_django.field(extensions=[IsAuthenticated()])
-    shipping_addresses: ListConnectionWithTotalCount[ShippingAddressType] = strawberry_django.connection(extensions=[IsAuthenticated()])
+    shipping_address: ShippingAddressType = field()
+    shipping_addresses: ListConnectionWithTotalCount[ShippingAddressType] = connection()
 
-    invoice_address: InvoiceAddressType = strawberry_django.field(extensions=[IsAuthenticated()])
-    invoice_addresses: ListConnectionWithTotalCount[InvoiceAddressType] = strawberry_django.connection(extensions=[IsAuthenticated()])
+    invoice_address: InvoiceAddressType = field()
+    invoice_addresses: ListConnectionWithTotalCount[InvoiceAddressType] = connection()

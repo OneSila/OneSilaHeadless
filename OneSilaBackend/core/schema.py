@@ -2,6 +2,9 @@ from django.db import models
 from django.core.exceptions import PermissionDenied
 from django_shared_multi_tenant.schema import StrawberryMultitenantMixin
 
+import strawberry_django
+from strawberry_django.permissions import IsAuthenticated
+
 from strawberry_django.mutations.fields import DjangoCreateMutation, \
     DjangoUpdateMutation, DjangoDeleteMutation
 from typing import TYPE_CHECKING, Any, Iterable, Union
@@ -82,3 +85,28 @@ class DeleteMutation(GetMultiTenantCompanyMixin, DjangoDeleteMutation):
 
 class TypeMultiTenantFilterMixin(StrawberryMultitenantMixin):
     pass
+
+
+def create(type):
+    extensions = [IsAuthenticated()]
+    return CreateMutation(type, extensions=extensions)
+
+
+def update(type):
+    extensions = [IsAuthenticated()]
+    return UpdateMutation(type, extensions=extensions)
+
+
+def delete():
+    extensions = [IsAuthenticated()]
+    return DeleteMutation(strawberry_django.NodeInput, extensions=extensions)
+
+
+def field(*args, **kwargs):
+    extensions = [IsAuthenticated()]
+    return strawberry_django.field(*args, **kwargs, extensions=extensions)
+
+
+def connection(*args, **kwargs):
+    extensions = [IsAuthenticated()]
+    return strawberry_django.connection(*args, **kwargs, extensions=extensions)
