@@ -5,6 +5,6 @@ from .types.types import CurrencyType
 
 
 @type(name="Query")
-class CurrencyQuery:
+class CurrenciesQuery:
     currency: CurrencyType = node()
     currencies: ListConnectionWithTotalCount[CurrencyType] = connection()

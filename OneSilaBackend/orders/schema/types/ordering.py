@@ -17,6 +17,6 @@ class OrderItemOrder:
 
 
 @order(OrderNote)
-class Order:
+class OrderNoteOrder:
     id: auto
     order: auto

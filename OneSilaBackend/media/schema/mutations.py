@@ -5,11 +5,9 @@ from .types.types import MediaType, ImageType, VideoType, MediaProductThroughTyp
 from .types.input import MediaInput, ImageInput, VideoInput, MediaProductThroughInput, \
     MediaPartialInput, ImagePartialInput, VideoPartialInput, MediaProductThroughPartialInput
 
-from media.models import Media, , ,
-
 
 @type(name="Mutation")
-class Mutation:
+class MediaMutation:
     create_media: MediaType = create(MediaInput)
     create_medias: List[MediaType] = create(MediaInput)
     update_media: MediaType = update(MediaPartialInput)

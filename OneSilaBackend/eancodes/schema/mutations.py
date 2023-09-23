@@ -6,7 +6,7 @@ from .types.input import EanCodeInput, EanCodePartialInput
 
 
 @type(name="Mutation")
-class Mutation:
+class EanCodesMutation:
     create_ean_code: EanCodeType = create(EanCodeInput)
     create_ean_codes: List[EanCodeType] = create(EanCodeInput)
     update_ean_code: EanCodeType = update(EanCodePartialInput)

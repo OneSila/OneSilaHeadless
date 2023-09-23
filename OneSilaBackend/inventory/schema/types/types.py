@@ -3,8 +3,8 @@ from core.schema.types.types import relay, type, GetQuerysetMultiTenantMixin
 from typing import List
 
 from inventory.models import Inventory, InventoryLocation
-from .filters import InventoryFilter, InventoryLocation
-from .ordering import InventoryOrder, InventoryLocation
+from .filters import InventoryFilter, InventoryLocationFilter
+from .ordering import InventoryOrder, InventoryLocationOrder
 
 
 @type(Inventory, filters=InventoryFilter, order=InventoryOrder, pagination=True, fields="__all__")

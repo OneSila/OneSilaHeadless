@@ -5,5 +5,5 @@ from units.models import Unit
 
 
 @order(Unit)
-class Order:
+class UnitOrder:
     name: auto

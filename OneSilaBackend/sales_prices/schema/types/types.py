@@ -2,10 +2,12 @@ from core.schema.types.types import relay, type, GetQuerysetMultiTenantMixin
 
 from typing import List
 
-from sales_prices.models import SalesPrice, SalesPriceList\
+from sales_prices.models import SalesPrice, SalesPriceList, \
     SalesPriceListItem
-from .filters import SalesPriceFilter, SalesPriceListFilter, SalesPriceListItemFilter
-from .ordering import SalesPriceOrder, SalesPriceListOrder, SalesPriceListItemOrder
+from .filters import SalesPriceFilter, SalesPriceListFilter, \
+    SalesPriceListItemFilter
+from .ordering import SalesPriceOrder, SalesPriceListOrder, \
+    SalesPriceListItemOrder
 
 
 @type(SalesPrice, filters=SalesPriceFilter, order=SalesPriceOrder, pagination=True, fields="__all__")

@@ -1,7 +1,7 @@
 from core.schema.types.ordering import order
 from core.schema.types.types import auto
 
-from media.models import Media, Image, Video
+from media.models import Media, Image, Video, MediaProductThrough
 
 
 @order(Media)
@@ -23,3 +23,8 @@ class VideoOrder:
     id: auto
     image_type: auto
     product: auto
+
+
+@order(MediaProductThrough)
+class MediaProductThroughOrder:
+    id: auto

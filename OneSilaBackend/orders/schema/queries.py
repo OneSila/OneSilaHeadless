@@ -5,12 +5,12 @@ from .types.types import OrderType, OrderItemType, OrderNoteType
 
 
 @type(name="Query")
-class OrderQuery:
+class OrdersQuery:
     order: OrderType = node()
     orders: ListConnectionWithTotalCount[OrderType] = connection()
 
     order_item: OrderItemType = node()
     order_items: ListConnectionWithTotalCount[OrderItemType] = connection()
 
-    order_note: OrderNoteTypeType = node()
-    order_notes: ListConnectionWithTotalCount[OrderNoteTypeType] = connection()
+    order_note: OrderNoteType = node()
+    order_notes: ListConnectionWithTotalCount[OrderNoteType] = connection()

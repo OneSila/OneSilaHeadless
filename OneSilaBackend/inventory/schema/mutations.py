@@ -7,7 +7,7 @@ from .types.input import InventoryInput, InventoryLocationInput, \
 
 
 @type(name="Mutation")
-class Mutation:
+class InventoryMutation:
     create_inventory: InventoryType = create(InventoryInput)
     create_inventories: List[InventoryType] = create(InventoryInput)
     update_inventory: InventoryType = update(InventoryLocationInput)

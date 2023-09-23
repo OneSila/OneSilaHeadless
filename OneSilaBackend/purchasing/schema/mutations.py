@@ -9,7 +9,7 @@ from .types.input import SupplierProductInput, PurchaseOrderInput, \
 
 
 @type(name="Mutation")
-class Mutation:
+class PurchasingMutation:
     create_supplier_product: SupplierProductType = create(SupplierProductInput)
     create_supplier_products: List[SupplierProductType] = create(SupplierProductInput)
     update_supplier_product: SupplierProductType = update(SupplierProductPartialInput)

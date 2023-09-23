@@ -1,7 +1,7 @@
 from core.schema.types.ordering import order
 from core.schema.types.types import auto
 
-from sales_prices.models import SalesPrice, SalesPriceList\
+from sales_prices.models import SalesPrice, SalesPriceList, \
     SalesPriceListItem
 
 
@@ -20,4 +20,4 @@ class SalesPriceListOrder:
 
 @order(SalesPriceListItem)
 class SalesPriceListItemOrder:
-    pass
+    id: auto

@@ -6,13 +6,14 @@ from .types.types import ProductType, BundleProductType, UmbrellaProductType, \
     BundleVariationType
 from .types.input import ProductInput, BundleProductInput, UmbrellaProductInput, \
     ProductVariationInput, ProductTranslationInput, UmbrellaVariationInput, \
-    BundleVariationInput, ProductPartialInput, BundleProductPartialInput, \
-    ProductVariationPartialInput, ProductTranslationPartialInput, \
-    UmbrellaVariationPartialInput, BundleVariationPartialInput, PartialInput
+    BundleVariationInput, ProductPartialInput, UmbrellaProductPartialInput, \
+    BundleProductPartialInput, ProductVariationPartialInput, \
+    ProductTranslationPartialInput, UmbrellaVariationPartialInput, \
+    BundleVariationPartialInput
 
 
 @type(name="Mutation")
-class Mutation:
+class ProductsMutation:
     create_product: ProductType = create(ProductInput)
     create_products: List[ProductType] = create(ProductInput)
     update_product: ProductType = update(ProductPartialInput)

@@ -6,8 +6,8 @@ from .types.input import TaxInput, TaxPartialInput
 
 
 @type(name="Mutation")
-class Mutation:
-    create_tax: TaxTypTaxe = create(TaxInput)
+class TaxesMutation:
+    create_tax: TaxType = create(TaxInput)
     create_taxes: List[TaxType] = create(TaxInput)
     update_tax: TaxType = update(TaxPartialInput)
     delete_tax: TaxType = delete()

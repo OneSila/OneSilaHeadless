@@ -1,7 +1,7 @@
 from core.schema.types.types import auto
 from core.schema.types.input import NodeInput, input, partial
 
-from sales_prices.models import SalesPrice, SalesPriceList\
+from sales_prices.models import SalesPrice, SalesPriceList, \
     SalesPriceListItem
 
 

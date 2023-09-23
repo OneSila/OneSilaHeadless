@@ -5,6 +5,6 @@ from .types.types import EanCodeType
 
 
 @type(name="Query")
-class EanCodeQuery:
+class EanCodesQuery:
     ean_code: EanCodeType = node()
     ean_codes: ListConnectionWithTotalCount[EanCodeType] = connection()

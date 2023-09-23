@@ -1,2 +1,2 @@
-from .queries import CurrencyQuery
-from .mutations import CurrencyMutation
+from .queries import CurrenciesQuery
+from .mutations import CurrenciesMutation

@@ -6,6 +6,7 @@ from .types.types import InventoryType, InventoryLocationType
 
 @type(name="Query")
 class InventoryQuery:
+    pass
     inventory: InventoryType = node()
     inventories: ListConnectionWithTotalCount[InventoryType] = connection()
 

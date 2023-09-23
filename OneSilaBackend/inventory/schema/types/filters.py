@@ -16,4 +16,5 @@ class InventoryFilter:
 class InventoryLocationFilter:
     id: auto
     name: auto
-    parent_location: 'InventoryLocationFilter'
+    # FIXME: Referencing self seems to crash the schema
+    # parent_location: 'InventoryLocationFilter'

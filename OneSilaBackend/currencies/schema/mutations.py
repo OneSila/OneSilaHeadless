@@ -6,7 +6,7 @@ from .types.input import CurrencyInput, CurrencyPartialInput
 
 
 @type(name="Mutation")
-class CurrencyMutation:
+class CurrenciesMutation:
     create_currency: CurrencyType = create(CurrencyInput)
     create_currencies: List[CurrencyType] = create(CurrencyInput)
     update_currency: CurrencyType = update(CurrencyPartialInput)

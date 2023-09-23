@@ -1,7 +1,9 @@
 from core.schema.types.ordering import order
 from core.schema.types.types import auto
 
-from products.models import Product, BundleProduct, UmbrellaProduct, ProductVariation
+from products.models import Product, BundleProduct, UmbrellaProduct, \
+    ProductVariation, ProductTranslation, UmbrellaVariation, \
+    BundleVariation
 
 
 @order(Product)
@@ -26,3 +28,18 @@ class UmbrellaProductOrder:
 class ProductVariationOrder:
     id: auto
     sku: auto
+
+
+@order(ProductTranslation)
+class ProductTranslationOrder:
+    id: auto
+
+
+@order(UmbrellaVariation)
+class UmbrellaVariationOrder:
+    id: auto
+
+
+@order(BundleVariation)
+class BundleVariationOrder:
+    id: auto

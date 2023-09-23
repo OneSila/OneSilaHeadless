@@ -1,20 +1,20 @@
 from core.schema.queries import node, connection, ListConnectionWithTotalCount, type
 from typing import List
 
-from .types.types import ProductTypeType, BundleProductType, UmbrellaProductType, \
-    ProductVariationType, ProductTranslationType, UmbrellaVariationTType, \
+from .types.types import ProductType, BundleProductType, UmbrellaProductType, \
+    ProductVariationType, ProductTranslationType, UmbrellaVariationType, \
     BundleVariationType
 
 
 @type(name="Query")
-class ProductQuery:
+class ProductsQuery:
     product: ProductType = node()
     products: ListConnectionWithTotalCount[ProductType] = connection()
 
     bundle_product: BundleProductType = node()
     bundle_products: ListConnectionWithTotalCount[BundleProductType] = connection()
 
-    unbrella_product: uUmbrellaProductType = node()
+    unbrella_product: UmbrellaProductType = node()
     umbrella_products: ListConnectionWithTotalCount[UmbrellaProductType] = connection()
 
     product_variation: ProductVariationType = node()

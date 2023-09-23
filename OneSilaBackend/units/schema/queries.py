@@ -5,6 +5,6 @@ from .types.types import UnitType
 
 
 @type(name="Query")
-class UnitQuery:
+class UnitsQuery:
     unit: UnitType = node()
     units: ListConnectionWithTotalCount[UnitType] = connection()

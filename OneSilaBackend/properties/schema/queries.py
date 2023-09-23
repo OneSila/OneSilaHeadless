@@ -7,7 +7,7 @@ from .types.types import PropertyType, PropertyTranslationType, \
 
 
 @type(name="Query")
-class PropertyQuery:
+class PropertiesQuery:
     property_type: PropertyType = node()
     property_types: ListConnectionWithTotalCount[PropertyType] = connection()
 

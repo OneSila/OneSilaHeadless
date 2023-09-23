@@ -2,7 +2,7 @@ from core.schema.types.types import auto
 from core.schema.types.filters import filter
 
 from sales_prices.models import SalesPrice, SalesPriceList, SalesPriceListItem
-from product.schema.types.filters import ProductFilter
+from products.schema.types.filters import ProductFilter
 from currencies.schema.types.filters import CurrencyFilter
 
 

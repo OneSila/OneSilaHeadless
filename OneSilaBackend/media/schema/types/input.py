@@ -15,22 +15,22 @@ class MediaPartialInput(NodeInput):
 
 
 @input(Image, fields="__all__")
-class ImageLocationInput:
+class ImageInput:
     pass
 
 
 @partial(Image, fields="__all__")
-class ImageLocationPartialInput(NodeInput):
+class ImagePartialInput(NodeInput):
     pass
 
 
 @input(Video, fields="__all__")
-class VideoLocationInput:
+class VideoInput:
     pass
 
 
 @partial(Video, fields="__all__")
-class VideoLocationPartialInput(NodeInput):
+class VideoPartialInput(NodeInput):
     pass
 
 
@@ -40,5 +40,5 @@ class MediaProductThroughInput:
 
 
 @partial(MediaProductThrough, fields="__all__")
-class MediaProductThroughInput(NodeInput):
+class MediaProductThroughPartialInput(NodeInput):
     pass

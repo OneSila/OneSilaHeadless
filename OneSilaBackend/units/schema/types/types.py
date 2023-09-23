@@ -2,7 +2,7 @@ from core.schema.types.types import relay, type, GetQuerysetMultiTenantMixin
 
 from typing import List
 
-from unites.models import Unit
+from units.models import Unit
 from .filters import UnitFilter
 from .ordering import UnitOrder
 

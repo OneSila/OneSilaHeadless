@@ -2,12 +2,12 @@ from core.schema.mutations import type
 from core.schema.mutations import create, update, delete, type, List
 
 from .types.types import PropertyType, PropertyTranslationType, PropertySelectValueType, ProductPropertyType
-from .types.input import PropertyInput, PropertyTranslationInput, PropertySelectValueInput, ProductPropertyInput,
-PropertyPartialInput, PropertyTranslationPartialInput, PropertySelectValuePartialInput, ProductPropertyPartialInput
+from .types.input import PropertyInput, PropertyTranslationInput, PropertySelectValueInput, ProductPropertyInput, \
+    PropertyPartialInput, PropertyTranslationPartialInput, PropertySelectValuePartialInput, ProductPropertyPartialInput
 
 
 @type(name="Mutation")
-class Mutation:
+class PropertiesMutation:
     create_property: PropertyType = create(PropertyInput)
     create_properties: List[PropertyType] = create(PropertyInput)
     update_property: PropertyType = update(PropertyPartialInput)
@@ -16,7 +16,7 @@ class Mutation:
 
     create_property_translation: PropertyTranslationType = create(PropertyTranslationInput)
     create_property_translations: List[PropertyTranslationType] = create(PropertyTranslationInput)
-    update_property_translation: PropertyTranslationType = update(PartialInput)
+    update_property_translation: PropertyTranslationType = update(PropertyTranslationPartialInput)
     delete_property_translation: PropertyTranslationType = delete()
     delete_property_translations: List[PropertyTranslationType] = delete()
 

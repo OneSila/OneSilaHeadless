@@ -5,6 +5,6 @@ from .types.types import TaxType
 
 
 @type(name="Query")
-class TaxQuery:
+class TaxesQuery:
     tax: TaxType = node()
     taxes: ListConnectionWithTotalCount[TaxType] = connection()

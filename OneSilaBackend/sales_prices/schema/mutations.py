@@ -7,7 +7,7 @@ from .types.input import SalesPriceInput, SalesPriceListInput, SalesPriceListIte
 
 
 @type(name="Mutation")
-class Mutation:
+class SalesPricesMutation:
     create_: SalesPriceType = create(SalesPriceInput)
     create_: List[SalesPriceType] = create(SalesPriceInput)
     update_: SalesPriceType = update(SalesPricePartialInput)

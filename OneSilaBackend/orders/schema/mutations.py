@@ -2,12 +2,12 @@ from core.schema.mutations import type
 from core.schema.mutations import create, update, delete, type, List
 
 from .types.types import OrderType, OrderItemType, OrderNoteType
-from .types.input import OrderInput, OrderItemInput, OrderNoteInput\
+from .types.input import OrderInput, OrderItemInput, OrderNoteInput, \
     OrderPartialInput, OrderItemPartialInput, OrderNotePartialInput
 
 
 @type(name="Mutation")
-class Mutation:
+class OrdersMutation:
     create_order: OrderType = create(OrderInput)
     create_orders: List[OrderType] = create(OrderInput)
     update_order: OrderType = update(OrderPartialInput)

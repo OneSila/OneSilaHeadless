@@ -5,6 +5,6 @@ from units.models import Unit
 
 
 @filter(Unit)
-class InventoryFilter:
+class UnitFilter:
     id: auto
     name: auto

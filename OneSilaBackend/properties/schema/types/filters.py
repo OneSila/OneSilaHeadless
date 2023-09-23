@@ -2,8 +2,8 @@ from core.schema.types.types import auto
 from core.schema.types.filters import filter
 
 from properties.models import Property, ProductProperty, \
-    ProductProperty
-from product.schema.types.filters import ProductFilter
+    ProductProperty, PropertySelectValue, PropertyTranslation
+from products.schema.types.filters import ProductFilter
 
 
 @filter(Property)
@@ -27,3 +27,8 @@ class ProductPropertyFilter:
     value: auto
     value_select: PropertySelectValueFilter
     value_multi_select: PropertySelectValueFilter
+
+
+@filter(PropertyTranslation)
+class PropertyTranslationFilter:
+    id: auto

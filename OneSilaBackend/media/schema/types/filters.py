@@ -1,7 +1,7 @@
 from core.schema.types.types import auto
 from core.schema.types.filters import filter
 
-from media.models import Media, Image, Video
+from media.models import Media, Image, Video, MediaProductThrough
 from products.schema.types.filters import ProductFilter
 
 
@@ -23,3 +23,8 @@ class ImageFilter:
 class VideoFilter:
     id: auto
     product: ProductFilter
+
+
+@filter(MediaProductThrough)
+class MediaProductThroughFilter:
+    id: auto
