@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand, CommandError
+from django.conf import settings
 import os
 import shutil
 
@@ -20,6 +21,7 @@ BASE_STRUCTURE = [
     'schema/__init__.py',
     'schema/queries.py',
     'schema/mutations.py',
+    'schema/subscriptions.py',
     'schema/types',
     'schema/types/input.py',
     'schema/types/filters.py',
@@ -66,13 +68,19 @@ def set_receiver_code(app_name):
 
 
 class Command(BaseCommand):
-    help = "Create the base file and folder structure for a given app_name in the current path. ex: schema, flows,.."
+    help = ("Create the base file and folder structure for a given app_name in the current path. ex: schema, flows,..  \n"
+        "Use 'all' to install in every app")
 
     def add_arguments(self, parser):
         parser.add_argument("app_names", nargs="+", type=str)
 
     def handle(self, *args, **options):
-        for app_name in options["app_names"]:
+        if 'all' in options["app_names"]:
+            apps = settings.INSTALLED_APPS
+        else:
+            apps = options["app_names"]
+
+        for app_name in apps:
             if not os.path.exists(app_name):
                 self.stdout.write(
                     self.style.ERROR(f"No such app: {app_name}")

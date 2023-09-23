@@ -63,7 +63,6 @@ class Mutation(ContactsMutation,
 #
 # Schema itself.
 #
-
 schema = strawberry.Schema(
     query=Query,
     mutation=Mutation,
