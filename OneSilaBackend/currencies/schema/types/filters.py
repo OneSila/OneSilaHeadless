@@ -1,10 +1,10 @@
-import strawberry_django
-from strawberry import auto
+from core.schema.types.types import auto
+from core.schema.types.filters import filter
 
 from currencies.models import Currency
 
 
-@strawberry_django.filters.filter(Currency, lookups=True)
+@filter(Currency)
 class CurrencyFilter:
     id: auto
     iso_code: auto

@@ -39,6 +39,7 @@ class PurchaseOrder(models.Model):
         (DELIVERED, _("Delivered")),
     )
 
+    status = models.CharField(max_length=16, choices=PO_STATUS_CHOICES)
     supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT)
     order_reference = models.CharField(max_length=100)
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
@@ -57,6 +58,7 @@ class PurchaseOrderItem(models.Model):
     """
     Items being purchased from through a given purchase order
     """
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE)
     item = models.ForeignKey(SupplierProduct, on_delete=models.PROTECT)
     quantity = models.IntegerField()
     price = models.FloatField()

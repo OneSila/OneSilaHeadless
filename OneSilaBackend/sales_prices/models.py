@@ -82,6 +82,8 @@ class SalesPriceList(models.Model):
     vat_included = models.BooleanField(default=False)
     auto_update = models.BooleanField(default=True)
 
+    customers = models.ManyToManyField('contacts.Customer')
+
     def __str__(self):
         return '{} {}'.format(self.name, self.currency)
 
@@ -108,11 +110,3 @@ class SalesPriceListItem(models.Model):
 
     class Meta:
         unique_together = ('product', 'salespricelist')
-
-
-class SalesPriceListAssign(models.Model):
-    salespricelist = models.ForeignKey(SalesPriceList, on_delete=models.PROTECT)
-    customer = models.OneToOneField('contacts.Customer', on_delete=models.CASCADE)
-
-    def __str__(self):
-        return f"{self.contact} > {self.salespricelist}"

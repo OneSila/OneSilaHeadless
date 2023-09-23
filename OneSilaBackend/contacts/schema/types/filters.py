@@ -4,7 +4,7 @@ from core.schema.types.filters import filter
 from contacts.models import Company, Address, Person
 
 
-@filter(Company, lookups=True)
+@filter(Company)
 class CompanyFilter:
     id: auto
     name: auto
@@ -17,7 +17,7 @@ class CompanyFilter:
     is_internal_company: auto
 
 
-@filter(Person, lookups=True)
+@filter(Person)
 class PersonFilter:
     first_name: auto
     last_name: auto
@@ -25,7 +25,7 @@ class PersonFilter:
     company: CompanyFilter
 
 
-@filter(Address, lookups=True)
+@filter(Address)
 class AddressFilter:
     company: CompanyFilter
     is_invoice_address: auto
