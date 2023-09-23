@@ -41,7 +41,7 @@ class Property(models.Model):
         return self.name
 
 
-class PropertyTranslations(TranslationFieldsMixin, models.Model):
+class PropertyTranslation(TranslationFieldsMixin, models.Model):
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
     name = models.CharField(max_length=200, unique=True, verbose_name=_('Name'))
 
