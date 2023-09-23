@@ -1,7 +1,8 @@
 from core.schema.types.types import auto
 from core.schema.types.filters import filter
 
-from properties.models import Property, ProductProperty
+from properties.models import Property, ProductProperty, \
+    ProductProperty
 from product.schema.types.filters import ProductFilter
 
 

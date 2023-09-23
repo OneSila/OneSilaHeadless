@@ -7,3 +7,4 @@ from currencies.models import Currency
 @order(Currency)
 class CurrencyOrder:
     iso_code: auto
+    name: auto

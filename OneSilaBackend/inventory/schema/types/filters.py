@@ -16,4 +16,4 @@ class InventoryFilter:
 class InventoryLocationFilter:
     id: auto
     name: auto
-    location: 'InventoryLocationFilter'
+    parent_location: 'InventoryLocationFilter'
