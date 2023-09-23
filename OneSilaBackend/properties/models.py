@@ -40,6 +40,9 @@ class Property(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        verbose_name_plural = _("Properties")
+
 
 class PropertyTranslation(TranslationFieldsMixin, models.Model):
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
@@ -118,3 +121,6 @@ class ProductProperty(models.Model):
     @staticmethod
     def to_python_multi_select(value):
         return self.value_multi_select
+
+    class Meta:
+        verbose_name_plural = _("Product Properties")

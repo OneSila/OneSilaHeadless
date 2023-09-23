@@ -24,6 +24,7 @@ class Order(models.Model):
     LOST = 'LOST'
     MERGED = 'MERGED'
     DAMAGED = 'DAMAGED'
+    VOID = 'VOID'
 
     UNPROCESSED = [PENDING]
     DONE_TYPES = [DONE, CANCELLED, HOLD, EXCHANGED, REFUNDED, LOST, MERGED, DAMAGED]
@@ -43,6 +44,7 @@ class Order(models.Model):
         (LOST, _('Lost')),
         (MERGED, _('Merged')),
         (DAMAGED, _('Damaged')),
+        (VOID, _('Void')),
     )
 
     SALE = 'SALE'
