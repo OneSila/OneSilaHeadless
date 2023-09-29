@@ -8,7 +8,7 @@ from strawberry import auto
 from strawberry_django import auth, mutations
 from strawberry_django.optimizer import DjangoOptimizerExtension
 
-from contacts.schema import ContactsQuery, ContactsMutation
+from contacts.schema import ContactsQuery, ContactsMutation, ContactsSubscription
 from currencies.schema import CurrenciesQuery, CurrenciesMutation
 from eancodes.schema import EanCodesQuery, EanCodesMutation
 from inventory.schema import InventoryQuery, InventoryMutation
@@ -49,8 +49,7 @@ class Query(ContactsQuery, CurrenciesQuery, EanCodesQuery, InventoryQuery,
 
 
 @strawberry.type
-class Mutation(ContactsMutation,
-         CurrenciesMutation, EanCodesMutation,
+class Mutation(ContactsMutation, CurrenciesMutation, EanCodesMutation,
         InventoryMutation, MediaMutation, OrdersMutation, ProductsMutation,
         PropertiesMutation, PurchasingMutation, SalesPricesMutation,
         TaxesMutation, UnitsMutation
@@ -60,11 +59,18 @@ class Mutation(ContactsMutation,
     register: UserType = auth.register(UserInput)
 
 
+@strawberry.type
+class Subscription(ContactsSubscription):
+    pass
+
 #
 # Schema itself.
 #
+
+
 schema = strawberry.Schema(
     query=Query,
     mutation=Mutation,
+    subscription=Subscription,
     extensions=[DjangoOptimizerExtension()]
 )

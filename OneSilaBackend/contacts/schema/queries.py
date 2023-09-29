@@ -1,4 +1,4 @@
-from core.schema.queries import node, connection, ListConnectionWithTotalCount, type
+from core.schema.queries import node, connection, ListConnectionWithTotalCount, type, field
 from contacts.models import Company
 
 from typing import List
@@ -36,3 +36,7 @@ class ContactsQuery:
 
     invoice_address: InvoiceAddressType = node()
     invoice_addresses: ListConnectionWithTotalCount[InvoiceAddressType] = connection()
+
+    @field
+    def hello() -> str:
+        return "world"

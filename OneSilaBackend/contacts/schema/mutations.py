@@ -1,5 +1,4 @@
-from core.schema.mutations import type
-from core.schema.mutations import create, update, delete, type, List
+from core.schema.mutations import create, update, delete, type, List, field
 
 from .types.types import CompanyType, SupplierType, CustomerType, \
     InfluencerType, InternalCompanyType, PersonType, AddressType, \
@@ -68,3 +67,11 @@ class ContactsMutation:
     update_invoice_address: List[InvoiceAddressType] = update(InvoiceAddressInput)
     delete_invoice_address: List[InvoiceAddressType] = delete()
     delete_invoice_addresses: InvoiceAddressType = delete()
+
+    @field
+    async def send_message(self, info, message: str) -> bool:
+        print("sending on_message")
+        print(id(info.context.broadcast))
+        await info.context.broadcast.publish(channel="chatroom", message=message)
+
+        return True

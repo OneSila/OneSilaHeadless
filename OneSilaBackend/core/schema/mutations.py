@@ -8,7 +8,7 @@ from strawberry_django.mutations.fields import DjangoCreateMutation, \
     DjangoUpdateMutation, DjangoDeleteMutation
 from typing import TYPE_CHECKING, Any, Iterable, Union
 from strawberry.types import Info
-from strawberry import type
+from strawberry import type, field
 from typing import List
 
 from .decorators import multi_tenant_owner_protection
