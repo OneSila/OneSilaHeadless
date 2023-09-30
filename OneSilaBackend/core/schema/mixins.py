@@ -1,5 +1,5 @@
 from strawberry.types import Info
-from strawberry_django.auth.queries import get_current_user
+from strawberry_django.auth.utils import get_current_user
 
 
 class GetMultiTenantCompanyMixin:

@@ -2,7 +2,7 @@ from core.schema.subscriptions import type, subscription, Info, AsyncGenerator, 
 from core.schema.queries import node
 
 from strawberry_django.permissions import filter_with_perms, get_with_perms
-from strawberry_django.auth.queries import get_current_user
+from strawberry_django.auth.utils import get_current_user
 from strawberry_django.mutations.fields import get_pk
 from strawberry.relay.utils import from_base64
 from channels.db import database_sync_to_async
