@@ -9,7 +9,7 @@ from .filters import CompanyFilter, AddressFilter, PersonFilter
 from .ordering import CompanyOrder
 
 
-@type(Company, filters=CompanyFilter, order=CompanyOrder, pagination=True, fields="__all__")
+@type(Company, filters=CompanyFilter, order=CompanyOrder, pagination=True, fields='__all__')
 class CompanyType(relay.Node, GetQuerysetMultiTenantMixin):
     related_companies: List['CompanyType'] | None
 

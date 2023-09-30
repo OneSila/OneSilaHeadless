@@ -36,7 +36,3 @@ class ContactsQuery:
 
     invoice_address: InvoiceAddressType = node()
     invoice_addresses: ListConnectionWithTotalCount[InvoiceAddressType] = connection()
-
-    @field
-    def hello() -> str:
-        return "world"
