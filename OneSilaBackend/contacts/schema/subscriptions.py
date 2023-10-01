@@ -1,9 +1,11 @@
 from core.schema.subscriptions import type, subscription, Info, AsyncGenerator, asyncio, List
+from core.schema.subscriptions import get_msg, get_group, get_msg_type
 from core.schema.queries import node
 
 from strawberry_django.permissions import filter_with_perms, get_with_perms
 from strawberry_django.auth.utils import get_current_user
 from strawberry_django.mutations.fields import get_pk
+# from strawberry_django.subscriptions.fields import subscription_node
 from strawberry.relay.utils import from_base64
 from channels.db import database_sync_to_async
 
@@ -22,66 +24,67 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class ModelSubscribePublisher:
-    def __init__(self, info: Info, input: CompanyPartialInput, model: Company):
-        self.info = info
-        self.input = input
-        self.model = model
+# class ModelSubscribePublisher:
+#     def __init__(self, info: Info, input: CompanyPartialInput, model: Company):
+#         self.info = info
+#         self.input = input
+#         self.model = model
 
-        self.ws = info.context["ws"]
-        self.channel_layer = self.ws.channel_layer
+#         self.ws = info.context["ws"]
+#         self.channel_layer = self.ws.channel_layer
 
-    @database_sync_to_async
-    def get_instance(self):
-        vinput = vars(self.input).copy() if self.input is not None else {}
-        pk = get_pk(vinput)
+#     @database_sync_to_async
+#     def get_instance(self):
+#         vinput = vars(self.input).copy() if self.input is not None else {}
+#         pk = get_pk(vinput)
 
-        instance = get_with_perms(pk, self.info, required=True, model=self.model)
-        return instance
+#         instance = get_with_perms(pk, self.info, required=True, model=self.model)
+#         return instance
 
-    async def get_group(self):
-        instance = await self.get_instance()
-        return str(instance.__class__.__name__)
+#     async def get_group(self):
+#         instance = await self.get_instance()
+#         return str(instance.__class__.__name__)
 
-    async def get_msg_type(self):
-        group = await self.get_group()
-        instance = await self.get_instance()
-        return f"{group}_{instance.id}"
+#     async def get_msg_type(self):
+#         group = await self.get_group()
+#         instance = await self.get_instance()
+#         return f"{group}_{instance.id}"
 
-    @timeit_and_log(logger)
-    async def subscribe(self):
-        group = await self.get_group()
-        await self.channel_layer.group_add(group, self.ws.channel_name)
+#     @timeit_and_log(logger)
+#     async def subscribe(self):
+#         group = await self.get_group()
+#         await self.channel_layer.group_add(group, self.ws.channel_name)
 
-    @timeit_and_log(logger)
-    async def send_message(self):
-        logger.debug(f"About to send message")
+#     @timeit_and_log(logger)
+#     async def send_message(self):
+#         logger.debug(f"About to send message")
 
-        msg_type = await self.get_msg_type()
-        group = await self.get_group()
-        msg = {'type': msg_type}
-        await self.channel_layer.group_send(group=group, message=msg)
-        # # async_to_sync(self.channel_layer.group_send)(group=group, message=message)
-        logger.debug(f"Sent message to group: {group} with message {msg}")
+#         msg_type = await self.get_msg_type()
+#         group = await self.get_group()
+#         msg = {'type': msg_type}
+#         await self.channel_layer.group_send(group=group, message=msg)
+#         # # async_to_sync(self.channel_layer.group_send)(group=group, message=message)
+#         logger.debug(f"Sent message to group: {group} with message {msg}")
 
-    @timeit_and_log(logger)
-    async def send_initial_message(self):
-        await self.send_message()
+#     @timeit_and_log(logger)
+#     async def send_initial_message(self):
+#         await self.send_message()
 
-    @timeit_and_log(logger)
-    async def publish_messages(self):
-        msg_type = await self.get_msg_type()
-        group = await self.get_group()
+#     @timeit_and_log(logger)
+#     async def publish_messages(self):
+#         msg_type = await self.get_msg_type()
+#         group = await self.get_group()
 
-        async with self.ws.listen_to_channel(type=msg_type, groups=[group]) as messages:
-            async for msg in messages:
-                logger.info(f"Found message: {msg}")
-                yield self.get_instance()
+#         async with self.ws.listen_to_channel(type=msg_type, groups=[group]) as messages:
+#             async for msg in messages:
+#                 logger.info(f"Found message: {msg}")
+#                 yield self.get_instance()
 
 
 @type(name="Subscription")
 class ContactsSubscription:
-    company_node: CompanyType = node()
+    company_node: CompanyType = node(is_subscription=True)
+    # company_subscription_node: CompanyType = subscription_node()
 
     @subscription
     async def company(self, info: Info, data: CompanyPartialInput) -> AsyncGenerator[CompanyType, None]:
@@ -110,9 +113,9 @@ class ContactsSubscription:
 
         # Perpare your message structure and send the welcome message.
         instance = await get_instance(pk=pk, info=info, model=model)
-        group = f"{instance.__class__.__name__}"
-        msg_type = f"{group}_{instance.id}"
-        msg = {'type': msg_type}
+        group = get_group(instance)
+        msg = get_msg(instance)
+        msg_type = get_msg_type(instance)
 
         await channel_layer.group_add(group, ws.channel_name)
         await channel_layer.group_send(group=group, message=msg)
