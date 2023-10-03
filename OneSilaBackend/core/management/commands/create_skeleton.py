@@ -4,7 +4,7 @@ import os
 import shutil
 
 
-BASE_STRUCTURE = [
+SKELETON_STRUCTURE = [
     'helpers.py',
     'defaults.py',
     'decorators.py',
@@ -30,7 +30,7 @@ BASE_STRUCTURE = [
     'schema/types/ordering.py',
     'schema/types/__init__.py',
     'tests',
-    'tests/__init__.py',
+    'tests/helpers.py',
     'tests/tests_schemas/',
     'tests/tests_schemas/__init__.py',
     'tests/tests_schemas/tests_queries.py',
@@ -45,7 +45,7 @@ BASE_STRUCTURE = [
 ]
 
 
-BASE_STRUCTURE_DELETE = [
+SKELETON_STRUCTURE_DELETE = [
     'tests.py',
 ]
 
@@ -65,9 +65,9 @@ def get_app_path(app_name):
 def create_structure(app_name):
     app_path = get_app_path(app_name)
 
-    for base in BASE_STRUCTURE:
-        path = os.path.join(app_path, base)
-        is_file = base[-3:-2] == '.'
+    for bone in SKELETON_STRUCTURE:
+        path = os.path.join(app_path, bone)
+        is_file = bone[-3:-2] == '.'
 
         if is_file:
             os.system(f'touch {path}')
@@ -83,8 +83,8 @@ def create_structure(app_name):
 def delete_structure(app_name):
     app_path = get_app_path(app_name)
 
-    for base in BASE_STRUCTURE_DELETE:
-        path = os.path.join(app_path, base)
+    for bone in SKELETON_STRUCTURE_DELETE:
+        path = os.path.join(app_path, bone)
         try:
             os.unlink(path)
         except FileNotFoundError:
@@ -113,15 +113,15 @@ def set_receiver_code(app_name):
 
 
 class Command(BaseCommand):
-    help = ("Create the base file and folder structure for a given app_name in the current path. ex: schema, flows,..  \n"
-        "Use 'all' to install in every app")
+    help = ("Create the skeleton files and folder structure for a given app_name in the current path. ex: schema, flows,..  \n"
+        "Use 'all' to create in every local app")
 
     def add_arguments(self, parser):
         parser.add_argument("app_names", nargs="+", type=str)
 
     def handle(self, *args, **options):
         if 'all' in options["app_names"]:
-            apps = settings.INSTALLED_APPS
+            apps = settings.INSTALLED_LOCAL_APPS
         else:
             apps = options["app_names"]
 
@@ -136,5 +136,5 @@ class Command(BaseCommand):
                 set_receiver_code(app_name)
 
                 self.stdout.write(
-                    self.style.SUCCESS('Created base file and folder structure for "%s"' % app_name)
+                    self.style.SUCCESS('Created skeleton file and folder structure for "%s"' % app_name)
                 )

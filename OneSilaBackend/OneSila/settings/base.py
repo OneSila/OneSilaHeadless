@@ -34,7 +34,7 @@ INSTALLED_APPS = [
     'strawberry_django',
 ]
 
-INSTALLED_LOCAL_PACKAGES = [
+INSTALLED_LOCAL_APPS = [
     'contacts',
     'core',
     'currencies',
@@ -51,7 +51,7 @@ INSTALLED_LOCAL_PACKAGES = [
     'units',
 ]
 
-INSTALLED_APPS += INSTALLED_LOCAL_PACKAGES
+INSTALLED_APPS += INSTALLED_LOCAL_APPS
 
 
 MIDDLEWARE = [
