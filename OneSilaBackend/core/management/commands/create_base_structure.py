@@ -3,6 +3,7 @@ from django.conf import settings
 import os
 import shutil
 
+
 BASE_STRUCTURE = [
     'helpers.py',
     'defaults.py',
@@ -47,6 +48,7 @@ BASE_STRUCTURE = [
 BASE_STRUCTURE_DELETE = [
     'tests.py',
 ]
+
 
 RECEIVERS_CODE = """
     def ready(self):

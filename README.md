@@ -85,3 +85,23 @@ will yield:
   }
 }
 ```
+
+## Running tests
+
+Runings tests, including coverage:
+
+```bash
+coverage run --source='.' manage.py test
+```
+
+To see the results
+
+```bash
+coverage report -m
+```
+
+Or with html
+
+```bash
+coverage html
+```

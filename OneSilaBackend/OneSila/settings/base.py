@@ -32,7 +32,9 @@ INSTALLED_APPS = [
 
     'django_shared_multi_tenant',
     'strawberry_django',
+]
 
+INSTALLED_LOCAL_PACKAGES = [
     'contacts',
     'core',
     'currencies',
@@ -48,6 +50,8 @@ INSTALLED_APPS = [
     'translations',
     'units',
 ]
+
+INSTALLED_APPS += INSTALLED_LOCAL_PACKAGES
 
 
 MIDDLEWARE = [
