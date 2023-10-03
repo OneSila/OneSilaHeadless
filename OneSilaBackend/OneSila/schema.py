@@ -9,17 +9,17 @@ from strawberry_django import auth, mutations
 from strawberry_django.optimizer import DjangoOptimizerExtension
 
 from contacts.schema import ContactsQuery, ContactsMutation, ContactsSubscription
-from currencies.schema import CurrenciesQuery, CurrenciesMutation
-from eancodes.schema import EanCodesQuery, EanCodesMutation
-from inventory.schema import InventoryQuery, InventoryMutation
-from media.schema import MediaQuery, MediaMutation
-from orders.schema import OrdersQuery, OrdersMutation
-from products.schema import ProductsQuery, ProductsMutation
-from properties.schema import PropertiesQuery, PropertiesMutation
-from purchasing.schema import PurchasingQuery, PurchasingMutation
-from sales_prices.schema import SalesPricesQuery, SalesPricesMutation
-from taxes.schema import TaxesQuery, TaxesMutation
-from units.schema import UnitsQuery, UnitsMutation
+from currencies.schema import CurrenciesQuery, CurrenciesMutation, CurrenciesSubscription
+from eancodes.schema import EanCodesQuery, EanCodesMutation, EanCodesSubscription
+from inventory.schema import InventoryQuery, InventoryMutation, InventorySubscription
+from media.schema import MediaQuery, MediaMutation, MediaSubscription
+from orders.schema import OrdersQuery, OrdersMutation, OrdersSubscription
+from products.schema import ProductsQuery, ProductsMutation, ProductsSubscription
+from properties.schema import PropertiesQuery, PropertiesMutation, PropertiesSubscription
+from purchasing.schema import PurchasingQuery, PurchasingMutation, PurchasingSubscription
+from sales_prices.schema import SalesPricesQuery, SalesPricesMutation, SalesPriceSubscription
+from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
+from units.schema import UnitsQuery, UnitsMutation, UnitsSubscription
 
 #
 # user types, used to user information in the main schema
@@ -60,7 +60,10 @@ class Mutation(ContactsMutation, CurrenciesMutation, EanCodesMutation,
 
 
 @strawberry.type
-class Subscription(ContactsSubscription):
+class Subscription(ContactsSubscription, CurrenciesSubscription, EanCodesSubscription,
+        InventorySubscription, MediaSubscription, OrdersSubscription, ProductsSubscription,
+        PropertiesSubscription, PurchasingSubscription, SalesPriceSubscription,
+        TaxSubscription, UnitsSubscription):
     pass
 
 #

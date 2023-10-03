@@ -10,4 +10,4 @@ def django_shared_multi_tenant__mutlitenantcompany__post_save(sender, instance, 
         # When a new company is created, we want to craete a number of default units.
         from .defaults import DEFAULT_UNITS
         for i in DEFAULT_UNITS:
-            Unit.objects.get_or_create(company=instance, **i)
+            Unit.objects.get_or_create(multi_tenant_company=instance, **i)

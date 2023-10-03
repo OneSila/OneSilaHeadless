@@ -1,13 +1,17 @@
 from django.db.models import Model
 
+from functools import wraps, partial
+
 from strawberry import type, subscription
 from strawberry.types import Info
+from strawberry.relay.types import GlobalID
+from strawberry.relay.utils import from_base64
 
 from strawberry_django import NodeInput
-from strawberry_django.permissions import get_with_perms
+from strawberry_django.auth.utils import get_current_user
 from strawberry_django.mutations.fields import get_pk
 
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Any
 
 import asyncio
 from asgiref.sync import async_to_sync, sync_to_async
@@ -34,13 +38,12 @@ def get_msg(instance):
 
 def refresh_subscription(instance):
     group = get_group(instance)
-    msg_type = get_msg_type(instance)
     msg = get_msg(instance)
 
     channel_layer = channels.layers.get_channel_layer()
     async_to_sync(channel_layer.group_send)(group=group, message=msg)
 
-    logger.debug(f"Send post_save message for '{instance}' to group '{group}' with msg: {msg}")
+    logger.debug(f"Send post_save message {instance.__class__} for '{instance}' to group '{group}' with msg: {msg}")
 
 
 class ModelSubscribePublisher:
@@ -50,19 +53,23 @@ class ModelSubscribePublisher:
     - Write guide
     """
 
-    def __init__(self, info: Info, input: NodeInput, model: Model):
+    def __init__(self, info: Info, pk: GlobalID, model: Model):
         self.info = info
-        self.input = input
+        self.pk = pk
         self.model = model
 
         self.ws = info.context["ws"]
         self.channel_layer = self.ws.channel_layer
 
+    def get_queryset(self):
+        user = get_current_user(self.info)
+        multi_tenant_company = user.multi_tenant_company
+        return self.model.objects.filter(multi_tenant_company=multi_tenant_company)
+
     @database_sync_to_async
     def set_instance(self):
-        vinput = vars(self.input).copy() if self.input is not None else {}
-        pk = get_pk(vinput)
-        instance = get_with_perms(pk, self.info, required=True, model=self.model)
+        _, pk = from_base64(self.pk)
+        instance = self.get_queryset().get(pk=pk)
         self.instance = instance
 
     @sync_to_async
@@ -83,14 +90,12 @@ class ModelSubscribePublisher:
         return get_msg(self.instance)
 
     async def subscribe(self):
-        logger.debug(f"About to subscribe to group")
         resp = await self.channel_layer.group_add(self.group, self.ws.channel_name)
         logger.debug(f"Subscribed to group {self.group} with resp {resp}")
 
     async def send_message(self):
-        logger.debug(f"About to send message")
         await self.channel_layer.group_send(group=self.group, message=self.msg)
-        logger.debug(f"Sent message to group: {self.group} with message {self.msg}")
+        logger.debug(f"Sent message {self.msg} to group {self.group}")
 
     async def send_initial_message(self):
         await self.send_message()
@@ -98,14 +103,27 @@ class ModelSubscribePublisher:
     async def publish_messages(self):
         async with self.ws.listen_to_channel(type=self.msg_type, groups=[self.group]) as messages:
             async for msg in messages:
-                logger.info(f"Found message: {msg}")
+                logger.info(f"Found wakup: {msg}")
                 yield await self.refresh_instance()
 
 
-async def model_subscribe_publisher(info: Info, input: NodeInput, model: Model) -> AsyncGenerator[type, None]:
-    fac = ModelSubscribePublisher(info=info, input=input, model=model)
+async def model_subscribe_publisher(info: Info, pk: GlobalID, model: Model) -> AsyncGenerator[Any, None]:
+    fac = ModelSubscribePublisher(info=info, pk=pk, model=model)
     await fac.set_instance()
     await fac.subscribe()
     await fac.send_initial_message()
     async for i in fac.publish_messages():
         yield i
+
+
+def model_subscription_field(model):
+    # FIXME: This field wrapper would be a much cleaner way of using the subscriptions.
+    # However, something in the annotations will not allow it to be annotated on the Subscription
+    # exmaple: company: AsyncGenerator[CompanyType, None] = model_subscription_field(Company)
+
+    # This fails when you delcare this as `@subscription` or without - obv with other errors
+    @subscription
+    async def model_subscription_inner(info: Info, pk: GlobalID, model: Model) -> AsyncGenerator[Any, None]:
+        async for i in model_subscribe_publisher(info=info, pk=pk, model=model):
+            yield i
+    return model_subscription_inner
