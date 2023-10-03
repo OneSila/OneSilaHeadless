@@ -1,5 +1,4 @@
 from core import models
-from django_shared_multi_tenant.models import MultiTenantAwareMixin
 from django_shared_multi_tenant.validators import phone_regex
 
 from .managers import SupplierManager, CustomerManager, InfluencerManager, \

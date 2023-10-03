@@ -1,7 +1,5 @@
 from core import models
-from django_shared_multi_tenant.models import MultiTenantAwareMixin
-
-# from .managers import ProductStockManager
+from .managers import InventorykManager
 
 
 class Inventory(models.Model):
@@ -13,7 +11,7 @@ class Inventory(models.Model):
     stocklocation = models.ForeignKey('InventoryLocation', on_delete=models.PROTECT)
     quantity = models.IntegerField()
 
-    # objects = ProductStockManager()
+    objects = InventorykManager()
 
     class Meta:
         unique_together = ('product', 'stocklocation')

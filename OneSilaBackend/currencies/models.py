@@ -30,5 +30,8 @@ class Currency(models.Model):
         verbose_name_plural = _('Currencies')
 
         constraints = [
-            models.UniqueConstraint(fields=['is_default_currency'], condition=Q(is_default_currency=True), name='unique_is_default_currency')
+            models.UniqueConstraint(
+                fields=['is_default_currency'],
+                condition=Q(is_default_currency=True),
+                name='unique_is_default_currency')
         ]

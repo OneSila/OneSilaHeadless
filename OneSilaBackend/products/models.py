@@ -24,17 +24,16 @@ class Product(models.Model):
     active = models.BooleanField(default=False)
     type = models.CharField(max_length=9, choices=PRODUCT_TYPE_CHOICES)
     tax_rate = models.ForeignKey(Tax, on_delete=models.PROTECT)
+    always_on_stock = models.BooleanField(default=False)
 
     umbrella_variations = models.ManyToManyField('self',
         through='UmbrellaVariation',
-        # through_fields=['umbrella', 'variation'],
         symmetrical=False,
         blank=True,
         related_name='umbrellas')
 
     bundle_variations = models.ManyToManyField('self',
         through='BundleVariation',
-        # through_fields=['umbrella', 'variation'],
         symmetrical=False,
         blank=True,
         related_name='bundles')

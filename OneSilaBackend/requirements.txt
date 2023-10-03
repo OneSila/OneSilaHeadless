@@ -13,7 +13,8 @@ broadcaster
 channels
 channels-redis
 ipython
+unicodecsv
 # strawberry-graphql-django==0.17.3
-git+ssh://git@github.com/sdobbelaere/strawberry-graphql-django.git
+git+ssh://git@github.com/sdobbelaere/strawberry-graphql-django.git@subscriptions
 git+ssh://git@github.com/TweaveTech/django_getuitkit.git@v0.4.5
 git+ssh://git@github.com/TweaveTech/django_get_absolute_url.git@v0.2
