@@ -1,3 +1,17 @@
+from django.dispatch import receiver
+from django.db.models.signals import post_save, pre_save
+
+
+@receiver(pre_save, sender='orders.OrderItem')
+def orders__order_item__pre_save(sender, instance, **kwargs):
+    '''
+    set a price if there is none supplied
+    '''
+    from .factories import OrderItemPriceSetFactory
+    fac = OrderItemPriceSetFactory(instance)
+    fac.run()
+
+
 # #
 # # Signals
 # #

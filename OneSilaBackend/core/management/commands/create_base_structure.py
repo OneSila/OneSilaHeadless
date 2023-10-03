@@ -28,6 +28,17 @@ BASE_STRUCTURE = [
     'schema/types/types.py',
     'schema/types/ordering.py',
     'schema/types/__init__.py',
+    'tests',
+    'tests/__init__.py',
+    'tests/schemas/',
+    'tests/schemas/__init__.py',
+    'tests/schemas/queries.py',
+    'tests/schemas/mutations.py',
+    'tests/schemas/subscriptions.py',
+]
+
+BASE_STRUCTURE_DELETE = [
+    'tests.py',
 ]
 
 RECEIVERS_CODE = """
@@ -36,9 +47,14 @@ RECEIVERS_CODE = """
 """
 
 
-def create_structure(app_name):
+def get_app_path(app_name):
     pwd = os.getcwd()
     app_path = os.path.join(pwd, app_name)
+    return app_path
+
+
+def create_structure(app_name):
+    app_path = get_app_path(app_name)
 
     for base in BASE_STRUCTURE:
         path = os.path.join(app_path, base)
@@ -55,7 +71,25 @@ def create_structure(app_name):
     return True
 
 
+def delete_structure(app_name):
+    app_path = get_app_path(app_name)
+
+    for base in BASE_STRUCTURE_DELETE:
+        path = os.path.join(app_path, base)
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+
+    return True
+
+
 def set_receiver_code(app_name):
+    """
+    To ensure signals are correctly interpreted
+    in the receivers.py file, we must add a
+    snippet to the apps.py file.
+    """
     pwd = os.getcwd()
     path = os.path.join(pwd, app_name, 'apps.py')
 
@@ -65,6 +99,8 @@ def set_receiver_code(app_name):
     if not RECEIVERS_CODE in file_contents:
         with open(path, 'a') as f:
             f.write(RECEIVERS_CODE)
+
+    return True
 
 
 class Command(BaseCommand):
@@ -87,6 +123,7 @@ class Command(BaseCommand):
                 )
             else:
                 create_structure(app_name)
+                delete_structure(app_name)
                 set_receiver_code(app_name)
 
                 self.stdout.write(

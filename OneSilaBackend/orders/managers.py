@@ -1,5 +1,5 @@
-from django.db import models
-from django.db.models import Sum, F, FloatField, Count
+from core import models
+from core.models import Sum, F, FloatField, Count
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
@@ -7,10 +7,6 @@ from datetime import timedelta
 
 import logging
 logger = logging.getLogger(__name__)
-
-
-# https://simpleisbetterthancomplex.com/tips/2016/08/16/django-tip-11-custom-manager-with-chainable-querysets.html
-# Use Queryset before manager to make everythin chainable
 
 
 # ##### #
@@ -39,7 +35,8 @@ class OrderQuerySet(models.QuerySet):
 
 class OrderManager(models.Manager):
     def get_queryset(self):
-        return OrderQuerySet(self.model, using=self._db)
+        return OrderQuerySet(self.model, using=self._db).\
+            annotate_order_value()
 
     def unprocessed(self):
         return self.get_queryset().unprocessed()
