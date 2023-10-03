@@ -117,11 +117,8 @@ async def model_subscribe_publisher(info: Info, pk: GlobalID, model: Model) -> A
 
 
 def model_subscription_field(model):
-    # FIXME: This field wrapper would be a much cleaner way of using the subscriptions.
-    # However, something in the annotations will not allow it to be annotated on the Subscription
-    # exmaple: company: AsyncGenerator[CompanyType, None] = model_subscription_field(Company)
-
-    # This fails when you delcare this as `@subscription` or without - obv with other errors
+    # FIMXE: Using this wrapper with @subscription breaks somewhwere inside of the subscription decorator.
+    # using it without @subscription return None instead of the AsyncGenerator.
     @subscription
     async def model_subscription_inner(info: Info, pk: GlobalID, model: Model) -> AsyncGenerator[Any, None]:
         async for i in model_subscribe_publisher(info=info, pk=pk, model=model):

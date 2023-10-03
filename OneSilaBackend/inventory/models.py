@@ -6,7 +6,7 @@ from django_shared_multi_tenant.models import MultiTenantAwareMixin
 
 class Inventory(models.Model):
     '''
-    Class to store quantity of proudcts
+    Class to store quantity of products on stock
     '''
     product = models.ForeignKey('products.ProductVariation', on_delete=models.PROTECT,
         related_name='stock')
