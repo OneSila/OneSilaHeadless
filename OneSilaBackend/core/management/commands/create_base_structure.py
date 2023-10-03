@@ -30,11 +30,11 @@ BASE_STRUCTURE = [
     'schema/types/__init__.py',
     'tests',
     'tests/__init__.py',
-    'tests/schemas/',
-    'tests/schemas/__init__.py',
-    'tests/schemas/queries.py',
-    'tests/schemas/mutations.py',
-    'tests/schemas/subscriptions.py',
+    'tests/tests_schemas/',
+    'tests/tests_schemas/__init__.py',
+    'tests/tests_schemas/tests_queries.py',
+    'tests/tests_schemas/tests_mutations.py',
+    'tests/tests_schemas/tests_subscriptions.py',
 ]
 
 BASE_STRUCTURE_DELETE = [
