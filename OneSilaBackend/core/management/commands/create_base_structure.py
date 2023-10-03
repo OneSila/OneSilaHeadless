@@ -35,7 +35,14 @@ BASE_STRUCTURE = [
     'tests/tests_schemas/tests_queries.py',
     'tests/tests_schemas/tests_mutations.py',
     'tests/tests_schemas/tests_subscriptions.py',
+    'tests/tests_factories/',
+    'tests/tests_factories/__init__.py',
+    'tests/tests_flows/',
+    'tests/tests_flows/__init__.py',
+    'tests/tests_tasks.py',
+    'tests/tests_models.py',
 ]
+
 
 BASE_STRUCTURE_DELETE = [
     'tests.py',
