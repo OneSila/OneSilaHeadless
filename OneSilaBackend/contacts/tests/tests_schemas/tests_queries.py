@@ -11,7 +11,7 @@ from contacts.models import Company, Supplier, Customer, Influencer, Person, Add
 # https://docs.djangoproject.com/en/5.0/topics/testing/tools/#transactiontestcase
 
 
-class DeeplFactoryTestCase(TransactionTestCase):
+class CompanyQueryTestCase(TransactionTestCase):
     def setUp(self):
         self.companies = companies = baker.make(Company, _quantity=3)
 
@@ -19,6 +19,26 @@ class DeeplFactoryTestCase(TransactionTestCase):
         query = """
             query companies {
                 companies() {
+                    id
+                    name
+                }
+            }
+        """
+
+        # resp = await schema.execute(query, variable_values={"title": "The Great Gatsby"})
+        resp = await schema.execute(query)
+        assert result.errors is None
+        # assert result.data["books"] == [
+        #     {
+        #         "title": "The Great Gatsby",
+        #         "author": "F. Scott Fitzgerald",
+        #     }
+        # ]
+
+    async def test_company(self):
+        query = """
+            query company(id: ID!) {
+                company(id: $id) {
                     id
                     name
                 }
