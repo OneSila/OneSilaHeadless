@@ -1,3 +1,4 @@
+daphne
 Django>=4
 django-imagekit>=4.1.0
 Pillow>=10.0.0
