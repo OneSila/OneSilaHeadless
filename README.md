@@ -1,4 +1,4 @@
-# OneSila
+# OneSila Headless Backend
 
 ## Quickstart
 
