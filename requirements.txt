@@ -15,6 +15,7 @@ channels-redis
 ipython
 unicodecsv
 mkdocs
+mkdocs-material
 coverage
 git+ssh://git@github.com/sdobbelaere/strawberry-graphql-django.git@subscriptions
 git+ssh://git@github.com/TweaveTech/django_getuitkit.git@v0.4.5
