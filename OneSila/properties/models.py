@@ -9,6 +9,7 @@ class Property(models.Model):
         INT = 'INT'
         FLOAT = 'FLOAT'
         STRING = 'STRING'
+        TEXT = 'TEXT'
         BOOLEAN = 'BOOLEAN'
         DATE = 'DATE'
         DATETIME = 'DATETIME'
@@ -19,6 +20,7 @@ class Property(models.Model):
             (INT, _('Integer')),
             (FLOAT, _('Float')),
             (STRING, _('String')),
+            (STRING, _('Text')),
             (BOOLEAN, _('Boolean')),
             (DATE, _('Date')),
             (DATETIME, _('Date time')),
@@ -51,16 +53,31 @@ class PropertyTranslation(TranslationFieldsMixin, models.Model):
 
 class PropertySelectValue(models.Model):
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
-    value = models.CharField(max_length=100)
 
     def __str__(self):
         return f"{self.value} <{self.property}>"
 
 
+class PropertySelectValueTranslation(TranslationFieldsMixin, models.Model):
+    propertyselectvalue = models.ForeignKey(PropertySelectValue, on_delete=models.CASCADE)
+    value = models.CharField(max_length=200, unique=True, verbose_name=_('Value'))
+
+
 class ProductProperty(models.Model):
+    # FIXME: This model needs to become translatable, more specifically:
+    # - value_string
+    # - value_text
+    # - value_select
+    # - value_multiselect
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
-    value = models.CharField(max_length=20)
+    value_boolean = models.BooleanField(null=True, blank=True)
+    value_int = models.IntegerField(null=True, blank=True)
+    value_float = models.FloatField(null=True, blank=True)
+    value_date = models.DateField(null=True, blank=True)
+    value_datetime = models.DateTimeField(null=True, blank=True)
+    value_string = models.CharField(max_length=255, null=True, blank=True)
+    value_text = models.TextField(null=True, blank=True)
     value_select = models.ForeignKey(PropertySelectValue, on_delete=models.CASCADE, related_name='value_select_set')
     value_multi_select = models.ManyToManyField(PropertySelectValue, related_name='value_multi_select_set')
 
@@ -69,57 +86,36 @@ class ProductProperty(models.Model):
 
     def get_value(self, value):
         """
-        run convertor from string to type in ``value_type`` field
+        Converts the various values and returns you the right type/value for the given property.
         """
         value_type = self.property.value_type.lower()
-        cleaner = getattr(self, 'get_value_{}'.format(value_type))
-        return cleaner(value)
+        return getattr(self, 'get_value_{}'.format(value_type))()
 
-    @staticmethod
-    def get_value_int(value):
-        return int(value)
+    def get_value_int(self):
+        return self.value_int
 
-    @staticmethod
-    def get_value_float(value):
-        return float(value)
+    def get_value_float(self):
+        return self.value_float
 
-    @staticmethod
-    def get_value_string(value):
-        return six.text_type(value)
+    def get_value_string(self):
+        return self.value_string
 
-    @staticmethod
-    def get_value_boolean(value):
-        value_lower = self.value.lower()
+    def get_value_text(self):
+        return self.value_text
 
-        if value_lower in ['on', 'yes', 'true']:
-            return True
-        elif value_lower in ['off', 'no', 'false']:
-            return False
+    def get_value_boolean(self):
+        return self.value_boolean
 
-        raise ValueError(_('Can\'t convert "{}" to boolean'.format(value)))
+    def get_value_date(self):
+        return self.value_date
 
-    @staticmethod
-    def to_python_date(value):
-        date = parse_date(value)
-        if value and not date:
-            raise ValueError('Can\'t convert "{}" to date'.format(value))
+    def get_value_datetime(self):
+        return self.value_datetime
 
-        return date
-
-    @staticmethod
-    def to_python_datetime(value):
-        datetime = parse_datetime(value)
-        if value and not datetime:
-            raise ValueError('Can\'t convert "{}" to datetime'.format(value))
-
-        return datetime
-
-    @staticmethod
-    def to_python_select(value):
+    def get_value_select(self):
         return self.value_select
 
-    @staticmethod
-    def to_python_multi_select(value):
+    def get_value_multi_select(self):
         return self.value_multi_select
 
     class Meta:

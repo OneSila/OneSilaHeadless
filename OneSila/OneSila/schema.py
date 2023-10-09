@@ -10,6 +10,7 @@ from strawberry_django.optimizer import DjangoOptimizerExtension
 
 from contacts.schema import ContactsQuery, ContactsMutation, ContactsSubscription
 from currencies.schema import CurrenciesQuery, CurrenciesMutation, CurrenciesSubscription
+from customs.schema import CustomsQuery, CustomsMutation, CustomsSubscription
 from eancodes.schema import EanCodesQuery, EanCodesMutation, EanCodesSubscription
 from inventory.schema import InventoryQuery, InventoryMutation, InventorySubscription
 from media.schema import MediaQuery, MediaMutation, MediaSubscription
@@ -42,14 +43,14 @@ class UserInput:
 #
 
 @strawberry.type
-class Query(ContactsQuery, CurrenciesQuery, EanCodesQuery, InventoryQuery,
+class Query(ContactsQuery, CurrenciesQuery, CustomsQuery, EanCodesQuery, InventoryQuery,
         MediaQuery, OrdersQuery, ProductsQuery, PropertiesQuery, PurchasingQuery,
         SalesPricesQuery, TaxesQuery, UnitsQuery):
     me: UserType = auth.current_user()
 
 
 @strawberry.type
-class Mutation(ContactsMutation, CurrenciesMutation, EanCodesMutation,
+class Mutation(ContactsMutation, CurrenciesMutation, CustomsMutation, EanCodesMutation,
         InventoryMutation, MediaMutation, OrdersMutation, ProductsMutation,
         PropertiesMutation, PurchasingMutation, SalesPricesMutation,
         TaxesMutation, UnitsMutation
@@ -60,8 +61,9 @@ class Mutation(ContactsMutation, CurrenciesMutation, EanCodesMutation,
 
 
 @strawberry.type
-class Subscription(ContactsSubscription, CurrenciesSubscription, EanCodesSubscription,
-        InventorySubscription, MediaSubscription, OrdersSubscription, ProductsSubscription,
+class Subscription(ContactsSubscription, CurrenciesSubscription,
+        CustomsSubscription, EanCodesSubscription, InventorySubscription,
+        MediaSubscription, OrdersSubscription, ProductsSubscription,
         PropertiesSubscription, PurchasingSubscription, SalesPriceSubscription,
         TaxSubscription, UnitsSubscription):
     pass

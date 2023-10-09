@@ -51,6 +51,7 @@ query companies {
 ```
 
 or on a local machine with some random companies, you can get the next page like so:
+
 ```graphql
 query companies {
   companies(first:2, after: "YXJyYXljb25uZWN0aW9uOjE=") {
@@ -69,6 +70,7 @@ query companies {
 }
 ```
 
+First, you can interpret as you page-size (with a maximum of 100).
 
 
 ### filtering

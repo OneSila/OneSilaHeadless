@@ -37,6 +37,7 @@ INSTALLED_APPS = [
 INSTALLED_LOCAL_APPS = [
     'contacts',
     'core',
+    'customs',
     'currencies',
     'eancodes',
     'media',
