@@ -5,52 +5,94 @@ from OneSila.schema import schema
 from contacts.models import Company, Supplier, Customer, Influencer, Person, Address, \
     ShippingAddress, InvoiceAddress
 
-# FIXME: async test_ are not picked up by django testcase:
-# https://stackoverflow.com/questions/49396918/django-ignoring-asynch-tests-completely-django-channels
-# Alternativly, await django 5.0 upgrade in december 23:
-# https://docs.djangoproject.com/en/5.0/topics/testing/tools/#transactiontestcase
+from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 
 
-class CompanyQueryTestCase(TransactionTestCase):
+class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def setUp(self):
-        self.companies = companies = baker.make(Company, _quantity=3)
+        super().setUp()
+        self.companies = baker.make(Company, multi_tenant_company=self.user.multi_tenant_company, _quantity=3)
 
-    async def test_companies(self):
+    def test_companies(self):
         query = """
             query companies {
-                companies() {
+              companies {
+                edges {
+                  node {
                     id
-                    name
+                  }
                 }
+                totalCount
+              }
             }
         """
 
         # resp = await schema.execute(query, variable_values={"title": "The Great Gatsby"})
-        resp = await schema.execute(query)
-        assert result.errors is None
-        # assert result.data["books"] == [
-        #     {
-        #         "title": "The Great Gatsby",
-        #         "author": "F. Scott Fitzgerald",
-        #     }
-        # ]
+        resp = schema.execute_sync(query=query, context_value=self.context)
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
 
-    async def test_company(self):
+        total_count = resp.data['companies']['totalCount']
+        self.assertEqual(total_count, len(self.companies))
+
+    def test_company(self):
         query = """
-            query company(id: ID!) {
+            query company($id: GlobalID!) {
                 company(id: $id) {
                     id
                     name
                 }
             }
         """
+        company = self.companies[0]
+        company_global_id = self.to_global_id(model_class=Company, instance_id=company.id)
+        resp = schema.execute_sync(query, context_value=self.context, variable_values={"id": company_global_id})
+        resp_company_name = resp.data['company']['name']
+        self.assertTrue(resp.errors is None)
+        self.assertEqual(resp_company_name, company.name)
+
+
+class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.suppliers = baker.make(Supplier, multi_tenant_company=self.user.multi_tenant_company, is_supplier=True, _quantity=3)
+        # Lets make sure they are correctly filtered - create some non suppliers.
+        self.companies = baker.make(Company, multi_tenant_company=self.user.multi_tenant_company, is_supplier=False, _quantity=3)
+
+    def test_suppliers(self):
+        query = """
+            query suppliers {
+              suppliers {
+                edges {
+                  node {
+                    id
+                  }
+                }
+                totalCount
+              }
+            }
+        """
 
         # resp = await schema.execute(query, variable_values={"title": "The Great Gatsby"})
-        resp = await schema.execute(query)
-        assert result.errors is None
-        # assert result.data["books"] == [
-        #     {
-        #         "title": "The Great Gatsby",
-        #         "author": "F. Scott Fitzgerald",
-        #     }
-        # ]
+        resp = schema.execute_sync(query=query, context_value=self.context)
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+        total_count = resp.data['suppliers']['totalCount']
+        self.assertEqual(total_count, len(self.suppliers))
+
+    def test_supplier(self):
+        query = """
+            query supplier($id: GlobalID!) {
+                supplier(id: $id) {
+                    id
+                    name
+                }
+            }
+        """
+        supplier = self.suppliers[0]
+        supplier_global_id = self.to_global_id(model_class=Supplier, instance_id=supplier.id)
+        resp = schema.execute_sync(query, context_value=self.context, variable_values={"id": supplier_global_id})
+        resp_supplier_name = resp.data['supplier']['name']
+        self.assertTrue(resp.errors is None)
+        self.assertEqual(resp_supplier_name, supplier.name)

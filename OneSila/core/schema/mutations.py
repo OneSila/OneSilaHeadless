@@ -21,7 +21,8 @@ class CreateMutation(GetMultiTenantCompanyMixin, DjangoCreateMutation):
     """
 
     def create(self, data: dict[str, Any], *, info: Info):
-        data['multi_tenant_company'] = self.get_multi_tenant_company(info)
+        multi_tenant_company = self.get_multi_tenant_company(info, fail_silently=False)
+        data['multi_tenant_company'] = multi_tenant_company
         return super().create(data=data, info=info)
 
 
@@ -43,14 +44,14 @@ class DeleteMutation(GetMultiTenantCompanyMixin, DjangoDeleteMutation):
         return super().delete(info=info, instance=instance)
 
 
-def create(type):
+def create(input_type):
     extensions = [IsAuthenticated()]
-    return CreateMutation(type, extensions=extensions)
+    return CreateMutation(input_type, extensions=extensions)
 
 
-def update(type):
+def update(input_type):
     extensions = [IsAuthenticated()]
-    return UpdateMutation(type, extensions=extensions)
+    return UpdateMutation(input_type, extensions=extensions)
 
 
 def delete():

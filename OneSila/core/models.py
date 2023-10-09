@@ -3,6 +3,8 @@ from django.db import IntegrityError
 from django_shared_multi_tenant.models import MultiTenantAwareMixin
 from django.db.models import Model as OldModel
 
+from django_shared_multi_tenant.models import MultiTenantCompany
+
 
 class TimeStampMixin(OldModel):
     created_at = DateTimeField(auto_now_add=True)
