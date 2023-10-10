@@ -17,10 +17,18 @@ class CompanyManager(MultiTenantCompanyCreateMixin, Manager):
         return CompanyQueryset(self.model, using=self._db)
 
 
+class SupplierQuerySet(QuerySet):
+    def filter(self, **kwargs):
+        kwargs.update({'is_supplier': True})
+        return super().filter(**kwargs)
+
+    def all(self):
+        return self.filter()
+
+
 class SupplierManager(CompanyManager):
     def get_queryset(self):
-        return CompanyQueryset(self.model, using=self._db).\
-            filter_supplier()
+        return SupplierQuerySet(self.model, using=self._db)
 
     def create(self, **kwargs):
         # What if is_supplier is already set?  Hard override.

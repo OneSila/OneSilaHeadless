@@ -5,8 +5,8 @@ from typing import List
 
 from contacts.models import Company, Supplier, Customer, Influencer, \
     InternalCompany, Person, Address, ShippingAddress, InvoiceAddress
-from .filters import CompanyFilter, AddressFilter, PersonFilter
-from .ordering import CompanyOrder
+from .filters import CompanyFilter, SupplierFilter, AddressFilter, PersonFilter
+from .ordering import CompanyOrder, SupplierOrder
 
 
 @type(Company, filters=CompanyFilter, order=CompanyOrder, pagination=True, fields='__all__')
@@ -15,7 +15,7 @@ class CompanyType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
 
 
-@type(Supplier, filters=CompanyFilter, order=CompanyOrder, pagination=True, fields="__all__")
+@type(Supplier, filters=SupplierFilter, order=SupplierOrder, pagination=True, fields="__all__")
 class SupplierType(relay.Node, GetQuerysetMultiTenantMixin):
     related_companies: List['CompanyType'] | None
     multi_tenant_company: MultiTenantCompanyType | None

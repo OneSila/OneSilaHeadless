@@ -27,8 +27,9 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
 
-        # resp = await schema.execute(query, variable_values={"title": "The Great Gatsby"})
-        resp = schema.execute_sync(query=query, context_value=self.context)
+        resp = self.stawberry_test_client(
+            query=query,
+        )
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
 
@@ -46,7 +47,10 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         """
         company = self.companies[0]
         company_global_id = self.to_global_id(model_class=Company, instance_id=company.id)
-        resp = schema.execute_sync(query, context_value=self.context, variable_values={"id": company_global_id})
+        resp = self.stawberry_test_client(
+            query=query,
+            variables={"id": company_global_id}
+        )
         resp_company_name = resp.data['company']['name']
         self.assertTrue(resp.errors is None)
         self.assertEqual(resp_company_name, company.name)
@@ -74,7 +78,9 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         """
 
         # resp = await schema.execute(query, variable_values={"title": "The Great Gatsby"})
-        resp = schema.execute_sync(query=query, context_value=self.context)
+        resp = self.stawberry_test_client(
+            query=query,
+        )
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
 
@@ -92,7 +98,10 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         """
         supplier = self.suppliers[0]
         supplier_global_id = self.to_global_id(model_class=Supplier, instance_id=supplier.id)
-        resp = schema.execute_sync(query, context_value=self.context, variable_values={"id": supplier_global_id})
+        resp = self.stawberry_test_client(
+            query=query,
+            variables={"id": supplier_global_id}
+        )
         resp_supplier_name = resp.data['supplier']['name']
         self.assertTrue(resp.errors is None)
         self.assertEqual(resp_supplier_name, supplier.name)

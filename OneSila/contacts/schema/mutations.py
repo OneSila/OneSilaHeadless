@@ -67,11 +67,3 @@ class ContactsMutation:
     update_invoice_address: List[InvoiceAddressType] = update(InvoiceAddressInput)
     delete_invoice_address: List[InvoiceAddressType] = delete()
     delete_invoice_addresses: InvoiceAddressType = delete()
-
-    @field
-    async def send_message(self, info, message: str) -> bool:
-        print("sending on_message")
-        print(id(info.context.broadcast))
-        await info.context.broadcast.publish(channel="chatroom", message=message)
-
-        return True

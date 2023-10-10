@@ -22,7 +22,7 @@ class SupplierInput:
 
 
 @partial(Supplier, fields="__all__")
-class SupplierPartialInput:
+class SupplierPartialInput(NodeInput):
     pass
 
 
@@ -32,7 +32,7 @@ class CustomerInput:
 
 
 @partial(Customer, fields="__all__")
-class CustomerPartialInput:
+class CustomerPartialInput(NodeInput):
     pass
 
 
@@ -42,7 +42,7 @@ class InfluencerInput:
 
 
 @partial(Influencer, fields="__all__")
-class InfluencerPartialInput:
+class InfluencerPartialInput(NodeInput):
     pass
 
 
@@ -52,7 +52,7 @@ class InternalCompanyInput:
 
 
 @partial(InternalCompany, fields="__all__")
-class InternalCompanyPartialInput:
+class InternalCompanyPartialInput(NodeInput):
     pass
 
 
@@ -62,7 +62,7 @@ class PersonInput:
 
 
 @partial(Person, fields="__all__")
-class PersonPartialInput:
+class PersonPartialInput(NodeInput):
     pass
 
 
@@ -72,7 +72,7 @@ class AddressInput:
 
 
 @partial(Address, fields="__all__")
-class AddressPartialInput:
+class AddressPartialInput(NodeInput):
     pass
 
 
@@ -82,7 +82,7 @@ class ShippingAddressInput:
 
 
 @partial(ShippingAddress, fields="__all__")
-class ShippingAddressPartialInput:
+class ShippingAddressPartialInput(NodeInput):
     pass
 
 
@@ -92,5 +92,5 @@ class InvoiceAddressInput:
 
 
 @partial(InvoiceAddress, fields="__all__")
-class InvoiceAddressPartialInput:
+class InvoiceAddressPartialInput(NodeInput):
     pass

@@ -1,5 +1,6 @@
 from .base import *
 
+ALLOWED_HOSTS = ['*', 'testserver']
 
 DATABASES = {
     'default': {

@@ -9,8 +9,7 @@ from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 
 
 class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
-    def test_company(self):
-
+    def test_company_create(self):
         mutation = """
             mutation createCompany($name: String!) {
                 createCompany(data: {name: $name}) {
@@ -20,13 +19,13 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
 
-        company_name = 'test_company'
+        company_name = 'test_company_create'
 
-        resp = schema.execute_sync(
+        resp = self.stawberry_test_client(
             query=mutation,
-            context_value=self.context,
-            variable_values={"name": company_name},
+            variables={"name": company_name}
         )
+
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
 
@@ -34,10 +33,35 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         self.assertEqual(resp_company_name, company_name)
 
+    def test_company_update(self):
+
+        mutation = """
+            mutation updateCompany($id: GlobalID!, $name: String!) {
+                updateCompany(data: {id: $id, name: $name}) {
+                    id
+                    name
+                }
+            }
+        """
+        company = Company.objects.create(name='test_company_update_ori', multi_tenant_company=self.multi_tenant_company)
+        company_global_id = self.to_global_id(model_class=Company, instance_id=company.id)
+        company_name = 'test_company_update'
+
+        resp = self.stawberry_test_client(
+            query=mutation,
+            variables={"id": company_global_id, "name": company_name}
+        )
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+        resp_company_name = resp.data['updateCompany']['name']
+
+        self.assertEqual(resp_company_name, company_name)
+
 
 class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
-    def test_supplier(self):
-
+    def test_supplier_create(self):
         mutation = """
             mutation createSupplier($name: String!) {
                 createSupplier(data: {name: $name}) {
@@ -46,17 +70,69 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 }
             }
         """
-
         company_name = 'test_supplier'
 
-        resp = schema.execute_sync(
+        resp = self.stawberry_test_client(
             query=mutation,
-            context_value=self.context,
-            variable_values={"name": company_name},
+            variables={"name": company_name}
         )
+
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
 
         resp_company_name = resp.data['createSupplier']['name']
+
+        self.assertEqual(resp_company_name, company_name)
+
+    def test_supplier_update(self):
+        mutation = """
+            mutation updateSupplier($id: GlobalID!, $name: String!) {
+                updateSupplier(data: {id: $id, name: $name}) {
+                    id
+                    name
+                }
+            }
+        """
+        company = Supplier.objects.create(name='test_supplier_update_ori', multi_tenant_company=self.multi_tenant_company)
+        company_global_id = self.to_global_id(model_class=Supplier, instance_id=company.id)
+        company_name = 'test_supplier_update'
+
+        resp = self.stawberry_test_client(
+            query=mutation,
+            variables={"name": company_name, "id": company_global_id}
+        )
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+        resp_company_name = resp.data['updateSupplier']['name']
+
+        self.assertEqual(resp_company_name, company_name)
+
+    def test_company_to_supplier_update(self):
+        mutation = """
+            mutation updateSupplier($id: GlobalID!, $name: String!) {
+                updateSupplier(data: {id: $id, name: $name}) {
+                    id
+                    name
+                }
+            }
+        """
+        company = Company.objects.create(name='test_company_to_supplier_update_ori', multi_tenant_company=self.multi_tenant_company)
+        company.is_supplier = True
+        company.save()
+
+        company_global_id = self.to_global_id(model_class=Supplier, instance_id=company.id)
+        company_name = 'test_company_to_supplier_update'
+
+        resp = self.stawberry_test_client(
+            query=mutation,
+            variables={"name": company_name, "id": company_global_id}
+        )
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+        resp_company_name = resp.data['updateSupplier']['name']
 
         self.assertEqual(resp_company_name, company_name)
