@@ -2,7 +2,7 @@ from core.schema.types.types import auto
 from core.schema.types.filters import filter
 
 from contacts.models import Company, Address, Person, Supplier, \
-    InvoiceAddress, ShippingAddress
+    InvoiceAddress, ShippingAddress, Customer
 
 
 @filter(Company)
@@ -20,6 +20,14 @@ class CompanyFilter:
 
 @filter(Supplier)
 class SupplierFilter:
+    id: auto
+    name: auto
+    vat_number: auto
+    eori_number: auto
+
+
+@filter(Customer)
+class CustomerFilter:
     id: auto
     name: auto
     vat_number: auto

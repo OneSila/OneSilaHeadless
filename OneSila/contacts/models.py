@@ -1,5 +1,5 @@
 from core import models
-from django_shared_multi_tenant.validators import phone_regex
+from core.validators import phone_regex
 
 from .managers import SupplierManager, CustomerManager, InfluencerManager, \
     InvoiceAddressManager, ShippingAddressManager, InternalCompanyManager, \
@@ -40,6 +40,7 @@ class Supplier(Company):
     A supplier is a contact, filtered as a proxy-model
     """
     objects = SupplierManager()
+    filter_create_overrides = {'is_supplier': True}
 
     class Meta:
         proxy = True
@@ -50,6 +51,7 @@ class Customer(Company):
     A Customer is a contact, filtered as a proxy-model
     """
     objects = CustomerManager()
+    filter_create_overrides = {'is_customer': True}
 
     class Meta:
         proxy = True
@@ -60,6 +62,7 @@ class Influencer(Company):
     A Influencer is a contact, filtered as a proxy-model
     """
     objects = InfluencerManager()
+    filter_create_overrides = {'is_influencer': True}
 
     class Meta:
         proxy = True
@@ -73,6 +76,7 @@ class InternalCompany(Company):
     # TODO: When a new 'MultiTenantCompany' is created and completed. This model should be created
     # with that information as well.
     objects = InternalCompanyManager()
+    filter_create_overrides = {'is_internal_company': True}
 
     class Meta:
         proxy = True
@@ -103,7 +107,7 @@ class Address(models.Model):
     """
     An address to be used by entities
     """
-    from django_shared_multi_tenant.countries import COUNTRY_CHOICES
+    from core.countries import COUNTRY_CHOICES
 
     contact = models.ForeignKey(Person, on_delete=models.CASCADE)
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
@@ -122,6 +126,7 @@ class Address(models.Model):
 
 class ShippingAddress(Address):
     objects = ShippingAddressManager()
+    filter_create_overrides = {'is_shipping_address': True}
 
     class Meta:
         proxy = True
@@ -129,6 +134,7 @@ class ShippingAddress(Address):
 
 class InvoiceAddress(Address):
     objects = InvoiceAddressManager()
+    filter_create_overrides = {'is_invoice_address': True}
 
     class Meta:
         proxy = True

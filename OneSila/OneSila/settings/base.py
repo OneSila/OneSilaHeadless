@@ -28,8 +28,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'daphne',
     'django.contrib.staticfiles',
-
-    'django_shared_multi_tenant',
     'strawberry_django',
 ]
 
@@ -65,7 +63,7 @@ MIDDLEWARE = [
 ]
 
 
-AUTH_USER_MODEL = 'django_shared_multi_tenant.MultiTenantUser'
+AUTH_USER_MODEL = 'core.MultiTenantUser'
 
 
 ROOT_URLCONF = 'OneSila.urls'

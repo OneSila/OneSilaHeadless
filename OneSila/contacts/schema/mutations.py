@@ -28,7 +28,7 @@ class ContactsMutation:
 
     create_customer: CustomerType = create(CustomerInput)
     create_customers: List[CustomerType] = create(CustomerInput)
-    update_customer: CustomerType = update(CustomerPartialInput)
+    update_customer: CompanyType = update(CustomerPartialInput)
     delete_customer: CustomerType = delete()
     delete_customers: List[CustomerType] = delete()
 

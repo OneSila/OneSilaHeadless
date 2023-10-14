@@ -3,7 +3,7 @@ from django.dispatch import receiver
 from django.db.models.signals import post_save, pre_save
 from django.utils.translation import gettext_lazy as _
 
-from django_shared_multi_tenant.models import MultiTenantAwareMixin
+from core.models import MultiTenantAwareMixin
 
 from currency_converter import CurrencyConverter, RateNotFoundError
 

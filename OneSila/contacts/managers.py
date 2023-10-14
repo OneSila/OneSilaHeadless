@@ -1,6 +1,19 @@
 from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin
 
 
+class QuerySetFilterCreateOverride:
+    def filter(self, *args, **kwargs):
+        kwargs.update(self.model.filter_create_overrides)
+        return super().filter(*args, **kwargs)
+
+    def create(self, **kwargs):
+        kwargs.update(self.model.filter_create_overrides)
+        return super().create(**kwargs)
+
+    def all(self):
+        return self.filter()
+
+
 class CompanyQueryset(QuerySet):
     def filter_supplier(self):
         return self.filter(is_supplier=True)
@@ -17,53 +30,40 @@ class CompanyManager(MultiTenantCompanyCreateMixin, Manager):
         return CompanyQueryset(self.model, using=self._db)
 
 
-class SupplierQuerySet(QuerySet):
-    def filter(self, **kwargs):
-        kwargs.update({'is_supplier': True})
-        return super().filter(**kwargs)
-
-    def all(self):
-        return self.filter()
+class SupplierQuerySet(QuerySetFilterCreateOverride, MultiTenantCompanyCreateMixin, QuerySet):
+    pass
 
 
 class SupplierManager(CompanyManager):
     def get_queryset(self):
         return SupplierQuerySet(self.model, using=self._db)
 
-    def create(self, **kwargs):
-        # What if is_supplier is already set?  Hard override.
-        kwargs.update({'is_supplier': True})
-        return super().create(**kwargs)
+
+class CustomerQuerySet(QuerySetFilterCreateOverride, MultiTenantCompanyCreateMixin, QuerySet):
+    pass
 
 
 class CustomerManager(CompanyManager):
     def get_queryset(self):
-        return CompanyQueryset(self.model, using=self._db).\
-            filter_customer()
+        return CustomerQuerySet(self.model, using=self._db)
 
-    def create(self, **kwargs):
-        kwargs.update({'is_customer': True})
-        return super().create(**kwargs)
+
+class InfluencerQuerySet(QuerySetFilterCreateOverride, MultiTenantCompanyCreateMixin, QuerySet):
+    pass
 
 
 class InfluencerManager(CompanyManager):
     def get_queryset(self):
-        return CompanyQueryset(self.model, using=self._db).\
-            filter_influencer()
+        return InfluencerQuerySet(self.model, using=self._db)
 
-    def create(self, **kwargs):
-        kwargs.update({'is_influencer': True})
-        return super().create(**kwargs)
+
+class InternalCompanyQuerySet(QuerySetFilterCreateOverride, MultiTenantCompanyCreateMixin, QuerySet):
+    pass
 
 
 class InternalCompanyManager(CompanyManager):
     def get_queryset(self):
-        return CompanyQueryset(self.model, using=self._db).\
-            filter_internal_company()
-
-    def create(self, **kwargs):
-        kwargs.update({'is_internal_company': True})
-        return super().create(**kwargs)
+        return InternalCompany(self.model, using=self._db)
 
 
 class AddressQuerySet(MultiTenantCompanyCreateMixin, QuerySet):
@@ -74,13 +74,19 @@ class AddressQuerySet(MultiTenantCompanyCreateMixin, QuerySet):
         return self.filter(is_invoice_address=True)
 
 
-class ShippingAddressManager(MultiTenantCompanyCreateMixin, Manager):
-    def get_queryset(self):
-        return AddressQuerySet(self.model, using=self._db).\
-            filter_shippingaddress()
+class ShippingAddressQuerySet(QuerySetFilterCreateOverride, MultiTenantCompanyCreateMixin, QuerySet):
+    pass
 
 
-class InvoiceAddressManager(MultiTenantCompanyCreateMixin, Manager):
+class ShippingAddressManager(Manager):
     def get_queryset(self):
-        return AddressQuerySet(self.model, using=self._db).\
-            filter_invoiceaddress()
+        return ShippingAddressQuerySet(self.model, using=self._db)
+
+
+class InvoiceAddressQuerySet(QuerySetFilterCreateOverride, MultiTenantCompanyCreateMixin, QuerySet):
+    pass
+
+
+class InvoiceAddressManager(Manager):
+    def get_queryset(self):
+        return InvoiceAddressQuerySet(self.model, using=self._db)

@@ -16,7 +16,7 @@ def units__subscription__post_save(sender, instance, **kwargs):
     refresh_subscription(instance)
 
 
-@receiver(post_save, sender='django_shared_multi_tenant.MultiTenantCompany')
+@receiver(post_save, sender='core.MultiTenantCompany')
 def units__multitenantcompany__post_save(sender, instance, created, **kwargs):
     if created:
         # When a new company is created, we want to create a number of default units.

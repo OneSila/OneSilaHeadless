@@ -13,6 +13,7 @@ from typing import List
 
 from .decorators import multi_tenant_owner_protection
 from .mixins import GetMultiTenantCompanyMixin
+from .extensions import HasMultiTenantCompany
 
 
 class CreateMutation(GetMultiTenantCompanyMixin, DjangoCreateMutation):
@@ -45,15 +46,15 @@ class DeleteMutation(GetMultiTenantCompanyMixin, DjangoDeleteMutation):
 
 
 def create(input_type):
-    extensions = [IsAuthenticated()]
+    extensions = [IsAuthenticated(), HasMultiTenantCompany()]
     return CreateMutation(input_type, extensions=extensions)
 
 
 def update(input_type):
-    extensions = [IsAuthenticated()]
+    extensions = [IsAuthenticated(), HasMultiTenantCompany()]
     return UpdateMutation(input_type, extensions=extensions)
 
 
 def delete():
-    extensions = [IsAuthenticated()]
+    extensions = [IsAuthenticated(), HasMultiTenantCompany()]
     return DeleteMutation(strawberry_django.NodeInput, extensions=extensions)

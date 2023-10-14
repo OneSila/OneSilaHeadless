@@ -4,4 +4,9 @@ from strawberry_django import type
 from typing import List
 
 from core.schema.mixins import GetQuerysetMultiTenantMixin
-from django_shared_multi_tenant.schema import MultiTenantCompanyType
+from core.models import MultiTenantCompany
+
+
+@type(MultiTenantCompany, pagination=False, fields='__all__')
+class MultiTenantCompanyType(relay.Node):
+    pass

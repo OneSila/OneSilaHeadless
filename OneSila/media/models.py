@@ -1,6 +1,6 @@
 from core import models
 from django.utils.translation import gettext_lazy as _
-from django_shared_multi_tenant.models import MultiTenantAwareMixin
+from core.models import MultiTenantAwareMixin
 
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFill, ResizeToFit

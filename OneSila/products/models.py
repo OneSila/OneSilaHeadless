@@ -2,7 +2,7 @@ from core import models
 from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 
-from django_shared_multi_tenant.models import MultiTenantAwareMixin
+from core.models import MultiTenantAwareMixin
 from translations.models import TranslationFieldsMixin
 from taxes.models import Tax
 
