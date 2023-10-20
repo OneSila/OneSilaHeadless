@@ -40,7 +40,7 @@ class Supplier(Company):
     A supplier is a contact, filtered as a proxy-model
     """
     objects = SupplierManager()
-    filter_create_overrides = {'is_supplier': True}
+    proxy_filter_fields = {'is_supplier': True}
 
     class Meta:
         proxy = True
@@ -51,7 +51,7 @@ class Customer(Company):
     A Customer is a contact, filtered as a proxy-model
     """
     objects = CustomerManager()
-    filter_create_overrides = {'is_customer': True}
+    _proxy_filter_fields = {'is_customer': True}
 
     class Meta:
         proxy = True
@@ -62,7 +62,7 @@ class Influencer(Company):
     A Influencer is a contact, filtered as a proxy-model
     """
     objects = InfluencerManager()
-    filter_create_overrides = {'is_influencer': True}
+    proxy_filter_fields = {'is_influencer': True}
 
     class Meta:
         proxy = True
@@ -76,7 +76,7 @@ class InternalCompany(Company):
     # TODO: When a new 'MultiTenantCompany' is created and completed. This model should be created
     # with that information as well.
     objects = InternalCompanyManager()
-    filter_create_overrides = {'is_internal_company': True}
+    proxy_filter_fields = {'is_internal_company': True}
 
     class Meta:
         proxy = True
@@ -126,7 +126,7 @@ class Address(models.Model):
 
 class ShippingAddress(Address):
     objects = ShippingAddressManager()
-    filter_create_overrides = {'is_shipping_address': True}
+    proxy_filter_fields = {'is_shipping_address': True}
 
     class Meta:
         proxy = True
@@ -134,7 +134,7 @@ class ShippingAddress(Address):
 
 class InvoiceAddress(Address):
     objects = InvoiceAddressManager()
-    filter_create_overrides = {'is_invoice_address': True}
+    proxy_filter_fields = {'is_invoice_address': True}
 
     class Meta:
         proxy = True

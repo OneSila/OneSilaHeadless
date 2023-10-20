@@ -1,20 +1,8 @@
-from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin
+from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin, \
+    QuerySetProxyModelMixin
 
 
-class QuerySetFilterCreateOverride:
-    def filter(self, *args, **kwargs):
-        kwargs.update(self.model.filter_create_overrides)
-        return super().filter(*args, **kwargs)
-
-    def create(self, **kwargs):
-        kwargs.update(self.model.filter_create_overrides)
-        return super().create(**kwargs)
-
-    def all(self):
-        return self.filter()
-
-
-class CompanyQueryset(QuerySet):
+class CompanyQueryset(MultiTenantCompanyCreateMixin, QuerySet):
     def filter_supplier(self):
         return self.filter(is_supplier=True)
 
@@ -30,7 +18,7 @@ class CompanyManager(MultiTenantCompanyCreateMixin, Manager):
         return CompanyQueryset(self.model, using=self._db)
 
 
-class SupplierQuerySet(QuerySetFilterCreateOverride, MultiTenantCompanyCreateMixin, QuerySet):
+class SupplierQuerySet(QuerySetProxyModelMixin, CompanyQueryset):
     pass
 
 
@@ -39,7 +27,7 @@ class SupplierManager(CompanyManager):
         return SupplierQuerySet(self.model, using=self._db)
 
 
-class CustomerQuerySet(QuerySetFilterCreateOverride, MultiTenantCompanyCreateMixin, QuerySet):
+class CustomerQuerySet(QuerySetProxyModelMixin, CompanyQueryset):
     pass
 
 
@@ -48,7 +36,7 @@ class CustomerManager(CompanyManager):
         return CustomerQuerySet(self.model, using=self._db)
 
 
-class InfluencerQuerySet(QuerySetFilterCreateOverride, MultiTenantCompanyCreateMixin, QuerySet):
+class InfluencerQuerySet(QuerySetProxyModelMixin, CompanyQueryset):
     pass
 
 
@@ -57,7 +45,7 @@ class InfluencerManager(CompanyManager):
         return InfluencerQuerySet(self.model, using=self._db)
 
 
-class InternalCompanyQuerySet(QuerySetFilterCreateOverride, MultiTenantCompanyCreateMixin, QuerySet):
+class InternalCompanyQuerySet(QuerySetProxyModelMixin, CompanyQueryset):
     pass
 
 
@@ -74,7 +62,7 @@ class AddressQuerySet(MultiTenantCompanyCreateMixin, QuerySet):
         return self.filter(is_invoice_address=True)
 
 
-class ShippingAddressQuerySet(QuerySetFilterCreateOverride, MultiTenantCompanyCreateMixin, QuerySet):
+class ShippingAddressQuerySet(QuerySetProxyModelMixin, AddressQuerySet):
     pass
 
 
@@ -83,7 +71,7 @@ class ShippingAddressManager(Manager):
         return ShippingAddressQuerySet(self.model, using=self._db)
 
 
-class InvoiceAddressQuerySet(QuerySetFilterCreateOverride, MultiTenantCompanyCreateMixin, QuerySet):
+class InvoiceAddressQuerySet(QuerySetProxyModelMixin, AddressQuerySet):
     pass
 
 

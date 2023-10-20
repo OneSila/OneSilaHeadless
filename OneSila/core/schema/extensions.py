@@ -1,6 +1,7 @@
 from strawberry.types.info import Info
 from strawberry_django.utils.typing import UserType
 from strawberry_django.resolvers import django_resolver
+from strawberry_django.permissions import IsAuthenticated
 from strawberry_django.permissions import DjangoPermissionExtension, \
     DjangoNoPermission, _desc
 
@@ -31,3 +32,6 @@ class HasMultiTenantCompany(DjangoPermissionExtension):
             raise DjangoNoPermission
 
         return resolver()
+
+
+default_extensions = [HasMultiTenantCompany(), IsAuthenticated()]

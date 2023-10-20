@@ -1,4 +1,3 @@
-daphne
 Django>=4
 django-imagekit>=4.1.0
 Pillow>=10.0.0
@@ -18,6 +17,8 @@ unicodecsv
 mkdocs
 mkdocs-material
 coverage
+daphne
+django-dirtyfields
 git+ssh://git@github.com/strawberry-graphql/strawberry-graphql-django.git
 #git+ssh://git@github.com/sdobbelaere/strawberry-graphql-django.git@subscriptions
 git+ssh://git@github.com/TweaveTech/django_getuitkit.git@v0.4.5

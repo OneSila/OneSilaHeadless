@@ -66,3 +66,21 @@ class MultiTenantCompanyCreateMixin:
 class Manager(DjangoManager):
     def get_queryset(self):
         return QuerySet(self.model, using=self._db)
+
+
+class QuerySetProxyModelMixin:
+    """
+    Should you wish ot use this mixin for proxy-classes, dont forget to set
+    - proxy_filter_field on the model
+    """
+
+    def filter(self, *args, **kwargs):
+        kwargs.update(self.model.proxy_filter_field)
+        return super().filter(*args, **kwargs)
+
+    def create(self, **kwargs):
+        kwargs.update(self.model.proxy_filter_field)
+        return super().create(**kwargs)
+
+    def all(self):
+        return self.filter()

@@ -6,12 +6,34 @@ from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 
+from dirtyfields import DirtyFieldsMixin
+
 from .validators import phone_regex
 from .managers import MultiTenantUserManager
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 def get_languages():
     return settings.LANGUAGES
+
+
+class OnlySaveOnChangeMixin(DirtyFieldsMixin, OldModel):
+    created_at = DateTimeField(auto_now_add=True)
+    updated_at = DateTimeField(auto_now=True)
+
+    def save(self, *args, force_save=False, **kwargs):
+        # https://github.com/romgar/django-dirtyfields
+        # Checking FK's requires a setting: https://django-dirtyfields.readthedocs.io/en/stable/advanced.html#checking-foreign-key-fields
+        if self.is_dirty(check_relationship=True) or force_save:
+            super().save(*args, **kwargs)
+
+    def is_dirty_field(field):
+        return field in self.dirty_fields.keys()
+
+    class Meta:
+        abstract = True
 
 
 class MultiTenantCompany(OldModel):
@@ -94,7 +116,7 @@ class TimeStampMixin(OldModel):
         abstract = True
 
 
-class Model(TimeStampMixin, MultiTenantAwareMixin, OldModel):
+class Model(OnlySaveOnChangeMixin, TimeStampMixin, MultiTenantAwareMixin, OldModel):
     class Meta:
         abstract = True
 
