@@ -12,3 +12,8 @@ DATABASES = {
         'PORT': '5432',
     }
 }
+
+SECRET_KEY = 'your-secret-key-goes-here'
+
+# to allow local enviroment connect backend and frontend
+CORS_ALLOW_ALL_ORIGINS = True

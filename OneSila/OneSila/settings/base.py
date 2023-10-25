@@ -34,6 +34,7 @@ INSTALLED_APPS = [
 INSTALLED_LOCAL_APPS = [
     'contacts',
     'core',
+    'corsheaders',
     'customs',
     'currencies',
     'eancodes',
@@ -53,10 +54,14 @@ INSTALLED_APPS += INSTALLED_LOCAL_APPS
 
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    # Disabled CsrfViewMiddleware in favour of graphql on 04/01/2022 to keep project moving forward
+    # Put before corsheaders, or it will cause cors-issues
+    # 'django.middleware.csrf.CsrfViewMiddleware',
+    'core.middleware.DisableCSRF',
+    'django.middleware.security.SecurityMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -154,3 +159,5 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+CORS_ALLOW_ALL_ORIGINS = True
