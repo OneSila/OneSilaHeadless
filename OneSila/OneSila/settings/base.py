@@ -57,7 +57,7 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
-    # Disabled CsrfViewMiddleware in favour of graphql on 04/01/2022 to keep project moving forward
+    # Disabled CsrfViewMiddleware in favour of graphql
     # Put before corsheaders, or it will cause cors-issues
     # 'django.middleware.csrf.CsrfViewMiddleware',
     'core.middleware.DisableCSRF',
@@ -160,4 +160,10 @@ CHANNEL_LAYERS = {
     },
 }
 
+
+# Original setting was with ALLOW_ALL, why?  FIXME
+# CORS_ORIGIN_ALLOW_ALL = True
+# As no comments were added, this has been disabled in favour of False with a localhost override.
+CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_ALL_ORIGINS = True
+# CORS_ORIGIN_WHITELIST = ("http://localhost:8080",)

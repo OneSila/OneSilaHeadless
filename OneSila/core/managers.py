@@ -75,11 +75,11 @@ class QuerySetProxyModelMixin:
     """
 
     def filter(self, *args, **kwargs):
-        kwargs.update(self.model.proxy_filter_field)
+        kwargs.update(self.model.proxy_filter_fields)
         return super().filter(*args, **kwargs)
 
     def create(self, **kwargs):
-        kwargs.update(self.model.proxy_filter_field)
+        kwargs.update(self.model.proxy_filter_fields)
         return super().create(**kwargs)
 
     def all(self):

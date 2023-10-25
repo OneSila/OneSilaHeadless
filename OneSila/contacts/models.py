@@ -51,7 +51,7 @@ class Customer(Company):
     A Customer is a contact, filtered as a proxy-model
     """
     objects = CustomerManager()
-    _proxy_filter_fields = {'is_customer': True}
+    proxy_filter_fields = {'is_customer': True}
 
     class Meta:
         proxy = True

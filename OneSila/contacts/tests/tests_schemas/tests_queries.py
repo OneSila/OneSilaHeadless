@@ -4,6 +4,7 @@ from model_bakery import baker
 from OneSila.schema import schema
 from contacts.models import Company, Supplier, Customer, Influencer, Person, Address, \
     ShippingAddress, InvoiceAddress
+from contacts.schema.types.types import SupplierType, CompanyType, CustomerType
 
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 
@@ -42,6 +43,7 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 company(id: $id) {
                     id
                     name
+                    __typename
                 }
             }
         """
@@ -54,6 +56,10 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         resp_company_name = resp.data['company']['name']
         self.assertTrue(resp.errors is None)
         self.assertEqual(resp_company_name, company.name)
+
+        typename = resp.data['company']['__typename']
+
+        self.assertEqual(typename, CompanyType.__name__)
 
 
 class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
@@ -93,6 +99,7 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 supplier(id: $id) {
                     id
                     name
+                    __typename
                 }
             }
         """
@@ -105,3 +112,64 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         resp_supplier_name = resp.data['supplier']['name']
         self.assertTrue(resp.errors is None)
         self.assertEqual(resp_supplier_name, supplier.name)
+
+        typename = resp.data['supplier']['__typename']
+        self.assertEqual(typename, SupplierType.__name__)
+
+
+class CustomerQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.customers = baker.make(Customer, multi_tenant_company=self.user.multi_tenant_company, is_customer=True, _quantity=3)
+        # Lets make sure they are correctly filtered - create some non suppliers.
+        self.companies = baker.make(Company, multi_tenant_company=self.user.multi_tenant_company, is_supplier=False, _quantity=3)
+
+    def test_customers(self):
+        query = """
+            query customers {
+              customers {
+                edges {
+                  node {
+                    id
+                  }
+                }
+                totalCount
+              }
+            }
+        """
+
+        # resp = await schema.execute(query, variable_values={"title": "The Great Gatsby"})
+        resp = self.stawberry_test_client(
+            query=query,
+        )
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+        total_count = resp.data['customers']['totalCount']
+        self.assertEqual(total_count, len(self.customers))
+
+    def test_customer(self):
+        query = """
+            query customer($id: GlobalID!) {
+                customer(id: $id) {
+                    id
+                    name
+                    __typename
+                    isCustomer
+                }
+            }
+        """
+        customer = self.customers[0]
+        customer_global_id = self.to_global_id(model_class=Customer, instance_id=customer.id)
+        resp = self.stawberry_test_client(
+            query=query,
+            variables={"id": customer_global_id}
+        )
+        resp_customer_name = resp.data['customer']['name']
+        self.assertTrue(resp.errors is None)
+        self.assertEqual(resp_customer_name, customer.name)
+
+        typename = resp.data['customer']['__typename']
+        self.assertEqual(typename, CustomerType.__name__)
+
+        self.assertTrue(resp.data['customer']['isCustomer'])
