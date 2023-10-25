@@ -57,10 +57,10 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
     # Disabled CsrfViewMiddleware in favour of graphql
     # Put before corsheaders, or it will cause cors-issues
-    # 'django.middleware.csrf.CsrfViewMiddleware',
-    'core.middleware.DisableCSRF',
+    # 'core.middleware.DisableCSRF',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
