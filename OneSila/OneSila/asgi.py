@@ -15,6 +15,8 @@ import os
 
 from django.core.asgi import get_asgi_application
 from strawberry_django.routers import AuthGraphQLProtocolTypeRouter
+from starlette.middleware.cors import CORSMiddleware
+
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "OneSila.settings")
 django_asgi_app = get_asgi_application()
@@ -28,3 +30,6 @@ application = AuthGraphQLProtocolTypeRouter(
     schema,
     django_application=django_asgi_app,
 )
+
+
+application = CORSMiddleware(application, allow_origins=['127.0.0.1', '0.0.0.0'])

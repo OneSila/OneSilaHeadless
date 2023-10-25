@@ -20,5 +20,6 @@ coverage
 daphne
 django-dirtyfields
 django-cors-headers
+starlette
 git+ssh://git@github.com/strawberry-graphql/strawberry-graphql-django.git
 git+ssh://git@github.com/TweaveTech/django_get_absolute_url.git@v0.2
