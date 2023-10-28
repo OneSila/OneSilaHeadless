@@ -20,6 +20,11 @@ coverage
 daphne
 django-dirtyfields
 django-cors-headers
-starlette
 git+ssh://git@github.com/strawberry-graphql/strawberry-graphql-django.git
 git+ssh://git@github.com/TweaveTech/django_get_absolute_url.git@v0.2
+
+
+# Starlette is used for it CORSMiddleware as referenced
+# in channels issue https://github.com/django/channels/issues/1247
+# Docs for middleware: https://www.starlette.io/middleware/#corsmiddleware
+starlette
