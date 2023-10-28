@@ -21,5 +21,8 @@ SECRET_KEY = 'your-secret-key-goes-here'
 #
 
 CORS_ALLOWED_ORIGINS = [
-    '*',
+    # Format example:
+    # 'http://172.19.250.107:3000',
+    # Or to allow everything:
+    # '*',
 ]
