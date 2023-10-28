@@ -26,3 +26,11 @@ CORS_ALLOWED_ORIGINS = [
     # Or to allow everything:
     # '*',
 ]
+
+CORS_ALLOWED_HEADERS = [
+    '*'
+]
+
+CORS_ALLOWED_METHODS = [
+    '*'
+]
