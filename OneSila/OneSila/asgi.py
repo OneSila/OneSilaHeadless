@@ -33,6 +33,4 @@ application = AuthGraphQLProtocolTypeRouter(
 
 application = CORSMiddleware(application,
     allow_origins=settings.CORS_ALLOWED_ORIGINS,
-    allow_methods=settings.CORS_ALLOWED_METHODS,
-    allow_headers=settings.CORS_ALLOWED_HEADERS,
                              )

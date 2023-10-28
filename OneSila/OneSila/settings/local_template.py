@@ -23,11 +23,3 @@ SECRET_KEY = 'your-secret-key-goes-here'
 CORS_ALLOWED_ORIGINS = [
     '*',
 ]
-
-CORS_ALLOWED_METHODS = [
-    '*',
-]
-
-CORS_ALLOWED_HEADERS = [
-    '*',
-]
