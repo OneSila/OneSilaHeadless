@@ -55,10 +55,7 @@ INSTALLED_APPS += INSTALLED_LOCAL_APPS
 MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    # 'django.middleware.csrf.CsrfViewMiddleware',
-    # Disabled CsrfViewMiddleware in favour of graphql
-    # Put before corsheaders, or it will cause cors-issues
-    # 'core.middleware.DisableCSRF',
+    'django.middleware.csrf.CsrfViewMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
