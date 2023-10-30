@@ -18,7 +18,6 @@ from operator import itemgetter
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DEBUG = False
-# Application definition
 
 INSTALLED_APPS = [
     'django.contrib.admin',

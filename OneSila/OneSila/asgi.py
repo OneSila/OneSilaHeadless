@@ -31,8 +31,9 @@ application = AuthGraphQLProtocolTypeRouter(
     django_application=django_application,
 )
 
-application = CORSMiddleware(application,
+application = CORSMiddleware(
+    application,
     allow_origins=settings.CORS_ALLOWED_ORIGINS,
     allow_headers=settings.CORS_ALLOWED_HEADERS,
     allow_methods=settings.CORS_ALLOWED_METHODS,
-                             )
+)
