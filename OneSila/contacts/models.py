@@ -15,7 +15,7 @@ class Company(models.Model):
     vat_number = models.CharField(max_length=100, blank=True, null=True)
     eori_number = models.CharField(max_length=100, blank=True, null=True)
 
-    related_companies = models.ManyToManyField('self', symmetrical=True)
+    related_companies = models.ManyToManyField('self', symmetrical=True, blank=True)
 
     is_supplier = models.BooleanField(default=False)
     is_customer = models.BooleanField(default=False)

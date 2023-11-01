@@ -7,3 +7,11 @@ class CompanyTestCase(TestCaseMixin, TestCase):
     def test_supplier_create(self):
         supplier = Supplier.objects.create(name='test_supplier_create', multi_tenant_company=self.multi_tenant_company)
         self.assertTrue(supplier.is_supplier)
+
+    def test_supplier_qstype(self):
+        supplier_id = Supplier.objects.create(name='test_supplier_create', multi_tenant_company=self.multi_tenant_company).id
+        supplier = Supplier.objects.get(id=supplier_id)
+        all_suppliers = Supplier.objects.all()
+
+        self.assertTrue(all_suppliers, Supplier.objects)
+        self.assertTrue(supplier, Supplier)

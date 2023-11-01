@@ -53,7 +53,7 @@ class FollowerRateFactory:
 
     def update_currency(self):
         if self.currency.follow_official_rate:
-            self.currency.exchange_rate self.currency.exchange_rate_official
+            self.currency.exchange_rate = self.currency.exchange_rate_official
             self.currency.save()
 
     def run(self):
