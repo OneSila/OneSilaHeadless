@@ -26,6 +26,16 @@ Next, migrate your db:
 ./manange.py migrate
 ```
 
+## Viewing docs
+
+Docs are housed inside of the docs folder.  You can view them easily by running `mkdocs serve` like so:
+
+```bash
+source venv/bin/active
+mkdocs serve
+# Now open: http://127.0.0.1:8000
+```
+
 ## Graphql
 
 Getting data out of - and putting in - is done using graphql.

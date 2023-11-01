@@ -1,9 +1,9 @@
 # Known issues
 
-## Graphql single object fetching.
+## Graphql single object fetching for proxy-models
 
 Fetching a single object suffers from returning an incorrect object type when the model is
-a proxy model.  Example:
+a proxy model, eg Customer vs Company.  Example:
 
 ```graphql
 query customers {
