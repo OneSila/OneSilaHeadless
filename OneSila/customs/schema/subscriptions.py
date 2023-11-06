@@ -1,4 +1,4 @@
-from core.schema.subscriptions import type, subscription, Info, AsyncGenerator, model_subscribe_publisher
+from core.schema.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
 from customs.models import HsCode
 from .types.types import HsCodeType
@@ -8,5 +8,5 @@ from .types.types import HsCodeType
 class CustomsSubscription:
     @subscription
     async def hs_code(self, info: Info, pk: str) -> AsyncGenerator[HsCodeType, None]:
-        async for i in model_subscribe_publisher(info=info, pk=pk, model=HsCode):
+        async for i in model_subscriber(info=info, pk=pk, model=HsCode):
             yield i

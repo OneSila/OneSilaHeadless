@@ -3,7 +3,7 @@ from django.dispatch import receiver
 from contacts.models import Company, Supplier, Customer, Influencer, InternalCompany, \
     Person, Address, ShippingAddress, InvoiceAddress
 
-from core.schema.subscriptions import refresh_subscription
+from core.schema.subscriptions import refresh_subscription_receiver
 
 import logging
 logger = logging.getLogger(__name__)
@@ -22,4 +22,4 @@ def contacts__subscription__post_save(sender, instance, **kwargs):
     """
     This is to be sent on the every post_save or relevant signal
     """
-    refresh_subscription(instance)
+    refresh_subscription_receiver(instance)

@@ -1,60 +1,57 @@
-from django.db.models import Model
-
-from functools import wraps, partial
-
-from strawberry import type, subscription
-from strawberry.types import Info
-from strawberry.relay.types import GlobalID
-from strawberry.relay.utils import from_base64
-
-from strawberry_django import NodeInput
 from strawberry_django.auth.utils import get_current_user
-from strawberry_django.mutations.fields import get_pk
+from strawberry.relay.utils import from_base64
+from asgiref.sync import sync_to_async
 
-from typing import AsyncGenerator, Any
+from .typing import Info, GlobalID, Model
 
-import asyncio
-from asgiref.sync import async_to_sync, sync_to_async
-
-import channels.layers
+from .helpers import get_group, get_msg, get_msg_type
 from channels.db import database_sync_to_async
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-def get_group(instance):
-    return f"{instance.__class__.__name__}"
-
-
-def get_msg_type(instance):
-    group = get_group(instance)
-    return f"{group}_{instance.id}"
-
-
-def get_msg(instance):
-    return {'type': get_msg_type(instance)}
-
-
-def refresh_subscription(instance):
-    group = get_group(instance)
-    msg = get_msg(instance)
-
-    channel_layer = channels.layers.get_channel_layer()
-    async_to_sync(channel_layer.group_send)(group=group, message=msg)
-
-    logger.debug(f"Send post_save message {instance.__class__} for '{instance}' to group '{group}' with msg: {msg}")
-
-
-class ModelSubscribePublisher:
+class ModelInstanceSubscribePublisher:
     """
-    TODO:
-    - Convert to use the entire strawberry_django structure and respect the extensions/filters
-    - Write guide
+    This Publisher is capable of subscribing and publishing updated instances
+    to graphql subscriptions.
+
+    It expects to be called with the Info context from strawberry django,
+    the instance pk and the model.
+
+    It can be used like so:
+    ```
+    publisher = ModelInstanceSubscribePublisher(info=info, pk=pk, model=model)
+    async for msg in publisher.await_messages():
+        yield msg
+    ```
+
     """
 
     def __init__(self, info: Info, pk: GlobalID, model: Model):
         self.info = info
+
+        # print('info')
+        # print(info.__dict__)
+
+        # print('context')
+        # print(info.context.keys())
+
+        # print('connection_params')
+        # print(info.context['connection_params'])
+
+        print('ws')
+        # print(info.context['ws'])
+        headers = info.context['ws'].__dict__['scope']['headers']
+        print([i[0] for i in headers])
+
+        for h in headers:
+            if h[0] == b'sec-websocket-protocol':
+                print(h)
+
+        # print('request')
+        # print(info.context['request'].__dict__.keys())
+
         self.pk = pk
         self.model = model
 
@@ -67,6 +64,14 @@ class ModelSubscribePublisher:
         if user.is_anonymous:
             raise Exception("No access")
 
+    async def verify_return_type(self):
+        return_type = self.info.return_type.__name__
+        requested_type = self.decode_global_id_type()
+
+        if return_type != requested_type:
+            msg = f"Requested GlobalID of type {return_type} instead of {requested_type}"
+            raise TypeError(msg)
+
     def get_queryset(self):
         user = get_current_user(self.info)
         multi_tenant_company = user.multi_tenant_company
@@ -74,6 +79,10 @@ class ModelSubscribePublisher:
 
     def get_instance(self, pk):
         return self.get_queryset().get(pk=pk)
+
+    def decode_global_id_type(self):
+        global_id_type, _ = from_base64(self.pk)
+        return global_id_type
 
     def decode_pk(self):
         _, pk = from_base64(self.pk)
@@ -113,29 +122,14 @@ class ModelSubscribePublisher:
     async def send_initial_message(self):
         await self.send_message()
 
-    async def messages(self):
+    async def await_messages(self):
         await self.verify_logged_in()
+        await self.verify_return_type()
         await self.set_instance()
         await self.subscribe()
         await self.send_initial_message()
 
         async with self.ws.listen_to_channel(type=self.msg_type, groups=[self.group]) as messages:
             async for msg in messages:
-                logger.info(f"Found wakup: {msg}")
+                logger.info(f"Found wake-up: {msg}")
                 yield await self.refresh_instance()
-
-
-async def model_subscribe_publisher(info: Info, pk: GlobalID, model: Model) -> AsyncGenerator[Any, None]:
-    publisher = ModelSubscribePublisher(info=info, pk=pk, model=model)
-    async for msg in publisher.messages():
-        yield msg
-
-
-def model_subscription_field(model):
-    # FIMXE: Using this wrapper with @subscription breaks somewhwere inside of the subscription decorator.
-    # using it without @subscription return None instead of the AsyncGenerator.
-    @subscription
-    async def model_subscription_inner(info: Info, pk: GlobalID, model: Model) -> AsyncGenerator[Any, None]:
-        async for i in model_subscribe_publisher(info=info, pk=pk, model=model):
-            yield i
-    return model_subscription_inner

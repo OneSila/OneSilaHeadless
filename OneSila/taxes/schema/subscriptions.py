@@ -1,4 +1,4 @@
-from core.schema.subscriptions import type, subscription, Info, AsyncGenerator, model_subscribe_publisher
+from core.schema.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
 from taxes.models import Tax
 from taxes.schema.types.types import TaxType
@@ -8,5 +8,5 @@ from taxes.schema.types.types import TaxType
 class TaxSubscription:
     @subscription
     async def tax(self, info: Info, pk: str) -> AsyncGenerator[TaxType, None]:
-        async for i in model_subscribe_publisher(info=info, pk=pk, model=Tax):
+        async for i in model_subscriber(info=info, pk=pk, model=Tax):
             yield i
