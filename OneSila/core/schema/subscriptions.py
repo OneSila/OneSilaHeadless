@@ -61,15 +61,28 @@ class ModelSubscribePublisher:
         self.ws = info.context["ws"]
         self.channel_layer = self.ws.channel_layer
 
+    async def verify_logged_in(self):
+        user = get_current_user(self.info)
+
+        if user.is_anonymous:
+            raise Exception("No access")
+
     def get_queryset(self):
         user = get_current_user(self.info)
         multi_tenant_company = user.multi_tenant_company
         return self.model.objects.filter(multi_tenant_company=multi_tenant_company)
 
+    def get_instance(self, pk):
+        return self.get_queryset().get(pk=pk)
+
+    def decode_pk(self):
+        _, pk = from_base64(self.pk)
+        return pk
+
     @database_sync_to_async
     def set_instance(self):
-        _, pk = from_base64(self.pk)
-        instance = self.get_queryset().get(pk=pk)
+        pk = self.decode_pk()
+        instance = self.get_instance(pk)
         self.instance = instance
 
     @sync_to_async
@@ -100,7 +113,12 @@ class ModelSubscribePublisher:
     async def send_initial_message(self):
         await self.send_message()
 
-    async def publish_messages(self):
+    async def messages(self):
+        await self.verify_logged_in()
+        await self.set_instance()
+        await self.subscribe()
+        await self.send_initial_message()
+
         async with self.ws.listen_to_channel(type=self.msg_type, groups=[self.group]) as messages:
             async for msg in messages:
                 logger.info(f"Found wakup: {msg}")
@@ -108,12 +126,9 @@ class ModelSubscribePublisher:
 
 
 async def model_subscribe_publisher(info: Info, pk: GlobalID, model: Model) -> AsyncGenerator[Any, None]:
-    fac = ModelSubscribePublisher(info=info, pk=pk, model=model)
-    await fac.set_instance()
-    await fac.subscribe()
-    await fac.send_initial_message()
-    async for i in fac.publish_messages():
-        yield i
+    publisher = ModelSubscribePublisher(info=info, pk=pk, model=model)
+    async for msg in publisher.messages():
+        yield msg
 
 
 def model_subscription_field(model):

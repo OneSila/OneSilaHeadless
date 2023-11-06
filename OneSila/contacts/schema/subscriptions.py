@@ -5,6 +5,9 @@ from contacts.models import Company, Supplier, Customer, Influencer, InternalCom
 from .types.types import CompanyType, SupplierType, CustomerType, InfluencerType, \
     InternalCompanyType, PersonType, AddressType, ShippingAddressType, InvoiceAddressType
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 @type(name="Subscription")
 class ContactsSubscription:
