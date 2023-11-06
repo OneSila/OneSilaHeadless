@@ -12,7 +12,7 @@ pip install -r requirements.txt
 Create your local settings:
 
 ```bash
-cp OneSila/settings/local_template.py OneSila/settings/local.py
+cp OneSila/OneSila/settings/local_template.py OneSila/OneSila/settings/local.py
 ```
 
 And create a postgres db + set the settings in your local.py setting file.
@@ -21,7 +21,8 @@ And create a postgres db + set the settings in your local.py setting file.
 Next, migrate your db:
 
 ```python
-./manange.py migrate
+cd OneSila
+./manage.py migrate
 ```
 
 # Graphql
