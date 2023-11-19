@@ -22,8 +22,7 @@ django-dirtyfields
 django-cors-headers
 
 # Using fork to ensure we have better proxy model support.
-#git+ssh://git@github.com/strawberry-graphql/strawberry-graphql-django.git
-git+ssh://git@github.com/sdobbelaere/strawberry-graphql-django.git@proxy_models
+git+ssh://git@github.com/sdobbelaere/strawberry-graphql-django.git@subscriptions
 
 git+ssh://git@github.com/TweaveTech/django_get_absolute_url.git@v0.2
 
