@@ -34,7 +34,6 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         self.assertEqual(resp_company_name, company_name)
 
     def test_company_update(self):
-
         mutation = """
             mutation updateCompany($id: GlobalID!, $name: String!) {
                 updateCompany(data: {id: $id, name: $name}) {
@@ -58,6 +57,37 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         resp_company_name = resp.data['updateCompany']['name']
 
         self.assertEqual(resp_company_name, company_name)
+
+    def test_company_related_assign(self):
+        mutation = """
+            mutation updateCompany($id: GlobalID!, $name: String!, $othercompany: GlobalID!) {
+                updateCompany(data: {id: $id, name: $name, relatedCompanies: [{id: $othercompany}]}) {
+                    id
+                    name
+                    relatedCompanies {
+                        id
+                    }
+                }
+            }
+        """
+        company = Company.objects.create(name='test_company_update_ori', multi_tenant_company=self.multi_tenant_company)
+        company_global_id = self.to_global_id(model_class=Company, instance_id=company.id)
+        company_name = 'test_company_update'
+
+        othercompany = Company.objects.create(name='test_company_update_related', multi_tenant_company=self.multi_tenant_company)
+        related_company_global_id = self.to_global_id(model_class=Company, instance_id=othercompany.id)
+
+        resp = self.stawberry_test_client(
+            query=mutation,
+            variables={"id": company_global_id, "name": company_name, "othercompany": related_company_global_id}
+        )
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+        related_ids = [i['id'] for i in resp.data['updateCompany']['relatedCompanies']]
+
+        self.assertTrue(related_company_global_id in related_ids)
 
 
 class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):

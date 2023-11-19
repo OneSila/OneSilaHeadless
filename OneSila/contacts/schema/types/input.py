@@ -1,5 +1,5 @@
 from core.schema.types.types import auto
-from core.schema.types.input import NodeInput, input, partial
+from core.schema.types.input import NodeInput, input, partial, List
 
 from contacts.models import Company, Supplier, Customer, \
     Influencer, InternalCompany, Person, Address, \
@@ -8,12 +8,12 @@ from contacts.models import Company, Supplier, Customer, \
 
 @input(Company, fields="__all__")
 class CompanyInput:
-    pass
+    related_companies: List['CompanyPartialInput'] | None
 
 
 @partial(Company, fields="__all__")
 class CompanyPartialInput(NodeInput):
-    pass
+    related_companies: List['CompanyPartialInput'] | None
 
 
 @input(Supplier, fields="__all__")
