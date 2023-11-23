@@ -40,14 +40,14 @@ class ModelInstanceSubscribePublisher:
         # print('connection_params')
         # print(info.context['connection_params'])
 
-        print('ws')
-        # print(info.context['ws'])
-        headers = info.context['ws'].__dict__['scope']['headers']
-        print([i[0] for i in headers])
+        # print('ws')
+        # # print(info.context['ws'])
+        # headers = info.context['ws'].__dict__['scope']['headers']
+        # print([i[0] for i in headers])
 
-        for h in headers:
-            if h[0] == b'sec-websocket-protocol':
-                print(h)
+        # for h in headers:
+        #     if h[0] == b'sec-websocket-protocol':
+        #         print(h)
 
         # print('request')
         # print(info.context['request'].__dict__.keys())
