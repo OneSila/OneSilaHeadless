@@ -38,6 +38,7 @@ class MultiTenantCompanyPartialInput:
 class MultiTenantUserInput:
     username: auto
     password: auto
+    language: auto
 
 
 @partial(MultiTenantUser)
@@ -45,3 +46,4 @@ class MultiTenantUserPartialInput:
     id: auto
     username: auto
     password: auto
+    language: auto

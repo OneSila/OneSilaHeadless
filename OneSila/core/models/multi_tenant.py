@@ -4,6 +4,7 @@ from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 
 from core.validators import phone_regex
+from core.helpers import get_languages
 
 
 class MultiTenantCompany(models.Model):
@@ -11,7 +12,6 @@ class MultiTenantCompany(models.Model):
     Class that holds company information and sales-conditions.
     '''
     from core.countries import COUNTRY_CHOICES
-    from core.helpers import get_languages
 
     LANGUAGE_CHOICES = get_languages()
 
@@ -56,7 +56,10 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     A: Because starwberry-django will break and rewriting this field is not something
     that's in the cards today.
     '''
+    LANGUAGE_CHOICES = get_languages()
+
     username = models.EmailField(unique=True, help_text=_('Email Address'))
+    language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
 
     def __str__(self):
         return f"{self.username} <{self.multi_tenant_company}>"
