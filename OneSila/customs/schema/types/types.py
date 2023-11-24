@@ -1,4 +1,4 @@
-from core.schema.types.types import type, relay, MultiTenantCompanyType, List
+from core.schema.types.types import type, relay, List
 from core.schema.mixins import GetQuerysetMultiTenantMixin
 
 from customs.models import HsCode
