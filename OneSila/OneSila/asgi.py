@@ -36,4 +36,5 @@ application = CORSMiddleware(
     allow_origins=settings.CORS_ALLOWED_ORIGINS,
     allow_headers=settings.CORS_ALLOWED_HEADERS,
     allow_methods=settings.CORS_ALLOWED_METHODS,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS
 )
