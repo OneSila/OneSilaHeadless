@@ -153,3 +153,9 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+#
+# Default CORS settings
+#
+
+CORS_ALLOW_CREDENTIALS = True

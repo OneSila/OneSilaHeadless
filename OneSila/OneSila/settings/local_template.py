@@ -35,3 +35,7 @@ CORS_ALLOWED_HEADERS = [
 CORS_ALLOWED_METHODS = [
     '*'
 ]
+
+# This allows session information to be passed through to the queries
+# to ensure login via django-sessions.
+CORS_ALLOW_CREDENTIALS = True

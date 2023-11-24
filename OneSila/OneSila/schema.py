@@ -38,6 +38,12 @@ class UserInput:
     password: auto
 
 
+class UserPartialInput:
+    id: auto
+    username: auto
+    password: auto
+
+
 #
 # Actual Query and Mutation declarations
 #
