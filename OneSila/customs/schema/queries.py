@@ -1,4 +1,4 @@
-from core.schema.queries import node, connection, ListConnectionWithTotalCount, type, field
+from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, type, field
 from customs.models import HsCode
 
 

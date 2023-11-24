@@ -1,5 +1,5 @@
-from core.schema.mutations import type
-from core.schema.mutations import create, update, delete, type, List
+from core.schema.core.mutations import type
+from core.schema.core.mutations import create, update, delete, type, List
 
 from .types.types import PropertyType, PropertyTranslationType, PropertySelectValueType, ProductPropertyType
 from .types.input import PropertyInput, PropertyTranslationInput, PropertySelectValueInput, ProductPropertyInput, \

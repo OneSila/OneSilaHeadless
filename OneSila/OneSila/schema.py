@@ -8,7 +8,7 @@ from strawberry_django import auth, mutations
 from strawberry_django.optimizer import DjangoOptimizerExtension
 
 from contacts.schema import ContactsQuery, ContactsMutation, ContactsSubscription
-from core.schema_multi_tenant import MultiTenantQuery, MultiTenantMutation, MultiTenantSubscription
+from core.schema.multi_tenant import MultiTenantQuery, MultiTenantMutation, MultiTenantSubscription
 from currencies.schema import CurrenciesQuery, CurrenciesMutation, CurrenciesSubscription
 from customs.schema import CustomsQuery, CustomsMutation, CustomsSubscription
 from eancodes.schema import EanCodesQuery, EanCodesMutation, EanCodesSubscription

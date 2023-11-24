@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 
-from core.schema.types.types import type, relay
-from core.schema.mixins import GetQuerysetMultiTenantMixin
+from core.schema.core.types.types import type, relay
+from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 
 from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser
 

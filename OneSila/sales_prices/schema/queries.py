@@ -1,5 +1,5 @@
-from core.schema.queries import node, connection, ListConnectionWithTotalCount, type
-from typing import List
+from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, \
+    type
 
 from .types.types import SalesPriceType, SalesPriceListType, SalesPriceListItemType
 

@@ -1,6 +1,6 @@
 from strawberry_django import auth
 
-from core.schema.queries import node, connection, ListConnectionWithTotalCount, type, field
+from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, type, field
 from .types.types import MultiTenantUserType, MultiTenantCompanyType
 
 

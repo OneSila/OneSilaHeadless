@@ -1,4 +1,4 @@
-from core.schema.mutations import create, update, delete, type, List, field
+from core.schema.core.mutations import create, update, delete, type, List, field
 
 from .types.types import CompanyType, SupplierType, CustomerType, \
     InfluencerType, InternalCompanyType, PersonType, AddressType, \

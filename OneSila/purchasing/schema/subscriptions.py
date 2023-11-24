@@ -1,4 +1,4 @@
-from core.schema.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
+from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
 from purchasing.models import SupplierProduct, PurchaseOrder, PurchaseOrderItem
 from purchasing.schema.types.types import SupplierProductType, PurchaseOrderType, \

@@ -1,4 +1,4 @@
-from core.schema.types.types import relay, type, GetQuerysetMultiTenantMixin
+from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin
 
 from typing import List
 

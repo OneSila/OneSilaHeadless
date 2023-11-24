@@ -1,4 +1,4 @@
-from core.schema.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
+from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
 from currencies.models import Currency
 from currencies.schema.types.types import CurrencyType

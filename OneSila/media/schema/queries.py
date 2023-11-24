@@ -1,4 +1,4 @@
-from core.schema.queries import node, connection, ListConnectionWithTotalCount, type
+from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, type
 from typing import List
 
 from .types.types import MediaType, ImageType, VideoType, MediaProductThroughType

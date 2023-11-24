@@ -1,5 +1,5 @@
-from core.schema.types.types import type, relay, List
-from core.schema.mixins import GetQuerysetMultiTenantMixin
+from core.schema.core.types.types import type, relay, List
+from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 
 from customs.models import HsCode
 from .filters import HsCodeFilter

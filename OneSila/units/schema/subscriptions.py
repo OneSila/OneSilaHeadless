@@ -1,4 +1,4 @@
-from core.schema.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
+from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
 from units.models import Unit
 from units.schema.types.types import UnitType

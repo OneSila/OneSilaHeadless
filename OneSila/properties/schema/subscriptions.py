@@ -1,4 +1,4 @@
-from core.schema.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
+from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
 from properties.models import Property, PropertyTranslation, PropertySelectValue, ProductProperty
 from properties.schema.types.types import PropertyType, PropertyTranslationType, \

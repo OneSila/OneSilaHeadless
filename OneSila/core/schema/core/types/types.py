@@ -5,5 +5,5 @@ from strawberry_django import type
 
 from typing import List
 
-from core.schema.mixins import GetQuerysetMultiTenantMixin
+from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from core.models import MultiTenantCompany

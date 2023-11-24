@@ -1,5 +1,5 @@
-from core.schema.types.types import auto
-from core.schema.types.input import NodeInput, input, partial
+from core.schema.core.types.types import auto
+from core.schema.core.types.input import NodeInput, input, partial
 
 from properties.models import Property, PropertyTranslation, \
     PropertySelectValue, ProductProperty

@@ -1,4 +1,4 @@
-from core.schema.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
+from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
 from sales_prices.models import SalesPrice, SalesPriceList, SalesPriceListItem
 from sales_prices.schema.types.types import SalesPriceType, SalesPriceListType, \

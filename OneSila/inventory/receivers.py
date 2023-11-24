@@ -3,7 +3,7 @@ from django.dispatch import receiver
 from inventory.models import Inventory, InventoryLocation
 
 
-from core.schema.subscriptions import refresh_subscription_receiver
+from core.schema.core.subscriptions import refresh_subscription_receiver
 
 import logging
 logger = logging.getLogger(__name__)

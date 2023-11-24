@@ -5,7 +5,7 @@ from strawberry_django.permissions import IsAuthenticated
 from strawberry_django.permissions import DjangoPermissionExtension, \
     _desc
 
-from core.schema.exceptions import NotAuthenticatedError, \
+from core.schema.core.exceptions import NotAuthenticatedError, \
     MultiTentantCompanyMissingError
 
 from typing import Callable, Optional, ClassVar, Any

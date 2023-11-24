@@ -1,4 +1,4 @@
-from core.schema.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
+from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
 from inventory.models import Inventory, InventoryLocation
 from inventory.schema.types.types import InventoryType, InventoryLocationType

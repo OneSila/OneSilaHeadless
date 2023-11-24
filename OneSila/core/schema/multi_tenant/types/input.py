@@ -1,6 +1,6 @@
 from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser
-from core.schema.types.types import auto
-from core.schema.types.input import NodeInput, input, partial, List
+from core.schema.core.types.types import auto
+from core.schema.core.types.input import NodeInput, input, partial, List
 
 
 @input(MultiTenantCompany)

@@ -1,8 +1,6 @@
-from core.schema.types.types import type, relay
-from core.schema_multi_tenant.types.types import MultiTenantCompanyType
-from core.schema.mixins import GetQuerysetMultiTenantMixin
-
-from typing import List
+from core.schema.core.types.types import type, relay, List
+from core.schema.core.mixins import GetQuerysetMultiTenantMixin
+from core.schema.multi_tenant.types.types import MultiTenantCompanyType
 
 from contacts.models import Company, Supplier, Customer, Influencer, \
     InternalCompany, Person, Address, ShippingAddress, InvoiceAddress

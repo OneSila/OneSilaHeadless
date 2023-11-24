@@ -1,4 +1,4 @@
-from core.schema.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
+from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
 from orders.models import Order, OrderItem, OrderNote
 from orders.schema.types.types import OrderType, OrderItemType, OrderNoteType

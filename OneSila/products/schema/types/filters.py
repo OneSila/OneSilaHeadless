@@ -1,5 +1,5 @@
-from core.schema.types.types import auto
-from core.schema.types.filters import filter
+from core.schema.core.types.types import auto
+from core.schema.core.types.filters import filter
 
 from products.models import Product, BundleProduct, UmbrellaProduct, \
     ProductVariation, ProductTranslation, UmbrellaVariation, BundleVariation

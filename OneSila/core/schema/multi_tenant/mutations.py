@@ -5,10 +5,10 @@ from strawberry_django.auth.utils import get_current_user
 
 from django.db import transaction
 
-from core.schema.mutations import create, type, DjangoUpdateMutation, \
+from core.schema.core.mutations import create, type, DjangoUpdateMutation, \
     GetMultiTenantCompanyMixin, default_extensions, update, Info, models, \
     Iterable, Any
-from core.schema.mixins import GetQuerysetMultiTenantMixin
+from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 
 from .types.types import MultiTenantUserType, MultiTenantCompanyType
 from .types.input import MultiTenantUserInput, MultiTenantUserPartialInput, \

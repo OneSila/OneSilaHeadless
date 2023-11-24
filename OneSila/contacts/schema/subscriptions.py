@@ -1,4 +1,4 @@
-from core.schema.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
+from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
 from contacts.models import Company, Supplier, Customer, Influencer, InternalCompany, \
     Person, Address, ShippingAddress, InvoiceAddress
