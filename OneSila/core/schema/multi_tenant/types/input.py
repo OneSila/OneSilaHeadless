@@ -51,3 +51,11 @@ class MultiTenantUserPartialInput:
     language: auto
     first_name: auto
     last_name: auto
+
+
+@input(MultiTenantUser)
+class MultiTenantInviteUserInput:
+    username: auto
+    language: auto
+    first_name: auto
+    last_name: auto

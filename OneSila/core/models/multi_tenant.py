@@ -61,6 +61,12 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     username = models.EmailField(unique=True, help_text=_('Email Address'))
     language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
 
+    # When users are created, the first one to register from a company is
+    # declared as the owner.
+    is_multi_tenant_company_owner = models.BooleanField(default=False)
+    # Subsequent users are invited.
+    invitation_accepted = models.BooleanField(default=False)
+
     def __str__(self):
         return f"{self.username} <{self.multi_tenant_company}>"
 
