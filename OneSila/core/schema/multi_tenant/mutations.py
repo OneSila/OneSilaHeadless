@@ -13,7 +13,7 @@ from typing import cast, Type
 
 from core.schema.core.mutations import create, type, DjangoUpdateMutation, \
     DjangoCreateMutation, GetMultiTenantCompanyMixin, default_extensions, \
-    update, Info, models, Iterable, Any
+    update, Info, models, Iterable, Any, IsAuthenticated
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from core.factories.multi_tenant import InviteUserFactory
 
@@ -130,7 +130,7 @@ class UpdateMeMutation(DjangoUpdateMutation):
 
 
 def register_my_multi_tenant_company():
-    extensions = default_extensions
+    extensions = [IsAuthenticated()]
     return MyMultiTenantCompanyCreateMutation(MultiTenantCompanyPartialInput, extensions=extensions)
 
 
