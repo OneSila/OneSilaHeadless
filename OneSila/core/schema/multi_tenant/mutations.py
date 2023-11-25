@@ -131,7 +131,7 @@ class UpdateMeMutation(DjangoUpdateMutation):
 
 def register_my_multi_tenant_company():
     extensions = [IsAuthenticated()]
-    return MyMultiTenantCompanyCreateMutation(MultiTenantCompanyPartialInput, extensions=extensions)
+    return MyMultiTenantCompanyCreateMutation(MultiTenantCompanyMyInput, extensions=extensions)
 
 
 def update_my_multi_tenant_company():

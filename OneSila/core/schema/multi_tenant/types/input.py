@@ -4,6 +4,14 @@ from core.schema.core.types.input import NodeInput, input, partial, List
 
 
 @input(MultiTenantCompany)
+class MultiTenantCompanyMyInput:
+    name: auto
+    country: auto
+    phone_number: auto
+    language: auto
+
+
+@input(MultiTenantCompany)
 class MultiTenantCompanyInput:
     name: auto
     address1: auto
