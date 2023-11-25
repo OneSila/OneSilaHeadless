@@ -83,7 +83,7 @@ class MyMultiTenantCompanyCreateMutation(GetMultiTenantCompanyMixin, DjangoCreat
         assert model is not None
 
         data = self.set_default_values(data)
-        user = self.get_current_user(info)
+        user = get_current_user(info)
 
         with DjangoOptimizerExtension.disabled():
             obj = resolvers.create(
