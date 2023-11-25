@@ -19,7 +19,8 @@ from core.factories.multi_tenant import InviteUserFactory
 
 from .types.types import MultiTenantUserType, MultiTenantCompanyType
 from .types.input import MultiTenantUserInput, MultiTenantUserPartialInput, \
-    MultiTenantCompanyPartialInput, MultiTenantCompanyInput, MultiTenantInviteUserInput
+    MultiTenantCompanyPartialInput, MultiTenantCompanyInput, \
+    MultiTenantInviteUserInput, MultiTenantCompanyMyInput
 
 
 class SetDefaultValuesMixin:
@@ -82,7 +83,6 @@ class MyMultiTenantCompanyCreateMutation(GetMultiTenantCompanyMixin, DjangoCreat
         model = self.django_model
         assert model is not None
 
-        data = self.set_default_values(data)
         user = get_current_user(info)
 
         with DjangoOptimizerExtension.disabled():
@@ -95,6 +95,8 @@ class MyMultiTenantCompanyCreateMutation(GetMultiTenantCompanyMixin, DjangoCreat
 
             user.multi_tenant_company = obj
             user.save()
+
+            return obj
 
 
 class MyMultiTentantCompanyUpdateMutation(GetMultiTenantCompanyMixin, DjangoUpdateMutation):
