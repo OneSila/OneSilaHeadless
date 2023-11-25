@@ -77,6 +77,26 @@ class InviteUserMutation(GetMultiTenantCompanyMixin, DjangoCreateMutation):
             return fac.user
 
 
+class MyMultiTenantCompanyCreateMutation(GetMultiTenantCompanyMixin, DjangoCreateMutation):
+    def create(self, data: dict[str, Any], *, info: Info):
+        model = self.django_model
+        assert model is not None
+
+        data = self.set_default_values(data)
+        user = self.get_current_user(info)
+
+        with DjangoOptimizerExtension.disabled():
+            obj = resolvers.create(
+                info,
+                model,
+                data,
+                full_clean=self.full_clean,
+            )
+
+            user.multi_tenant_company = obj
+            user.save()
+
+
 class MyMultiTentantCompanyUpdateMutation(GetMultiTenantCompanyMixin, DjangoUpdateMutation):
     """
     This mutation will only protect against having a multi-tentant company.
@@ -109,6 +129,11 @@ class UpdateMeMutation(DjangoUpdateMutation):
         return self.update(info, instance, resolvers.parse_input(info, vdata))
 
 
+def register_my_multi_tenant_company():
+    extensions = default_extensions
+    return MyMultiTenantCompanyCreateMutation(MultiTenantCompanyPartialInput, extensions=extensions)
+
+
 def update_my_multi_tenant_company():
     extensions = default_extensions
     return MyMultiTentantCompanyUpdateMutation(MultiTenantCompanyPartialInput, extensions=extensions)
@@ -136,7 +161,7 @@ class MultiTenantMutation:
 
     # register_user: MultiTenantUserType = auth.register()
     register_user: MultiTenantUserType = register_user()
-    register_multi_tenant_company: MultiTenantCompanyType = create(MultiTenantUserInput)
+    register_my_multi_tenant_company: MultiTenantCompanyType = register_my_multi_tenant_company()
 
     update_me: MultiTenantUserType = update_me()
     update_my_multi_tenant_company: MultiTenantCompanyType = update_my_multi_tenant_company()
