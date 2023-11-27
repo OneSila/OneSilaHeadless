@@ -3,6 +3,17 @@ name: CodeCov
 on: [push, pull_request]
 
 jobs:
+  services:
+    postgres:
+      image: postgres:12
+      env:
+        POSTGRES_USER: fake
+        POSTGRES_PASSWORD: fake
+        POSTGRES_DB: fake
+      ports:
+        - 5432:5432
+      options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
   build:
     runs-on: ubuntu-latest
     name: Test OneSilaHeadless
@@ -16,6 +27,12 @@ jobs:
     - name: Install OS dependencies
       run: sudo apt-get install postgresql
     - name: Run tests and collect coverage
+      env:
+        POSTGRES_HOST: postgres
+        POSTGRES_USER: fake
+        POSTGRES_PASSWORD: fake
+        POSTGRES_DB: fake
+        POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
       run: cd OneSila && coverage run --source='.' manage.py test
     - name: Upload coverage reports to Codecov with GitHub Action
       uses: codecov/codecov-action@v3

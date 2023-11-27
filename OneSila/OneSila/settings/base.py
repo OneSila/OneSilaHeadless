@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 from django.utils.translation import gettext_lazy as _
 from operator import itemgetter
+import os
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -90,10 +91,10 @@ ASGI_APPLICATION = 'OneSila.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'fake',
-        'USER': 'fake',
-        'PASSWORD': 'fake',
-        'HOST': 'localhost',
+        'NAME': os.getenv('POSTGRES_DB', 'fake'),
+        'USER': os.getenv('POSTGRES_USER', 'fake'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'fake'),
+        'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
         'PORT': '5432',
     }
 }
