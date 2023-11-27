@@ -87,6 +87,18 @@ WSGI_APPLICATION = 'OneSila.wsgi.application'
 ASGI_APPLICATION = 'OneSila.asgi.application'
 
 
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': 'fake',
+        'USER': 'fake',
+        'PASSWORD': 'fake',
+        'HOST': 'localhost',
+        'PORT': '5432',
+    }
+}
+
+
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 
