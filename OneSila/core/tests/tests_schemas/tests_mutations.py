@@ -203,4 +203,40 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         self.assertTrue(resp.data['inviteUser']['invitationAccepted'])
 
     def test_enable_disable_user(self):
-        pass
+        password = '22kk22@ksk!aAD'
+        company = MultiTenantCompany.objects.create(name='enableuser', country="DE")
+        user = MultiTenantUser(username='enabledisable@maadil.com', language="nl", multi_tenant_company=company,
+            is_active=False)
+        user.set_password(password)
+        user.save()
+
+        user_id = to_base64("MultiTenantUserType", user.id)
+
+        enable_query = """
+        mutation enableUser($id: GlobalID!){
+          enableUser(data: {id: $id}){
+            username
+            isActive
+          }
+        }
+        """
+
+        resp = self.stawberry_test_client(
+            query=enable_query,
+            variables={"id": user_id}
+        )
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data['inviteUser']['isActive'])
+
+        disable_query = """
+        mutation disableUser($id: GlobalID!){
+          disableUser(data: {id: $id}){
+            username
+            isActive
+          }
+        }
+        """
+
+        self.assertTrue(resp.errors is None)
+        self.assertFalse(resp.data['inviteUser']['isActive'])
