@@ -202,19 +202,25 @@ What about about the `_`.
 All signals are created in here, and called from this file.  All signals go in `signals.py`
 
 Instead of hooking logic directly into the post_save or conditions you need to trigger a custom signal with a naming like so:
-`appname__modelname__verb__action`
+`verb_action`
 
-they are separated with double `_`:
+they are separated with single `_`:
 
 example:
-`magento2__magentoproduct__sync_failed`
+`sync_failed`
 
 Dont use
 
-`telegram__magentoproduct__sync_failed`
+`some_app__sync_failed`
 
 or don’t do
 `telegram_somthing_failed_random_name`
+
+You can trigger the signals inside your factories by calling them:
+
+```
+sync_failed(sender=instance.__class__, instance=instance)
+```
 
 ## Receivers
 

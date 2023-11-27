@@ -2,6 +2,8 @@ from django.db import transaction
 from core.models.multi_tenant import MultiTenantUser
 from django.core.exceptions import ValidationError
 
+from core.signals import registered, invite_sent, invite_accepted
+
 
 class RegisterUserFactory:
     model = MultiTenantUser
@@ -34,19 +36,19 @@ class RegisterUserFactory:
 
         self.user = user
 
-    def send_welcome(self):
-        pass
+    def send_signal(self):
+        registered.send(sender=self.user.__class__, instance=self.user)
 
     @transaction.atomic
     def run(self):
         self.create_user()
-        self.send_welcome()
+        self.send_signal()
 
 
 class InviteUserFactory:
     model = MultiTenantUser
-    is_active = False
     invitation_accepted = False
+    is_active = False
 
     def __init__(self, *, multi_tenant_company, language, username, first_name="", last_name=""):
         self.multi_tenant_company = multi_tenant_company
@@ -76,11 +78,14 @@ class InviteUserFactory:
         user.save()
         self.user = user
 
-    def send_invite(self):
-        # FIXME: Send out (branded) email to the new user.
-        pass
+    def send_signal(self):
+        invite_sent.send(sender=self.user.__class__, instance=self.user)
 
     @transaction.atomic
     def run(self):
         self.create_user()
-        self.send_invite()
+        self.send_signal()
+
+
+class AcceptUserInviteFactory:
+    pass
