@@ -11,21 +11,16 @@ from strawberry_django.fields.field import StrawberryDjangoField
 from strawberry import relay
 
 
-def resolve_my_multi_tenant_company_node(info: Info) -> MultiTenantCompany:
+def my_multi_tenant_company_resolver(info: Info) -> MultiTenantCompany:
     multi_tenant_company = get_multi_tenant_company(info)
     return multi_tenant_company
 
 
-def my_multi_tenant_company_node(*args, **kwargs):
-    return field(resolver=resolve_my_multi_tenant_company_node)
+def my_multi_tenant_company(*args, **kwargs):
+    return field(resolver=my_multi_tenant_company_resolver)
 
 
 @type(name="Query")
 class MultiTenantQuery:
     me: MultiTenantUserType = auth.current_user()
-
-    # FIXME: You shouldn't be able to fetch the multi_tenant_company from
-    # another user.  And you should receive the right company by default.
-    # eg field my_multi_tenant_company instead of the default multi_tenant_company node.
-    # multi_tenant_company: MultiTenantCompanyType = node()
-    my_multi_tenant_company: MultiTenantCompanyType = my_multi_tenant_company_node()
+    my_multi_tenant_company: MultiTenantCompanyType = my_multi_tenant_company()
