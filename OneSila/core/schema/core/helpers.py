@@ -1,5 +1,7 @@
 from strawberry.types import Info
-from strawberry_django.auth.utils import get_current_user
+from strawberry_django.auth.utils import get_current_user, aget_current_user
+
+from asgiref.sync import sync_to_async
 
 
 def get_multi_tenant_company(info: Info, fail_silently=True):

@@ -4,8 +4,8 @@ from .typing import GlobalID, Info, Model, AsyncGenerator, Any
 from strawberry import subscription
 
 
-async def model_subscriber(info: Info, pk: GlobalID, model: Model) -> AsyncGenerator[Any, None]:
-    publisher = ModelInstanceSubscribePublisher(info=info, pk=pk, model=model)
+async def model_subscriber(info: Info, pk: GlobalID, model: Model, multi_tenant_company_protection: bool = True) -> AsyncGenerator[Any, None]:
+    publisher = ModelInstanceSubscribePublisher(info=info, pk=pk, model=model, multi_tenant_company_protection=multi_tenant_company_protection)
     async for msg in publisher.await_messages():
         yield msg
 

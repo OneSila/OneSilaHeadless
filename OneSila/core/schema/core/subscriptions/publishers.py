@@ -28,8 +28,9 @@ class ModelInstanceSubscribePublisher:
 
     """
 
-    def __init__(self, info: Info, pk: GlobalID, model: Model):
+    def __init__(self, info: Info, pk: GlobalID, model: Model, multi_tenant_company_protection=True):
         self.info = info
+        self.multi_tenant_company_protection = multi_tenant_company_protection
 
         # print('info')
         # print(info.__dict__)
@@ -75,7 +76,13 @@ class ModelInstanceSubscribePublisher:
     def get_queryset(self):
         user = get_current_user(self.info)
         multi_tenant_company = user.multi_tenant_company
-        return self.model.objects.filter(multi_tenant_company=multi_tenant_company)
+
+        filter_kwargs = {}
+
+        if self.multi_tenant_company_protection:
+            filter_kwargs['multi_tenant_company_protection'] = multi_tenant_company
+
+        return self.model.objects.filter(**filter_kwargs)
 
     def get_instance(self, pk):
         return self.get_queryset().get(pk=pk)
