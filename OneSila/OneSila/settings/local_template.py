@@ -39,3 +39,10 @@ CORS_ALLOWED_METHODS = [
 # This allows session information to be passed through to the queries
 # to ensure login via django-sessions.
 CORS_ALLOW_CREDENTIALS = True
+
+
+#
+# Strawberry override
+#
+
+STRAWBERRY_DJANGO_REGISTER_USER_AUTO_LOGIN = False

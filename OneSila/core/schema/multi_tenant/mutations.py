@@ -1,21 +1,30 @@
 from strawberry import UNSET
-from strawberry_django import auth
+from strawberry_django import auth as strawberry_auth
 from strawberry_django.resolvers import django_resolver
 from strawberry_django.mutations import resolvers
 from strawberry_django.auth.utils import get_current_user
 from strawberry_django.optimizer import DjangoOptimizerExtension
+from strawberry_django.utils.requests import get_request
+from strawberry_django.auth.exceptions import IncorrectUsernamePasswordError
 
 from django.db import transaction
+from django.core.exceptions import ValidationError
+from django.contrib import auth
 from django.contrib.auth.password_validation import validate_password
 from django.db.utils import IntegrityError
+from django.conf import settings
 
 from typing import cast, Type
+from asgiref.sync import async_to_sync, sync_to_async
+
+from channels import auth as channels_auth
+from channels.db import database_sync_to_async
 
 from core.schema.core.mutations import create, type, DjangoUpdateMutation, \
     DjangoCreateMutation, GetMultiTenantCompanyMixin, default_extensions, \
     update, Info, models, Iterable, Any, IsAuthenticated
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
-from core.factories.multi_tenant import InviteUserFactory
+from core.factories.multi_tenant import InviteUserFactory, RegisterUserFactory
 
 from .types.types import MultiTenantUserType, MultiTenantCompanyType
 from .types.input import MultiTenantUserInput, MultiTenantUserPartialInput, \
@@ -23,59 +32,71 @@ from .types.input import MultiTenantUserInput, MultiTenantUserPartialInput, \
     MultiTenantInviteUserInput, MultiTenantCompanyMyInput
 
 
-class SetDefaultValuesMixin:
-    DEFAULT_VALUES = {}
-
-    def set_default_values(self, data):
-        data.update(self.DEFAULT_VALUES)
-        return data
-
-
-class RegisterUserMutation(SetDefaultValuesMixin, DjangoCreateMutation):
-    DEFAULT_VALUES = {
-        'is_multi_tenant_company_owner': True,
-        'invitation_accepted': True,
-    }
-
-    def create(self, data: dict[str, Any], *, info: Info):
-        model = cast(Type["AbstractBaseUser"], self.django_model)
-        assert model is not None
-
-        password = data.pop("password")
-        validate_password(password)
-
-        data = self.set_default_values(data)
-
-        with DjangoOptimizerExtension.disabled():
-            return resolvers.create(
-                info,
-                model,
-                data,
-                full_clean=self.full_clean,
-                pre_save_hook=lambda obj: obj.set_password(password),
-            )
-
-
-class InviteUserMutation(GetMultiTenantCompanyMixin, DjangoCreateMutation):
-    @transaction.atomic
-    def create(self, data: dict[str, Any], *, info: Info):
-        multi_tenant_company = self.get_multi_tenant_company(info)
-        data['multi_tenant_company'] = multi_tenant_company
-        data['is_active'] = False
-
-        for k in data.keys():
+class CleanupDataMixin:
+    def cleanup_data(self, data):
+        for k in data.copy().keys():
             if data[k] is UNSET:
                 del data[k]
 
-        with DjangoOptimizerExtension.disabled():
-            # Lets bother with the resolvers.  We just want to create the item.
-            # But we do want to validate before saving.
-            fac = InviteUserFactory(
-                data=data,
-                model=self.django_model)
-            fac.run()
+        return data
 
+
+class RegisterUserMutation(CleanupDataMixin, DjangoCreateMutation):
+    AUTO_LOGIN = settings.STRAWBERRY_DJANGO_REGISTER_USER_AUTO_LOGIN
+
+    def create_user(self, data):
+        data = self.cleanup_data(data)
+        fac = RegisterUserFactory(**data)
+        fac.run()
+
+        return fac.user
+
+    def login_user(self, info, username, password):
+        request = get_request(info)
+        user = auth.authenticate(request, username=username, password=password)
+
+        if user is None:
+            raise IncorrectUsernamePasswordError()
+
+        scope = request.consumer.scope
+        async_to_sync(channels_auth.login)(scope, user)
+        # Channels docs, you must save the session, or no user will be logged in.
+        scope["session"].save()
+
+        return user
+
+    def create(self, data: dict[str, Any], *, info: Info):
+        password = data.get("password")
+        username = data.get('username')
+        validate_password(password)
+
+        with DjangoOptimizerExtension.disabled():
+            user = self.create_user(data)
+
+            if self.AUTO_LOGIN:
+                # FIXME: Using auto-login seems to break:
+                # https://stackoverflow.com/questions/77557246/django-channels-login-connection-already-closed
+                # breaks on async_to_sync(channels_auth.login) section.
+                self.login_user(info, username, password)
+
+            return user
+
+
+class InviteUserMutation(CleanupDataMixin, GetMultiTenantCompanyMixin, DjangoCreateMutation):
+    def create(self, data: dict[str, Any], *, info: Info):
+        multi_tenant_company = self.get_multi_tenant_company(info)
+        data = self.cleanup_data(data)
+
+        with DjangoOptimizerExtension.disabled():
+            fac = InviteUserFactory(
+                multi_tenant_company=multi_tenant_company,
+                **data)
+            fac.run()
             return fac.user
+
+
+class AcceptInvitationMutation(DjangoUpdateMutation):
+    pass
 
 
 class MyMultiTenantCompanyCreateMutation(GetMultiTenantCompanyMixin, DjangoCreateMutation):
@@ -146,9 +167,36 @@ def update_me():
     return UpdateMeMutation(MultiTenantUserPartialInput, extensions=extensions)
 
 
+# @django_resolver
 def register_user():
     extensions = []
     return RegisterUserMutation(MultiTenantUserInput, extensions=extensions)
+
+
+# def resolve_login(info: Info, username: str, password: str) -> AbstractBaseUser:
+#     request = get_request(info)
+#     user = auth.authenticate(request, username=username, password=password)
+
+#     if user is None:
+#         raise IncorrectUsernamePasswordError()  # noqa: RSE102
+
+#     try:
+#         auth.login(request, user)
+#     except AttributeError:
+#         # ASGI in combo with websockets needs the channels login functionality.
+#         # to ensure we're talking about channels, let's veriy that our
+#         # request is actually channelsrequest
+#         try:
+#             scope = request.consumer.scope  # type: ignore
+#             async_to_sync(channels_auth.login)(scope, user)  # type: ignore
+#             # According to channels docs you must save the session
+#             scope["session"].save()
+#         except (AttributeError, NameError):
+#             # When Django-channels is not installed,
+#             # this code will be non-existing
+#             pass
+
+#     return user
 
 
 def invite_user():
@@ -158,10 +206,9 @@ def invite_user():
 
 @type(name="Mutation")
 class MultiTenantMutation:
-    login: MultiTenantUserType = auth.login()
-    logout = auth.logout()
+    login: MultiTenantUserType = strawberry_auth.login()
+    logout = strawberry_auth.logout()
 
-    # register_user: MultiTenantUserType = auth.register()
     register_user: MultiTenantUserType = register_user()
     register_my_multi_tenant_company: MultiTenantCompanyType = register_my_multi_tenant_company()
 
