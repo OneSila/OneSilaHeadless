@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/OneSila/OneSilaHeadless/graph/badge.svg?token=URYTB56K2W)](https://codecov.io/gh/OneSila/OneSilaHeadless)
+
 # OneSila Headless Backend
 
 ## Quickstart
