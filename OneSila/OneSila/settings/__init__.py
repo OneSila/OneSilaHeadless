@@ -1,3 +1,7 @@
 import socket
 from .base import *
-from .local import *
+
+try:
+    from .local import *
+except ModuleNotFoundError:
+    pass

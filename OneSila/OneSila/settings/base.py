@@ -13,7 +13,9 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 from django.utils.translation import gettext_lazy as _
 from operator import itemgetter
+import os
 
+SECRET_KEY = "FAKE-KEY-DONT-KEEP-THIS-YOU-SHOULD-SET-A-NEW-ONE"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -87,6 +89,18 @@ WSGI_APPLICATION = 'OneSila.wsgi.application'
 ASGI_APPLICATION = 'OneSila.asgi.application'
 
 
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': os.getenv('POSTGRES_DB', 'fake'),
+        'USER': os.getenv('POSTGRES_USER', 'fake'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'fake'),
+        'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
+        'PORT': '5432',
+    }
+}
+
+
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 
@@ -138,6 +152,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Strawberry graphql settings
 #
 
+STRAWBERRY_DJANGO_REGISTER_USER_AUTO_LOGIN = False
+
 STRAWBERRY_DJANGO = {
     "FIELD_DESCRIPTION_FROM_HELP_TEXT": True,
     "TYPE_DESCRIPTION_FROM_MODEL_DOCSTRING": True,
@@ -149,7 +165,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+            "hosts": [(os.getenv('REDIS_HOST', "127.0.0.1"), os.getenv('REDIS_PORT', 6379))],
         },
     },
 }
@@ -159,3 +175,16 @@ CHANNEL_LAYERS = {
 #
 
 CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOWED_ORIGINS = [
+    '*',
+    # 'http://172.19.250.107:3000',
+]
+
+CORS_ALLOWED_HEADERS = [
+    '*'
+]
+
+CORS_ALLOWED_METHODS = [
+    '*'
+]
