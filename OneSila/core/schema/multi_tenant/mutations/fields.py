@@ -35,7 +35,7 @@ def invite_user():
 
 
 def accept_user_invitation():
-    extensions = default_extensions
+    extensions = []
     return AcceptInvitationMutation(MultiTenantAcceptInviteInput, extensions=extensions)
 
 
