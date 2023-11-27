@@ -23,8 +23,6 @@ jobs:
         python-version: '3.11'
     - name: Install requirements
       run: pip install -r requirements.txt
-    - name: Install OS dependencies
-      run: sudo apt-get install postgresql
     - name: Run tests and collect coverage
       env:
         POSTGRES_HOST: localhost
