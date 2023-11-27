@@ -24,12 +24,14 @@ from core.schema.core.mutations import create, type, DjangoUpdateMutation, \
     DjangoCreateMutation, GetMultiTenantCompanyMixin, default_extensions, \
     update, Info, models, Iterable, Any, IsAuthenticated
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
-from core.factories.multi_tenant import InviteUserFactory, RegisterUserFactory
+from core.factories.multi_tenant import InviteUserFactory, RegisterUserFactory, \
+    AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory
 
 from .types.types import MultiTenantUserType, MultiTenantCompanyType
 from .types.input import MultiTenantUserInput, MultiTenantUserPartialInput, \
     MultiTenantCompanyPartialInput, MultiTenantCompanyInput, \
-    MultiTenantInviteUserInput, MultiTenantCompanyMyInput
+    MultiTenantInviteUserInput, MultiTenantCompanyMyInput, \
+    MultiTenantAcceptInviteInput, MultiTenantUserStatusInput
 
 
 class CleanupDataMixin:
@@ -96,7 +98,16 @@ class InviteUserMutation(CleanupDataMixin, GetMultiTenantCompanyMixin, DjangoCre
 
 
 class AcceptInvitationMutation(DjangoUpdateMutation):
-    pass
+    def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
+        # Do not optimize anything while retrieving the object to update
+        with DjangoOptimizerExtension.disabled():
+            fac = AcceptUserInviteFactory(
+                instance=instance,
+                password=password,
+                language=language)
+            fac.run()
+
+            return fac.user
 
 
 class MyMultiTenantCompanyCreateMutation(GetMultiTenantCompanyMixin, DjangoCreateMutation):
@@ -152,6 +163,24 @@ class UpdateMeMutation(DjangoUpdateMutation):
         return self.update(info, instance, resolvers.parse_input(info, vdata))
 
 
+class DisableUserMutation(DjangoUpdateMutation):
+    def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
+        # Do not optimize anything while retrieving the object to update
+        with DjangoOptimizerExtension.disabled():
+            fac = DisableUserFactory(user=instance)
+            fac.run()
+            return fac.user
+
+
+class EnableUserMutation(DjangoUpdateMutation):
+    def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
+        # Do not optimize anything while retrieving the object to update
+        with DjangoOptimizerExtension.disabled():
+            fac = EnableUserFactory(user=instance)
+            fac.run()
+            return fac.user
+
+
 def register_my_multi_tenant_company():
     extensions = [IsAuthenticated()]
     return MyMultiTenantCompanyCreateMutation(MultiTenantCompanyMyInput, extensions=extensions)
@@ -177,6 +206,21 @@ def invite_user():
     return InviteUserMutation(MultiTenantInviteUserInput, extensions=extensions)
 
 
+def accept_user_invitation():
+    extensions = default_extensions
+    return AcceptInvitationMutation(MultiTenantAcceptInviteInput, extensions=extensions)
+
+
+def disable_user():
+    extensions = default_extensions
+    return EnableUserMutation(MultiTenantUserStatusInput, extensions=extensions)
+
+
+def enable_user():
+    extensions = default_extensions
+    return DisableUserMutation(MultiTenantUserStatusInput, extensions=extensions)
+
+
 @type(name="Mutation")
 class MultiTenantMutation:
     login: MultiTenantUserType = strawberry_auth.login()
@@ -189,10 +233,7 @@ class MultiTenantMutation:
     update_my_multi_tenant_company: MultiTenantCompanyType = update_my_multi_tenant_company()
 
     invite_user: MultiTenantUserType = invite_user()
-    # TODO: Invite user mutation.
-    # this mutation will:
-    # create "un-activated" user
-    # assign to multi-tenant-company
-    # send out email to invite and resturn invitation link
-    # + query/mutation flow for the user to actually subscribe.
-    # + mutation to re-invite the user
+    accept_user_invitation: MultiTenantUserType = accept_user_invitation()
+
+    disable_user: MultiTenantUserType = disable_user()
+    enable_user: MultiTenantUserType = enable_user()

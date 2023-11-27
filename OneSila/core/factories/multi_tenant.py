@@ -2,7 +2,8 @@ from django.db import transaction
 from core.models.multi_tenant import MultiTenantUser
 from django.core.exceptions import ValidationError
 
-from core.signals import registered, invite_sent, invite_accepted
+from core.signals import registered, invite_sent, invite_accepted, \
+    disabled, enabled
 
 
 class RegisterUserFactory:
@@ -88,4 +89,57 @@ class InviteUserFactory:
 
 
 class AcceptUserInviteFactory:
-    pass
+    def __init__(self, user, password, language):
+        self.user = user
+        self.password = password
+        self.language = language
+
+    def update_user(self):
+        self.user.invitation_accepted = True
+        self.user.language = self.language
+        self.user.is_active = True
+
+        self.user.set_password(self.password)
+        self.user.save()
+
+    def send_signal(self):
+        invite_accepted.send(sender=self.user.__class__, instance=self.user)
+
+    @transaction.atomic
+    def run(self):
+        self.update_user()
+        self.send_signal()
+
+
+class DisableUserFactory:
+    def __init__(self, user):
+        self.user = user
+
+    def disable_user(self):
+        self.user.is_active = False
+        self.user.save()
+
+    def send_signal(self):
+        disabled.send(sender=self.user.__class__, instance=self.user)
+
+    @transaction.atomic
+    def run(self):
+        self.disable_user()
+        self.send_signal()
+
+
+class EnableUserFactory:
+    def __init__(self, user):
+        self.user = user
+
+    def enable_user(self):
+        self.user.is_active = True
+        self.user.save()
+
+    def send_signal(self):
+        enabled.send(sender=self.user.__class__, instance=self.user)
+
+    @transaction.atomic
+    def run(self):
+        self.enable_user()
+        self.send_signal()
