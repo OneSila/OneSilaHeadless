@@ -167,36 +167,9 @@ def update_me():
     return UpdateMeMutation(MultiTenantUserPartialInput, extensions=extensions)
 
 
-# @django_resolver
 def register_user():
     extensions = []
     return RegisterUserMutation(MultiTenantUserInput, extensions=extensions)
-
-
-# def resolve_login(info: Info, username: str, password: str) -> AbstractBaseUser:
-#     request = get_request(info)
-#     user = auth.authenticate(request, username=username, password=password)
-
-#     if user is None:
-#         raise IncorrectUsernamePasswordError()  # noqa: RSE102
-
-#     try:
-#         auth.login(request, user)
-#     except AttributeError:
-#         # ASGI in combo with websockets needs the channels login functionality.
-#         # to ensure we're talking about channels, let's veriy that our
-#         # request is actually channelsrequest
-#         try:
-#             scope = request.consumer.scope  # type: ignore
-#             async_to_sync(channels_auth.login)(scope, user)  # type: ignore
-#             # According to channels docs you must save the session
-#             scope["session"].save()
-#         except (AttributeError, NameError):
-#             # When Django-channels is not installed,
-#             # this code will be non-existing
-#             pass
-
-#     return user
 
 
 def invite_user():

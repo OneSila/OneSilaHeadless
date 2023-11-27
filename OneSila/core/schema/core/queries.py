@@ -1,5 +1,6 @@
 import strawberry_django
 from strawberry_django.relay import ListConnectionWithTotalCount
+from strawberry.types import Info
 from strawberry import type, field
 from typing import Any
 from .extensions import default_extensions
