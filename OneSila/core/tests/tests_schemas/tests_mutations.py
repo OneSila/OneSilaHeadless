@@ -26,15 +26,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
 
-        me_query = """
-            query me {
-              me {
-                multiTenantCompany{
-                    id
-                }
-              }
-            }
-        """
+        me_query = ME_QUERY
 
         username = 'my@mail.com'
         password = "someNewPas@k22!"
@@ -130,18 +122,8 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         self.assertTrue(resp.data['logout'] is True)
 
     def test_me(self):
-        query = """
-            query me {
-              me {
-                username
-                password
-                multiTenantCompany{
-                    id
-                }
-                language
-              }
-            }
-        """
+        me_query = ME_QUERY
+
         password = '22kk22@ksk!aAD'
         user = MultiTenantUser(username='usead3rname@mail.com', language="nl")
         user.set_password(password)
@@ -153,7 +135,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         )
 
         resp = self.stawberry_test_client(
-            query=query,
+            query=me_query,
             variables={}
         )
 
