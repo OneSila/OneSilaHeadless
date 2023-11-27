@@ -4,7 +4,8 @@ from model_bakery import baker
 from core.models.multi_tenant import MultiTenantUser
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 
-from .mutations import REGISTER_USER_MUTATION, LOGIN_MUTATION, LOGOUT_MUTATION
+from .mutations import REGISTER_USER_MUTATION, LOGIN_MUTATION, LOGOUT_MUTATION, \
+    ME_QUERY
 
 
 class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
