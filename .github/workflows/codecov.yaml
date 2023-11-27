@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: Test python API
+    name: Test OneSilaHeadless
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v2
