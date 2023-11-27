@@ -159,3 +159,16 @@ CHANNEL_LAYERS = {
 #
 
 CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOWED_ORIGINS = [
+    '*',
+    # 'http://172.19.250.107:3000',
+]
+
+CORS_ALLOWED_HEADERS = [
+    '*'
+]
+
+CORS_ALLOWED_METHODS = [
+    '*'
+]

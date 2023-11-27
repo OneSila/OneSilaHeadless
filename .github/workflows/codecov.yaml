@@ -13,6 +13,8 @@ jobs:
         python-version: '3.11'
     - name: Install requirements
       run: pip install -r requirements.txt
+    - name: Install OS dependencies
+      run: sudo apti-get install postgresql
     - name: Run tests and collect coverage
       run: cd OneSila && coverage run --source='.' manage.py test
     - name: Upload coverage reports to Codecov with GitHub Action
