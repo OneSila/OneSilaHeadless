@@ -91,6 +91,7 @@ class InviteUserFactory:
 class AcceptUserInviteFactory:
     def __init__(self, user, password, language):
         self.user = user
+
         self.password = password
         self.language = language
 

@@ -44,8 +44,10 @@ class MultiTenantCompanyPartialInput:
 
 @input(MultiTenantUser)
 class MultiTenantAcceptInviteInput:
+    id: auto
     username: auto
     password: auto
+    language: auto
 
 
 @input(MultiTenantUser)

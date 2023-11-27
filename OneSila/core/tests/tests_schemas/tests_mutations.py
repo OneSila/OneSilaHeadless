@@ -1,7 +1,7 @@
 from django.test import TestCase, TransactionTestCase
 from model_bakery import baker
-
-from core.models.multi_tenant import MultiTenantUser
+from strawberry.relay import to_base64
+from core.models.multi_tenant import MultiTenantUser, MultiTenantCompany
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 
 from .mutations import REGISTER_USER_MUTATION, LOGIN_MUTATION, LOGOUT_MUTATION, \
@@ -142,6 +142,65 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         self.assertTrue(resp.data is not None)
         self.assertTrue(resp.errors is None)
+
+    def test_invite_user(self):
+        password = '22kk22@ksk!aAD'
+        company = MultiTenantCompany.objects.create(name='Invitecompany', country="DE")
+        user = MultiTenantUser(username='use323name@mail.com', language="nl", multi_tenant_company=company)
+        user.set_password(password)
+        user.save()
+
+        user_id = to_base64("MultiTenantUserType", user.id)
+
+        resp = self.stawberry_test_client(
+            query=LOGIN_MUTATION,
+            variables={"username": user.username, "password": password}
+        )
+
+        invite_mutation = """
+            mutation inviteUser($username: String!, $language: String!){
+              inviteUser(data: {username: $username, language: $language}){
+                username
+                isActive
+                invitationAccepted
+              }
+            }
+        """
+
+        username = "invite@kdka.com"
+
+        resp = self.stawberry_test_client(
+            query=invite_mutation,
+            variables={'username': username, 'language': 'nl'}
+        )
+
+        self.assertTrue(resp.errors is None)
+        self.assertFalse(resp.data['inviteUser']['isActive'])
+        self.assertFalse(resp.data['inviteUser']['invitationAccepted'])
+
+        resp = self.stawberry_test_client(
+            query=LOGOUT_MUTATION,
+            variables={}
+        )
+
+        accept_mutation = """
+            mutation acceptUserInvitation($id: GlobalID!, $username: String!, $password: String!){
+              acceptUserInvitation(data: {id: $id, username: $username, password: $password}){
+                username
+                isActive
+                invitationAccepted
+              }
+            }
+        """
+
+        resp = self.stawberry_test_client(
+            query=accept_mutation,
+            variables={'username': username, 'password': "SomePaddk@2k2", "id": user_id}
+        )
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data['inviteUser']['isActive'])
+        self.assertTrue(resp.data['inviteUser']['invitationAccepted'])
 
     def test_enable_disable_user(self):
         pass

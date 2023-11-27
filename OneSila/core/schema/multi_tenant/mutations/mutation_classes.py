@@ -1,5 +1,6 @@
 from strawberry import UNSET
 
+from strawberry.relay.utils import from_base64
 from strawberry_django.resolvers import django_resolver
 from strawberry_django.mutations import resolvers
 from strawberry_django.auth.utils import get_current_user
@@ -90,10 +91,12 @@ class AcceptInvitationMutation(DjangoUpdateMutation):
     def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
         # Do not optimize anything while retrieving the object to update
         with DjangoOptimizerExtension.disabled():
+            _, user_id = from_base64(data['id'])
+            user = instance.filter(id=user_id)
             fac = AcceptUserInviteFactory(
-                instance=instance,
-                password=password,
-                language=language)
+                user=user,
+                password=data['password'],
+                language=data['language'])
             fac.run()
 
             return fac.user
