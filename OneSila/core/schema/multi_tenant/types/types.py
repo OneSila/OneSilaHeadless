@@ -3,14 +3,16 @@ from django.contrib.auth import get_user_model
 from core.schema.core.types.types import type, relay, auto
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 
+from core.schema.multi_tenant.types.ordering import MultiTenantUserOrder
+from core.schema.multi_tenant.types.filters import MultiTenantUserFilter
 from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser
+
 
 from typing import List
 
 
-@type(MultiTenantUser, fields="__all__")
+@type(MultiTenantUser, filters=MultiTenantUserOrder, order=MultiTenantUserFilter, pagination=True, fields='__all__')
 class MultiTenantUserType:
-    # multi_tenant_company: auto
     pass
 
 

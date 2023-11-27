@@ -47,8 +47,6 @@ class MultiTenantUserInput:
     username: auto
     password: auto
     language: auto
-    # first_name: auto
-    # last_name: auto
 
 
 @partial(MultiTenantUser)
