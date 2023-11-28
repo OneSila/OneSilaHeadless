@@ -1,0 +1,21 @@
+{% extends 'notifications/email/base_email.html' %}
+{% load i18n %}
+
+{% block content %}
+{% translate "Hi" %} {{ name }}
+<br><br>
+{% translate "We're amazed to go on this productivity journey together." %}
+{% translate "Let's start by logging in to your account and prepare your first produts and orders." %}
+<br><br>
+<a href="{{ dashboard_url }}">{% translate "Login to your dashboard here." %}</a>
+<br><br>
+{% translate "Any help needed?" %}
+<br>
+{% translate "I'd love to hear from you." %}
+<br>
+{% translate "Best regards" %}
+<br>
+{% translate "Sascha Dobbelaere" %}
+<br>
+
+{% endblock %}
