@@ -1,5 +1,6 @@
 from strawberry import UNSET
-from strawberry_django import auth as strawberry_auth
+
+from strawberry.relay.utils import from_base64
 from strawberry_django.resolvers import django_resolver
 from strawberry_django.mutations import resolvers
 from strawberry_django.auth.utils import get_current_user
@@ -8,28 +9,19 @@ from strawberry_django.utils.requests import get_request
 from strawberry_django.auth.exceptions import IncorrectUsernamePasswordError
 
 from django.db import transaction
-from django.core.exceptions import ValidationError
 from django.contrib import auth
 from django.contrib.auth.password_validation import validate_password
-from django.db.utils import IntegrityError
 from django.conf import settings
 
-from typing import cast, Type
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
 
 from channels import auth as channels_auth
-from channels.db import database_sync_to_async
 
 from core.schema.core.mutations import create, type, DjangoUpdateMutation, \
     DjangoCreateMutation, GetMultiTenantCompanyMixin, default_extensions, \
     update, Info, models, Iterable, Any, IsAuthenticated
-from core.schema.core.mixins import GetQuerysetMultiTenantMixin
-from core.factories.multi_tenant import InviteUserFactory, RegisterUserFactory
-
-from .types.types import MultiTenantUserType, MultiTenantCompanyType
-from .types.input import MultiTenantUserInput, MultiTenantUserPartialInput, \
-    MultiTenantCompanyPartialInput, MultiTenantCompanyInput, \
-    MultiTenantInviteUserInput, MultiTenantCompanyMyInput
+from core.factories.multi_tenant import InviteUserFactory, RegisterUserFactory, \
+    AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory
 
 
 class CleanupDataMixin:
@@ -96,7 +88,16 @@ class InviteUserMutation(CleanupDataMixin, GetMultiTenantCompanyMixin, DjangoCre
 
 
 class AcceptInvitationMutation(DjangoUpdateMutation):
-    pass
+    def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
+        # Do not optimize anything while retrieving the object to update
+        with DjangoOptimizerExtension.disabled():
+            fac = AcceptUserInviteFactory(
+                user=instance,
+                password=data['password'],
+                language=data['language'])
+            fac.run()
+
+            return fac.user
 
 
 class MyMultiTenantCompanyCreateMutation(GetMultiTenantCompanyMixin, DjangoCreateMutation):
@@ -152,47 +153,21 @@ class UpdateMeMutation(DjangoUpdateMutation):
         return self.update(info, instance, resolvers.parse_input(info, vdata))
 
 
-def register_my_multi_tenant_company():
-    extensions = [IsAuthenticated()]
-    return MyMultiTenantCompanyCreateMutation(MultiTenantCompanyMyInput, extensions=extensions)
+class DisableUserMutation(DjangoUpdateMutation):
+    def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
+        # Do not optimize anything while retrieving the object to update
+        with DjangoOptimizerExtension.disabled():
+            fac = DisableUserFactory(user=instance)
+            fac.run()
+            return fac.user
 
 
-def update_my_multi_tenant_company():
-    extensions = default_extensions
-    return MyMultiTentantCompanyUpdateMutation(MultiTenantCompanyPartialInput, extensions=extensions)
+class EnableUserMutation(DjangoUpdateMutation):
+    def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
+        # Do not optimize anything while retrieving the object to update
+        with DjangoOptimizerExtension.disabled():
+            fac = EnableUserFactory(user=instance)
+            fac.run()
 
-
-def update_me():
-    extensions = default_extensions
-    return UpdateMeMutation(MultiTenantUserPartialInput, extensions=extensions)
-
-
-def register_user():
-    extensions = []
-    return RegisterUserMutation(MultiTenantUserInput, extensions=extensions)
-
-
-def invite_user():
-    extensions = default_extensions
-    return InviteUserMutation(MultiTenantInviteUserInput, extensions=extensions)
-
-
-@type(name="Mutation")
-class MultiTenantMutation:
-    login: MultiTenantUserType = strawberry_auth.login()
-    logout = strawberry_auth.logout()
-
-    register_user: MultiTenantUserType = register_user()
-    register_my_multi_tenant_company: MultiTenantCompanyType = register_my_multi_tenant_company()
-
-    update_me: MultiTenantUserType = update_me()
-    update_my_multi_tenant_company: MultiTenantCompanyType = update_my_multi_tenant_company()
-
-    invite_user: MultiTenantUserType = invite_user()
-    # TODO: Invite user mutation.
-    # this mutation will:
-    # create "un-activated" user
-    # assign to multi-tenant-company
-    # send out email to invite and resturn invitation link
-    # + query/mutation flow for the user to actually subscribe.
-    # + mutation to re-invite the user
+            instance.refresh_from_db()
+            return instance

@@ -11,35 +11,22 @@ class MultiTenantCompanyMyInput:
     language: auto
 
 
-@input(MultiTenantCompany)
+@input(MultiTenantCompany, fields="__all__")
 class MultiTenantCompanyInput:
-    name: auto
-    address1: auto
-    address2: auto
-    postcode: auto
-    city: auto
-    country: auto
-    language: auto
-    email: auto
-    phone_number: auto
-    vat_number: auto
-    website: auto
+    pass
 
 
-@partial(MultiTenantCompany)
-class MultiTenantCompanyPartialInput:
+@partial(MultiTenantCompany, fields="__all__")
+class MultiTenantCompanyPartialInput(NodeInput):
+    pass
+
+
+@input(MultiTenantUser)
+class MultiTenantUserAcceptInviteInput:
     id: auto
-    name: auto
-    address1: auto
-    address2: auto
-    postcode: auto
-    city: auto
-    country: auto
+    username: auto
+    password: auto
     language: auto
-    email: auto
-    phone_number: auto
-    vat_number: auto
-    website: auto
 
 
 @input(MultiTenantUser)
@@ -47,18 +34,16 @@ class MultiTenantUserInput:
     username: auto
     password: auto
     language: auto
-    # first_name: auto
-    # last_name: auto
 
 
-@partial(MultiTenantUser)
-class MultiTenantUserPartialInput:
+@input(MultiTenantUser)
+class MultiTenantUserStatusInput:
     id: auto
-    username: auto
-    password: auto
-    language: auto
-    first_name: auto
-    last_name: auto
+
+
+@partial(MultiTenantUser, fields="__all__")
+class MultiTenantUserPartialInput:
+    pass
 
 
 @input(MultiTenantUser)
