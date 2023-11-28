@@ -15,6 +15,7 @@ from typing import List
 @type(MultiTenantUser, filters=MultiTenantUserOrder, order=MultiTenantUserFilter, pagination=True, fields='__all__')
 class MultiTenantUserType(relay.Node):
     avatar_resized: DjangoImageType
+    avatar_resized_full_url: str
 
 
 @type(MultiTenantCompany, fields='__all__')

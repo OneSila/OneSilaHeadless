@@ -9,6 +9,7 @@ from imagekit.processors import ResizeToFill
 from core.validators import phone_regex, validate_image_extension, \
     no_dots_in_filename
 from core.helpers import get_languages
+from get_absolute_url.helpers import generate_absolute_url
 
 
 class MultiTenantCompany(models.Model):
@@ -83,6 +84,9 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
 
     def __str__(self):
         return f"{self.username} <{self.multi_tenant_company}>"
+
+    def avatar_resized_full_url(self):
+        return f"{generate_absolute_url(trailing_slash=False)}{self.avatar_resized.url}"
 
     def save(self, *args, **kwargs):
         self.email = self.username

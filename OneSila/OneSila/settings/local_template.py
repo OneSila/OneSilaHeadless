@@ -15,6 +15,11 @@ DATABASES = {
 
 SECRET_KEY = 'your-secret-key-goes-here'
 
+#
+# Url generation settings
+#
+
+HTTPS_SUPPORTED = True
 
 #
 # CORS Settings. See: https://www.starlette.io/middleware/#corsmiddleware
