@@ -20,3 +20,21 @@ class TransactionTestCaseMixin:
         test_client = TestClient('/graphql/')
         with test_client.login(self.user):
             return test_client.query(**kwargs)
+
+
+class TestCountyQuery(TransactionTestCaseMixin, TransactionTestCase):
+    def test_countries(self):
+        query = """
+            query countries{
+              countries{
+                code
+                name
+              }
+            }
+        """
+
+        resp = self.stawberry_test_client(
+            query=query)
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
