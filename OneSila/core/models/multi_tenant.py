@@ -5,10 +5,10 @@ from django.utils.translation import gettext_lazy as _
 
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFill
-
+from core.helpers import get_languages
 from core.validators import phone_regex, validate_image_extension, \
     no_dots_in_filename
-from core.helpers import get_languages
+
 from get_absolute_url.helpers import generate_absolute_url
 
 
@@ -85,13 +85,12 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     def __str__(self):
         return f"{self.username} <{self.multi_tenant_company}>"
 
-    def avatar_resized_full_url(self):
-        return f"{generate_absolute_url(trailing_slash=False)}{self.avatar_resized.url}"
-
     def save(self, *args, **kwargs):
         self.email = self.username
-
         super().save(*args, **kwargs)
+
+    def avatar_resized_full_url(self):
+        return f"{generate_absolute_url(trailing_slash=False)}{self.avatar_resized.url}"
 
     def set_active(self, save=True):
         self.is_active = True
