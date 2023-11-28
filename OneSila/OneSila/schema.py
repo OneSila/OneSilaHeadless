@@ -9,6 +9,7 @@ from strawberry_django.optimizer import DjangoOptimizerExtension
 
 from contacts.schema import ContactsQuery, ContactsMutation, ContactsSubscription
 from core.schema.countries import CountryQuery
+from core.schema.languages import LanguageQuery
 from core.schema.multi_tenant import MultiTenantQuery, MultiTenantMutation, MultiTenantSubscription
 from currencies.schema import CurrenciesQuery, CurrenciesMutation, CurrenciesSubscription
 from customs.schema import CustomsQuery, CustomsMutation, CustomsSubscription
@@ -30,8 +31,9 @@ from units.schema import UnitsQuery, UnitsMutation, UnitsSubscription
 
 @strawberry.type
 class Query(ContactsQuery, CurrenciesQuery, CustomsQuery, CountryQuery, EanCodesQuery,
-        InventoryQuery, MediaQuery, MultiTenantQuery, OrdersQuery, ProductsQuery,
-        PropertiesQuery, PurchasingQuery, SalesPricesQuery, TaxesQuery, UnitsQuery):
+        InventoryQuery, LanguageQuery, MediaQuery, MultiTenantQuery, OrdersQuery,
+        ProductsQuery, PropertiesQuery, PurchasingQuery, SalesPricesQuery, TaxesQuery,
+        UnitsQuery):
     pass
 
 

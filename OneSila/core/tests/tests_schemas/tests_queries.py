@@ -22,7 +22,7 @@ class TransactionTestCaseMixin:
             return test_client.query(**kwargs)
 
 
-class TestCountyQuery(TransactionTestCaseMixin, TransactionTestCase):
+class TestCountryQuery(TransactionTestCaseMixin, TransactionTestCase):
     def test_countries(self):
         query = """
             query countries{
@@ -30,6 +30,37 @@ class TestCountyQuery(TransactionTestCaseMixin, TransactionTestCase):
                 code
                 name
               }
+            }
+        """
+
+        resp = self.stawberry_test_client(
+            query=query)
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+
+class TestLanguageQuery(TransactionTestCaseMixin, TransactionTestCase):
+    def test_languages(self):
+        query = """
+            query languages{
+              languages{
+                iso
+                name
+              }
+            }
+        """
+
+        resp = self.stawberry_test_client(
+            query=query)
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+    def test_default_language(self):
+        query = """
+            query defaultLanguage{
+              defaultLanguageCode
             }
         """
 
