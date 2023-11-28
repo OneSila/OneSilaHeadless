@@ -20,3 +20,74 @@ class TransactionTestCaseMixin:
         test_client = TestClient('/graphql/')
         with test_client.login(self.user):
             return test_client.query(**kwargs)
+
+
+class TestCountryQuery(TransactionTestCaseMixin, TransactionTestCase):
+    def test_countries(self):
+        query = """
+            query countries{
+              countries{
+                code
+                name
+              }
+            }
+        """
+
+        resp = self.stawberry_test_client(
+            query=query)
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+
+class TestLanguageQuery(TransactionTestCaseMixin, TransactionTestCase):
+    def test_languages(self):
+        query = """
+            query languages{
+              languages{
+                code
+                name
+                nameLocal
+                nameTranslated
+              }
+            }
+        """
+
+        resp = self.stawberry_test_client(
+            query=query)
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+    def test_default_language(self):
+        query = """
+            query defaultLanguage{
+              defaultLanguage{
+                code
+                name
+                bidi
+              }
+            }
+        """
+
+        resp = self.stawberry_test_client(
+            query=query)
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+    def test_current_lang(self):
+        query = """
+            query currentUserLanguage{
+                currentUserLanguage{
+                    code
+                    name
+                    bidi
+                }
+            }
+        """
+        resp = self.stawberry_test_client(
+            query=query)
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
