@@ -41,9 +41,9 @@ def accept_user_invitation():
 
 def disable_user():
     extensions = default_extensions
-    return EnableUserMutation(MultiTenantUserStatusInput, extensions=extensions)
+    return DisableUserMutation(MultiTenantUserStatusInput, extensions=extensions)
 
 
 def enable_user():
     extensions = default_extensions
-    return DisableUserMutation(MultiTenantUserStatusInput, extensions=extensions)
+    return EnableUserMutation(MultiTenantUserStatusInput, extensions=extensions)

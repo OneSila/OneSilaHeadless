@@ -117,8 +117,7 @@ class DisableUserFactory:
         self.user = user
 
     def disable_user(self):
-        self.user.is_active = False
-        self.user.save()
+        self.user.set_inactive()
 
     def send_signal(self):
         disabled.send(sender=self.user.__class__, instance=self.user)
@@ -134,8 +133,7 @@ class EnableUserFactory:
         self.user = user
 
     def enable_user(self):
-        self.user.is_active = True
-        self.user.save()
+        self.user.set_active()
 
     def send_signal(self):
         enabled.send(sender=self.user.__class__, instance=self.user)

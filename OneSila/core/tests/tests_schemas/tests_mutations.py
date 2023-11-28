@@ -198,8 +198,6 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
             variables={'username': username, 'password': "SomePaddk@2k2", "id": user_id}
         )
 
-        print(resp)
-
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data['acceptUserInvitation']['isActive'])
         self.assertTrue(resp.data['acceptUserInvitation']['invitationAccepted'])
@@ -229,7 +227,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         )
 
         self.assertTrue(resp.errors is None)
-        self.assertTrue(resp.data['inviteUser']['isActive'])
+        self.assertTrue(resp.data['enableUser']['isActive'])
 
         disable_query = """
         mutation disableUser($id: GlobalID!){
@@ -240,5 +238,10 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         }
         """
 
+        resp = self.stawberry_test_client(
+            query=disable_query,
+            variables={"id": user_id}
+        )
+
         self.assertTrue(resp.errors is None)
-        self.assertFalse(resp.data['inviteUser']['isActive'])
+        self.assertFalse(resp.data['disableUser']['isActive'])

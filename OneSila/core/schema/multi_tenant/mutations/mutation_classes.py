@@ -91,10 +91,8 @@ class AcceptInvitationMutation(DjangoUpdateMutation):
     def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
         # Do not optimize anything while retrieving the object to update
         with DjangoOptimizerExtension.disabled():
-            _, user_id = from_base64(data['id'])
-            user = instance.filter(id=user_id)
             fac = AcceptUserInviteFactory(
-                user=user,
+                user=instance,
                 password=data['password'],
                 language=data['language'])
             fac.run()
@@ -170,4 +168,6 @@ class EnableUserMutation(DjangoUpdateMutation):
         with DjangoOptimizerExtension.disabled():
             fac = EnableUserFactory(user=instance)
             fac.run()
-            return fac.user
+
+            instance.refresh_from_db()
+            return instance

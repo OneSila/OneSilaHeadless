@@ -12,7 +12,7 @@ from typing import List
 
 
 @type(MultiTenantUser, filters=MultiTenantUserOrder, order=MultiTenantUserFilter, pagination=True, fields='__all__')
-class MultiTenantUserType:
+class MultiTenantUserType(relay.Node):
     pass
 
 
