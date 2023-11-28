@@ -26,7 +26,7 @@ def get_default_language() -> LanguageType:
     return LanguageType(**get_language_info(settings.LANGUAGE_CODE))
 
 
-def get_current_language(info) -> LanguageType:
+def get_current_user_language(info) -> LanguageType:
     user = get_current_user(info)
     activate(user.language)
     lang = LanguageType(**get_language_info(user.language))
@@ -37,5 +37,5 @@ def get_current_language(info) -> LanguageType:
 @type(name="Query")
 class LanguageQuery:
     default_language: LanguageType = field(resolver=get_default_language)
-    current_language: LanguageType = field(resolver=get_current_language)
+    current_user_language: LanguageType = field(resolver=get_current_user_language)
     languages: List[LanguageType] = field(resolver=get_languages)
