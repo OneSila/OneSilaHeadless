@@ -3,7 +3,11 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 
-from core.validators import phone_regex
+from imagekit.models import ImageSpecField
+from imagekit.processors import ResizeToFill
+
+from core.validators import phone_regex, validate_image_extension, \
+    no_dots_in_filename
 from core.helpers import get_languages
 
 
@@ -59,13 +63,23 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     LANGUAGE_CHOICES = get_languages()
 
     username = models.EmailField(unique=True, help_text=_('Email Address'))
-    language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
 
     # When users are created, the first one to register from a company is
     # declared as the owner.
     is_multi_tenant_company_owner = models.BooleanField(default=False)
-    # Subsequent users are invited.
+    # Subsequent users are invited, this gets marked as accepted when the
+    # relevant mutation is run.
     invitation_accepted = models.BooleanField(default=False)
+
+    # Profile data:
+    language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
+    avatar = models.ImageField(upload_to='avatars', null=True,
+        validators=[validate_image_extension, no_dots_in_filename])
+
+    avatar_resized = ImageSpecField(source='avatar',
+                            processors=[ResizeToFill(100, 100)],
+                            format='JPEG',
+                            options={'quality': 70})
 
     def __str__(self):
         return f"{self.username} <{self.multi_tenant_company}>"
