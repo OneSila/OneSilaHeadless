@@ -70,15 +70,15 @@ Tasks are reserved to wrap action-classes and expose them to Huey, or any other 
 __Construction steps:__
 
 ```python
-from .flows import SyncStockFlow
+from .flows import sync_stock_flow
 
 def shopware6_local__tasks__sync_stock(*, shopware_product):
-    SyncStockFlow(shopware_product=shopware_product).flow()
+    sync_stock_flow(shopware_product=shopware_product)
 
 @db_task(cronjob(day='*'))
 @db_task(cronjob(hour='4'))
 def shopware6_local__tasks__sync_stock__cronjob(*, shopware_product):
-    SyncStockFlow(shopware_product=shopware_product).flow()
+    sync_stock_flow(shopware_product=shopware_product)
 ```
 
 __Task Naming conventions__
@@ -98,7 +98,7 @@ and
 
 ## Flows
 
-Flows are classes that decide the work.  They are the decision makers and will trigger the factories according to a set of conditions decided internally in the Flow class.
+Flows are classes or methods that decide the work.  They are the decision makers and will trigger the factories according to a set of conditions decided internally in the Flow class.
 
 All flows go In either:
 
@@ -126,6 +126,16 @@ class StockSyncFlow:
     def flow(self):
         self.identify_product()
 ```
+
+or in simple cases:
+
+```python
+def sync_stock_flow(*, shopware_product):
+        from .factories import SomeFactory
+        fac = SomeFactory(shopware_product)
+        fac.run()
+```
+
 
 __Naming convention__
 
