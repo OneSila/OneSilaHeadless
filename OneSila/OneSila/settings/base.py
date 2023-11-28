@@ -39,6 +39,7 @@ INSTALLED_LOCAL_APPS = [
     'currencies',
     'eancodes',
     'media',
+    'notifications',
     'inventory',
     'orders',
     'products',
