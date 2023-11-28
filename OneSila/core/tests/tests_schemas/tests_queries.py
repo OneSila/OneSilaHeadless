@@ -78,10 +78,11 @@ class TestLanguageQuery(TransactionTestCaseMixin, TransactionTestCase):
 
     def test_current_lang(self):
         query = """
-            query currentLanguage{
-                currentLanguage{
+            query currentUserLanguage{
+                currentUserLanguage{
                     code
                     name
+                    bidi
                 }
             }
         """
