@@ -198,9 +198,11 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
             variables={'username': username, 'password': "SomePaddk@2k2", "id": user_id}
         )
 
+        print(resp)
+
         self.assertTrue(resp.errors is None)
-        self.assertTrue(resp.data['inviteUser']['isActive'])
-        self.assertTrue(resp.data['inviteUser']['invitationAccepted'])
+        self.assertTrue(resp.data['acceptUserInvitation']['isActive'])
+        self.assertTrue(resp.data['acceptUserInvitation']['invitationAccepted'])
 
     def test_enable_disable_user(self):
         password = '22kk22@ksk!aAD'

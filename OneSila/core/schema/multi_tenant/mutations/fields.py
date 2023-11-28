@@ -1,6 +1,6 @@
 from core.schema.multi_tenant.types.input import MultiTenantCompanyMyInput, \
     MultiTenantCompanyPartialInput, MultiTenantUserPartialInput, \
-    MultiTenantUserInput, MultiTenantInviteUserInput, MultiTenantAcceptInviteInput, \
+    MultiTenantUserInput, MultiTenantInviteUserInput, MultiTenantUserAcceptInviteInput, \
     MultiTenantUserStatusInput
 from core.schema.core.mutations import IsAuthenticated, default_extensions
 from .mutation_classes import MyMultiTenantCompanyCreateMutation, \
@@ -36,7 +36,7 @@ def invite_user():
 
 def accept_user_invitation():
     extensions = []
-    return AcceptInvitationMutation(MultiTenantAcceptInviteInput, extensions=extensions)
+    return AcceptInvitationMutation(MultiTenantUserAcceptInviteInput, extensions=extensions)
 
 
 def disable_user():
