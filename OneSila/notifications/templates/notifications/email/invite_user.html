@@ -1,0 +1,20 @@
+{% extends 'notifications/email/base_email.html' %}
+{% load i18n %}
+
+{% block content %}
+{% translate "Hi" %} {{ name }}
+<br><br>
+{% blocktranslate %}You've been invited to '{{ multi_tenant_company }}'.{% endblocktranslate %}
+<br><br>
+<a href="{{ accept_invite_url }}">{% translate "Accept your invitation here." %}</a>
+<br><br>
+{% translate "Any help needed?" %}
+<br>
+{% translate "I'd love to hear from you." %}
+<br>
+{% translate "Best regards" %}
+<br>
+{% translate "Sascha Dobbelaere" %}
+<br>
+
+{% endblock %}

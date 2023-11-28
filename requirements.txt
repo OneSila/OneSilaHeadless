@@ -18,12 +18,13 @@ mkdocs
 mkdocs-material
 coverage
 daphne
+premailer
 django-dirtyfields
 django-cors-headers
 
 # Using fork to ensure we have better authentication error support
 strawberry-graphql-django @ git+https://github.com/sdobbelaere/strawberry-graphql-django.git@not_authenticated_bug
-django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absolute_url.git@v0.2
+django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absolute_url.git@master
 
 
 # Starlette is used for it CORSMiddleware as referenced
