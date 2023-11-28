@@ -75,6 +75,18 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
 
         super().save(*args, **kwargs)
 
+    def set_active(self, save=True):
+        self.is_active = True
+
+        if save:
+            self.save()
+
+    def set_inactive(self, save=True):
+        self.is_active = False
+
+        if save:
+            self.save()
+
     class Meta:
         verbose_name = _("Multi tenant user")
         verbose_name_plural = _("Multi tenant users")

@@ -1,17 +1,12 @@
 from strawberry_django import auth, field
 
-from core.models.multi_tenant import MultiTenantCompany
+from core.schema.core.helpers import get_multi_tenant_company
+from core.schema.multi_tenant.types.types import MultiTenantUserType, MultiTenantCompanyType
 from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, \
     type, field, default_extensions, Info
-from core.schema.core.helpers import get_multi_tenant_company
-from .types.types import MultiTenantUserType, MultiTenantCompanyType
 
 
-from strawberry_django.fields.field import StrawberryDjangoField
-from strawberry import relay
-
-
-def my_multi_tenant_company_resolver(info: Info) -> MultiTenantCompany:
+def my_multi_tenant_company_resolver(info: Info) -> MultiTenantCompanyType:
     multi_tenant_company = get_multi_tenant_company(info)
     return multi_tenant_company
 
