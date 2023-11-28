@@ -45,8 +45,10 @@ class TestLanguageQuery(TransactionTestCaseMixin, TransactionTestCase):
         query = """
             query languages{
               languages{
-                iso
+                code
                 name
+                nameLocal
+                nameTranslated
               }
             }
         """
@@ -60,10 +62,29 @@ class TestLanguageQuery(TransactionTestCaseMixin, TransactionTestCase):
     def test_default_language(self):
         query = """
             query defaultLanguage{
-              defaultLanguageCode
+              defaultLanguage{
+                code
+                name
+                bidi
+              }
             }
         """
 
+        resp = self.stawberry_test_client(
+            query=query)
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+    def test_current_lang(self):
+        query = """
+            query currentLanguage{
+                currentLanguage{
+                    code
+                    name
+                }
+            }
+        """
         resp = self.stawberry_test_client(
             query=query)
 

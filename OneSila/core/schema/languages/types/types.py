@@ -8,5 +8,8 @@ from typing import List
 
 @strawberry_type
 class LanguageType:
-    iso: str
+    bidi: bool
+    code: str
     name: str
+    name_local: str
+    name_translated: str

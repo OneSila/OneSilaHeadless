@@ -17,16 +17,25 @@ from django.utils.translation import activate, get_language_info, deactivate
 def get_languages(info) -> List[LanguageType]:
     user = get_current_user(info)
     activate(user.language)
-    languages = [LanguageType(iso=iso, name=name) for iso, name in settings.LANGUAGES]
+    languages = [LanguageType(**get_language_info(code)) for code, _ in settings.LANGUAGES]
     deactivate()
     return languages
 
 
-def get_default_language_code() -> str:
-    return settings.LANGUAGE_CODE
+def get_default_language() -> LanguageType:
+    return LanguageType(**get_language_info(settings.LANGUAGE_CODE))
+
+
+def get_current_language(info) -> LanguageType:
+    user = get_current_user(info)
+    activate(user.language)
+    lang = LanguageType(**get_language_info(user.language))
+    deactivate()
+    return lang
 
 
 @type(name="Query")
 class LanguageQuery:
-    default_language_code: str = field(resolver=get_default_language_code)
+    default_language: LanguageType = field(resolver=get_default_language)
+    current_language: LanguageType = field(resolver=get_current_language)
     languages: List[LanguageType] = field(resolver=get_languages)
