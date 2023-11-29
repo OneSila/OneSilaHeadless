@@ -3,7 +3,7 @@ from strawberry_django import auth, field
 from core.schema.core.helpers import get_multi_tenant_company
 from core.schema.multi_tenant.types.types import MultiTenantUserType, MultiTenantCompanyType
 from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, \
-    type, field, default_extensions, Info
+    type, field, default_extensions, Info, anonymous_field
 
 from typing import List
 
@@ -36,6 +36,6 @@ def get_current_user_language(info) -> LanguageType:
 
 @type(name="Query")
 class LanguageQuery:
-    default_language: LanguageType = field(resolver=get_default_language)
+    default_language: LanguageType = anonymous_field(resolver=get_default_language)
     current_user_language: LanguageType = field(resolver=get_current_user_language)
-    languages: List[LanguageType] = field(resolver=get_languages)
+    languages: List[LanguageType] = anonymous_field(resolver=get_languages)

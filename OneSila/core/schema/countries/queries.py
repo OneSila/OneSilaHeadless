@@ -1,9 +1,9 @@
-from strawberry_django import auth, field
+from strawberry_django import auth
 
 from core.schema.core.helpers import get_multi_tenant_company
 from core.schema.multi_tenant.types.types import MultiTenantUserType, MultiTenantCompanyType
 from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, \
-    type, field, default_extensions, Info
+    type, field, anonymous_field, default_extensions, Info
 
 from typing import List
 
@@ -17,4 +17,4 @@ def get_countries() -> List[CountryType]:
 
 @type(name="Query")
 class CountryQuery:
-    countries: List[CountryType] = field(resolver=get_countries)
+    countries: List[CountryType] = anonymous_field(resolver=get_countries)

@@ -6,6 +6,10 @@ from typing import Any
 from .extensions import default_extensions
 
 
+def anonymous_field(*args, **kwargs):
+    return strawberry_django.field(*args, **kwargs)
+
+
 def field(*args, **kwargs):
     extensions = default_extensions
     return strawberry_django.field(*args, **kwargs, extensions=extensions)
