@@ -66,7 +66,10 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     A: Because starwberry-django will break and rewriting this field is not something
     that's in the cards today.
     '''
+    from core.timezones import TIMEZONE_CHOICES
+
     LANGUAGE_CHOICES = get_languages()
+    DEFAULT_TIMEZONE = 'Europe/London'
 
     username = models.EmailField(unique=True, help_text=_('Email Address'))
 
@@ -79,6 +82,7 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
 
     # Profile data:
     language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
+    timezone = models.CharField(max_length=35, choices=TIMEZONE_CHOICES, default=DEFAULT_TIMEZONE)
     avatar = models.ImageField(upload_to='avatars', null=True,
         validators=[validate_image_extension, no_dots_in_filename])
     avatar_resized = ImageSpecField(source='avatar',
