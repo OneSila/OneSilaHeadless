@@ -4,8 +4,13 @@ from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import get_language_info
 
-from core.validators import phone_regex
+from imagekit.models import ImageSpecField
+from imagekit.processors import ResizeToFill
 from core.helpers import get_languages
+from core.validators import phone_regex, validate_image_extension, \
+    no_dots_in_filename
+
+from get_absolute_url.helpers import generate_absolute_url
 
 
 class MultiTenantCompany(models.Model):
@@ -61,24 +66,42 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     A: Because starwberry-django will break and rewriting this field is not something
     that's in the cards today.
     '''
+    from core.timezones import TIMEZONE_CHOICES
+
     LANGUAGE_CHOICES = get_languages()
+    DEFAULT_TIMEZONE = 'Europe/London'
 
     username = models.EmailField(unique=True, help_text=_('Email Address'))
-    language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
 
     # When users are created, the first one to register from a company is
     # declared as the owner.
     is_multi_tenant_company_owner = models.BooleanField(default=False)
-    # Subsequent users are invited.
+    # Subsequent users are invited, this gets marked as accepted when the
+    # relevant mutation is run.
     invitation_accepted = models.BooleanField(default=False)
+
+    # Profile data:
+    language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
+    timezone = models.CharField(max_length=35, choices=TIMEZONE_CHOICES, default=DEFAULT_TIMEZONE)
+    mobile_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
+    whatsapp_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
+    telegram_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
+    avatar = models.ImageField(upload_to='avatars', null=True,
+        validators=[validate_image_extension, no_dots_in_filename])
+    avatar_resized = ImageSpecField(source='avatar',
+                            processors=[ResizeToFill(100, 100)],
+                            format='JPEG',
+                            options={'quality': 70})
 
     def __str__(self):
         return f"{self.username} <{self.multi_tenant_company}>"
 
     def save(self, *args, **kwargs):
         self.email = self.username
-
         super().save(*args, **kwargs)
+
+    def avatar_resized_full_url(self):
+        return f"{generate_absolute_url(trailing_slash=False)}{self.avatar_resized.url}"
 
     def set_active(self, save=True):
         self.is_active = True
