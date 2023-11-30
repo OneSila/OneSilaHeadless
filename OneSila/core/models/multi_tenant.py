@@ -83,6 +83,7 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     # Profile data:
     language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
     timezone = models.CharField(max_length=35, choices=TIMEZONE_CHOICES, default=DEFAULT_TIMEZONE)
+    mobile_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
     avatar = models.ImageField(upload_to='avatars', null=True,
         validators=[validate_image_extension, no_dots_in_filename])
     avatar_resized = ImageSpecField(source='avatar',
