@@ -6,6 +6,8 @@ from core.models import MultiTenantCompany
 from strawberry_django.test.client import TestClient
 from django.urls import reverse_lazy
 
+from .mutations import LOGOUT_MUTATION, ME_QUERY
+
 
 class TransactionTestCaseMixin:
     def setUp(self):
@@ -21,6 +23,10 @@ class TransactionTestCaseMixin:
         with test_client.login(self.user):
             return test_client.query(**kwargs)
 
+    def stawberry_anonymous_test_client(self, **kwargs):
+        test_client = TestClient('/graphql/')
+        return test_client.query(asserts_errors=False, **kwargs)
+
 
 class TestCountryQuery(TransactionTestCaseMixin, TransactionTestCase):
     def test_countries(self):
@@ -32,8 +38,7 @@ class TestCountryQuery(TransactionTestCaseMixin, TransactionTestCase):
               }
             }
         """
-
-        resp = self.stawberry_test_client(
+        resp = self.stawberry_anonymous_test_client(
             query=query)
 
         self.assertTrue(resp.errors is None)
@@ -53,7 +58,12 @@ class TestLanguageQuery(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
 
-        resp = self.stawberry_test_client(
+        # Make sure you are logged out first.  The test-client is
+        # logged in by default.
+        # resp = self.stawberry_anonymous_test_client(query=ME_QUERY)
+        # self.assertTrue(resp.errors is not None)
+
+        resp = self.stawberry_anonymous_test_client(
             query=query)
 
         self.assertTrue(resp.errors is None)
@@ -70,7 +80,7 @@ class TestLanguageQuery(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
 
-        resp = self.stawberry_test_client(
+        resp = self.stawberry_anonymous_test_client(
             query=query)
 
         self.assertTrue(resp.errors is None)

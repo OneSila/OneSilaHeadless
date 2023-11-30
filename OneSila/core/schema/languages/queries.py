@@ -1,5 +1,7 @@
 from strawberry_django import auth, field
 
+from django.contrib.auth.models import AnonymousUser
+
 from core.schema.core.helpers import get_multi_tenant_company
 from core.schema.multi_tenant.types.types import MultiTenantUserType, MultiTenantCompanyType
 from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, \
@@ -16,9 +18,15 @@ from django.utils.translation import activate, get_language_info, deactivate
 
 def get_languages(info) -> List[LanguageType]:
     user = get_current_user(info)
-    activate(user.language)
+
+    if not user.is_anonymous:
+        activate(user.language)
+
     languages = [LanguageType(**get_language_info(code)) for code, _ in settings.LANGUAGES]
-    deactivate()
+
+    if not user.is_anonymous:
+        deactivate()
+
     return languages
 
 
