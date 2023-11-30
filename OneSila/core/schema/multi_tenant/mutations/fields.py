@@ -20,7 +20,7 @@ def update_my_multi_tenant_company():
 
 
 def update_me():
-    extensions = default_extensions
+    extensions = [IsAuthenticated()]
     return UpdateMeMutation(MultiTenantUserPartialInput, extensions=extensions)
 
 

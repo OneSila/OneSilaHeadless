@@ -6,11 +6,11 @@ from strawberry_django.mutations import resolvers
 from strawberry_django.auth.utils import get_current_user
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from strawberry_django.utils.requests import get_request
-from strawberry_django.auth.exceptions import IncorrectUsernamePasswordError
 
 from django.db import transaction
 from django.contrib import auth
 from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.conf import settings
 
 from asgiref.sync import async_to_sync
@@ -48,7 +48,7 @@ class RegisterUserMutation(CleanupDataMixin, DjangoCreateMutation):
         user = auth.authenticate(request, username=username, password=password)
 
         if user is None:
-            raise IncorrectUsernamePasswordError()
+            raise ValidationError("User is not logged in.")
 
         scope = request.consumer.scope
         async_to_sync(channels_auth.login)(scope, user)

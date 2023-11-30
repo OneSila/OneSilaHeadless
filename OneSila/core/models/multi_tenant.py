@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import get_language_info
 
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFill
@@ -35,6 +36,10 @@ class MultiTenantCompany(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def language_detail(self):
+        return get_language_info(self.language)
 
     class Meta:
         verbose_name_plural = _("Multi tenant companies")
@@ -76,7 +81,6 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
     avatar = models.ImageField(upload_to='avatars', null=True,
         validators=[validate_image_extension, no_dots_in_filename])
-
     avatar_resized = ImageSpecField(source='avatar',
                             processors=[ResizeToFill(100, 100)],
                             format='JPEG',
