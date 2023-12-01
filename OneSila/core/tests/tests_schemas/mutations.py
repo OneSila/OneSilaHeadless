@@ -36,6 +36,19 @@ ME_QUERY = """
       multiTenantCompany{
         id
       }
+      avatarResizedFullUrl
+      avatar {
+        name
+        path
+        url
+        width
+      }
+      avatarResized {
+        name
+        path
+        url
+        size
+      }
     }
   }
 """

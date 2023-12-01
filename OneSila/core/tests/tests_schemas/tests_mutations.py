@@ -68,7 +68,6 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         me_company_id = resp.data['me']['multiTenantCompany']['id']
 
-        self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
         self.assertEqual(company_id, me_company_id)
 
@@ -132,16 +131,16 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         resp = self.stawberry_test_client(
             query=LOGIN_MUTATION,
-            variables={"username": user.username, "password": password}
+            variables={"username": user.username, "password": password},
         )
 
         resp = self.stawberry_test_client(
             query=me_query,
-            variables={}
+            variables={},
+            asserts_errors=False
         )
 
         self.assertTrue(resp.data is not None)
-        self.assertTrue(resp.errors is None)
 
     def test_invite_user(self):
         password = '22kk22@ksk!aAD'

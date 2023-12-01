@@ -5,6 +5,10 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import get_language_info
 
 from core.validators import phone_regex
+from imagekit.models import ImageSpecField
+from imagekit.processors import ResizeToFill
+from imagekit.exceptions import MissingSource
+
 from core.helpers import get_languages
 
 
@@ -64,7 +68,6 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     LANGUAGE_CHOICES = get_languages()
 
     username = models.EmailField(unique=True, help_text=_('Email Address'))
-    language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
 
     # When users are created, the first one to register from a company is
     # declared as the owner.
@@ -72,13 +75,31 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     # Subsequent users are invited.
     invitation_accepted = models.BooleanField(default=False)
 
+    # Profile data:
+    language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
+    timezone = models.CharField(max_length=35, choices=TIMEZONE_CHOICES, default=DEFAULT_TIMEZONE)
+    mobile_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
+    whatsapp_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
+    telegram_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
+    avatar = models.ImageField(upload_to='avatars', null=True, blank=True,
+        validators=[validate_image_extension, no_dots_in_filename])
+    avatar_resized = ImageSpecField(source='avatar',
+                            processors=[ResizeToFill(100, 100)],
+                            format='JPEG',
+                            options={'quality': 70})
+
     def __str__(self):
         return f"{self.username} <{self.multi_tenant_company}>"
 
     def save(self, *args, **kwargs):
         self.email = self.username
-
         super().save(*args, **kwargs)
+
+    def avatar_resized_full_url(self):
+        if self.avatar_resized.url:
+            return f"{generate_absolute_url(trailing_slash=False)}{self.avatar_resized.url}"
+
+        return None
 
     def set_active(self, save=True):
         self.is_active = True

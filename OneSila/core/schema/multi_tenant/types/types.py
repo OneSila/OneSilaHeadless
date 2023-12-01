@@ -7,13 +7,13 @@ from core.schema.multi_tenant.types.ordering import MultiTenantUserOrder
 from core.schema.multi_tenant.types.filters import MultiTenantUserFilter
 from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser
 
-
 from typing import List
 
 
 @type(MultiTenantUser, filters=MultiTenantUserOrder, order=MultiTenantUserFilter, pagination=True, fields='__all__')
 class MultiTenantUserType(relay.Node):
-    pass
+    avatar_resized: DjangoImageType | None
+    avatar_resized_full_url: str | None
 
 
 @type(MultiTenantCompany, fields='__all__')
