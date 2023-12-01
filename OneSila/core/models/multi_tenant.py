@@ -9,6 +9,7 @@ from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFill
 from imagekit.exceptions import MissingSource
 
+from core.typing import LanguageType
 from core.helpers import get_languages
 from core.validators import phone_regex, validate_image_extension, \
     no_dots_in_filename
@@ -40,9 +41,8 @@ class MultiTenantCompany(models.Model):
     def __str__(self):
         return self.name
 
-    @property
     def language_detail(self):
-        return get_language_info(self.language)
+        return LanguageType(**get_language_info(self.language))
 
     class Meta:
         verbose_name_plural = _("Multi tenant companies")
@@ -109,6 +109,9 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
             return f"{generate_absolute_url(trailing_slash=False)}{self.avatar_resized.url}"
 
         return None
+
+    def language_detail(self):
+        return LanguageType(**get_language_info(self.language))
 
     def set_active(self, save=True):
         self.is_active = True

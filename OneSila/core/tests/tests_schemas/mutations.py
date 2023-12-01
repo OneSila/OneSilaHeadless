@@ -33,6 +33,10 @@ ME_QUERY = """
       username
       password
       language
+      languageDetail {
+        code
+        name
+      }
       multiTenantCompany{
         id
       }
