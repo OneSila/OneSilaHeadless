@@ -16,11 +16,15 @@ DATABASES = {
 SECRET_KEY = 'your-secret-key-goes-here'
 
 #
+# Url generation settings
+#
+
+HTTPS_SUPPORTED = True
+
 # Email setup
 #
 EMAIL_BACKEND = 'django.core.mail.backends.dummy.EmailBackend'
 EMAIL_FILE_PATH = '/tmp/app-messages'  # change this to a proper location
-
 
 #
 # CORS Settings. See: https://www.starlette.io/middleware/#corsmiddleware

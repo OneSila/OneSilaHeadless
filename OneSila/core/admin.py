@@ -10,6 +10,7 @@ class MultiTenantUserAdmin(BaseUserAdmin):
     fieldsets = (
         (None, {'fields': ('username', 'email', 'password')}),
         (_('Personal info'), {'fields': ('first_name', 'last_name', 'multi_tenant_company')}),
+        (_('Profile info'), {'fields': ('language', 'avatar')}),
         (_('Permissions'), {
             'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
         }),

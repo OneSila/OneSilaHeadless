@@ -7,6 +7,7 @@ from core.schema.multi_tenant.types.ordering import MultiTenantUserOrder
 from core.schema.multi_tenant.types.filters import MultiTenantUserFilter
 from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser
 
+from strawberry_django.fields.types import DjangoImageType
 from typing import List
 
 
