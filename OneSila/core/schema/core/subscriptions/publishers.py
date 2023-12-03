@@ -4,6 +4,7 @@ from asgiref.sync import sync_to_async
 
 from .typing import Info, GlobalID, Model
 
+from core.schema.core.helpers import get_multi_tenant_company
 from .helpers import get_group, get_msg, get_msg_type
 from channels.db import database_sync_to_async
 
@@ -64,6 +65,10 @@ class ModelInstanceSubscribePublisher:
 
         if user.is_anonymous:
             raise Exception("No access")
+
+    async def verify_multi_tenant_company(self):
+        """ensure there is a multi tenant user present"""
+        get_multi_tenant_company(self.info, fail_silently=False)
 
     async def verify_return_type(self):
         return_type = self.info.return_type.__name__
@@ -131,6 +136,7 @@ class ModelInstanceSubscribePublisher:
 
     async def await_messages(self):
         await self.verify_logged_in()
+        await self.verify_multi_tenant_company()
         await self.verify_return_type()
         await self.set_instance()
         await self.subscribe()

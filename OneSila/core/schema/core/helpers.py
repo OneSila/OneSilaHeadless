@@ -10,6 +10,6 @@ def get_multi_tenant_company(info: Info, fail_silently=True):
     multi_tenant_company = user.multi_tenant_company
 
     if not fail_silently and not multi_tenant_company:
-        raise ValueError("multi_tenant_company is missing from mutation.")
+        raise ValueError("User is not assigned to a multi tenant company.")
 
     return multi_tenant_company
