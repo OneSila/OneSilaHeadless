@@ -1,7 +1,19 @@
-# GraphQL cheatsheet
+# Getting Started
 
 Querying graphql is based on the strawberry library.  You can find some samples below.
-In a dev-environment there is also a graphiql availble.  Eg: (http://127.0.0.1:8080/graphql)[http://127.0.0.1:8080/graphql]
+
+## Exploring the playground.
+
+Once you have setup the backend, you can easily run the system locally for testing.  In order to do this, run:
+
+```
+source venv/bin/activate
+cd OneSila
+./manage.py runserver 127.0.0.1:8080
+```
+
+This will give your system access to (http://127.0.0.1:8080/graphql)[http://127.0.0.1:8080/graphql]. In this location you can explore / test all queries, mutations and subscriptions available.  Including the fields, field requirements and return options available.
+
 
 ## Query Single result
 
