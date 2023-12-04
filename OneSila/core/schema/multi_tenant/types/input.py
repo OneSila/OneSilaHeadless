@@ -16,7 +16,7 @@ class MultiTenantCompanyInput:
     pass
 
 
-@partial(MultiTenantCompany, fields="__all__")
+@partial(MultiTenantCompany, exclude=['id'])
 class MultiTenantCompanyPartialInput(NodeInput):
     pass
 
@@ -41,7 +41,9 @@ class MultiTenantUserStatusInput:
     id: auto
 
 
-@partial(MultiTenantUser, fields="__all__")
+@partial(MultiTenantUser, fields=['username', 'is_multi_tenant_company_owner',
+    'language', 'timezone', 'mobile_number', 'whatsapp_number', 'telegram_number',
+    'avatar', 'is_active'])
 class MultiTenantUserPartialInput:
     pass
 

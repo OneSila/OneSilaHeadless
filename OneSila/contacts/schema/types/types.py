@@ -1,4 +1,4 @@
-from core.schema.core.types.types import type, relay, List
+from core.schema.core.types.types import type, relay, List, Annotated, lazy
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from core.schema.multi_tenant.types.types import MultiTenantCompanyType
 
