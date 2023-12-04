@@ -11,7 +11,7 @@ from asgiref.sync import sync_to_async
 class MultiTenantSubscription:
     @subscription
     async def me(self, info: Info) -> AsyncGenerator[MultiTenantUserType, None]:
-        user = await sync_to_async(get_current_user)(info)
+        user = get_current_user(info)
         pk = create_global_id(user)
         async for i in model_subscriber(info=info, pk=pk, model=MultiTenantUser, multi_tenant_company_protection=False):
             yield i

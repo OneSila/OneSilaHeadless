@@ -13,3 +13,7 @@ def get_multi_tenant_company(info: Info, fail_silently=True):
         raise ValueError("User is not assigned to a multi tenant company.")
 
     return multi_tenant_company
+
+
+async def aget_multi_tenant_company(info: Info, fail_silently=True):
+    return sync_to_async(get_multi_tenant_company)(info=info, fail_silently=fail_silently)

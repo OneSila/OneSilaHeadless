@@ -19,6 +19,7 @@ class MultiTenantUserType(relay.Node):
     avatar_resized: DjangoImageType | None
     avatar_resized_full_url: str | None
     language_detail: Annotated['LanguageType', lazy("core.schema.languages.types.types")]
+    multi_tenant_company: Annotated['MultiTenantCompanyType', lazy("core.schema.multi_tenant.types.types")]
 
 
 @type(MultiTenantCompany, fields='__all__')
