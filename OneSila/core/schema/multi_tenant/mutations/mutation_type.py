@@ -2,7 +2,8 @@ from core.schema.core.mutations import type
 from strawberry_django import auth as strawberry_auth
 from .fields import register_user, register_my_multi_tenant_company, \
     update_me, update_my_multi_tenant_company, invite_user, \
-    accept_user_invitation, disable_user, enable_user
+    accept_user_invitation, disable_user, enable_user, login_link, \
+    recovery_link, authenticate_link
 
 from core.schema.multi_tenant.types.types import MultiTenantUserType, \
     MultiTenantCompanyType
@@ -18,6 +19,10 @@ class MultiTenantMutation:
 
     update_me: MultiTenantUserType = update_me()
     update_my_multi_tenant_company: MultiTenantCompanyType = update_my_multi_tenant_company()
+
+    recovery_link = recovery_link()
+    login_link = login_link()
+    authenticate_link: MultiTenantUserType = authenticate_link()
 
     invite_user: MultiTenantUserType = invite_user()
     accept_user_invitation: MultiTenantUserType = accept_user_invitation()

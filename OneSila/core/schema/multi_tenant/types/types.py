@@ -5,7 +5,7 @@ from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 
 from core.schema.multi_tenant.types.ordering import MultiTenantUserOrder
 from core.schema.multi_tenant.types.filters import MultiTenantUserFilter
-from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser
+from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser, MultiTenantUserLoginToken
 
 from strawberry_django.fields.types import DjangoImageType
 from typing import List, TYPE_CHECKING, Dict
@@ -26,3 +26,8 @@ class MultiTenantUserType(relay.Node):
 class MultiTenantCompanyType(relay.Node):
     multitenantuser_set: List[MultiTenantUserType]
     language_detail: Annotated['LanguageType', lazy("core.schema.languages.types.types")]
+
+
+@type(MultiTenantUserLoginToken, fields='__all__')
+class MultiTenantUserLoginTokenType(relay.Node):
+    pass

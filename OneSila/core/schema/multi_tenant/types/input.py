@@ -1,4 +1,4 @@
-from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser
+from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser, MultiTenantUserLoginToken
 from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial, List
 
@@ -54,3 +54,13 @@ class MultiTenantInviteUserInput:
     language: auto
     first_name: auto
     last_name: auto
+
+
+@input(MultiTenantUser)
+class MultiTenantLoginLinkInput:
+    username: auto
+
+
+@input(MultiTenantUserLoginToken)
+class MultiTenantUserLoginTokenInput:
+    pass

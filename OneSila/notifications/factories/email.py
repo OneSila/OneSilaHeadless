@@ -54,3 +54,25 @@ class SendUserInviteEmailFactory(SendBrandedEmail):
         self.template_variables.update({
             'accept_invite_url': generate_absolute_url()
         })
+
+
+class SendLoginLinkEmailFactory(SendBrandedEmail):
+    subject = _("Your login link")
+    template_path = 'notifications/email/login_link.html'
+
+    def set_template_variables(self):
+        super().set_template_variables()
+        self.template_variables.update({
+            'token_url': generate_absolute_url()
+        })
+
+
+class SendRecoveryLinkEmailFactory(SendBrandedEmail):
+    subject = _("Your Account Recovery link")
+    template_path = 'notifications/email/account_recovery_link.html'
+
+    def set_template_variables(self):
+        super().set_template_variables()
+        self.template_variables.update({
+            'token_url': generate_absolute_url()
+        })

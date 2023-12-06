@@ -1,12 +1,12 @@
 from core.schema.multi_tenant.types.input import MultiTenantCompanyMyInput, \
     MultiTenantCompanyPartialInput, MultiTenantUserPartialInput, \
     MultiTenantUserInput, MultiTenantInviteUserInput, MultiTenantUserAcceptInviteInput, \
-    MultiTenantUserStatusInput
+    MultiTenantUserStatusInput, MultiTenantLoginLinkInput
 from core.schema.core.mutations import IsAuthenticated, default_extensions
 from .mutation_classes import MyMultiTenantCompanyCreateMutation, \
     MyMultiTentantCompanyUpdateMutation, UpdateMeMutation, \
     RegisterUserMutation, InviteUserMutation, AcceptInvitationMutation, \
-    EnableUserMutation, DisableUserMutation
+    EnableUserMutation, DisableUserMutation, LoginTokenMutation, RecoveryTokenMutation
 
 
 def register_my_multi_tenant_company():
@@ -47,3 +47,13 @@ def disable_user():
 def enable_user():
     extensions = default_extensions
     return EnableUserMutation(MultiTenantUserStatusInput, extensions=extensions)
+
+
+def recovery_link():
+    extensions = [IsAuthenticated()]
+    return RecoveryTokenMutation(MultiTenantLoginLinkInput, extensions=extensions)
+
+
+def login_link():
+    extensions = [IsAuthenticated()]
+    return RecoveryTokenMutation(MultiTenantLoginLinkInput, extensions=extensions)

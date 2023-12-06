@@ -1,9 +1,29 @@
 from django.db import transaction
-from core.models.multi_tenant import MultiTenantUser
+from core.models.multi_tenant import MultiTenantUser, MultiTenantUserLoginToken
 from django.core.exceptions import ValidationError
 
 from core.signals import registered, invite_sent, invite_accepted, \
-    disabled, enabled
+    disabled, enabled, login_token_created, recovery_token_created
+
+
+class LoginTokenFactory:
+    def __init__(self, user):
+        self.user = user
+
+    def create_token(self):
+        self.token = MultiTenantUserLoginToken.objects.create(
+            multi_tenant_user=self.user)
+
+    def send_signal(self):
+        login_token_created.send(sender=self.token.__class__, instance=self.token)
+
+    def run(self):
+        self.create_token()
+
+
+class RecoryTokenFactory(LoginTokenFactory):
+    def send_signal(self):
+        recovery_token_created.send(sender=self.token.__class__, instance=self.token)
 
 
 class RegisterUserFactory:

@@ -1,8 +1,10 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import get_language_info
+
 
 from core.validators import phone_regex
 from imagekit.models import ImageSpecField
@@ -137,3 +139,23 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     #             violation_error_message=_("Users need to have a company assign. Staff and Superusers cannot.")
     #         ),
     #     ]
+
+
+class MultiTenantUserLoginToken(models.Model):
+    """
+    A user can login with a "magic link". This is used for logging in and
+    resetting the password.  Or in other words account recovery.
+    """
+    EXPIRES_AFTER_MIN = settings.MULTI_TENANT_LOGIN_LINK_EXPIRES_AFTER_MIN
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True)
+
+    multi_tenant_user = models.ForeignKey(MultiTenantUser, on_delete=models.CASCADE)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+    def get_expires_at(self, save=False):
+        expires_at = self.created_at + timezone.timedelta(minutes=self.EXPIRES_AFTER_MIN)
+        return expires_at
