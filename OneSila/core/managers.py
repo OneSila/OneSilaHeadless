@@ -15,6 +15,9 @@ class MultiTenantManager(DjangoManager):
     def get_queryset(self):
         return MultiTenantQuerySet(self.model, using=self._db)
 
+    # def filter(self, *, multi_tenant_company, **kwargs):
+    #     return super().filter(multi_tenant_company=multi_tenant_company, **kwargs)
+
     def create(self, *, multi_tenant_company, **kwargs):
         return super().create(multi_tenant_company=multi_tenant_company, **kwargs)
 

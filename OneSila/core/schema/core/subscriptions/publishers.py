@@ -65,8 +65,8 @@ class ModelInstanceSubscribePublisher:
 
         filter_kwargs = {}
 
-        if self.multi_tenant_company_protection:
-            filter_kwargs['multi_tenant_company_protection'] = multi_tenant_company
+        # if self.multi_tenant_company_protection:
+        #     filter_kwargs['multi_tenant_company_protection'] = multi_tenant_company
 
         return self.model.objects.filter(**filter_kwargs)
 
@@ -117,7 +117,7 @@ class ModelInstanceSubscribePublisher:
 
     async def await_messages(self):
         await self.verify_logged_in()
-        await self.verify_multi_tenant_company()
+        # await self.verify_multi_tenant_company()
         await self.verify_return_type()
         await self.set_instance()
         await self.subscribe()

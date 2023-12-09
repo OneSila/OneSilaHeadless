@@ -13,7 +13,7 @@ from functools import wraps
 
 class Currency(models.Model):
     '''
-    Currencies determin the final price.
+    Currencies determine the final price.
 
     Every price generated will be based on the inheritance, exchange rate and round_price_to.
     '''
