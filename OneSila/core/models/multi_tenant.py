@@ -11,6 +11,7 @@ from imagekit.exceptions import MissingSource
 
 from core.typing import LanguageType
 from core.helpers import get_languages
+from core.managers import MultiTenantManager
 from core.validators import phone_regex, validate_image_extension, \
     no_dots_in_filename
 
@@ -51,12 +52,16 @@ class MultiTenantCompany(models.Model):
 class MultiTenantAwareMixin(models.Model):
     multi_tenant_company = models.ForeignKey(MultiTenantCompany, on_delete=models.PROTECT, null=True, blank=True)
 
+    objects = MultiTenantManager()
+
     class Meta:
         abstract = True
 
 
 class MultiTenantMultiAwareMixin(models.Model):
     multi_tenant_company = models.ManyToManyField(MultiTenantCompany)
+
+    objects = MultiTenantManager()
 
     class Meta:
         abstract = True
