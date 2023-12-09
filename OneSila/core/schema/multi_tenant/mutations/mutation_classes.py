@@ -22,7 +22,7 @@ from core.schema.core.mutations import create, type, DjangoUpdateMutation, \
     update, Info, models, Iterable, Any, IsAuthenticated
 from core.factories.multi_tenant import InviteUserFactory, RegisterUserFactory, \
     AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory, LoginTokenFactory, \
-    RecoryTokenFactory
+    RecoveryTokenFactory, AuthenticateTokenFactory
 from core.models.multi_tenant import MultiTenantUser
 
 
@@ -39,7 +39,7 @@ class LoginTokenMutation(CleanupDataMixin, DjangoCreateMutation):
     def create_token(self, *, user):
         fac = LoginTokenFactory(user)
         fac.run()
-        return fac.login_token
+        return fac.token
 
     def create(self, data: dict[str, Any], *, info: Info):
         with DjangoOptimizerExtension.disabled():
@@ -50,9 +50,29 @@ class LoginTokenMutation(CleanupDataMixin, DjangoCreateMutation):
 
 class RecoveryTokenMutation(LoginTokenMutation):
     def create_token(self, *, user):
-        fac = RecoryTokenFactory(user)
+        fac = RecoveryTokenFactory(user)
         fac.run()
-        return fac.login_token
+        return fac.token
+
+
+class AuthenticateTokenMutation(CleanupDataMixin, DjangoCreateMutation):
+    """
+    This takes the token supplied, and logs in the user
+    if the token exists and is still valid
+    """
+
+    def login(self):
+        user = self.user
+
+    def create(self, data: dict[str, Any], *, info: Info):
+        token = data.get('token')
+        fac = AuthenticateTokenFactory(token, info)
+        fac.run()
+
+        self.user = fac.user
+        self.login()
+
+        return fac.user
 
 
 class RegisterUserMutation(CleanupDataMixin, DjangoCreateMutation):

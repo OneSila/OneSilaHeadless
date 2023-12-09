@@ -17,6 +17,8 @@ from core.validators import phone_regex, validate_image_extension, \
     no_dots_in_filename
 
 from get_absolute_url.helpers import generate_absolute_url
+from hashlib import shake_256
+import shortuuid
 
 
 class MultiTenantCompany(models.Model):
@@ -150,12 +152,20 @@ class MultiTenantUserLoginToken(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True)
+    token = models.CharField(max_length=20, unique=True)
 
     multi_tenant_user = models.ForeignKey(MultiTenantUser, on_delete=models.CASCADE)
 
     def save(self, *args, **kwargs):
+        print(self.created_at)
+        self.set_token()
         super().save(*args, **kwargs)
+        self.set_expires_at()
 
-    def get_expires_at(self, save=False):
+    def set_token(self):
+        if not self.token:
+            self.token = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(10)
+
+    def set_expires_at(self, save=False):
         expires_at = self.created_at + timezone.timedelta(minutes=self.EXPIRES_AFTER_MIN)
-        return expires_at
+        self.__class__.objects.filter(id=self.id).update(expires_at=expires_at)

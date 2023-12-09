@@ -28,6 +28,6 @@ class MultiTenantCompanyType(relay.Node):
     language_detail: Annotated['LanguageType', lazy("core.schema.languages.types.types")]
 
 
-@type(MultiTenantUserLoginToken, fields='__all__')
+@type(MultiTenantUserLoginToken, exclude=['token'])
 class MultiTenantUserLoginTokenType(relay.Node):
     pass

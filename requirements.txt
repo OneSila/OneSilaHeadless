@@ -22,6 +22,7 @@ premailer
 django-dirtyfields
 django-cors-headers
 tzdata
+shortuuid
 
 # Using fork to ensure we have better authentication error support
 strawberry-graphql-django

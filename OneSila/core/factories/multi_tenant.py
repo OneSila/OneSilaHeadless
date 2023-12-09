@@ -6,6 +6,18 @@ from core.signals import registered, invite_sent, invite_accepted, \
     disabled, enabled, login_token_created, recovery_token_created
 
 
+class AuthenticateTokenFactory:
+    def __init__(self, token, info):
+        self.info = info
+        self.token = token
+
+    def set_user(self):
+        self.user = MultiTenantUser.objects.get_by_token(self.token)
+
+    def run(self):
+        self.set_user()
+
+
 class LoginTokenFactory:
     def __init__(self, user):
         self.user = user
@@ -21,7 +33,7 @@ class LoginTokenFactory:
         self.create_token()
 
 
-class RecoryTokenFactory(LoginTokenFactory):
+class RecoveryTokenFactory(LoginTokenFactory):
     def send_signal(self):
         recovery_token_created.send(sender=self.token.__class__, instance=self.token)
 

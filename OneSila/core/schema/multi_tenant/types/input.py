@@ -1,6 +1,7 @@
-from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser, MultiTenantUserLoginToken
+from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser, \
+    MultiTenantUserLoginToken
 from core.schema.core.types.types import auto
-from core.schema.core.types.input import NodeInput, input, partial, List
+from core.schema.core.types.input import NodeInput, input, partial, List, strawberry_input
 
 
 @input(MultiTenantCompany)
@@ -56,11 +57,16 @@ class MultiTenantInviteUserInput:
     last_name: auto
 
 
-@input(MultiTenantUser)
+@strawberry_input
 class MultiTenantLoginLinkInput:
-    username: auto
+    username: str
 
 
-@input(MultiTenantUserLoginToken)
+@strawberry_input
 class MultiTenantUserLoginTokenInput:
-    pass
+    username: str
+
+
+@partial(MultiTenantUserLoginToken)
+class MultiTenantUserAuthenticateTokenInput:
+    token: auto
