@@ -40,7 +40,7 @@ def trigger_pre_and_post_save(dirty_field, signal_pre, signal_post):
         @wraps(f)
         def f_wrap(self, *args, **kwargs):
             is_dirty_field = False
-            if self.is_dirty_field(field):
+            if self.is_dirty_field(dirty_field):
                 is_dirty_field = True
                 signal_pre.send(sender=self.__class__, instance=self)
 

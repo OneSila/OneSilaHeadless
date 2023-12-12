@@ -1,6 +1,7 @@
 from django.db import transaction
 from core.models.multi_tenant import MultiTenantUser
 from django.core.exceptions import ValidationError
+from django.contrib.auth.password_validation import validate_password
 
 from core.signals import registered, invite_sent, invite_accepted, \
     disabled, enabled
@@ -17,6 +18,9 @@ class RegisterUserFactory:
         self.language = language
         self.first_name = first_name
         self.last_name = last_name
+
+    def validate_password(self):
+        validate_password(password=self.password)
 
     def create_user(self):
         user = self.model(
@@ -42,6 +46,7 @@ class RegisterUserFactory:
 
     @transaction.atomic
     def run(self):
+        self.validate_password()
         self.create_user()
         self.send_signal()
 

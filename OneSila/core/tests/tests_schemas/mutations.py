@@ -1,7 +1,7 @@
 
 REGISTER_USER_MUTATION = """
   mutation registerUser($username: String!, $password: String!, $language: String!) {
-    registerUser(data: {username: $username, password: $password, language: $language}) {
+    registerUser(username: $username, password: $password, language: $language) {
       username
       password
       invitationAccepted

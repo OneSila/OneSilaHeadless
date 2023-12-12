@@ -9,7 +9,6 @@ from strawberry_django.utils.requests import get_request
 
 from django.db import transaction
 from django.contrib import auth
-from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.conf import settings
 
@@ -31,47 +30,6 @@ class CleanupDataMixin:
                 del data[k]
 
         return data
-
-
-class RegisterUserMutation(CleanupDataMixin, DjangoCreateMutation):
-    AUTO_LOGIN = settings.STRAWBERRY_DJANGO_REGISTER_USER_AUTO_LOGIN
-
-    def create_user(self, data):
-        data = self.cleanup_data(data)
-        fac = RegisterUserFactory(**data)
-        fac.run()
-
-        return fac.user
-
-    def login_user(self, info, username, password):
-        request = get_request(info)
-        user = auth.authenticate(request, username=username, password=password)
-
-        if user is None:
-            raise ValidationError("User is not logged in.")
-
-        scope = request.consumer.scope
-        async_to_sync(channels_auth.login)(scope, user)
-        # Channels docs, you must save the session, or no user will be logged in.
-        scope["session"].save()
-
-        return user
-
-    def create(self, data: dict[str, Any], *, info: Info):
-        password = data.get("password")
-        username = data.get('username')
-        validate_password(password)
-
-        with DjangoOptimizerExtension.disabled():
-            user = self.create_user(data)
-
-            if self.AUTO_LOGIN:
-                # FIXME: Using auto-login seems to break:
-                # https://stackoverflow.com/questions/77557246/django-channels-login-connection-already-closed
-                # breaks on async_to_sync(channels_auth.login) section.
-                self.login_user(info, username, password)
-
-            return user
 
 
 class InviteUserMutation(CleanupDataMixin, GetMultiTenantCompanyMixin, DjangoCreateMutation):

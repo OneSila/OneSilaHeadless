@@ -5,8 +5,11 @@ from core.schema.multi_tenant.types.input import MultiTenantCompanyMyInput, \
 from core.schema.core.mutations import IsAuthenticated, default_extensions
 from .mutation_classes import MyMultiTenantCompanyCreateMutation, \
     MyMultiTentantCompanyUpdateMutation, UpdateMeMutation, \
-    RegisterUserMutation, InviteUserMutation, AcceptInvitationMutation, \
+    InviteUserMutation, AcceptInvitationMutation, \
     EnableUserMutation, DisableUserMutation
+import functools
+import strawberry
+from .resolvers import resolve_register_user
 
 
 def register_my_multi_tenant_company():
@@ -22,11 +25,6 @@ def update_my_multi_tenant_company():
 def update_me():
     extensions = [IsAuthenticated()]
     return UpdateMeMutation(MultiTenantUserPartialInput, extensions=extensions)
-
-
-def register_user():
-    extensions = []
-    return RegisterUserMutation(MultiTenantUserInput, extensions=extensions)
 
 
 def invite_user():
@@ -47,3 +45,6 @@ def disable_user():
 def enable_user():
     extensions = default_extensions
     return EnableUserMutation(MultiTenantUserStatusInput, extensions=extensions)
+
+
+register_user = functools.partial(strawberry.mutation, resolver=resolve_register_user)
