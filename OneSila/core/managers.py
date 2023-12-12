@@ -2,8 +2,30 @@ from django.db.models import QuerySet as DjangoQueryset
 from django.db.models import Manager as DjangoManager
 from django.db import IntegrityError
 from django.db.models import QuerySet
+from django.core.exceptions import ValidationError
 
 from django.contrib.auth.models import BaseUserManager
+
+
+class MultiTenantUserLoginTokenQuerySet(DjangoQueryset):
+    def get_by_token(self, token):
+        try:
+            instance = self.get(token=token)
+        except self.model.DoesNotExist:
+            raise ValidationError('Unknown token')
+
+        if not instance.is_valid:
+            raise ValidationError('Token is no longer valid')
+
+        return instance
+
+
+class MultiTenantUserLoginTokenManager(DjangoManager):
+    def get_queryset(self):
+        return MultiTenantUserLoginTokenQuerySet(self.model, using=self._db)
+
+    def get_by_token(self, token):
+        return self.get_queryset().get_by_token(token)
 
 
 class MultiTenantQuerySet(DjangoQueryset):

@@ -1,15 +1,18 @@
 from core.schema.multi_tenant.types.input import MultiTenantCompanyMyInput, \
     MultiTenantCompanyPartialInput, MultiTenantUserPartialInput, \
     MultiTenantUserInput, MultiTenantInviteUserInput, MultiTenantUserAcceptInviteInput, \
-    MultiTenantUserStatusInput, MultiTenantCompanyMyPartialInput
+    MultiTenantUserStatusInput, MultiTenantLoginLinkInput, MultiTenantUserAuthenticateTokenInput, \
+    MultiTenantCompanyMyPartialInput
+
 from core.schema.core.mutations import IsAuthenticated, default_extensions
 from .mutation_classes import MyMultiTenantCompanyCreateMutation, \
     MyMultiTentantCompanyUpdateMutation, UpdateMeMutation, \
-    InviteUserMutation, AcceptInvitationMutation, \
-    EnableUserMutation, DisableUserMutation
+    InviteUserMutation, AcceptInvitationMutation, EnableUserMutation, \
+    DisableUserMutation, LoginTokenMutation, RecoveryTokenMutation
+
 import functools
 import strawberry
-from .resolvers import resolve_register_user
+from .resolvers import resolve_register_user, resolve_authenticate_token
 
 
 def register_my_multi_tenant_company():
@@ -47,4 +50,15 @@ def enable_user():
     return EnableUserMutation(MultiTenantUserStatusInput, extensions=extensions)
 
 
+def recovery_token():
+    extensions = []
+    return RecoveryTokenMutation(MultiTenantLoginLinkInput, extensions=extensions)
+
+
+def login_token():
+    extensions = []
+    return RecoveryTokenMutation(MultiTenantLoginLinkInput, extensions=extensions)
+
+
 register_user = functools.partial(strawberry.mutation, resolver=resolve_register_user)
+authenticate_token = functools.partial(strawberry.mutation, resolver=resolve_authenticate_token)

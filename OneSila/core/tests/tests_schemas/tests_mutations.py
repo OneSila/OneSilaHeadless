@@ -1,11 +1,72 @@
 from django.test import TestCase, TransactionTestCase
 from model_bakery import baker
 from strawberry.relay import to_base64
-from core.models.multi_tenant import MultiTenantUser, MultiTenantCompany
+from core.models.multi_tenant import MultiTenantUser, MultiTenantCompany, \
+    MultiTenantUserLoginToken
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 
 from .mutations import REGISTER_USER_MUTATION, LOGIN_MUTATION, LOGOUT_MUTATION, \
-    ME_QUERY
+    ME_QUERY, AUTHENTICATE_TOKEN
+
+
+class AuthenticateTokenTestCase(TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        self.multi_tenant_company = baker.make(MultiTenantCompany)
+        self.user = baker.make(MultiTenantUser, multi_tenant_company=self.multi_tenant_company)
+
+    def test_recovery_login(self):
+        mutations = """
+        mutation($username: String!){
+          recoveryToken(data:{username: $username}){
+            expiresAt
+          }
+        }
+        """
+
+        resp = self.stawberry_anonymous_test_client(
+            query=mutations,
+            variables={"username": self.user.username}
+        )
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+        token = MultiTenantUserLoginToken.objects.filter(multi_tenant_user=self.user).last()
+
+        resp = self.stawberry_anonymous_test_client(
+            query=AUTHENTICATE_TOKEN,
+            variables={"token": token.token}
+        )
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+    def test_token_login(self):
+        mutations = """
+        mutation($username: String!){
+          loginToken(data:{username: $username}){
+            expiresAt
+          }
+        }
+        """
+
+        resp = self.stawberry_anonymous_test_client(
+            query=mutations,
+            variables={"username": self.user.username}
+        )
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+        token = MultiTenantUserLoginToken.objects.filter(multi_tenant_user=self.user).last()
+
+        resp = self.stawberry_anonymous_test_client(
+            query=AUTHENTICATE_TOKEN,
+            variables={"token": token.token}
+        )
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
 
 
 class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
@@ -42,8 +103,6 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
             asserts_errors=False,
             variables={"username": username, "password": password, 'language': language}
         )
-
-        print(resp)
 
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)

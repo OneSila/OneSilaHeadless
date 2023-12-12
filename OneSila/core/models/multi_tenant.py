@@ -1,8 +1,10 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import get_language_info
+
 
 from core.validators import phone_regex
 from imagekit.models import ImageSpecField
@@ -11,11 +13,13 @@ from imagekit.exceptions import MissingSource
 
 from core.typing import LanguageType
 from core.helpers import get_languages
-from core.managers import MultiTenantManager
+from core.managers import MultiTenantManager, MultiTenantUserLoginTokenManager
 from core.validators import phone_regex, validate_image_extension, \
     no_dots_in_filename
 
 from get_absolute_url.helpers import generate_absolute_url
+from hashlib import shake_256
+import shortuuid
 
 
 class MultiTenantCompany(models.Model):
@@ -142,3 +146,40 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     #             violation_error_message=_("Users need to have a company assign. Staff and Superusers cannot.")
     #         ),
     #     ]
+
+
+class MultiTenantUserLoginToken(models.Model):
+    """
+    A user can login with a "magic link". This is used for logging in and
+    resetting the password.  Or in other words account recovery.
+    """
+    EXPIRES_AFTER_MIN = settings.MULTI_TENANT_LOGIN_LINK_EXPIRES_AFTER_MIN
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True)
+    token = models.CharField(max_length=20, unique=True)
+
+    multi_tenant_user = models.ForeignKey(MultiTenantUser, on_delete=models.CASCADE)
+
+    objects = MultiTenantUserLoginTokenManager()
+
+    def save(self, *args, **kwargs):
+        print(self.created_at)
+        self.set_token()
+        super().save(*args, **kwargs)
+        self.set_expires_at()
+
+    def set_token(self):
+        if not self.token:
+            self.token = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(10)
+
+    def set_expires_at(self, save=False):
+        # This strange construction is to avoid a second save signal.
+        expires_at = self.created_at + timezone.timedelta(minutes=self.EXPIRES_AFTER_MIN)
+        self.__class__.objects.filter(id=self.id).update(expires_at=expires_at)
+
+    def is_valid(self, now=timezone.now()):
+        if self.expires_at > now:
+            return False
+
+        return True

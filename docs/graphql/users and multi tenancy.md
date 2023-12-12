@@ -14,7 +14,7 @@ For user registration, there has been a mutation created called `registerUser` a
 
 ```graphql
 mutation{
-  registerUser(data:{username:"my@mail.com", password: "My123!Pass", language: "nl"}){
+  registerUser(username:"my@mail.com", password: "My123!Pass", language: "nl"){
 		username
   }
 }
@@ -112,6 +112,61 @@ In order to use this, you will need to find the relevant user ids.  There is no 
 ```
 
 
+## Logging in a user
+
+We have 2 ways of logging in.  The first is the classic, by way of username/email + password.
+The second is via a login link.
+
+
+### Classic username / password
+
+```graphql
+mutation{
+  login(data:{username: "my@email.com", password: "my!291Pakd"}){
+    username
+  }
+}
+```
+
+
+### Login Link
+
+First request the login link, which will be sent to the user.
+
+```graphql
+mutation{
+  requestLoginLink(data:{username: "my@email.com"}){
+    username
+  }
+}
+```
+
+Once the user receives the link, you should take the ID from the link provided.
+That link will be the ID with which you can call the actual login mutation.
+
+```graphql
+mutation($username: String!){
+  loginToken(data:{username: $username}){
+    expiresAt
+  }
+}
+```
+
+Remeber that the login-links expire.  This is controlled via the setting `MULTI_TENANT_LOGIN_LINK_EXPIRES_AFTER_MIN` in your settings file.
+
 ## Account Recovery
 
-TODO
+Account recovery is done through a magic login link.  This is the same mechanism as used to login a user via link, is conveniently sepparated to allow you to direct the user to setup a new password on the frontend.
+
+Request the link via:
+
+```graphql
+mutation($username: String!){
+  recoveryToken(data:{username: $username}){
+    expiresAt
+  }
+}
+```
+
+Now you can authenticate using the same mutation as with loginLink.
+After which you should be showing the user his/her password change page, instead of your usual login location.

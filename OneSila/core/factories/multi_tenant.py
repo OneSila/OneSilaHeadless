@@ -1,10 +1,46 @@
 from django.db import transaction
-from core.models.multi_tenant import MultiTenantUser
+from core.models.multi_tenant import MultiTenantUser, MultiTenantUserLoginToken
 from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
 
 from core.signals import registered, invite_sent, invite_accepted, \
-    disabled, enabled
+    disabled, enabled, login_token_created, recovery_token_created
+
+
+class AuthenticateTokenFactory:
+    def __init__(self, token, info):
+        self.info = info
+        self.token = token
+
+    def set_token_instance(self):
+        self.token_instance = MultiTenantUserLoginToken.objects.get_by_token(self.token)
+
+    def set_user(self):
+        self.user = self.token_instance.multi_tenant_user
+
+    def run(self):
+        self.set_token_instance()
+        self.set_user()
+
+
+class LoginTokenFactory:
+    def __init__(self, user):
+        self.user = user
+
+    def create_token(self):
+        self.token = MultiTenantUserLoginToken.objects.create(
+            multi_tenant_user=self.user)
+
+    def send_signal(self):
+        login_token_created.send(sender=self.token.__class__, instance=self.token)
+
+    def run(self):
+        self.create_token()
+
+
+class RecoveryTokenFactory(LoginTokenFactory):
+    def send_signal(self):
+        recovery_token_created.send(sender=self.token.__class__, instance=self.token)
 
 
 class RegisterUserFactory:

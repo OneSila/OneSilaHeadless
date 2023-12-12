@@ -56,3 +56,9 @@ CORS_ALLOW_CREDENTIALS = True
 #
 
 STRAWBERRY_DJANGO_REGISTER_USER_AUTO_LOGIN = False
+
+
+#
+# How long should the login link stay valid for?
+#
+MULTI_TENANT_LOGIN_LINK_EXPIRES_AFTER_MIN = 60
