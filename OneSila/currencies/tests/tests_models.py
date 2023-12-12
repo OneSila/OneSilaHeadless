@@ -1,7 +1,7 @@
 from django.test import TestCase
 from core.tests import TestCaseMixin
 from model_bakery import baker
-from currency.models import Currency
+from currencies.models import Currency
 
 
 class CurrencyTestCase(TestCaseMixin, TestCase):

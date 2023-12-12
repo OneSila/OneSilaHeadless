@@ -49,7 +49,7 @@ class FollowerRateFactory:
     """
 
     def __init__(self, currency):
-        self.currency = Currency
+        self.currency = currency
 
     def update_currency(self):
         if self.currency.follow_official_rate:
