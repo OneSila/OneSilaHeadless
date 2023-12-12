@@ -34,10 +34,4 @@ def resolve_register_user(info, username: str, password: str, language: str):
             # When Django-channels is not installed,
             # this code will be non-existing
             pass
-
-    # scope = request.consumer.scope
-    # async_to_sync(channels_auth.login)(scope, user)
-    # # According to channels docs you must save the session
-    # scope["session"].save()
-
     return user
