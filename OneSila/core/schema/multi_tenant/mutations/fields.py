@@ -1,14 +1,19 @@
 from core.schema.multi_tenant.types.input import MultiTenantCompanyMyInput, \
     MultiTenantCompanyPartialInput, MultiTenantUserPartialInput, \
     MultiTenantUserInput, MultiTenantInviteUserInput, MultiTenantUserAcceptInviteInput, \
-    MultiTenantUserStatusInput, MultiTenantLoginLinkInput, MultiTenantUserAuthenticateTokenInput
+    MultiTenantUserStatusInput, MultiTenantLoginLinkInput, MultiTenantUserAuthenticateTokenInput, \
+    MultiTenantCompanyMyPartialInput
 
 from core.schema.core.mutations import IsAuthenticated, default_extensions
 from .mutation_classes import MyMultiTenantCompanyCreateMutation, \
     MyMultiTentantCompanyUpdateMutation, UpdateMeMutation, \
-    RegisterUserMutation, InviteUserMutation, AcceptInvitationMutation, \
-    EnableUserMutation, DisableUserMutation, LoginTokenMutation, RecoveryTokenMutation, \
+    InviteUserMutation, AcceptInvitationMutation, EnableUserMutation, \
+    DisableUserMutation, LoginTokenMutation, RecoveryTokenMutation, \
     AuthenticateTokenMutation
+
+import functools
+import strawberry
+from .resolvers import resolve_register_user
 
 
 def register_my_multi_tenant_company():
@@ -24,11 +29,6 @@ def update_my_multi_tenant_company():
 def update_me():
     extensions = [IsAuthenticated()]
     return UpdateMeMutation(MultiTenantUserPartialInput, extensions=extensions)
-
-
-def register_user():
-    extensions = []
-    return RegisterUserMutation(MultiTenantUserInput, extensions=extensions)
 
 
 def invite_user():
@@ -64,3 +64,6 @@ def login_token():
 def authenticate_token():
     extensions = []
     return AuthenticateTokenMutation(MultiTenantUserAuthenticateTokenInput, extensions=extensions)
+
+
+register_user = functools.partial(strawberry.mutation, resolver=resolve_register_user)

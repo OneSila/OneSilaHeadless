@@ -21,5 +21,5 @@ def currencies__currency__exchange_rate_official__receiver(sender, instance, **k
     """
     Ensure that relevant exchange rates are updates if they are blindly following.
     """
-    from core.flows.update_rates import UpdateFollowerRateFlow
+    from currencies.flows.update_rates import UpdateFollowerRateFlow
     UpdateFollowerRateFlow(instance).flow()

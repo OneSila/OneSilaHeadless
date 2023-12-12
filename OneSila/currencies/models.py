@@ -34,8 +34,7 @@ class Currency(models.Model):
         return self.name
 
     @trigger_pre_and_post_save('exchange_rate', exchange_rate__pre_save, exchange_rate__post_save)
-    @trigger_pre_and_post_save('exchange_rate_official', exchange_rate_official__pre_save,
-            exchange_rate_official__post_save)
+    @trigger_pre_and_post_save('exchange_rate_official', exchange_rate_official__pre_save, exchange_rate_official__post_save)
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
 

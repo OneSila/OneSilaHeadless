@@ -1,4 +1,4 @@
-from factories.update_rates import UpdateOfficialRateFactory, FollowerRateFactory
+from currencies.factories.update_rates import UpdateOfficialRateFactory, FollowerRateFactory
 
 
 class UpdateOfficialRateFlow:
