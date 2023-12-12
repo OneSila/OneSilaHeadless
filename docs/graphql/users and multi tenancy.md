@@ -14,7 +14,7 @@ For user registration, there has been a mutation created called `registerUser` a
 
 ```graphql
 mutation{
-  registerUser(data:{username:"my@mail.com", password: "My123!Pass", language: "nl"}){
+  registerUser(username:"my@mail.com", password: "My123!Pass", language: "nl"){
 		username
   }
 }
@@ -145,9 +145,9 @@ Once the user receives the link, you should take the ID from the link provided.
 That link will be the ID with which you can call the actual login mutation.
 
 ```graphql
-mutation{
-  authenticateLoginLink(data:{id: "SomeGlobalID"}){
-    username
+mutation($username: String!){
+  loginToken(data:{username: $username}){
+    expiresAt
   }
 }
 ```
@@ -161,8 +161,10 @@ Account recovery is done through a magic login link.  This is the same mechanism
 Request the link via:
 
 ```graphql
-mutation{
-  recoverMe
+mutation($username: String!){
+  recoveryToken(data:{username: $username}){
+    expiresAt
+  }
 }
 ```
 
