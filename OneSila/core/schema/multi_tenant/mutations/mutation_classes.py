@@ -54,26 +54,6 @@ class RecoveryTokenMutation(LoginTokenMutation):
         return fac.token
 
 
-class AuthenticateTokenMutation(CleanupDataMixin, DjangoCreateMutation):
-    """
-    This takes the token supplied, and logs in the user
-    if the token exists and is still valid
-    """
-
-    def login(self):
-        user = self.user
-
-    def create(self, data: dict[str, Any], *, info: Info):
-        token = data.get('token')
-        fac = AuthenticateTokenFactory(token, info)
-        fac.run()
-
-        self.user = fac.user
-        self.login()
-
-        return fac.user
-
-
 class InviteUserMutation(CleanupDataMixin, GetMultiTenantCompanyMixin, DjangoCreateMutation):
     def create(self, data: dict[str, Any], *, info: Info):
         multi_tenant_company = self.get_multi_tenant_company(info)

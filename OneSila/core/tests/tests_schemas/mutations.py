@@ -19,6 +19,14 @@ LOGIN_MUTATION = """
   }
 """
 
+AUTHENTICATE_TOKEN = """
+mutation($token: String!){
+  authenticateToken(token: $token){
+    username
+  }
+}
+"""
+
 
 LOGOUT_MUTATION = """
   mutation logout {

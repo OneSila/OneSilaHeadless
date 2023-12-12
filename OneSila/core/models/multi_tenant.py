@@ -13,7 +13,7 @@ from imagekit.exceptions import MissingSource
 
 from core.typing import LanguageType
 from core.helpers import get_languages
-from core.managers import MultiTenantManager
+from core.managers import MultiTenantManager, MultiTenantUserLoginTokenManager
 from core.validators import phone_regex, validate_image_extension, \
     no_dots_in_filename
 
@@ -161,6 +161,8 @@ class MultiTenantUserLoginToken(models.Model):
 
     multi_tenant_user = models.ForeignKey(MultiTenantUser, on_delete=models.CASCADE)
 
+    objects = MultiTenantUserLoginTokenManager()
+
     def save(self, *args, **kwargs):
         print(self.created_at)
         self.set_token()
@@ -172,5 +174,12 @@ class MultiTenantUserLoginToken(models.Model):
             self.token = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(10)
 
     def set_expires_at(self, save=False):
+        # This strange construction is to avoid a second save signal.
         expires_at = self.created_at + timezone.timedelta(minutes=self.EXPIRES_AFTER_MIN)
         self.__class__.objects.filter(id=self.id).update(expires_at=expires_at)
+
+    def is_valid(self, now=timezone.now()):
+        if self.expires_at > now:
+            return False
+
+        return True

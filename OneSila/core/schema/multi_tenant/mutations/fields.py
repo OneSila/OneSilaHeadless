@@ -8,12 +8,11 @@ from core.schema.core.mutations import IsAuthenticated, default_extensions
 from .mutation_classes import MyMultiTenantCompanyCreateMutation, \
     MyMultiTentantCompanyUpdateMutation, UpdateMeMutation, \
     InviteUserMutation, AcceptInvitationMutation, EnableUserMutation, \
-    DisableUserMutation, LoginTokenMutation, RecoveryTokenMutation, \
-    AuthenticateTokenMutation
+    DisableUserMutation, LoginTokenMutation, RecoveryTokenMutation
 
 import functools
 import strawberry
-from .resolvers import resolve_register_user
+from .resolvers import resolve_register_user, resolve_authenticate_token
 
 
 def register_my_multi_tenant_company():
@@ -61,9 +60,5 @@ def login_token():
     return RecoveryTokenMutation(MultiTenantLoginLinkInput, extensions=extensions)
 
 
-def authenticate_token():
-    extensions = []
-    return AuthenticateTokenMutation(MultiTenantUserAuthenticateTokenInput, extensions=extensions)
-
-
 register_user = functools.partial(strawberry.mutation, resolver=resolve_register_user)
+authenticate_token = functools.partial(strawberry.mutation, resolver=resolve_authenticate_token)

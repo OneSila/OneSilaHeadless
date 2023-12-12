@@ -12,10 +12,14 @@ class AuthenticateTokenFactory:
         self.info = info
         self.token = token
 
+    def set_token_instance(self):
+        self.token_instance = MultiTenantUserLoginToken.objects.get_by_token(self.token)
+
     def set_user(self):
-        self.user = MultiTenantUser.objects.get_by_token(self.token)
+        self.user = self.token_instance.multi_tenant_user
 
     def run(self):
+        self.set_token_instance()
         self.set_user()
 
 
