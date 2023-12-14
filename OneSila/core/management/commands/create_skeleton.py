@@ -40,6 +40,7 @@ SKELETON_STRUCTURE = [
     'tests/tests_flows/__init__.py',
     'tests/tests_tasks.py',
     'tests/tests_models.py',
+    'urls.py',
 ]
 
 
