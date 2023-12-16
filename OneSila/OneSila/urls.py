@@ -28,7 +28,13 @@ urlpatterns = [
     path('eancodes/', include('eancodes.urls')),
     path('inventory/', include('inventory.urls')),
     path('media/', include('media.urls')),
-    # path('orders/', include('orders.urls')),
+    path('orders/', include('orders.urls')),
+    # path('products/', include('products.urls')),
+    # path('properties/', include('properties.urls')),
+    # path('purchasing/', include('purchasing.urls')),
+    # path('sales-prices/', include('sales_prices.urls')),
+    # path('taxes/', include('taxes.urls')),
+    # path('units/', include('units.urls')),
     path(
         'graphql/',
         AsyncGraphQLView.as_view(
