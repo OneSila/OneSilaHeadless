@@ -21,7 +21,21 @@ from strawberry.django.views import AsyncGraphQLView
 from .schema import schema
 
 urlpatterns = [
+    path('', include('core.urls')),
     path('admin/', admin.site.urls),
+    path('contacts/', include('contacts.urls')),
+    path('currencies/', include('currencies.urls')),
+    path('customs/', include('customs.urls')),
+    path('eancodes/', include('eancodes.urls')),
+    path('inventory/', include('inventory.urls')),
+    path('media/', include('media.urls')),
+    path('orders/', include('orders.urls')),
+    path('products/', include('products.urls')),
+    path('properties/', include('properties.urls')),
+    path('purchasing/', include('purchasing.urls')),
+    path('sales-prices/', include('sales_prices.urls')),
+    path('taxes/', include('taxes.urls')),
+    path('units/', include('units.urls')),
     path(
         'graphql/',
         AsyncGraphQLView.as_view(

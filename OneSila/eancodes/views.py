@@ -1,3 +1,18 @@
-from django.shortcuts import render
+from core.views import EmptyTemplateView
+from .models import EanCode
 
-# Create your views here.
+
+class EanCodeListView(EmptyTemplateView):
+    pass
+
+
+class EanCodeDetailViev(EmptyTemplateView):
+    pass
+
+
+class EanCodeUpdateView(EmptyTemplateView):
+    pass
+
+
+class EanCodeDeleteView(EmptyTemplateView):
+    pass

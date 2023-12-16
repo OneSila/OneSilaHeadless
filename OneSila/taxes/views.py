@@ -1,3 +1,18 @@
-from django.shortcuts import render
+from core.views import EmptyTemplateView
+from .models import Tax
 
-# Create your views here.
+
+class TaxListView(EmptyTemplateView):
+    pass
+
+
+class TaxDetailViev(EmptyTemplateView):
+    pass
+
+
+class TaxUpdateView(EmptyTemplateView):
+    pass
+
+
+class TaxDeleteView(EmptyTemplateView):
+    pass

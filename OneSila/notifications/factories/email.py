@@ -4,7 +4,7 @@ from django.utils.translation import activate, get_language_info, deactivate
 from django.utils.translation import gettext_lazy as _
 from django.template.loader import render_to_string
 
-from get_absolute_url.helpers import generate_absolute_url
+from core.helpers import reverse_lazy
 
 
 class SendBrandedEmail:
@@ -41,7 +41,7 @@ class SendWelcomeEmailFactory(SendBrandedEmail):
     def set_template_variables(self):
         super().set_template_variables()
         self.template_variables.update({
-            'dashboard_url': generate_absolute_url()
+            'dashboard_url': reverse_lazy('core:dashboard')
         })
 
 
@@ -52,7 +52,7 @@ class SendUserInviteEmailFactory(SendBrandedEmail):
     def set_template_variables(self):
         super().set_template_variables()
         self.template_variables.update({
-            'accept_invite_url': generate_absolute_url()
+            'accept_invite_url': reverse_lazy('core:auth_register_accept_invite')
         })
 
 
@@ -63,7 +63,7 @@ class SendLoginLinkEmailFactory(SendBrandedEmail):
     def set_template_variables(self):
         super().set_template_variables()
         self.template_variables.update({
-            'token_url': generate_absolute_url()
+            'token_url': reverse_lazy('core:auth_token_login')
         })
 
 
@@ -74,5 +74,5 @@ class SendRecoveryLinkEmailFactory(SendBrandedEmail):
     def set_template_variables(self):
         super().set_template_variables()
         self.template_variables.update({
-            'token_url': generate_absolute_url()
+            'token_url': reverse_lazy('core:auth_recover')
         })

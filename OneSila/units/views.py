@@ -1,3 +1,18 @@
-from django.shortcuts import render
+from core.views import EmptyTemplateView
+from .models import Unit
 
-# Create your views here.
+
+class UnitListView(EmptyTemplateView):
+    pass
+
+
+class UnitDetailViev(EmptyTemplateView):
+    pass
+
+
+class UnitUpdateView(EmptyTemplateView):
+    pass
+
+
+class UnitDeleteView(EmptyTemplateView):
+    pass
