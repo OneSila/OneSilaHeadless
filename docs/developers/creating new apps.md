@@ -1,6 +1,10 @@
-# Creating apps and models
+# Creating apps, models, views and urls
+
+## The app
 
 ## Models
+
+### Private Models
 
 When creating a new app it's imporant to import models from the core instead of the default django.
 eg:
@@ -44,7 +48,7 @@ This means that OneSila will only truly save if the data has changed.  Otherwise
     Remember, OneSila will only save() if the data has changed.
     Unless specified it should trigger an empty save.
 
-## Shared Models
+### Shared Models
 
 In case you do want to add models that are shared across all users.  Perhaps some kind of property, or global setting.  Then you can import `SharedModel` like so:
 
@@ -54,3 +58,34 @@ from core import models
 class MySharedThing(models.SharedModel):
     field = models.IntegerField()
 ```
+
+## Views and URL's
+
+The app will use the django-structure to generate urls. Even though this is a headless backend, there are occasions where
+links need to be generated, eg images or emails with links.
+
+As the Django url structure is easy enough to use, we created a few management commands to generate the views and urls
+
+
+### Generating Views
+
+Once you have completed the models, there is a management command to create the views and urls base pages.
+You can print them to screen using:
+
+```
+./manage.py generate_views app_name # or all
+```
+
+Paste this content in your `views.py` for the new app and make changes should you need to.
+
+### Generating Urls and configuring
+
+Just like with the views, you can also generate the `urls.py` page.  The management command for this is:
+
+```
+./manage.py generate_urls app_name # or all
+```
+
+Paste this content in your `urls.py` for the new app and make changes should you need to.
+
+Next, configure your OneSila.urls to include the new app.

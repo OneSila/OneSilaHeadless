@@ -1,3 +1,18 @@
-from django.shortcuts import render
+from core.views import EmtpyTemplateView
+from .models import HsCode
 
-# Create your views here.
+
+class HsCodeListView(EmtpyTemplateView):
+    pass
+
+
+class HsCodeDetailViev(EmtpyTemplateView):
+    pass
+
+
+class HsCodeUpdateView(EmtpyTemplateView):
+    pass
+
+
+class HsCodeDeleteView(EmtpyTemplateView):
+    pass
