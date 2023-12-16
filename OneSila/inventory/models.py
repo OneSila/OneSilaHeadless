@@ -15,6 +15,7 @@ class Inventory(models.Model):
 
     class Meta:
         unique_together = ('product', 'stocklocation')
+        verbose_name_plural = "inventories"
 
     def __str__(self):
         return '{}: {}@{}'.format(self.product, self.stocklocation, self.quantity)

@@ -22,6 +22,13 @@ from .schema import schema
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('contacts/', include('contacts.urls')),
+    path('currencies/', include('currencies.urls')),
+    path('customs/', include('customs.urls')),
+    path('eancodes/', include('eancodes.urls')),
+    path('inventory/', include('inventory.urls')),
+    path('media/', include('media.urls')),
+    # path('orders/', include('orders.urls')),
     path(
         'graphql/',
         AsyncGraphQLView.as_view(

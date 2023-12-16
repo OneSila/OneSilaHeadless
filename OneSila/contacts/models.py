@@ -1,5 +1,6 @@
 from core import models
 from core.validators import phone_regex
+from django.utils.translation import gettext_lazy as _
 
 from .managers import SupplierManager, CustomerManager, InfluencerManager, \
     InvoiceAddressManager, ShippingAddressManager, InternalCompanyManager, \
@@ -33,6 +34,7 @@ class Company(models.Model):
 
     class Meta:
         unique_together = ("name", "multi_tenant_company")
+        verbose_name_plural = _("companies")
 
 
 class Supplier(Company):
@@ -80,6 +82,7 @@ class InternalCompany(Company):
 
     class Meta:
         proxy = True
+        verbose_name_plural = _("interal companies")
 
 
 class Person(models.Model):
@@ -102,6 +105,10 @@ class Person(models.Model):
     def __str__(self):
         return self.name()
 
+    class Meta:
+        verbose_name = _("person")
+        verbose_name_plural = _("people")
+
 
 class Address(models.Model):
     """
@@ -123,6 +130,9 @@ class Address(models.Model):
     is_invoice_address = models.BooleanField(default=False)
     is_shipping_address = models.BooleanField(default=False)
 
+    class Meta:
+        verbose_name_plural = 'addresses'
+
 
 class ShippingAddress(Address):
     objects = ShippingAddressManager()
@@ -130,6 +140,7 @@ class ShippingAddress(Address):
 
     class Meta:
         proxy = True
+        verbose_name_plural = 'shipping addresses'
 
 
 class InvoiceAddress(Address):
@@ -138,3 +149,4 @@ class InvoiceAddress(Address):
 
     class Meta:
         proxy = True
+        verbose_name_plural = 'invoice addresses'

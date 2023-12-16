@@ -1,3 +1,18 @@
-from django.shortcuts import render
+from core.views import EmtpyTemplateView
+from .models import Currency
 
-# Create your views here.
+
+class CurrencyListView(EmtpyTemplateView):
+    pass
+
+
+class CurrencyDetailViev(EmtpyTemplateView):
+    pass
+
+
+class CurrencyUpdateView(EmtpyTemplateView):
+    pass
+
+
+class CurrencyDeleteView(EmtpyTemplateView):
+    pass

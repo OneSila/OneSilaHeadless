@@ -1,3 +1,34 @@
-from django.shortcuts import render
+from core.views import EmtpyTemplateView
+from .models import Inventory, InventoryLocation
 
-# Create your views here.
+
+class InventoryListView(EmtpyTemplateView):
+    pass
+
+
+class InventoryLocationListView(EmtpyTemplateView):
+    pass
+
+
+class InventoryDetailViev(EmtpyTemplateView):
+    pass
+
+
+class InventoryLocationDetailViev(EmtpyTemplateView):
+    pass
+
+
+class InventoryUpdateView(EmtpyTemplateView):
+    pass
+
+
+class InventoryLocationUpdateView(EmtpyTemplateView):
+    pass
+
+
+class InventoryDeleteView(EmtpyTemplateView):
+    pass
+
+
+class InventoryLocationDeleteView(EmtpyTemplateView):
+    pass
