@@ -115,7 +115,7 @@ class Command(BaseCommand):
                         f.write(statement)
 
                     self.stdout.write(
-                        self.style.SUCCESS(f"Generated urls added to {path}")
+                        self.style.SUCCESS(f"Generated statements added to {path}")
                     )
 
                 else:
