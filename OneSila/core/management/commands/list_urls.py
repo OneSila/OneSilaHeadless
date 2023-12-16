@@ -45,6 +45,9 @@ class Command(BaseCommand):
         for p in url_list:
             app = p[0].rstrip('/').replace('-', '_')
 
+            if not app:
+                app = 'core'
+
             if 'admin' in app and not include_admin:
                 pass
             else:
