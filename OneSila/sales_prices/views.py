@@ -1,50 +1,50 @@
-from core.views import EmtpyTemplateView
+from core.views import EmptyTemplateView
 from .models import SalesPrice, SalesPriceList, SalesPriceListItem
 
 
-class SalesPriceListView(EmtpyTemplateView):
+class SalesPriceListView(EmptyTemplateView):
     pass
 
 
-class SalesPriceDetailViev(EmtpyTemplateView):
+class SalesPriceDetailViev(EmptyTemplateView):
     pass
 
 
-class SalesPriceUpdateView(EmtpyTemplateView):
+class SalesPriceUpdateView(EmptyTemplateView):
     pass
 
 
-class SalesPriceDeleteView(EmtpyTemplateView):
+class SalesPriceDeleteView(EmptyTemplateView):
     pass
 
 
-class SalesPriceListListView(EmtpyTemplateView):
+class SalesPriceListListView(EmptyTemplateView):
     pass
 
 
-class SalesPriceListDetailViev(EmtpyTemplateView):
+class SalesPriceListDetailViev(EmptyTemplateView):
     pass
 
 
-class SalesPriceListUpdateView(EmtpyTemplateView):
+class SalesPriceListUpdateView(EmptyTemplateView):
     pass
 
 
-class SalesPriceListDeleteView(EmtpyTemplateView):
+class SalesPriceListDeleteView(EmptyTemplateView):
     pass
 
 
-class SalesPriceListItemListView(EmtpyTemplateView):
+class SalesPriceListItemListView(EmptyTemplateView):
     pass
 
 
-class SalesPriceListItemDetailViev(EmtpyTemplateView):
+class SalesPriceListItemDetailViev(EmptyTemplateView):
     pass
 
 
-class SalesPriceListItemUpdateView(EmtpyTemplateView):
+class SalesPriceListItemUpdateView(EmptyTemplateView):
     pass
 
 
-class SalesPriceListItemDeleteView(EmtpyTemplateView):
+class SalesPriceListItemDeleteView(EmptyTemplateView):
     pass

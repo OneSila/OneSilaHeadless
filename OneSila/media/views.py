@@ -1,50 +1,50 @@
-from core.views import EmtpyTemplateView
-from .models import Image, Media, Video
+from core.views import EmptyTemplateView
+from .models import Image, Media, MediaProductThrough, Video
 
 
-class ImageListView(EmtpyTemplateView):
+class ImageListView(EmptyTemplateView):
     pass
 
 
-class ImageDetailViev(EmtpyTemplateView):
+class ImageDetailViev(EmptyTemplateView):
     pass
 
 
-class ImageUpdateView(EmtpyTemplateView):
+class ImageUpdateView(EmptyTemplateView):
     pass
 
 
-class ImageDeleteView(EmtpyTemplateView):
+class ImageDeleteView(EmptyTemplateView):
     pass
 
 
-class MediaListView(EmtpyTemplateView):
+class MediaListView(EmptyTemplateView):
     pass
 
 
-class MediaDetailViev(EmtpyTemplateView):
+class MediaDetailViev(EmptyTemplateView):
     pass
 
 
-class MediaUpdateView(EmtpyTemplateView):
+class MediaUpdateView(EmptyTemplateView):
     pass
 
 
-class MediaDeleteView(EmtpyTemplateView):
+class MediaDeleteView(EmptyTemplateView):
     pass
 
 
-class VideoListView(EmtpyTemplateView):
+class VideoListView(EmptyTemplateView):
     pass
 
 
-class VideoDetailViev(EmtpyTemplateView):
+class VideoDetailViev(EmptyTemplateView):
     pass
 
 
-class VideoUpdateView(EmtpyTemplateView):
+class VideoUpdateView(EmptyTemplateView):
     pass
 
 
-class VideoDeleteView(EmtpyTemplateView):
+class VideoDeleteView(EmptyTemplateView):
     pass

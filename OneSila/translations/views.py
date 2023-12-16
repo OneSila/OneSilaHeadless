@@ -1,3 +1,18 @@
-from django.shortcuts import render
+from core.views import EmptyTemplateView
+from .models import TranslationFieldsMixin
 
-# Create your views here.
+
+class TranslationFieldsMixinListView(EmptyTemplateView):
+    pass
+
+
+class TranslationFieldsMixinDetailViev(EmptyTemplateView):
+    pass
+
+
+class TranslationFieldsMixinUpdateView(EmptyTemplateView):
+    pass
+
+
+class TranslationFieldsMixinDeleteView(EmptyTemplateView):
+    pass

@@ -10,7 +10,7 @@ VIEW_TYPES = ['ListView', 'DetailViev', 'UpdateView', 'DeleteView']
 
 def generate_view(view):
     view = (
-        f"class {view}(EmtpyTemplateView):\n"
+        f"class {view}(EmptyTemplateView):\n"
         "    pass\n"
 
     )
@@ -21,7 +21,7 @@ def generate_model_import_statement(models):
     model_names = [m.__name__ for m in models]
     model_str = ', '.join(model_names)
     statement = (
-        "from core.views import EmtpyTemplateView\n"
+        "from core.views import EmptyTemplateView\n"
         f"from .models import {model_str}\n\n"
     )
     return statement

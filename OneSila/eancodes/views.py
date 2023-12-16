@@ -1,18 +1,18 @@
-from core.views import EmtpyTemplateView
+from core.views import EmptyTemplateView
 from .models import EanCode
 
 
-class EanCodeListView(EmtpyTemplateView):
+class EanCodeListView(EmptyTemplateView):
     pass
 
 
-class EanCodeDetailViev(EmtpyTemplateView):
+class EanCodeDetailViev(EmptyTemplateView):
     pass
 
 
-class EanCodeUpdateView(EmtpyTemplateView):
+class EanCodeUpdateView(EmptyTemplateView):
     pass
 
 
-class EanCodeDeleteView(EmtpyTemplateView):
+class EanCodeDeleteView(EmptyTemplateView):
     pass

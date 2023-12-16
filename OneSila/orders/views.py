@@ -1,50 +1,50 @@
-from core.views import EmtpyTemplateView
+from core.views import EmptyTemplateView
 from .models import Order, OrderItem, OrderNote
 
 
-class OrderListView(EmtpyTemplateView):
+class OrderListView(EmptyTemplateView):
     pass
 
 
-class OrderDetailViev(EmtpyTemplateView):
+class OrderDetailViev(EmptyTemplateView):
     pass
 
 
-class OrderUpdateView(EmtpyTemplateView):
+class OrderUpdateView(EmptyTemplateView):
     pass
 
 
-class OrderDeleteView(EmtpyTemplateView):
+class OrderDeleteView(EmptyTemplateView):
     pass
 
 
-class OrderItemListView(EmtpyTemplateView):
+class OrderItemListView(EmptyTemplateView):
     pass
 
 
-class OrderItemDetailViev(EmtpyTemplateView):
+class OrderItemDetailViev(EmptyTemplateView):
     pass
 
 
-class OrderItemUpdateView(EmtpyTemplateView):
+class OrderItemUpdateView(EmptyTemplateView):
     pass
 
 
-class OrderItemDeleteView(EmtpyTemplateView):
+class OrderItemDeleteView(EmptyTemplateView):
     pass
 
 
-class OrderNoteListView(EmtpyTemplateView):
+class OrderNoteListView(EmptyTemplateView):
     pass
 
 
-class OrderNoteDetailViev(EmtpyTemplateView):
+class OrderNoteDetailViev(EmptyTemplateView):
     pass
 
 
-class OrderNoteUpdateView(EmtpyTemplateView):
+class OrderNoteUpdateView(EmptyTemplateView):
     pass
 
 
-class OrderNoteDeleteView(EmtpyTemplateView):
+class OrderNoteDeleteView(EmptyTemplateView):
     pass

@@ -1,18 +1,18 @@
-from core.views import EmtpyTemplateView
+from core.views import EmptyTemplateView
 from .models import HsCode
 
 
-class HsCodeListView(EmtpyTemplateView):
+class HsCodeListView(EmptyTemplateView):
     pass
 
 
-class HsCodeDetailViev(EmtpyTemplateView):
+class HsCodeDetailViev(EmptyTemplateView):
     pass
 
 
-class HsCodeUpdateView(EmtpyTemplateView):
+class HsCodeUpdateView(EmptyTemplateView):
     pass
 
 
-class HsCodeDeleteView(EmtpyTemplateView):
+class HsCodeDeleteView(EmptyTemplateView):
     pass

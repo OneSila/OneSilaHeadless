@@ -1,114 +1,114 @@
-from core.views import EmtpyTemplateView
+from core.views import EmptyTemplateView
 from .models import BundleProduct, BundleVariation, Product, ProductTranslation, ProductVariation, UmbrellaProduct, UmbrellaVariation
 
 
-class BundleProductListView(EmtpyTemplateView):
+class BundleProductListView(EmptyTemplateView):
     pass
 
 
-class BundleProductDetailViev(EmtpyTemplateView):
+class BundleProductDetailViev(EmptyTemplateView):
     pass
 
 
-class BundleProductUpdateView(EmtpyTemplateView):
+class BundleProductUpdateView(EmptyTemplateView):
     pass
 
 
-class BundleProductDeleteView(EmtpyTemplateView):
+class BundleProductDeleteView(EmptyTemplateView):
     pass
 
 
-class BundleVariationListView(EmtpyTemplateView):
+class BundleVariationListView(EmptyTemplateView):
     pass
 
 
-class BundleVariationDetailViev(EmtpyTemplateView):
+class BundleVariationDetailViev(EmptyTemplateView):
     pass
 
 
-class BundleVariationUpdateView(EmtpyTemplateView):
+class BundleVariationUpdateView(EmptyTemplateView):
     pass
 
 
-class BundleVariationDeleteView(EmtpyTemplateView):
+class BundleVariationDeleteView(EmptyTemplateView):
     pass
 
 
-class ProductListView(EmtpyTemplateView):
+class ProductListView(EmptyTemplateView):
     pass
 
 
-class ProductDetailViev(EmtpyTemplateView):
+class ProductDetailViev(EmptyTemplateView):
     pass
 
 
-class ProductUpdateView(EmtpyTemplateView):
+class ProductUpdateView(EmptyTemplateView):
     pass
 
 
-class ProductDeleteView(EmtpyTemplateView):
+class ProductDeleteView(EmptyTemplateView):
     pass
 
 
-class ProductTranslationListView(EmtpyTemplateView):
+class ProductTranslationListView(EmptyTemplateView):
     pass
 
 
-class ProductTranslationDetailViev(EmtpyTemplateView):
+class ProductTranslationDetailViev(EmptyTemplateView):
     pass
 
 
-class ProductTranslationUpdateView(EmtpyTemplateView):
+class ProductTranslationUpdateView(EmptyTemplateView):
     pass
 
 
-class ProductTranslationDeleteView(EmtpyTemplateView):
+class ProductTranslationDeleteView(EmptyTemplateView):
     pass
 
 
-class ProductVariationListView(EmtpyTemplateView):
+class ProductVariationListView(EmptyTemplateView):
     pass
 
 
-class ProductVariationDetailViev(EmtpyTemplateView):
+class ProductVariationDetailViev(EmptyTemplateView):
     pass
 
 
-class ProductVariationUpdateView(EmtpyTemplateView):
+class ProductVariationUpdateView(EmptyTemplateView):
     pass
 
 
-class ProductVariationDeleteView(EmtpyTemplateView):
+class ProductVariationDeleteView(EmptyTemplateView):
     pass
 
 
-class UmbrellaProductListView(EmtpyTemplateView):
+class UmbrellaProductListView(EmptyTemplateView):
     pass
 
 
-class UmbrellaProductDetailViev(EmtpyTemplateView):
+class UmbrellaProductDetailViev(EmptyTemplateView):
     pass
 
 
-class UmbrellaProductUpdateView(EmtpyTemplateView):
+class UmbrellaProductUpdateView(EmptyTemplateView):
     pass
 
 
-class UmbrellaProductDeleteView(EmtpyTemplateView):
+class UmbrellaProductDeleteView(EmptyTemplateView):
     pass
 
 
-class UmbrellaVariationListView(EmtpyTemplateView):
+class UmbrellaVariationListView(EmptyTemplateView):
     pass
 
 
-class UmbrellaVariationDetailViev(EmtpyTemplateView):
+class UmbrellaVariationDetailViev(EmptyTemplateView):
     pass
 
 
-class UmbrellaVariationUpdateView(EmtpyTemplateView):
+class UmbrellaVariationUpdateView(EmptyTemplateView):
     pass
 
 
-class UmbrellaVariationDeleteView(EmtpyTemplateView):
+class UmbrellaVariationDeleteView(EmptyTemplateView):
     pass

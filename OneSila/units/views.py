@@ -1,18 +1,18 @@
-from core.views import EmtpyTemplateView
+from core.views import EmptyTemplateView
 from .models import Unit
 
 
-class UnitListView(EmtpyTemplateView):
+class UnitListView(EmptyTemplateView):
     pass
 
 
-class UnitDetailViev(EmtpyTemplateView):
+class UnitDetailViev(EmptyTemplateView):
     pass
 
 
-class UnitUpdateView(EmtpyTemplateView):
+class UnitUpdateView(EmptyTemplateView):
     pass
 
 
-class UnitDeleteView(EmtpyTemplateView):
+class UnitDeleteView(EmptyTemplateView):
     pass

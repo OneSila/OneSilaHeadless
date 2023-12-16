@@ -1,18 +1,18 @@
-from core.views import EmtpyTemplateView
+from core.views import EmptyTemplateView
 from .models import Currency
 
 
-class CurrencyListView(EmtpyTemplateView):
+class CurrencyListView(EmptyTemplateView):
     pass
 
 
-class CurrencyDetailViev(EmtpyTemplateView):
+class CurrencyDetailViev(EmptyTemplateView):
     pass
 
 
-class CurrencyUpdateView(EmtpyTemplateView):
+class CurrencyUpdateView(EmptyTemplateView):
     pass
 
 
-class CurrencyDeleteView(EmtpyTemplateView):
+class CurrencyDeleteView(EmptyTemplateView):
     pass

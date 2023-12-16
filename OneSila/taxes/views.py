@@ -1,18 +1,18 @@
-from core.views import EmtpyTemplateView
+from core.views import EmptyTemplateView
 from .models import Tax
 
 
-class TaxListView(EmtpyTemplateView):
+class TaxListView(EmptyTemplateView):
     pass
 
 
-class TaxDetailViev(EmtpyTemplateView):
+class TaxDetailViev(EmptyTemplateView):
     pass
 
 
-class TaxUpdateView(EmtpyTemplateView):
+class TaxUpdateView(EmptyTemplateView):
     pass
 
 
-class TaxDeleteView(EmtpyTemplateView):
+class TaxDeleteView(EmptyTemplateView):
     pass

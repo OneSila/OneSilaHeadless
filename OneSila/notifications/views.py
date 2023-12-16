@@ -1,3 +1,2 @@
-from django.shortcuts import render
-
-# Create your views here.
+from core.views import EmptyTemplateView
+from .models import
