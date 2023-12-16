@@ -63,7 +63,7 @@ class SendLoginLinkEmailFactory(SendBrandedEmail):
     def set_template_variables(self):
         super().set_template_variables()
         self.template_variables.update({
-            'token_url': generate_absolute_url()
+            'token_url': reverse_lazy('core:auth_token_login')
         })
 
 
@@ -74,5 +74,5 @@ class SendRecoveryLinkEmailFactory(SendBrandedEmail):
     def set_template_variables(self):
         super().set_template_variables()
         self.template_variables.update({
-            'token_url': generate_absolute_url()
+            'token_url': reverse_lazy('core:auth_recover')
         })
