@@ -1,82 +1,82 @@
-from core.views import EmtpyTemplateView
+from core.views import EmptyTemplateView
 from .models import ProductProperty, Property, PropertySelectValue, PropertySelectValueTranslation, PropertyTranslation
 
 
-class ProductPropertyListView(EmtpyTemplateView):
+class ProductPropertyListView(EmptyTemplateView):
     pass
 
 
-class ProductPropertyDetailViev(EmtpyTemplateView):
+class ProductPropertyDetailViev(EmptyTemplateView):
     pass
 
 
-class ProductPropertyUpdateView(EmtpyTemplateView):
+class ProductPropertyUpdateView(EmptyTemplateView):
     pass
 
 
-class ProductPropertyDeleteView(EmtpyTemplateView):
+class ProductPropertyDeleteView(EmptyTemplateView):
     pass
 
 
-class PropertyListView(EmtpyTemplateView):
+class PropertyListView(EmptyTemplateView):
     pass
 
 
-class PropertyDetailViev(EmtpyTemplateView):
+class PropertyDetailViev(EmptyTemplateView):
     pass
 
 
-class PropertyUpdateView(EmtpyTemplateView):
+class PropertyUpdateView(EmptyTemplateView):
     pass
 
 
-class PropertyDeleteView(EmtpyTemplateView):
+class PropertyDeleteView(EmptyTemplateView):
     pass
 
 
-class PropertySelectValueListView(EmtpyTemplateView):
+class PropertySelectValueListView(EmptyTemplateView):
     pass
 
 
-class PropertySelectValueDetailViev(EmtpyTemplateView):
+class PropertySelectValueDetailViev(EmptyTemplateView):
     pass
 
 
-class PropertySelectValueUpdateView(EmtpyTemplateView):
+class PropertySelectValueUpdateView(EmptyTemplateView):
     pass
 
 
-class PropertySelectValueDeleteView(EmtpyTemplateView):
+class PropertySelectValueDeleteView(EmptyTemplateView):
     pass
 
 
-class PropertySelectValueTranslationListView(EmtpyTemplateView):
+class PropertySelectValueTranslationListView(EmptyTemplateView):
     pass
 
 
-class PropertySelectValueTranslationDetailViev(EmtpyTemplateView):
+class PropertySelectValueTranslationDetailViev(EmptyTemplateView):
     pass
 
 
-class PropertySelectValueTranslationUpdateView(EmtpyTemplateView):
+class PropertySelectValueTranslationUpdateView(EmptyTemplateView):
     pass
 
 
-class PropertySelectValueTranslationDeleteView(EmtpyTemplateView):
+class PropertySelectValueTranslationDeleteView(EmptyTemplateView):
     pass
 
 
-class PropertyTranslationListView(EmtpyTemplateView):
+class PropertyTranslationListView(EmptyTemplateView):
     pass
 
 
-class PropertyTranslationDetailViev(EmtpyTemplateView):
+class PropertyTranslationDetailViev(EmptyTemplateView):
     pass
 
 
-class PropertyTranslationUpdateView(EmtpyTemplateView):
+class PropertyTranslationUpdateView(EmptyTemplateView):
     pass
 
 
-class PropertyTranslationDeleteView(EmtpyTemplateView):
+class PropertyTranslationDeleteView(EmptyTemplateView):
     pass

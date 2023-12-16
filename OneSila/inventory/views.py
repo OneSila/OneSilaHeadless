@@ -1,34 +1,34 @@
-from core.views import EmtpyTemplateView
+from core.views import EmptyTemplateView
 from .models import Inventory, InventoryLocation
 
 
-class InventoryListView(EmtpyTemplateView):
+class InventoryListView(EmptyTemplateView):
     pass
 
 
-class InventoryLocationListView(EmtpyTemplateView):
+class InventoryDetailViev(EmptyTemplateView):
     pass
 
 
-class InventoryDetailViev(EmtpyTemplateView):
+class InventoryUpdateView(EmptyTemplateView):
     pass
 
 
-class InventoryLocationDetailViev(EmtpyTemplateView):
+class InventoryDeleteView(EmptyTemplateView):
     pass
 
 
-class InventoryUpdateView(EmtpyTemplateView):
+class InventoryLocationListView(EmptyTemplateView):
     pass
 
 
-class InventoryLocationUpdateView(EmtpyTemplateView):
+class InventoryLocationDetailViev(EmptyTemplateView):
     pass
 
 
-class InventoryDeleteView(EmtpyTemplateView):
+class InventoryLocationUpdateView(EmptyTemplateView):
     pass
 
 
-class InventoryLocationDeleteView(EmtpyTemplateView):
+class InventoryLocationDeleteView(EmptyTemplateView):
     pass

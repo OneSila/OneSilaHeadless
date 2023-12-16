@@ -1,5 +1,5 @@
 from django.views.generic import TemplateView
 
 
-class EmtpyTemplateView(TemplateView):
+class EmptyTemplateView(TemplateView):
     pass

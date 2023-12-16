@@ -1,147 +1,146 @@
-from core.views import EmtpyTemplateView
-from contacts.models import Address, Company, Customer, Influencer, \
-    InternalCompany, InvoiceAddress, Person, ShippingAddress, Supplier
+from core.views import EmptyTemplateView
+from .models import Address, Company, Customer, Influencer, InternalCompany, InvoiceAddress, Person, ShippingAddress, Supplier
 
 
-class AddressListView(EmtpyTemplateView):
+class AddressListView(EmptyTemplateView):
     pass
 
 
-class AddressDetailViev(EmtpyTemplateView):
+class AddressDetailViev(EmptyTemplateView):
     pass
 
 
-class AddressUpdateView(EmtpyTemplateView):
+class AddressUpdateView(EmptyTemplateView):
     pass
 
 
-class AddressDeleteView(EmtpyTemplateView):
+class AddressDeleteView(EmptyTemplateView):
     pass
 
 
-class CompanyListView(EmtpyTemplateView):
+class CompanyListView(EmptyTemplateView):
     pass
 
 
-class CompanyDetailViev(EmtpyTemplateView):
+class CompanyDetailViev(EmptyTemplateView):
     pass
 
 
-class CompanyUpdateView(EmtpyTemplateView):
+class CompanyUpdateView(EmptyTemplateView):
     pass
 
 
-class CompanyDeleteView(EmtpyTemplateView):
+class CompanyDeleteView(EmptyTemplateView):
     pass
 
 
-class CustomerListView(EmtpyTemplateView):
+class CustomerListView(EmptyTemplateView):
     pass
 
 
-class CustomerDetailViev(EmtpyTemplateView):
+class CustomerDetailViev(EmptyTemplateView):
     pass
 
 
-class CustomerUpdateView(EmtpyTemplateView):
+class CustomerUpdateView(EmptyTemplateView):
     pass
 
 
-class CustomerDeleteView(EmtpyTemplateView):
+class CustomerDeleteView(EmptyTemplateView):
     pass
 
 
-class InfluencerListView(EmtpyTemplateView):
+class InfluencerListView(EmptyTemplateView):
     pass
 
 
-class InfluencerDetailViev(EmtpyTemplateView):
+class InfluencerDetailViev(EmptyTemplateView):
     pass
 
 
-class InfluencerUpdateView(EmtpyTemplateView):
+class InfluencerUpdateView(EmptyTemplateView):
     pass
 
 
-class InfluencerDeleteView(EmtpyTemplateView):
+class InfluencerDeleteView(EmptyTemplateView):
     pass
 
 
-class InternalCompanyListView(EmtpyTemplateView):
+class InternalCompanyListView(EmptyTemplateView):
     pass
 
 
-class InternalCompanyDetailViev(EmtpyTemplateView):
+class InternalCompanyDetailViev(EmptyTemplateView):
     pass
 
 
-class InternalCompanyUpdateView(EmtpyTemplateView):
+class InternalCompanyUpdateView(EmptyTemplateView):
     pass
 
 
-class InternalCompanyDeleteView(EmtpyTemplateView):
+class InternalCompanyDeleteView(EmptyTemplateView):
     pass
 
 
-class InvoiceAddressListView(EmtpyTemplateView):
+class InvoiceAddressListView(EmptyTemplateView):
     pass
 
 
-class InvoiceAddressDetailViev(EmtpyTemplateView):
+class InvoiceAddressDetailViev(EmptyTemplateView):
     pass
 
 
-class InvoiceAddressUpdateView(EmtpyTemplateView):
+class InvoiceAddressUpdateView(EmptyTemplateView):
     pass
 
 
-class InvoiceAddressDeleteView(EmtpyTemplateView):
+class InvoiceAddressDeleteView(EmptyTemplateView):
     pass
 
 
-class PersonListView(EmtpyTemplateView):
+class PersonListView(EmptyTemplateView):
     pass
 
 
-class PersonDetailViev(EmtpyTemplateView):
+class PersonDetailViev(EmptyTemplateView):
     pass
 
 
-class PersonUpdateView(EmtpyTemplateView):
+class PersonUpdateView(EmptyTemplateView):
     pass
 
 
-class PersonDeleteView(EmtpyTemplateView):
+class PersonDeleteView(EmptyTemplateView):
     pass
 
 
-class ShippingAddressListView(EmtpyTemplateView):
+class ShippingAddressListView(EmptyTemplateView):
     pass
 
 
-class ShippingAddressDetailViev(EmtpyTemplateView):
+class ShippingAddressDetailViev(EmptyTemplateView):
     pass
 
 
-class ShippingAddressUpdateView(EmtpyTemplateView):
+class ShippingAddressUpdateView(EmptyTemplateView):
     pass
 
 
-class ShippingAddressDeleteView(EmtpyTemplateView):
+class ShippingAddressDeleteView(EmptyTemplateView):
     pass
 
 
-class SupplierListView(EmtpyTemplateView):
+class SupplierListView(EmptyTemplateView):
     pass
 
 
-class SupplierDetailViev(EmtpyTemplateView):
+class SupplierDetailViev(EmptyTemplateView):
     pass
 
 
-class SupplierUpdateView(EmtpyTemplateView):
+class SupplierUpdateView(EmptyTemplateView):
     pass
 
 
-class SupplierDeleteView(EmtpyTemplateView):
+class SupplierDeleteView(EmptyTemplateView):
     pass
