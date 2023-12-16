@@ -43,8 +43,6 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
             variables={"username": username, "password": password, 'language': language}
         )
 
-        print(resp)
-
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
 
