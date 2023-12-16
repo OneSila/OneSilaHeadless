@@ -52,5 +52,5 @@ class SendUserInviteEmailFactory(SendBrandedEmail):
     def set_template_variables(self):
         super().set_template_variables()
         self.template_variables.update({
-            'accept_invite_url': reverse_lazy('core:accept_invite')
+            'accept_invite_url': reverse_lazy('core:auth_accept_invite')
         })
