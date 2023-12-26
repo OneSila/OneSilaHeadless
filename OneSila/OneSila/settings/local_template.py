@@ -13,6 +13,11 @@ DATABASES = {
     }
 }
 
+
+STATIC_ROOT = '/path/to/OneSilaHeadless/static/'
+MEDIA_ROOT = '/path/to/OneSilaHeadless/mediafiles/'
+APP_ROOT = '/path/to/OneSilaHeadless/'
+
 SECRET_KEY = 'your-secret-key-goes-here'
 
 #
