@@ -8,3 +8,8 @@ class LanguageType:
     name: str
     name_local: str
     name_translated: str
+
+
+@strawberry.type
+class TimezoneType:
+    key: str
