@@ -110,7 +110,6 @@ class MyMultiTentantCompanyUpdateMutation(GetMultiTenantCompanyMixin, DjangoUpda
     @transaction.atomic
     def resolver(self, source: Any, info: Info, args: list[Any], kwargs: dict[str, Any],) -> Any:
         model = self.django_model
-        assert model is not None
 
         data: Any = kwargs.get(self.argument_name)
         vdata = vars(data).copy() if data is not None else {}
