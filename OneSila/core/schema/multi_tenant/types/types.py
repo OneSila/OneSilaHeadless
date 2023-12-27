@@ -10,6 +10,8 @@ from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser, MultiT
 from strawberry_django.fields.types import DjangoImageType
 from typing import List, TYPE_CHECKING, Dict
 
+from core.typing import TimezoneType
+
 if TYPE_CHECKING:
     from core.schema.languages.types.types import LanguageType
 
@@ -19,6 +21,7 @@ class MultiTenantUserType(relay.Node):
     avatar_resized: DjangoImageType | None
     avatar_resized_full_url: str | None
     language_detail: Annotated['LanguageType', lazy("core.schema.languages.types.types")]
+    timezone_detail: TimezoneType
     multi_tenant_company: Annotated['MultiTenantCompanyType', lazy("core.schema.multi_tenant.types.types")]
 
 

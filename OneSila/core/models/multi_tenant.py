@@ -11,7 +11,7 @@ from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFill
 from imagekit.exceptions import MissingSource
 
-from core.typing import LanguageType
+from core.typing import LanguageType, TimezoneType
 from core.helpers import get_languages
 from core.managers import MultiTenantManager, MultiTenantUserLoginTokenManager
 from core.validators import phone_regex, validate_image_extension, \
@@ -94,7 +94,7 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
 
     # Profile data:
     language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
-    timezone = models.CharField(max_length=35, choices=TIMEZONE_CHOICES, default=DEFAULT_TIMEZONE)
+    timezone = models.CharField(max_length=35, choices=TIMEZONE_CHOICES, default=timezone.get_default_timezone().key)
     mobile_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
     whatsapp_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
     telegram_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
@@ -114,13 +114,16 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
         super().save(*args, **kwargs)
 
     def avatar_resized_full_url(self):
-        if self.avatar_resized.url:
+        if self.avatar:
             return f"{generate_absolute_url(trailing_slash=False)}{self.avatar_resized.url}"
 
         return None
 
     def language_detail(self):
         return LanguageType(**get_language_info(self.language))
+
+    def timezone_detail(self):
+        return TimezoneType(key=self.timezone)
 
     def set_active(self, save=True):
         self.is_active = True

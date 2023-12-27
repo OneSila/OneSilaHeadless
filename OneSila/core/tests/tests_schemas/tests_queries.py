@@ -101,3 +101,54 @@ class TestLanguageQuery(TransactionTestCaseMixin, TransactionTestCase):
 
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
+
+
+class TestTimeZoneQuery(TransactionTestCaseMixin, TransactionTestCase):
+    def test_languages(self):
+        query = """
+            query timezones{
+              timezones{
+                key
+              }
+            }
+        """
+
+        # Make sure you are logged out first.  The test-client is
+        # logged in by default.
+        # resp = self.stawberry_anonymous_test_client(query=ME_QUERY)
+        # self.assertTrue(resp.errors is not None)
+
+        resp = self.stawberry_anonymous_test_client(
+            query=query)
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+    def test_default_timezone(self):
+        query = """
+            query defaultTimezone{
+              defaultTimezone{
+                key
+              }
+            }
+        """
+
+        resp = self.stawberry_anonymous_test_client(
+            query=query)
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+    def test_current_user_timezone(self):
+        query = """
+            query currentUserTimezone{
+                currentUserTimezone{
+                    key
+                }
+            }
+        """
+        resp = self.stawberry_test_client(
+            query=query)
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
