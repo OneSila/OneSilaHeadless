@@ -94,7 +94,7 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
 
     # Profile data:
     language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
-    timezone = models.CharField(max_length=35, choices=TIMEZONE_CHOICES, default=DEFAULT_TIMEZONE)
+    timezone = models.CharField(max_length=35, choices=TIMEZONE_CHOICES, default=timezone.get_default_timezone().key)
     mobile_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
     whatsapp_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
     telegram_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
