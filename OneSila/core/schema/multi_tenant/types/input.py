@@ -12,14 +12,6 @@ class MultiTenantCompanyMyInput:
     language: auto
 
 
-@partial(MultiTenantCompany)
-class MultiTenantCompanyMyPartialInput:
-    name: auto
-    country: auto
-    phone_number: auto
-    language: auto
-
-
 @input(MultiTenantCompany, fields="__all__")
 class MultiTenantCompanyInput:
     pass
