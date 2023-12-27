@@ -18,6 +18,9 @@ class TransactionTestCaseMixin:
         type_name = f"{model_class.__name__}Type"
         return to_base64(type_name, instance_id)
 
+    def strawberry_raw_client(self):
+        return TestClient('/graphql/')
+
     def stawberry_test_client(self, **kwargs):
         test_client = TestClient('/graphql/')
         with test_client.login(self.user):

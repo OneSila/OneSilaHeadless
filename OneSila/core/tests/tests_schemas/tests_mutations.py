@@ -6,7 +6,36 @@ from core.models.multi_tenant import MultiTenantUser, MultiTenantCompany, \
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 
 from .mutations import REGISTER_USER_MUTATION, LOGIN_MUTATION, LOGOUT_MUTATION, \
-    ME_QUERY, AUTHENTICATE_TOKEN
+    ME_QUERY, AUTHENTICATE_TOKEN, UPDATE_MY_MULTITENTANTCOMPANY
+
+
+class UpdateMyMultiTenantCompanyTestCase(TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        self.multi_tenant_company = baker.make(MultiTenantCompany)
+        self.user_owner = baker.make(MultiTenantUser, multi_tenant_company=self.multi_tenant_company,
+            is_multi_tenant_company_owner=True)
+        self.user_non_owner = baker.make(MultiTenantUser, multi_tenant_company=self.multi_tenant_company,
+            is_multi_tenant_company_owner=False)
+
+    def test_update_owner(self):
+        client = self.strawberry_raw_client()
+        with client.login(self.user_owner):
+            res = client.query(UPDATE_MY_MULTITENTANTCOMPANY,
+                variables={"name": "owner edit"},
+                asserts_errors=False)
+
+        self.assertTrue(res.errors is None)
+        self.assertTrue(res.data is not None)
+
+    def test_update_non_owner(self):
+        client = self.strawberry_raw_client()
+        with client.login(self.user_non_owner):
+            res = client.query(UPDATE_MY_MULTITENTANTCOMPANY,
+                variables={"name": "non owner edit"},
+                asserts_errors=False)
+
+        self.assertTrue(res.errors is not None)
+        self.assertTrue(res.data is None)
 
 
 class AuthenticateTokenTestCase(TransactionTestCaseMixin, TransactionTestCase):

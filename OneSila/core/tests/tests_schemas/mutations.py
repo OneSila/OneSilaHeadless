@@ -1,3 +1,11 @@
+UPDATE_MY_MULTITENTANTCOMPANY = """
+    mutation updateMyMultiTenantCompany($name: String!) {
+      updateMyMultiTenantCompany(data: {name: $name}) {
+        name
+      }
+    }
+"""
+
 
 REGISTER_USER_MUTATION = """
   mutation registerUser($username: String!, $password: String!, $language: String!) {
