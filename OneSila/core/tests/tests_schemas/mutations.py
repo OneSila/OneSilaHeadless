@@ -45,6 +45,9 @@ ME_QUERY = """
         code
         name
       }
+      timezoneDetail {
+        key
+      }
       multiTenantCompany{
         id
       }
