@@ -15,3 +15,11 @@ class CompanyTestCase(TestCaseMixin, TestCase):
 
         self.assertTrue(all_suppliers, Supplier.objects)
         self.assertTrue(supplier, Supplier)
+
+    def test_supplier_search(self):
+        supplier_id = Supplier.objects.create(name='test_search_supplier', multi_tenant_company=self.multi_tenant_company).id
+        supplier = Supplier.objects.get(id=supplier_id)
+
+        qs = Supplier.objects.search('supplier')
+
+        self.assertTrue(qs.exists())

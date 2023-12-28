@@ -3,6 +3,8 @@ from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin, \
 
 
 class CompanyQueryset(MultiTenantCompanyCreateMixin, QuerySet):
+    search_terms = ['name']
+
     def filter_supplier(self):
         return self.filter(is_supplier=True)
 

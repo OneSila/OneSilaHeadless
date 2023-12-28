@@ -9,3 +9,6 @@ class HsCode(models.Model):
 
     def __str__(self):
         return f"{self.name} <{self.code}>"
+
+    class Meta:
+        search_terms = ['name', 'code']

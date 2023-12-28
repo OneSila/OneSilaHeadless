@@ -43,6 +43,7 @@ class Currency(models.Model):
         self.save(force_save=force_save)
 
     class Meta:
+        search_terms = ['iso_code', 'name']
         verbose_name = _('Currency')
         verbose_name_plural = _('Currencies')
 

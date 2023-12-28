@@ -33,6 +33,7 @@ class Company(models.Model):
         return self.name
 
     class Meta:
+        search_terms = ['name']
         unique_together = ("name", "multi_tenant_company")
         verbose_name_plural = _("companies")
 
@@ -106,6 +107,7 @@ class Person(models.Model):
         return self.name()
 
     class Meta:
+        search_terms = ['name', 'company__name', 'email']
         verbose_name = _("person")
         verbose_name_plural = _("people")
 
@@ -131,6 +133,7 @@ class Address(models.Model):
     is_shipping_address = models.BooleanField(default=False)
 
     class Meta:
+        search_terms = ['contact__email', 'company__name']
         verbose_name_plural = 'addresses'
 
 

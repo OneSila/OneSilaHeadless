@@ -7,6 +7,93 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.models import BaseUserManager
 
 
+class SearchQuerySetMixin:
+    def get_search_results(self, search_term, search_fields):
+        """
+        Return a tuple containing a queryset to implement the search
+        and a boolean indicating if the results may contain duplicates.
+
+        This code is borrowed from the django-source where it's present in the
+        admin, but not in the querysets which feels like a missed opportunity.
+        Currently from version 3.2: https://github.com/django/django/blob/stable/3.2.x/django/contrib/admin/options.py
+
+        There have been some changes as this take the queryset internally, and
+        if fed the search_fields instead af grabbing them through the request which has been removed.
+        """
+        queryset = self
+        # Apply keyword searches.
+
+        def construct_search(field_name):
+            if field_name.startswith('^'):
+                return "%s__istartswith" % field_name[1:]
+            elif field_name.startswith('='):
+                return "%s__iexact" % field_name[1:]
+            elif field_name.startswith('@'):
+                return "%s__search" % field_name[1:]
+            # Use field_name if it includes a lookup.
+            opts = self.model._meta
+            lookup_fields = field_name.split(LOOKUP_SEP)
+            # Go through the fields, following all relations.
+            prev_field = None
+            for path_part in lookup_fields:
+                if path_part == 'pk':
+                    path_part = opts.pk.name
+                try:
+                    field = opts.get_field(path_part)
+                except FieldDoesNotExist:
+                    # Use valid query lookups.
+                    if prev_field and prev_field.get_lookup(path_part):
+                        return field_name
+                else:
+                    prev_field = field
+                    if hasattr(field, 'get_path_info'):
+                        # Update opts to follow the relation.
+                        opts = field.get_path_info()[-1].to_opts
+            # Otherwise, use the field with icontains.
+            return "%s__icontains" % field_name
+
+        may_have_duplicates = False
+        opts = self.model._meta
+
+        try:
+            if search_fields and search_term:
+                orm_lookups = [construct_search(str(search_field))
+                               for search_field in search_fields]
+                for bit in smart_split(search_term):
+                    if bit.startswith(('"', "'")) and bit[0] == bit[-1]:
+                        bit = unescape_string_literal(bit)
+                    or_queries = [models.Q(**{orm_lookup: bit})
+                                  for orm_lookup in orm_lookups]
+                    queryset = queryset.filter(reduce(operator.or_, or_queries))
+
+                may_have_duplicates |= any(
+                    lookup_needs_distinct(opts, search_spec)
+                    for search_spec in orm_lookups
+                )
+        except Exception as e:
+            # made this because lost half hour because if we give wrong field name it fails silently
+            raise SearchFailedError(f"Search failed with error: {str(e)}")
+
+        return queryset, may_have_duplicates
+
+    def search(self, search_term):
+        try:
+            search_fields = self.model._meta.search_terms
+        except AttributeError:
+            search_fields = []
+
+        qs, _ = self.get_search_results(search_term, search_fields)
+        return qs
+
+
+class SearchManagerMixin:
+    def get_search_results(self, search_term, search_fields):
+        return self.get_queryset().get_search_results(search_term, search_fields)
+
+    def search(self, search_term):
+        return self.get_queryset().search(search_term)
+
+
 class MultiTenantUserLoginTokenQuerySet(DjangoQueryset):
     def get_by_token(self, token):
         try:
@@ -28,12 +115,12 @@ class MultiTenantUserLoginTokenManager(DjangoManager):
         return self.get_queryset().get_by_token(token)
 
 
-class MultiTenantQuerySet(DjangoQueryset):
+class MultiTenantQuerySet(SearchQuerySetMixin, DjangoQueryset):
     def filter(self, *, multi_tenant_company, **kwargs):
         return super().filter(multi_tenant_company=multi_tenant_company, **kwargs)
 
 
-class MultiTenantManager(DjangoManager):
+class MultiTenantManager(SearchManagerMixin, DjangoManager):
     def get_queryset(self):
         return MultiTenantQuerySet(self.model, using=self._db)
 

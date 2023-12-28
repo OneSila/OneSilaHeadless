@@ -26,3 +26,6 @@ class EanCode(models.Model):
             raise IntegrityError(f"You cannot assign an ean_code to an UMBRELLA.  It needs to be BUNDLE or VARIATION")
 
         super().save(*args, **kwargs)
+
+    class Meta:
+        search_terms = ['ean_code']
