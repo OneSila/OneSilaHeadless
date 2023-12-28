@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 from .models import MultiTenantCompany, MultiTenantUser
+from .models.multi_tenant import MultiTenantUserLoginToken
 
 
 @admin.register(MultiTenantUser)
@@ -10,7 +11,7 @@ class MultiTenantUserAdmin(BaseUserAdmin):
     fieldsets = (
         (None, {'fields': ('username', 'email', 'password')}),
         (_('Personal info'), {'fields': ('first_name', 'last_name', 'multi_tenant_company')}),
-        (_('Profile info'), {'fields': ('language', 'avatar')}),
+        (_('Profile info'), {'fields': ('language', 'avatar', 'mobile_number', 'whatsapp_number', 'telegram_number', 'timezone')}),
         (_('Permissions'), {
             'fields': (
                 'is_active', 'is_staff', 'is_superuser', 'is_multi_tenant_company_owner',
@@ -32,4 +33,8 @@ class MultiTenantUserAdmin(BaseUserAdmin):
 
 @admin.register(MultiTenantCompany)
 class MultiTenantCompanyAdmin(admin.ModelAdmin):
+    pass
+
+@admin.register(MultiTenantUserLoginToken)
+class MultiTenantUserLoginTokenAdmin(admin.ModelAdmin):
     pass

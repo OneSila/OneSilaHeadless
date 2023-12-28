@@ -51,6 +51,8 @@ class RecoveryTokenMutation(LoginTokenMutation):
     def create_token(self, *, user):
         fac = RecoveryTokenFactory(user)
         fac.run()
+        # we need to do that or the mutation will not return expired at
+        fac.token.refresh_from_db()
         return fac.token
 
 
