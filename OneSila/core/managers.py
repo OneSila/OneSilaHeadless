@@ -1,13 +1,31 @@
 from django.db.models import QuerySet as DjangoQueryset
 from django.db.models import Manager as DjangoManager
 from django.db import IntegrityError
-from django.db.models import QuerySet
 from django.core.exceptions import ValidationError
-
+from django.db import models
+from django.db.models.constants import LOOKUP_SEP
+from django.core.exceptions import FieldDoesNotExist
+from django.utils.text import smart_split, unescape_string_literal
 from django.contrib.auth.models import BaseUserManager
+from django.contrib.admin.utils import lookup_spawns_duplicates as lookup_function
+
+from core.exceptions import SearchFailedError
+
+import operator
+from functools import reduce
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class SearchQuerySetMixin:
+    def lookup_needs_distinct(self, queryset, orm_lookups):
+        """Return True if an orm_lookup requires calling qs.distinct()."""
+        return any(
+            lookup_function(queryset.model._meta, search_spec)
+            for search_spec in orm_lookups
+        )
+
     def get_search_results(self, search_term, search_fields):
         """
         Return a tuple containing a queryset to implement the search
@@ -21,8 +39,8 @@ class SearchQuerySetMixin:
         if fed the search_fields instead af grabbing them through the request which has been removed.
         """
         queryset = self
-        # Apply keyword searches.
 
+        # Apply keyword searches.
         def construct_search(field_name):
             if field_name.startswith('^'):
                 return "%s__istartswith" % field_name[1:]
@@ -54,32 +72,26 @@ class SearchQuerySetMixin:
 
         may_have_duplicates = False
         opts = self.model._meta
-
-        try:
-            if search_fields and search_term:
-                orm_lookups = [construct_search(str(search_field))
-                               for search_field in search_fields]
-                for bit in smart_split(search_term):
-                    if bit.startswith(('"', "'")) and bit[0] == bit[-1]:
-                        bit = unescape_string_literal(bit)
-                    or_queries = [models.Q(**{orm_lookup: bit})
-                                  for orm_lookup in orm_lookups]
-                    queryset = queryset.filter(reduce(operator.or_, or_queries))
-
-                may_have_duplicates |= any(
-                    lookup_needs_distinct(opts, search_spec)
-                    for search_spec in orm_lookups
-                )
-        except Exception as e:
-            # made this because lost half hour because if we give wrong field name it fails silently
-            raise SearchFailedError(f"Search failed with error: {str(e)}")
-
+        if search_fields and search_term:
+            orm_lookups = [construct_search(str(search_field))
+                           for search_field in search_fields]
+            for bit in smart_split(search_term):
+                if bit.startswith(('"', "'")) and bit[0] == bit[-1]:
+                    bit = unescape_string_literal(bit)
+                or_queries = [models.Q(**{orm_lookup: bit})
+                              for orm_lookup in orm_lookups]
+                queryset = queryset.filter(reduce(operator.or_, or_queries))
+            may_have_duplicates |= any(
+                self.lookup_needs_distinct(opts, search_spec)
+                for search_spec in orm_lookups
+            )
         return queryset, may_have_duplicates
 
     def search(self, search_term):
         try:
             search_fields = self.model._meta.search_terms
         except AttributeError:
+            logger.warning("No `search_terms` declared on the model Meta class")
             search_fields = []
 
         qs, _ = self.get_search_results(search_term, search_fields)
@@ -172,7 +184,11 @@ class MultiTenantCompanyCreateMixin:
         return super().create(*args, **kwargs)
 
 
-class Manager(DjangoManager):
+class QuerySet(SearchQuerySetMixin, DjangoQueryset):
+    pass
+
+
+class Manager(SearchManagerMixin, DjangoManager):
     def get_queryset(self):
         return QuerySet(self.model, using=self._db)
 
