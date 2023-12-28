@@ -53,7 +53,7 @@ class InternalCompanyQuerySet(QuerySetProxyModelMixin, CompanyQueryset):
 
 class InternalCompanyManager(CompanyManager):
     def get_queryset(self):
-        return InternalCompany(self.model, using=self._db)
+        return InternalCompanyQuerySet(self.model, using=self._db)
 
 
 class AddressQuerySet(MultiTenantCompanyCreateMixin, QuerySet):

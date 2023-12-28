@@ -47,6 +47,7 @@ class Supplier(Company):
 
     class Meta:
         proxy = True
+        search_terms = ['name']
 
 
 class Customer(Company):
@@ -58,6 +59,7 @@ class Customer(Company):
 
     class Meta:
         proxy = True
+        search_terms = ['name']
 
 
 class Influencer(Company):
@@ -69,6 +71,7 @@ class Influencer(Company):
 
     class Meta:
         proxy = True
+        search_terms = ['name']
 
 
 class InternalCompany(Company):
@@ -83,6 +86,7 @@ class InternalCompany(Company):
 
     class Meta:
         proxy = True
+        search_terms = ['name']
         verbose_name_plural = _("interal companies")
 
 
@@ -143,6 +147,7 @@ class ShippingAddress(Address):
 
     class Meta:
         proxy = True
+        search_terms = ['contact__email', 'company__name']
         verbose_name_plural = 'shipping addresses'
 
 
@@ -152,4 +157,5 @@ class InvoiceAddress(Address):
 
     class Meta:
         proxy = True
+        search_terms = ['contact__email', 'company__name']
         verbose_name_plural = 'invoice addresses'

@@ -1,12 +1,12 @@
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter
-
+from core.schema.core.types.filters import filter, SearchFilterMixin
 from contacts.models import Company, Address, Person, Supplier, \
     InvoiceAddress, ShippingAddress, Customer
 
 
 @filter(Company)
-class CompanyFilter:
+class CompanyFilter(SearchFilterMixin):
+    search: str
     id: auto
     name: auto
     vat_number: auto
@@ -19,7 +19,8 @@ class CompanyFilter:
 
 
 @filter(Supplier)
-class SupplierFilter:
+class SupplierFilter(SearchFilterMixin):
+    search: str
     id: auto
     name: auto
     vat_number: auto
@@ -27,7 +28,8 @@ class SupplierFilter:
 
 
 @filter(Customer)
-class CustomerFilter:
+class CustomerFilter(SearchFilterMixin):
+    search: str
     id: auto
     name: auto
     vat_number: auto
@@ -35,7 +37,8 @@ class CustomerFilter:
 
 
 @filter(Person)
-class PersonFilter:
+class PersonFilter(SearchFilterMixin):
+    search: str
     first_name: auto
     last_name: auto
     email: auto
@@ -43,17 +46,20 @@ class PersonFilter:
 
 
 @filter(Address)
-class AddressFilter:
+class AddressFilter(SearchFilterMixin):
+    search: str
     company: CompanyFilter
     is_invoice_address: auto
     is_shipping_address: auto
 
 
 @filter(InvoiceAddress)
-class InvoiceAddressFilter:
+class InvoiceAddressFilter(SearchFilterMixin):
+    search: str
     company: CompanyFilter
 
 
 @filter(ShippingAddress)
-class ShippingAddressFilter:
+class ShippingAddressFilter(SearchFilterMixin):
+    search: str
     company: CompanyFilter
