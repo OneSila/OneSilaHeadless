@@ -1,11 +1,12 @@
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter
+from core.schema.core.types.filters import filter, SearchFilterMixin
 
 from currencies.models import Currency
 
 
 @filter(Currency)
-class CurrencyFilter:
+class CurrencyFilter(SearchFilterMixin):
+    search: str
     id: auto
     iso_code: auto
     name: auto

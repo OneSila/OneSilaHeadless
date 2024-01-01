@@ -1,5 +1,5 @@
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter
+from core.schema.core.types.filters import filter, SearchFilterMixin
 
 from purchasing.models import SupplierProduct, PurchaseOrder, PurchaseOrderItem
 from products.schema.types.filters import ProductFilter
@@ -10,7 +10,8 @@ from contacts.schema.types.filters import SupplierFilter, InvoiceAddressFilter, 
 
 
 @filter(SupplierProduct)
-class SupplierProductFilter:
+class SupplierProductFilter(SearchFilterMixin):
+    search: str
     id: auto
     sku: auto
     name: auto
@@ -21,7 +22,8 @@ class SupplierProductFilter:
 
 
 @filter(PurchaseOrder)
-class PurchaseOrderFilter:
+class PurchaseOrderFilter(SearchFilterMixin):
+    search: str
     id: auto
     status: auto
     supplier: SupplierFilter
@@ -32,7 +34,8 @@ class PurchaseOrderFilter:
 
 
 @filter(PurchaseOrderItem)
-class PurchaseOrderItemFilter:
+class PurchaseOrderItemFilter(SearchFilterMixin):
+    search: str
     id: auto
     purchase_order: PurchaseOrderFilter
     item: SupplierProductFilter
