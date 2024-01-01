@@ -33,6 +33,7 @@ class Company(models.Model):
         return self.name
 
     class Meta:
+        search_terms = ['name']
         unique_together = ("name", "multi_tenant_company")
         verbose_name_plural = _("companies")
 
@@ -46,6 +47,7 @@ class Supplier(Company):
 
     class Meta:
         proxy = True
+        search_terms = ['name']
 
 
 class Customer(Company):
@@ -57,6 +59,7 @@ class Customer(Company):
 
     class Meta:
         proxy = True
+        search_terms = ['name']
 
 
 class Influencer(Company):
@@ -68,6 +71,7 @@ class Influencer(Company):
 
     class Meta:
         proxy = True
+        search_terms = ['name']
 
 
 class InternalCompany(Company):
@@ -82,6 +86,7 @@ class InternalCompany(Company):
 
     class Meta:
         proxy = True
+        search_terms = ['name']
         verbose_name_plural = _("interal companies")
 
 
@@ -106,6 +111,7 @@ class Person(models.Model):
         return self.name()
 
     class Meta:
+        search_terms = ['name', 'company__name', 'email']
         verbose_name = _("person")
         verbose_name_plural = _("people")
 
@@ -131,6 +137,7 @@ class Address(models.Model):
     is_shipping_address = models.BooleanField(default=False)
 
     class Meta:
+        search_terms = ['contact__email', 'company__name']
         verbose_name_plural = 'addresses'
 
 
@@ -140,6 +147,7 @@ class ShippingAddress(Address):
 
     class Meta:
         proxy = True
+        search_terms = ['contact__email', 'company__name']
         verbose_name_plural = 'shipping addresses'
 
 
@@ -149,4 +157,5 @@ class InvoiceAddress(Address):
 
     class Meta:
         proxy = True
+        search_terms = ['contact__email', 'company__name']
         verbose_name_plural = 'invoice addresses'

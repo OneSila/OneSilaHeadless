@@ -4,6 +4,19 @@
 
 ## Models
 
+### Search fields
+
+The default manager also has the search ability added. Searching through the models should be set by adding:
+
+```python
+class MyModel(models.Model):
+    my_field = models.CharField(max_length=100)
+
+    class Meta:
+        search_fields = ['my_field']
+```
+
+
 ### Private Models
 
 When creating a new app it's imporant to import models from the core instead of the default django.

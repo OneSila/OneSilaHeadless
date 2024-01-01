@@ -167,7 +167,6 @@ class MultiTenantUserLoginToken(models.Model):
     objects = MultiTenantUserLoginTokenManager()
 
     def save(self, *args, **kwargs):
-        print(self.created_at)
         self.set_token()
         super().save(*args, **kwargs)
         self.set_expires_at()

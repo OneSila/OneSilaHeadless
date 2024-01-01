@@ -14,6 +14,7 @@ class Inventory(models.Model):
     objects = InventorykManager()
 
     class Meta:
+        search_terms = ['product__sku', 'stocklocation__name']
         unique_together = ('product', 'stocklocation')
         verbose_name_plural = "inventories"
 
@@ -38,3 +39,6 @@ class InventoryLocation(models.Model):
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        search_terms = ['name']

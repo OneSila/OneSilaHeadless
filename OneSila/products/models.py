@@ -72,6 +72,9 @@ class Product(models.Model):
     def is_not_variations(self):
         return self.type != self.VARIATION
 
+    class Meta:
+        search_terms = ['sku']
+
 
 class BundleProduct(Product):
     objects = BundleManager()

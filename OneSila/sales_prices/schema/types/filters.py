@@ -1,5 +1,5 @@
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter
+from core.schema.core.types.filters import filter, SearchFilterMixin
 
 from sales_prices.models import SalesPrice, SalesPriceList, SalesPriceListItem
 from products.schema.types.filters import ProductFilter
@@ -7,14 +7,16 @@ from currencies.schema.types.filters import CurrencyFilter
 
 
 @filter(SalesPrice)
-class SalesPriceFilter:
+class SalesPriceFilter(SearchFilterMixin):
+    search: str
     id: auto
     product: ProductFilter
     currency: CurrencyFilter
 
 
 @filter(SalesPriceList)
-class SalesPriceListFilter:
+class SalesPriceListFilter(SearchFilterMixin):
+    search: str
     id: auto
     name: auto
     currency: CurrencyFilter
@@ -23,7 +25,8 @@ class SalesPriceListFilter:
 
 
 @filter(SalesPriceListItem)
-class SalesPriceListItemFilter:
+class SalesPriceListItemFilter(SearchFilterMixin):
+    search: str
     id: auto
     salespricelist: SalesPriceListFilter
     product: ProductFilter

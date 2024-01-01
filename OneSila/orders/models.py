@@ -141,6 +141,9 @@ class Order(models.Model):
     def is_done(self):
         return self.status == self.DONE
 
+    class Meta:
+        search_terms = ['reference', 'company__name']
+
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.PROTECT)
@@ -185,6 +188,9 @@ class OrderItem(models.Model):
 
         return price * self.quantity
 
+    class Meta:
+        search_terms = ['order__reference', 'order__company__name']
+
 
 class OrderNote(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE)
@@ -192,3 +198,6 @@ class OrderNote(models.Model):
 
     def __str__(self):
         return '{}'.format(self.order)
+
+    class Meta:
+        search_terms = ['order__reference', 'order__company__name', 'note']
