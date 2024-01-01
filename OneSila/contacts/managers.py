@@ -1,21 +1,19 @@
 from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin, \
-    QuerySetProxyModelMixin
+    QuerySetProxyModelMixin, MultiTenantQuerySet, MultiTenantManager
 
 
-class CompanyQueryset(MultiTenantCompanyCreateMixin, QuerySet):
-    search_terms = ['name']
-
-    def filter_supplier(self):
-        return self.filter(is_supplier=True)
+class CompanyQueryset(MultiTenantQuerySet):
+    def filter_supplier(self, multi_tenant_company):
+        return self.filter(is_supplier=True, multi_tenant_company=multi_tenant_company)
 
     def filter_customer(self):
-        return self.filter(is_customer=True)
+        return self.filter(is_customer=True, multi_tenant_company=multi_tenant_company)
 
     def filter_influencer(self):
-        return self.filter(is_influencer=True)
+        return self.filter(is_influencer=True, multi_tenant_company=multi_tenant_company)
 
 
-class CompanyManager(MultiTenantCompanyCreateMixin, Manager):
+class CompanyManager(MultiTenantManager):
     def get_queryset(self):
         return CompanyQueryset(self.model, using=self._db)
 
@@ -56,7 +54,7 @@ class InternalCompanyManager(CompanyManager):
         return InternalCompanyQuerySet(self.model, using=self._db)
 
 
-class AddressQuerySet(MultiTenantCompanyCreateMixin, QuerySet):
+class AddressQuerySet(MultiTenantQuerySet):
     def filter_shippingaddress(self):
         return self.filter(is_shipping_address=True)
 
@@ -68,7 +66,7 @@ class ShippingAddressQuerySet(QuerySetProxyModelMixin, AddressQuerySet):
     pass
 
 
-class ShippingAddressManager(Manager):
+class ShippingAddressManager(MultiTenantManager):
     def get_queryset(self):
         return ShippingAddressQuerySet(self.model, using=self._db)
 
@@ -77,6 +75,6 @@ class InvoiceAddressQuerySet(QuerySetProxyModelMixin, AddressQuerySet):
     pass
 
 
-class InvoiceAddressManager(Manager):
+class InvoiceAddressManager(MultiTenantManager):
     def get_queryset(self):
         return InvoiceAddressQuerySet(self.model, using=self._db)
