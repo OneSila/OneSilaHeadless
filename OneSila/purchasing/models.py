@@ -20,6 +20,9 @@ class SupplierProduct(models.Model):
     def __str__(self):
         return f"{self.product} <{self.supplier}>"
 
+    class Meta:
+        search_terms = ['sku', 'name', 'supplier__name']
+
 
 class PurchaseOrder(models.Model):
     """
@@ -53,6 +56,9 @@ class PurchaseOrder(models.Model):
     def __str__(self):
         return self.reference()
 
+    class Meta:
+        search_terms = ['supplier__name', 'order_reference']
+
 
 class PurchaseOrderItem(models.Model):
     """
@@ -62,3 +68,6 @@ class PurchaseOrderItem(models.Model):
     item = models.ForeignKey(SupplierProduct, on_delete=models.PROTECT)
     quantity = models.IntegerField()
     price = models.FloatField()
+
+    class Meta:
+        search_terms = ['purchase_order__order_reference', 'purchase_order__supplier__name']

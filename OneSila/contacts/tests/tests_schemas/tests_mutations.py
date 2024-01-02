@@ -129,7 +129,9 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         resp = self.stawberry_test_client(
             query=mutation,
-            variables={"name": company_name, "id": company_global_id}
+            variables={"name": company_name, "id": company_global_id},
+            asserts_errors=False,
+
         )
 
         self.assertTrue(resp.errors is None)
@@ -157,7 +159,8 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         resp = self.stawberry_test_client(
             query=mutation,
-            variables={"name": company_name, "id": company_global_id}
+            variables={"name": company_name, "id": company_global_id},
+            asserts_errors=False,
         )
 
         self.assertTrue(resp.errors is None)

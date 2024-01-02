@@ -1,10 +1,9 @@
 from django.db.models import QuerySet as DjangoQueryset
 from django.db.models import Manager as DjangoManager
-from django.db import IntegrityError
-from django.db.models import QuerySet
-from django.core.exceptions import ValidationError
-
 from django.contrib.auth.models import BaseUserManager
+from django.db import IntegrityError
+from core.managers.search import SearchQuerySetMixin, SearchManagerMixin
+from core.managers.decorators import multi_tenant_company_required
 
 
 class MultiTenantUserLoginTokenQuerySet(DjangoQueryset):
@@ -28,20 +27,47 @@ class MultiTenantUserLoginTokenManager(DjangoManager):
         return self.get_queryset().get_by_token(token)
 
 
-class MultiTenantQuerySet(DjangoQueryset):
-    def filter(self, *, multi_tenant_company, **kwargs):
-        return super().filter(multi_tenant_company=multi_tenant_company, **kwargs)
+class MultiTenantQuerySet(SearchQuerySetMixin, DjangoQueryset):
+    def get_search_results(self, *, search_term, search_fields, multi_tenant_company):
+        return super().get_search_results(
+            search_term=search_term,
+            search_fields=search_fields,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+    def search(self, search_term, multi_tenant_company=None):
+        return super().search(search_term=search_term, multi_tenant_company=multi_tenant_company)
+
+    # def filter(self, *args, **kwargs):
+    #     return super().filter(*args, **kwargs)
+
+    # def all(self, multi_tenant_company=None):
+    #     if multi_tenant_company:
+    #         return self.filter(multi_tenant_company=multi_tenant_company)
+
+    #     return self.filter()
 
 
-class MultiTenantManager(DjangoManager):
+class MultiTenantManager(SearchManagerMixin, DjangoManager):
     def get_queryset(self):
         return MultiTenantQuerySet(self.model, using=self._db)
 
-    def create(self, *, multi_tenant_company, **kwargs):
-        return super().create(multi_tenant_company=multi_tenant_company, **kwargs)
+    @multi_tenant_company_required()
+    def create(self, **kwargs):
+        return self.get_queryset().create(**kwargs)
 
-    def get_or_create(self, *, multi_tenant_company, **kwargs):
-        return super().get_or_create(multi_tenant_company=multi_tenant_company, **kwargs)
+    @multi_tenant_company_required()
+    def get_or_create(self, **kwargs):
+        return self.get_queryset().get_or_create(**kwargs)
+
+    def search(self, search_term, multi_tenant_company):
+        return self.get_queryset().search(search_term=search_term, multi_tenant_company=multi_tenant_company)
+
+    # def filter(self, *args, **kwargs):
+    #     return self.get_queryset().filter(*args, **kwargs)
+
+    # def all(self, multi_tenant_company=None):
+    #     return self.get_queryset().all(multi_tenant_company=multi_tenant_company)
 
 
 class MultiTenantUserManager(BaseUserManager):
@@ -85,24 +111,21 @@ class MultiTenantCompanyCreateMixin:
         return super().create(*args, **kwargs)
 
 
-class Manager(DjangoManager):
-    def get_queryset(self):
-        return QuerySet(self.model, using=self._db)
-
-
-class QuerySetProxyModelMixin:
+class QuerySetProxyModelMixin(MultiTenantQuerySet):
     """
     Should you wish ot use this mixin for proxy-classes, dont forget to set
     - proxy_filter_field on the model
     """
 
-    def filter(self, *args, **kwargs):
+    # @multi_tenant_company_required()
+    def filter(self, **kwargs):
         kwargs.update(self.model.proxy_filter_fields)
-        return super().filter(*args, **kwargs)
+        return super().filter(**kwargs)
 
+    @multi_tenant_company_required()
     def create(self, **kwargs):
         kwargs.update(self.model.proxy_filter_fields)
         return super().create(**kwargs)
 
-    def all(self):
-        return self.filter()
+    def all(self, multi_tenant_company):
+        return self.filter(multi_tenant_company=multi_tenant_company)

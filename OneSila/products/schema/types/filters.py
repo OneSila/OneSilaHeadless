@@ -1,12 +1,13 @@
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter
+from core.schema.core.types.filters import filter, SearchFilterMixin
 
 from products.models import Product, BundleProduct, UmbrellaProduct, \
     ProductVariation, ProductTranslation, UmbrellaVariation, BundleVariation
 
 
 @filter(Product)
-class ProductFilter:
+class ProductFilter(SearchFilterMixin):
+    search: str
     id: auto
     sku: auto
     type: auto
@@ -14,21 +15,24 @@ class ProductFilter:
 
 
 @filter(BundleProduct)
-class BundleProductFilter:
+class BundleProductFilter(SearchFilterMixin):
+    search: str
     id: auto
     sku: auto
     tax_rate: auto
 
 
 @filter(UmbrellaProduct)
-class UmbrellaProductFilter:
+class UmbrellaProductFilter(SearchFilterMixin):
+    search: str
     id: auto
     sku: auto
     tax_rate: auto
 
 
 @filter(ProductVariation)
-class ProductVariationFilter:
+class ProductVariationFilter(SearchFilterMixin):
+    search: str
     id: auto
     sku: auto
     tax_rate: auto

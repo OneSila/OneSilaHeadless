@@ -33,6 +33,8 @@ class UpdateMutation(GetMultiTenantCompanyMixin, DjangoUpdateMutation):
     """
     @multi_tenant_owner_protection()
     def update(self, info: Info, instance: models.Model | Iterable[models.Model], data: dict[str, Any],):
+        multi_tenant_company = self.get_multi_tenant_company(info, fail_silently=False)
+        data['multi_tenant_company'] = multi_tenant_company
         return super().update(info=info, instance=instance, data=data)
 
 

@@ -1,11 +1,12 @@
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter
+from core.schema.core.types.filters import filter, SearchFilterMixin
 
 from taxes.models import Tax
 
 
 @filter(Tax)
-class TaxFilter:
+class TaxFilter(SearchFilterMixin):
+    search: str
     id: auto
     name: auto
     rate: auto

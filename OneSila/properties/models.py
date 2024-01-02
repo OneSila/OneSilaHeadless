@@ -50,6 +50,9 @@ class PropertyTranslation(TranslationFieldsMixin, models.Model):
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
     name = models.CharField(max_length=200, unique=True, verbose_name=_('Name'))
 
+    class Meta:
+        search_terms = ['name']
+
 
 class PropertySelectValue(models.Model):
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
