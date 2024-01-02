@@ -2,8 +2,7 @@
 
 from django.db import migrations, models
 import django.db.models.deletion
-import media.helpers
-import media.validators
+import core.validators
 
 
 class Migration(migrations.Migration):
@@ -25,8 +24,8 @@ class Migration(migrations.Migration):
                 ('type', models.CharField(choices=[('IMAGE', 'Image'), ('VIDEO', 'Video')], max_length=5)),
                 ('video_url', models.URLField()),
                 ('image_type', models.CharField(choices=[('MOOD', 'Mood Shot'), ('PACK', 'Pack Shot')], default='PACK', max_length=4)),
-                ('image', models.ImageField(upload_to=media.helpers.get_media_folder_upload_path, validators=[
-                 media.validators.validate_image_extension], verbose_name='Image (High resolution)')),
+                ('image', models.ImageField(upload_to='images/', validators=[
+                 core.validators.validate_image_extension], verbose_name='Image (High resolution)')),
                 ('multi_tenant_company', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='core.multitenantcompany')),
             ],
             options={

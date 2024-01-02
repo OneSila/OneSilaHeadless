@@ -1,4 +1,5 @@
 from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin
+from strawberry_django.fields.types import DjangoImageType
 
 from typing import List
 
@@ -11,12 +12,14 @@ from .ordering import MediaOrder, ImageOrder, VideoOrder, \
 
 @type(Media, filters=MediaFilter, order=MediaOrder, pagination=True, fields="__all__")
 class MediaType(relay.Node, GetQuerysetMultiTenantMixin):
-    pass
+    image_web: DjangoImageType | None
+    image_web_url: str | None
 
 
 @type(Image, filters=ImageFilter, order=ImageOrder, pagination=True, fields="__all__")
 class ImageType(relay.Node, GetQuerysetMultiTenantMixin):
-    pass
+    image_web: DjangoImageType | None
+    image_web_url: str | None
 
 
 @type(Video, filters=VideoFilter, order=VideoOrder, pagination=True, fields="__all__")
