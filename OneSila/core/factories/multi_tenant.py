@@ -4,7 +4,8 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
 
 from core.signals import registered, invite_sent, invite_accepted, \
-    disabled, enabled, login_token_created, recovery_token_created
+    disabled, enabled, login_token_created, recovery_token_created, \
+    password_changed
 
 
 class AuthenticateTokenFactory:
@@ -59,7 +60,7 @@ class RegisterUserFactory:
         validate_password(password=self.password)
 
     def create_user(self):
-        user = self.model(
+        self.user = self.model(
             username=self.username,
             first_name=self.first_name,
             last_name=self.last_name,
@@ -67,15 +68,14 @@ class RegisterUserFactory:
         )
 
         try:
-            user.full_clean()
+            self.user.full_clean()
         except ValidationError as e:
             if 'username' in str(e):
                 raise Exception("Email is already taken.")
 
-        user.set_password(self.password)
-        user.save()
-
-        self.user = user
+    def set_password(self):
+        self.user.set_password(self.password)
+        self.user.save()
 
     def send_signal(self):
         registered.send(sender=self.user.__class__, instance=self.user)
@@ -84,6 +84,22 @@ class RegisterUserFactory:
     def run(self):
         self.validate_password()
         self.create_user()
+        self.set_password()
+        self.send_signal()
+
+
+class ChangePasswordFactory(RegisterUserFactory):
+    def __init__(self, user, password):
+        self.user = user
+        self.password = password
+
+    def send_signal(self):
+        password_changed.send(sender=self.user.__class__, instance=self.user)
+
+    @transaction.atomic
+    def run(self):
+        self.validate_password()
+        self.set_password()
         self.send_signal()
 
 

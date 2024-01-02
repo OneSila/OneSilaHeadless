@@ -6,6 +6,15 @@ UPDATE_MY_MULTITENTANTCOMPANY = """
     }
 """
 
+CHANGE_PASSWORD_MUTATION = """
+    mutation($password: String!){
+      updateMyPassword(data:{password: $password}){
+        username
+        id
+      }
+    }
+"""
+
 
 REGISTER_USER_MUTATION = """
   mutation registerUser($username: String!, $password: String!, $language: String!) {

@@ -17,7 +17,7 @@ class SendBrandedEmail:
     def set_template_variables(self):
         self.template_variables = {
             'user': self.user,
-            'multi_tenant_company': self.user.multi_tenant_company
+            'multi_tenant_company': self.user.multi_tenant_company,
         }
 
     def compile_html_body(self):
@@ -75,4 +75,15 @@ class SendRecoveryLinkEmailFactory(SendBrandedEmail):
         super().set_template_variables()
         self.template_variables.update({
             'token_url': reverse_lazy('core:auth_recover')
+        })
+
+
+class SendPasswordChangedEmailFactory(SendBrandedEmail):
+    subject = _("Your password has been updated.")
+    template_path = 'notifications/email/password_changed.html'
+
+    def set_template_variables(self):
+        super().set_template_variables()
+        self.template_variables.update({
+            'auth_change_password': reverse_lazy('core:auth_change_password')
         })

@@ -6,7 +6,7 @@ from core.models.multi_tenant import MultiTenantUser, MultiTenantCompany, \
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 
 from .mutations import REGISTER_USER_MUTATION, LOGIN_MUTATION, LOGOUT_MUTATION, \
-    ME_QUERY, AUTHENTICATE_TOKEN, UPDATE_MY_MULTITENTANTCOMPANY
+    ME_QUERY, AUTHENTICATE_TOKEN, UPDATE_MY_MULTITENTANTCOMPANY, CHANGE_PASSWORD_MUTATION
 
 
 class UpdateMyMultiTenantCompanyTestCase(TransactionTestCaseMixin, TransactionTestCase):
@@ -42,6 +42,30 @@ class AuthenticateTokenTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def setUp(self):
         self.multi_tenant_company = baker.make(MultiTenantCompany)
         self.user = baker.make(MultiTenantUser, multi_tenant_company=self.multi_tenant_company)
+
+    def test_update_my_password(self):
+        mutations = CHANGE_PASSWORD_MUTATION
+        password = "Bla112k11!"
+        resp = self.stawberry_test_client(
+            query=mutations,
+            variables={"password": password},
+            asserts_errors=False
+        )
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+    def test_update_my_password_fail(self):
+        mutations = CHANGE_PASSWORD_MUTATION
+        password = "broken"
+        resp = self.stawberry_test_client(
+            query=mutations,
+            variables={"password": password},
+            asserts_errors=False
+        )
+
+        self.assertTrue(resp.errors is not None)
+        self.assertTrue(resp.data is None)
 
     def test_recovery_login(self):
         mutations = """

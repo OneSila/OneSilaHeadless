@@ -1,14 +1,16 @@
 from core.schema.multi_tenant.types.input import MultiTenantCompanyMyInput, \
     MultiTenantCompanyPartialInput, MultiTenantUserPartialInput, \
     MultiTenantUserInput, MultiTenantInviteUserInput, MultiTenantUserAcceptInviteInput, \
-    MultiTenantUserStatusInput, MultiTenantLoginLinkInput, MultiTenantUserAuthenticateTokenInput
+    MultiTenantUserStatusInput, MultiTenantLoginLinkInput, \
+    MultiTenantUserPasswordInput, MultiTenantUserAuthenticateTokenInput
 
 from core.schema.core.mutations import IsAuthenticated, default_extensions
 from core.schema.multi_tenant.extensions import IsMultiTenantCompanyOwner
 from .mutation_classes import MyMultiTenantCompanyCreateMutation, \
     MyMultiTentantCompanyUpdateMutation, UpdateMeMutation, \
     InviteUserMutation, AcceptInvitationMutation, EnableUserMutation, \
-    DisableUserMutation, LoginTokenMutation, RecoveryTokenMutation
+    DisableUserMutation, LoginTokenMutation, RecoveryTokenMutation, \
+    UpdateMyPasswordMutation
 
 import functools
 import strawberry
@@ -28,6 +30,11 @@ def update_my_multi_tenant_company():
 def update_me():
     extensions = [IsAuthenticated()]
     return UpdateMeMutation(MultiTenantUserPartialInput, extensions=extensions)
+
+
+def update_my_password():
+    extensions = [IsAuthenticated()]
+    return UpdateMyPasswordMutation(MultiTenantUserPasswordInput, extensions=extensions)
 
 
 def invite_user():

@@ -7,10 +7,12 @@ from strawberry_django.auth.utils import get_current_user
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from strawberry_django.utils.requests import get_request
 
-from django.db import transaction
 from django.contrib import auth
-from django.core.exceptions import ValidationError
 from django.conf import settings
+from django.db import transaction
+from django.core.exceptions import ValidationError
+from django.contrib.auth.password_validation import validate_password
+
 
 from asgiref.sync import async_to_sync
 
@@ -21,7 +23,7 @@ from core.schema.core.mutations import create, type, DjangoUpdateMutation, \
     update, Info, models, Iterable, Any, IsAuthenticated
 from core.factories.multi_tenant import InviteUserFactory, RegisterUserFactory, \
     AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory, LoginTokenFactory, \
-    RecoveryTokenFactory, AuthenticateTokenFactory
+    RecoveryTokenFactory, AuthenticateTokenFactory, ChangePasswordFactory
 from core.models.multi_tenant import MultiTenantUser
 
 
@@ -130,6 +132,18 @@ class UpdateMeMutation(DjangoUpdateMutation):
         instance = get_current_user(info)
 
         return self.update(info, instance, resolvers.parse_input(info, vdata))
+
+
+class UpdateMyPasswordMutation(UpdateMeMutation):
+    def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
+        with DjangoOptimizerExtension.disabled():
+            user = instance
+            password = data.get("password")
+
+            fac = ChangePasswordFactory(user=user, password=password)
+            fac.run()
+
+            return fac.user
 
 
 class DisableUserMutation(DjangoUpdateMutation):
