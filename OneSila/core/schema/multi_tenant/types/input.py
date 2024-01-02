@@ -50,6 +50,11 @@ class MultiTenantUserPartialInput:
     pass
 
 
+@partial(MultiTenantUser, fields=['password'])
+class MultiTenantUserPasswordInput:
+    pass
+
+
 @input(MultiTenantUser)
 class MultiTenantInviteUserInput:
     username: auto

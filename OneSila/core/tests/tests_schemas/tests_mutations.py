@@ -43,6 +43,33 @@ class AuthenticateTokenTestCase(TransactionTestCaseMixin, TransactionTestCase):
         self.multi_tenant_company = baker.make(MultiTenantCompany)
         self.user = baker.make(MultiTenantUser, multi_tenant_company=self.multi_tenant_company)
 
+    def test_update_my_password(self):
+        mutations = """
+            mutation($password: String!){
+              updateMyPassword(data:{password: $password}){
+                username
+                id
+              }
+            }
+        """
+        password = "Bla112k11!"
+        resp = self.stawberry_test_client(
+            query=mutations,
+            variables={"password": password}
+        )
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+        password = "broken"
+        resp = self.stawberry_test_client(
+            query=mutations,
+            variables={"password": password}
+        )
+
+        self.assertTrue(resp.errors is not None)
+        self.assertTrue(resp.data is None)
+
     def test_recovery_login(self):
         mutations = """
         mutation($username: String!){
