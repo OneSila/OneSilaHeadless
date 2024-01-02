@@ -13,6 +13,7 @@ urlpatterns = [
     path('auth/register/accept-invite/', EmptyTemplateView.as_view(), name='auth_register_accept_invite'),
     path('auth/register/company/', EmptyTemplateView.as_view(), name='auth_register_company'),
     path('auth/recover/', EmptyTemplateView.as_view(), name='auth_recover'),
+    path('auth/password/change/', EmptyTemplateView.as_view(), name='auth_change_password'),
     path('profile/', EmptyTemplateView.as_view(), name='profile'),
     path('company/profile/', EmptyTemplateView.as_view(), name='company_profile'),
 ]
