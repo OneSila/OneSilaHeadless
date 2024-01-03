@@ -8,14 +8,14 @@ from products.schema.types.filters import ProductFilter
 
 @filter(Property)
 class PropertyFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     type: auto
 
 
 @filter(PropertySelectValue)
 class PropertySelectValueFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     property: PropertyFilter
     # value: auto
@@ -23,7 +23,7 @@ class PropertySelectValueFilter(SearchFilterMixin):
 
 @filter(ProductProperty)
 class ProductPropertyFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     product: ProductFilter
     property: PropertyFilter

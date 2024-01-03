@@ -6,7 +6,7 @@ from customs.models import HsCode
 
 @filter(HsCode)
 class HsCodeFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     code: auto
     name: auto

@@ -7,7 +7,7 @@ from products.schema.types.filters import ProductFilter
 
 @filter(Order)
 class OrderFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     reference: auto
     company: auto
@@ -20,7 +20,7 @@ class OrderFilter(SearchFilterMixin):
 
 @filter(OrderItem)
 class OrderItemFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     order: OrderFilter
     product: ProductFilter
@@ -28,6 +28,6 @@ class OrderItemFilter(SearchFilterMixin):
 
 @filter(OrderNote)
 class OrderNoteFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     order: OrderFilter

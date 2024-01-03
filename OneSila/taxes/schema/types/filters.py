@@ -6,7 +6,7 @@ from taxes.models import Tax
 
 @filter(Tax)
 class TaxFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     name: auto
     rate: auto
