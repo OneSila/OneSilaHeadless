@@ -7,7 +7,7 @@ from products.models import Product, BundleProduct, UmbrellaProduct, \
 
 @filter(Product)
 class ProductFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     sku: auto
     type: auto
@@ -16,7 +16,7 @@ class ProductFilter(SearchFilterMixin):
 
 @filter(BundleProduct)
 class BundleProductFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     sku: auto
     tax_rate: auto
@@ -24,7 +24,7 @@ class BundleProductFilter(SearchFilterMixin):
 
 @filter(UmbrellaProduct)
 class UmbrellaProductFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     sku: auto
     tax_rate: auto
@@ -32,7 +32,7 @@ class UmbrellaProductFilter(SearchFilterMixin):
 
 @filter(ProductVariation)
 class ProductVariationFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     sku: auto
     tax_rate: auto

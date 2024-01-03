@@ -7,7 +7,7 @@ from products.schema.types.filters import ProductFilter
 
 @filter(Media)
 class MediaFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     type: auto
     product: ProductFilter
@@ -15,7 +15,7 @@ class MediaFilter(SearchFilterMixin):
 
 @filter(Image)
 class ImageFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     image_type: auto
     product: ProductFilter
@@ -23,7 +23,7 @@ class ImageFilter(SearchFilterMixin):
 
 @filter(Video)
 class VideoFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     product: ProductFilter
 

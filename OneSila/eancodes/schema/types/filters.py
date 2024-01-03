@@ -7,7 +7,7 @@ from products.schema.types.filters import ProductFilter
 
 @filter(EanCode)
 class EanCodeFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     ean_code: auto
     product: ProductFilter
