@@ -14,8 +14,8 @@ class SalesPrice(models.Model):
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
     currency = models.ForeignKey('currencies.Currency', on_delete=models.CASCADE)
 
-    amount = models.FloatField(default=0.0)
-    discount_amount = models.FloatField(blank=True, null=True)
+    amount = models.DecimalField(default=0.0, decimal_places=2, max_digits=10)
+    discount_amount = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=10)
 
     objects = SalesPriceManager()
 
