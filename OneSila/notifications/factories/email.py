@@ -60,21 +60,25 @@ class SendLoginLinkEmailFactory(SendBrandedEmail):
     subject = _("Your login link")
     template_path = 'notifications/email/login_link.html'
 
+    def __init__(self, token):
+        self.user = token.multi_tenant_user
+        self.token = token
+
     def set_template_variables(self):
         super().set_template_variables()
         self.template_variables.update({
-            'token_url': reverse_lazy('core:auth_token_login')
+            'token_url': reverse_lazy('core:auth_token_login', kwargs={'token': self.token.token})
         })
 
 
-class SendRecoveryLinkEmailFactory(SendBrandedEmail):
+class SendRecoveryLinkEmailFactory(SendLoginLinkEmailFactory):
     subject = _("Your Account Recovery link")
     template_path = 'notifications/email/account_recovery_link.html'
 
     def set_template_variables(self):
         super().set_template_variables()
         self.template_variables.update({
-            'token_url': reverse_lazy('core:auth_recover')
+            'token_url': reverse_lazy('core:auth_recover', kwargs={'token': self.token.token})
         })
 
 
