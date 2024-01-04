@@ -9,8 +9,7 @@ from core.signals import registered, invite_sent, invite_accepted, \
 
 
 class AuthenticateTokenFactory:
-    def __init__(self, token, info):
-        self.info = info
+    def __init__(self, token: str):
         self.token = token
 
     def set_token_instance(self):
