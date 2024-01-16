@@ -3,7 +3,6 @@ from strawberry import UNSET
 from strawberry.relay.utils import from_base64
 from strawberry_django.resolvers import django_resolver
 from strawberry_django.mutations import resolvers
-from strawberry_django.auth.utils import get_current_user
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from strawberry_django.utils.requests import get_request
 
@@ -18,8 +17,9 @@ from asgiref.sync import async_to_sync
 
 from channels import auth as channels_auth
 
+from core.schema.core.mixins import GetCurrentUserMixin, GetMultiTenantCompanyMixin
 from core.schema.core.mutations import create, type, DjangoUpdateMutation, \
-    DjangoCreateMutation, GetMultiTenantCompanyMixin, default_extensions, \
+    DjangoCreateMutation, default_extensions, \
     update, Info, models, Iterable, Any, IsAuthenticated
 from core.factories.multi_tenant import InviteUserFactory, RegisterUserFactory, \
     AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory, LoginTokenFactory, \
@@ -49,13 +49,6 @@ class LoginTokenMutation(CleanupDataMixin, DjangoCreateMutation):
             return self.create_token(user=user)
 
 
-class RecoveryTokenMutation(LoginTokenMutation):
-    def create_token(self, *, user):
-        fac = RecoveryTokenFactory(user)
-        fac.run()
-        return fac.token
-
-
 class InviteUserMutation(CleanupDataMixin, GetMultiTenantCompanyMixin, DjangoCreateMutation):
     def create(self, data: dict[str, Any], *, info: Info):
         multi_tenant_company = self.get_multi_tenant_company(info)
@@ -69,25 +62,35 @@ class InviteUserMutation(CleanupDataMixin, GetMultiTenantCompanyMixin, DjangoCre
             return fac.user
 
 
-class AcceptInvitationMutation(DjangoUpdateMutation):
+class RecoveryTokenMutation(LoginTokenMutation):
+    def create_token(self, *, user):
+        fac = RecoveryTokenFactory(user)
+        fac.run()
+        return fac.token
+
+
+class AcceptInvitationMutation(GetCurrentUserMixin, DjangoUpdateMutation):
     def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
-        # Do not optimize anything while retrieving the object to update
+        user = self.get_current_user(info)
+        language = data['language']
+        password = data['password']
+
         with DjangoOptimizerExtension.disabled():
             fac = AcceptUserInviteFactory(
-                user=instance,
-                password=data['password'],
-                language=data['language'])
+                user=user,
+                password=password,
+                language=language)
             fac.run()
 
             return fac.user
 
 
-class MyMultiTenantCompanyCreateMutation(GetMultiTenantCompanyMixin, DjangoCreateMutation):
+class MyMultiTenantCompanyCreateMutation(GetCurrentUserMixin, DjangoCreateMutation):
     def create(self, data: dict[str, Any], *, info: Info):
         model = self.django_model
         assert model is not None
 
-        user = get_current_user(info)
+        user = self.get_current_user(info)
 
         with DjangoOptimizerExtension.disabled():
             obj = resolvers.create(
@@ -120,7 +123,7 @@ class MyMultiTentantCompanyUpdateMutation(GetMultiTenantCompanyMixin, DjangoUpda
         return self.update(info, instance, resolvers.parse_input(info, vdata))
 
 
-class UpdateMeMutation(DjangoUpdateMutation):
+class UpdateMeMutation(GetCurrentUserMixin, DjangoUpdateMutation):
     @django_resolver
     @transaction.atomic
     def resolver(self, source: Any, info: Info, args: list[Any], kwargs: dict[str, Any],) -> Any:
@@ -129,7 +132,7 @@ class UpdateMeMutation(DjangoUpdateMutation):
 
         data: Any = kwargs.get(self.argument_name)
         vdata = vars(data).copy() if data is not None else {}
-        instance = get_current_user(info)
+        instance = self.get_current_user(info)
 
         return self.update(info, instance, resolvers.parse_input(info, vdata))
 
