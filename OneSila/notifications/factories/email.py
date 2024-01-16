@@ -49,20 +49,20 @@ class SendUserInviteEmailFactory(SendBrandedEmail):
     subject = _("Accept your invitation to OneSila.")
     template_path = 'notifications/email/invite_user.html'
 
-    def set_template_variables(self):
-        super().set_template_variables()
-        self.template_variables.update({
-            'accept_invite_url': reverse_lazy('core:auth_register_accept_invite')
-        })
-
-
-class SendLoginLinkEmailFactory(SendBrandedEmail):
-    subject = _("Your login link")
-    template_path = 'notifications/email/login_link.html'
-
     def __init__(self, token):
         self.user = token.multi_tenant_user
         self.token = token
+
+    def set_template_variables(self):
+        super().set_template_variables()
+        self.template_variables.update({
+            'accept_invite_url': reverse_lazy('core:auth_register_accept_invite', kwargs={'token': self.token.token})
+        })
+
+
+class SendLoginLinkEmailFactory(SendUserInviteEmailFactory):
+    subject = _("Your login link")
+    template_path = 'notifications/email/login_link.html'
 
     def set_template_variables(self):
         super().set_template_variables()
@@ -71,7 +71,7 @@ class SendLoginLinkEmailFactory(SendBrandedEmail):
         })
 
 
-class SendRecoveryLinkEmailFactory(SendLoginLinkEmailFactory):
+class SendRecoveryLinkEmailFactory(SendUserInviteEmailFactory):
     subject = _("Your Account Recovery link")
     template_path = 'notifications/email/account_recovery_link.html'
 
