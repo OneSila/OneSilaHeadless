@@ -12,7 +12,7 @@ from strawberry import type, field
 from typing import List
 
 from .decorators import multi_tenant_owner_protection
-from .mixins import GetMultiTenantCompanyMixin
+from .mixins import GetMultiTenantCompanyMixin, GetCurrentUserMixin
 from .extensions import default_extensions
 
 

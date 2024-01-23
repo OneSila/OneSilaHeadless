@@ -2,6 +2,8 @@ from imagekit import ImageSpec, register
 from imagekit.processors import ResizeToFill, ResizeToFit
 from imagekit.utils import get_field_info
 
+import os
+
 
 class ImageWebSpec(ImageSpec):
     '''

@@ -23,12 +23,14 @@ class MultiTenantCompanyPartialInput:
     pass
 
 
-@input(MultiTenantUser)
+@input(MultiTenantUser, fields=['password', 'language'])
 class MultiTenantUserAcceptInviteInput:
-    id: auto
-    username: auto
-    password: auto
-    language: auto
+    pass
+
+
+@partial(MultiTenantUser, fields=['password'])
+class MultiTenantUserPasswordInput:
+    pass
 
 
 @input(MultiTenantUser)

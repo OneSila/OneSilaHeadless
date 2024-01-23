@@ -5,7 +5,6 @@ from sales_prices.models import SalesPriceList, SalesPriceListItem, SalesPriceLi
 from io import BytesIO
 from datetime import datetime
 from xlsxwriter.workbook import Workbook
-import socket
 
 
 class SalesPriceListItemGeneratorUpdater:

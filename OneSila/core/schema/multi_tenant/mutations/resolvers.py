@@ -44,7 +44,7 @@ def resolve_register_user(info, username: str, password: str, language: str):
 def resolve_authenticate_token(info, token: str):
     request = get_request(info)
 
-    fac = AuthenticateTokenFactory(token, info)
+    fac = AuthenticateTokenFactory(token)
     fac.run()
 
     login(request=request, user=fac.user)

@@ -17,7 +17,7 @@ class SendBrandedEmail:
     def set_template_variables(self):
         self.template_variables = {
             'user': self.user,
-            'multi_tenant_company': self.user.multi_tenant_company
+            'multi_tenant_company': self.user.multi_tenant_company,
         }
 
     def compile_html_body(self):
@@ -49,30 +49,45 @@ class SendUserInviteEmailFactory(SendBrandedEmail):
     subject = _("Accept your invitation to OneSila.")
     template_path = 'notifications/email/invite_user.html'
 
+    def __init__(self, token):
+        self.user = token.multi_tenant_user
+        self.token = token
+
     def set_template_variables(self):
         super().set_template_variables()
         self.template_variables.update({
-            'accept_invite_url': reverse_lazy('core:auth_register_accept_invite')
+            'accept_invite_url': reverse_lazy('core:auth_register_accept_invite', kwargs={'token': self.token.token})
         })
 
 
-class SendLoginLinkEmailFactory(SendBrandedEmail):
+class SendLoginLinkEmailFactory(SendUserInviteEmailFactory):
     subject = _("Your login link")
     template_path = 'notifications/email/login_link.html'
 
     def set_template_variables(self):
         super().set_template_variables()
         self.template_variables.update({
-            'token_url': reverse_lazy('core:auth_token_login')
+            'token_url': reverse_lazy('core:auth_token_login', kwargs={'token': self.token.token})
         })
 
 
-class SendRecoveryLinkEmailFactory(SendBrandedEmail):
+class SendRecoveryLinkEmailFactory(SendUserInviteEmailFactory):
     subject = _("Your Account Recovery link")
     template_path = 'notifications/email/account_recovery_link.html'
 
     def set_template_variables(self):
         super().set_template_variables()
         self.template_variables.update({
-            'token_url': reverse_lazy('core:auth_recover')
+            'token_url': reverse_lazy('core:auth_recover', kwargs={'token': self.token.token})
+        })
+
+
+class SendPasswordChangedEmailFactory(SendBrandedEmail):
+    subject = _("Your password has been updated.")
+    template_path = 'notifications/email/password_changed.html'
+
+    def set_template_variables(self):
+        super().set_template_variables()
+        self.template_variables.update({
+            'auth_change_password': reverse_lazy('core:auth_change_password')
         })

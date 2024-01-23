@@ -1,6 +1,7 @@
 from django.db.models import QuerySet as DjangoQueryset
 from django.db.models import Manager as DjangoManager
 from django.contrib.auth.models import BaseUserManager
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from core.managers.search import SearchQuerySetMixin, SearchManagerMixin
 from core.managers.decorators import multi_tenant_company_required

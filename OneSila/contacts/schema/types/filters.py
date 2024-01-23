@@ -6,7 +6,7 @@ from contacts.models import Company, Address, Person, Supplier, \
 
 @filter(Company)
 class CompanyFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     name: auto
     vat_number: auto
@@ -20,7 +20,7 @@ class CompanyFilter(SearchFilterMixin):
 
 @filter(Supplier)
 class SupplierFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     name: auto
     vat_number: auto
@@ -29,7 +29,7 @@ class SupplierFilter(SearchFilterMixin):
 
 @filter(Customer)
 class CustomerFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     id: auto
     name: auto
     vat_number: auto
@@ -38,7 +38,7 @@ class CustomerFilter(SearchFilterMixin):
 
 @filter(Person)
 class PersonFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     first_name: auto
     last_name: auto
     email: auto
@@ -47,7 +47,7 @@ class PersonFilter(SearchFilterMixin):
 
 @filter(Address)
 class AddressFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     company: CompanyFilter
     is_invoice_address: auto
     is_shipping_address: auto
@@ -55,11 +55,11 @@ class AddressFilter(SearchFilterMixin):
 
 @filter(InvoiceAddress)
 class InvoiceAddressFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     company: CompanyFilter
 
 
 @filter(ShippingAddress)
 class ShippingAddressFilter(SearchFilterMixin):
-    search: str
+    search: str | None
     company: CompanyFilter

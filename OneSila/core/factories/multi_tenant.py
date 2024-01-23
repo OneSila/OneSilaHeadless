@@ -3,13 +3,13 @@ from core.models.multi_tenant import MultiTenantUser, MultiTenantUserLoginToken
 from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
 
-from core.signals import registered, invite_sent, invite_accepted, \
-    disabled, enabled, login_token_created, recovery_token_created
+from core.signals import registered, invited, invite_accepted, \
+    disabled, enabled, login_token_created, recovery_token_created, \
+    password_changed
 
 
 class AuthenticateTokenFactory:
-    def __init__(self, token, info):
-        self.info = info
+    def __init__(self, token: str):
         self.token = token
 
     def set_token_instance(self):
@@ -28,8 +28,10 @@ class LoginTokenFactory:
         self.user = user
 
     def create_token(self):
-        self.token = MultiTenantUserLoginToken.objects.create(
-            multi_tenant_user=self.user)
+        self.token = MultiTenantUserLoginToken.objects.create(multi_tenant_user=self.user)
+        # The save method will add the expiry-date after the save(). Let's refresh
+        # to ensure the frontend can use that date.
+        self.token.refresh_from_db()
 
     def send_signal(self):
         login_token_created.send(sender=self.token.__class__, instance=self.token)
@@ -59,7 +61,7 @@ class RegisterUserFactory:
         validate_password(password=self.password)
 
     def create_user(self):
-        user = self.model(
+        self.user = self.model(
             username=self.username,
             first_name=self.first_name,
             last_name=self.last_name,
@@ -67,15 +69,14 @@ class RegisterUserFactory:
         )
 
         try:
-            user.full_clean()
+            self.user.full_clean()
         except ValidationError as e:
             if 'username' in str(e):
                 raise Exception("Email is already taken.")
 
-        user.set_password(self.password)
-        user.save()
-
-        self.user = user
+    def set_password(self):
+        self.user.set_password(self.password)
+        self.user.save()
 
     def send_signal(self):
         registered.send(sender=self.user.__class__, instance=self.user)
@@ -84,10 +85,26 @@ class RegisterUserFactory:
     def run(self):
         self.validate_password()
         self.create_user()
+        self.set_password()
         self.send_signal()
 
 
-class InviteUserFactory:
+class ChangePasswordFactory(RegisterUserFactory):
+    def __init__(self, user, password):
+        self.user = user
+        self.password = password
+
+    def send_signal(self):
+        password_changed.send(sender=self.user.__class__, instance=self.user)
+
+    @transaction.atomic
+    def run(self):
+        self.validate_password()
+        self.set_password()
+        self.send_signal()
+
+
+class InviteUserFactory(LoginTokenFactory):
     model = MultiTenantUser
     invitation_accepted = False
     is_active = False
@@ -99,7 +116,6 @@ class InviteUserFactory:
         self.first_name = first_name
         self.last_name = last_name
 
-    @transaction.atomic
     def create_user(self):
         user = self.model(
             multi_tenant_company=self.multi_tenant_company,
@@ -121,11 +137,12 @@ class InviteUserFactory:
         self.user = user
 
     def send_signal(self):
-        invite_sent.send(sender=self.user.__class__, instance=self.user)
+        invited.send(sender=self.token.__class__, instance=self.token)
 
     @transaction.atomic
     def run(self):
         self.create_user()
+        self.create_token()
         self.send_signal()
 
 
