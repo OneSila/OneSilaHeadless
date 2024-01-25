@@ -38,6 +38,7 @@ class RequestLoginTokenFactory:
 
     def run(self):
         self.create_token()
+        self.send_signal()
 
 
 class RecoveryTokenFactory(RequestLoginTokenFactory):

@@ -1,0 +1,20 @@
+{% extends 'notifications/email/base_email.html' %}
+{% load i18n %}
+
+{% block content %}
+{% translate "Hi" %} {{ name }}
+<br><br>
+{% blocktranslate %}You can find your account recovery link below.{% endblocktranslate %}
+<br><br>
+<a href="{{ token_url }}">{% translate "Recover your account." %}</a>
+<br><br>
+{% translate "Any help needed?" %}
+<br>
+{% translate "I'd love to hear from you." %}
+<br>
+{% translate "Best regards" %}
+<br>
+{% translate "Sascha Dobbelaere" %}
+<br>
+
+{% endblock %}
