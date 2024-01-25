@@ -22,7 +22,7 @@ from core.schema.core.mutations import create, type, DjangoUpdateMutation, \
     DjangoCreateMutation, default_extensions, \
     update, Info, models, Iterable, Any, IsAuthenticated
 from core.factories.multi_tenant import InviteUserFactory, RegisterUserFactory, \
-    AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory, LoginTokenFactory, \
+    AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory, RequestLoginTokenFactory, \
     RecoveryTokenFactory, AuthenticateTokenFactory, ChangePasswordFactory
 from core.models.multi_tenant import MultiTenantUser
 
@@ -36,9 +36,9 @@ class CleanupDataMixin:
         return data
 
 
-class LoginTokenMutation(CleanupDataMixin, DjangoCreateMutation):
+class RequestLoginTokenMutation(CleanupDataMixin, DjangoCreateMutation):
     def create_token(self, *, user):
-        fac = LoginTokenFactory(user)
+        fac = RequestLoginTokenFactory(user)
         fac.run()
         return fac.token
 
@@ -62,7 +62,7 @@ class InviteUserMutation(CleanupDataMixin, GetMultiTenantCompanyMixin, DjangoCre
             return fac.user
 
 
-class RecoveryTokenMutation(LoginTokenMutation):
+class RecoveryTokenMutation(RequestLoginTokenMutation):
     def create_token(self, *, user):
         fac = RecoveryTokenFactory(user)
         fac.run()

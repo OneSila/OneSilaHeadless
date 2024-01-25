@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
 
 from core.signals import registered, invited, invite_accepted, \
-    disabled, enabled, login_token_created, recovery_token_created, \
+    disabled, enabled, login_token_requested, recovery_token_created, \
     password_changed
 
 
@@ -23,7 +23,7 @@ class AuthenticateTokenFactory:
         self.set_user()
 
 
-class LoginTokenFactory:
+class RequestLoginTokenFactory:
     def __init__(self, user):
         self.user = user
 
@@ -34,13 +34,13 @@ class LoginTokenFactory:
         self.token.refresh_from_db()
 
     def send_signal(self):
-        login_token_created.send(sender=self.token.__class__, instance=self.token)
+        login_token_requested.send(sender=self.token.__class__, instance=self.token)
 
     def run(self):
         self.create_token()
 
 
-class RecoveryTokenFactory(LoginTokenFactory):
+class RecoveryTokenFactory(RequestLoginTokenFactory):
     def send_signal(self):
         recovery_token_created.send(sender=self.token.__class__, instance=self.token)
 
@@ -104,7 +104,7 @@ class ChangePasswordFactory(RegisterUserFactory):
         self.send_signal()
 
 
-class InviteUserFactory(LoginTokenFactory):
+class InviteUserFactory(RequestLoginTokenFactory):
     model = MultiTenantUser
     invitation_accepted = False
 
