@@ -288,7 +288,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         )
 
         self.assertTrue(resp.errors is None)
-        self.assertFalse(resp.data['inviteUser']['isActive'])
+        self.assertTrue(resp.data['inviteUser']['isActive'])
         self.assertFalse(resp.data['inviteUser']['invitationAccepted'])
 
         resp = self.stawberry_test_client(
@@ -309,8 +309,21 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         resp = self.stawberry_test_client(
             query=accept_mutation,
             variables={'language': 'NL', 'password': "SomePaddk@2k2"},
-            asserts_errors=False,
         )
+
+        print("_______")
+        print("_______")
+        print("_______")
+        print("_______")
+        print("_______")
+        print(resp.errors)
+        print(resp.errors)
+        print("_______")
+        print("_______")
+        print("_______")
+        print("_______")
+        print("_______")
+        print("_______")
 
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data['acceptUserInvitation']['isActive'])

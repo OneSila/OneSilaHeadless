@@ -107,7 +107,10 @@ class ChangePasswordFactory(RegisterUserFactory):
 class InviteUserFactory(LoginTokenFactory):
     model = MultiTenantUser
     invitation_accepted = False
-    is_active = False
+
+    # Setting is_active to false will stop the user to accept the invite.
+    # as a non-active user cannot be logged in.
+    is_active = True
 
     def __init__(self, *, multi_tenant_company, language, username, first_name="", last_name=""):
         self.multi_tenant_company = multi_tenant_company
@@ -153,6 +156,10 @@ class AcceptUserInviteFactory:
         self.password = password
         self.language = language
 
+    def sanity_check(self):
+        if self.user.is_anonymous:
+            raise ValidationError(f"Permission denied. Only logged in users can accept invitations.")
+
     def update_user(self):
         self.user.invitation_accepted = True
         self.user.language = self.language
@@ -166,6 +173,7 @@ class AcceptUserInviteFactory:
 
     @transaction.atomic
     def run(self):
+        self.sanity_check()
         self.update_user()
         self.send_signal()
 
