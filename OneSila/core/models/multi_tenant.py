@@ -175,13 +175,13 @@ class MultiTenantUserLoginToken(models.Model):
         if not self.token:
             self.token = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(10)
 
-    def set_expires_at(self, save=False):
+    def set_expires_at(self, expires_at=None):
         # This strange construction is to avoid a second save signal.
-        expires_at = self.created_at + timezone.timedelta(minutes=self.EXPIRES_AFTER_MIN)
+        # if expires_at is not None:
+        if expires_at is None:
+            expires_at = self.created_at + timezone.timedelta(minutes=self.EXPIRES_AFTER_MIN)
+
         self.__class__.objects.filter(id=self.id).update(expires_at=expires_at)
 
     def is_valid(self, now=timezone.now()):
-        if self.expires_at > now:
-            return False
-
-        return True
+        return self.expires_at >= now
