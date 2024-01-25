@@ -4,9 +4,9 @@
 {% block content %}
 {% translate "Hi" %} {{ name }}
 <br><br>
-{% blocktranslate %}You've been invited to join {{ multi_tenant_company }} on OneSila.{% endblocktranslate %}
+{% blocktranslate %}You can find your account recovery link below.{% endblocktranslate %}
 <br><br>
-<a href="{{ accept_invite_url }}">{% translate "Accept your invitation here." %}</a>
+<a href="{{ token_url }}">{% translate "Recover your account." %}</a>
 <br><br>
 {% translate "Any help needed?" %}
 <br>

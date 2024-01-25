@@ -94,13 +94,13 @@ class AuthenticateTokenTestCase(TransactionTestCaseMixin, TransactionTestCase):
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
 
-    def test_token_login(self):
+    def test_token_authentication(self):
         mutations = """
-        mutation($username: String!){
-          loginToken(data:{username: $username}){
-            expiresAt
-          }
-        }
+            mutation($username: String!){
+              requestLoginToken(data:{username: $username}){
+                expiresAt
+              }
+            }
         """
 
         resp = self.stawberry_anonymous_test_client(
@@ -288,7 +288,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         )
 
         self.assertTrue(resp.errors is None)
-        self.assertFalse(resp.data['inviteUser']['isActive'])
+        self.assertTrue(resp.data['inviteUser']['isActive'])
         self.assertFalse(resp.data['inviteUser']['invitationAccepted'])
 
         resp = self.stawberry_test_client(
@@ -309,7 +309,6 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         resp = self.stawberry_test_client(
             query=accept_mutation,
             variables={'language': 'NL', 'password': "SomePaddk@2k2"},
-            asserts_errors=False,
         )
 
         self.assertTrue(resp.errors is None)

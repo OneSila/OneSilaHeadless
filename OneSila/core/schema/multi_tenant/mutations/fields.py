@@ -9,7 +9,7 @@ from core.schema.multi_tenant.extensions import IsMultiTenantCompanyOwner
 from .mutation_classes import MyMultiTenantCompanyCreateMutation, \
     MyMultiTentantCompanyUpdateMutation, UpdateMeMutation, \
     InviteUserMutation, AcceptInvitationMutation, EnableUserMutation, \
-    DisableUserMutation, LoginTokenMutation, RecoveryTokenMutation, \
+    DisableUserMutation, RequestLoginTokenMutation, RecoveryTokenMutation, \
     UpdateMyPasswordMutation
 
 import functools
@@ -62,9 +62,9 @@ def recovery_token():
     return RecoveryTokenMutation(MultiTenantLoginLinkInput, extensions=extensions)
 
 
-def login_token():
+def request_login_token():
     extensions = []
-    return RecoveryTokenMutation(MultiTenantLoginLinkInput, extensions=extensions)
+    return RequestLoginTokenMutation(MultiTenantLoginLinkInput, extensions=extensions)
 
 
 register_user = functools.partial(strawberry.mutation, resolver=resolve_register_user)
