@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
 
 from core.signals import registered, invited, invite_accepted, \
-    disabled, enabled, login_token_created, recovery_token_created, \
+    disabled, enabled, login_token_requested, recovery_token_created, \
     password_changed
 
 
@@ -23,7 +23,7 @@ class AuthenticateTokenFactory:
         self.set_user()
 
 
-class LoginTokenFactory:
+class RequestLoginTokenFactory:
     def __init__(self, user):
         self.user = user
 
@@ -34,13 +34,14 @@ class LoginTokenFactory:
         self.token.refresh_from_db()
 
     def send_signal(self):
-        login_token_created.send(sender=self.token.__class__, instance=self.token)
+        login_token_requested.send(sender=self.token.__class__, instance=self.token)
 
     def run(self):
         self.create_token()
+        self.send_signal()
 
 
-class RecoveryTokenFactory(LoginTokenFactory):
+class RecoveryTokenFactory(RequestLoginTokenFactory):
     def send_signal(self):
         recovery_token_created.send(sender=self.token.__class__, instance=self.token)
 
@@ -104,10 +105,13 @@ class ChangePasswordFactory(RegisterUserFactory):
         self.send_signal()
 
 
-class InviteUserFactory(LoginTokenFactory):
+class InviteUserFactory(RequestLoginTokenFactory):
     model = MultiTenantUser
     invitation_accepted = False
-    is_active = False
+
+    # Setting is_active to false will stop the user to accept the invite.
+    # as a non-active user cannot be logged in.
+    is_active = True
 
     def __init__(self, *, multi_tenant_company, language, username, first_name="", last_name=""):
         self.multi_tenant_company = multi_tenant_company
@@ -153,6 +157,10 @@ class AcceptUserInviteFactory:
         self.password = password
         self.language = language
 
+    def sanity_check(self):
+        if self.user.is_anonymous:
+            raise ValidationError(f"Permission denied. Only logged in users can accept invitations.")
+
     def update_user(self):
         self.user.invitation_accepted = True
         self.user.language = self.language
@@ -166,6 +174,7 @@ class AcceptUserInviteFactory:
 
     @transaction.atomic
     def run(self):
+        self.sanity_check()
         self.update_user()
         self.send_signal()
 

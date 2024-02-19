@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from core.managers.search import SearchQuerySetMixin, SearchManagerMixin
 from core.managers.decorators import multi_tenant_company_required
+from django.utils.translation import gettext_lazy as _
 
 
 class MultiTenantUserLoginTokenQuerySet(DjangoQueryset):
@@ -12,10 +13,10 @@ class MultiTenantUserLoginTokenQuerySet(DjangoQueryset):
         try:
             instance = self.get(token=token)
         except self.model.DoesNotExist:
-            raise ValidationError('Unknown token')
+            raise ValidationError(_('Unknown token'))
 
         if not instance.is_valid:
-            raise ValidationError('Token is no longer valid')
+            raise ValidationError(_('Token is no longer valid'))
 
         return instance
 
