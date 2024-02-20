@@ -1,7 +1,7 @@
 from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, type
 from typing import List
 
-from .types.types import MediaType, ImageType, VideoType, MediaProductThroughType
+from .types.types import MediaType, ImageType, VideoType, MediaProductThroughType, FileType
 
 
 @type(name="Query")
@@ -11,6 +11,9 @@ class MediaQuery:
 
     image: ImageType = node()
     images: ListConnectionWithTotalCount[ImageType] = connection()
+
+    file: FileType = node()
+    files: ListConnectionWithTotalCount[FileType] = connection()
 
     video: VideoType = node()
     videos: ListConnectionWithTotalCount[VideoType] = connection()

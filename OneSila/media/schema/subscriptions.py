@@ -1,7 +1,7 @@
 from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
-from media.models import Media, Image, Video
-from media.schema.types.types import MediaType, ImageType, VideoType
+from media.models import Media, Image, Video, File
+from media.schema.types.types import MediaType, ImageType, VideoType, FileType
 
 
 @type(name="Subscription")
@@ -14,6 +14,11 @@ class MediaSubscription:
     @subscription
     async def image(self, info: Info, pk: str) -> AsyncGenerator[ImageType, None]:
         async for i in model_subscriber(info=info, pk=pk, model=Image):
+            yield i
+
+    @subscription
+    async def file(self, info: Info, pk: str) -> AsyncGenerator[FileType, None]:
+        async for i in model_subscriber(info=info, pk=pk, model=File):
             yield i
 
     @subscription

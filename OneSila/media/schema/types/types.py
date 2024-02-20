@@ -3,11 +3,11 @@ from strawberry_django.fields.types import DjangoImageType
 
 from typing import List
 
-from media.models import Media, Image, Video, MediaProductThrough
+from media.models import Media, Image, Video, MediaProductThrough, File
 from .filters import MediaFilter, ImageFilter, VideoFilter, \
-    MediaProductThroughFilter
+    MediaProductThroughFilter, FileFilter
 from .ordering import MediaOrder, ImageOrder, VideoOrder, \
-    MediaProductThroughOrder
+    MediaProductThroughOrder, FileOrder
 
 
 @type(Media, filters=MediaFilter, order=MediaOrder, pagination=True, fields="__all__")
@@ -24,6 +24,11 @@ class ImageType(relay.Node, GetQuerysetMultiTenantMixin):
 
 @type(Video, filters=VideoFilter, order=VideoOrder, pagination=True, fields="__all__")
 class VideoType(relay.Node, GetQuerysetMultiTenantMixin):
+    pass
+
+
+@type(File, filters=FileFilter, order=FileOrder, pagination=True, fields="__all__")
+class FileType(relay.Node, GetQuerysetMultiTenantMixin):
     pass
 
 

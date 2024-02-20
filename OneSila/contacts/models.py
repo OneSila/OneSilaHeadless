@@ -133,6 +133,9 @@ class Address(models.Model):
     city = models.CharField(max_length=100)
     country = models.CharField(max_length=2, choices=COUNTRY_CHOICES)
 
+    # FIXME: Add constraint that there can be only invoice address for a company
+    # If a customer has multiple invoice addresses, they are multiple comnpanies
+    # So a new company should be added, and related to the current one.
     is_invoice_address = models.BooleanField(default=False)
     is_shipping_address = models.BooleanField(default=False)
 

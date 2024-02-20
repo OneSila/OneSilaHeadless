@@ -3,13 +3,13 @@ from django.core.exceptions import ValidationError
 
 from core.tests import TestCase
 from core.models.multi_tenant import MultiTenantUserLoginToken
-from core.factories.multi_tenant import LoginTokenFactory, AuthenticateTokenFactory, \
+from core.factories.multi_tenant import RequestLoginTokenFactory, AuthenticateTokenFactory, \
     RecoveryTokenFactory
 
 
 class AccountRecoveryTestCase(TestCase):
     def test_login_token(self):
-        fac = LoginTokenFactory(self.user)
+        fac = RequestLoginTokenFactory(self.user)
         fac.run()
 
         self.assertTrue(fac.token is not None)
@@ -21,7 +21,7 @@ class AccountRecoveryTestCase(TestCase):
         self.assertTrue(fac.token is not None)
 
     def test_authenticate_token(self):
-        fac = LoginTokenFactory(self.user)
+        fac = RequestLoginTokenFactory(self.user)
         fac.run()
         token = fac.token.token
 
@@ -43,7 +43,7 @@ class AccountRecoveryTestCase(TestCase):
         hours = (MultiTenantUserLoginToken.EXPIRES_AFTER_MIN + 1) / 60
 
         try:
-            fac = LoginTokenFactory(self.user)
+            fac = RequestLoginTokenFactory(self.user)
             fac.run()
             token = fac.token
 

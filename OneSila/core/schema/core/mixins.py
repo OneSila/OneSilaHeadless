@@ -1,3 +1,5 @@
+from strawberry_django.auth.utils import get_current_user
+
 from .helpers import get_multi_tenant_company
 
 
@@ -16,3 +18,14 @@ class GetQuerysetMultiTenantMixin:
     def get_queryset(cls, queryset, info, **kwargs):
         multi_tenant_company = get_multi_tenant_company(info)
         return queryset.filter(multi_tenant_company=multi_tenant_company)
+
+
+class GetCurrentUserMixin:
+    @classmethod
+    def get_current_user(self, info, fail_silently=False):
+        current_user = get_current_user(info)
+
+        if not fail_silently and not current_user:
+            raise ValueError("Unable to identify the current user.")
+
+        return current_user

@@ -18,6 +18,15 @@ def validate_image_extension(value):
         raise ValidationError(_('Only {} are allowed.'.format(valid_extensions)))
 
 
+def validate_file_extensions(value):
+    ext = os.path.splitext(value.name)[1]
+    # Images are restricted to "validate_image_extension". Keep in mind if you want to extend this restriction
+    # to also update the frontend, and extend the cropping tools so that no conflicts arise.
+    valid_extensions = ['.pdf', '.xlsx', '.xls', '.docx', '.doc']
+    if not ext.lower() in valid_extensions:
+        raise ValidationError(_('Only {} are allowed.'.format(valid_extensions)))
+
+
 def no_dots_in_filename(value):
     ''' validate is a filename doesnt contain any dots'''
     split = value.name.split('.')

@@ -94,13 +94,13 @@ class AuthenticateTokenTestCase(TransactionTestCaseMixin, TransactionTestCase):
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
 
-    def test_token_login(self):
+    def test_token_authentication(self):
         mutations = """
-        mutation($username: String!){
-          loginToken(data:{username: $username}){
-            expiresAt
-          }
-        }
+            mutation($username: String!){
+              requestLoginToken(data:{username: $username}){
+                expiresAt
+              }
+            }
         """
 
         resp = self.stawberry_anonymous_test_client(
@@ -258,7 +258,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
     def test_invite_user(self):
         password = '22kk22@ksk!aAD'
-        company = MultiTenantCompany.objects.create(name='Invitecompany', country="DE")
+        company = MultiTenantCompany.objects.create(name='Invitecompany', country="DE", language="nl")
         user = MultiTenantUser(username='use323name@mail.com', language="nl", multi_tenant_company=company)
         user.set_password(password)
         user.save()
@@ -288,7 +288,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         )
 
         self.assertTrue(resp.errors is None)
-        self.assertFalse(resp.data['inviteUser']['isActive'])
+        self.assertTrue(resp.data['inviteUser']['isActive'])
         self.assertFalse(resp.data['inviteUser']['invitationAccepted'])
 
         resp = self.stawberry_test_client(
@@ -297,8 +297,8 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         )
 
         accept_mutation = """
-            mutation acceptUserInvitation($id: GlobalID!, $username: String!, $password: String!){
-              acceptUserInvitation(data: {id: $id, username: $username, password: $password}){
+            mutation acceptUserInvitation($password: String!, $language: String!){
+              acceptUserInvitation(data: {password: $password, language: $language}){
                 username
                 isActive
                 invitationAccepted
@@ -308,7 +308,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         resp = self.stawberry_test_client(
             query=accept_mutation,
-            variables={'username': username, 'password': "SomePaddk@2k2", "id": user_id}
+            variables={'language': 'NL', 'password': "SomePaddk@2k2"},
         )
 
         self.assertTrue(resp.errors is None)

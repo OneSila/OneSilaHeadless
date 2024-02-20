@@ -7,8 +7,8 @@ def send_welcome_email_flow(*, user):
     fac.run()
 
 
-def send_user_invite_email_flow(*, user):
-    fac = SendUserInviteEmailFactory(user)
+def send_user_invite_email_flow(*, token):
+    fac = SendUserInviteEmailFactory(token)
     fac.run()
 
 
