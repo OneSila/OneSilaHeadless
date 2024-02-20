@@ -14,6 +14,7 @@ class SupplierProduct(models.Model):
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
     unit = models.ForeignKey('units.Unit', on_delete=models.PROTECT)
     quantity = models.IntegerField()
+    unit_price = models.FloatField()
     product = models.ForeignKey(ProductVariation, on_delete=models.CASCADE)
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE)
 
@@ -67,7 +68,7 @@ class PurchaseOrderItem(models.Model):
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE)
     item = models.ForeignKey(SupplierProduct, on_delete=models.PROTECT)
     quantity = models.IntegerField()
-    price = models.FloatField()
+    unit_price = models.FloatField()
 
     class Meta:
         search_terms = ['purchase_order__order_reference', 'purchase_order__supplier__name']

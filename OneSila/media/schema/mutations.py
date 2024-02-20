@@ -1,9 +1,11 @@
 from core.schema.core.mutations import type
 from core.schema.core.mutations import create, update, delete, type, List
 
-from .types.types import MediaType, ImageType, VideoType, MediaProductThroughType
+from .types.types import MediaType, ImageType, VideoType, MediaProductThroughType, \
+    FileType
 from .types.input import MediaInput, ImageInput, VideoInput, MediaProductThroughInput, \
-    MediaPartialInput, ImagePartialInput, VideoPartialInput, MediaProductThroughPartialInput
+    FileInput, FilePartialInput, MediaPartialInput, ImagePartialInput, \
+    VideoPartialInput, MediaProductThroughPartialInput
 
 
 @type(name="Mutation")
@@ -19,6 +21,12 @@ class MediaMutation:
     update_image: ImageType = update(ImagePartialInput)
     delete_image: ImageType = delete()
     delete_images: List[ImageType] = delete()
+
+    create_file: FileType = create(FileInput)
+    create_files: List[FileType] = create(FileInput)
+    update_file: FileType = update(FilePartialInput)
+    delete_file: FileType = delete()
+    delete_files: List[FileType] = delete()
 
     create_video: VideoType = create(VideoInput)
     create_videos: List[VideoType] = create(VideoInput)

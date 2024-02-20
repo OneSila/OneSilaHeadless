@@ -7,9 +7,10 @@ from imagekit.processors import ResizeToFill, ResizeToFit
 
 from get_absolute_url.helpers import generate_absolute_url
 
-from core.validators import no_dots_in_filename, validate_image_extension
+from core.validators import no_dots_in_filename, validate_image_extension, \
+    validate_file_extensions
 from .image_specs import ImageWebSpec
-from .managers import ImageManager, VideoManager
+from .managers import ImageManager, VideoManager, FileManager
 
 
 import os
@@ -33,22 +34,28 @@ class Media(models.Model):
 
     IMAGE = 'IMAGE'
     VIDEO = 'VIDEO'
+    FILE = 'FILE'
 
     MEDIA_TYPE_CHOICES = (
         (IMAGE, _('Image')),
-        (VIDEO, _('Video'))
+        (VIDEO, _('Video')),
+        (FILE, _("File")),
     )
 
     type = models.CharField(max_length=5, choices=MEDIA_TYPE_CHOICES)
 
-    video_url = models.URLField()
+    video_url = models.URLField(null=True, blank=True)
 
     image_type = models.CharField(max_length=4, choices=IMAGE_TYPE_CHOICES, default=PACK_SHOT)
     image = models.ImageField(_('Image (High resolution)'),
-        upload_to='images/', validators=[validate_image_extension, no_dots_in_filename])
-
+        upload_to='images/', validators=[validate_image_extension, no_dots_in_filename],
+        null=True, blank=True)
     image_web = ImageSpecField(source='image',
         id='mediapp:image:imagewebspec')
+
+    file = models.FileField(_('File'),
+        upload_to='files/', validators=[validate_file_extensions, no_dots_in_filename],
+        null=True, blank=True)
 
     products = models.ManyToManyField('products.Product', through='MediaProductThrough')
 
@@ -69,6 +76,7 @@ class Media(models.Model):
 
 class Image(Media):
     objects = ImageManager()
+    proxy_filter_fields = {'type': Media.IMAGE}
 
     class Meta:
         proxy = True
@@ -76,6 +84,15 @@ class Image(Media):
 
 class Video(Media):
     objects = VideoManager()
+    proxy_filter_fields = {'type': Media.VIDEO}
+
+    class Meta:
+        proxy = True
+
+
+class File(Media):
+    objects = FileManager()
+    proxy_filter_fields = {'type': Media.FILE}
 
     class Meta:
         proxy = True
