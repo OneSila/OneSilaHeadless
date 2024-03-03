@@ -156,7 +156,7 @@ class OrderItem(models.Model):
     objects = OrderItemManager()
 
     def __str__(self):
-        return '{} x {} : {}'.format(self.product.name, self.quantity, self.order)
+        return '{} x {} : {}'.format(self.product.sku, self.quantity, self.order)
 
     def qty_on_stock(self):
         # Firstly, dont bother calculating this for order-items that dont need processing

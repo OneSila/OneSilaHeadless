@@ -44,7 +44,7 @@ class Product(models.Model):
     umbrellas = UmbrellaManager()
 
     def __str__(self):
-        return f"{self.name} <{self.sku}>"
+        return f"{self.sku}"
 
     def set_active(self):
         self.active = True

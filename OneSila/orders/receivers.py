@@ -24,6 +24,7 @@ def orders__order_item__pre_save(sender, instance, **kwargs):
     '''
     set a price if there is none supplied
     '''
-    from .factories import OrderItemPriceSetFactory
-    fac = OrderItemPriceSetFactory(instance)
-    fac.run()
+    # @TODO: FIX THIS! WAS IMPORTING A NON EXISTING FACTORY!
+    # from .factories import OrderItemPriceSetFactory
+    # fac = OrderItemPriceSetFactory(instance)
+    # fac.run()

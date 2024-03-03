@@ -1,11 +1,11 @@
-from core.schema.core.types.types import type, relay, List, Annotated, lazy
+from core.schema.core.types.types import type, relay, List, Annotated, lazy, strawberry_type
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from core.schema.multi_tenant.types.types import MultiTenantCompanyType
 
 from contacts.models import Company, Supplier, Customer, Influencer, \
     InternalCompany, Person, Address, ShippingAddress, InvoiceAddress
 from .filters import CompanyFilter, SupplierFilter, AddressFilter, PersonFilter, CustomerFilter
-from .ordering import CompanyOrder, SupplierOrder, CustomerOrder
+from .ordering import CompanyOrder, SupplierOrder, CustomerOrder, PersonOrder
 
 
 @type(Company, filters=CompanyFilter, order=CompanyOrder, pagination=True, fields='__all__')
@@ -43,7 +43,7 @@ class InternalCompanyType(relay.Node, GetQuerysetMultiTenantMixin):
     person_set: List[Annotated['PersonType', lazy("contacts.schema.types.types")]]
 
 
-@type(Person, filters=PersonFilter, pagination=True, fields="__all__")
+@type(Person, filters=PersonFilter, order=PersonOrder, pagination=True, fields="__all__")
 class PersonType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
@@ -68,3 +68,8 @@ class InvoiceAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
     contact: List[Annotated['PersonType', lazy("contacts.schema.types.types")]]
+
+@strawberry_type
+class CustomerLanguageType:
+    code: str
+    name: str

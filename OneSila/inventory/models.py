@@ -25,6 +25,8 @@ class Inventory(models.Model):
         if not self.product.is_variation():
             raise IntegrityError(_("Inventory can only be attached to a VARIATION. Not a {}".format(self.product.type)))
 
+        super().save(*args, **kwargs)
+
 
 class InventoryLocation(models.Model):
     '''
@@ -35,7 +37,7 @@ class InventoryLocation(models.Model):
     '''
     name = models.CharField(max_length=10, unique=True)
     description = models.TextField()
-    parent_location = models.ForeignKey('self', on_delete=models.CASCADE)
+    parent_location = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return self.name

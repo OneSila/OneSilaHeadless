@@ -29,5 +29,6 @@ def translation__producttranslation__post_save(sender, instance, created, *args,
     """
     Whenever a new product is created, create the needed translation instance in the default language.
     """
-    language = instance.company.language
-    ProductTranslation.objects.get_or_create(product=instance, language=language)
+    # @TODO: FIX THIS! IS BROKEN!
+    # language = instance.company.language
+    # ProductTranslation.objects.get_or_create(product=instance, language=language)
