@@ -38,7 +38,7 @@ class Currency(models.Model):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
 
-    def set_exchange_rate_official(new_rate, force_save=False):
+    def set_exchange_rate_official(self, new_rate, force_save=False):
         self.exchange_rate_official = new_rate
         self.save(force_save=force_save)
 
