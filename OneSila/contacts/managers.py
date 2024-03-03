@@ -6,10 +6,10 @@ class CompanyQueryset(MultiTenantQuerySet):
     def filter_supplier(self, multi_tenant_company):
         return self.filter(is_supplier=True, multi_tenant_company=multi_tenant_company)
 
-    def filter_customer(self):
+    def filter_customer(self, multi_tenant_company):
         return self.filter(is_customer=True, multi_tenant_company=multi_tenant_company)
 
-    def filter_influencer(self):
+    def filter_influencer(self, multi_tenant_company):
         return self.filter(is_influencer=True, multi_tenant_company=multi_tenant_company)
 
 

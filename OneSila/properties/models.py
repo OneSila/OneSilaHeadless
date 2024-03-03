@@ -31,6 +31,7 @@ class Property(models.Model):
         verbose_name=_('Type of property'),
         db_index=True
     )
+    is_private_information = models.BooleanField(default=False)
     value_validator = models.CharField(
         max_length=500,
         null=True,
@@ -70,8 +71,8 @@ class ProductProperty(models.Model):
     # FIXME: This model needs to become translatable, more specifically:
     # - value_string
     # - value_text
-    # - value_select
-    # - value_multiselect
+    # - value_select <- Already translated
+    # - value_multiselect <- Already translated
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
     value_boolean = models.BooleanField(null=True, blank=True)

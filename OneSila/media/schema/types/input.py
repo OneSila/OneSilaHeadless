@@ -1,7 +1,7 @@
 from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial
 
-from media.models import Media, Image, Video, MediaProductThrough
+from media.models import Media, Image, Video, MediaProductThrough, File
 
 
 @input(Media, fields="__all__")
@@ -21,6 +21,16 @@ class ImageInput:
 
 @partial(Image, fields="__all__")
 class ImagePartialInput(NodeInput):
+    pass
+
+
+@input(File, fields="__all__")
+class FileInput:
+    pass
+
+
+@partial(File, fields="__all__")
+class FilePartialInput(NodeInput):
     pass
 
 
