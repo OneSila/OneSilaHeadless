@@ -87,7 +87,6 @@ class SalesPriceList(models.Model):
     def __str__(self):
         return '{} {}'.format(self.name, self.currency)
 
-
 class SalesPriceListItem(models.Model):
     salespricelist = models.ForeignKey(SalesPriceList, on_delete=models.CASCADE)
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)

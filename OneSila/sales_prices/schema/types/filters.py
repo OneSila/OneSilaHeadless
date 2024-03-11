@@ -1,3 +1,6 @@
+from typing import List, Optional
+
+from contacts.schema.types.filters import CustomerFilter
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin
 
@@ -10,23 +13,24 @@ from currencies.schema.types.filters import CurrencyFilter
 class SalesPriceFilter(SearchFilterMixin):
     search: str | None
     id: auto
-    product: ProductFilter
-    currency: CurrencyFilter
-
+    product: ProductFilter | None
+    currency: CurrencyFilter | None
 
 @filter(SalesPriceList)
 class SalesPriceListFilter(SearchFilterMixin):
     search: str | None
     id: auto
     name: auto
-    currency: CurrencyFilter
+    currency: CurrencyFilter | None
     vat_included: auto
     auto_update: auto
+    customers: CustomerFilter | None
+    salespricelistitem: Optional['SalesPriceListItemFilter']
 
 
 @filter(SalesPriceListItem)
 class SalesPriceListItemFilter(SearchFilterMixin):
     search: str | None
     id: auto
-    salespricelist: SalesPriceListFilter
-    product: ProductFilter
+    salespricelist: SalesPriceListFilter | None
+    product: ProductFilter | None

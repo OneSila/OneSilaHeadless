@@ -1,3 +1,5 @@
+from typing import Optional
+from contacts.schema.types.filters import CustomerFilter
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin
 
@@ -10,24 +12,24 @@ class OrderFilter(SearchFilterMixin):
     search: str | None
     id: auto
     reference: auto
-    company: auto
+    customer: CustomerFilter | None
     invoice_address: auto
     shipping_address: auto
     currency: auto
     status: auto
     reason_for_sale: auto
-
+    orderitem: Optional['OrderItemFilter']
 
 @filter(OrderItem)
 class OrderItemFilter(SearchFilterMixin):
     search: str | None
     id: auto
-    order: OrderFilter
-    product: ProductFilter
+    order: OrderFilter | None
+    product: ProductFilter | None
 
 
 @filter(OrderNote)
 class OrderNoteFilter(SearchFilterMixin):
     search: str | None
     id: auto
-    order: OrderFilter
+    order: OrderFilter | None

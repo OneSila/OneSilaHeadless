@@ -13,7 +13,7 @@ class SalesPriceSubscription:
             yield i
 
     @subscription
-    async def sales_price_list(self, info: Info, pk: str) -> AsyncGenerator[SalesPriceListItemType, None]:
+    async def sales_price_list(self, info: Info, pk: str) -> AsyncGenerator[SalesPriceListType, None]:
         async for i in model_subscriber(info=info, pk=pk, model=SalesPriceList):
             yield i
 

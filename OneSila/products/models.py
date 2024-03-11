@@ -72,6 +72,16 @@ class Product(models.Model):
     def is_not_variations(self):
         return self.type != self.VARIATION
 
+    def get_proxy_instance(self):
+        if self.is_variation():
+            return ProductVariation.objects.get(pk=self.pk)
+        elif self.is_bundle():
+            return BundleProduct.objects.get(pk=self.pk)
+        elif self.is_umbrella():
+            return UmbrellaProduct.objects.get(pk=self.pk)
+        else:
+            return self
+
     class Meta:
         search_terms = ['sku']
 
@@ -106,7 +116,10 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
     url_key = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.product} <{self.get_language_display()}>"
+        return f"{self.product} <{self.language}>"
+
+    class Meta:
+        unique_together = ('product', 'language')
 
 
 class UmbrellaVariation(models.Model):

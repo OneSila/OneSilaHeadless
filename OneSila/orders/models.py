@@ -62,7 +62,7 @@ class Order(models.Model):
     )
 
     reference = models.CharField(max_length=100, blank=True, null=True)
-    company = models.ForeignKey('contacts.Customer', on_delete=models.PROTECT)
+    customer = models.ForeignKey('contacts.Customer', on_delete=models.PROTECT)
     invoice_address = models.ForeignKey('contacts.InvoiceAddress', on_delete=models.PROTECT,
         related_name='invoiceaddress_set')
     shipping_address = models.ForeignKey('contacts.ShippingAddress', on_delete=models.PROTECT,

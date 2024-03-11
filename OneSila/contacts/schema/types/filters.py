@@ -42,13 +42,13 @@ class PersonFilter(SearchFilterMixin):
     first_name: auto
     last_name: auto
     email: auto
-    company: CompanyFilter
+    company: CompanyFilter | None
 
 
 @filter(Address)
 class AddressFilter(SearchFilterMixin):
     search: str | None
-    company: CompanyFilter
+    company: CompanyFilter | None
     is_invoice_address: auto
     is_shipping_address: auto
 
@@ -56,10 +56,10 @@ class AddressFilter(SearchFilterMixin):
 @filter(InvoiceAddress)
 class InvoiceAddressFilter(SearchFilterMixin):
     search: str | None
-    company: CompanyFilter
+    company: CompanyFilter | None
 
 
 @filter(ShippingAddress)
 class ShippingAddressFilter(SearchFilterMixin):
     search: str | None
-    company: CompanyFilter
+    company: CompanyFilter | None
