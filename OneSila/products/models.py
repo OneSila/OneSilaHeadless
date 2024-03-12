@@ -138,6 +138,9 @@ class UmbrellaVariation(models.Model):
     def __str__(self):
         return f"{self.umbrella} x {self.variation}"
 
+    class Meta:
+        unique_together = ("umbrella", "variation")
+
 
 class BundleVariation(models.Model):
     umbrella = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_umbrellas")
@@ -155,3 +158,6 @@ class BundleVariation(models.Model):
             raise IntegrityError(_("variation needs to a product of type BUNDLE or VARIATION. Not %s" % (self.umbrella.type)))
 
         super().save(*args, **kwargs)
+
+    class Meta:
+        unique_together = ("umbrella", "variation")

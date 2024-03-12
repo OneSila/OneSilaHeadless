@@ -1,6 +1,6 @@
 from currencies.models import Currency
 from eancodes.models import EanCode
-from sales_prices.models import SalesPriceList, SalesPriceListItem, SalesPriceListAssign, SalesPrice
+from sales_prices.models import SalesPriceList, SalesPriceListItem, SalesPrice
 
 from io import BytesIO
 from datetime import datetime
