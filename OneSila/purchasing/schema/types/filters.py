@@ -15,10 +15,10 @@ class SupplierProductFilter(SearchFilterMixin):
     id: auto
     sku: auto
     name: auto
-    currency: CurrencyFilter
-    product: ProductFilter
-    supplier: SupplierFilter
-    unit: UnitFilter
+    currency: CurrencyFilter | None
+    product: ProductFilter | None
+    supplier: SupplierFilter | None
+    unit: UnitFilter | None
 
 
 @filter(PurchaseOrder)
@@ -26,16 +26,16 @@ class PurchaseOrderFilter(SearchFilterMixin):
     search: str | None
     id: auto
     status: auto
-    supplier: SupplierFilter
+    supplier: SupplierFilter | None
     order_reference: auto
-    currency: CurrencyFilter
-    invoice_address: InvoiceAddressFilter
-    shipping_address: ShippingAddressFilter
+    currency: CurrencyFilter | None
+    invoice_address: InvoiceAddressFilter | None
+    shipping_address: ShippingAddressFilter | None
 
 
 @filter(PurchaseOrderItem)
 class PurchaseOrderItemFilter(SearchFilterMixin):
     search: str | None
     id: auto
-    purchase_order: PurchaseOrderFilter
-    item: SupplierProductFilter
+    purchase_order: PurchaseOrderFilter | None
+    item: SupplierProductFilter | None

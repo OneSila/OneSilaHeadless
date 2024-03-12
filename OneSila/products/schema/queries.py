@@ -21,7 +21,7 @@ class ProductsQuery:
     product_variations: ListConnectionWithTotalCount[ProductVariationType] = connection()
 
     product_translation: ProductTranslationType = node()
-    product_tranlations: ListConnectionWithTotalCount[ProductTranslationType] = connection()
+    product_translations: ListConnectionWithTotalCount[ProductTranslationType] = connection()
 
     umbrella_variation: UmbrellaVariationType = node()
     umbrella_variations: ListConnectionWithTotalCount[UmbrellaVariationType] = connection()

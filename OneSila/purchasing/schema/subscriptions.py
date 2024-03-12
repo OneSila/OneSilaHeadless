@@ -13,7 +13,7 @@ class PurchasingSubscription:
             yield i
 
     @subscription
-    async def purchase_order(self, info: Info, pk: str) -> AsyncGenerator[PurchaseOrderItemType, None]:
+    async def purchase_order(self, info: Info, pk: str) -> AsyncGenerator[PurchaseOrderType, None]:
         async for i in model_subscriber(info=info, pk=pk, model=PurchaseOrder):
             yield i
 

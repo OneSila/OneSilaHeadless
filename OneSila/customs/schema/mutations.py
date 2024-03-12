@@ -8,6 +8,6 @@ from .types.input import HsCodeInput, HsCodePartialInput
 class CustomsMutation:
     create_hs_code: HsCodeType = create(HsCodeInput)
     create_hs_codes: List[HsCodeType] = create(HsCodeInput)
-    update_hs_code: HsCodeType = update(HsCodeInput)
+    update_hs_code: HsCodeType = update(HsCodePartialInput)
     delete_hs_code: HsCodeType = delete()
     delete_hs_codes: List[HsCodeType] = delete()

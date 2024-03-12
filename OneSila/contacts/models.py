@@ -122,7 +122,7 @@ class Address(models.Model):
     """
     from core.countries import COUNTRY_CHOICES
 
-    contact = models.ForeignKey(Person, on_delete=models.CASCADE)
+    contact = models.ForeignKey(Person, on_delete=models.CASCADE, null=True, blank=True)
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
 
     address1 = models.CharField(max_length=100)

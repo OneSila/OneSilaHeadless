@@ -44,7 +44,7 @@ class Product(models.Model):
     umbrellas = UmbrellaManager()
 
     def __str__(self):
-        return f"{self.name} <{self.sku}>"
+        return f"{self.sku}"
 
     def set_active(self):
         self.active = True
@@ -71,6 +71,16 @@ class Product(models.Model):
 
     def is_not_variations(self):
         return self.type != self.VARIATION
+
+    def get_proxy_instance(self):
+        if self.is_variation():
+            return ProductVariation.objects.get(pk=self.pk)
+        elif self.is_bundle():
+            return BundleProduct.objects.get(pk=self.pk)
+        elif self.is_umbrella():
+            return UmbrellaProduct.objects.get(pk=self.pk)
+        else:
+            return self
 
     class Meta:
         search_terms = ['sku']
@@ -106,7 +116,10 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
     url_key = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.product} <{self.get_language_display()}>"
+        return f"{self.product} <{self.language}>"
+
+    class Meta:
+        unique_together = ('product', 'language')
 
 
 class UmbrellaVariation(models.Model):
@@ -125,6 +138,9 @@ class UmbrellaVariation(models.Model):
     def __str__(self):
         return f"{self.umbrella} x {self.variation}"
 
+    class Meta:
+        unique_together = ("umbrella", "variation")
+
 
 class BundleVariation(models.Model):
     umbrella = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_umbrellas")
@@ -142,3 +158,6 @@ class BundleVariation(models.Model):
             raise IntegrityError(_("variation needs to a product of type BUNDLE or VARIATION. Not %s" % (self.umbrella.type)))
 
         super().save(*args, **kwargs)
+
+    class Meta:
+        unique_together = ("umbrella", "variation")

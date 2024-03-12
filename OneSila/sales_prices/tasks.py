@@ -1,5 +1,3 @@
-from defaults.helpers import exists
-
 from huey import crontab
 from huey.contrib.djhuey import db_periodic_task, db_task
 
@@ -29,6 +27,7 @@ def salespricelistitem__update_task(sales_price_id):
 
 @db_task()
 def sales_price_update_create_task(sales_price_id):
+    # @TODO: Move this in a flow.
     '''
     Acts as task to create the necessary child-prices or force updates on child prices.
     if the price acts as a maaster-price there is no need for updates.
@@ -67,7 +66,7 @@ def sales_price_update_create_task(sales_price_id):
                 amount=amount)
 
     # If you're part of an inhertiance, update yourself:
-    if exists(sales_price.currency.inherits_from):
+    if sales_price.currency.inherits_from:
         currency = sales_price.currency
 
         amount = currency_convert(

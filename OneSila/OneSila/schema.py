@@ -24,6 +24,7 @@ from purchasing.schema import PurchasingQuery, PurchasingMutation, PurchasingSub
 from sales_prices.schema import SalesPricesQuery, SalesPricesMutation, SalesPriceSubscription
 from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
 from units.schema import UnitsQuery, UnitsMutation, UnitsSubscription
+from translations.schema import TranslationsQuery
 
 
 #
@@ -34,7 +35,7 @@ from units.schema import UnitsQuery, UnitsMutation, UnitsSubscription
 class Query(ContactsQuery, CurrenciesQuery, CustomsQuery, CountryQuery, EanCodesQuery,
         InventoryQuery, LanguageQuery, MediaQuery, MultiTenantQuery, OrdersQuery,
         ProductsQuery, PropertiesQuery, PurchasingQuery, SalesPricesQuery, TaxesQuery,
-        TimeZoneQuery, UnitsQuery):
+        TimeZoneQuery, UnitsQuery, TranslationsQuery):
     pass
 
 

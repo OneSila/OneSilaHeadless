@@ -1,7 +1,6 @@
 from core import models
-from django.db import models
 from django.utils.translation import gettext_lazy as _
-from contacts.models import Supplier, InternalCompany, ShippingAddress
+from contacts.models import Supplier, ShippingAddress, InvoiceAddress
 from products.models import ProductVariation
 
 
@@ -48,8 +47,22 @@ class PurchaseOrder(models.Model):
     order_reference = models.CharField(max_length=100)
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
 
-    invoice_address = models.ForeignKey(InternalCompany, on_delete=models.PROTECT, related_name="invoice_address_set")
-    delivery_address = models.ForeignKey(ShippingAddress, on_delete=models.PROTECT, related_name="delivery_address_set")
+    invoice_address = models.ForeignKey(InvoiceAddress, on_delete=models.PROTECT, related_name="invoice_address_set")
+    shipping_address = models.ForeignKey(ShippingAddress, on_delete=models.PROTECT, related_name="shipping_address_set")
+
+    @property
+    def total_value(self):
+        from django.db.models import Sum, F
+
+        total = self.purchaseorderitem_set.aggregate(
+            total_sum=Sum(F('quantity') * F('unit_price'))
+        )['total_sum']
+
+        if total is None:
+            return f"0 {self.currency.symbol}"
+
+        # Return the total sum with the currency symbol
+        return f"{total} {self.currency.symbol}"
 
     def reference(self):
         return f"PO{self.id}"
