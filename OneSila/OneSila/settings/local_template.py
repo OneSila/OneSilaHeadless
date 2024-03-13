@@ -5,9 +5,9 @@ ALLOWED_HOSTS = ['myonesilaserver.com']
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'mydb',
-        'USER': 'mydb_user',
-        'PASSWORD': 'somedbpass',
+        'NAME': 'onesila',
+        'USER': 'onesila',
+        'PASSWORD': 'my-complicated-pass',
         'HOST': 'localhost',
         'PORT': '5432',
     }
