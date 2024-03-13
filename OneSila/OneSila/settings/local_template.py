@@ -1,6 +1,6 @@
 from .base import *
 
-ALLOWED_HOSTS = ['*', 'testserver']
+ALLOWED_HOSTS = ['myonesilaserver.com']
 
 DATABASES = {
     'default': {
@@ -14,9 +14,9 @@ DATABASES = {
 }
 
 
-STATIC_ROOT = '/path/to/OneSilaHeadless/static/'
-MEDIA_ROOT = '/path/to/OneSilaHeadless/mediafiles/'
-APP_ROOT = '/path/to/OneSilaHeadless/'
+STATIC_ROOT = '/home/onesila/static/'
+MEDIA_ROOT = '/home/onesila/mediafiles/'
+APP_ROOT = '/home/onesila/OneSilaHeadless/OneSila/'
 
 SECRET_KEY = 'your-secret-key-goes-here'
 
