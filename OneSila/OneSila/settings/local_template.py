@@ -1,6 +1,7 @@
 from .base import *
 
 ALLOWED_HOSTS = ['myonesilaserver.com']
+DEBUG = True
 
 DATABASES = {
     'default': {
@@ -67,3 +68,9 @@ STRAWBERRY_DJANGO_REGISTER_USER_AUTO_LOGIN = False
 # How long should the login link stay valid for?
 #
 MULTI_TENANT_LOGIN_LINK_EXPIRES_AFTER_MIN = 60
+
+
+#
+# Huey overrides
+#
+HUEY['immediate'] = DEBUG
