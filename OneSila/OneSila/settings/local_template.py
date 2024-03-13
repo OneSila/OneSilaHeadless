@@ -1,6 +1,7 @@
 from .base import *
 
 ALLOWED_HOSTS = ['myonesilaserver.com']
+CSRF_TRUSTED_ORIGINS = [f"https://{domain}" for domain in ALLOWED_HOSTS]
 DEBUG = True
 
 DATABASES = {
