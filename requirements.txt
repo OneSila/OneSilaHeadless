@@ -1,4 +1,4 @@
-Django>=4
+Django>=5
 django-imagekit>=4.1.0
 Pillow>=10.0.0
 CurrencyConverter
@@ -25,6 +25,7 @@ django-cors-headers
 tzdata
 shortuuid
 pytz
+hypercorn
 
 # Using fork to ensure we have better authentication error support
 strawberry-graphql-django
