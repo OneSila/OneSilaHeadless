@@ -120,9 +120,9 @@ class QuerySetProxyModelMixin(MultiTenantQuerySet):
     """
 
     # @multi_tenant_company_required()
-    def filter(self, **kwargs):
+    def filter(self, *args, **kwargs):
         kwargs.update(self.model.proxy_filter_fields)
-        return super().filter(**kwargs)
+        return super().filter(*args, **kwargs)
 
     @multi_tenant_company_required()
     def create(self, **kwargs):

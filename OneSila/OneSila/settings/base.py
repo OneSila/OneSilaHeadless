@@ -141,6 +141,15 @@ USE_I18N = True
 
 USE_TZ = True
 
+# Mails with errors go to...
+
+ADMINS = [
+    ("Sascha", 'sd@tweave.tech'),
+    ("David", 'david@tweave.tech')
+]
+
+MANAGERS = ADMINS
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
