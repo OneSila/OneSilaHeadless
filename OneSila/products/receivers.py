@@ -27,7 +27,7 @@ def products__subscription__post_save(sender, instance, **kwargs):
 @receiver(post_save, sender=Product)
 def translation__producttranslation__post_save(sender, instance, created, *args, **kwargs):
     """
-    Whenever a new product is created, create the needed translation instance in the default language.
+    Whenever a new product is created, create the needed translation instance in the default company language.
     """
     # @TODO: FIX THIS! IS BROKEN!
     # language = instance.company.language
