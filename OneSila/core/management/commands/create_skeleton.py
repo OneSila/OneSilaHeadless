@@ -8,6 +8,7 @@ SKELETON_STRUCTURE = [
     'helpers.py',
     'defaults.py',
     'decorators.py',
+    'demo_data.py',
     'exceptions.py',
     'tasks.py',
     'flows',
@@ -52,6 +53,20 @@ SKELETON_STRUCTURE_DELETE = [
 RECEIVERS_CODE = """
     def ready(self):
         from . import receivers
+"""
+
+DEMO_DATA_CODE = """
+from core.demo_data import DemoDataLibrary, model_baker, faker
+
+registry = DemoDataLibrary()
+
+# A demo-data generator could look like:
+# @registry.register
+# def populate_some_data(multi_tenant_user):
+#     demo_data = {
+#         'first_name': faker.first_name()
+#     }
+#     model_baker.create("MyModel", **demo_data)
 """
 
 
