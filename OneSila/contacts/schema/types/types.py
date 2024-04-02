@@ -6,7 +6,7 @@ from core.schema.multi_tenant.types.types import MultiTenantCompanyType
 
 from contacts.models import Company, Supplier, Customer, Influencer, \
     InternalCompany, Person, Address, ShippingAddress, InvoiceAddress
-from .filters import CompanyFilter, SupplierFilter, AddressFilter, PersonFilter, CustomerFilter
+from .filters import CompanyFilter, SupplierFilter, AddressFilter, PersonFilter, CustomerFilter, ShippingAddressFilter, InvoiceAddressFilter
 from .ordering import CompanyOrder, SupplierOrder, CustomerOrder, PersonOrder
 
 
@@ -58,14 +58,14 @@ class AddressType(relay.Node, GetQuerysetMultiTenantMixin):
     contact: Optional[PersonType]
 
 
-@type(ShippingAddress, filters=AddressFilter, pagination=True, fields="__all__")
+@type(ShippingAddress, filters=ShippingAddressFilter, pagination=True, fields="__all__")
 class ShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
     contact: Optional[PersonType]
 
 
-@type(InvoiceAddress, filters=AddressFilter, pagination=True, fields="__all__")
+@type(InvoiceAddress, filters=InvoiceAddressFilter, pagination=True, fields="__all__")
 class InvoiceAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
