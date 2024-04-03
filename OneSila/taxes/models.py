@@ -10,7 +10,7 @@ class VatRate(models.Model):
     These are not to be confused with the international rates one should charge eg in the euro-zone.
     although it is someting that needs to be concidered just the same: TODO
     '''
-    name = models.CharField(max_length=3, null=True)
+    name = models.CharField(max_length=3, null=True, blank=True)
     rate = models.IntegerField(help_text=_("VAT rate in percent.  Eg 21 for 21%"))
 
     def __str__(self):
