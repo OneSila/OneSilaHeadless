@@ -1,7 +1,9 @@
+from django.db import IntegrityError
+from django.utils.translation import gettext_lazy as _
 from core import models
 from django.utils.translation import gettext_lazy as _
 from contacts.models import Supplier, ShippingAddress, InvoiceAddress
-from products.models import ProductVariation
+from products.models import Product
 
 
 class SupplierProduct(models.Model):
@@ -14,11 +16,17 @@ class SupplierProduct(models.Model):
     unit = models.ForeignKey('units.Unit', on_delete=models.PROTECT)
     quantity = models.IntegerField()
     unit_price = models.FloatField()
-    product = models.ForeignKey(ProductVariation, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.product} <{self.supplier}>"
+
+    def save(self, *args, **kwargs):
+        if not self.product.is_variation():
+            raise IntegrityError(_("Inventory can only be attached to a VARIATION. Not a {}".format(self.product.type)))
+
+        super().save(*args, **kwargs)
 
     class Meta:
         search_terms = ['sku', 'name', 'supplier__name']

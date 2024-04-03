@@ -1,3 +1,5 @@
+from django.db import IntegrityError
+from django.utils.translation import gettext_lazy as _
 from core import models
 from .managers import InventorykManager
 
@@ -6,7 +8,7 @@ class Inventory(models.Model):
     '''
     Class to store quantity of products on stock
     '''
-    product = models.ForeignKey('products.ProductVariation', on_delete=models.PROTECT,
+    product = models.ForeignKey('products.Product', on_delete=models.PROTECT,
         related_name='stock')
     stocklocation = models.ForeignKey('InventoryLocation', on_delete=models.PROTECT)
     quantity = models.IntegerField()

@@ -111,7 +111,7 @@ class Person(models.Model):
         return self.name()
 
     class Meta:
-        search_terms = ['name', 'company__name', 'email']
+        search_terms = ['first_name', 'last_name', 'company__name', 'email']
         verbose_name = _("person")
         verbose_name_plural = _("people")
 

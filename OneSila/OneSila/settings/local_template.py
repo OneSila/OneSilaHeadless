@@ -1,22 +1,24 @@
 from .base import *
 
-ALLOWED_HOSTS = ['*', 'testserver']
+ALLOWED_HOSTS = ['myonesilaserver.com']
+CSRF_TRUSTED_ORIGINS = [f"https://{domain}" for domain in ALLOWED_HOSTS]
+DEBUG = True
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'mydb',
-        'USER': 'mydb_user',
-        'PASSWORD': 'somedbpass',
+        'NAME': 'onesila',
+        'USER': 'onesila',
+        'PASSWORD': 'my-complicated-pass',
         'HOST': 'localhost',
         'PORT': '5432',
     }
 }
 
 
-STATIC_ROOT = '/path/to/OneSilaHeadless/static/'
-MEDIA_ROOT = '/path/to/OneSilaHeadless/mediafiles/'
-APP_ROOT = '/path/to/OneSilaHeadless/'
+STATIC_ROOT = '/home/onesila/static/'
+MEDIA_ROOT = '/home/onesila/mediafiles/'
+APP_ROOT = '/home/onesila/OneSilaHeadless/OneSila/'
 
 SECRET_KEY = 'your-secret-key-goes-here'
 
@@ -67,3 +69,9 @@ STRAWBERRY_DJANGO_REGISTER_USER_AUTO_LOGIN = False
 # How long should the login link stay valid for?
 #
 MULTI_TENANT_LOGIN_LINK_EXPIRES_AFTER_MIN = 60
+
+
+#
+# Huey overrides
+#
+HUEY['immediate'] = DEBUG

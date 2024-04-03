@@ -1,0 +1,34 @@
+name: Deploy to master / production
+
+on:
+  push:
+    branches:
+      - 'master'
+
+jobs:
+  deploy:
+    name: Deploy to PROD server
+    runs-on: ubuntu-latest
+    environment: development
+    # https://github.com/marketplace/actions/ssh-execute-commands
+    steps:
+      - name: Login remotely, pull and deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.MASTER_HOSTNAME }}
+          username: ${{ secrets.MASTER_USERNAME }}
+          key: ${{ secrets.DEVELOPMENT_SECRET_KEY_SSH }}
+          port: 22
+          script: |
+            source venv/bin/activate
+            cd /home/${{ secrets.MASTER_USERNAME }}/OneSilaHeadless/
+            git config pull.rebase false
+            git pull
+            pip install --upgrade pip
+            pip install -r requirements.txt --upgrade
+            cd OneSila
+            ./manage.py migrate
+            ./manage.py collectstatic --noinput
+            sudo supervisorctl restart hypercornctl
+            sudo chmod 777 /home/${{ secrets.MASTER_USERNAME }}/hypercorn.sock
+            sudo supervisorctl restart huey

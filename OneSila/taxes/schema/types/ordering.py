@@ -1,10 +1,10 @@
 from core.schema.core.types.ordering import order
 from core.schema.core.types.types import auto
 
-from taxes.models import Tax
+from taxes.models import VatRate
 
 
-@order(Tax)
-class TaxOrder:
+@order(VatRate)
+class VatRateOrder:
     name: auto
     rate: auto

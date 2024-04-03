@@ -13,7 +13,7 @@ class ProductFilter(SearchFilterMixin):
     id: auto
     sku: auto
     type: auto
-    tax_rate: auto
+    vat_rate: auto
 
 
 @filter(BundleProduct)
@@ -21,7 +21,7 @@ class BundleProductFilter(SearchFilterMixin):
     search: str | None
     id: auto
     sku: auto
-    tax_rate: auto
+    vat_rate: auto
 
 
 @filter(UmbrellaProduct)
@@ -29,7 +29,7 @@ class UmbrellaProductFilter(SearchFilterMixin):
     search: str | None
     id: auto
     sku: auto
-    tax_rate: auto
+    vat_rate: auto
 
 
 @filter(ProductVariation)
@@ -37,7 +37,7 @@ class ProductVariationFilter(SearchFilterMixin):
     search: str | None
     id: auto
     sku: auto
-    tax_rate: auto
+    vat_rate: auto
 
 
 @filter(ProductTranslation)
@@ -51,6 +51,7 @@ class ProductTranslationFilter:
 class UmbrellaVariationFilter:
     id: auto
     umbrella: Optional[ProductFilter]
+
 
 @filter(BundleVariation)
 class BundleVariationFilter:
