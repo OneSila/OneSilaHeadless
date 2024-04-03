@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core.models import MultiTenantAwareMixin
 from translations.models import TranslationFieldsMixin
-from taxes.models import Tax
+from taxes.models import VatRate
 
 from .managers import ProductManger, UmbrellaManager, BundleManager, VariationManager
 
@@ -23,7 +23,7 @@ class Product(models.Model):
     sku = models.CharField(max_length=100, unique=True, db_index=True)
     active = models.BooleanField(default=False)
     type = models.CharField(max_length=9, choices=PRODUCT_TYPE_CHOICES)
-    tax_rate = models.ForeignKey(Tax, on_delete=models.PROTECT)
+    vat_rate = models.ForeignKey(VatRate, on_delete=models.PROTECT)
     always_on_stock = models.BooleanField(default=False)
 
     umbrella_variations = models.ManyToManyField('self',
