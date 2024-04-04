@@ -1,10 +1,14 @@
+from django.db.models import UniqueConstraint
+
+from core.exceptions import RequiredFieldException
 from core import models
-from core.validators import phone_regex
 from django.utils.translation import gettext_lazy as _
 
 from .managers import SupplierManager, CustomerManager, InfluencerManager, \
     InvoiceAddressManager, ShippingAddressManager, InternalCompanyManager, \
     CompanyManager
+
+
 
 
 class Company(models.Model):
@@ -31,6 +35,14 @@ class Company(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+
+        types = [self.is_supplier, self.is_customer, self.is_influencer, self.is_internal_company]
+        if not any(types):
+            raise RequiredFieldException(field_name='type')
+
+        super().save(*args, **kwargs)
 
     class Meta:
         search_terms = ['name']
@@ -133,16 +145,31 @@ class Address(models.Model):
     city = models.CharField(max_length=100)
     country = models.CharField(max_length=2, choices=COUNTRY_CHOICES)
 
-    # FIXME: Add constraint that there can be only invoice address for a company
     # If a customer has multiple invoice addresses, they are multiple comnpanies
     # So a new company should be added, and related to the current one.
     is_invoice_address = models.BooleanField(default=False)
     is_shipping_address = models.BooleanField(default=False)
 
+    def save(self, *args, **kwargs):
+
+        types = [self.is_invoice_address, self.is_shipping_address]
+        if not any(types):
+            raise RequiredFieldException(field_name='type')
+
+        super().save(*args, **kwargs)
+
     class Meta:
         search_terms = ['contact__email', 'company__name']
         verbose_name_plural = 'addresses'
 
+        constraints = [
+            UniqueConstraint(
+                fields=['company'],
+                condition=models.Q(is_invoice_address=True),
+                name='unique_invoice_address_per_company',
+                violation_error_message=_("Company already has an invoice address.")
+            )
+        ]
 
 class ShippingAddress(Address):
     objects = ShippingAddressManager()

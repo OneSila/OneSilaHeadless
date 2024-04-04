@@ -23,3 +23,4 @@ class VatRate(models.Model):
     class Meta:
         verbose_name = 'VAT Rate'
         verbose_name_plural = 'VAT Taxes'
+        unique_together = ("rate", "multi_tenant_company")

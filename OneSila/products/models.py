@@ -1,13 +1,11 @@
 from core import models
 from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
-
-from core.models import MultiTenantAwareMixin
 from translations.models import TranslationFieldsMixin
 from taxes.models import VatRate
-
 from .managers import ProductManger, UmbrellaManager, BundleManager, VariationManager
-
+import shortuuid
+from hashlib import shake_256
 
 class Product(models.Model):
     VARIATION = 'VARIATION'
@@ -20,7 +18,7 @@ class Product(models.Model):
         (UMBRELLA, _('Umbrella Product')),
     )
 
-    sku = models.CharField(max_length=100, unique=True, db_index=True)
+    sku = models.CharField(max_length=100, db_index=True, blank=True, null=True)
     active = models.BooleanField(default=False)
     type = models.CharField(max_length=9, choices=PRODUCT_TYPE_CHOICES)
     vat_rate = models.ForeignKey(VatRate, on_delete=models.PROTECT)
@@ -82,8 +80,16 @@ class Product(models.Model):
         else:
             return self
 
+    def _generate_sku(self, save=False):
+        self.sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
+    def save(self, *args, **kwargs):
+        if not self.sku:
+            self._generate_sku()
+
+        super().save(*args, **kwargs)
     class Meta:
         search_terms = ['sku']
+        unique_together = ("sku", "multi_tenant_company")
 
 
 class BundleProduct(Product):
