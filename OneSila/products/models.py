@@ -7,6 +7,7 @@ from .managers import ProductManger, UmbrellaManager, BundleManager, VariationMa
 import shortuuid
 from hashlib import shake_256
 
+
 class Product(models.Model):
     VARIATION = 'VARIATION'
     BUNDLE = 'BUNDLE'
@@ -82,11 +83,13 @@ class Product(models.Model):
 
     def _generate_sku(self, save=False):
         self.sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
+
     def save(self, *args, **kwargs):
         if not self.sku:
             self._generate_sku()
 
         super().save(*args, **kwargs)
+
     class Meta:
         search_terms = ['sku']
         unique_together = ("sku", "multi_tenant_company")
@@ -94,23 +97,29 @@ class Product(models.Model):
 
 class BundleProduct(Product):
     objects = BundleManager()
+    proxy_filter_fields = {'type': "BUNDLE"}
 
     class Meta:
         proxy = True
+        search_terms = ['sku']
 
 
 class UmbrellaProduct(Product):
     objects = UmbrellaManager()
+    proxy_filter_fields = {'type': "UMBRELLA"}
 
     class Meta:
         proxy = True
+        search_terms = ['sku']
 
 
 class ProductVariation(Product):
     objects = VariationManager()
+    proxy_filter_fields = {'type': "VARIATION"}
 
     class Meta:
         proxy = True
+        search_terms = ['sku']
 
 
 class ProductTranslation(TranslationFieldsMixin, models.Model):

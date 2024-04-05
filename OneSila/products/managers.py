@@ -1,7 +1,8 @@
-from django.db.models import QuerySet, Manager
+from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin, \
+    QuerySetProxyModelMixin, MultiTenantQuerySet, MultiTenantManager
 
 
-class ProductQuerySet(QuerySet):
+class ProductQuerySet(MultiTenantQuerySet):
     def filter_umbrella(self):
         return self.filter(type=self.model.UMBRELLA)
 
@@ -12,30 +13,33 @@ class ProductQuerySet(QuerySet):
         return self.filter(type=self.model.BUNDLE)
 
 
-class ProductManger(Manager):
+class ProductManger(MultiTenantManager):
     def get_queryset(self):
         return ProductQuerySet(self.model, using=self._db)
 
 
-class UmbrellaManager(ProductManger):
-    def get_queryset(self):
-        return super().get_queryset().filter_umbrella()
+class UmbrellaQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+    pass
 
-    def create(self, *args, **kwargs):
-        return super().create(type=self.model.UMBRELLA, **kwargs)
+
+class UmbrellaManager():
+    def get_queryset(self):
+        return UmbrellaQuerySet(self.model, using=self._db)
+
+
+class VariationQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+    pass
 
 
 class VariationManager(ProductManger):
     def get_queryset(self):
-        return super().get_queryset().filter_variation()
+        return VariationQuerySet(self.model, using=self._db)
 
-    def create(self, *args, **kwargs):
-        return super().create(type=self.model.VARIATION, **kwargs)
+
+class BundleQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+    pass
 
 
 class BundleManager(ProductManger):
     def get_queryset(self):
-        return super().get_queryset().filter_bundle()
-
-    def create(self, *args, **kwargs):
-        return super().create(type=self.model.BUNDLE, **kwargs)
+        return BundleQuerySet(self.model, using=self._db)
