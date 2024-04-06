@@ -185,3 +185,4 @@ class MultiTenantUserLoginToken(models.Model):
 
     def is_valid(self, now=timezone.now()):
         return self.expires_at >= now
+

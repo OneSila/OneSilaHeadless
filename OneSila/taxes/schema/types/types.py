@@ -2,11 +2,11 @@ from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixi
 
 from typing import List
 
-from taxes.models import Tax
-from .filters import TaxFilter
-from .ordering import TaxOrder
+from taxes.models import VatRate
+from .filters import VatRateFilter
+from .ordering import VatRateOrder
 
 
-@type(Tax, filters=TaxFilter, order=TaxOrder, pagination=True, fields="__all__")
-class TaxType(relay.Node, GetQuerysetMultiTenantMixin):
+@type(VatRate, filters=VatRateFilter, order=VatRateOrder, pagination=True, fields="__all__")
+class VatRateType(relay.Node, GetQuerysetMultiTenantMixin):
     pass

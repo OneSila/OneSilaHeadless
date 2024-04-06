@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from products.models import Product, BundleProduct, UmbrellaProduct, ProductVariation, \
     ProductTranslation, UmbrellaVariation, BundleVariation
-from taxes.schema.types.types import TaxType
+from taxes.schema.types.types import VatRateType
 from .filters import ProductFilter, BundleProductFilter, UmbrellaProductFilter, \
     ProductVariationFilter, ProductTranslationFilter, UmbrellaVariationFilter, BundleVariationFilter
 from .ordering import ProductOrder, BundleProductOrder, UmbrellaProductOrder, \
@@ -16,7 +16,7 @@ from .ordering import ProductOrder, BundleProductOrder, UmbrellaProductOrder, \
 
 @type(Product, filters=ProductFilter, order=ProductOrder, pagination=True, fields="__all__")
 class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
-    tax_rate: TaxType
+    vat_rate: VatRateType
 
     @field()
     def proxy_id(self, info) -> str:

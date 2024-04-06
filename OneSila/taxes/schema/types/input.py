@@ -1,14 +1,14 @@
 from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial
 
-from taxes.models import Tax
+from taxes.models import VatRate
 
 
-@input(Tax, fields="__all__")
-class TaxInput:
+@input(VatRate, fields="__all__")
+class VatRateInput:
     pass
 
 
-@partial(Tax, fields="__all__")
-class TaxPartialInput(NodeInput):
+@partial(VatRate, fields="__all__")
+class VatRatePartialInput(NodeInput):
     pass

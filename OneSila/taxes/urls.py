@@ -1,11 +1,11 @@
 from django.urls import path
-from .views import TaxListView, TaxDetailViev, TaxUpdateView, TaxDeleteView
+from .views import VatRateListView, VatRateDetailViev, VatRateUpdateView, VatRateDeleteView
 
 app_name = 'taxes'
 
 urlpatterns = [
-    path('taxes/', TaxListView.as_view(), name='taxes_list'),
-    path('taxes/<str:pk>/', TaxDetailViev.as_view(), name='tax_detail'),
-    path('taxes/<str:pk>/update/', TaxUpdateView.as_view(), name='tax_update'),
-    path('taxes/<str:pk>/delete/', TaxDeleteView.as_view(), name='tax_delete'),
+    path('taxes/vat-rates/', VatRateListView.as_view(), name='vat_rates_list'),
+    path('taxes/vat-rates/<str:pk>/', VatRateDetailViev.as_view(), name='vat_rates_detail'),
+    path('taxes/vat-rates/<str:pk>/update/', VatRateUpdateView.as_view(), name='vat_rates_update'),
+    path('taxes/vat-rates/<str:pk>/delete/', VatRateDeleteView.as_view(), name='vat_rates_delete'),
 ]

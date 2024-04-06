@@ -1,7 +1,7 @@
 from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from core import models
-from .managers import InventorykManager
+from .managers import InventoryManager
 
 
 class Inventory(models.Model):
@@ -13,7 +13,7 @@ class Inventory(models.Model):
     stocklocation = models.ForeignKey('InventoryLocation', on_delete=models.PROTECT)
     quantity = models.IntegerField()
 
-    objects = InventorykManager()
+    objects = InventoryManager()
 
     class Meta:
         search_terms = ['product__sku', 'stocklocation__name']
@@ -37,8 +37,8 @@ class InventoryLocation(models.Model):
     - Location inside of location: Shelf 1, Rack B, Col 3
     Just remember to chain the locatons.
     '''
-    name = models.CharField(max_length=10, unique=True)
-    description = models.TextField()
+    name = models.CharField(max_length=10)
+    description = models.TextField(null=True, blank=True)
     parent_location = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
@@ -46,3 +46,4 @@ class InventoryLocation(models.Model):
 
     class Meta:
         search_terms = ['name']
+        unique_together = ("name", "multi_tenant_company")

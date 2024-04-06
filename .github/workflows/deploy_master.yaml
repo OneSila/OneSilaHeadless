@@ -17,7 +17,7 @@ jobs:
         with:
           host: ${{ secrets.MASTER_HOSTNAME }}
           username: ${{ secrets.MASTER_USERNAME }}
-          key: ${{ secrets.DEVELOPMENT_SECRET_KEY_SSH }}
+          key: ${{ secrets.MASTER_SECRET_KEY_SSH }}
           port: 22
           script: |
             source venv/bin/activate

@@ -1,18 +1,18 @@
 from core.views import EmptyTemplateView
-from .models import Tax
+from .models import VatRate
 
 
-class TaxListView(EmptyTemplateView):
+class VatRateListView(EmptyTemplateView):
     pass
 
 
-class TaxDetailViev(EmptyTemplateView):
+class VatRateDetailViev(EmptyTemplateView):
     pass
 
 
-class TaxUpdateView(EmptyTemplateView):
+class VatRateUpdateView(EmptyTemplateView):
     pass
 
 
-class TaxDeleteView(EmptyTemplateView):
+class VatRateDeleteView(EmptyTemplateView):
     pass

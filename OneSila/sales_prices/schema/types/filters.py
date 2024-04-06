@@ -21,10 +21,10 @@ class SalesPriceListFilter(SearchFilterMixin):
     search: str | None
     id: auto
     name: auto
-    currency: CurrencyFilter | None
+    currency: Optional[CurrencyFilter]
     vat_included: auto
     auto_update: auto
-    customers: CustomerFilter | None
+    customers: Optional[CustomerFilter]
     salespricelistitem: Optional['SalesPriceListItemFilter']
 
 
