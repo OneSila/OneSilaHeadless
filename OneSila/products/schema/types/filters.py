@@ -5,6 +5,7 @@ from core.schema.core.types.filters import filter, SearchFilterMixin
 
 from products.models import Product, BundleProduct, UmbrellaProduct, \
     ProductVariation, ProductTranslation, UmbrellaVariation, BundleVariation
+from taxes.schema.types.filters import VatRateFilter
 
 
 @filter(Product)
@@ -13,7 +14,7 @@ class ProductFilter(SearchFilterMixin):
     id: auto
     sku: auto
     type: auto
-    vat_rate: auto
+    vat_rate: Optional[VatRateFilter]
 
 
 @filter(BundleProduct)
@@ -21,7 +22,7 @@ class BundleProductFilter(SearchFilterMixin):
     search: str | None
     id: auto
     sku: auto
-    vat_rate: auto
+    vat_rate: Optional[VatRateFilter]
 
 
 @filter(UmbrellaProduct)
@@ -29,7 +30,7 @@ class UmbrellaProductFilter(SearchFilterMixin):
     search: str | None
     id: auto
     sku: auto
-    vat_rate: auto
+    vat_rate: Optional[VatRateFilter]
 
 
 @filter(ProductVariation)
@@ -37,7 +38,7 @@ class ProductVariationFilter(SearchFilterMixin):
     search: str | None
     id: auto
     sku: auto
-    vat_rate: auto
+    vat_rate: Optional[VatRateFilter]
 
 
 @filter(ProductTranslation)

@@ -1,7 +1,7 @@
 from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from core import models
-from .managers import InventorykManager
+from .managers import InventoryManager
 
 
 class Inventory(models.Model):
@@ -13,7 +13,7 @@ class Inventory(models.Model):
     stocklocation = models.ForeignKey('InventoryLocation', on_delete=models.PROTECT)
     quantity = models.IntegerField()
 
-    objects = InventorykManager()
+    objects = InventoryManager()
 
     class Meta:
         search_terms = ['product__sku', 'stocklocation__name']

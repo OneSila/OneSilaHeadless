@@ -45,7 +45,7 @@ class Company(models.Model):
         super().save(*args, **kwargs)
 
     class Meta:
-        search_terms = ['name']
+        search_terms = ['name', 'vat_number', 'eori_number']
         unique_together = ("name", "multi_tenant_company")
         verbose_name_plural = _("companies")
 
@@ -59,7 +59,7 @@ class Supplier(Company):
 
     class Meta:
         proxy = True
-        search_terms = ['name']
+        search_terms = ['name', 'vat_number', 'eori_number']
 
 
 class Customer(Company):
@@ -71,7 +71,7 @@ class Customer(Company):
 
     class Meta:
         proxy = True
-        search_terms = ['name']
+        search_terms = ['name', 'vat_number', 'eori_number']
 
 
 class Influencer(Company):
@@ -83,7 +83,7 @@ class Influencer(Company):
 
     class Meta:
         proxy = True
-        search_terms = ['name']
+        search_terms = ['name', 'vat_number', 'eori_number']
 
 
 class InternalCompany(Company):
@@ -98,7 +98,7 @@ class InternalCompany(Company):
 
     class Meta:
         proxy = True
-        search_terms = ['name']
+        search_terms = ['name', 'vat_number', 'eori_number']
         verbose_name_plural = _("interal companies")
 
 
@@ -150,6 +150,20 @@ class Address(models.Model):
     is_invoice_address = models.BooleanField(default=False)
     is_shipping_address = models.BooleanField(default=False)
 
+    @property
+    def full_address(self):
+        address_parts = [self.address1]
+
+        # Optionally add address2 and address3 if they exist
+        if self.address2:
+            address_parts.append(self.address2)
+        if self.address3:
+            address_parts.append(self.address3)
+
+        address_parts.extend([self.city, self.postcode, self.get_country_display()])
+
+        return ', '.join(address_parts)
+
     def save(self, *args, **kwargs):
 
         types = [self.is_invoice_address, self.is_shipping_address]
@@ -159,7 +173,7 @@ class Address(models.Model):
         super().save(*args, **kwargs)
 
     class Meta:
-        search_terms = ['contact__email', 'company__name']
+        search_terms = ['contact__email', 'company__name', 'address1', 'city']
         verbose_name_plural = 'addresses'
 
         constraints = [

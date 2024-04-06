@@ -1,5 +1,13 @@
 from django.db.models import QuerySet, Manager, Q
+from core.managers import MultiTenantQuerySet, MultiTenantManager
 
+class SalesPriceListQuerySet(MultiTenantQuerySet):
+    pass
+
+
+class SalesPriceListManager(MultiTenantManager):
+    def get_queryset(self):
+        return SalesPriceListQuerySet(self.model, using=self._db)
 
 class SalesPriceQuerySet(QuerySet):
     def get_default_price(self):

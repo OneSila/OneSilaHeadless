@@ -1,6 +1,6 @@
 from typing import Optional
 
-from core.schema.core.types.types import type, relay, List, Annotated, lazy, strawberry_type
+from core.schema.core.types.types import type, relay, List, Annotated, lazy, strawberry_type, field
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from core.schema.multi_tenant.types.types import MultiTenantCompanyType
 
@@ -57,6 +57,9 @@ class AddressType(relay.Node, GetQuerysetMultiTenantMixin):
     company: CompanyType
     contact: Optional[PersonType]
 
+    @field()
+    def full_address(self, info) -> str:
+        return self.full_address
 
 @type(ShippingAddress, filters=ShippingAddressFilter, pagination=True, fields="__all__")
 class ShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
@@ -64,12 +67,20 @@ class ShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     company: CompanyType
     contact: Optional[PersonType]
 
+    @field()
+    def full_address(self, info) -> str:
+        return self.full_address
+
 
 @type(InvoiceAddress, filters=InvoiceAddressFilter, pagination=True, fields="__all__")
 class InvoiceAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
     contact: Optional[PersonType]
+
+    @field()
+    def full_address(self, info) -> str:
+        return self.full_address
 
 @strawberry_type
 class CustomerLanguageType:
