@@ -9,15 +9,7 @@ from hashlib import shake_256
 
 
 class Product(models.Model):
-    VARIATION = 'VARIATION'
-    BUNDLE = 'BUNDLE'
-    UMBRELLA = 'UMBRELLA'
-
-    PRODUCT_TYPE_CHOICES = (
-        (VARIATION, _('Product Variation')),
-        (BUNDLE, _('Bundle Product')),
-        (UMBRELLA, _('Umbrella Product')),
-    )
+    from products.product_types import UMBRELLA, VARIATION, BUNDLE, PRODUCT_TYPE_CHOICES
 
     sku = models.CharField(max_length=100, db_index=True, blank=True, null=True)
     active = models.BooleanField(default=False)
@@ -96,8 +88,10 @@ class Product(models.Model):
 
 
 class BundleProduct(Product):
+    from products.product_types import BUNDLE
+
     objects = BundleManager()
-    proxy_filter_fields = {'type': "BUNDLE"}
+    proxy_filter_fields = {'type': BUNDLE}
 
     class Meta:
         proxy = True
@@ -105,8 +99,10 @@ class BundleProduct(Product):
 
 
 class UmbrellaProduct(Product):
+    from .product_types import UMBRELLA
+
     objects = UmbrellaManager()
-    proxy_filter_fields = {'type': "UMBRELLA"}
+    proxy_filter_fields = {'type': UMBRELLA}
 
     class Meta:
         proxy = True
@@ -114,8 +110,10 @@ class UmbrellaProduct(Product):
 
 
 class ProductVariation(Product):
+    from products.product_types import VARIATION
+
     objects = VariationManager()
-    proxy_filter_fields = {'type': "VARIATION"}
+    proxy_filter_fields = {'type': VARIATION}
 
     class Meta:
         proxy = True
