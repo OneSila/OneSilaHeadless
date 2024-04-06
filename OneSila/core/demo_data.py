@@ -4,23 +4,26 @@ from django.core.exceptions import ValidationError
 from django.conf import settings
 
 
-class DemoData:
-    registry = {}
-
+class DemoDataMixin:
     @staticmethod
     def method_name(method):
         return method.__name__
 
-    def register(self, method):
+    def register_private_app(self, method):
         method_name = self.method_name(method)
 
-        if self.registry.get(method_name):
-            raise ValidationError(f"Method {method} is already present in the registry. You should pick a unique name.")
+        if self.registry_private_apps.get(method_name):
+            raise ValidationError(f"Method {method} is already present in the private app registry. You should pick a unique name.")
 
-        self.registry[method_name] = method
+        self.registry_private_apps[method_name] = method
 
-    def unregister(self, method):
-        del self.registry[self.method_name(method)]
+    def register_pubic_app(self, method):
+        method_name = self.method_name(method)
+
+        if self.registry_public_apps.get(method_name):
+            raise ValidationError(f"Method {method} is already present in the public app registry. You should pick a unique name.")
+
+        self.registry_public_apps[method_name] = method
 
     def load_apps(self):
         # To get the apps to register their demo-data, all we need to do is load the file.
@@ -34,9 +37,17 @@ class DemoData:
                 pass
 
     def populate_db(self, *, multi_tenant_user):
-        for method in self.registry.values():
+        for method in self.registry_public_apps.values():
+            method(multi_tenant_user)
+
+        for method in self.registry_private_apps.values():
             method(multi_tenant_user)
 
     def run(self, *, multi_tenant_user):
         self.load_apps()
         self.populate_db(multi_tenant_user=multi_tenant_user)
+
+
+class DemoData(DemoDataMixin):
+    registry_private_apps = {}
+    registry_public_apps = {}
