@@ -2,6 +2,10 @@ import importlib
 
 from django.core.exceptions import ValidationError
 from django.conf import settings
+from model_bakery import baker
+from faker import Faker
+
+faker = Faker()
 
 
 class DemoDataMixin:
@@ -48,6 +52,6 @@ class DemoDataMixin:
         self.populate_db(multi_tenant_user=multi_tenant_user)
 
 
-class DemoData(DemoDataMixin):
+class DemoDataLibrary(DemoDataMixin):
     registry_private_apps = {}
     registry_public_apps = {}

@@ -60,9 +60,17 @@ from core.demo_data import DemoDataLibrary, model_baker, faker
 
 registry = DemoDataLibrary()
 
-# A demo-data generator could look like:
-# @registry.register
-# def populate_some_data(multi_tenant_user):
+# A demo-data generator for a private could look like:
+# @registry.register_private_app
+# def populate_private_some_data(multi_tenant_user):
+#     demo_data = {
+#         'first_name': faker.first_name()
+#     }
+#     model_baker.create("MyModel", **demo_data)
+
+# A demo-data generator for a public app would like
+# @registry.register_private_app
+# def populate_some_public_data():
 #     demo_data = {
 #         'first_name': faker.first_name()
 #     }
