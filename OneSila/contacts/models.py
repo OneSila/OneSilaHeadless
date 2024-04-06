@@ -9,8 +9,6 @@ from .managers import SupplierManager, CustomerManager, InfluencerManager, \
     CompanyManager
 
 
-
-
 class Company(models.Model):
     """
     An Company is essentially customer, supplier, influencers, any of the above.
@@ -35,14 +33,6 @@ class Company(models.Model):
 
     def __str__(self):
         return self.name
-
-    def save(self, *args, **kwargs):
-
-        types = [self.is_supplier, self.is_customer, self.is_influencer, self.is_internal_company]
-        if not any(types):
-            raise RequiredFieldException(field_name='type')
-
-        super().save(*args, **kwargs)
 
     class Meta:
         search_terms = ['name', 'vat_number', 'eori_number']
@@ -164,14 +154,6 @@ class Address(models.Model):
 
         return ', '.join(address_parts)
 
-    def save(self, *args, **kwargs):
-
-        types = [self.is_invoice_address, self.is_shipping_address]
-        if not any(types):
-            raise RequiredFieldException(field_name='type')
-
-        super().save(*args, **kwargs)
-
     class Meta:
         search_terms = ['contact__email', 'company__name', 'address1', 'city']
         verbose_name_plural = 'addresses'
@@ -184,6 +166,7 @@ class Address(models.Model):
                 violation_error_message=_("Company already has an invoice address.")
             )
         ]
+
 
 class ShippingAddress(Address):
     objects = ShippingAddressManager()
