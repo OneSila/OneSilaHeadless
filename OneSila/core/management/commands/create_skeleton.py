@@ -62,14 +62,14 @@ registry = DemoDataLibrary()
 
 # # Demo-data generators can be used as method, like the public and private examples below.
 # @registry.register_private_app
-# def populate_private_some_data(multi_tenant_user):
+# def populate_private_some_data(multi_tenant_company):
 #     demo_data = {
 #         'first_name': faker.first_name()
 #     }
 #     baker.make("MyModel", **demo_data)
 #
 # # A demo-data generator for a public app could look like:
-# @registry.register_private_app
+# @registry.register_public_app
 # def populate_some_public_data():
 #     demo_data = {
 #         'first_name': faker.first_name()
@@ -82,8 +82,8 @@ registry = DemoDataLibrary()
 #     model = PrivateModel
 #     count = 10
 #     field_mapper = {
-#         'first_name' = fake.fist_name,
-#         'last_name' = fake.last_name,
+#         'first_name': fake.fist_name,
+#         'last_name': fake.last_name,
 #    }
 #
 # @registry.register_public_app
@@ -91,7 +91,7 @@ registry = DemoDataLibrary()
 #     model = PublicModel
 #     count = 10
 #     field_mapper = {
-#         'unit' = some_data_generating_method,
+#         'unit': some_data_generating_method,
 #    }
 """
 
