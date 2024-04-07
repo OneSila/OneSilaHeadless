@@ -1,11 +1,10 @@
 from contacts.models import Company, Supplier, Customer, Influencer, InternalCompany, Person, \
     Address, ShippingAddress, InvoiceAddress
-from django.test import TestCase
-from core.tests import TestCaseMixin
+from core.tests import TestCase, TestCaseWithDemoData
 from model_bakery import baker
 
 
-class CompanyTestCase(TestCaseMixin, TestCase):
+class CompanyTestCase(TestCaseWithDemoData):
     def setUp(self):
         super().setUp()
         self.me = InternalCompany.objects.create(name='test_search_address', multi_tenant_company=self.multi_tenant_company)

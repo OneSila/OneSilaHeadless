@@ -7,6 +7,16 @@ from core.demo_data import DemoDataLibrary
 
 
 class TestCaseMixin:
+    def setUp(self):
+        self.multi_tenant_company = baker.make(MultiTenantCompany)
+        self.user = baker.make(get_user_model(), multi_tenant_company=self.multi_tenant_company)
+
+
+class TestCase(TestCaseMixin, DjangoTestCase):
+    pass
+
+
+class TestCaseWithDemoData(TestCase):
     # This variable will be shared across all TestCases subsclassed from here.
     # That will ensure we only try to generate the demo-data once.
     demo_data_generated = False
@@ -18,10 +28,8 @@ class TestCaseMixin:
             self.demo_data_generated = True
 
     def setUp(self):
-        self.multi_tenant_company = baker.make(MultiTenantCompany)
-        self.user = baker.make(get_user_model(), multi_tenant_company=self.multi_tenant_company)
+        super().setUp()
         self.generate_demo_data()
 
-
-class TestCase(TestCaseMixin, DjangoTestCase):
-    pass
+    def tearDown(self):
+        self.demo_data_registry.delete_demo_data(multi_tenant_company=self.multi_tenant_company)
