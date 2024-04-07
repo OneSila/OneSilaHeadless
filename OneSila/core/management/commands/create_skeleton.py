@@ -56,25 +56,43 @@ RECEIVERS_CODE = """
 """
 
 DEMO_DATA_CODE = """
-# from core.demo_data import DemoDataLibrary, model_baker, faker
+from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator
 
-# registry = DemoDataLibrary()
+registry = DemoDataLibrary()
 
-# # Demo-data generator for a private app could look like:
+# # Demo-data generators can be used as method, like the public and private examples below.
 # @registry.register_private_app
 # def populate_private_some_data(multi_tenant_user):
 #     demo_data = {
 #         'first_name': faker.first_name()
 #     }
-#     model_baker.create("MyModel", **demo_data)
-
+#     baker.make("MyModel", **demo_data)
+#
 # # A demo-data generator for a public app could look like:
 # @registry.register_private_app
 # def populate_some_public_data():
 #     demo_data = {
 #         'first_name': faker.first_name()
 #     }
-#     model_baker.create("MyModel", **demo_data)
+#     baker.make("MyModel", **demo_data)
+
+# # They can also be classes, subclassed from PrivateDataGenerator or PublicDataGenerator
+# @registry.register_private_app
+# class AppModelPrivateGenerator(PrivateDataGenerator):
+#     model = PrivateModel
+#     count = 10
+#     field_mapper = {
+#         'first_name' = fake.fist_name,
+#         'last_name' = fake.last_name,
+#    }
+#
+# @registry.register_public_app
+# class AppModelPublicGenerator(PublicDataGenerator):
+#     model = PublicModel
+#     count = 10
+#     field_mapper = {
+#         'unit' = some_data_generating_method,
+#    }
 """
 
 
@@ -129,7 +147,7 @@ def set_code(app_name, filename, string_to_set):
 
     if not string_to_set in file_contents:
         with open(path, 'a') as f:
-            f.write(string_to_set)
+            f.write(string_to_set.strip())
 
     return True
 

@@ -283,3 +283,6 @@ EU_COUNTRIES = [
     'SE',  # Sweden (1995)
     'GB',  # United Kingdom (1973)
 ]
+
+
+num_countries = len(COUNTRY_CHOICES)
