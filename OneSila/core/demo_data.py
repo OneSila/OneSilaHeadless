@@ -10,6 +10,7 @@ from faker import Faker
 from random import randint
 from faker.providers import DynamicProvider, BaseProvider
 from core.countries import COUNTRY_CHOICES, num_countries
+import types
 
 fake = Faker()
 
@@ -116,8 +117,9 @@ class DemoDataLibrary(DemoDataRegistryMixin):
 
 class DemoDataGeneratorMixin:
     # field_mapper = {
-    #     # 'field_name', 'function',
-    #     # 'field_other', (function, {kwarg: 393}),
+    #     # 'field_name': 'function',
+    #     # 'field_other': (function, {kwarg: 393}),
+    #     # 'field_value': 12121,
     # }
     # model = Model
     # count = 10
@@ -141,8 +143,10 @@ class DemoDataGeneratorMixin:
             if isinstance(v, (tuple, list)):
                 f, fkwargs = v
                 baker_kwargs[k] = f(**fkwargs)
-            else:
+            elif isinstance(v, types.FunctionType):
                 baker_kwargs[k] = v()
+            else:
+                baker_kwargs[k] = v
 
         return baker_kwargs
 
