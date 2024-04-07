@@ -49,7 +49,7 @@ class Currency(models.Model):
 
         constraints = [
             models.UniqueConstraint(
-                fields=['is_default_currency'],
+                fields=['multi_tenant_company'],
                 condition=Q(is_default_currency=True),
                 name='unique_is_default_currency')
         ]
