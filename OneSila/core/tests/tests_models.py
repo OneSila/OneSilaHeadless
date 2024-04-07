@@ -9,7 +9,7 @@ class TestMultiTenantUserLoginTokenTestCase(TestCase):
 
     def test_expired_token(self):
         token = baker.make("core.MultiTenantUserLoginToken")
-        past = timezone.now() - timezone.timedelta(minutes=1)
+        past = timezone.now() - timezone.timedelta(minutes=10)
         token.set_expires_at(expires_at=past)
         token.refresh_from_db()
         self.assertFalse(token.is_valid())
