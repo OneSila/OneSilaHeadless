@@ -116,7 +116,8 @@ class DemoDataLibrary(DemoDataRegistryMixin):
 
 class DemoDataGeneratorMixin:
     # field_mapper = {
-    #     # 'field_name', 'function'
+    #     # 'field_name', 'function',
+    #     # 'field_other', (function, {kwarg: 393}),
     # }
     # model = Model
     # count = 10
@@ -135,7 +136,15 @@ class DemoDataGeneratorMixin:
 
     def prep_baker_kwargs(self, seed):
         fake.seed_instance(seed)
-        return {k: v() for k, v in self.get_field_mapper()}
+        baker_kwargs = {}
+        for k, v in self.get_field_mapper():
+            if isinstance(v, (tuple, list)):
+                f, fkwargs = v
+                baker_kwargs[k] = f(**fkwargs)
+            else:
+                baker_kwargs[k] = v()
+
+        return baker_kwargs
 
     def create_instance(self, kwargs):
         return baker.make(self.get_model(), **kwargs)

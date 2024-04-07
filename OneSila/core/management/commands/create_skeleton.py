@@ -65,6 +65,7 @@ registry = DemoDataLibrary()
 # def populate_private_some_data(multi_tenant_company):
 #     demo_data = {
 #         'first_name': faker.first_name()
+#         'field_other', (function, {kwarg: 393}),
 #     }
 #     baker.make("MyModel", **demo_data)
 #
