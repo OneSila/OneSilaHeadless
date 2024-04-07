@@ -38,6 +38,3 @@ def contacts_company_demo(multi_tenant_company):
                 company=company,
                 multi_tenant_company=multi_tenant_company)
             registry.create_demo_data_relation(person)
-
-
-# registry.register_private_app(contacts_company_demo)
