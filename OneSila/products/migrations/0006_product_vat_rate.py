@@ -8,7 +8,6 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('products', '0005_remove_product_tax_rate'),
-        ('taxes', '0004_alter_vatrate_name'),
     ]
 
     operations = [

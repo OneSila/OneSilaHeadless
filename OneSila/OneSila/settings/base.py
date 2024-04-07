@@ -33,22 +33,28 @@ INSTALLED_APPS = [
 ]
 
 INSTALLED_LOCAL_APPS = [
-    'contacts',
+    # Order matters!  The demo-data will run
+    # through the list and some apps depend on others.
+    # so not alphabetic order, but order according to dependency.
     'core',
-    'customs',
+
+    'contacts',
     'currencies',
+    'taxes',
+    'products',
+    'units',
+    'translations',
+
+    'customs',
     'eancodes',
     'media',
     'notifications',
     'inventory',
     'orders',
-    'products',
+
     'properties',
     'purchasing',
     'sales_prices',
-    'taxes',
-    'translations',
-    'units',
 
     'huey.contrib.djhuey',
 ]
