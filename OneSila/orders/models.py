@@ -94,7 +94,7 @@ class Order(models.Model):
         total_value = self.total_value
 
         if total_value:
-            return '{} {}'.format(self.currency, total_value)
+            return '{}{}'.format(self.currency.symbol, total_value)
         else:
             return total_value
 
