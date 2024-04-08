@@ -1,5 +1,6 @@
 from strawberry_django.filters import filter as strawberry_filter
 from strawberry import UNSET
+from typing import Optional
 
 
 class SearchFilterMixin:

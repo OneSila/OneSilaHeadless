@@ -28,4 +28,4 @@ class EanCode(models.Model):
         super().save(*args, **kwargs)
 
     class Meta:
-        search_terms = ['ean_code']
+        search_terms = ['ean_code', 'product__sku']

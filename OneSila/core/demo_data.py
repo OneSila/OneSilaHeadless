@@ -101,8 +101,6 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
         # we reverse the sequence, to avoid dealing with protected instances.
         for instance in multi_tenant_company.demodatarelation_set.all().reverse().iterator():
             try:
-                # self.delete_traversed(instance)
-                # instance.content_object.delete()
                 self.delete_traversed_content_object(instance.content_object)
             except AttributeError:
                 # Already deleted.
