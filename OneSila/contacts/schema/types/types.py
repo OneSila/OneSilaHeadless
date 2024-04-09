@@ -5,8 +5,9 @@ from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from core.schema.multi_tenant.types.types import MultiTenantCompanyType
 
 from contacts.models import Company, Supplier, Customer, Influencer, \
-    InternalCompany, Person, Address, ShippingAddress, InvoiceAddress
-from .filters import CompanyFilter, SupplierFilter, AddressFilter, PersonFilter, CustomerFilter, ShippingAddressFilter, InvoiceAddressFilter
+    InternalCompany, Person, Address, ShippingAddress, InvoiceAddress, InternalShippingAddress
+from .filters import CompanyFilter, SupplierFilter, AddressFilter, PersonFilter, CustomerFilter, \
+    ShippingAddressFilter, InvoiceAddressFilter, InternalShippingAddressFilter
 from .ordering import CompanyOrder, SupplierOrder, CustomerOrder, PersonOrder
 
 
@@ -61,6 +62,7 @@ class AddressType(relay.Node, GetQuerysetMultiTenantMixin):
     def full_address(self, info) -> str:
         return self.full_address
 
+
 @type(ShippingAddress, filters=ShippingAddressFilter, pagination=True, fields="__all__")
 class ShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
@@ -81,6 +83,18 @@ class InvoiceAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def full_address(self, info) -> str:
         return self.full_address
+
+
+@type(InternalShippingAddress, filters=InternalShippingAddressFilter, pagination=True, fields="__all__")
+class InternalShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
+    multi_tenant_company: MultiTenantCompanyType | None
+    company: CompanyType
+    contact: Optional[PersonType]
+
+    @field()
+    def full_address(self, info) -> str:
+        return self.full_address
+
 
 @strawberry_type
 class CustomerLanguageType:

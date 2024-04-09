@@ -3,7 +3,7 @@ from core.schema.core.types.input import NodeInput, input, partial, List
 
 from contacts.models import Company, Supplier, Customer, \
     Influencer, InternalCompany, Person, Address, \
-    ShippingAddress, InvoiceAddress
+    ShippingAddress, InvoiceAddress, InternalShippingAddress
 
 
 @input(Company, fields="__all__")
@@ -93,4 +93,14 @@ class InvoiceAddressInput:
 
 @partial(InvoiceAddress, fields="__all__")
 class InvoiceAddressPartialInput(NodeInput):
+    pass
+
+
+@input(InternalShippingAddress, fields="__all__")
+class InternalShippingAddressInput:
+    pass
+
+
+@partial(InternalShippingAddress, fields="__all__")
+class InternalShippingAddressPartialInput(NodeInput):
     pass
