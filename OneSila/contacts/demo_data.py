@@ -15,7 +15,8 @@ def contacts_company_demo(multi_tenant_company):
         company = baker.make(Company,
             name=fake.company(),
             vat_number=fake.vat_number(country_code),
-            multi_tenant_company=multi_tenant_company)
+            multi_tenant_company=multi_tenant_company,
+            is_internal_company=False)
         registry.create_demo_data_relation(company)
 
         address = baker.make(Address,
