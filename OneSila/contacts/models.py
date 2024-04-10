@@ -128,7 +128,7 @@ class Address(models.Model):
     """
     from core.countries import COUNTRY_CHOICES
 
-    people = models.ManyToManyField(Person, blank=True, related_name='people')
+    people = models.ManyToManyField(Person, blank=True)
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
 
     vat_number = models.CharField(max_length=100, blank=True, null=True)
