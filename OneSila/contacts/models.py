@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from .managers import SupplierManager, CustomerManager, InfluencerManager, \
     InvoiceAddressManager, ShippingAddressManager, InternalCompanyManager, \
-    CompanyManager
+    CompanyManager, InternalShippingAddressManager
 
 
 class Company(models.Model):
@@ -186,3 +186,13 @@ class InvoiceAddress(Address):
         proxy = True
         search_terms = ['contact__email', 'company__name']
         verbose_name_plural = 'invoice addresses'
+
+
+class InternalShippingAddress(Address):
+    objects = InternalShippingAddressManager()
+    proxy_filter_fields = {'is_shipping_address': True, 'company__is_internal_company': True}
+
+    class Meta:
+        proxy = True
+        search_terms = ['contact__email', 'company__name']
+        verbose_name_plural = 'internal shipping addresses'
