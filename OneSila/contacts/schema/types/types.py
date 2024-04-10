@@ -46,6 +46,10 @@ class PersonType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
 
+    @field()
+    def full_name(self, info) -> str:
+        return self.name()
+
 
 @type(Address, filters=AddressFilter, pagination=True, fields="__all__")
 class AddressType(relay.Node, GetQuerysetMultiTenantMixin):

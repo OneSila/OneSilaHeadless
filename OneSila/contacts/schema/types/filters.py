@@ -34,6 +34,7 @@ class CustomerFilter(SearchFilterMixin):
 class PersonFilter(SearchFilterMixin):
     id: auto
     search: str | None
+    active: auto
     first_name: auto
     last_name: auto
     email: auto
