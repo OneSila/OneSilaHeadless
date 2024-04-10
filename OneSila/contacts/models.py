@@ -14,7 +14,12 @@ class Company(models.Model):
     An Company is essentially customer, supplier, influencers, any of the above.
     And sometimes they relate to each other for whatever reason like various branches or departments.
     """
+    from .languages import CUSTOMER_LANGUAGE_CHOICES
+
     name = models.CharField(max_length=100)
+    phone = models.CharField(max_length=100, blank=True, null=True)
+    email = models.CharField(max_length=100, blank=True, null=True)
+    language = models.CharField(max_length=2, default='EN', choices=CUSTOMER_LANGUAGE_CHOICES)
 
     is_supplier = models.BooleanField(default=False)
     is_customer = models.BooleanField(default=False)
@@ -31,7 +36,7 @@ class Company(models.Model):
         return self.name
 
     class Meta:
-        search_terms = ['name']
+        search_terms = ['name', 'email']
         unique_together = ("name", "multi_tenant_company")
         verbose_name_plural = _("companies")
 
