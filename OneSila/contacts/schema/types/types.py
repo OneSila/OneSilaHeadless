@@ -48,7 +48,7 @@ class PersonType(relay.Node, GetQuerysetMultiTenantMixin):
 
     @field()
     def full_name(self, info) -> str:
-        return self.name()
+        return self.full_name()
 
 
 @type(Address, filters=AddressFilter, pagination=True, fields="__all__")
