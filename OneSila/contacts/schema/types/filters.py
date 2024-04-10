@@ -38,6 +38,7 @@ class CustomerFilter(SearchFilterMixin):
 
 @filter(Person)
 class PersonFilter(SearchFilterMixin):
+    id: auto
     search: str | None
     first_name: auto
     last_name: auto
@@ -47,6 +48,7 @@ class PersonFilter(SearchFilterMixin):
 
 @filter(Address)
 class AddressFilter(SearchFilterMixin):
+    id: auto
     search: str | None
     company: CompanyFilter | None
     is_invoice_address: auto
@@ -55,17 +57,20 @@ class AddressFilter(SearchFilterMixin):
 
 @filter(InvoiceAddress)
 class InvoiceAddressFilter(SearchFilterMixin):
+    id: auto
     search: str | None
     company: CompanyFilter | None
 
 
 @filter(ShippingAddress)
 class ShippingAddressFilter(SearchFilterMixin):
+    id: auto
     search: str | None
     company: CompanyFilter | None
 
 
 @filter(InternalShippingAddress)
 class InternalShippingAddressFilter(SearchFilterMixin):
+    id: auto
     search: str | None
     company: CompanyFilter | None
