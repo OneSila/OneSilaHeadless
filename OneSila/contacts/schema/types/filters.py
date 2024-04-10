@@ -9,8 +9,6 @@ class CompanyFilter(SearchFilterMixin):
     search: str | None
     id: auto
     name: auto
-    vat_number: auto
-    eori_number: auto
 
     is_supplier: auto
     is_customer: auto
@@ -23,8 +21,6 @@ class SupplierFilter(SearchFilterMixin):
     search: str | None
     id: auto
     name: auto
-    vat_number: auto
-    eori_number: auto
 
 
 @filter(Customer)
@@ -32,8 +28,6 @@ class CustomerFilter(SearchFilterMixin):
     search: str | None
     id: auto
     name: auto
-    vat_number: auto
-    eori_number: auto
 
 
 @filter(Person)

@@ -13,35 +13,30 @@ from .ordering import CompanyOrder, SupplierOrder, CustomerOrder, PersonOrder
 
 @type(Company, filters=CompanyFilter, order=CompanyOrder, pagination=True, fields='__all__')
 class CompanyType(relay.Node, GetQuerysetMultiTenantMixin):
-    related_companies: List['CompanyType'] | None
     multi_tenant_company: MultiTenantCompanyType | None
     person_set: List[Annotated['PersonType', lazy("contacts.schema.types.types")]]
 
 
 @type(Supplier, filters=SupplierFilter, order=SupplierOrder, pagination=True, fields="__all__")
 class SupplierType(relay.Node, GetQuerysetMultiTenantMixin):
-    related_companies: List['CompanyType'] | None
     multi_tenant_company: MultiTenantCompanyType | None
     person_set: List[Annotated['PersonType', lazy("contacts.schema.types.types")]]
 
 
 @type(Customer, filters=CustomerFilter, order=CustomerOrder, pagination=True, fields="__all__")
 class CustomerType(relay.Node, GetQuerysetMultiTenantMixin):
-    related_companies: List['CompanyType'] | None
     multi_tenant_company: MultiTenantCompanyType | None
     person_set: List[Annotated['PersonType', lazy("contacts.schema.types.types")]]
 
 
 @type(Influencer, filters=CompanyFilter, order=CompanyOrder, pagination=True, fields="__all__")
 class InfluencerType(relay.Node, GetQuerysetMultiTenantMixin):
-    related_companies: List['CompanyType'] | None
     multi_tenant_company: MultiTenantCompanyType | None
     person_set: List[Annotated['PersonType', lazy("contacts.schema.types.types")]]
 
 
 @type(InternalCompany, filters=CompanyFilter, order=CompanyOrder, pagination=True, fields="__all__")
 class InternalCompanyType(relay.Node, GetQuerysetMultiTenantMixin):
-    related_companies: List['CompanyType'] | None
     multi_tenant_company: MultiTenantCompanyType | None
     person_set: List[Annotated['PersonType', lazy("contacts.schema.types.types")]]
 
@@ -56,7 +51,7 @@ class PersonType(relay.Node, GetQuerysetMultiTenantMixin):
 class AddressType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
-    contact: Optional[PersonType]
+    people: Optional[PersonType]
 
     @field()
     def full_address(self, info) -> str:
@@ -67,7 +62,7 @@ class AddressType(relay.Node, GetQuerysetMultiTenantMixin):
 class ShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
-    contact: Optional[PersonType]
+    people: Optional[PersonType]
 
     @field()
     def full_address(self, info) -> str:
@@ -78,7 +73,7 @@ class ShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
 class InvoiceAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
-    contact: Optional[PersonType]
+    people: Optional[PersonType]
 
     @field()
     def full_address(self, info) -> str:
@@ -89,7 +84,7 @@ class InvoiceAddressType(relay.Node, GetQuerysetMultiTenantMixin):
 class InternalShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
-    contact: Optional[PersonType]
+    people: Optional[PersonType]
 
     @field()
     def full_address(self, info) -> str:

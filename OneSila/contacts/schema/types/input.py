@@ -8,12 +8,12 @@ from contacts.models import Company, Supplier, Customer, \
 
 @input(Company, fields="__all__")
 class CompanyInput:
-    related_companies: List['CompanyPartialInput'] | None
+    pass
 
 
 @partial(Company, fields="__all__")
 class CompanyPartialInput(NodeInput):
-    related_companies: List['CompanyPartialInput'] | None
+    pass
 
 
 @input(Supplier, fields="__all__")

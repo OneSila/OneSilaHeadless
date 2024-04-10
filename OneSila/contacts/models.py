@@ -15,10 +15,6 @@ class Company(models.Model):
     And sometimes they relate to each other for whatever reason like various branches or departments.
     """
     name = models.CharField(max_length=100)
-    vat_number = models.CharField(max_length=100, blank=True, null=True)
-    eori_number = models.CharField(max_length=100, blank=True, null=True)
-
-    related_companies = models.ManyToManyField('self', symmetrical=True, blank=True)
 
     is_supplier = models.BooleanField(default=False)
     is_customer = models.BooleanField(default=False)
@@ -35,7 +31,7 @@ class Company(models.Model):
         return self.name
 
     class Meta:
-        search_terms = ['name', 'vat_number', 'eori_number']
+        search_terms = ['name']
         unique_together = ("name", "multi_tenant_company")
         verbose_name_plural = _("companies")
 
@@ -49,7 +45,7 @@ class Supplier(Company):
 
     class Meta:
         proxy = True
-        search_terms = ['name', 'vat_number', 'eori_number']
+        search_terms = ['name']
 
 
 class Customer(Company):
@@ -61,7 +57,7 @@ class Customer(Company):
 
     class Meta:
         proxy = True
-        search_terms = ['name', 'vat_number', 'eori_number']
+        search_terms = ['name']
 
 
 class Influencer(Company):
@@ -73,7 +69,7 @@ class Influencer(Company):
 
     class Meta:
         proxy = True
-        search_terms = ['name', 'vat_number', 'eori_number']
+        search_terms = ['name']
 
 
 class InternalCompany(Company):
@@ -88,7 +84,7 @@ class InternalCompany(Company):
 
     class Meta:
         proxy = True
-        search_terms = ['name', 'vat_number', 'eori_number']
+        search_terms = ['name']
         verbose_name_plural = _("interal companies")
 
 
@@ -101,10 +97,13 @@ class Person(models.Model):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     company = models.ForeignKey(Company, on_delete=models.PROTECT)
+    role = models.CharField(max_length=200, blank=True, null=True)
 
     phone = models.CharField(max_length=100, blank=True, null=True)
     email = models.CharField(max_length=100, blank=True, null=True)
     language = models.CharField(max_length=2, default='EN', choices=CUSTOMER_LANGUAGE_CHOICES)
+
+    active = models.BooleanField(default=True)
 
     def name(self):
         return f"{self.first_name} {self.last_name}".strip()
@@ -124,8 +123,11 @@ class Address(models.Model):
     """
     from core.countries import COUNTRY_CHOICES
 
-    contact = models.ForeignKey(Person, on_delete=models.CASCADE, null=True, blank=True)
+    people = models.ManyToManyField(Person, blank=True, related_name='people')
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
+
+    vat_number = models.CharField(max_length=100, blank=True, null=True)
+    eori_number = models.CharField(max_length=100, blank=True, null=True)
 
     address1 = models.CharField(max_length=100)
     address2 = models.CharField(max_length=100, blank=True, null=True)
@@ -155,7 +157,7 @@ class Address(models.Model):
         return ', '.join(address_parts)
 
     class Meta:
-        search_terms = ['contact__email', 'company__name', 'address1', 'city']
+        search_terms = ['people__email', 'company__name', 'address1', 'city']
         verbose_name_plural = 'addresses'
 
         constraints = [
@@ -174,7 +176,7 @@ class ShippingAddress(Address):
 
     class Meta:
         proxy = True
-        search_terms = ['contact__email', 'company__name']
+        search_terms = ['people__email', 'company__name']
         verbose_name_plural = 'shipping addresses'
 
 
@@ -184,7 +186,7 @@ class InvoiceAddress(Address):
 
     class Meta:
         proxy = True
-        search_terms = ['contact__email', 'company__name']
+        search_terms = ['people__email', 'company__name']
         verbose_name_plural = 'invoice addresses'
 
 
@@ -194,5 +196,5 @@ class InternalShippingAddress(Address):
 
     class Meta:
         proxy = True
-        search_terms = ['contact__email', 'company__name']
+        search_terms = ['people__email', 'company__name']
         verbose_name_plural = 'internal shipping addresses'

@@ -14,12 +14,12 @@ def contacts_company_demo(multi_tenant_company):
         country_code = fake.country_code()
         company = baker.make(Company,
             name=fake.company(),
-            vat_number=fake.vat_number(country_code),
             multi_tenant_company=multi_tenant_company)
         registry.create_demo_data_relation(company)
 
         address = baker.make(Address,
             company=company,
+            vat_number=fake.vat_number(country_code),
             address1=fake.street_address(),
             city=fake.city(),
             postcode=fake.postcode(),
@@ -37,4 +37,5 @@ def contacts_company_demo(multi_tenant_company):
                 email=fake.email(),
                 company=company,
                 multi_tenant_company=multi_tenant_company)
+            address.people.add(person)
             registry.create_demo_data_relation(person)
