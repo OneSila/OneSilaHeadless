@@ -9,11 +9,13 @@ class OrderOrder:
     id: auto
     reference: auto
     status: auto
+    created_at: auto
 
 
 @order(OrderItem)
 class OrderItemOrder:
     id: auto
+    created_at: auto
 
 
 @order(OrderNote)

@@ -55,6 +55,15 @@ class InternalCompanyInput:
 class InternalCompanyPartialInput(NodeInput):
     pass
 
+@input(Address, fields="__all__")
+class AddressInput:
+    pass
+
+
+@partial(Address, fields="__all__")
+class AddressPartialInput(NodeInput):
+    pass
+
 
 @input(Person, fields="__all__")
 class PersonInput:
@@ -63,16 +72,6 @@ class PersonInput:
 
 @partial(Person, fields="__all__")
 class PersonPartialInput(NodeInput):
-    pass
-
-
-@input(Address, fields="__all__")
-class AddressInput:
-    pass
-
-
-@partial(Address, fields="__all__")
-class AddressPartialInput(NodeInput):
     pass
 
 

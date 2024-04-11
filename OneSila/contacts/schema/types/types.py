@@ -40,6 +40,9 @@ class InternalCompanyType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     person_set: List[Annotated['PersonType', lazy("contacts.schema.types.types")]]
 
+    @field()
+    def full_address(self, info) -> str:
+        return self.full_address
 
 @type(Person, filters=PersonFilter, order=PersonOrder, pagination=True, fields="__all__")
 class PersonType(relay.Node, GetQuerysetMultiTenantMixin):
@@ -50,23 +53,21 @@ class PersonType(relay.Node, GetQuerysetMultiTenantMixin):
     def full_name(self, info) -> str:
         return self.full_name()
 
-
 @type(Address, filters=AddressFilter, pagination=True, fields="__all__")
 class AddressType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
-    people: Optional[PersonType]
+    person: Optional[PersonType]
 
     @field()
     def full_address(self, info) -> str:
         return self.full_address
 
-
 @type(ShippingAddress, filters=ShippingAddressFilter, pagination=True, fields="__all__")
 class ShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
-    people: Optional[PersonType]
+    person: Optional[PersonType]
 
     @field()
     def full_address(self, info) -> str:
@@ -77,7 +78,7 @@ class ShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
 class InvoiceAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
-    people: Optional[PersonType]
+    person: Optional[PersonType]
 
     @field()
     def full_address(self, info) -> str:
@@ -88,7 +89,7 @@ class InvoiceAddressType(relay.Node, GetQuerysetMultiTenantMixin):
 class InternalShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
-    people: Optional[PersonType]
+    person: Optional[PersonType]
 
     @field()
     def full_address(self, info) -> str:

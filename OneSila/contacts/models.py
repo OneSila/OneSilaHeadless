@@ -36,7 +36,7 @@ class Company(models.Model):
         return self.name
 
     class Meta:
-        search_terms = ['name', 'email']
+        search_terms = ['name']
         unique_together = ("name", "multi_tenant_company")
         verbose_name_plural = _("companies")
 
@@ -128,7 +128,7 @@ class Address(models.Model):
     """
     from core.countries import COUNTRY_CHOICES
 
-    people = models.ManyToManyField(Person, blank=True)
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, null=True, blank=True)
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
 
     vat_number = models.CharField(max_length=100, blank=True, null=True)
