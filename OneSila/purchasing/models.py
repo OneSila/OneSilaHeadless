@@ -52,7 +52,7 @@ class PurchaseOrder(models.Model):
 
     status = models.CharField(max_length=16, choices=PO_STATUS_CHOICES)
     supplier = models.ForeignKey('contacts.Company', on_delete=models.PROTECT)
-    order_reference = models.CharField(max_length=100)
+    order_reference = models.CharField(max_length=100, blank=True, null=True)
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
 
     invoice_address = models.ForeignKey(InvoiceAddress, on_delete=models.PROTECT, related_name="invoice_address_set")
