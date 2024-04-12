@@ -95,7 +95,7 @@ class SalesPriceList(models.Model):
 class SalesPriceListItem(models.Model):
     salespricelist = models.ForeignKey(SalesPriceList, on_delete=models.CASCADE)
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
-    salesprice = models.FloatField()
+    salesprice = models.FloatField(blank=True, null=True)
 
     objects = SalesPriceListItemManager()
 

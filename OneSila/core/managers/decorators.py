@@ -11,7 +11,6 @@ def multi_tenant_company_required():
 
         @wraps(f)
         def f_deco(*args, **kwargs):
-            print(kwargs)
             multi_tenant_company = kwargs.get('multi_tenant_company')
 
             if not multi_tenant_company:

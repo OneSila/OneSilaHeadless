@@ -1,5 +1,5 @@
 
-from contacts.schema.types.types import SupplierType, InvoiceAddressType, ShippingAddressType
+from contacts.schema.types.types import CompanyType, InvoiceAddressType, ShippingAddressType
 from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field
 
 from typing import List
@@ -17,7 +17,7 @@ from .ordering import SupplierProductOrder, PurchaseOrderOrder, \
 
 @type(SupplierProduct, filters=SupplierProductFilter, order=SupplierProductOrder, pagination=True, fields="__all__")
 class SupplierProductType(relay.Node, GetQuerysetMultiTenantMixin):
-    supplier: SupplierType
+    supplier: CompanyType
     product: ProductType
     unit: UnitType
     currency: CurrencyType
@@ -25,10 +25,11 @@ class SupplierProductType(relay.Node, GetQuerysetMultiTenantMixin):
 
 @type(PurchaseOrder, filters=PurchaseOrderFilter, order=PurchaseOrderOrder, pagination=True, fields="__all__")
 class PurchaseOrderType(relay.Node, GetQuerysetMultiTenantMixin):
-    supplier: SupplierType
+    supplier: CompanyType
     currency: CurrencyType
     invoice_address: InvoiceAddressType
     shipping_address: ShippingAddressType
+    purchaseorderitem_set: List['PurchaseOrderItemType']
 
     @field()
     def total_value(self) -> str | None:

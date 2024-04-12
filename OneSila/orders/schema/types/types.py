@@ -1,4 +1,4 @@
-from contacts.schema.types.types import CustomerType, InvoiceAddressType, ShippingAddressType
+from contacts.schema.types.types import CompanyType, InvoiceAddressType, ShippingAddressType
 from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field
 
 from typing import List
@@ -12,7 +12,7 @@ from .ordering import OrderOrder, OrderItemOrder, OrderNoteOrder
 
 @type(Order, filters=OrderFilter, order=OrderOrder, pagination=True, fields="__all__")
 class OrderType(relay.Node, GetQuerysetMultiTenantMixin):
-    customer: CustomerType
+    customer: CompanyType
     invoice_address: InvoiceAddressType
     shipping_address: ShippingAddressType
     currency: CurrencyType

@@ -39,7 +39,7 @@ class InventoryLocation(models.Model):
     '''
     name = models.CharField(max_length=10)
     description = models.TextField(null=True, blank=True)
-    parent_location = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True)
+    location = models.ForeignKey('contacts.InternalShippingAddress', on_delete=models.CASCADE, null=True)
 
     def __str__(self):
         return self.name

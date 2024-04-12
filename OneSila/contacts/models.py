@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from .managers import SupplierManager, CustomerManager, InfluencerManager, \
     InvoiceAddressManager, ShippingAddressManager, InternalCompanyManager, \
-    CompanyManager
+    CompanyManager, InternalShippingAddressManager
 
 
 class Company(models.Model):
@@ -14,11 +14,12 @@ class Company(models.Model):
     An Company is essentially customer, supplier, influencers, any of the above.
     And sometimes they relate to each other for whatever reason like various branches or departments.
     """
-    name = models.CharField(max_length=100)
-    vat_number = models.CharField(max_length=100, blank=True, null=True)
-    eori_number = models.CharField(max_length=100, blank=True, null=True)
+    from .languages import CUSTOMER_LANGUAGE_CHOICES
 
-    related_companies = models.ManyToManyField('self', symmetrical=True, blank=True)
+    name = models.CharField(max_length=100)
+    phone = models.CharField(max_length=100, blank=True, null=True)
+    email = models.CharField(max_length=100, blank=True, null=True)
+    language = models.CharField(max_length=2, default='EN', choices=CUSTOMER_LANGUAGE_CHOICES)
 
     is_supplier = models.BooleanField(default=False)
     is_customer = models.BooleanField(default=False)
@@ -35,7 +36,7 @@ class Company(models.Model):
         return self.name
 
     class Meta:
-        search_terms = ['name', 'vat_number', 'eori_number']
+        search_terms = ['name']
         unique_together = ("name", "multi_tenant_company")
         verbose_name_plural = _("companies")
 
@@ -49,7 +50,7 @@ class Supplier(Company):
 
     class Meta:
         proxy = True
-        search_terms = ['name', 'vat_number', 'eori_number']
+        search_terms = ['name']
 
 
 class Customer(Company):
@@ -61,7 +62,7 @@ class Customer(Company):
 
     class Meta:
         proxy = True
-        search_terms = ['name', 'vat_number', 'eori_number']
+        search_terms = ['name']
 
 
 class Influencer(Company):
@@ -73,7 +74,7 @@ class Influencer(Company):
 
     class Meta:
         proxy = True
-        search_terms = ['name', 'vat_number', 'eori_number']
+        search_terms = ['name']
 
 
 class InternalCompany(Company):
@@ -88,7 +89,7 @@ class InternalCompany(Company):
 
     class Meta:
         proxy = True
-        search_terms = ['name', 'vat_number', 'eori_number']
+        search_terms = ['name']
         verbose_name_plural = _("interal companies")
 
 
@@ -101,16 +102,19 @@ class Person(models.Model):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     company = models.ForeignKey(Company, on_delete=models.PROTECT)
+    role = models.CharField(max_length=200, blank=True, null=True)
 
     phone = models.CharField(max_length=100, blank=True, null=True)
     email = models.CharField(max_length=100, blank=True, null=True)
     language = models.CharField(max_length=2, default='EN', choices=CUSTOMER_LANGUAGE_CHOICES)
 
-    def name(self):
+    active = models.BooleanField(default=True)
+
+    def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
 
     def __str__(self):
-        return self.name()
+        return self.full_name()
 
     class Meta:
         search_terms = ['first_name', 'last_name', 'company__name', 'email']
@@ -124,8 +128,11 @@ class Address(models.Model):
     """
     from core.countries import COUNTRY_CHOICES
 
-    contact = models.ForeignKey(Person, on_delete=models.CASCADE, null=True, blank=True)
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, null=True, blank=True)
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
+
+    vat_number = models.CharField(max_length=100, blank=True, null=True)
+    eori_number = models.CharField(max_length=100, blank=True, null=True)
 
     address1 = models.CharField(max_length=100)
     address2 = models.CharField(max_length=100, blank=True, null=True)
@@ -155,7 +162,7 @@ class Address(models.Model):
         return ', '.join(address_parts)
 
     class Meta:
-        search_terms = ['contact__email', 'company__name', 'address1', 'city']
+        search_terms = ['person__email', 'company__name', 'address1', 'city']
         verbose_name_plural = 'addresses'
 
         constraints = [
@@ -174,7 +181,7 @@ class ShippingAddress(Address):
 
     class Meta:
         proxy = True
-        search_terms = ['contact__email', 'company__name']
+        search_terms = ['person__email', 'company__name']
         verbose_name_plural = 'shipping addresses'
 
 
@@ -184,5 +191,15 @@ class InvoiceAddress(Address):
 
     class Meta:
         proxy = True
-        search_terms = ['contact__email', 'company__name']
+        search_terms = ['person__email', 'company__name']
         verbose_name_plural = 'invoice addresses'
+
+
+class InternalShippingAddress(Address):
+    objects = InternalShippingAddressManager()
+    proxy_filter_fields = {'is_shipping_address': True, 'company__is_internal_company': True}
+
+    class Meta:
+        proxy = True
+        search_terms = ['person__email', 'company__name']
+        verbose_name_plural = 'internal shipping addresses'

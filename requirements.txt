@@ -26,6 +26,8 @@ tzdata
 shortuuid
 pytz
 hypercorn
+Faker
+sentry-sdk[django]
 
 # version stuck to 0.32.1, filters need upgrading before increasing version number
 strawberry-graphql-django==0.32.1
