@@ -162,7 +162,7 @@ class Address(models.Model):
         return ', '.join(address_parts)
 
     class Meta:
-        search_terms = ['people__email', 'company__name', 'address1', 'city']
+        search_terms = ['person__email', 'company__name', 'address1', 'city']
         verbose_name_plural = 'addresses'
 
         constraints = [
@@ -181,7 +181,7 @@ class ShippingAddress(Address):
 
     class Meta:
         proxy = True
-        search_terms = ['people__email', 'company__name']
+        search_terms = ['person__email', 'company__name']
         verbose_name_plural = 'shipping addresses'
 
 
@@ -191,7 +191,7 @@ class InvoiceAddress(Address):
 
     class Meta:
         proxy = True
-        search_terms = ['people__email', 'company__name']
+        search_terms = ['person__email', 'company__name']
         verbose_name_plural = 'invoice addresses'
 
 
@@ -201,5 +201,5 @@ class InternalShippingAddress(Address):
 
     class Meta:
         proxy = True
-        search_terms = ['people__email', 'company__name']
+        search_terms = ['person__email', 'company__name']
         verbose_name_plural = 'internal shipping addresses'

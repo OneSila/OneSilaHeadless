@@ -17,6 +17,15 @@ def contacts_company_demo(multi_tenant_company):
             multi_tenant_company=multi_tenant_company)
         registry.create_demo_data_relation(company)
 
+        person = baker.make(Person,
+                            first_name=fake.first_name(),
+                            last_name=fake.last_name(),
+                            phone=fake.phone_number(),
+                            email=fake.email(),
+                            company=company,
+                            multi_tenant_company=multi_tenant_company)
+        registry.create_demo_data_relation(person)
+
         address = baker.make(Address,
             company=company,
             vat_number=fake.vat_number(country_code),
@@ -26,16 +35,6 @@ def contacts_company_demo(multi_tenant_company):
             country=country_code,
             is_shipping_address=True,
             is_invoice_address=True,
-            multi_tenant_company=multi_tenant_company)
+            multi_tenant_company=multi_tenant_company,
+            person=person)
         registry.create_demo_data_relation(address)
-
-        for i in range(2):
-            person = baker.make(Person,
-                first_name=fake.first_name(),
-                last_name=fake.last_name(),
-                phone=fake.phone_number(),
-                email=fake.email(),
-                company=company,
-                multi_tenant_company=multi_tenant_company)
-            address.people.add(person)
-            registry.create_demo_data_relation(person)
