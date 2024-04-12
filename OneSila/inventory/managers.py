@@ -1,13 +1,13 @@
 from core import models
 from core.models import Sum
-
+from core.managers import  MultiTenantQuerySet, MultiTenantManager
 from orders.models import Order
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class InventoryQuerySet(models.QuerySet):
+class InventoryQuerySet(MultiTenantQuerySet):
     def salable(self):
         """Items that are available for sale"""
         if self._hints['instance'].product.always_on_stock:
@@ -34,7 +34,7 @@ class InventoryQuerySet(models.QuerySet):
         return sold_agg['quantity__sum'] or 0
 
 
-class InventorykManager(models.Manager):
+class InventoryManager(MultiTenantManager):
     def get_queryset(self):
         return InventoryQuerySet(self.model, using=self._db)
 

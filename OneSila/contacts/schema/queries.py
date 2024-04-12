@@ -5,12 +5,14 @@ from typing import List
 
 from .types.types import CompanyType, SupplierType, CustomerType, \
     InfluencerType, InternalCompanyType, PersonType, AddressType, \
-    ShippingAddressType, InvoiceAddressType, CustomerLanguageType
+    ShippingAddressType, InvoiceAddressType, CustomerLanguageType, \
+    InternalShippingAddressType
 from ..languages import CUSTOMER_LANGUAGE_CHOICES
 
 
 def get_customer_languages(info) -> List[CustomerLanguageType]:
     return [CustomerLanguageType(code=code, name=name) for code, name in CUSTOMER_LANGUAGE_CHOICES]
+
 
 @type(name="Query")
 class ContactsQuery:
@@ -41,5 +43,7 @@ class ContactsQuery:
     invoice_address: InvoiceAddressType = node()
     invoice_addresses: ListConnectionWithTotalCount[InvoiceAddressType] = connection()
 
-    customer_languages: List[CustomerLanguageType] = anonymous_field(resolver=get_customer_languages)
+    internal_shipping_address: InternalShippingAddressType = node()
+    internal_shipping_addresses: ListConnectionWithTotalCount[InternalShippingAddressType] = connection()
 
+    customer_languages: List[CustomerLanguageType] = anonymous_field(resolver=get_customer_languages)

@@ -6,7 +6,38 @@ from contacts.models import Company, Supplier, Customer, Influencer, Person, Add
     ShippingAddress, InvoiceAddress
 from contacts.schema.types.types import SupplierType, CompanyType, CustomerType
 
+from core.tests import TestCaseWithDemoData
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
+
+
+class AddressTestCase(TestCaseWithDemoData, TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.addresses = Address.objects.filter(multi_tenant_company=self.user.multi_tenant_company)
+
+    def test_addresses(self):
+        query = """
+            query addresses {
+              addresses {
+                edges {
+                  node {
+                    id
+                    fullAddress
+                  }
+                }
+                totalCount
+              }
+            }
+        """
+
+        resp = self.stawberry_test_client(
+            query=query,
+        )
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+        total_count = resp.data['addresses']['totalCount']
+        self.assertEqual(total_count, len(self.addresses))
 
 
 class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):

@@ -17,7 +17,7 @@ class SupplierProduct(models.Model):
     quantity = models.IntegerField()
     unit_price = models.FloatField()
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE)
+    supplier = models.ForeignKey('contacts.Company', on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.product} <{self.supplier}>"
@@ -51,8 +51,8 @@ class PurchaseOrder(models.Model):
     )
 
     status = models.CharField(max_length=16, choices=PO_STATUS_CHOICES)
-    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT)
-    order_reference = models.CharField(max_length=100)
+    supplier = models.ForeignKey('contacts.Company', on_delete=models.PROTECT)
+    order_reference = models.CharField(max_length=100, blank=True, null=True)
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
 
     invoice_address = models.ForeignKey(InvoiceAddress, on_delete=models.PROTECT, related_name="invoice_address_set")
@@ -93,3 +93,4 @@ class PurchaseOrderItem(models.Model):
 
     class Meta:
         search_terms = ['purchase_order__order_reference', 'purchase_order__supplier__name']
+        unique_together = ("purchase_order", "item")

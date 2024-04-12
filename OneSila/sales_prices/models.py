@@ -1,7 +1,7 @@
 from core import models
 from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
-from .managers import SalesPriceManager, SalesPriceListItemManager
+from .managers import SalesPriceManager, SalesPriceListItemManager, SalesPriceListManager
 
 
 class SalesPrice(models.Model):
@@ -84,13 +84,18 @@ class SalesPriceList(models.Model):
 
     customers = models.ManyToManyField('contacts.Customer')
 
+    objects = SalesPriceListManager()
+
     def __str__(self):
         return '{} {}'.format(self.name, self.currency)
+
+    class Meta:
+        search_terms = ['name']
 
 class SalesPriceListItem(models.Model):
     salespricelist = models.ForeignKey(SalesPriceList, on_delete=models.CASCADE)
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
-    salesprice = models.FloatField()
+    salesprice = models.FloatField(blank=True, null=True)
 
     objects = SalesPriceListItemManager()
 

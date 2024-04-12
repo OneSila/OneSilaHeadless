@@ -1,10 +1,5 @@
 from core import models
-from django.dispatch import receiver
-from django.db.models.signals import post_save, pre_save
 from django.utils.translation import gettext_lazy as _
-
-from core.models import MultiTenantAwareMixin
-
 from currency_converter import CurrencyConverter, RateNotFoundError
 
 from .managers import OrderItemManager, OrderManager, OrderReportManager
@@ -62,7 +57,7 @@ class Order(models.Model):
     )
 
     reference = models.CharField(max_length=100, blank=True, null=True)
-    customer = models.ForeignKey('contacts.Customer', on_delete=models.PROTECT)
+    customer = models.ForeignKey('contacts.Company', on_delete=models.PROTECT)
     invoice_address = models.ForeignKey('contacts.InvoiceAddress', on_delete=models.PROTECT,
         related_name='invoiceaddress_set')
     shipping_address = models.ForeignKey('contacts.ShippingAddress', on_delete=models.PROTECT,
@@ -94,7 +89,7 @@ class Order(models.Model):
         total_value = self.total_value
 
         if total_value:
-            return '{} {}'.format(self.currency, total_value)
+            return '{} {}'.format(self.currency.symbol, total_value)
         else:
             return total_value
 
@@ -190,6 +185,7 @@ class OrderItem(models.Model):
 
     class Meta:
         search_terms = ['order__reference', 'order__company__name']
+        unique_together = ("order", "product")
 
 
 class OrderNote(models.Model):

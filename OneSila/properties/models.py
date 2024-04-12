@@ -49,10 +49,11 @@ class Property(models.Model):
 
 class PropertyTranslation(TranslationFieldsMixin, models.Model):
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
-    name = models.CharField(max_length=200, unique=True, verbose_name=_('Name'))
+    name = models.CharField(max_length=200, verbose_name=_('Name'))
 
     class Meta:
         search_terms = ['name']
+        unique_together = ("name", "multi_tenant_company")
 
 
 class PropertySelectValue(models.Model):
@@ -64,8 +65,11 @@ class PropertySelectValue(models.Model):
 
 class PropertySelectValueTranslation(TranslationFieldsMixin, models.Model):
     propertyselectvalue = models.ForeignKey(PropertySelectValue, on_delete=models.CASCADE)
-    value = models.CharField(max_length=200, unique=True, verbose_name=_('Value'))
+    value = models.CharField(max_length=200, verbose_name=_('Value'))
 
+    class Meta:
+        search_terms = ['value']
+        unique_together = ("value", "multi_tenant_company")
 
 class ProductProperty(models.Model):
     # FIXME: This model needs to become translatable, more specifically:
