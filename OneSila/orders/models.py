@@ -185,6 +185,7 @@ class OrderItem(models.Model):
 
     class Meta:
         search_terms = ['order__reference', 'order__company__name']
+        unique_together = ("order", "product")
 
 
 class OrderNote(models.Model):

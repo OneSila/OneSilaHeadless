@@ -93,3 +93,4 @@ class PurchaseOrderItem(models.Model):
 
     class Meta:
         search_terms = ['purchase_order__order_reference', 'purchase_order__supplier__name']
+        unique_together = ("purchase_order", "item")

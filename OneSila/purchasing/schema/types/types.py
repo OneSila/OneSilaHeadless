@@ -29,6 +29,7 @@ class PurchaseOrderType(relay.Node, GetQuerysetMultiTenantMixin):
     currency: CurrencyType
     invoice_address: InvoiceAddressType
     shipping_address: ShippingAddressType
+    purchaseorderitem_set: List['PurchaseOrderItemType']
 
     @field()
     def total_value(self) -> str | None:
