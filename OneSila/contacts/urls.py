@@ -1,12 +1,12 @@
-from .views import AddressListView, AddressDetailViev, AddressUpdateView, \
+from .views import AddressListView, AddressDetailView, AddressUpdateView, \
     AddressDeleteView, CompanyListView, CompanyDetailViev, CompanyUpdateView, \
     CompanyDeleteView, CustomerListView, CustomerDetailViev, CustomerUpdateView, \
     CustomerDeleteView, InfluencerListView, InfluencerDetailViev, InfluencerUpdateView, \
     InfluencerDeleteView, InternalCompanyListView, InternalCompanyDetailViev, \
     InternalCompanyUpdateView, InternalCompanyDeleteView, InvoiceAddressListView, \
-    InvoiceAddressDetailViev, InvoiceAddressUpdateView, InvoiceAddressDeleteView, \
+    InvoiceAddressDetailView, InvoiceAddressUpdateView, InvoiceAddressDeleteView, \
     PersonListView, PersonDetailViev, PersonUpdateView, PersonDeleteView, ShippingAddressListView, \
-    ShippingAddressDetailViev, ShippingAddressUpdateView, ShippingAddressDeleteView, SupplierListView, \
+    ShippingAddressDetailView, ShippingAddressUpdateView, ShippingAddressDeleteView, SupplierListView, \
     SupplierDetailViev, SupplierUpdateView, SupplierDeleteView
 from django.urls import path
 
@@ -14,7 +14,7 @@ app_name = "contacts"
 
 urlpatterns = [
     path('addresss/', AddressListView.as_view(), name='addresss_list'),
-    path('addresss/<str:pk>/', AddressDetailViev.as_view(), name='address_detail'),
+    path('addresss/<str:pk>/', AddressDetailView.as_view(), name='address_detail'),
     path('addresss/<str:pk>/update/', AddressUpdateView.as_view(), name='address_update'),
     path('addresss/<str:pk>/delete/', AddressDeleteView.as_view(), name='address_delete'),
     path('companies/', CompanyListView.as_view(), name='companies_list'),
@@ -34,7 +34,7 @@ urlpatterns = [
     path('interal-companies/<str:pk>/update/', InternalCompanyUpdateView.as_view(), name='internal_company_update'),
     path('interal-companies/<str:pk>/delete/', InternalCompanyDeleteView.as_view(), name='internal_company_delete'),
     path('invoice-addresss/', InvoiceAddressListView.as_view(), name='invoice_addresss_list'),
-    path('invoice-addresss/<str:pk>/', InvoiceAddressDetailViev.as_view(), name='invoice_address_detail'),
+    path('invoice-addresss/<str:pk>/', InvoiceAddressDetailView.as_view(), name='invoice_address_detail'),
     path('invoice-addresss/<str:pk>/update/', InvoiceAddressUpdateView.as_view(), name='invoice_address_update'),
     path('invoice-addresss/<str:pk>/delete/', InvoiceAddressDeleteView.as_view(), name='invoice_address_delete'),
     path('people/', PersonListView.as_view(), name='people_list'),
@@ -42,7 +42,7 @@ urlpatterns = [
     path('people/<str:pk>/update/', PersonUpdateView.as_view(), name='person_update'),
     path('people/<str:pk>/delete/', PersonDeleteView.as_view(), name='person_delete'),
     path('shipping-addresss/', ShippingAddressListView.as_view(), name='shipping_addresss_list'),
-    path('shipping-addresss/<str:pk>/', ShippingAddressDetailViev.as_view(), name='shipping_address_detail'),
+    path('shipping-addresss/<str:pk>/', ShippingAddressDetailView.as_view(), name='shipping_address_detail'),
     path('shipping-addresss/<str:pk>/update/', ShippingAddressUpdateView.as_view(), name='shipping_address_update'),
     path('shipping-addresss/<str:pk>/delete/', ShippingAddressDeleteView.as_view(), name='shipping_address_delete'),
     path('suppliers/', SupplierListView.as_view(), name='suppliers_list'),

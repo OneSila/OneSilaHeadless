@@ -79,8 +79,8 @@ class CompanyTestCase(TestCaseWithDemoData):
         self.assertTrue(not_me not in qs)
 
     def test_address_search(self):
-        add_me = Address.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.me, contact=self.person_me)
-        add_not_me = Address.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.not_me, contact=self.person_me)
+        add_me = Address.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.me, person=self.person_me)
+        add_not_me = Address.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.not_me, person=self.person_me)
 
         qs = Address.objects.search('search', multi_tenant_company=self.multi_tenant_company)
 
@@ -89,9 +89,8 @@ class CompanyTestCase(TestCaseWithDemoData):
         self.assertTrue(add_not_me not in qs)
 
     def test_shippingaddress_search(self):
-        add_me = ShippingAddress.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.me, contact=self.person_me)
-        add_not_me = ShippingAddress.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.not_me, contact=self.person_me)
-
+        add_me = ShippingAddress.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.me, person=self.person_me)
+        add_not_me = ShippingAddress.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.not_me, person=self.person_me)
         qs = ShippingAddress.objects.search('search', multi_tenant_company=self.multi_tenant_company)
 
         self.assertTrue(qs.exists())
@@ -99,8 +98,8 @@ class CompanyTestCase(TestCaseWithDemoData):
         self.assertTrue(add_not_me not in qs)
 
     def test_invoiceaddress_search(self):
-        add_me = InvoiceAddress.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.me, contact=self.person_me)
-        add_not_me = InvoiceAddress.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.not_me, contact=self.person_me)
+        add_me = InvoiceAddress.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.me, person=self.person_me)
+        add_not_me = InvoiceAddress.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.not_me, person=self.person_me)
 
         qs = InvoiceAddress.objects.search('search', multi_tenant_company=self.multi_tenant_company)
 

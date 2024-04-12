@@ -1,3 +1,5 @@
+from typing import Optional
+
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin
 from contacts.models import Company, Address, Person, Supplier, \
@@ -9,8 +11,7 @@ class CompanyFilter(SearchFilterMixin):
     search: str | None
     id: auto
     name: auto
-    vat_number: auto
-    eori_number: auto
+    language: auto
 
     is_supplier: auto
     is_customer: auto
@@ -23,8 +24,6 @@ class SupplierFilter(SearchFilterMixin):
     search: str | None
     id: auto
     name: auto
-    vat_number: auto
-    eori_number: auto
 
 
 @filter(Customer)
@@ -32,14 +31,13 @@ class CustomerFilter(SearchFilterMixin):
     search: str | None
     id: auto
     name: auto
-    vat_number: auto
-    eori_number: auto
 
 
 @filter(Person)
 class PersonFilter(SearchFilterMixin):
     id: auto
     search: str | None
+    active: auto
     first_name: auto
     last_name: auto
     email: auto
