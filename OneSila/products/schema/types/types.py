@@ -31,11 +31,9 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
 
         return to_base64(graphql_type, self.pk)
 
-    # @TODO: Improve that in the future to get the current language or something like this rn it need discussion because translations languages are different
     @field()
     def name(self, info) -> str | None:
-        translation = self.translations.first()
-        return None if translation is None else translation.name
+        return self.name
 
 
 @type(BundleProduct, filters=BundleProductFilter, order=BundleProductOrder, pagination=True, fields="__all__")
@@ -50,7 +48,9 @@ class UmbrellaProductType(relay.Node, GetQuerysetMultiTenantMixin):
 
 @type(ProductVariation, filters=ProductVariationFilter, order=ProductVariationOrder, pagination=True, fields="__all__")
 class ProductVariationType(relay.Node, GetQuerysetMultiTenantMixin):
-    pass
+    @field()
+    def name(self, info) -> str | None:
+        return self.name
 
 
 @type(ProductTranslation, filters=ProductTranslationFilter, order=ProductTranslationOrder, pagination=True, fields="__all__")

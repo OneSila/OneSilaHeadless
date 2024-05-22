@@ -86,4 +86,4 @@ class InternalShippingAddressQuerySet(MultiTenantQuerySet):
 
 class InternalShippingAddressManager(MultiTenantManager):
     def get_queryset(self):
-        return InternalShippingAddressQuerySet(self.model, using=self._db)
+        return InternalShippingAddressQuerySet(self.model, using=self._db).filter(**self.model.proxy_filter_fields)

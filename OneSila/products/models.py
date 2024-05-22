@@ -34,7 +34,8 @@ class Product(models.Model):
     bundles = BundleManager()
     umbrellas = UmbrellaManager()
 
-    def __str__(self):
+    @property
+    def name(self):
         translations = self.translations.all()
         lang = self.multi_tenant_company.language
         name = self.sku
@@ -48,6 +49,8 @@ class Product(models.Model):
             name = translation.name
 
         return f"{name}"
+    def __str__(self):
+        return f"{self.name}"
 
     def set_active(self):
         self.active = True
