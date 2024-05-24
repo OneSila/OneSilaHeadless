@@ -1,6 +1,6 @@
 from core import models
 from django.utils.translation import gettext_lazy as _
-from core.models import MultiTenantAwareMixin
+from core.models import MultiTenantAwareMixin, MultiTenantUser
 
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFill, ResizeToFit
@@ -56,6 +56,8 @@ class Media(models.Model):
     file = models.FileField(_('File'),
         upload_to='files/', validators=[validate_file_extensions, no_dots_in_filename],
         null=True, blank=True)
+
+    owner = models.ForeignKey(MultiTenantUser, on_delete=models.CASCADE)
 
     products = models.ManyToManyField('products.Product', through='MediaProductThrough')
 
