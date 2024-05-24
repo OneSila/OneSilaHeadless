@@ -48,7 +48,7 @@ class Media(models.Model):
 
     image_type = models.CharField(max_length=4, choices=IMAGE_TYPE_CHOICES, default=PACK_SHOT)
     image = models.ImageField(_('Image (High resolution)'),
-        upload_to='images/', validators=[validate_image_extension, no_dots_in_filename],
+        upload_to='images/', validators=[validate_image_extension],
         null=True, blank=True)
     image_web = ImageSpecField(source='image',
         id='mediapp:image:imagewebspec')
@@ -68,6 +68,15 @@ class Media(models.Model):
     @property
     def image_web_size(self):
         return self.image_web.file.image_web.size
+
+    def is_image(self):
+        return self.type == self.IMAGE
+
+    def is_file(self):
+        return self.type == self.IMAGE
+
+    def is_video(self):
+        return self.type == self.IMAGE
 
     def image_web_url(self):
         if self.image:
