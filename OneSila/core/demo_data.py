@@ -9,6 +9,7 @@ from model_bakery import baker
 from faker import Faker
 from random import randint, choice
 from faker.providers import DynamicProvider, BaseProvider
+import faker_commerce
 from core.countries import COUNTRY_CHOICES, num_countries
 import types
 
@@ -32,6 +33,7 @@ class OrderReferenceProvider(BaseProvider):
 
 fake.add_provider(VATProvider)
 fake.add_provider(OrderReferenceProvider)
+fake.add_provider(faker_commerce.Provider)
 
 
 class CreatePrivateDataRelationMixin:
