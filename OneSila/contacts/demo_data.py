@@ -4,17 +4,35 @@ import random
 
 registry = DemoDataLibrary()
 
-
+def generate_company_types(is_first=False):
+    if is_first:
+        # If it's the first company, make it an internal company
+        return {
+            'is_supplier': False,
+            'is_customer': False,
+            'is_influencer': False,
+            'is_internal_company': True
+        }
+    else:
+        return {
+            'is_supplier': random.choice([True, False]),
+            'is_customer': random.choice([True, False]),
+            'is_influencer': random.choice([True, False]),
+            'is_internal_company': False
+        }
 @registry.register_private_app
 def contacts_company_demo(multi_tenant_company):
     from contacts.models import Company, Person, Address
 
-    for i in range(30):
+    for i in range(50):
         fake.seed_instance(i)
         country_code = fake.country_code()
+        types = generate_company_types(is_first=(i == 0))
         company = baker.make(Company,
             name=fake.company(),
-            multi_tenant_company=multi_tenant_company)
+            email=fake.email(),
+            language=random.choice(['EN', 'FR', 'RU', 'DE', 'NL', 'NL']),
+            multi_tenant_company=multi_tenant_company, **types)
         registry.create_demo_data_relation(company)
 
         person = baker.make(Person,
