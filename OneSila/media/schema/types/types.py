@@ -17,7 +17,7 @@ from .ordering import MediaOrder, ImageOrder, VideoOrder, \
 class MediaType(relay.Node, GetQuerysetMultiTenantMixin):
     image_web: DjangoImageType | None
     image_web_url: str | None
-    file_web_url: str | None
+    file_url: str | None
     owner: MultiTenantUserType
 
     @field()
@@ -38,6 +38,7 @@ class MediaType(relay.Node, GetQuerysetMultiTenantMixin):
 class ImageType(relay.Node, GetQuerysetMultiTenantMixin):
     image_web: DjangoImageType | None
     image_web_url: str | None
+    image_url: str | None
     owner: MultiTenantUserType
 
 
@@ -49,7 +50,7 @@ class VideoType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(File, filters=FileFilter, order=FileOrder, pagination=True, fields="__all__")
 class FileType(relay.Node, GetQuerysetMultiTenantMixin):
     owner: MultiTenantUserType
-    file_web_url: str | None
+    file_url: str | None
 
 
 @type(MediaProductThrough, filters=MediaProductThroughFilter,

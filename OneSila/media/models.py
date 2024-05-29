@@ -84,7 +84,13 @@ class Media(models.Model):
 
         return None
 
-    def file_web_url(self):
+    def image_url(self):
+        if self.image:
+            return f"{generate_absolute_url(trailing_slash=False)}{self.image.url}"
+
+        return None
+
+    def file_url(self):
         if self.file:
             return f"{generate_absolute_url(trailing_slash=False)}{self.file.url}"
 
