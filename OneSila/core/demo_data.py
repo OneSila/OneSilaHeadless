@@ -7,7 +7,7 @@ from django.conf import settings
 from django.db.models import ProtectedError
 from model_bakery import baker
 from faker import Faker
-from random import randint
+from random import randint, choice
 from faker.providers import DynamicProvider, BaseProvider
 from core.countries import COUNTRY_CHOICES, num_countries
 import types
@@ -21,7 +21,17 @@ class VATProvider(BaseProvider):
         return f"{country_code}{rand}"
 
 
+class OrderReferenceProvider(BaseProvider):
+    order_prepends = ['UKGB', 'BENL', 'BEFR']
+
+    def order_reference(self) -> str:
+        rand = randint(111111111, 999999999)
+        prepen = choice(self.order_prepends)
+        return f"{prepen}{rand}"
+
+
 fake.add_provider(VATProvider)
+fake.add_provider(OrderReferenceProvider)
 
 
 class CreatePrivateDataRelationMixin:
