@@ -1,5 +1,5 @@
 from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator
-from orders.models import SalesOrder, SalesOrderItem
+from orders.models import Order, OrderItem
 from contacts.models import Customer
 
 registry = DemoDataLibrary()
@@ -7,7 +7,7 @@ registry = DemoDataLibrary()
 
 @registry.register_private_app
 class SalesOrderGenerator(PrivateDataGenerator):
-    model = SalesOrder
+    model = Order
     count = 300
     field_mapper = {
         'reference': fake.order_reference,
