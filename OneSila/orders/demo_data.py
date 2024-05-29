@@ -47,13 +47,14 @@ class SalesOrderGenerator(PrivateDataGenerator):
         kwargs['shipping_address'] = shipping_address
         return kwargs
 
+
 @registry.register_private_app
 class OrderItemGenerator(PrivateDataGenerator):
     model = OrderItem
     count = 1000
 
     field_mapper = {
-        'quantity': lambda: fake.random_int(min=1, max=100),
+        'quantity': lambda: fake.random_int(min=1, max=4),
         'price': lambda: round(fake.random_number(digits=2) + fake.pyfloat(left_digits=0, right_digits=2, min_value=0, max_value=1), 2)
     }
 

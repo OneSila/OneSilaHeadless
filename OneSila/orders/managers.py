@@ -91,7 +91,7 @@ class OrderItemQuerySet(models.QuerySet):
         is the sum of all price * quantity
         '''
         total_value_aggregate = self.all().aggregate(total_value=Sum(F('quantity') * F('price'), output_field=FloatField()))
-        return total_value_aggregate['total_value']
+        return round(total_value_aggregate['total_value'], 2)
 
     def filter_sold_in_x_days(self, x_days=21):
         '''
