@@ -75,3 +75,6 @@ MULTI_TENANT_LOGIN_LINK_EXPIRES_AFTER_MIN = 60
 # Huey overrides
 #
 HUEY['immediate'] = DEBUG
+
+# This will make absolute path to work
+LOCAL_HOST = 'localhost:8080'

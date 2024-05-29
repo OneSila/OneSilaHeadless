@@ -1,10 +1,9 @@
-from core.schema.core.mutations import type
 from core.schema.core.mutations import create, update, delete, type, List
-
-from .types.types import ProductType, BundleProductType, UmbrellaProductType, \
+from .fields import create_product
+from ..types.types import ProductType, BundleProductType, UmbrellaProductType, \
     ProductVariationType, ProductTranslationType, UmbrellaVariationType, \
     BundleVariationType
-from .types.input import ProductInput, BundleProductInput, UmbrellaProductInput, \
+from ..types.input import ProductInput, BundleProductInput, UmbrellaProductInput, \
     ProductVariationInput, ProductTranslationInput, UmbrellaVariationInput, \
     BundleVariationInput, ProductPartialInput, UmbrellaProductPartialInput, \
     BundleProductPartialInput, ProductVariationPartialInput, \
@@ -12,9 +11,10 @@ from .types.input import ProductInput, BundleProductInput, UmbrellaProductInput,
     BundleVariationPartialInput
 
 
+
 @type(name="Mutation")
 class ProductsMutation:
-    create_product: ProductType = create(ProductInput)
+    create_product: ProductType = create_product()
     create_products: List[ProductType] = create(ProductInput)
     update_product: ProductType = update(ProductPartialInput)
     delete_product: ProductType = delete()

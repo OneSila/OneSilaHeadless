@@ -41,6 +41,9 @@ class InventoryLocation(models.Model):
     description = models.TextField(null=True, blank=True)
     location = models.ForeignKey('contacts.InternalShippingAddress', on_delete=models.CASCADE, null=True)
 
+    precise = models.BooleanField(default=False)
+
+
     def __str__(self):
         return self.name
 

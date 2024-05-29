@@ -34,8 +34,23 @@ class Product(models.Model):
     bundles = BundleManager()
     umbrellas = UmbrellaManager()
 
+    @property
+    def name(self):
+        translations = self.translations.all()
+        lang = self.multi_tenant_company.language
+        name = self.sku
+
+        if translations:
+            try:
+                translation = translations.get(language=lang)
+            except ProductTranslation.DoesNotExist:
+                translation = translations.last()
+
+            name = translation.name
+
+        return f"{name}"
     def __str__(self):
-        return f"{self.sku}"
+        return f"{self.name}"
 
     def set_active(self):
         self.active = True
@@ -83,7 +98,7 @@ class Product(models.Model):
         super().save(*args, **kwargs)
 
     class Meta:
-        search_terms = ['sku']
+        search_terms = ['sku', 'translations__name']
         unique_together = ("sku", "multi_tenant_company")
 
 
@@ -124,8 +139,8 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations")
 
     name = models.CharField(max_length=100)
-    short_description = models.TextField()
-    description = models.TextField()
+    short_description = models.TextField(blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
     url_key = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):

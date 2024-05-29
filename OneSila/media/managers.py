@@ -20,7 +20,8 @@ class ImageManager(MediaManager):
         return ImageQuerySet(self.model, using=self._db)
 
     def create(self, *args, **kwargs):
-        return super().create(*args, **kwargs, type=self.model.IMAGE)
+        kwargs.setdefault('type', self.model.IMAGE)
+        return super().create(*args, **kwargs)
 
 
 class VideoQuerySet(MediaQuerySet, QuerySetProxyModelMixin):
@@ -32,7 +33,8 @@ class VideoManager(MediaManager):
         return VideoQuerySet(self.model, using=self._db)
 
     def create(self, *args, **kwargs):
-        return super().create(*args, **kwargs, type=self.model.VIDEO)
+        kwargs.setdefault('type', self.model.VIDEO)
+        return super().create(*args, **kwargs)
 
 
 class FileQuerySet(MediaQuerySet, QuerySetProxyModelMixin):
@@ -44,4 +46,5 @@ class FileManager(MediaManager):
         return FileQuerySet(self.model, using=self._db)
 
     def create(self, *args, **kwargs):
-        return super().create(*args, **kwargs, type=self.model.FILE)
+        kwargs.setdefault('type', self.model.FILE)
+        return super().create(*args, **kwargs)

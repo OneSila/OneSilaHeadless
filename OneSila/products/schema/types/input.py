@@ -7,7 +7,7 @@ from products.models import Product, BundleProduct, UmbrellaProduct, ProductVari
 
 @input(Product, fields="__all__")
 class ProductInput:
-    pass
+    name: str
 
 
 @partial(Product, fields="__all__")
