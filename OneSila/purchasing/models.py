@@ -62,9 +62,9 @@ class PurchaseOrder(models.Model):
     def total_value(self):
         from django.db.models import Sum, F
 
-        total = self.purchaseorderitem_set.aggregate(
+        total = round(self.purchaseorderitem_set.aggregate(
             total_sum=Sum(F('quantity') * F('unit_price'))
-        )['total_sum']
+        )['total_sum'], 2)
 
         if total is None:
             return f"0 {self.currency.symbol}"
