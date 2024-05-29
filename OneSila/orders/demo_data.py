@@ -49,8 +49,8 @@ class SalesOrderGenerator(PrivateDataGenerator):
         kwargs['shipping_address'] = shipping_address
         return kwargs
 
-    def create_instance(self, *args, **kwargs):
-        instance = super().create_instance(*args, **kwargs)
+    def create_instance(self, kwargs):
+        instance = super().create_instance(kwargs)
         # we want to adjust the created at date to make it look like orders arrived over the last weeks.
         days_ago = randint(1, 7)
         new_created_at = timezone.now() - timezone.timedelta(days=days_ago)
