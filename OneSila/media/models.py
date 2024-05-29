@@ -73,14 +73,20 @@ class Media(models.Model):
         return self.type == self.IMAGE
 
     def is_file(self):
-        return self.type == self.IMAGE
+        return self.type == self.FILE
 
     def is_video(self):
-        return self.type == self.IMAGE
+        return self.type == self.VIDEO
 
     def image_web_url(self):
         if self.image:
             return f"{generate_absolute_url(trailing_slash=False)}{self.image_web.url}"
+
+        return None
+
+    def file_web_url(self):
+        if self.file:
+            return f"{generate_absolute_url(trailing_slash=False)}{self.file.url}"
 
         return None
 
@@ -117,7 +123,7 @@ class MediaProductThrough(models.Model):
     is_main_image = models.BooleanField(default=False)
 
     def __str__(self):
-        return '{} > {}'.format(self.product, self.image)
+        return '{} > {}'.format(self.product, self.media)
 
     class Meta:
         ordering = ('-is_main_image', 'sort_order')
