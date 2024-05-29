@@ -20,7 +20,7 @@ class SupplierProduct(models.Model):
     supplier = models.ForeignKey('contacts.Company', on_delete=models.CASCADE)
 
     def __str__(self):
-        return f"{self.product} <{self.supplier}>"
+        return f"{self.product.sku} < {self.supplier}>"
 
     def save(self, *args, **kwargs):
         if not self.product.is_variation():
