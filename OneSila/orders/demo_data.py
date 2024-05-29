@@ -3,6 +3,7 @@ from currencies.models import Currency
 from orders.models import Order, OrderItem
 from contacts.models import Customer, InvoiceAddress, ShippingAddress
 from products.models import Product
+from django.utils import timezone
 
 registry = DemoDataLibrary()
 
@@ -46,6 +47,14 @@ class SalesOrderGenerator(PrivateDataGenerator):
         kwargs['invoice_address'] = invoice_address
         kwargs['shipping_address'] = shipping_address
         return kwargs
+
+    def create_instance(self, *args, **kwargs):
+        instance = super().create_instance(*args, **kwargs)
+        # we want to adjust the created at date to make it look like orders arrived over the last weeks.
+        days_ago = random_int(1, 7)
+        new_created_at = timezone.now() - timezone.timedelta(days=days_ago)
+        instance.created_at = days_ago
+        instance.save()
 
 
 @registry.register_private_app
