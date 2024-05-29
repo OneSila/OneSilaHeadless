@@ -20,20 +20,21 @@ class SupplierProductGenerator(PrivateDataGenerator):
     }
 
     def prep_baker_kwargs(self, seed):
-        super_kwargs = super().prep_baker_kwargs(seed)
-        product = Product.objects.filter(type=Product.VARIATION).order_by('?').first()
-        supplier = Supplier.objects.filter(is_supplier=True).order_by('?').first()
-        currency = Currency.objects.filter(iso_code__in=['GBP', 'USD', 'EUR', 'THB']).order_by('?').first()
+        kwargs = super().prep_baker_kwargs(seed)
+        multi_tenant_company = kwargs['multi_tenant_company']
+        product = Product.objects.filter(type=Product.VARIATION, multi_tenant_company=multi_tenant_company).order_by('?').first()
+        supplier = Supplier.objects.filter(is_supplier=True, multi_tenant_company=multi_tenant_company).order_by('?').first()
+        currency = Currency.objects.filter(iso_code__in=['GBP', 'USD', 'EUR', 'THB'], multi_tenant_company=multi_tenant_company).order_by('?').first()
         unit = Unit.objects.order_by('?').first()
 
-        super_kwargs.update({
+        kwargs.update({
             'product': product,
             'supplier': supplier,
             'currency': currency,
             'unit': unit
         })
 
-        return super_kwargs
+        return kwargs
 
 @registry.register_private_app
 class PurchaseOrderGenerator(PrivateDataGenerator):
@@ -50,26 +51,27 @@ class PurchaseOrderGenerator(PrivateDataGenerator):
     }
 
     def prep_baker_kwargs(self, seed):
-        super_kwargs = super().prep_baker_kwargs(seed)
-        supplier = Supplier.objects.filter(is_supplier=True).order_by('?').first()
-        currency = Currency.objects.filter(iso_code__in=['GBP', 'USD', 'EUR', 'THB']).order_by('?').first()
+        kwargs = super().prep_baker_kwargs(seed)
+        multi_tenant_company = kwargs['multi_tenant_company']
+        supplier = Supplier.objects.filter(is_supplier=True, multi_tenant_company=multi_tenant_company).order_by('?').first()
+        currency = Currency.objects.filter(iso_code__in=['GBP', 'USD', 'EUR', 'THB'], multi_tenant_company=multi_tenant_company).order_by('?').first()
 
-        invoice_address = InvoiceAddress.objects.filter(company=supplier).last()
+        invoice_address = InvoiceAddress.objects.filter(company=supplier, multi_tenant_company=multi_tenant_company).last()
         if not invoice_address:
-            invoice_address = InvoiceAddress.objects.first()
+            invoice_address = InvoiceAddress.objects.filter(multi_tenant_company=multi_tenant_company).first()
 
-        shipping_address = ShippingAddress.objects.filter(company=supplier).last()
+        shipping_address = ShippingAddress.objects.filter(company=supplier, multi_tenant_company=multi_tenant_company).last()
         if not shipping_address:
-            shipping_address = ShippingAddress.objects.first()
+            shipping_address = ShippingAddress.objects.filter(multi_tenant_company=multi_tenant_company).first()
 
-        super_kwargs.update({
+        kwargs.update({
             'supplier': supplier,
             'currency': currency,
             'invoice_address': invoice_address,
             'shipping_address': shipping_address
         })
 
-        return super_kwargs
+        return kwargs
 
 @registry.register_private_app
 class PurchaseOrderItemGenerator(PrivateDataGenerator):
@@ -82,7 +84,9 @@ class PurchaseOrderItemGenerator(PrivateDataGenerator):
     }
 
     def prep_baker_kwargs(self, seed):
-        super_kwargs = super().prep_baker_kwargs(seed)
+        kwargs = super().prep_baker_kwargs(seed)
+        multi_tenant_company = kwargs['multi_tenant_company']
+
         valid = False
         attempts = 0
         max_attempts = 5
@@ -91,12 +95,12 @@ class PurchaseOrderItemGenerator(PrivateDataGenerator):
             purchase_order = PurchaseOrder.objects.order_by('?').first()
             supplier_product = SupplierProduct.objects.order_by('?').first()
 
-            if not PurchaseOrderItem.objects.filter(purchase_order=purchase_order, item=supplier_product).exists():
+            if not PurchaseOrderItem.objects.filter(purchase_order=purchase_order, item=supplier_product, multi_tenant_company=multi_tenant_company).exists():
                 valid = True
-                super_kwargs.update({
+                kwargs.update({
                     'purchase_order': purchase_order,
                     'item': supplier_product
                 })
             attempts += 1
 
-        return super_kwargs
+        return kwargs

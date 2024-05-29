@@ -32,16 +32,18 @@ class SalesOrderGenerator(PrivateDataGenerator):
 
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)
-        customer = Customer.objects.filter(is_customer=True).order_by('?').first()
-        currency = Currency.objects.filter(iso_code__in=['GBP', 'USD', 'EUR', 'THB']).order_by('?').first()
+        multi_tenant_company = kwargs['multi_tenant_company']
 
-        invoice_address = InvoiceAddress.objects.filter(company=customer).last()
+        customer = Customer.objects.filter(is_customer=True, multi_tenant_company=multi_tenant_company).order_by('?').first()
+        currency = Currency.objects.filter(iso_code__in=['GBP', 'USD', 'EUR', 'THB'], multi_tenant_company=multi_tenant_company).order_by('?').first()
+
+        invoice_address = InvoiceAddress.objects.filter(company=customer, multi_tenant_company=multi_tenant_company).last()
         if not invoice_address:
-            invoice_address = InvoiceAddress.objects.first()
+            invoice_address = InvoiceAddress.objects.filter(multi_tenant_company=multi_tenant_company).first()
 
-        shipping_address = ShippingAddress.objects.filter(company=customer).last()
+        shipping_address = ShippingAddress.objects.filter(company=customer, multi_tenant_company=multi_tenant_company).last()
         if not shipping_address:
-            shipping_address = ShippingAddress.objects.first()
+            shipping_address = ShippingAddress.objects.filter(multi_tenant_company=multi_tenant_company).first()
 
         days_ago = randint(1, 50)
         new_created_at = timezone.now() - timezone.timedelta(days=days_ago)
@@ -65,7 +67,8 @@ class OrderItemGenerator(PrivateDataGenerator):
     }
 
     def prep_baker_kwargs(self, seed):
-        super_kwargs = super().prep_baker_kwargs(seed)
+        kwargs = super().prep_baker_kwargs(seed)
+        multi_tenant_company = kwargs['multi_tenant_company']
         valid = False
         attempts = 0
         max_attempts = 5
@@ -75,10 +78,10 @@ class OrderItemGenerator(PrivateDataGenerator):
             order = Order.objects.order_by('?').first()
 
             # Check if the combination already exists
-            if not OrderItem.objects.filter(order=order, product=product).exists():
+            if not OrderItem.objects.filter(order=order, product=product, multi_tenant_company=multi_tenant_company).exists():
                 valid = True
-                super_kwargs['product'] = product
-                super_kwargs['order'] = order
+                kwargs['product'] = product
+                kwargs['order'] = order
             attempts += 1
 
-        return super_kwargs
+        return kwargs
