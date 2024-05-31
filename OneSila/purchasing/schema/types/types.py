@@ -5,22 +5,10 @@ from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixi
 from typing import List
 
 from currencies.schema.types.types import CurrencyType
-from products.schema.types.types import ProductVariationType, ProductType
-from purchasing.models import SupplierProduct, PurchaseOrder, \
-    PurchaseOrderItem
-from units.schema.types.types import UnitType
-from .filters import SupplierProductFilter, PurchaseOrderFilter, \
-    PurchaseOrderItemFilter
-from .ordering import SupplierProductOrder, PurchaseOrderOrder, \
-    PurchaseOrderItemOrder
-
-
-@type(SupplierProduct, filters=SupplierProductFilter, order=SupplierProductOrder, pagination=True, fields="__all__")
-class SupplierProductType(relay.Node, GetQuerysetMultiTenantMixin):
-    supplier: CompanyType
-    product: ProductType
-    unit: UnitType
-    currency: CurrencyType
+from products.schema.types.types import SupplierProductType
+from purchasing.models import PurchaseOrder, PurchaseOrderItem
+from .filters import PurchaseOrderFilter, PurchaseOrderItemFilter
+from .ordering import PurchaseOrderOrder, PurchaseOrderItemOrder
 
 
 @type(PurchaseOrder, filters=PurchaseOrderFilter, order=PurchaseOrderOrder, pagination=True, fields="__all__")

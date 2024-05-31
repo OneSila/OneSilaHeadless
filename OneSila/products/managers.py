@@ -7,15 +7,21 @@ class ProductQuerySet(MultiTenantQuerySet):
         return self.filter(type=self.model.UMBRELLA)
 
     def filter_variation(self):
-        return self.filter(type=self.model.VARIATION)
+        return self.filter(type=self.model.SIMPLE)
 
     def filter_bundle(self):
         return self.filter(type=self.model.BUNDLE)
 
+    def filter_manufacturer(self):
+        return self.filter(type=self.model.MANUFACTURER)
 
-class ProductManger(MultiTenantManager):
+    def filter_dropship(self):
+        return self.filter(type=self.model.DROPSHIP)
+
+
+class ProductManager(MultiTenantManager):
     def get_queryset(self):
-        return ProductQuerySet(self.model, using=self._db)
+        return ProductQuerySet(self.model, using=self._db).exclude(type=self.model.SUPPLIER)
 
 
 class UmbrellaQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
@@ -31,7 +37,7 @@ class VariationQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
     pass
 
 
-class VariationManager(ProductManger):
+class VariationManager(ProductManager):
     def get_queryset(self):
         return VariationQuerySet(self.model, using=self._db)
 
@@ -40,6 +46,32 @@ class BundleQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
     pass
 
 
-class BundleManager(ProductManger):
+class BundleManager(ProductManager):
     def get_queryset(self):
         return BundleQuerySet(self.model, using=self._db)
+
+class ManufacturableQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+    pass
+
+
+class ManufacturableManager(ProductManager):
+    def get_queryset(self):
+        return ManufacturableQuerySet(self.model, using=self._db)
+
+
+class DropshipQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+    pass
+
+
+class DropshipManager(ProductManager):
+    def get_queryset(self):
+        return DropshipQuerySet(self.model, using=self._db)
+
+
+class SupplierProductQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+    pass
+
+
+class SupplierProductManager(ProductManager):
+    def get_queryset(self):
+        return SupplierProductQuerySet(self.model, using=self._db)

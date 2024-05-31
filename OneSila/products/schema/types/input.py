@@ -1,8 +1,8 @@
 from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial
 
-from products.models import Product, BundleProduct, UmbrellaProduct, ProductVariation, \
-    ProductTranslation, UmbrellaVariation, BundleVariation
+from products.models import Product, BundleProduct, UmbrellaProduct, SimpleProduct, \
+    ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct
 
 
 @input(Product, fields="__all__")
@@ -35,13 +35,13 @@ class UmbrellaProductPartialInput(NodeInput):
     pass
 
 
-@input(ProductVariation, fields="__all__")
-class ProductVariationInput:
+@input(SimpleProduct, fields="__all__")
+class SimpleProductInput:
     pass
 
 
-@partial(ProductVariation, fields="__all__")
-class ProductVariationPartialInput(NodeInput):
+@partial(SimpleProduct, fields="__all__")
+class SimpleProductPartialInput(NodeInput):
     pass
 
 
@@ -72,4 +72,44 @@ class BundleVariationInput:
 
 @partial(BundleVariation, fields="__all__")
 class BundleVariationPartialInput(NodeInput):
+    pass
+
+
+@input(ManufacturableProduct, fields="__all__")
+class ManufacturableProductInput:
+    pass
+
+
+@partial(ManufacturableProduct, fields="__all__")
+class ManufacturableProductPartialInput(NodeInput):
+    pass
+
+
+@input(DropshipProduct, fields="__all__")
+class DropshipProductInput:
+    pass
+
+
+@partial(DropshipProduct, fields="__all__")
+class DropshipProductPartialInput(NodeInput):
+    pass
+
+
+@input(SupplierProduct, fields="__all__")
+class SupplierProductInput:
+    pass
+
+
+@partial(SupplierProduct, fields="__all__")
+class SupplierProductPartialInput(NodeInput):
+    pass
+
+
+@input(BillOfMaterial, fields="__all__")
+class BillOfMaterialInput:
+    pass
+
+
+@partial(BillOfMaterial, fields="__all__")
+class BillOfMaterialPartialInput(NodeInput):
     pass

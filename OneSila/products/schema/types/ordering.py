@@ -2,8 +2,8 @@ from core.schema.core.types.ordering import order
 from core.schema.core.types.types import auto
 
 from products.models import Product, BundleProduct, UmbrellaProduct, \
-    ProductVariation, ProductTranslation, UmbrellaVariation, \
-    BundleVariation
+    SimpleProduct, ProductTranslation, UmbrellaVariation, \
+    BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct
 
 
 @order(Product)
@@ -24,8 +24,8 @@ class UmbrellaProductOrder:
     sku: auto
 
 
-@order(ProductVariation)
-class ProductVariationOrder:
+@order(SimpleProduct)
+class SimpleProductOrder:
     id: auto
     sku: auto
 
@@ -42,4 +42,26 @@ class UmbrellaVariationOrder:
 
 @order(BundleVariation)
 class BundleVariationOrder:
+    id: auto
+
+@order(ManufacturableProduct)
+class ManufacturableProductOrder:
+    id: auto
+    sku: auto
+
+
+@order(DropshipProduct)
+class DropshipProductOrder:
+    id: auto
+    sku: auto
+
+
+@order(SupplierProduct)
+class SupplierProductOrder:
+    id: auto
+    sku: auto
+
+
+@order(BillOfMaterial)
+class BillOfMaterialOrder:
     id: auto

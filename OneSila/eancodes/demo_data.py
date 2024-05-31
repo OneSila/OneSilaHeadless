@@ -2,7 +2,7 @@ from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, P
 from django.db.models import Q
 from eancodes.models import EanCode
 from products.models import Product
-from products.product_types import UMBRELLA, VARIATION, BUNDLE, PRODUCT_TYPE_CHOICES
+from products.product_types import UMBRELLA, SIMPLE, BUNDLE, PRODUCT_TYPE_CHOICES
 
 registry = DemoDataLibrary()
 
@@ -20,7 +20,7 @@ class AppModelPrivateGenerator(PrivateDataGenerator):
 
         if fake.boolean():
             kwargs['product'] = Product.objects.\
-                filter(Q(type=VARIATION) | Q(type=BUNDLE)).\
+                filter(Q(type=SIMPLE) | Q(type=BUNDLE)).\
                 filter(eancode__isnull=True).\
                 first()
 

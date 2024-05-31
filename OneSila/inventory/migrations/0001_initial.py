@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('quantity', models.IntegerField()),
                 ('multi_tenant_company', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='core.multitenantcompany')),
-                ('product', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='stock', to='products.productvariation')),
+                ('product', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='stock', to='products.simpleproduct')),
                 ('stocklocation', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='inventory.inventorylocation')),
             ],
             options={

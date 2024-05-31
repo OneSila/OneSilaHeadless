@@ -3,19 +3,32 @@ from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from translations.models import TranslationFieldsMixin
 from taxes.models import VatRate
-from .managers import ProductManger, UmbrellaManager, BundleManager, VariationManager
+from .managers import ProductManager, UmbrellaManager, BundleManager, VariationManager, SupplierProductManager, ManufacturableManager, DropshipManager
 import shortuuid
 from hashlib import shake_256
 
 
 class Product(models.Model):
-    from products.product_types import UMBRELLA, VARIATION, BUNDLE, PRODUCT_TYPE_CHOICES
+    from products.product_types import UMBRELLA, BUNDLE, MANUFACTURABLE, DROPSHIP, SUPPLIER, SIMPLE, PRODUCT_TYPE_CHOICES
 
+    # Mandatory
     sku = models.CharField(max_length=100, db_index=True, blank=True, null=True)
     active = models.BooleanField(default=False)
-    type = models.CharField(max_length=9, choices=PRODUCT_TYPE_CHOICES)
-    vat_rate = models.ForeignKey(VatRate, on_delete=models.PROTECT)
+    type = models.CharField(max_length=15, choices=PRODUCT_TYPE_CHOICES)
+
+    # For Everything except supplier product
+    vat_rate = models.ForeignKey(VatRate, on_delete=models.PROTECT, null=True, blank=True)
+    for_sale = models.BooleanField(default=True) # Supplier products will have always this as False
+
+    # for simple products
     always_on_stock = models.BooleanField(default=False)
+
+    # Supplier Product Fields
+    supplier = models.ForeignKey('contacts.Company', on_delete=models.CASCADE, null=True, blank=True)
+    base_product = models.ForeignKey('self', on_delete=models.CASCADE, related_name='supplier_products', null=True, blank=True)
+
+    #Manufacturer product fields
+    production_time = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     umbrella_variations = models.ManyToManyField('self',
         through='UmbrellaVariation',
@@ -29,10 +42,22 @@ class Product(models.Model):
         blank=True,
         related_name='bundles')
 
-    objects = ProductManger()
+
+    bom_variations = models.ManyToManyField(
+        'self',
+        through='BillOfMaterial',
+        symmetrical=False,
+        blank=True,
+        related_name='manufacturables'
+    )
+
+    objects = ProductManager()
     variations = VariationManager()
     bundles = BundleManager()
     umbrellas = UmbrellaManager()
+    manufacturables = ManufacturableManager()
+    dropships = DropshipManager()
+    supplier_products = SupplierProductManager()
 
     @property
     def name(self):
@@ -72,19 +97,36 @@ class Product(models.Model):
     def is_not_bundle(self):
         return self.type != self.BUNDLE
 
-    def is_variation(self):
-        return self.type == self.VARIATION
+    def is_simple(self):
+        return self.type == self.SIMPLE
 
     def is_not_variations(self):
-        return self.type != self.VARIATION
+        return self.type != self.SIMPLE
+
+    def is_not_manufacturable(self):
+        return self.type != self.MANUFACTURABLE
+    def is_manufacturable(self):
+        return self.type == self.MANUFACTURABLE
+
+    def is_dropship(self):
+        return self.type == self.DROPSHIP
+
+    def is_supplier_product(self):
+        return self.type == self.SUPPLIER
 
     def get_proxy_instance(self):
-        if self.is_variation():
-            return ProductVariation.objects.get(pk=self.pk)
+        if self.is_simple():
+            return SimpleProduct.objects.get(pk=self.pk)
         elif self.is_bundle():
             return BundleProduct.objects.get(pk=self.pk)
         elif self.is_umbrella():
             return UmbrellaProduct.objects.get(pk=self.pk)
+        elif self.is_manufacturable():
+            return ManufacturableProduct.objects.get(pk=self.pk)
+        elif self.is_dropship():
+            return DropshipProduct.objects.get(pk=self.pk)
+        elif self.is_supplier_product():
+            return SupplierProduct.objects.get(pk=self.pk)
         else:
             return self
 
@@ -124,31 +166,36 @@ class UmbrellaProduct(Product):
         search_terms = ['sku']
 
 
-class ProductVariation(Product):
-    from products.product_types import VARIATION
+class SimpleProduct(Product):
+    from products.product_types import SIMPLE
 
     objects = VariationManager()
-    proxy_filter_fields = {'type': VARIATION}
+    proxy_filter_fields = {'type': SIMPLE}
+
+    class Meta:
+        proxy = True
+        search_terms = ['sku']
+
+class ManufacturableProduct(Product):
+    from products.product_types import MANUFACTURABLE
+
+    objects = ManufacturableManager()
+    proxy_filter_fields = {'type': MANUFACTURABLE}
 
     class Meta:
         proxy = True
         search_terms = ['sku']
 
 
-class ProductTranslation(TranslationFieldsMixin, models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations")
+class DropshipProduct(Product):
+    from products.product_types import DROPSHIP
 
-    name = models.CharField(max_length=100)
-    short_description = models.TextField(blank=True, null=True)
-    description = models.TextField(blank=True, null=True)
-    url_key = models.CharField(max_length=100, null=True, blank=True)
-
-    def __str__(self):
-        return f"{self.product} <{self.language}>"
+    objects = DropshipManager()
+    proxy_filter_fields = {'type': DROPSHIP}
 
     class Meta:
-        unique_together = ('product', 'language')
-
+        proxy = True
+        search_terms = ['sku']
 
 class UmbrellaVariation(models.Model):
     umbrella = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="umbrellavariation_umbrellas")
@@ -159,7 +206,7 @@ class UmbrellaVariation(models.Model):
             raise IntegrityError(_("umbrella needs to a product of type UMBRELLA. Not %s" % (self.umbrella.type)))
 
         if self.variation.is_umbrella():
-            raise IntegrityError(_("variation needs to a product of type BUNDLE or VARIATION. Not %s" % (self.umbrella.type)))
+            raise IntegrityError(_("variation needs to a product of type BUNDLE or SIMPLE. Not %s" % (self.umbrella.type)))
 
         super().save(*args, **kwargs)
 
@@ -183,9 +230,71 @@ class BundleVariation(models.Model):
             raise IntegrityError(_("umbrella needs to a product of type BUNDLE. Not %s" % (self.umbrella.type)))
 
         if self.variation.is_umbrella():
-            raise IntegrityError(_("variation needs to a product of type BUNDLE or VARIATION. Not %s" % (self.umbrella.type)))
+            raise IntegrityError(_("variation needs to a product of type BUNDLE or SIMPLE. Not %s" % (self.umbrella.type)))
 
         super().save(*args, **kwargs)
 
     class Meta:
         unique_together = ("umbrella", "variation")
+
+class BillOfMaterial(models.Model):
+    manufacturable = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_manufacturables")
+    component = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_components")
+    quantity = models.IntegerField(default=1)
+
+    def __str__(self):
+        return f"{self.manufacturable} x {self.quantity} {self.component}"
+
+    def save(self, *args, **kwargs):
+        if self.manufacturable.is_not_manufacturable():
+            raise IntegrityError(_("Product needs to be of type MANUFACTURABLE. Not %s" % self.manufacturable.type))
+
+        super().save(*args, **kwargs)
+
+    class Meta:
+        unique_together = ("manufacturable", "component")
+
+class ProductTranslation(TranslationFieldsMixin, models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations")
+
+    name = models.CharField(max_length=100)
+    short_description = models.TextField(blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+    url_key = models.CharField(max_length=100, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.product} <{self.language}>"
+
+    class Meta:
+        unique_together = ('product', 'language')
+
+class SupplierProduct(Product):
+    from products.product_types import SUPPLIER
+
+    objects = SupplierProductManager()
+    proxy_filter_fields = {'type': SUPPLIER}
+
+    class Meta:
+        proxy = True
+        search_terms = ['sku', 'supplier__name']
+
+    def save(self, *args, **kwargs):
+        if self.base_product.type not in [self.SIMPLE, self.DROPSHIP]:
+            raise IntegrityError(_("SupplierProduct can only be attached to a SIMPLE or DROPSHIP product. Not a {}".format(self.type)))
+
+        if self.supplier and not self.supplier.is_supplier:
+            self.supplier.is_supplier = True
+            self.supplier.save()
+
+        self.for_sale = False
+
+        super().save(*args, **kwargs)
+class SupplierPrices(models.Model):
+    supplier_product = models.ForeignKey(SupplierProduct, on_delete=models.CASCADE, related_name='details')
+
+    unit = models.ForeignKey('units.Unit', on_delete=models.PROTECT)
+    quantity = models.IntegerField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        search_terms = ['supplier_product__product__sku', 'supplier_product__supplier__name']

@@ -4,7 +4,7 @@ from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin
 
 from inventory.models import Inventory, InventoryLocation
-from products.schema.types.filters import ProductVariationFilter
+from products.schema.types.filters import SimpleProductFilter
 from contacts.schema.types.filters import InternalShippingAddressFilter
 
 
@@ -21,4 +21,4 @@ class InventoryFilter(SearchFilterMixin):
     search: str | None
     id: auto
     stocklocation: InventoryLocationFilter | None
-    product: ProductVariationFilter | None
+    product: SimpleProductFilter | None

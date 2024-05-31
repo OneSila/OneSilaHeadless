@@ -1,6 +1,6 @@
 from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator
-from products.models import ProductVariation
-from products.product_types import UMBRELLA, VARIATION, BUNDLE, PRODUCT_TYPE_CHOICES
+from products.models import SimpleProduct
+from products.product_types import UMBRELLA, SIMPLE, BUNDLE, PRODUCT_TYPE_CHOICES
 from taxes.models import VatRate
 
 
@@ -8,13 +8,13 @@ registry = DemoDataLibrary()
 
 
 @registry.register_private_app
-class ProductVariationDataGenerator(PrivateDataGenerator):
-    model = ProductVariation
+class SimpleProductDataGenerator(PrivateDataGenerator):
+    model = SimpleProduct
     count = 10
     field_mapper = {
         'always_on_stock': fake.boolean,
         'active': fake.boolean,
-        'type': VARIATION,
+        'type': SIMPLE,
     }
 
     def prep_baker_kwargs(self, seed):

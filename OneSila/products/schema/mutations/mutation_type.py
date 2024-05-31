@@ -1,12 +1,12 @@
 from core.schema.core.mutations import create, update, delete, type, List
 from .fields import create_product
 from ..types.types import ProductType, BundleProductType, UmbrellaProductType, \
-    ProductVariationType, ProductTranslationType, UmbrellaVariationType, \
+    SimpleProductType, ProductTranslationType, UmbrellaVariationType, \
     BundleVariationType
 from ..types.input import ProductInput, BundleProductInput, UmbrellaProductInput, \
-    ProductVariationInput, ProductTranslationInput, UmbrellaVariationInput, \
+    SimpleProductInput, ProductTranslationInput, UmbrellaVariationInput, \
     BundleVariationInput, ProductPartialInput, UmbrellaProductPartialInput, \
-    BundleProductPartialInput, ProductVariationPartialInput, \
+    BundleProductPartialInput, SimpleProductPartialInput, \
     ProductTranslationPartialInput, UmbrellaVariationPartialInput, \
     BundleVariationPartialInput
 
@@ -32,11 +32,11 @@ class ProductsMutation:
     delete_umbrella_product: UmbrellaProductType = delete()
     delete_umbrella_products: List[UmbrellaProductType] = delete()
 
-    create_product_variation: ProductVariationType = create(ProductVariationInput)
-    create_product_variations: List[ProductVariationType] = create(ProductVariationInput)
-    update_product_variation: ProductVariationType = update(ProductVariationPartialInput)
-    delete_product_variation: ProductVariationType = delete()
-    delete_product_variations: List[ProductVariationType] = delete()
+    create_simple_product: SimpleProductType = create(SimpleProductInput)
+    create_simple_products: List[SimpleProductType] = create(SimpleProductInput)
+    update_simple_product: SimpleProductType = update(SimpleProductPartialInput)
+    delete_simple_product: SimpleProductType = delete()
+    delete_simple_products: List[SimpleProductType] = delete()
 
     create_product_translation: ProductTranslationType = create(ProductTranslationInput)
     create_product_translations: List[ProductTranslationType] = create(ProductTranslationInput)

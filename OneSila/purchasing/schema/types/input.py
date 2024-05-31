@@ -1,18 +1,7 @@
 from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial
 
-from purchasing.models import SupplierProduct, PurchaseOrder, \
-    PurchaseOrderItem
-
-
-@input(SupplierProduct, fields="__all__")
-class SupplierProductInput:
-    pass
-
-
-@partial(SupplierProduct, fields="__all__")
-class SupplierProductPartialInput(NodeInput):
-    pass
+from purchasing.models import PurchaseOrder, PurchaseOrderItem
 
 
 @input(PurchaseOrder, fields="__all__")

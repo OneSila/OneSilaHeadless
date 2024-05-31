@@ -1,7 +1,7 @@
 from django.db import models
 from django.dispatch import receiver
 from django.db.models.signals import post_save
-from products.models import Product, BundleProduct, UmbrellaProduct, ProductVariation, ProductTranslation, \
+from products.models import Product, BundleProduct, UmbrellaProduct, SimpleProduct, ProductTranslation, \
     UmbrellaVariation, BundleVariation
 
 from core.schema.core.subscriptions import refresh_subscription_receiver
@@ -13,7 +13,7 @@ logger = logging.getLogger('__name__')
 @receiver(post_save, sender=Product)
 @receiver(post_save, sender=BundleProduct)
 @receiver(post_save, sender=UmbrellaProduct)
-@receiver(post_save, sender=ProductVariation)
+@receiver(post_save, sender=SimpleProduct)
 @receiver(post_save, sender=ProductTranslation)
 @receiver(post_save, sender=UmbrellaVariation)
 @receiver(post_save, sender=BundleVariation)

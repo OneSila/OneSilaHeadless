@@ -3,7 +3,9 @@ from products.models import Product
 from contacts.models import Company, InvoiceAddress, ShippingAddress, Supplier
 from currencies.models import Currency
 from units.models import Unit
-from .models import SupplierProduct, PurchaseOrder, PurchaseOrderItem
+from .models import PurchaseOrder, PurchaseOrderItem
+from products.models import SupplierProduct
+from taxes.models import VatRate
 
 registry = DemoDataLibrary()
 
@@ -14,7 +16,6 @@ class SupplierProductGenerator(PrivateDataGenerator):
 
     field_mapper = {
         'sku': lambda: fake.bothify(text='SKU-####??'),
-        'name': lambda: fake.ecommerce_name(),
         'quantity': lambda: fake.random_int(min=1, max=100),
         'unit_price': lambda: round(fake.random_number(digits=2) + fake.pyfloat(left_digits=0, right_digits=2, min_value=0, max_value=1), 2)
     }
@@ -22,16 +23,18 @@ class SupplierProductGenerator(PrivateDataGenerator):
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)
         multi_tenant_company = kwargs['multi_tenant_company']
-        product = Product.objects.filter(type=Product.VARIATION, multi_tenant_company=multi_tenant_company).order_by('?').first()
+
+        product = Product.objects.filter(type=Product.SIMPLE, multi_tenant_company=multi_tenant_company).order_by('?').first()
         supplier = Supplier.objects.filter(is_supplier=True, multi_tenant_company=multi_tenant_company).order_by('?').first()
-        currency = Currency.objects.filter(iso_code__in=['GBP', 'USD', 'EUR', 'THB'], multi_tenant_company=multi_tenant_company).order_by('?').first()
+        vat_rate = VatRate.objects.filter(multi_tenant_company=multi_tenant_company).first()
         unit = Unit.objects.order_by('?').first()
 
         kwargs.update({
-            'product': product,
+            'base_product': product,
             'supplier': supplier,
-            'currency': currency,
-            'unit': unit
+            'vat_rate': vat_rate,
+            'unit': unit,
+            'type': Product.SUPPLIER
         })
 
         return kwargs

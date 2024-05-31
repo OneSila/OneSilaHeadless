@@ -1,21 +1,12 @@
 from core.schema.core.mutations import type
 from core.schema.core.mutations import create, update, delete, type, List
 
-from .types.types import SupplierProductType, PurchaseOrderType, \
-    PurchaseOrderItemType
-from .types.input import SupplierProductInput, PurchaseOrderInput, \
-    PurchaseOrderItemInput, SupplierProductPartialInput, \
-    PurchaseOrderPartialInput, PurchaseOrderItemPartialInput
+from .types.types import  PurchaseOrderType, PurchaseOrderItemType
+from .types.input import  PurchaseOrderInput, PurchaseOrderItemInput, PurchaseOrderPartialInput, PurchaseOrderItemPartialInput
 
 
 @type(name="Mutation")
 class PurchasingMutation:
-    create_supplier_product: SupplierProductType = create(SupplierProductInput)
-    create_supplier_products: List[SupplierProductType] = create(SupplierProductInput)
-    update_supplier_product: SupplierProductType = update(SupplierProductPartialInput)
-    delete_supplier_product: SupplierProductType = delete()
-    delete_supplier_products: List[SupplierProductType] = delete()
-
     create_purchase_order: PurchaseOrderType = create(PurchaseOrderInput)
     create_purchase_orders: List[PurchaseOrderType] = create(PurchaseOrderInput)
     update_purchase_order: PurchaseOrderType = update(PurchaseOrderPartialInput)
