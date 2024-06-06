@@ -5,7 +5,8 @@ from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin
 
 from products.models import Product, BundleProduct, UmbrellaProduct, \
-    SimpleProduct, ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct
+    SimpleProduct, ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, \
+    SupplierPrices
 from taxes.schema.types.filters import VatRateFilter
 from units.schema.types.filters import UnitFilter
 
@@ -16,6 +17,7 @@ class ProductFilter(SearchFilterMixin):
     id: auto
     sku: auto
     type: auto
+    for_sale: auto
     vat_rate: Optional[VatRateFilter]
 
 
@@ -83,11 +85,15 @@ class SupplierProductFilter(SearchFilterMixin):
     id: auto
     sku: auto
     supplier: Optional[SupplierFilter]
-    unit: Optional[UnitFilter]
+    base_product: Optional[ProductFilter]
 
 
 @filter(BillOfMaterial)
 class BillOfMaterialFilter:
     id: auto
-    manufacturable: Optional[ProductFilter]
-    component: Optional[ProductFilter]
+    umbrella: Optional[ProductFilter]
+
+@filter(SupplierPrices)
+class SupplierPricesFilter(SearchFilterMixin):
+    search: str | None
+    supplier_product: Optional[SupplierProductFilter]

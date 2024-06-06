@@ -8,7 +8,7 @@ registry = DemoDataLibrary()
 
 
 @registry.register_private_app
-class AppModelPrivateGenerator(PrivateDataGenerator):
+class EanCodeGenerator(PrivateDataGenerator):
     model = EanCode
     count = 1200
     field_mapper = {
@@ -17,9 +17,11 @@ class AppModelPrivateGenerator(PrivateDataGenerator):
 
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)
+        multi_tenant_company = kwargs['multi_tenant_company']
 
         if fake.boolean():
             kwargs['product'] = Product.objects.\
+                filter(multi_tenant_company=multi_tenant_company).\
                 filter(Q(type=SIMPLE) | Q(type=BUNDLE)).\
                 filter(eancode__isnull=True).\
                 first()

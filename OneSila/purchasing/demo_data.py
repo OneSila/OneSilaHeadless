@@ -1,11 +1,9 @@
 from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator
-from products.models import Product
-from contacts.models import Company, InvoiceAddress, ShippingAddress, Supplier
+from contacts.models import InvoiceAddress, ShippingAddress, Supplier
 from currencies.models import Currency
 from units.models import Unit
 from .models import PurchaseOrder, PurchaseOrderItem
-from products.models import SupplierProduct
-from taxes.models import VatRate
+from products.models import SupplierProduct, Product, ProductTranslation, SupplierPrices
 
 registry = DemoDataLibrary()
 
@@ -16,8 +14,7 @@ class SupplierProductGenerator(PrivateDataGenerator):
 
     field_mapper = {
         'sku': lambda: fake.bothify(text='SKU-####??'),
-        'quantity': lambda: fake.random_int(min=1, max=100),
-        'unit_price': lambda: round(fake.random_number(digits=2) + fake.pyfloat(left_digits=0, right_digits=2, min_value=0, max_value=1), 2)
+        'type': Product.SUPPLIER
     }
 
     def prep_baker_kwargs(self, seed):
@@ -26,18 +23,33 @@ class SupplierProductGenerator(PrivateDataGenerator):
 
         product = Product.objects.filter(type=Product.SIMPLE, multi_tenant_company=multi_tenant_company).order_by('?').first()
         supplier = Supplier.objects.filter(is_supplier=True, multi_tenant_company=multi_tenant_company).order_by('?').first()
-        vat_rate = VatRate.objects.filter(multi_tenant_company=multi_tenant_company).first()
-        unit = Unit.objects.order_by('?').first()
 
         kwargs.update({
             'base_product': product,
-            'supplier': supplier,
-            'vat_rate': vat_rate,
-            'unit': unit,
-            'type': Product.SUPPLIER
+            'supplier': supplier
         })
 
         return kwargs
+
+    def post_generate_instance(self, instance, **kwargs):
+        multi_tenant_company = instance.multi_tenant_company
+        language = multi_tenant_company.language
+        unit = Unit.objects.filter(multi_tenant_company=multi_tenant_company).order_by('?').first()
+
+        ProductTranslation.objects.create(
+            product=instance,
+            language=language,
+            name=fake.ecommerce_name(),
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        SupplierPrices.objects.create(
+            supplier_product=instance,
+            unit=unit,
+            quantity=fake.random_int(min=1, max=100),
+            unit_price=fake.random_int(min=1, max=1000),
+            multi_tenant_company=multi_tenant_company,
+        )
 
 @registry.register_private_app
 class PurchaseOrderGenerator(PrivateDataGenerator):
@@ -89,21 +101,14 @@ class PurchaseOrderItemGenerator(PrivateDataGenerator):
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)
         multi_tenant_company = kwargs['multi_tenant_company']
+        purchase_order = PurchaseOrder.objects.filter(multi_tenant_company=multi_tenant_company).order_by('?').first()
+        existing_product_ids = PurchaseOrderItem.objects.filter(purchase_order=purchase_order, multi_tenant_company=multi_tenant_company).values_list('item_id', flat=True)
+        supplier_product = SupplierProduct.objects.filter(multi_tenant_company=multi_tenant_company).exclude(id__in=existing_product_ids).order_by('?').first()
 
-        valid = False
-        attempts = 0
-        max_attempts = 5
-
-        while not valid and attempts < max_attempts:
-            purchase_order = PurchaseOrder.objects.order_by('?').first()
-            supplier_product = SupplierProduct.objects.order_by('?').first()
-
-            if not PurchaseOrderItem.objects.filter(purchase_order=purchase_order, item=supplier_product, multi_tenant_company=multi_tenant_company).exists():
-                valid = True
-                kwargs.update({
-                    'purchase_order': purchase_order,
-                    'item': supplier_product
-                })
-            attempts += 1
+        kwargs.update({
+            'purchase_order': purchase_order,
+            'item': supplier_product,
+            'multi_tenant_company': multi_tenant_company,
+        })
 
         return kwargs

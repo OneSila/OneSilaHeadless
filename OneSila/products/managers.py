@@ -21,7 +21,7 @@ class ProductQuerySet(MultiTenantQuerySet):
 
 class ProductManager(MultiTenantManager):
     def get_queryset(self):
-        return ProductQuerySet(self.model, using=self._db).exclude(type=self.model.SUPPLIER)
+        return ProductQuerySet(self.model, using=self._db)
 
 
 class UmbrellaQuerySet(QuerySetProxyModelMixin, ProductQuerySet):

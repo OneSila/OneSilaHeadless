@@ -24,8 +24,8 @@ class Inventory(models.Model):
         return '{}: {}@{}'.format(self.product, self.stocklocation, self.quantity)
 
     def save(self, *args, **kwargs):
-        if not self.product.is_simple():
-            raise IntegrityError(_("Inventory can only be attached to a SIMPLE. Not a {}".format(self.product.type)))
+        if not self.product.is_supplier_product():
+            raise IntegrityError(_("Inventory can only be attached to a SUPPLIER PRODUCT. Not a {}".format(self.product.type)))
 
         super().save(*args, **kwargs)
 

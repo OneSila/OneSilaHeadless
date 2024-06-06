@@ -59,7 +59,7 @@ class SalesOrderGenerator(PrivateDataGenerator):
 @registry.register_private_app
 class OrderItemGenerator(PrivateDataGenerator):
     model = OrderItem
-    count = 1000
+    count = 200
 
     field_mapper = {
         'quantity': lambda: fake.random_int(min=1, max=4),
@@ -69,19 +69,11 @@ class OrderItemGenerator(PrivateDataGenerator):
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)
         multi_tenant_company = kwargs['multi_tenant_company']
-        valid = False
-        attempts = 0
-        max_attempts = 5
+        order = Order.objects.filter(multi_tenant_company=multi_tenant_company).order_by('?').first()
+        existing_product_ids = OrderItem.objects.filter(order=order, multi_tenant_company=multi_tenant_company).values_list('product_id', flat=True)
+        product = Product.objects.filter(multi_tenant_company=multi_tenant_company).exclude(id__in=existing_product_ids).order_by('?').first()
 
-        while not valid and attempts < max_attempts:
-            product = Product.objects.order_by('?').first()
-            order = Order.objects.order_by('?').first()
-
-            # Check if the combination already exists
-            if not OrderItem.objects.filter(order=order, product=product, multi_tenant_company=multi_tenant_company).exists():
-                valid = True
-                kwargs['product'] = product
-                kwargs['order'] = order
-            attempts += 1
+        kwargs['product'] = product
+        kwargs['order'] = order
 
         return kwargs

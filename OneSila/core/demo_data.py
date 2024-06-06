@@ -13,6 +13,8 @@ import faker_commerce
 from core.countries import COUNTRY_CHOICES, num_countries
 import types
 
+from products.models import Product
+
 fake = Faker()
 
 
@@ -54,7 +56,16 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
         if self.registry_private_apps.get(method_name):
             raise ValidationError(f"Method {method} is already present in the private app registry. You should pick a unique name.")
 
-        self.registry_private_apps[method_name] = method
+        priority = 50
+        try:
+            priority = method.priority
+        except:
+            pass
+
+        self.registry_private_apps[method_name] = {
+            'method': method,
+            'priority': priority
+        }
 
     def register_pubic_app(self, method):
         method_name = self.method_name(method)
@@ -62,7 +73,17 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
         if self.registry_public_apps.get(method_name):
             raise ValidationError(f"Method {method} is already present in the public app registry. You should pick a unique name.")
 
-        self.registry_public_apps[method_name] = method
+
+        priority = 50
+        try:
+            priority = method.priority
+        except:
+            pass
+
+        self.registry_public_apps[method_name] = {
+            'method': method,
+            'priority': priority
+        }
 
     def load_apps(self):
         # To get the apps to register their demo-data, all we need to do is load the file.
@@ -76,7 +97,10 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
                 pass
 
     def populate_db(self, *, multi_tenant_company):
-        for val in self.registry_public_apps.values():
+
+        sorted_public_vals = sorted(self.registry_public_apps.values(), key=lambda x: x['priority'], reverse=True)
+        for v in sorted_public_vals:
+            val = v['method']
             try:
                 if issubclass(val, PublicDataGenerator):
                     c = val()
@@ -86,7 +110,9 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
             except TypeError:
                 val()
 
-        for val in self.registry_private_apps.values():
+        sorted_private_vals = sorted(self.registry_private_apps.values(), key=lambda x: x['priority'], reverse=True)
+        for v in sorted_private_vals:
+            val = v['method']
             try:
                 if issubclass(val, PrivateDataGenerator):
                     c = val(multi_tenant_company)
@@ -165,11 +191,15 @@ class DemoDataGeneratorMixin:
     def create_instance(self, kwargs):
         return baker.make(self.get_model(), **kwargs)
 
+    def post_generate_instance(self, instance):
+        pass
+
     def generate(self):
         for i in range(self.get_count()):
             kwargs = self.prep_baker_kwargs(i)
             instance = self.create_instance(kwargs)
             self.generated_instances.append(instance)
+            self.post_generate_instance(instance)
 
 
 class PrivateDataGenerator(DemoDataGeneratorMixin, CreatePrivateDataRelationMixin):

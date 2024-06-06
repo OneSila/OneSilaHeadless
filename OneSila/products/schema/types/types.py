@@ -8,21 +8,23 @@ from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixi
 
 from typing import List, Optional
 
+from media.models import Media
 from products.models import Product, BundleProduct, UmbrellaProduct, SimpleProduct, \
-    ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct
+    ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrices
 from taxes.schema.types.types import VatRateType
 from units.schema.types.types import UnitType
 from .filters import ProductFilter, BundleProductFilter, UmbrellaProductFilter, \
     SimpleProductFilter, ProductTranslationFilter, UmbrellaVariationFilter, BundleVariationFilter, BillOfMaterialFilter, SupplierProductFilter, \
-    DropshipProductFilter, ManufacturableProductFilter
+    DropshipProductFilter, ManufacturableProductFilter, SupplierPricesFilter
 from .ordering import ProductOrder, BundleProductOrder, UmbrellaProductOrder, \
     SimpleProductOrder, ProductTranslationOrder, UmbrellaVariationOrder, BundleVariationOrder, BillOfMaterialOrder, SupplierProductOrder, \
-    DropshipProductOrder, ManufacturableProductOrder
+    DropshipProductOrder, ManufacturableProductOrder, SupplierPricesOrder
 
 
 @type(Product, filters=ProductFilter, order=ProductOrder, pagination=True, fields="__all__")
 class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
-    vat_rate: VatRateType
+    vat_rate: Optional[VatRateType]
+    base_product: Optional["ProductType"]
 
     @field()
     def proxy_id(self, info) -> str:
@@ -32,6 +34,12 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
             graphql_type = BundleProductType
         elif self.is_umbrella():
             graphql_type = UmbrellaProductType
+        elif self.is_manufacturable():
+            graphql_type = ManufacturableProductType
+        elif self.is_dropship():
+            graphql_type = DropshipProductType
+        elif self.is_supplier_product():
+            graphql_type = SupplierProductType
         else:
             graphql_type = ProductType
 
@@ -41,6 +49,15 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
     def name(self, info) -> str | None:
         return self.name
 
+    @field(description="Gets the URL of the first MediaProductThrough Image with the lowest sort order")
+    def thumbnail_url(self, info) -> str | None:
+        media_relation = self.mediaproductthrough_set.filter(media__type=Media.IMAGE).order_by('sort_order')
+
+        first_media = media_relation.first()
+        if first_media and first_media.media.image:
+            return first_media.media.image_web_url()
+
+        return None
 
 @type(ProductTranslation, filters=ProductTranslationFilter, order=ProductTranslationOrder, pagination=True, fields="__all__")
 class ProductTranslationType(relay.Node, GetQuerysetMultiTenantMixin):
@@ -73,6 +90,10 @@ class BundleVariationType(relay.Node, GetQuerysetMultiTenantMixin):
     umbrella: Optional[ProductType]
     variation: Optional[ProductType]
 
+@type(BillOfMaterial, filters=BillOfMaterialFilter, order=BillOfMaterialOrder, pagination=True, fields="__all__")
+class BillOfMaterialType(relay.Node, GetQuerysetMultiTenantMixin):
+    umbrella: Optional[ProductType]
+    variation: Optional[ProductType]
 
 @type(ManufacturableProduct, filters=ManufacturableProductFilter, order=ManufacturableProductOrder, pagination=True, fields="__all__")
 class ManufacturableProductType(relay.Node, GetQuerysetMultiTenantMixin):
@@ -92,18 +113,30 @@ class DropshipProductType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(SupplierProduct, filters=SupplierProductFilter, order=SupplierProductOrder, pagination=True, fields="__all__")
 class SupplierProductType(relay.Node, GetQuerysetMultiTenantMixin):
     supplier: Optional[CompanyType]
-    unit: Optional[UnitType]
-    product: ProductType
-    quantity: int
-    purchase_price: float
+    base_product: ProductType
 
     @field()
     def name(self, info) -> str | None:
         return self.name
 
+    @field()
+    def quantity(self, info) -> int:
+        return self.details.first().quantity if self.details.exists() else None
 
-@type(BillOfMaterial, filters=BillOfMaterialFilter, order=BillOfMaterialOrder, pagination=True, fields="__all__")
-class BillOfMaterialType(relay.Node, GetQuerysetMultiTenantMixin):
-    manufacturable: Optional[ProductType]
-    component: Optional[ProductType]
-    quantity: int
+    @field()
+    def unit_price(self, info) -> float:
+        return self.details.first().unit_price if self.details.exists() else None
+
+    @field()
+    def unit(self, info) -> UnitType:
+        unit = self.details.first().unit if self.details.exists() else None
+        return unit
+
+    @field()
+    def proxy_id(self, info) -> str:
+        return to_base64(ProductType, self.pk)
+
+@type(SupplierPrices, filters=SupplierPricesFilter, order=SupplierPricesOrder, pagination=True, fields="__all__")
+class SupplierPricesType(relay.Node, GetQuerysetMultiTenantMixin):
+    supplier_product: SupplierProductType
+    unit: UnitType

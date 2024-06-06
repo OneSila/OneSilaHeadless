@@ -3,7 +3,7 @@ from core.schema.core.types.types import auto
 
 from products.models import Product, BundleProduct, UmbrellaProduct, \
     SimpleProduct, ProductTranslation, UmbrellaVariation, \
-    BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct
+    BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrices
 
 
 @order(Product)
@@ -65,3 +65,9 @@ class SupplierProductOrder:
 @order(BillOfMaterial)
 class BillOfMaterialOrder:
     id: auto
+
+@order(SupplierPrices)
+class SupplierPricesOrder:
+    id: auto
+    quantity: auto
+    unit_price: auto

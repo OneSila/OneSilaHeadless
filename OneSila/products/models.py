@@ -1,3 +1,5 @@
+from django.db.models import Q
+
 from core import models
 from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
@@ -18,7 +20,7 @@ class Product(models.Model):
 
     # For Everything except supplier product
     vat_rate = models.ForeignKey(VatRate, on_delete=models.PROTECT, null=True, blank=True)
-    for_sale = models.BooleanField(default=True) # Supplier products will have always this as False
+    for_sale = models.BooleanField(default=True)
 
     # for simple products
     always_on_stock = models.BooleanField(default=False)
@@ -141,8 +143,18 @@ class Product(models.Model):
 
     class Meta:
         search_terms = ['sku', 'translations__name']
-        unique_together = ("sku", "multi_tenant_company")
-
+        constraints = [
+            models.UniqueConstraint(
+                fields=['sku', 'supplier', 'multi_tenant_company'],
+                name='unique_sku_with_supplier',
+                condition=Q(supplier__isnull=False)
+            ),
+            models.UniqueConstraint(
+                fields=['sku', 'multi_tenant_company'],
+                name='unique_sku_without_supplier',
+                condition=Q(supplier__isnull=True)
+            )
+        ]
 
 class BundleProduct(Product):
     from products.product_types import BUNDLE
@@ -238,21 +250,24 @@ class BundleVariation(models.Model):
         unique_together = ("umbrella", "variation")
 
 class BillOfMaterial(models.Model):
-    manufacturable = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_manufacturables")
-    component = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_components")
+    umbrella = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_manufacturables")
+    variation = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_components")
     quantity = models.IntegerField(default=1)
 
     def __str__(self):
-        return f"{self.manufacturable} x {self.quantity} {self.component}"
+        return f"{self.umbrella} x {self.quantity} {self.variation}"
 
     def save(self, *args, **kwargs):
-        if self.manufacturable.is_not_manufacturable():
-            raise IntegrityError(_("Product needs to be of type MANUFACTURABLE. Not %s" % self.manufacturable.type))
+        if self.umbrella.is_not_manufacturable():
+            raise IntegrityError(_("Product needs to be of type MANUFACTURABLE. Not %s" % self.umbrella.type))
+
+        if self.variation.type not in [Product.SIMPLE, Product.MANUFACTURABLE]:
+            raise IntegrityError(_("variation needs to a product of type BUNDLE or MANUFACTURABLE. Not %s" % (self.variation.type)))
 
         super().save(*args, **kwargs)
 
     class Meta:
-        unique_together = ("manufacturable", "component")
+        unique_together = ("umbrella", "variation")
 
 class ProductTranslation(TranslationFieldsMixin, models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations")

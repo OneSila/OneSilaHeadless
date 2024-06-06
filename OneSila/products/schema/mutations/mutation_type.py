@@ -1,15 +1,15 @@
-from core.schema.core.mutations import create, update, delete, type, List
-from .fields import create_product
+from .fields import create_product, create_supplier_product
 from ..types.types import ProductType, BundleProductType, UmbrellaProductType, \
     SimpleProductType, ProductTranslationType, UmbrellaVariationType, \
-    BundleVariationType
+    BundleVariationType, ManufacturableProductType, DropshipProductType, SupplierProductType, BillOfMaterialType, SupplierPricesType
 from ..types.input import ProductInput, BundleProductInput, UmbrellaProductInput, \
     SimpleProductInput, ProductTranslationInput, UmbrellaVariationInput, \
     BundleVariationInput, ProductPartialInput, UmbrellaProductPartialInput, \
     BundleProductPartialInput, SimpleProductPartialInput, \
     ProductTranslationPartialInput, UmbrellaVariationPartialInput, \
-    BundleVariationPartialInput
-
+    BundleVariationPartialInput, ManufacturableProductInput, ManufacturableProductPartialInput, DropshipProductInput, DropshipProductPartialInput, \
+    SupplierProductInput, SupplierProductPartialInput, BillOfMaterialInput, BillOfMaterialPartialInput, SupplierPricesPartialInput, SupplierPricesInput
+from core.schema.core.mutations import create, update, delete, type, List
 
 
 @type(name="Mutation")
@@ -55,3 +55,31 @@ class ProductsMutation:
     update_bundle_variation: BundleVariationType = update(BundleVariationPartialInput)
     delete_bundle_variation: BundleVariationType = delete()
     delete_bundle_variations: List[BundleVariationType] = delete()
+
+    create_manufacturable_product: ManufacturableProductType = create(ManufacturableProductInput)
+    create_manufacturable_products: List[ManufacturableProductType] = create(ManufacturableProductInput)
+    update_manufacturable_product: ManufacturableProductType = update(ManufacturableProductPartialInput)
+    delete_manufacturable_product: ManufacturableProductType = delete()
+    delete_manufacturable_products: List[ManufacturableProductType] = delete()
+
+    create_dropship_product: DropshipProductType = create(DropshipProductInput)
+    create_dropship_products: List[DropshipProductType] = create(DropshipProductInput)
+    update_dropship_product: DropshipProductType = update(DropshipProductPartialInput)
+    delete_dropship_product: DropshipProductType = delete()
+    delete_dropship_products: List[DropshipProductType] = delete()
+
+    create_supplier_product: SupplierProductType = create_supplier_product()
+    create_supplier_products: List[SupplierProductType] = create(SupplierProductInput)
+    update_supplier_product: SupplierProductType = update(SupplierProductPartialInput)
+    delete_supplier_product: SupplierProductType = delete()
+    delete_supplier_products: List[SupplierProductType] = delete()
+
+    create_bill_of_material: BillOfMaterialType = create(BillOfMaterialInput)
+    create_bills_of_material: List[BillOfMaterialType] = create(BillOfMaterialInput)
+    update_bill_of_material: BillOfMaterialType = update(BillOfMaterialPartialInput)
+    delete_bill_of_material: BillOfMaterialType = delete()
+    delete_bills_of_material: List[BillOfMaterialType] = delete()
+
+    create_supplier_price: SupplierPricesType = create(SupplierPricesInput)
+    update_supplier_price: SupplierPricesType = update(SupplierPricesPartialInput)
+    delete_supplier_price: SupplierPricesType = delete()
