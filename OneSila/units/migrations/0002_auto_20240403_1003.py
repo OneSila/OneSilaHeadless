@@ -21,6 +21,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('units', '0001_initial'),
+        ('purchasing', '0001_initial'),
     ]
 
     operations = [

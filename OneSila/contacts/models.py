@@ -20,6 +20,7 @@ class Company(models.Model):
     phone = models.CharField(max_length=100, blank=True, null=True)
     email = models.CharField(max_length=100, blank=True, null=True)
     language = models.CharField(max_length=2, default='EN', choices=CUSTOMER_LANGUAGE_CHOICES)
+    currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT, blank=True, null=True)
 
     is_supplier = models.BooleanField(default=False)
     is_customer = models.BooleanField(default=False)

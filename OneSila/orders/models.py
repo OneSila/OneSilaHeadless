@@ -139,6 +139,15 @@ class Order(models.Model):
     class Meta:
         search_terms = ['reference', 'company__name']
 
+    def save(self, *args, **kwargs):
+
+        # if we buy from someone it mean it become a customer if is not already
+        if not self.customer.is_customer:
+            self.customer.is_customer = True
+            self.customer.save()
+
+
+        super().save(*args, **kwargs)
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.PROTECT)

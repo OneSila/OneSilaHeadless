@@ -23,7 +23,7 @@ class EanCode(models.Model):
 
     def save(self, *args, **kwargs):
         if self.product and self.product.is_umbrella():
-            raise IntegrityError(f"You cannot assign an ean_code to an UMBRELLA.  It needs to be BUNDLE or VARIATION")
+            raise IntegrityError(f"You cannot assign an ean_code to an UMBRELLA.  It needs to be BUNDLE or SIMPLE")
 
         super().save(*args, **kwargs)
 

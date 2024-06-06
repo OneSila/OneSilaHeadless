@@ -1,4 +1,9 @@
 from typing import Optional
+
+import strawberry_django
+from strawberry import UNSET
+from strawberry.relay import GlobalID
+
 from contacts.schema.types.filters import CustomerFilter
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin
@@ -18,7 +23,9 @@ class OrderFilter(SearchFilterMixin):
     currency: auto
     status: auto
     reason_for_sale: auto
+    product_item_id: Optional[GlobalID]
     orderitem: Optional['OrderItemFilter']
+
 
 @filter(OrderItem)
 class OrderItemFilter(SearchFilterMixin):

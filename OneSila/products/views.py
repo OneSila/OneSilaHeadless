@@ -1,5 +1,5 @@
 from core.views import EmptyTemplateView
-from .models import BundleProduct, BundleVariation, Product, ProductTranslation, ProductVariation, UmbrellaProduct, UmbrellaVariation
+from .models import BundleProduct, BundleVariation, Product, ProductTranslation, SimpleProduct, UmbrellaProduct, UmbrellaVariation
 
 
 class BundleProductListView(EmptyTemplateView):
@@ -66,19 +66,19 @@ class ProductTranslationDeleteView(EmptyTemplateView):
     pass
 
 
-class ProductVariationListView(EmptyTemplateView):
+class SimpleProductListView(EmptyTemplateView):
     pass
 
 
-class ProductVariationDetailViev(EmptyTemplateView):
+class SimpleProductDetailViev(EmptyTemplateView):
     pass
 
 
-class ProductVariationUpdateView(EmptyTemplateView):
+class SimpleProductUpdateView(EmptyTemplateView):
     pass
 
 
-class ProductVariationDeleteView(EmptyTemplateView):
+class SimpleProductDeleteView(EmptyTemplateView):
     pass
 
 

@@ -9,5 +9,6 @@ class CurrencyFilter(SearchFilterMixin):
     search: str | None
     id: auto
     iso_code: auto
+    is_default_currency: auto
     name: auto
     symbol: auto

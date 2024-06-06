@@ -1,8 +1,11 @@
+from decimal import Decimal
+
 from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial
 
-from products.models import Product, BundleProduct, UmbrellaProduct, ProductVariation, \
-    ProductTranslation, UmbrellaVariation, BundleVariation
+from products.models import Product, BundleProduct, UmbrellaProduct, SimpleProduct, \
+    ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrices
+from units.schema.types.types import UnitType
 
 
 @input(Product, fields="__all__")
@@ -35,13 +38,13 @@ class UmbrellaProductPartialInput(NodeInput):
     pass
 
 
-@input(ProductVariation, fields="__all__")
-class ProductVariationInput:
+@input(SimpleProduct, fields="__all__")
+class SimpleProductInput:
     pass
 
 
-@partial(ProductVariation, fields="__all__")
-class ProductVariationPartialInput(NodeInput):
+@partial(SimpleProduct, fields="__all__")
+class SimpleProductPartialInput(NodeInput):
     pass
 
 
@@ -72,4 +75,58 @@ class BundleVariationInput:
 
 @partial(BundleVariation, fields="__all__")
 class BundleVariationPartialInput(NodeInput):
+    pass
+
+
+@input(ManufacturableProduct, fields="__all__")
+class ManufacturableProductInput:
+    pass
+
+
+@partial(ManufacturableProduct, fields="__all__")
+class ManufacturableProductPartialInput(NodeInput):
+    pass
+
+
+@input(DropshipProduct, fields="__all__")
+class DropshipProductInput:
+    pass
+
+
+@partial(DropshipProduct, fields="__all__")
+class DropshipProductPartialInput(NodeInput):
+    pass
+
+
+@input(SupplierProduct, fields="__all__")
+class SupplierProductInput:
+    name: str
+    quantity: int
+    unit_price: float
+    unit: NodeInput
+
+
+@partial(SupplierProduct, fields="__all__")
+class SupplierProductPartialInput(NodeInput):
+    quantity: int | None
+    unit_price: float | None
+    unit: NodeInput | None
+
+
+@input(BillOfMaterial, fields="__all__")
+class BillOfMaterialInput:
+    pass
+
+
+@partial(BillOfMaterial, fields="__all__")
+class BillOfMaterialPartialInput(NodeInput):
+    pass
+
+@input(SupplierPrices, fields="__all__")
+class SupplierPricesInput:
+    pass
+
+
+@partial(SupplierPrices, fields="__all__")
+class SupplierPricesPartialInput(NodeInput):
     pass

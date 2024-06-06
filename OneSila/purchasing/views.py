@@ -1,5 +1,5 @@
 from core.views import EmptyTemplateView
-from .models import PurchaseOrder, PurchaseOrderItem, SupplierProduct
+from .models import PurchaseOrder, PurchaseOrderItem
 
 
 class PurchaseOrderListView(EmptyTemplateView):
