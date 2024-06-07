@@ -9,6 +9,7 @@ class PurchaseOrderOrder:
     id: auto
     status: auto
     order_reference: auto
+    created_at: auto
 
 
 @order(PurchaseOrderItem)
