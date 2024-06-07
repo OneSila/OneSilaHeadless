@@ -25,6 +25,7 @@ from .ordering import ProductOrder, BundleProductOrder, UmbrellaProductOrder, \
 class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
     vat_rate: Optional[VatRateType]
     base_product: Optional["ProductType"]
+    supplier: Optional[CompanyType]
 
     @field()
     def proxy_id(self, info) -> str:
