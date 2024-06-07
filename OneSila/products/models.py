@@ -64,6 +64,10 @@ class Product(models.Model):
     @property
     def name(self):
         translations = self.translations.all()
+
+        if self.multi_tenant_company is None:
+            return self.sku
+
         lang = self.multi_tenant_company.language
         name = self.sku
 
