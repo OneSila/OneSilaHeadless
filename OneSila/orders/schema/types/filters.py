@@ -24,7 +24,7 @@ class OrderFilter(SearchFilterMixin):
     status: auto
     reason_for_sale: auto
     product_item_id: Optional[GlobalID]
-    orderitem: Optional['OrderItemFilter']
+    # orderitem: Optional['OrderItemFilter']
 
 
 @filter(OrderItem)

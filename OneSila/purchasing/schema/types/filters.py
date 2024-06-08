@@ -21,7 +21,7 @@ class PurchaseOrderFilter(SearchFilterMixin):
     currency: CurrencyFilter | None
     invoice_address: InvoiceAddressFilter | None
     shipping_address: ShippingAddressFilter | None
-    purchaseorderitem: Optional['PurchaseOrderItemFilter']
+    # purchaseorderitem: Optional['PurchaseOrderItemFilter']
 
 
 @filter(PurchaseOrderItem)
