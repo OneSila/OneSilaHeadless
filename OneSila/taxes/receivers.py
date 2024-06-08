@@ -15,10 +15,3 @@ def vat_rates__populate_from_multi_tenant_company(sender, instance, created, **k
         vat_rate = vat_rates.get(instance.country, None)
         if vat_rate:
             VatRate.objects.create(rate=vat_rate, name=f'{str(vat_rate)}%', multi_tenant_company=instance)
-
-@receiver(post_save, sender=VatRate)
-def vat_rates__subscription__post_save(sender, instance, **kwargs):
-    """
-    This is to be sent on the every post_save or relevant signal
-    """
-    refresh_subscription_receiver(instance)
