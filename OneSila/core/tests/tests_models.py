@@ -1,4 +1,6 @@
 from django.utils import timezone
+
+from core.models.multi_tenant import MultiTenantUserLoginToken
 from core.tests import TestCase
 from model_bakery import baker
 
@@ -9,7 +11,7 @@ class TestMultiTenantUserLoginTokenTestCase(TestCase):
 
     def test_expired_token(self):
         token = baker.make("core.MultiTenantUserLoginToken")
-        past = timezone.now() - timezone.timedelta(minutes=10)
+        past = timezone.now() - timezone.timedelta(minutes=MultiTenantUserLoginToken.EXPIRES_AFTER_MIN + 1)
         token.set_expires_at(expires_at=past)
         token.refresh_from_db()
         self.assertFalse(token.is_valid())
