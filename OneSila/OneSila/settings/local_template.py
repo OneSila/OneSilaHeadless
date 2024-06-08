@@ -20,6 +20,13 @@ STATIC_ROOT = '/home/onesila/static/'
 MEDIA_ROOT = '/home/onesila/mediafiles/'
 APP_ROOT = '/home/onesila/OneSilaHeadless/OneSila/'
 
+#
+# Localhost settings if your localhost has poor hostname resolve for
+# image and absolute url settings. https://github.com/TweaveTech/django_get_absolute_url
+#
+# HTTPS_SUPPORTED = False
+# LOCAL_HOST = 'localhost:8080'
+
 SECRET_KEY = 'your-secret-key-goes-here'
 
 #
@@ -75,3 +82,6 @@ MULTI_TENANT_LOGIN_LINK_EXPIRES_AFTER_MIN = 60
 # Huey overrides
 #
 HUEY['immediate'] = DEBUG
+
+# This will make absolute path to work
+LOCAL_HOST = 'localhost:8080'

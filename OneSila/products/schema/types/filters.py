@@ -1,11 +1,14 @@
 from typing import Optional
 
+from contacts.schema.types.filters import SupplierFilter
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin
 
 from products.models import Product, BundleProduct, UmbrellaProduct, \
-    ProductVariation, ProductTranslation, UmbrellaVariation, BundleVariation
+    SimpleProduct, ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, \
+    SupplierPrices
 from taxes.schema.types.filters import VatRateFilter
+from units.schema.types.filters import UnitFilter
 
 
 @filter(Product)
@@ -14,6 +17,7 @@ class ProductFilter(SearchFilterMixin):
     id: auto
     sku: auto
     type: auto
+    for_sale: auto
     vat_rate: Optional[VatRateFilter]
 
 
@@ -33,8 +37,8 @@ class UmbrellaProductFilter(SearchFilterMixin):
     vat_rate: Optional[VatRateFilter]
 
 
-@filter(ProductVariation)
-class ProductVariationFilter(SearchFilterMixin):
+@filter(SimpleProduct)
+class SimpleProductFilter(SearchFilterMixin):
     search: str | None
     id: auto
     sku: auto
@@ -58,3 +62,38 @@ class UmbrellaVariationFilter:
 class BundleVariationFilter:
     id: auto
     umbrella: Optional[ProductFilter]
+
+@filter(ManufacturableProduct)
+class ManufacturableProductFilter(SearchFilterMixin):
+    search: str | None
+    id: auto
+    sku: auto
+    vat_rate: Optional[VatRateFilter]
+
+
+@filter(DropshipProduct)
+class DropshipProductFilter(SearchFilterMixin):
+    search: str | None
+    id: auto
+    sku: auto
+    vat_rate: Optional[VatRateFilter]
+
+
+@filter(SupplierProduct)
+class SupplierProductFilter(SearchFilterMixin):
+    search: str | None
+    id: auto
+    sku: auto
+    supplier: Optional[SupplierFilter]
+    base_product: Optional[ProductFilter]
+
+
+@filter(BillOfMaterial)
+class BillOfMaterialFilter:
+    id: auto
+    umbrella: Optional[ProductFilter]
+
+@filter(SupplierPrices)
+class SupplierPricesFilter(SearchFilterMixin):
+    search: str | None
+    supplier_product: Optional[SupplierProductFilter]

@@ -24,8 +24,8 @@ class Inventory(models.Model):
         return '{}: {}@{}'.format(self.product, self.stocklocation, self.quantity)
 
     def save(self, *args, **kwargs):
-        if not self.product.is_variation():
-            raise IntegrityError(_("Inventory can only be attached to a VARIATION. Not a {}".format(self.product.type)))
+        if not self.product.is_supplier_product():
+            raise IntegrityError(_("Inventory can only be attached to a SUPPLIER PRODUCT. Not a {}".format(self.product.type)))
 
         super().save(*args, **kwargs)
 
@@ -40,6 +40,9 @@ class InventoryLocation(models.Model):
     name = models.CharField(max_length=10)
     description = models.TextField(null=True, blank=True)
     location = models.ForeignKey('contacts.InternalShippingAddress', on_delete=models.CASCADE, null=True)
+
+    precise = models.BooleanField(default=False)
+
 
     def __str__(self):
         return self.name

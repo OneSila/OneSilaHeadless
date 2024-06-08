@@ -1,4 +1,5 @@
 from core import models
+from core.managers import MultiTenantQuerySet, MultiTenantManager
 from core.models import Sum, F, FloatField, Count
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 # Order #
 # ##### #
 
-class OrderQuerySet(models.QuerySet):
+class OrderQuerySet(MultiTenantQuerySet):
     def unprocessed(self):
         return self.filter(status__in=self.model.UNPROCESSED)
 
@@ -33,7 +34,7 @@ class OrderQuerySet(models.QuerySet):
         return self.annotate(order_value=Sum(F('orderitem__quantity') * F('orderitem__price'), output_field=FloatField()))
 
 
-class OrderManager(models.Manager):
+class OrderManager(MultiTenantManager):
     def get_queryset(self):
         return OrderQuerySet(self.model, using=self._db).\
             annotate_order_value()
@@ -54,7 +55,7 @@ class OrderManager(models.Manager):
         return self.get_queryset().refunded()
 
 
-class OrderReportQuerySet(models.QuerySet):
+class OrderReportQuerySet(MultiTenantQuerySet):
     def returns_per_month(self, year):
         return self.filter(created_at__year=year).filter(status=self.model.REFUNDED)\
             .annotate(month=TruncMonth('created_at'))\
@@ -70,7 +71,7 @@ class OrderReportQuerySet(models.QuerySet):
             .values('month', 'c')
 
 
-class OrderReportManager(models.Manager):
+class OrderReportManager(MultiTenantManager):
     def get_queryset(self):
         return OrderReportQuerySet(self.model, using=self._db)
 
@@ -85,13 +86,13 @@ class OrderReportManager(models.Manager):
 # Order Item #
 # ########## #
 
-class OrderItemQuerySet(models.QuerySet):
+class OrderItemQuerySet(MultiTenantQuerySet):
     def total_value(self):
         '''
         is the sum of all price * quantity
         '''
         total_value_aggregate = self.all().aggregate(total_value=Sum(F('quantity') * F('price'), output_field=FloatField()))
-        return total_value_aggregate['total_value']
+        return round(total_value_aggregate['total_value'], 2) if total_value_aggregate['total_value'] is not None else 0
 
     def filter_sold_in_x_days(self, x_days=21):
         '''
@@ -111,7 +112,7 @@ class OrderItemQuerySet(models.QuerySet):
         return self.annotate(total_value=Sum(F('quantity') * F('price'), output_field=FloatField()))
 
 
-class OrderItemManager(models.Manager):
+class OrderItemManager(MultiTenantManager):
     def get_queryset(self):
         return OrderItemQuerySet(self.model, using=self._db)  # Important!
 

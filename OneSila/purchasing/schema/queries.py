@@ -7,9 +7,6 @@ from .types.types import SupplierProductType, PurchaseOrderType, \
 
 @type(name="Query")
 class PurchasingQuery:
-    supplier_product: SupplierProductType = node()
-    supplier_products: ListConnectionWithTotalCount[SupplierProductType] = connection()
-
     purchase_order: PurchaseOrderType = node()
     purchase_orders: ListConnectionWithTotalCount[PurchaseOrderType] = connection()
 

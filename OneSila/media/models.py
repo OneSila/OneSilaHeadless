@@ -1,6 +1,6 @@
 from core import models
 from django.utils.translation import gettext_lazy as _
-from core.models import MultiTenantAwareMixin
+from core.models import MultiTenantAwareMixin, MultiTenantUser
 
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFill, ResizeToFit
@@ -48,7 +48,7 @@ class Media(models.Model):
 
     image_type = models.CharField(max_length=4, choices=IMAGE_TYPE_CHOICES, default=PACK_SHOT)
     image = models.ImageField(_('Image (High resolution)'),
-        upload_to='images/', validators=[validate_image_extension, no_dots_in_filename],
+        upload_to='images/', validators=[validate_image_extension],
         null=True, blank=True)
     image_web = ImageSpecField(source='image',
         id='mediapp:image:imagewebspec')
@@ -56,6 +56,8 @@ class Media(models.Model):
     file = models.FileField(_('File'),
         upload_to='files/', validators=[validate_file_extensions, no_dots_in_filename],
         null=True, blank=True)
+
+    owner = models.ForeignKey(MultiTenantUser, on_delete=models.CASCADE)
 
     products = models.ManyToManyField('products.Product', through='MediaProductThrough')
 
@@ -67,9 +69,30 @@ class Media(models.Model):
     def image_web_size(self):
         return self.image_web.file.image_web.size
 
+    def is_image(self):
+        return self.type == self.IMAGE
+
+    def is_file(self):
+        return self.type == self.FILE
+
+    def is_video(self):
+        return self.type == self.VIDEO
+
     def image_web_url(self):
         if self.image:
             return f"{generate_absolute_url(trailing_slash=False)}{self.image_web.url}"
+
+        return None
+
+    def image_url(self):
+        if self.image:
+            return f"{generate_absolute_url(trailing_slash=False)}{self.image.url}"
+
+        return None
+
+    def file_url(self):
+        if self.file:
+            return f"{generate_absolute_url(trailing_slash=False)}{self.file.url}"
 
         return None
 
@@ -106,7 +129,7 @@ class MediaProductThrough(models.Model):
     is_main_image = models.BooleanField(default=False)
 
     def __str__(self):
-        return '{} > {}'.format(self.product, self.image)
+        return '{} > {}'.format(self.product, self.media)
 
     class Meta:
         ordering = ('-is_main_image', 'sort_order')

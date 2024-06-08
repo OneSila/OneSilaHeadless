@@ -19,6 +19,7 @@ from django.conf import settings
 from django.urls import include, path
 from strawberry.django.views import AsyncGraphQLView
 from .schema import schema
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('', include('core.urls')),
@@ -46,3 +47,6 @@ urlpatterns = [
         name='graphql',
     ),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
