@@ -1,6 +1,6 @@
 from strawberry_django.filters import filter as strawberry_filter
 from strawberry import UNSET
-
+from strawberry import LazyType as lazy
 
 class SearchFilterMixin:
     search: str | None

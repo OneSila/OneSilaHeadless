@@ -1,5 +1,5 @@
 from contacts.schema.types.types import CompanyType, InvoiceAddressType, ShippingAddressType
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field
+from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field,  Annotated, lazy
 
 from typing import List
 
@@ -16,7 +16,7 @@ class OrderType(relay.Node, GetQuerysetMultiTenantMixin):
     invoice_address: InvoiceAddressType
     shipping_address: ShippingAddressType
     currency: CurrencyType
-    orderitem_set: List['OrderItemType']
+    orderitem_set: List[Annotated['OrderItemType', lazy("orders.schema.types.types")]]
 
     @field()
     def total_value(self) -> str | None:

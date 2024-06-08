@@ -1,12 +1,9 @@
 from typing import Optional
-
-import strawberry_django
-from strawberry import UNSET
 from strawberry.relay import GlobalID
 
 from contacts.schema.types.filters import CustomerFilter
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin
+from core.schema.core.types.filters import filter, SearchFilterMixin, lazy
 
 from orders.models import Order, OrderItem, OrderNote
 from products.schema.types.filters import ProductFilter
@@ -23,8 +20,7 @@ class OrderFilter(SearchFilterMixin):
     currency: auto
     status: auto
     reason_for_sale: auto
-    product_item_id: Optional[GlobalID]
-    orderitem: Optional['OrderItemFilter']
+    orderitem: Optional[lazy['OrderItemFilter', "orders.schema.types.filters"]]
 
 
 @filter(OrderItem)

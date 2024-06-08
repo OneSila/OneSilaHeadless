@@ -17,7 +17,8 @@ class GetQuerysetMultiTenantMixin:
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
         multi_tenant_company = get_multi_tenant_company(info)
-        return queryset.filter(multi_tenant_company=multi_tenant_company)
+        ordering = queryset.model._meta.ordering
+        return queryset.filter(multi_tenant_company=multi_tenant_company).order_by(*ordering)
 
 
 class GetCurrentUserMixin:

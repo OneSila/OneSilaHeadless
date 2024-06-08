@@ -137,7 +137,8 @@ class Order(models.Model):
         return self.status == self.DONE
 
     class Meta:
-        search_terms = ['reference', 'company__name']
+        ordering = ('-created_at',)
+        search_terms = ['reference', 'customer__name']
 
     def save(self, *args, **kwargs):
 

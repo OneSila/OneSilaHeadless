@@ -8,14 +8,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@receiver(post_save, sender=Currency)
-def currencies__subscription__post_save(sender, instance, **kwargs):
-    """
-    This is to be sent on the every post_save or relevant signal.
-    """
-    refresh_subscription_receiver(instance)
-
-
 @receiver(exchange_rate_official__post_save, sender=Currency)
 def currencies__currency__exchange_rate_official__receiver(sender, instance, **kwargs):
     """

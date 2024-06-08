@@ -58,6 +58,7 @@ class PurchaseOrder(models.Model):
         return self.reference()
 
     class Meta:
+        ordering = ('-created_at',)
         search_terms = ['supplier__name', 'order_reference']
 
 

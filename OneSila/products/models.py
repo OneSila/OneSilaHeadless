@@ -1,7 +1,8 @@
 from django.db.models import Q
+from django.utils.text import slugify
 
 from core import models
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils.translation import gettext_lazy as _
 from translations.models import TranslationFieldsMixin
 from taxes.models import VatRate
@@ -15,7 +16,7 @@ class Product(models.Model):
 
     # Mandatory
     sku = models.CharField(max_length=100, db_index=True, blank=True, null=True)
-    active = models.BooleanField(default=False)
+    active = models.BooleanField(default=True)
     type = models.CharField(max_length=15, choices=PRODUCT_TYPE_CHOICES)
 
     # For Everything except supplier product
@@ -64,6 +65,10 @@ class Product(models.Model):
     @property
     def name(self):
         translations = self.translations.all()
+
+        if self.multi_tenant_company is None:
+            return self.sku
+
         lang = self.multi_tenant_company.language
         name = self.sku
 
@@ -232,7 +237,7 @@ class UmbrellaVariation(models.Model):
 class BundleVariation(models.Model):
     umbrella = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_umbrellas")
     variation = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_variations")
-    quantity = models.IntegerField(default=1)
+    quantity = models.FloatField(default=1)
 
     def __str__(self):
         return f"{self.umbrella} x {self.quantity} {self.variation}"
@@ -252,7 +257,7 @@ class BundleVariation(models.Model):
 class BillOfMaterial(models.Model):
     umbrella = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_manufacturables")
     variation = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_components")
-    quantity = models.IntegerField(default=1)
+    quantity = models.FloatField(default=1)
 
     def __str__(self):
         return f"{self.umbrella} x {self.quantity} {self.variation}"
@@ -280,8 +285,31 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
     def __str__(self):
         return f"{self.product} <{self.language}>"
 
+    def _get_default_url_key(self):
+        if self.product.type != Product.SUPPLIER:
+            new_url_key = slugify(self.name)
+
+            if ProductTranslation.objects.filter(url_key=new_url_key, multi_tenant_company=self.multi_tenant_company).exists():
+                # sku is unique so this will solve everything
+                new_url_key += f'-{self.product.sku}-{self.language}'
+
+            return new_url_key
+
+        return None
+
+    def save(self, *args, **kwargs):
+
+        if not self.url_key:
+            self.url_key = self._get_default_url_key()
+
+        super().save(*args, **kwargs)
+
+
     class Meta:
-        unique_together = ('product', 'language')
+        unique_together = (
+            ('product', 'language'),
+            ('url_key', 'multi_tenant_company'),
+        )
 
 class SupplierProduct(Product):
     from products.product_types import SUPPLIER

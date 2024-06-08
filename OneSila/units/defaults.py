@@ -1,6 +1,6 @@
 DEFAULT_UNITS = [
     {
-        'name': "Piece",
+        "name": "Piece",
         "unit": "p",
     }
 ]
