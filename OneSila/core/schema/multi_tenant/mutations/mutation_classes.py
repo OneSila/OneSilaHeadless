@@ -1,29 +1,13 @@
 from strawberry import UNSET
 
-from strawberry.relay.utils import from_base64
 from strawberry_django.resolvers import django_resolver
 from strawberry_django.mutations import resolvers
 from strawberry_django.optimizer import DjangoOptimizerExtension
-from strawberry_django.utils.requests import get_request
-
-from django.contrib import auth
-from django.conf import settings
 from django.db import transaction
-from django.core.exceptions import ValidationError
-from django.contrib.auth.password_validation import validate_password
-
-
-from asgiref.sync import async_to_sync
-
-from channels import auth as channels_auth
-
 from core.schema.core.mixins import GetCurrentUserMixin, GetMultiTenantCompanyMixin
-from core.schema.core.mutations import create, type, DjangoUpdateMutation, \
-    DjangoCreateMutation, default_extensions, \
-    update, Info, models, Iterable, Any, IsAuthenticated
-from core.factories.multi_tenant import InviteUserFactory, RegisterUserFactory, \
-    AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory, RequestLoginTokenFactory, \
-    RecoveryTokenFactory, AuthenticateTokenFactory, ChangePasswordFactory
+from core.schema.core.mutations import DjangoUpdateMutation, DjangoCreateMutation, Info, models, Any
+from core.factories.multi_tenant import InviteUserFactory, AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory, RequestLoginTokenFactory, \
+    RecoveryTokenFactory, ChangePasswordFactory
 from core.models.multi_tenant import MultiTenantUser
 
 
@@ -167,3 +151,12 @@ class EnableUserMutation(DjangoUpdateMutation):
 
             instance.refresh_from_db()
             return instance
+
+class UpdateOnboardingStatusMutation(GetCurrentUserMixin, DjangoUpdateMutation):
+    def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
+        user = self.get_current_user(info)
+
+        with DjangoOptimizerExtension.disabled():
+            user.onboarding_status = data['onboarding_status']
+            user.save()
+            return user
