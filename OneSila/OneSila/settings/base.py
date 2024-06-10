@@ -137,7 +137,6 @@ LANGUAGES = (
     ('nl', _('Nederlands')),
     ('en', _('English')),
     ('en-gb', _('English GB')),
-    ('he', _("Hebrew")),
 )
 
 

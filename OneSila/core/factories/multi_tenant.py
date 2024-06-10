@@ -1,4 +1,6 @@
 from django.db import transaction
+
+from contacts.models import InternalCompany, Address
 from core.models.multi_tenant import MultiTenantUser, MultiTenantUserLoginToken
 from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
@@ -129,6 +131,7 @@ class InviteUserFactory(RequestLoginTokenFactory):
             last_name=self.last_name,
             is_active=self.is_active,
             invitation_accepted=self.invitation_accepted,
+            onboarding_status=self.model.DONE
         )
 
         try:
@@ -209,3 +212,51 @@ class EnableUserFactory:
     def run(self):
         self.enable_user()
         self.send_signal()
+
+class CreateInternalCompanyFromOwnerCompany:
+    def __init__(self, multi_tenant_company):
+        multi_tenant_company.refresh_from_db()
+        self.multi_tenant_company = multi_tenant_company
+
+    def _get_customer_language(self):
+        language = self.multi_tenant_company.language
+
+        map = {
+            'nl': 'NL',
+            'en': 'EN',
+            'en-gb': 'EN',
+            'he': 'EN',
+        }
+
+        return map.get(language, 'EN')
+
+    def _create_internal_company(self):
+        if not InternalCompany.objects.all().exists():
+            internal_company_kwargs = {
+                'multi_tenant_company': self.multi_tenant_company,
+                'name': self.multi_tenant_company.name,
+                'email': self.multi_tenant_company.email,
+                'phone': self.multi_tenant_company.phone_number,
+                'language': self._get_customer_language(),
+            }
+            self.internal_comapany = InternalCompany.objects.get_or_create(**internal_company_kwargs)
+
+    def _create_address(self):
+        if not Address.objects.all().exists():
+            address_kwargs = {
+                'multi_tenant_company': self.multi_tenant_company,
+                'company': self.internal_comapany,
+                'vat_number': self.multi_tenant_company.vat_number,
+                'address1': self.multi_tenant_company.address1,
+                'address2': self.multi_tenant_company.address2,
+                'city': self.multi_tenant_company.city,
+                'postcode': self.multi_tenant_company.postcode,
+                'country': self.multi_tenant_company.country,
+                'is_invoice_address': True,
+                'is_shipping_address': True,
+            }
+            Address.objects.create(**address_kwargs)
+
+    def run(self):
+        self._create_internal_company()
+        self._create_address ()

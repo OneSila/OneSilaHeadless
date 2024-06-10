@@ -1,30 +1,17 @@
 from strawberry import UNSET
 
-from strawberry.relay.utils import from_base64
 from strawberry_django.resolvers import django_resolver
 from strawberry_django.mutations import resolvers
 from strawberry_django.optimizer import DjangoOptimizerExtension
-from strawberry_django.utils.requests import get_request
-
-from django.contrib import auth
-from django.conf import settings
 from django.db import transaction
-from django.core.exceptions import ValidationError
-from django.contrib.auth.password_validation import validate_password
-
-
-from asgiref.sync import async_to_sync
-
-from channels import auth as channels_auth
-
 from core.schema.core.mixins import GetCurrentUserMixin, GetMultiTenantCompanyMixin
-from core.schema.core.mutations import create, type, DjangoUpdateMutation, \
-    DjangoCreateMutation, default_extensions, \
-    update, Info, models, Iterable, Any, IsAuthenticated
-from core.factories.multi_tenant import InviteUserFactory, RegisterUserFactory, \
-    AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory, RequestLoginTokenFactory, \
-    RecoveryTokenFactory, AuthenticateTokenFactory, ChangePasswordFactory
+from core.schema.core.mutations import DjangoUpdateMutation, DjangoCreateMutation, Info, models, Any
+from core.factories.multi_tenant import InviteUserFactory, AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory, RequestLoginTokenFactory, \
+    RecoveryTokenFactory, ChangePasswordFactory
 from core.models.multi_tenant import MultiTenantUser
+from django.utils.translation import gettext_lazy as _
+
+from core.tasks import core__demo_data__create_task, core__demo_data__delete_task
 
 
 class CleanupDataMixin:
@@ -167,3 +154,40 @@ class EnableUserMutation(DjangoUpdateMutation):
 
             instance.refresh_from_db()
             return instance
+
+class UpdateOnboardingStatusMutation(GetCurrentUserMixin, DjangoUpdateMutation):
+    def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
+        from core.factories.multi_tenant import CreateInternalCompanyFromOwnerCompany
+
+        user = self.get_current_user(info)
+        status = data['onboarding_status']
+        valid_statuses = {choice[0] for choice in MultiTenantUser.ONBOARDING_STATUS_CHOICES}
+        if status not in valid_statuses:
+            raise ValueError(_("Invalid onboarding status: {}").format(status))
+
+        with DjangoOptimizerExtension.disabled():
+            user.onboarding_status = status
+            user.save()
+
+            if status == MultiTenantUser.ADD_CURRENCY:
+                fac = CreateInternalCompanyFromOwnerCompany(user.multi_tenant_company)
+                fac.run()
+
+            return user
+
+class CreateDemoDataMutation(GetMultiTenantCompanyMixin, DjangoUpdateMutation):
+    @django_resolver
+    @transaction.atomic
+    def resolver(self, source: Any, info: Info, args: list[Any], kwargs: dict[str, Any],) -> Any:
+        instance = self.get_multi_tenant_company(info)
+        core__demo_data__create_task(multi_tenant_company=instance)
+        return instance
+
+
+class DeleteDemoDataMutation(GetMultiTenantCompanyMixin, DjangoUpdateMutation):
+    @django_resolver
+    @transaction.atomic
+    def resolver(self, source: Any, info: Info, args: list[Any], kwargs: dict[str, Any],) -> Any:
+        instance = self.get_multi_tenant_company(info)
+        core__demo_data__delete_task(multi_tenant_company=instance)
+        return instance
