@@ -9,6 +9,9 @@ from core.schema.core.mutations import DjangoUpdateMutation, DjangoCreateMutatio
 from core.factories.multi_tenant import InviteUserFactory, AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory, RequestLoginTokenFactory, \
     RecoveryTokenFactory, ChangePasswordFactory
 from core.models.multi_tenant import MultiTenantUser
+from django.utils.translation import gettext_lazy as _
+
+from core.tasks import core__demo_data__create_task, core__demo_data__delete_task
 
 
 class CleanupDataMixin:
@@ -154,9 +157,37 @@ class EnableUserMutation(DjangoUpdateMutation):
 
 class UpdateOnboardingStatusMutation(GetCurrentUserMixin, DjangoUpdateMutation):
     def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
+        from core.factories.multi_tenant import CreateInternalCompanyFromOwnerCompany
+
         user = self.get_current_user(info)
+        status = data['onboarding_status']
+        valid_statuses = {choice[0] for choice in MultiTenantUser.ONBOARDING_STATUS_CHOICES}
+        if status not in valid_statuses:
+            raise ValueError(_("Invalid onboarding status: {}").format(status))
 
         with DjangoOptimizerExtension.disabled():
-            user.onboarding_status = data['onboarding_status']
+            user.onboarding_status = status
             user.save()
+
+            if status == MultiTenantUser.ADD_CURRENCY:
+                fac = CreateInternalCompanyFromOwnerCompany(user.multi_tenant_company)
+                fac.run()
+
             return user
+
+class CreateDemoDataMutation(GetMultiTenantCompanyMixin, DjangoUpdateMutation):
+    @django_resolver
+    @transaction.atomic
+    def resolver(self, source: Any, info: Info, args: list[Any], kwargs: dict[str, Any],) -> Any:
+        instance = self.get_multi_tenant_company(info)
+        core__demo_data__create_task(multi_tenant_company=instance)
+        return instance
+
+
+class DeleteDemoDataMutation(GetMultiTenantCompanyMixin, DjangoUpdateMutation):
+    @django_resolver
+    @transaction.atomic
+    def resolver(self, source: Any, info: Info, args: list[Any], kwargs: dict[str, Any],) -> Any:
+        instance = self.get_multi_tenant_company(info)
+        core__demo_data__delete_task(multi_tenant_company=instance)
+        return instance

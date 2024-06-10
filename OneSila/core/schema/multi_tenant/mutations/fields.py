@@ -10,7 +10,7 @@ from .mutation_classes import MyMultiTenantCompanyCreateMutation, \
     MyMultiTentantCompanyUpdateMutation, UpdateMeMutation, \
     InviteUserMutation, AcceptInvitationMutation, EnableUserMutation, \
     DisableUserMutation, RequestLoginTokenMutation, RecoveryTokenMutation, \
-    UpdateMyPasswordMutation, UpdateOnboardingStatusMutation
+    UpdateMyPasswordMutation, UpdateOnboardingStatusMutation, CreateDemoDataMutation, DeleteDemoDataMutation
 
 import functools
 import strawberry
@@ -70,13 +70,13 @@ def go_to_step():
     extensions = default_extensions
     return UpdateOnboardingStatusMutation(UpdateOnboardingStatusInput, extensions=extensions)
 
-# def create_demo_data():
-#     extensions = default_extensions
-#     return CreateDemoDataMutation(DemoDataInput, extensions=extensions)
-#
-# def delete_demo_data():
-#     extensions = default_extensions
-#     return DeleteDemoDataMutation(DemoDataInput, extensions=extensions)
+def create_demo_data():
+    extensions = default_extensions
+    return CreateDemoDataMutation(extensions=extensions)
+
+def delete_demo_data():
+    extensions = default_extensions
+    return DeleteDemoDataMutation(extensions=extensions)
 
 
 register_user = functools.partial(strawberry.mutation, resolver=resolve_register_user)
