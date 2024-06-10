@@ -18,3 +18,21 @@ def general__subscription__post_save(sender, instance, **kwargs):
         # of which many can fail if they are not models as we use them in our apps.
         # That's why we don't let AttributeErrors fail our method.
         pass
+
+@receiver(post_save, sender=MultiTenantCompany)
+def core__multi_tenant_company__populate_defaults_from_multi_tenant_company(sender, instance, created, **kwargs):
+    from taxes.models import VatRate
+    from currencies.models import Currency
+    from core.countries import vat_rates, currencies
+
+    if created:
+
+        vat_rate = vat_rates.get(instance.country, None)
+        if vat_rate:
+            VatRate.objects.create(rate=vat_rate, name=f'{str(vat_rate)}%', multi_tenant_company=instance)
+
+        currency = currencies.get(instance.country, None)
+        if currency:
+            currency['is_default_currency'] = True
+            currency['multi_tenant_company'] = instance
+            Currency.objects.create(**currency)

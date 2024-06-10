@@ -1,3 +1,4 @@
+import strawberry
 from django.contrib.auth import get_user_model
 
 from core.schema.core.types.types import type, relay, auto, lazy, Annotated
@@ -34,3 +35,7 @@ class MultiTenantCompanyType(relay.Node):
 @type(MultiTenantUserLoginToken, exclude=['token'])
 class MultiTenantUserLoginTokenType(relay.Node):
     pass
+
+@strawberry.type
+class HasDemoDataType:
+    has_demo_data: bool
