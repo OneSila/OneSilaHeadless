@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0091_alter_multitenantuser_timezone'),
+        ('core', '0095_alter_multitenantuser_timezone'),
     ]
 
     operations = [
