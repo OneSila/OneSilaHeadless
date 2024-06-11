@@ -1,7 +1,7 @@
 from typing import Optional
 
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin
+from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin
 from contacts.models import Company, Address, Person, Supplier, \
     InvoiceAddress, ShippingAddress, Customer, InternalShippingAddress
 
@@ -20,18 +20,18 @@ class CompanyFilter(SearchFilterMixin):
 
 
 @filter(Supplier)
-class SupplierFilter(SearchFilterMixin):
+class SupplierFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     search: str | None
     id: auto
     name: auto
-
+    exclude_demo_data: Optional[bool]
 
 @filter(Customer)
-class CustomerFilter(SearchFilterMixin):
+class CustomerFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     search: str | None
     id: auto
     name: auto
-
+    exclude_demo_data: Optional[bool]
 
 @filter(Person)
 class PersonFilter(SearchFilterMixin):

@@ -3,15 +3,16 @@ from strawberry.relay import GlobalID
 
 from contacts.schema.types.filters import CustomerFilter
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin, lazy
+from core.schema.core.types.filters import filter, SearchFilterMixin, lazy, ExcluideDemoDataFilterMixin
 
 from orders.models import Order, OrderItem, OrderNote
 from products.schema.types.filters import ProductFilter
 
 
 @filter(Order)
-class OrderFilter(SearchFilterMixin):
+class OrderFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     search: str | None
+    exclude_demo_data: Optional[bool]
     id: auto
     reference: auto
     customer: CustomerFilter | None

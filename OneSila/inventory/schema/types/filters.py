@@ -1,7 +1,7 @@
-from typing import Self
+from typing import Self, Optional
 
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin
+from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin
 
 from inventory.models import Inventory, InventoryLocation
 from products.schema.types.filters import SupplierProductFilter
@@ -17,8 +17,9 @@ class InventoryLocationFilter(SearchFilterMixin):
 
 
 @filter(Inventory)
-class InventoryFilter(SearchFilterMixin):
+class InventoryFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     search: str | None
+    exclude_demo_data: Optional[bool]
     id: auto
     stocklocation: InventoryLocationFilter | None
     product: SupplierProductFilter | None
