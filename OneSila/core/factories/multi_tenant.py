@@ -240,13 +240,13 @@ class CreateInternalCompanyFromOwnerCompany:
                 'phone': self.multi_tenant_company.phone_number,
                 'language': self._get_customer_language(),
             }
-            self.internal_comapany = InternalCompany.objects.get_or_create(**internal_company_kwargs)
+            self.internal_comapany, _ = InternalCompany.objects.get_or_create(**internal_company_kwargs)
 
     def _create_address(self):
         if not Address.objects.filter(multi_tenant_company=self.multi_tenant_company).exists():
             address_kwargs = {
                 'multi_tenant_company': self.multi_tenant_company,
-                'company': self.internal_comapany,
+                'company_id': self.internal_comapany.id,
                 'vat_number': self.multi_tenant_company.vat_number,
                 'address1': self.multi_tenant_company.address1,
                 'address2': self.multi_tenant_company.address2,
@@ -260,4 +260,4 @@ class CreateInternalCompanyFromOwnerCompany:
 
     def run(self):
         self._create_internal_company()
-        self._create_address ()
+        self._create_address()
