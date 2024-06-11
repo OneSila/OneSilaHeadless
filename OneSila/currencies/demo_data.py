@@ -14,7 +14,7 @@ def currencies_create_currency_structure(multi_tenant_company):
         iso_code="GBP",
         name="British Pound",
         symbol="£",
-        is_default_currency=True,
+        is_default_currency=not Currency.objects.filter(multi_tenant_company=multi_tenant_company, is_default_currency=True).exists(),
         comment="Base Currency")
 
     registry.create_demo_data_relation(base_currency)

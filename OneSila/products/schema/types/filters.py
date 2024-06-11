@@ -2,7 +2,7 @@ from typing import Optional
 
 from contacts.schema.types.filters import SupplierFilter
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin
+from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin
 
 from products.models import Product, BundleProduct, UmbrellaProduct, \
     SimpleProduct, ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, \
@@ -12,14 +12,14 @@ from units.schema.types.filters import UnitFilter
 
 
 @filter(Product)
-class ProductFilter(SearchFilterMixin):
+class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     search: str | None
     id: auto
     sku: auto
     type: auto
     for_sale: auto
     vat_rate: Optional[VatRateFilter]
-
+    exclude_demo_data: Optional[bool]
 
 @filter(BundleProduct)
 class BundleProductFilter(SearchFilterMixin):

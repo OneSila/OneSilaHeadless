@@ -1,7 +1,7 @@
 from typing import Optional
 
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin, lazy
+from core.schema.core.types.filters import filter, SearchFilterMixin, lazy, ExcluideDemoDataFilterMixin
 from products.schema.types.filters import SupplierProductFilter
 
 from purchasing.models import PurchaseOrder, PurchaseOrderItem
@@ -10,9 +10,8 @@ from contacts.schema.types.filters import SupplierFilter, InvoiceAddressFilter, 
     ShippingAddressFilter
 
 
-
 @filter(PurchaseOrder)
-class PurchaseOrderFilter(SearchFilterMixin):
+class PurchaseOrderFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     search: str | None
     id: auto
     status: auto
@@ -22,7 +21,7 @@ class PurchaseOrderFilter(SearchFilterMixin):
     invoice_address: InvoiceAddressFilter | None
     shipping_address: ShippingAddressFilter | None
     purchaseorderitem: Optional[lazy['PurchaseOrderItemFilter', "purchasing.schema.types.filters"]]
-
+    exclude_demo_data: Optional[bool]
 
 
 @filter(PurchaseOrderItem)
