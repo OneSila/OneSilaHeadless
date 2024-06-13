@@ -57,6 +57,16 @@ class PurchaseOrder(models.Model):
     def __str__(self):
         return self.reference()
 
+    def save(self, *args, **kwargs):
+
+        # if we buy from someone it mean it become a customer if is not already
+        if not self.supplier.is_supplier:
+            self.supplier.is_supplier = True
+            self.supplier.save()
+
+
+        super().save(*args, **kwargs)
+
     class Meta:
         ordering = ('-created_at',)
         search_terms = ['supplier__name', 'order_reference']

@@ -28,7 +28,7 @@ class Product(models.Model):
 
     # Supplier Product Fields
     supplier = models.ForeignKey('contacts.Company', on_delete=models.CASCADE, null=True, blank=True)
-    base_product = models.ForeignKey('self', on_delete=models.CASCADE, related_name='supplier_products', null=True, blank=True)
+    base_products = models.ManyToManyField('self', related_name='supplier_products', blank=True)
 
     #Manufacturer product fields
     production_time = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
@@ -319,11 +319,11 @@ class SupplierProduct(Product):
 
     class Meta:
         proxy = True
-        search_terms = ['sku', 'supplier__name']
+        search_terms = ['sku', 'supplier__name', 'translations__name']
 
     def save(self, *args, **kwargs):
-        if self.base_product.type not in [self.SIMPLE, self.DROPSHIP]:
-            raise IntegrityError(_("SupplierProduct can only be attached to a SIMPLE or DROPSHIP product. Not a {}".format(self.type)))
+        if self.id and not all(bp.type in [self.SIMPLE, self.DROPSHIP] for bp in self.base_products.all()):
+            raise IntegrityError(_("SupplierProduct can only be attached to SIMPLE or DROPSHIP products."))
 
         if self.supplier and not self.supplier.is_supplier:
             self.supplier.is_supplier = True
@@ -332,6 +332,7 @@ class SupplierProduct(Product):
         self.for_sale = False
 
         super().save(*args, **kwargs)
+
 class SupplierPrices(models.Model):
     supplier_product = models.ForeignKey(SupplierProduct, on_delete=models.CASCADE, related_name='details')
 

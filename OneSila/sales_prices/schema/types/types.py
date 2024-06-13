@@ -1,4 +1,4 @@
-from contacts.schema.types.types import CustomerType
+from contacts.schema.types.types import CompanyType
 from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin
 
 from typing import List, Optional
@@ -22,7 +22,7 @@ class SalesPriceType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(SalesPriceList, filters=SalesPriceListFilter, order=SalesPriceListOrder, pagination=True, fields="__all__")
 class SalesPriceListType(relay.Node, GetQuerysetMultiTenantMixin):
     currency: CurrencyType
-    customers: List[CustomerType]
+    customers: List[CompanyType]
     salespricelistitem_set: List['SalesPriceListItemType']
 
 

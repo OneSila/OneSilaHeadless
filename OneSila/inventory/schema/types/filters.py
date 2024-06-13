@@ -9,11 +9,12 @@ from contacts.schema.types.filters import InternalShippingAddressFilter
 
 
 @filter(InventoryLocation)
-class InventoryLocationFilter(SearchFilterMixin):
+class InventoryLocationFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     search: str | None
+    exclude_demo_data: Optional[bool]
     id: auto
     name: auto
-    location: InternalShippingAddressFilter
+    location: Optional[InternalShippingAddressFilter]
 
 
 @filter(Inventory)

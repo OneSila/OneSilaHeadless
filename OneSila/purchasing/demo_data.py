@@ -20,12 +20,9 @@ class SupplierProductGenerator(PrivateDataGenerator):
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)
         multi_tenant_company = kwargs['multi_tenant_company']
-
-        product = Product.objects.filter(type=Product.SIMPLE, multi_tenant_company=multi_tenant_company).order_by('?').first()
         supplier = Supplier.objects.filter(is_supplier=True, multi_tenant_company=multi_tenant_company).order_by('?').first()
 
         kwargs.update({
-            'base_product': product,
             'supplier': supplier
         })
 
@@ -50,6 +47,10 @@ class SupplierProductGenerator(PrivateDataGenerator):
             unit_price=fake.random_int(min=1, max=1000),
             multi_tenant_company=multi_tenant_company,
         )
+
+        products = list(Product.objects.filter(type__in=[Product.SIMPLE, Product.DROPSHIP], multi_tenant_company=multi_tenant_company).order_by('?')[:3])
+        instance.base_products.set(products)
+        instance.save()
 
 @registry.register_private_app
 class PurchaseOrderGenerator(PrivateDataGenerator):
