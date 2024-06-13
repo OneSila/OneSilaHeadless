@@ -1,10 +1,8 @@
 from decimal import Decimal
 
 from strawberry.relay.utils import to_base64
-from strawberry_django.relay import resolve_model_id
-
 from contacts.schema.types.types import CompanyType
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field
+from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, Annotated, lazy
 
 from typing import List, Optional
 
@@ -24,7 +22,8 @@ from .ordering import ProductOrder, BundleProductOrder, UmbrellaProductOrder, \
 @type(Product, filters=ProductFilter, order=ProductOrder, pagination=True, fields="__all__")
 class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
     vat_rate: Optional[VatRateType]
-    base_product: Optional["ProductType"]
+    base_products: List[Annotated['ProductType', lazy("products.schema.types.types")]]
+
     supplier: Optional[CompanyType]
 
     @field()
@@ -114,7 +113,7 @@ class DropshipProductType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(SupplierProduct, filters=SupplierProductFilter, order=SupplierProductOrder, pagination=True, fields="__all__")
 class SupplierProductType(relay.Node, GetQuerysetMultiTenantMixin):
     supplier: Optional[CompanyType]
-    base_product: ProductType
+    base_products: List[Annotated['ProductType', lazy("products.schema.types.types")]]
 
     @field()
     def name(self, info) -> str | None:

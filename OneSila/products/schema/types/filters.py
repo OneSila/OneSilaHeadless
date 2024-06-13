@@ -2,7 +2,7 @@ from typing import Optional
 
 from contacts.schema.types.filters import SupplierFilter
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin
+from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin, lazy
 
 from products.models import Product, BundleProduct, UmbrellaProduct, \
     SimpleProduct, ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, \
@@ -85,7 +85,8 @@ class SupplierProductFilter(SearchFilterMixin):
     id: auto
     sku: auto
     supplier: Optional[SupplierFilter]
-    base_product: Optional[ProductFilter]
+    base_products: Optional[lazy['ProductFilter', "products.schema.types.filters"]]
+
 
 
 @filter(BillOfMaterial)

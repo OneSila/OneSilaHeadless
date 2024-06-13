@@ -1,11 +1,10 @@
 from decimal import Decimal
-
-from core.schema.core.types.types import auto
+from typing import List, Optional
 from core.schema.core.types.input import NodeInput, input, partial
+from core.schema.core.types.types import Annotated, lazy
 
 from products.models import Product, BundleProduct, UmbrellaProduct, SimpleProduct, \
     ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrices
-from units.schema.types.types import UnitType
 
 
 @input(Product, fields="__all__")
@@ -15,7 +14,7 @@ class ProductInput:
 
 @partial(Product, fields="__all__")
 class ProductPartialInput(NodeInput):
-    pass
+    base_products: Optional[List[Annotated['ProductPartialInput', lazy("products.schema.types.input")]]]
 
 
 @input(BundleProduct, fields="__all__")
@@ -104,6 +103,7 @@ class SupplierProductInput:
     quantity: int
     unit_price: float
     unit: NodeInput
+    base_products: Optional[List[ProductPartialInput]]
 
 
 @partial(SupplierProduct, fields="__all__")
@@ -111,6 +111,7 @@ class SupplierProductPartialInput(NodeInput):
     quantity: int | None
     unit_price: float | None
     unit: NodeInput | None
+    base_products: Optional[List[ProductPartialInput]]
 
 
 @input(BillOfMaterial, fields="__all__")

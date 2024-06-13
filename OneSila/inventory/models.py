@@ -16,7 +16,7 @@ class Inventory(models.Model):
     objects = InventoryManager()
 
     class Meta:
-        search_terms = ['product__sku', 'stocklocation__name']
+        search_terms = ['product__sku', 'stocklocation__name', 'product__supplier__name']
         unique_together = ('product', 'stocklocation')
         verbose_name_plural = "inventories"
 
