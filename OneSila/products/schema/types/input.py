@@ -1,6 +1,6 @@
 from decimal import Decimal
 from typing import List, Optional
-from core.schema.core.types.input import NodeInput, input, partial
+from core.schema.core.types.input import NodeInput, input, partial, lazy
 
 from products.models import Product, BundleProduct, UmbrellaProduct, SimpleProduct, \
     ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrices
@@ -13,7 +13,7 @@ class ProductInput:
 
 @partial(Product, fields="__all__")
 class ProductPartialInput(NodeInput):
-    base_products: Optional[List['ProductPartialInput']]
+    base_products: Optional[lazy['ProductPartialInput', "products.schema.types.input"]]
 
 
 @input(BundleProduct, fields="__all__")
