@@ -28,7 +28,7 @@ class Product(models.Model):
 
     # Supplier Product Fields
     supplier = models.ForeignKey('contacts.Company', on_delete=models.CASCADE, null=True, blank=True)
-    base_products = models.ManyToManyField('self', related_name='supplier_products', blank=True)
+    base_products = models.ManyToManyField('self', symmetrical=False, related_name='supplier_products', blank=True)
 
     #Manufacturer product fields
     production_time = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
