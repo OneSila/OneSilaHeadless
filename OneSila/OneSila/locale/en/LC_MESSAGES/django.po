@@ -1,0 +1,489 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-06-16 13:51+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+#: OneSila/settings/base.py:140
+msgid "Nederlands"
+msgstr ""
+
+#: OneSila/settings/base.py:141
+msgid "English"
+msgstr ""
+
+#: contacts/models.py:42
+msgid "companies"
+msgstr ""
+
+#: contacts/models.py:94
+msgid "interal companies"
+msgstr ""
+
+#: contacts/models.py:122
+msgid "person"
+msgstr ""
+
+#: contacts/models.py:123
+msgid "people"
+msgstr ""
+
+#: contacts/models.py:174
+msgid "Company already has an invoice address."
+msgstr ""
+
+#: core/admin.py:13
+msgid "Personal info"
+msgstr ""
+
+#: core/admin.py:14
+msgid "Profile info"
+msgstr ""
+
+#: core/admin.py:15
+msgid "Permissions"
+msgstr ""
+
+#: core/admin.py:21
+msgid "Important dates"
+msgstr ""
+
+#: core/managers/multi_tenant.py:16
+msgid "Unknown token"
+msgstr ""
+
+#: core/managers/multi_tenant.py:19
+msgid "Token is no longer valid"
+msgstr ""
+
+#: core/managers/multi_tenant.py:86
+msgid "The Email must be set"
+msgstr ""
+
+#: core/models/multi_tenant.py:53
+msgid "Multi tenant companies"
+msgstr ""
+
+#: core/models/multi_tenant.py:93
+msgid "Generate Demo Data"
+msgstr ""
+
+#: core/models/multi_tenant.py:94
+msgid "Add Company"
+msgstr ""
+
+#: core/models/multi_tenant.py:95
+msgid "Add Currency"
+msgstr ""
+
+#: core/models/multi_tenant.py:96
+msgid "Confirm VAT Rate"
+msgstr ""
+
+#: core/models/multi_tenant.py:97
+msgid "Create Inventory Location"
+msgstr ""
+
+#: core/models/multi_tenant.py:98
+msgid "Dashboard Cards Presentation"
+msgstr ""
+
+#: core/models/multi_tenant.py:99
+msgid "Complete Dashboard Cards"
+msgstr ""
+
+#: core/models/multi_tenant.py:100 orders/models.py:34
+msgid "Done"
+msgstr ""
+
+#: core/models/multi_tenant.py:106
+msgid "Email Address"
+msgstr ""
+
+#: core/models/multi_tenant.py:163
+msgid "Multi tenant user"
+msgstr ""
+
+#: core/models/multi_tenant.py:164
+msgid "Multi tenant users"
+msgstr ""
+
+#: core/schema/multi_tenant/mutations/mutation_classes.py:166
+msgid "Invalid onboarding status: {}"
+msgstr ""
+
+#: core/validators.py:8
+msgid ""
+"Phone number must be entered in the format: '+999999999'. Up to 20 digits "
+"allowed."
+msgstr ""
+
+#: core/validators.py:18 core/validators.py:27
+msgid "Only {} are allowed."
+msgstr ""
+
+#: core/validators.py:34
+msgid "No dots are allowed in the filename"
+msgstr ""
+
+#: currencies/models.py:47
+msgid "Currency"
+msgstr ""
+
+#: currencies/models.py:48
+msgid "Currencies"
+msgstr ""
+
+#: inventory/models.py:28
+msgid "Inventory can only be attached to a SUPPLIER PRODUCT. Not a {}"
+msgstr ""
+
+#: media/models.py:31
+msgid "Mood Shot"
+msgstr ""
+
+#: media/models.py:32
+msgid "Pack Shot"
+msgstr ""
+
+#: media/models.py:40
+msgid "Image"
+msgstr ""
+
+#: media/models.py:41
+msgid "Video"
+msgstr ""
+
+#: media/models.py:42 media/models.py:56
+msgid "File"
+msgstr ""
+
+#: media/models.py:50
+msgid "Image (High resolution)"
+msgstr ""
+
+#: notifications/factories/email.py:38
+msgid "Welcome to OneSila. Let's kickstart your productivity."
+msgstr ""
+
+#: notifications/factories/email.py:49
+msgid "Accept your invitation to OneSila."
+msgstr ""
+
+#: notifications/factories/email.py:64
+msgid "Your login link"
+msgstr ""
+
+#: notifications/factories/email.py:75
+msgid "Your Account Recovery link"
+msgstr ""
+
+#: notifications/factories/email.py:86
+msgid "Your password has been updated."
+msgstr ""
+
+#: notifications/templates/notifications/email/account_recovery_link.html:5
+#: notifications/templates/notifications/email/invite_user.html:5
+#: notifications/templates/notifications/email/login_link.html:5
+#: notifications/templates/notifications/email/password_changed.html:5
+#: notifications/templates/notifications/email/welcome.html:5
+msgid "Hi"
+msgstr ""
+
+#: notifications/templates/notifications/email/account_recovery_link.html:7
+msgid "You can find your account recovery link below."
+msgstr ""
+
+#: notifications/templates/notifications/email/account_recovery_link.html:9
+msgid "Recover your account."
+msgstr ""
+
+#: notifications/templates/notifications/email/account_recovery_link.html:11
+#: notifications/templates/notifications/email/invite_user.html:11
+#: notifications/templates/notifications/email/login_link.html:11
+#: notifications/templates/notifications/email/welcome.html:12
+msgid "Any help needed?"
+msgstr ""
+
+#: notifications/templates/notifications/email/account_recovery_link.html:13
+#: notifications/templates/notifications/email/invite_user.html:13
+#: notifications/templates/notifications/email/login_link.html:13
+#: notifications/templates/notifications/email/welcome.html:14
+msgid "I'd love to hear from you."
+msgstr ""
+
+#: notifications/templates/notifications/email/account_recovery_link.html:15
+#: notifications/templates/notifications/email/invite_user.html:15
+#: notifications/templates/notifications/email/login_link.html:15
+#: notifications/templates/notifications/email/welcome.html:16
+msgid "Best regards"
+msgstr ""
+
+#: notifications/templates/notifications/email/account_recovery_link.html:17
+#: notifications/templates/notifications/email/invite_user.html:17
+#: notifications/templates/notifications/email/login_link.html:17
+#: notifications/templates/notifications/email/welcome.html:18
+msgid "Sascha Dobbelaere"
+msgstr ""
+
+#: notifications/templates/notifications/email/invite_user.html:7
+#, python-format
+msgid "You've been invited to join %(multi_tenant_company)s on OneSila."
+msgstr ""
+
+#: notifications/templates/notifications/email/invite_user.html:9
+msgid "Accept your invitation here."
+msgstr ""
+
+#: notifications/templates/notifications/email/login_link.html:7
+msgid "You can find the login-link you requested below."
+msgstr ""
+
+#: notifications/templates/notifications/email/login_link.html:9
+msgid "Login."
+msgstr ""
+
+#: notifications/templates/notifications/email/password_changed.html:7
+msgid ""
+"Just a quick message to let you know that your password has been changed."
+msgstr ""
+
+#: notifications/templates/notifications/email/password_changed.html:8
+msgid ""
+"If this wasn't you, go change you password immediatly and verify no-one else "
+"has access to your email address. "
+msgstr ""
+
+#: notifications/templates/notifications/email/password_changed.html:10
+msgid "Go change your password."
+msgstr ""
+
+#: notifications/templates/notifications/email/welcome.html:7
+msgid "We're amazed to go on this productivity journey together."
+msgstr ""
+
+#: notifications/templates/notifications/email/welcome.html:8
+msgid ""
+"Let's start by logging in to your account and prepare your first produts and "
+"orders."
+msgstr ""
+
+#: notifications/templates/notifications/email/welcome.html:10
+msgid "Login to your dashboard here."
+msgstr ""
+
+#: orders/models.py:29 purchasing/models.py:20
+msgid "Draft"
+msgstr ""
+
+#: orders/models.py:30
+msgid "Pending"
+msgstr ""
+
+#: orders/models.py:31
+msgid "Pending Inventory"
+msgstr ""
+
+#: orders/models.py:32
+msgid "To Pick"
+msgstr ""
+
+#: orders/models.py:33
+msgid "To Ship"
+msgstr ""
+
+#: orders/models.py:35
+msgid "Cancelled"
+msgstr ""
+
+#: orders/models.py:36
+msgid "On Hold"
+msgstr ""
+
+#: orders/models.py:37
+msgid "Exchanged"
+msgstr ""
+
+#: orders/models.py:38
+msgid "Refunded"
+msgstr ""
+
+#: orders/models.py:39
+msgid "Lost"
+msgstr ""
+
+#: orders/models.py:40
+msgid "Merged"
+msgstr ""
+
+#: orders/models.py:41
+msgid "Damaged"
+msgstr ""
+
+#: orders/models.py:42
+msgid "Void"
+msgstr ""
+
+#: orders/models.py:52
+msgid "Sale"
+msgstr ""
+
+#: orders/models.py:53
+msgid "Return goods"
+msgstr ""
+
+#: orders/models.py:54
+msgid "Commercial Sample"
+msgstr ""
+
+#: orders/models.py:55
+msgid "Gift"
+msgstr ""
+
+#: orders/models.py:56
+msgid "Documents"
+msgstr ""
+
+#: products/models.py:223
+#, python-format
+msgid "umbrella needs to a product of type UMBRELLA. Not %s"
+msgstr ""
+
+#: products/models.py:226 products/models.py:250
+#, python-format
+msgid "variation needs to a product of type BUNDLE or SIMPLE. Not %s"
+msgstr ""
+
+#: products/models.py:247
+#, python-format
+msgid "umbrella needs to a product of type BUNDLE. Not %s"
+msgstr ""
+
+#: products/models.py:267
+#, python-format
+msgid "Product needs to be of type MANUFACTURABLE. Not %s"
+msgstr ""
+
+#: products/models.py:270
+#, python-format
+msgid "variation needs to a product of type BUNDLE or MANUFACTURABLE. Not %s"
+msgstr ""
+
+#: products/models.py:326
+msgid ""
+"SupplierProduct can only be attached to a SIMPLE or DROPSHIP product. Not a "
+"{}"
+msgstr ""
+
+#: products/product_types.py:11
+msgid "Bundle Product"
+msgstr ""
+
+#: products/product_types.py:12
+msgid "Umbrella Product"
+msgstr ""
+
+#: products/product_types.py:13
+msgid "Manufacturable Product"
+msgstr ""
+
+#: products/product_types.py:14
+msgid "Dropship Product"
+msgstr ""
+
+#: products/product_types.py:15
+msgid "Supplier Product"
+msgstr ""
+
+#: products/product_types.py:16
+msgid "Simple Product"
+msgstr ""
+
+#: properties/models.py:20
+msgid "Integer"
+msgstr ""
+
+#: properties/models.py:21
+msgid "Float"
+msgstr ""
+
+#: properties/models.py:22
+msgid "String"
+msgstr ""
+
+#: properties/models.py:23
+msgid "Text"
+msgstr ""
+
+#: properties/models.py:24
+msgid "Boolean"
+msgstr ""
+
+#: properties/models.py:25
+msgid "Date"
+msgstr ""
+
+#: properties/models.py:26
+msgid "Date time"
+msgstr ""
+
+#: properties/models.py:31
+msgid "Type of property"
+msgstr ""
+
+#: properties/models.py:39
+msgid "Value validator"
+msgstr ""
+
+#: properties/models.py:40
+msgid "Regex to validate value"
+msgstr ""
+
+#: properties/models.py:47
+msgid "Properties"
+msgstr ""
+
+#: properties/models.py:52
+msgid "Name"
+msgstr ""
+
+#: properties/models.py:68
+msgid "Value"
+msgstr ""
+
+#: properties/models.py:130
+msgid "Product Properties"
+msgstr ""
+
+#: purchasing/models.py:21
+msgid "Ordered"
+msgstr ""
+
+#: purchasing/models.py:22
+msgid "Confirmation Received"
+msgstr ""
+
+#: purchasing/models.py:23
+msgid "Pending Delivery"
+msgstr ""
+
+#: purchasing/models.py:24
+msgid "Delivered"
+msgstr ""
+
+#: taxes/models.py:14
+msgid "VAT rate in percent.  Eg 21 for 21%"
+msgstr ""
