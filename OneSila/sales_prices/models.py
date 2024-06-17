@@ -82,7 +82,7 @@ class SalesPriceList(models.Model):
     vat_included = models.BooleanField(default=False)
     auto_update = models.BooleanField(default=True)
 
-    customers = models.ManyToManyField('contacts.Company')
+    customers = models.ManyToManyField('contacts.Company', blank=True)
 
     objects = SalesPriceListManager()
 
