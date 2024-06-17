@@ -23,10 +23,10 @@ class Currency(models.Model):
 
     inherits_from = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='passes_to')
-    exchange_rate = models.FloatField(default=1)
-    exchange_rate_official = models.FloatField(default=1)
+    exchange_rate = models.FloatField(default=1, null=True, blank=True)
+    exchange_rate_official = models.FloatField(default=1, null=True, blank=True)
     follow_official_rate = models.BooleanField(default=False)
-    round_prices_up_to = models.IntegerField(default=1)
+    round_prices_up_to = models.IntegerField(default=1, null=True, blank=True)
     is_default_currency = models.BooleanField(default=False)
     comment = models.TextField(null=True, blank=True)
 
@@ -51,5 +51,7 @@ class Currency(models.Model):
             models.UniqueConstraint(
                 fields=['multi_tenant_company'],
                 condition=Q(is_default_currency=True),
-                name='unique_is_default_currency')
+                name='unique_is_default_currency',
+                violation_error_message=_("You can only have one default currency.")
+            ),
         ]
