@@ -18,8 +18,11 @@ class InventoryLocationGenerator(PrivateDataGenerator):
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)
         multi_tenant_company = kwargs['multi_tenant_company']
-        kwargs['location'] = InternalShippingAddress.objects.filter(multi_tenant_company=multi_tenant_company).last()
+        kwargs['location'] = InternalShippingAddress.objects.\
+            filter_multi_tenant(multi_tenant_company).\
+            last()
         return kwargs
+
 
 @registry.register_private_app
 class InventoryGenerator(PrivateDataGenerator):
@@ -33,10 +36,20 @@ class InventoryGenerator(PrivateDataGenerator):
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)
         multi_tenant_company = kwargs['multi_tenant_company']
-        stocklocation = InventoryLocation.objects.filter(multi_tenant_company=multi_tenant_company).order_by('?').first()
-        existing_product_ids = Inventory.objects.filter(stocklocation=stocklocation, multi_tenant_company=multi_tenant_company).values_list('product_id', flat=True)
+        stocklocation = InventoryLocation.objects.\
+            filter_multi_tenant(multi_tenant_company=multi_tenant_company).\
+            order_by('?').\
+            first()
+        existing_product_ids = Inventory.objects.\
+            filter_multi_tenant(multi_tenant_company=multi_tenant_company).\
+            filter(stocklocation=stocklocation).\
+            values_list('product_id', flat=True)
 
-        supplier_product = SupplierProduct.objects.filter(multi_tenant_company=multi_tenant_company).exclude(id__in=existing_product_ids).order_by('?').first()
+        supplier_product = SupplierProduct.objects.\
+            filter_multi_tenant(multi_tenant_company=multi_tenant_company).\
+            exclude(id__in=existing_product_ids).\
+            order_by('?').\
+            first()
 
         kwargs['stocklocation'] = stocklocation
         kwargs['product'] = supplier_product

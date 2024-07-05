@@ -1,7 +1,7 @@
 import random
 
 from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator
-from products.models import  ProductTranslation, Product
+from products.models import ProductTranslation, Product
 from products.product_types import MANUFACTURABLE, SIMPLE, BUNDLE, DROPSHIP
 from taxes.models import VatRate
 
@@ -21,7 +21,7 @@ class ProductDataGenerator(PrivateDataGenerator):
 
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)
-        kwargs['vat_rate'] = VatRate.objects.last()
+        kwargs['vat_rate'] = VatRate.objects.filter_multi_tenant(self.multi_tenant_company)
         kwargs['type'] = random.choice([SIMPLE, BUNDLE, DROPSHIP])
         return kwargs
 
