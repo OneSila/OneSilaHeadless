@@ -21,7 +21,7 @@ class ProductDataGenerator(PrivateDataGenerator):
 
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)
-        kwargs['vat_rate'] = VatRate.objects.filter_multi_tenant(self.multi_tenant_company)
+        kwargs['vat_rate'] = VatRate.objects.filter_multi_tenant(self.multi_tenant_company).last()
         kwargs['type'] = random.choice([SIMPLE, BUNDLE, DROPSHIP])
         return kwargs
 
