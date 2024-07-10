@@ -15,3 +15,10 @@ PRODUCT_TYPE_CHOICES = (
     (SUPPLIER, _('Supplier Product')),
     (SIMPLE, _('Simple Product')),
 )
+
+HAS_PRICES_TYPES = [
+    SIMPLE,
+    BUNDLE,
+    MANUFACTURABLE,
+    DROPSHIP
+]
