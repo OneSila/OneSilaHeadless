@@ -4,7 +4,7 @@ from decimal import Decimal
 
 def roundup(x, ceil):
     ''' Roundup a number to the nearest ceiling
-    For example:  roundup(111, 30) returns 120'''
+    For example:  roundup(111, 20) returns 120'''
     return int(math.ceil(x / Decimal(ceil))) * Decimal(ceil)
 
 
