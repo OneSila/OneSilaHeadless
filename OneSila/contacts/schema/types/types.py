@@ -18,6 +18,12 @@ class CompanyType(relay.Node, GetQuerysetMultiTenantMixin):
     currency: Optional[CurrencyType]
     person_set: List[Annotated['PersonType', lazy("contacts.schema.types.types")]]
 
+    @field()
+    def country(self, info) -> str | None:
+        try:
+            return InvoiceAddress.objects.filter_multi_tenant(self.multi_tenant_company).filter(company=self).first().get_country_display()
+        except Exception:
+            return None
 
 @type(Supplier, filters=SupplierFilter, order=SupplierOrder, pagination=True, fields="__all__")
 class SupplierType(relay.Node, GetQuerysetMultiTenantMixin):

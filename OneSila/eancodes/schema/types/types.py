@@ -3,10 +3,11 @@ from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixi
 from typing import List
 
 from eancodes.models import EanCode
+from products.schema.types.filters import ProductFilter
 from .filters import EanCodeFilter
 from .ordering import EanCodeOrder
 
 
 @type(EanCode, filters=EanCodeFilter, order=EanCodeOrder, pagination=True, fields="__all__")
 class EanCodeType(relay.Node, GetQuerysetMultiTenantMixin):
-    pass
+    product: ProductFilter | None

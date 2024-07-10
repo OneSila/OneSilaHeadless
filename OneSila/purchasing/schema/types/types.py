@@ -23,6 +23,13 @@ class PurchaseOrderType(relay.Node, GetQuerysetMultiTenantMixin):
     def total_value(self) -> str | None:
         return self.total_value
 
+    @field()
+    def country(self, info) -> str | None:
+        try:
+            return self.invoice_address.get_country_display()
+        except Exception:
+            return None
+
 
 @type(PurchaseOrderItem, filters=PurchaseOrderItemFilter, order=PurchaseOrderItemOrder, pagination=True, fields="__all__")
 class PurchaseOrderItemType(relay.Node, GetQuerysetMultiTenantMixin):
