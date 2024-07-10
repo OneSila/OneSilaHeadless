@@ -33,8 +33,19 @@ class OrderReferenceProvider(BaseProvider):
         return f"{prepen}{rand}"
 
 
+class PriceProvider(BaseProvider):
+    def price(self):
+        rand = float(randint(10, 90))
+        return rand - 0.01
+
+    def price_discount(self, price):
+        rand = float(randint(1, int(price) - 2))
+        return rand - 0.01
+
+
 fake.add_provider(VATProvider)
 fake.add_provider(OrderReferenceProvider)
+fake.add_provider(PriceProvider)
 fake.add_provider(faker_commerce.Provider)
 
 
@@ -72,7 +83,6 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
 
         if self.registry_public_apps.get(method_name):
             raise ValidationError(f"Method {method} is already present in the public app registry. You should pick a unique name.")
-
 
         priority = 50
         try:

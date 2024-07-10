@@ -2,8 +2,6 @@ from django.dispatch import receiver
 from django.db.models.signals import post_save
 from units.models import Unit
 
-from core.schema.core.subscriptions import refresh_subscription_receiver
-
 import logging
 logger = logging.getLogger(__name__)
 

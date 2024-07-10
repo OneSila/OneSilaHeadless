@@ -15,8 +15,6 @@ channels
 channels-redis
 ipython
 unicodecsv
-mkdocs
-mkdocs-material
 coverage
 daphne
 premailer

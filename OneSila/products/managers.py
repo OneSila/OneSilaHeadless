@@ -18,6 +18,9 @@ class ProductQuerySet(MultiTenantQuerySet):
     def filter_dropship(self):
         return self.filter(type=self.model.DROPSHIP)
 
+    def filter_has_prices(self):
+        return self.filter(type__in=self.model.HAS_PRICES_TYPES)
+
 
 class ProductManager(MultiTenantManager):
     def get_queryset(self):
@@ -49,6 +52,7 @@ class BundleQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
 class BundleManager(ProductManager):
     def get_queryset(self):
         return BundleQuerySet(self.model, using=self._db)
+
 
 class ManufacturableQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
     pass
