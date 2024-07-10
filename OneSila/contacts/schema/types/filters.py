@@ -1,7 +1,9 @@
+from typing import Optional
+
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin
+from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin
 from contacts.models import Company, Address, Person, Supplier, \
-    InvoiceAddress, ShippingAddress, Customer
+    InvoiceAddress, ShippingAddress, Customer, InternalShippingAddress
 
 
 @filter(Company)
@@ -9,8 +11,7 @@ class CompanyFilter(SearchFilterMixin):
     search: str | None
     id: auto
     name: auto
-    vat_number: auto
-    eori_number: auto
+    language: auto
 
     is_supplier: auto
     is_customer: auto
@@ -19,47 +20,55 @@ class CompanyFilter(SearchFilterMixin):
 
 
 @filter(Supplier)
-class SupplierFilter(SearchFilterMixin):
+class SupplierFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     search: str | None
     id: auto
     name: auto
-    vat_number: auto
-    eori_number: auto
-
+    exclude_demo_data: Optional[bool]
 
 @filter(Customer)
-class CustomerFilter(SearchFilterMixin):
+class CustomerFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     search: str | None
     id: auto
     name: auto
-    vat_number: auto
-    eori_number: auto
-
+    exclude_demo_data: Optional[bool]
 
 @filter(Person)
 class PersonFilter(SearchFilterMixin):
+    id: auto
     search: str | None
+    active: auto
     first_name: auto
     last_name: auto
     email: auto
-    company: CompanyFilter
+    company: CompanyFilter | None
 
 
 @filter(Address)
 class AddressFilter(SearchFilterMixin):
+    id: auto
     search: str | None
-    company: CompanyFilter
+    company: CompanyFilter | None
     is_invoice_address: auto
     is_shipping_address: auto
 
 
 @filter(InvoiceAddress)
 class InvoiceAddressFilter(SearchFilterMixin):
+    id: auto
     search: str | None
-    company: CompanyFilter
+    company: CompanyFilter | None
 
 
 @filter(ShippingAddress)
 class ShippingAddressFilter(SearchFilterMixin):
+    id: auto
     search: str | None
-    company: CompanyFilter
+    company: CompanyFilter | None
+
+
+@filter(InternalShippingAddress)
+class InternalShippingAddressFilter(SearchFilterMixin):
+    id: auto
+    search: str | None
+    company: CompanyFilter | None

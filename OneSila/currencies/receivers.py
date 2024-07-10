@@ -1,5 +1,6 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from core.models import MultiTenantCompany
 from currencies.models import Currency
 from currencies.signals import exchange_rate_official__post_save
 
@@ -14,3 +15,15 @@ def currencies__currency__exchange_rate_official__receiver(sender, instance, **k
     """
     from currencies.flows.update_rates import UpdateFollowerRateFlow
     UpdateFollowerRateFlow(instance).flow()
+
+
+@receiver(post_save, sender=MultiTenantCompany)
+def currencies__multi_tenant_company__populate_defaults(sender, instance, created, **kwargs):
+    from currencies.currencies import currencies
+
+    if created:
+        currency = currencies.get(instance.country, None)
+        if currency:
+            currency['is_default_currency'] = True
+            currency['multi_tenant_company'] = instance
+            Currency.objects.create(**currency)

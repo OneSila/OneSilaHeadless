@@ -1,10 +1,5 @@
 from core import models
-from django.dispatch import receiver
-from django.db.models.signals import post_save, pre_save
 from django.utils.translation import gettext_lazy as _
-
-from core.models import MultiTenantAwareMixin
-
 from currency_converter import CurrencyConverter, RateNotFoundError
 
 from .managers import OrderItemManager, OrderManager, OrderReportManager
@@ -62,7 +57,7 @@ class Order(models.Model):
     )
 
     reference = models.CharField(max_length=100, blank=True, null=True)
-    company = models.ForeignKey('contacts.Customer', on_delete=models.PROTECT)
+    customer = models.ForeignKey('contacts.Company', on_delete=models.PROTECT)
     invoice_address = models.ForeignKey('contacts.InvoiceAddress', on_delete=models.PROTECT,
         related_name='invoiceaddress_set')
     shipping_address = models.ForeignKey('contacts.ShippingAddress', on_delete=models.PROTECT,
@@ -94,7 +89,7 @@ class Order(models.Model):
         total_value = self.total_value
 
         if total_value:
-            return '{} {}'.format(self.currency, total_value)
+            return '{} {}'.format(self.currency.symbol, total_value)
         else:
             return total_value
 
@@ -142,8 +137,18 @@ class Order(models.Model):
         return self.status == self.DONE
 
     class Meta:
-        search_terms = ['reference', 'company__name']
+        ordering = ('-created_at',)
+        search_terms = ['reference', 'customer__name']
 
+    def save(self, *args, **kwargs):
+
+        # if we buy from someone it mean it become a customer if is not already
+        if not self.customer.is_customer:
+            self.customer.is_customer = True
+            self.customer.save()
+
+
+        super().save(*args, **kwargs)
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.PROTECT)
@@ -156,7 +161,7 @@ class OrderItem(models.Model):
     objects = OrderItemManager()
 
     def __str__(self):
-        return '{} x {} : {}'.format(self.product.name, self.quantity, self.order)
+        return '{} x {} : {}'.format(self.product.sku, self.quantity, self.order)
 
     def qty_on_stock(self):
         # Firstly, dont bother calculating this for order-items that dont need processing
@@ -190,6 +195,7 @@ class OrderItem(models.Model):
 
     class Meta:
         search_terms = ['order__reference', 'order__company__name']
+        unique_together = ("order", "product")
 
 
 class OrderNote(models.Model):

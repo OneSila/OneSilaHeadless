@@ -80,6 +80,26 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     '''
     from core.timezones import TIMEZONE_CHOICES
 
+    ADD_COMPANY = 'ADD_COMPANY' # - add owner company + create internal company + internal company address out of it
+    ADD_CURRENCY = 'ADD_CURRENCY' # - add default currency
+    CONFIRM_VAT_RATE = 'CONFIRM_VAT_RATE' # - edit / create VAT Rate
+    CREATE_INVENTORY_LOCATION = 'CREATE_INVENTORY_LOCATION' # add inventory location (can be skipped)
+    GENERATE_DEMO_DATA = 'GENERATE_DEMO_DATA' # - Ask if want demo data
+    DASHBOARD_CARDS_PRESENTATION = 'DASHBOARD_CARDS_PRESENTATION' # Presentation of dashboard Tutorial Carads
+    COMPLETE_DASHBOARD_CARDS = 'COMPLETE_DASHBOARD_CARDS' # Dashboard cards still not completed
+    DONE = 'DONE' # Everything is done
+
+    ONBOARDING_STATUS_CHOICES = (
+        (GENERATE_DEMO_DATA, _('Generate Demo Data')),
+        (ADD_COMPANY, _('Add Company')),
+        (ADD_CURRENCY, _('Add Currency')),
+        (CONFIRM_VAT_RATE, _('Confirm VAT Rate')),
+        (CREATE_INVENTORY_LOCATION, _('Create Inventory Location')),
+        (DASHBOARD_CARDS_PRESENTATION, _('Dashboard Cards Presentation')),
+        (COMPLETE_DASHBOARD_CARDS, _('Complete Dashboard Cards')),
+        (DONE, _('Done')),
+    )
+
     LANGUAGE_CHOICES = get_languages()
     DEFAULT_TIMEZONE = 'Europe/London'
 
@@ -98,6 +118,7 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     mobile_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
     whatsapp_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
     telegram_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
+    onboarding_status = models.CharField(max_length=30, choices=ONBOARDING_STATUS_CHOICES, default=ADD_COMPANY)
 
     avatar = models.ImageField(upload_to='avatars', null=True, blank=True,
         validators=[validate_image_extension, no_dots_in_filename])
@@ -105,6 +126,7 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
                             processors=[ResizeToFill(100, 100)],
                             format='JPEG',
                             options={'quality': 70})
+
 
     def __str__(self):
         return f"{self.username} <{self.multi_tenant_company}>"
@@ -185,3 +207,4 @@ class MultiTenantUserLoginToken(models.Model):
 
     def is_valid(self, now=timezone.now()):
         return self.expires_at >= now
+

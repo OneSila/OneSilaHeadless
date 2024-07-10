@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
                 ('name', models.CharField(max_length=100)),
                 ('quantity', models.IntegerField()),
                 ('currency', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='currencies.currency')),
-                ('product', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='products.productvariation')),
+                ('product', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='products.simpleproduct')),
                 ('supplier', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contacts.supplier')),
                 ('unit', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='units.unit')),
             ],

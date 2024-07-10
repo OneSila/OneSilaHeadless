@@ -1,7 +1,14 @@
-from django.db.models import QuerySet, Manager, Q
+from core.managers import MultiTenantQuerySet, MultiTenantManager
+
+class SalesPriceListQuerySet(MultiTenantQuerySet):
+    pass
 
 
-class SalesPriceQuerySet(QuerySet):
+class SalesPriceListManager(MultiTenantManager):
+    def get_queryset(self):
+        return SalesPriceListQuerySet(self.model, using=self._db)
+
+class SalesPriceQuerySet(MultiTenantQuerySet):
     def get_default_price(self):
         return self.get(currency__is_default_currency=True)
 
@@ -15,7 +22,7 @@ class SalesPriceQuerySet(QuerySet):
         return self.filter(auto_update=True)
 
 
-class SalesPriceManager(Manager):
+class SalesPriceManager(MultiTenantManager):
     def get_queryset(self):
         return SalesPriceQuerySet(self.model, using=self._db)  # Important!
 
@@ -32,7 +39,7 @@ class SalesPriceManager(Manager):
         return self.get_queryset().filter_auto_update()
 
 
-class SalesPriceListItemQuerySet(QuerySet):
+class SalesPriceListItemQuerySet(MultiTenantQuerySet):
     def get_or_create__with_auto_price(self, product, salespricelist):
         from .factories import SalesPriceListItemGeneratorUpdater
 
@@ -45,7 +52,7 @@ class SalesPriceListItemQuerySet(QuerySet):
         return fac.item, fac.item_created
 
 
-class SalesPriceListItemManager(Manager):
+class SalesPriceListItemManager(MultiTenantManager):
     def get_queryset(self):
         return SalesPriceListItemQuerySet(self.model, using=self._db)  # Important!
 

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin
 
@@ -10,31 +12,27 @@ class MediaFilter(SearchFilterMixin):
     search: str | None
     id: auto
     type: auto
-    product: ProductFilter
-
 
 @filter(Image)
 class ImageFilter(SearchFilterMixin):
     search: str | None
     id: auto
     image_type: auto
-    product: ProductFilter
 
 
 @filter(File)
 class FileFilter(SearchFilterMixin):
     search: str | None
     id: auto
-    product: ProductFilter
-
 
 @filter(Video)
 class VideoFilter(SearchFilterMixin):
     search: str | None
     id: auto
-    product: ProductFilter
 
 
 @filter(MediaProductThrough)
 class MediaProductThroughFilter:
     id: auto
+    media: Optional[MediaFilter]
+    product: Optional[ProductFilter]

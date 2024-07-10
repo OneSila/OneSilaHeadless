@@ -1,41 +1,77 @@
-from django.db.models import QuerySet, Manager
+from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin, \
+    QuerySetProxyModelMixin, MultiTenantQuerySet, MultiTenantManager
 
 
-class ProductQuerySet(QuerySet):
+class ProductQuerySet(MultiTenantQuerySet):
     def filter_umbrella(self):
         return self.filter(type=self.model.UMBRELLA)
 
     def filter_variation(self):
-        return self.filter(type=self.model.VARIATION)
+        return self.filter(type=self.model.SIMPLE)
 
     def filter_bundle(self):
         return self.filter(type=self.model.BUNDLE)
 
+    def filter_manufacturer(self):
+        return self.filter(type=self.model.MANUFACTURER)
 
-class ProductManger(Manager):
+    def filter_dropship(self):
+        return self.filter(type=self.model.DROPSHIP)
+
+
+class ProductManager(MultiTenantManager):
     def get_queryset(self):
         return ProductQuerySet(self.model, using=self._db)
 
 
-class UmbrellaManager(ProductManger):
+class UmbrellaQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+    pass
+
+
+class UmbrellaManager():
     def get_queryset(self):
-        return super().get_queryset().filter_umbrella()
-
-    def create(self, *args, **kwargs):
-        return super().create(type=self.model.UMBRELLA, **kwargs)
+        return UmbrellaQuerySet(self.model, using=self._db)
 
 
-class VariationManager(ProductManger):
+class VariationQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+    pass
+
+
+class VariationManager(ProductManager):
     def get_queryset(self):
-        return super().get_queryset().filter_variation()
-
-    def create(self, *args, **kwargs):
-        return super().create(type=self.model.VARIATION, **kwargs)
+        return VariationQuerySet(self.model, using=self._db)
 
 
-class BundleManager(ProductManger):
+class BundleQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+    pass
+
+
+class BundleManager(ProductManager):
     def get_queryset(self):
-        return super().get_queryset().filter_bundle()
+        return BundleQuerySet(self.model, using=self._db)
 
-    def create(self, *args, **kwargs):
-        return super().create(type=self.model.BUNDLE, **kwargs)
+class ManufacturableQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+    pass
+
+
+class ManufacturableManager(ProductManager):
+    def get_queryset(self):
+        return ManufacturableQuerySet(self.model, using=self._db)
+
+
+class DropshipQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+    pass
+
+
+class DropshipManager(ProductManager):
+    def get_queryset(self):
+        return DropshipQuerySet(self.model, using=self._db)
+
+
+class SupplierProductQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+    pass
+
+
+class SupplierProductManager(ProductManager):
+    def get_queryset(self):
+        return SupplierProductQuerySet(self.model, using=self._db)

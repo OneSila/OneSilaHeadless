@@ -2,7 +2,7 @@ from core.schema.multi_tenant.types.input import MultiTenantCompanyMyInput, \
     MultiTenantCompanyPartialInput, MultiTenantUserPartialInput, \
     MultiTenantUserInput, MultiTenantInviteUserInput, MultiTenantUserAcceptInviteInput, \
     MultiTenantUserStatusInput, MultiTenantLoginLinkInput, \
-    MultiTenantUserPasswordInput, MultiTenantUserAuthenticateTokenInput
+    MultiTenantUserPasswordInput, MultiTenantUserAuthenticateTokenInput, UpdateOnboardingStatusInput
 
 from core.schema.core.mutations import IsAuthenticated, default_extensions
 from core.schema.multi_tenant.extensions import IsMultiTenantCompanyOwner
@@ -10,7 +10,7 @@ from .mutation_classes import MyMultiTenantCompanyCreateMutation, \
     MyMultiTentantCompanyUpdateMutation, UpdateMeMutation, \
     InviteUserMutation, AcceptInvitationMutation, EnableUserMutation, \
     DisableUserMutation, RequestLoginTokenMutation, RecoveryTokenMutation, \
-    UpdateMyPasswordMutation
+    UpdateMyPasswordMutation, UpdateOnboardingStatusMutation, CreateDemoDataMutation, DeleteDemoDataMutation
 
 import functools
 import strawberry
@@ -65,6 +65,18 @@ def recovery_token():
 def request_login_token():
     extensions = []
     return RequestLoginTokenMutation(MultiTenantLoginLinkInput, extensions=extensions)
+
+def go_to_step():
+    extensions = default_extensions
+    return UpdateOnboardingStatusMutation(UpdateOnboardingStatusInput, extensions=extensions)
+
+def create_demo_data():
+    extensions = default_extensions
+    return CreateDemoDataMutation(extensions=extensions)
+
+def delete_demo_data():
+    extensions = default_extensions
+    return DeleteDemoDataMutation(extensions=extensions)
 
 
 register_user = functools.partial(strawberry.mutation, resolver=resolve_register_user)

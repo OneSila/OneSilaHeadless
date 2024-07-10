@@ -13,6 +13,8 @@ def core__subscription__post_save(sender, instance, **kwargs):
     try:
         refresh_subscription_receiver(instance)
     except AttributeError:
-        # This is a very greedy approach.  There are many post_save signals going around in Django
-        # many can fail is they are not models as we have them in the apps
+        # We take a very greedy approach to post_save signals.
+        # Since there are many post_save signals going around in Django,
+        # of which many can fail if they are not models as we use them in our apps.
+        # That's why we don't let AttributeErrors fail our method.
         pass

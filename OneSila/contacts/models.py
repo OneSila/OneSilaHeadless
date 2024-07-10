@@ -1,10 +1,12 @@
+from django.db.models import UniqueConstraint
+
+from core.exceptions import RequiredFieldException
 from core import models
-from core.validators import phone_regex
 from django.utils.translation import gettext_lazy as _
 
 from .managers import SupplierManager, CustomerManager, InfluencerManager, \
     InvoiceAddressManager, ShippingAddressManager, InternalCompanyManager, \
-    CompanyManager
+    CompanyManager, InternalShippingAddressManager
 
 
 class Company(models.Model):
@@ -12,11 +14,13 @@ class Company(models.Model):
     An Company is essentially customer, supplier, influencers, any of the above.
     And sometimes they relate to each other for whatever reason like various branches or departments.
     """
-    name = models.CharField(max_length=100)
-    vat_number = models.CharField(max_length=100, blank=True, null=True)
-    eori_number = models.CharField(max_length=100, blank=True, null=True)
+    from .languages import CUSTOMER_LANGUAGE_CHOICES
 
-    related_companies = models.ManyToManyField('self', symmetrical=True, blank=True)
+    name = models.CharField(max_length=100)
+    phone = models.CharField(max_length=100, blank=True, null=True)
+    email = models.CharField(max_length=100, blank=True, null=True)
+    language = models.CharField(max_length=2, default='EN', choices=CUSTOMER_LANGUAGE_CHOICES)
+    currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT, blank=True, null=True)
 
     is_supplier = models.BooleanField(default=False)
     is_customer = models.BooleanField(default=False)
@@ -99,19 +103,22 @@ class Person(models.Model):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     company = models.ForeignKey(Company, on_delete=models.PROTECT)
+    role = models.CharField(max_length=200, blank=True, null=True)
 
     phone = models.CharField(max_length=100, blank=True, null=True)
     email = models.CharField(max_length=100, blank=True, null=True)
     language = models.CharField(max_length=2, default='EN', choices=CUSTOMER_LANGUAGE_CHOICES)
 
-    def name(self):
+    active = models.BooleanField(default=True)
+
+    def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
 
     def __str__(self):
-        return self.name()
+        return self.full_name()
 
     class Meta:
-        search_terms = ['name', 'company__name', 'email']
+        search_terms = ['first_name', 'last_name', 'company__name', 'email']
         verbose_name = _("person")
         verbose_name_plural = _("people")
 
@@ -122,8 +129,11 @@ class Address(models.Model):
     """
     from core.countries import COUNTRY_CHOICES
 
-    contact = models.ForeignKey(Person, on_delete=models.CASCADE)
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, null=True, blank=True)
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
+
+    vat_number = models.CharField(max_length=100, blank=True, null=True)
+    eori_number = models.CharField(max_length=100, blank=True, null=True)
 
     address1 = models.CharField(max_length=100)
     address2 = models.CharField(max_length=100, blank=True, null=True)
@@ -133,15 +143,37 @@ class Address(models.Model):
     city = models.CharField(max_length=100)
     country = models.CharField(max_length=2, choices=COUNTRY_CHOICES)
 
-    # FIXME: Add constraint that there can be only invoice address for a company
     # If a customer has multiple invoice addresses, they are multiple comnpanies
     # So a new company should be added, and related to the current one.
     is_invoice_address = models.BooleanField(default=False)
     is_shipping_address = models.BooleanField(default=False)
 
+    @property
+    def full_address(self):
+        address_parts = [self.address1]
+
+        # Optionally add address2 and address3 if they exist
+        if self.address2:
+            address_parts.append(self.address2)
+        if self.address3:
+            address_parts.append(self.address3)
+
+        address_parts.extend([self.city, self.postcode, self.get_country_display()])
+
+        return ', '.join(address_parts)
+
     class Meta:
-        search_terms = ['contact__email', 'company__name']
+        search_terms = ['person__email', 'company__name', 'address1', 'city']
         verbose_name_plural = 'addresses'
+
+        constraints = [
+            UniqueConstraint(
+                fields=['company'],
+                condition=models.Q(is_invoice_address=True),
+                name='unique_invoice_address_per_company',
+                violation_error_message=_("Company already has an invoice address.")
+            )
+        ]
 
 
 class ShippingAddress(Address):
@@ -150,7 +182,7 @@ class ShippingAddress(Address):
 
     class Meta:
         proxy = True
-        search_terms = ['contact__email', 'company__name']
+        search_terms = ['person__email', 'company__name']
         verbose_name_plural = 'shipping addresses'
 
 
@@ -160,5 +192,15 @@ class InvoiceAddress(Address):
 
     class Meta:
         proxy = True
-        search_terms = ['contact__email', 'company__name']
+        search_terms = ['person__email', 'company__name']
         verbose_name_plural = 'invoice addresses'
+
+
+class InternalShippingAddress(Address):
+    objects = InternalShippingAddressManager()
+    proxy_filter_fields = {'is_shipping_address': True, 'company__is_internal_company': True}
+
+    class Meta:
+        proxy = True
+        search_terms = ['person__email', 'company__name']
+        verbose_name_plural = 'internal shipping addresses'

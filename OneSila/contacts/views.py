@@ -6,7 +6,7 @@ class AddressListView(EmptyTemplateView):
     pass
 
 
-class AddressDetailViev(EmptyTemplateView):
+class AddressDetailView(EmptyTemplateView):
     pass
 
 
@@ -86,7 +86,7 @@ class InvoiceAddressListView(EmptyTemplateView):
     pass
 
 
-class InvoiceAddressDetailViev(EmptyTemplateView):
+class InvoiceAddressDetailView(EmptyTemplateView):
     pass
 
 
@@ -118,7 +118,7 @@ class ShippingAddressListView(EmptyTemplateView):
     pass
 
 
-class ShippingAddressDetailViev(EmptyTemplateView):
+class ShippingAddressDetailView(EmptyTemplateView):
     pass
 
 

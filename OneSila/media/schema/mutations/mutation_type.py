@@ -1,12 +1,11 @@
-from core.schema.core.mutations import type
-from core.schema.core.mutations import create, update, delete, type, List
+from core.schema.core.mutations import update, delete, type, List
+from .fields import create
 
-from .types.types import MediaType, ImageType, VideoType, MediaProductThroughType, \
+from ..types.types import MediaType, ImageType, VideoType, MediaProductThroughType, \
     FileType
-from .types.input import MediaInput, ImageInput, VideoInput, MediaProductThroughInput, \
+from ..types.input import MediaInput, ImageInput, VideoInput, MediaProductThroughInput, \
     FileInput, FilePartialInput, MediaPartialInput, ImagePartialInput, \
     VideoPartialInput, MediaProductThroughPartialInput
-
 
 @type(name="Mutation")
 class MediaMutation:

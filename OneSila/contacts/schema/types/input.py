@@ -3,17 +3,17 @@ from core.schema.core.types.input import NodeInput, input, partial, List
 
 from contacts.models import Company, Supplier, Customer, \
     Influencer, InternalCompany, Person, Address, \
-    ShippingAddress, InvoiceAddress
+    ShippingAddress, InvoiceAddress, InternalShippingAddress
 
 
 @input(Company, fields="__all__")
 class CompanyInput:
-    related_companies: List['CompanyPartialInput'] | None
+    pass
 
 
 @partial(Company, fields="__all__")
 class CompanyPartialInput(NodeInput):
-    related_companies: List['CompanyPartialInput'] | None
+    pass
 
 
 @input(Supplier, fields="__all__")
@@ -55,6 +55,15 @@ class InternalCompanyInput:
 class InternalCompanyPartialInput(NodeInput):
     pass
 
+@input(Address, fields="__all__")
+class AddressInput:
+    pass
+
+
+@partial(Address, fields="__all__")
+class AddressPartialInput(NodeInput):
+    pass
+
 
 @input(Person, fields="__all__")
 class PersonInput:
@@ -63,16 +72,6 @@ class PersonInput:
 
 @partial(Person, fields="__all__")
 class PersonPartialInput(NodeInput):
-    pass
-
-
-@input(Address, fields="__all__")
-class AddressInput:
-    pass
-
-
-@partial(Address, fields="__all__")
-class AddressPartialInput(NodeInput):
     pass
 
 
@@ -93,4 +92,14 @@ class InvoiceAddressInput:
 
 @partial(InvoiceAddress, fields="__all__")
 class InvoiceAddressPartialInput(NodeInput):
+    pass
+
+
+@input(InternalShippingAddress, fields="__all__")
+class InternalShippingAddressInput:
+    pass
+
+
+@partial(InternalShippingAddress, fields="__all__")
+class InternalShippingAddressPartialInput(NodeInput):
     pass

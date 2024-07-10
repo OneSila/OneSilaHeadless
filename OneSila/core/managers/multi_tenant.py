@@ -40,6 +40,9 @@ class MultiTenantQuerySet(SearchQuerySetMixin, DjangoQueryset):
     def search(self, search_term, multi_tenant_company=None):
         return super().search(search_term=search_term, multi_tenant_company=multi_tenant_company)
 
+    def filter_multi_tenant(self, multi_tenant_company):
+        return self.filter(multi_tenant_company=multi_tenant_company)
+
     # def filter(self, *args, **kwargs):
     #     return super().filter(*args, **kwargs)
 
@@ -64,6 +67,9 @@ class MultiTenantManager(SearchManagerMixin, DjangoManager):
 
     def search(self, search_term, multi_tenant_company):
         return self.get_queryset().search(search_term=search_term, multi_tenant_company=multi_tenant_company)
+
+    def filter_multi_tenant(self, multi_tenant_company):
+        return self.get_queryset().filter_multi_tenant(multi_tenant_company=multi_tenant_company)
 
     # def filter(self, *args, **kwargs):
     #     return self.get_queryset().filter(*args, **kwargs)
@@ -120,9 +126,9 @@ class QuerySetProxyModelMixin(MultiTenantQuerySet):
     """
 
     # @multi_tenant_company_required()
-    def filter(self, **kwargs):
+    def filter(self, *args, **kwargs):
         kwargs.update(self.model.proxy_filter_fields)
-        return super().filter(**kwargs)
+        return super().filter(*args, **kwargs)
 
     @multi_tenant_company_required()
     def create(self, **kwargs):

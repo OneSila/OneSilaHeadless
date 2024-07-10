@@ -23,10 +23,10 @@ class Currency(models.Model):
 
     inherits_from = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='passes_to')
-    exchange_rate = models.FloatField(default=1)
-    exchange_rate_official = models.FloatField(default=1)
+    exchange_rate = models.FloatField(default=1, null=True, blank=True)
+    exchange_rate_official = models.FloatField(default=1, null=True, blank=True)
     follow_official_rate = models.BooleanField(default=False)
-    round_prices_up_to = models.IntegerField(default=1)
+    round_prices_up_to = models.IntegerField(default=1, null=True, blank=True)
     is_default_currency = models.BooleanField(default=False)
     comment = models.TextField(null=True, blank=True)
 
@@ -38,7 +38,7 @@ class Currency(models.Model):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
 
-    def set_exchange_rate_official(new_rate, force_save=False):
+    def set_exchange_rate_official(self, new_rate, force_save=False):
         self.exchange_rate_official = new_rate
         self.save(force_save=force_save)
 
@@ -49,7 +49,9 @@ class Currency(models.Model):
 
         constraints = [
             models.UniqueConstraint(
-                fields=['is_default_currency'],
+                fields=['multi_tenant_company'],
                 condition=Q(is_default_currency=True),
-                name='unique_is_default_currency')
+                name='unique_is_default_currency',
+                violation_error_message=_("You can only have one default currency.")
+            ),
         ]

@@ -1,4 +1,4 @@
-Django>=4
+Django>=5
 django-imagekit>=4.1.0
 Pillow>=10.0.0
 CurrencyConverter
@@ -9,6 +9,7 @@ huey==2.4.5
 django-redis>=5.3.0
 django-select2==8.1.2
 django-model-utils>=4.3.1
+xlsxwriter==3.0.2
 broadcaster
 channels
 channels-redis
@@ -22,10 +23,13 @@ django-cors-headers
 tzdata
 shortuuid
 pytz
+hypercorn
+Faker
+faker-commerce
+sentry-sdk[django]
 
-# Using fork to ensure we have better authentication error support
-strawberry-graphql-django
-#strawberry-graphql-django @ git+https://github.com/sdobbelaere/strawberry-graphql-django.git@not_authenticated_bug
+# version stuck to 0.32.1, filters need upgrading before increasing version number
+strawberry-graphql-django==0.32.1
 django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absolute_url.git@master
 
 

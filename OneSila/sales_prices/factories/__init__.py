@@ -1,0 +1,1 @@
+from .sales_pricelist_item_generator import SalesPriceListItemGeneratorUpdater

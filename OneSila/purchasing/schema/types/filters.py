@@ -1,41 +1,32 @@
-from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin
+from typing import Optional
 
-from purchasing.models import SupplierProduct, PurchaseOrder, PurchaseOrderItem
-from products.schema.types.filters import ProductFilter
+from core.schema.core.types.types import auto
+from core.schema.core.types.filters import filter, SearchFilterMixin, lazy, ExcluideDemoDataFilterMixin
+from products.schema.types.filters import SupplierProductFilter
+
+from purchasing.models import PurchaseOrder, PurchaseOrderItem
 from currencies.schema.types.filters import CurrencyFilter
-from units.schema.types.filters import UnitFilter
 from contacts.schema.types.filters import SupplierFilter, InvoiceAddressFilter, \
     ShippingAddressFilter
 
 
-@filter(SupplierProduct)
-class SupplierProductFilter(SearchFilterMixin):
-    search: str | None
-    id: auto
-    sku: auto
-    name: auto
-    currency: CurrencyFilter
-    product: ProductFilter
-    supplier: SupplierFilter
-    unit: UnitFilter
-
-
 @filter(PurchaseOrder)
-class PurchaseOrderFilter(SearchFilterMixin):
+class PurchaseOrderFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     search: str | None
     id: auto
     status: auto
-    supplier: SupplierFilter
+    supplier: SupplierFilter | None
     order_reference: auto
-    currency: CurrencyFilter
-    invoice_address: InvoiceAddressFilter
-    shipping_address: ShippingAddressFilter
+    currency: CurrencyFilter | None
+    invoice_address: InvoiceAddressFilter | None
+    shipping_address: ShippingAddressFilter | None
+    purchaseorderitem: Optional[lazy['PurchaseOrderItemFilter', "purchasing.schema.types.filters"]]
+    exclude_demo_data: Optional[bool]
 
 
 @filter(PurchaseOrderItem)
 class PurchaseOrderItemFilter(SearchFilterMixin):
     search: str | None
     id: auto
-    purchase_order: PurchaseOrderFilter
-    item: SupplierProductFilter
+    purchase_order: PurchaseOrderFilter | None
+    item: SupplierProductFilter | None

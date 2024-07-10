@@ -10,7 +10,7 @@ from .types.input import InventoryInput, InventoryLocationInput, \
 class InventoryMutation:
     create_inventory: InventoryType = create(InventoryInput)
     create_inventories: List[InventoryType] = create(InventoryInput)
-    update_inventory: InventoryType = update(InventoryLocationInput)
+    update_inventory: InventoryType = update(InventoryPartialInput)
     delete_inventory: InventoryType = delete()
     delete_inventories: List[InventoryType] = delete()
 

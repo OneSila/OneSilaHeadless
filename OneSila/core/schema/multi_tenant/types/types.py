@@ -1,3 +1,4 @@
+import strawberry
 from django.contrib.auth import get_user_model
 
 from core.schema.core.types.types import type, relay, auto, lazy, Annotated
@@ -22,7 +23,7 @@ class MultiTenantUserType(relay.Node):
     avatar_resized_full_url: str | None
     language_detail: Annotated['LanguageType', lazy("core.schema.languages.types.types")]
     timezone_detail: TimezoneType
-    multi_tenant_company: Annotated['MultiTenantCompanyType', lazy("core.schema.multi_tenant.types.types")]
+    multi_tenant_company: Annotated['MultiTenantCompanyType', lazy("core.schema.multi_tenant.types.types")] | None
 
 
 @type(MultiTenantCompany, fields='__all__')
@@ -34,3 +35,7 @@ class MultiTenantCompanyType(relay.Node):
 @type(MultiTenantUserLoginToken, exclude=['token'])
 class MultiTenantUserLoginTokenType(relay.Node):
     pass
+
+@strawberry.type
+class HasDemoDataType:
+    has_demo_data: bool

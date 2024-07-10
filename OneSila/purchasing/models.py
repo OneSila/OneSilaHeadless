@@ -1,28 +1,9 @@
-from core import models
-from django.db import models
+from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
-from contacts.models import Supplier, InternalCompany, ShippingAddress
-from products.models import ProductVariation
-
-
-class SupplierProduct(models.Model):
-    """
-    A product can have mulitple suppliers. Let's look at that from here.
-    """
-    sku = models.CharField(max_length=100)
-    name = models.CharField(max_length=100)
-    currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
-    unit = models.ForeignKey('units.Unit', on_delete=models.PROTECT)
-    quantity = models.IntegerField()
-    unit_price = models.FloatField()
-    product = models.ForeignKey(ProductVariation, on_delete=models.CASCADE)
-    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE)
-
-    def __str__(self):
-        return f"{self.product} <{self.supplier}>"
-
-    class Meta:
-        search_terms = ['sku', 'name', 'supplier__name']
+from core import models
+from django.utils.translation import gettext_lazy as _
+from contacts.models import ShippingAddress, InvoiceAddress
+from products.models import SupplierProduct
 
 
 class PurchaseOrder(models.Model):
@@ -44,12 +25,31 @@ class PurchaseOrder(models.Model):
     )
 
     status = models.CharField(max_length=16, choices=PO_STATUS_CHOICES)
-    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT)
-    order_reference = models.CharField(max_length=100)
+    supplier = models.ForeignKey('contacts.Company', on_delete=models.PROTECT)
+    order_reference = models.CharField(max_length=100, blank=True, null=True)
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
 
-    invoice_address = models.ForeignKey(InternalCompany, on_delete=models.PROTECT, related_name="invoice_address_set")
-    delivery_address = models.ForeignKey(ShippingAddress, on_delete=models.PROTECT, related_name="delivery_address_set")
+    invoice_address = models.ForeignKey(InvoiceAddress, on_delete=models.PROTECT, related_name="invoice_address_set")
+    shipping_address = models.ForeignKey(ShippingAddress, on_delete=models.PROTECT, related_name="shipping_address_set")
+
+    @property
+    def total_value(self):
+        from django.db.models import Sum, F
+
+        sum = self.purchaseorderitem_set.aggregate(
+            total_sum=Sum(F('quantity') * F('unit_price'))
+        )['total_sum']
+
+        if sum is None:
+            return f"0 {self.currency.symbol}"
+
+        total = round(sum, 2)
+
+        if total is None:
+            return f"0 {self.currency.symbol}"
+
+        # Return the total sum with the currency symbol
+        return f"{total} {self.currency.symbol}"
 
     def reference(self):
         return f"PO{self.id}"
@@ -57,7 +57,18 @@ class PurchaseOrder(models.Model):
     def __str__(self):
         return self.reference()
 
+    def save(self, *args, **kwargs):
+
+        # if we buy from someone it mean it become a customer if is not already
+        if not self.supplier.is_supplier:
+            self.supplier.is_supplier = True
+            self.supplier.save()
+
+
+        super().save(*args, **kwargs)
+
     class Meta:
+        ordering = ('-created_at',)
         search_terms = ['supplier__name', 'order_reference']
 
 
@@ -72,3 +83,4 @@ class PurchaseOrderItem(models.Model):
 
     class Meta:
         search_terms = ['purchase_order__order_reference', 'purchase_order__supplier__name']
+        unique_together = ("purchase_order", "item")

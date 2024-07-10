@@ -104,7 +104,7 @@ class Migration(migrations.Migration):
             bases=('products.product',),
         ),
         migrations.CreateModel(
-            name='ProductVariation',
+            name='SimpleProduct',
             fields=[
             ],
             options={
