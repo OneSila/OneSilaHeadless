@@ -14,8 +14,6 @@ class SalesPriceUpdateCreateFactory:
     def _set_inheriting_currencies(self):
         self.inheriting_currencies = self.sales_price.currency.passes_to.all()
 
-        logger.debug(f"Discovered {self.inheriting_currencies.count()} currencies to populate")
-
     def _cycle_through_currencies(self):
         for currency in self.inheriting_currencies:
             self._update_create_salesprice(currency)
@@ -33,26 +31,20 @@ class SalesPriceUpdateCreateFactory:
             price=self.sales_price.parent_aware_amount
         )
 
-        if self.sales_price.parent_aware_discount_amount:
-            discount_amount = currency_convert(
-                round_prices_up_to=currency.round_prices_up_to,
-                exchange_rate=self.get_exchange_rate(currency),
-                price=self.sales_price.parent_aware_discount_amount
-            )
-        else:
-            discount_amount = None
+        discount_amount = currency_convert(
+            round_prices_up_to=currency.round_prices_up_to,
+            exchange_rate=self.get_exchange_rate(currency),
+            price=self.sales_price.parent_aware_discount_amount
+        )
 
-        try:
-            child_sales_price = currency.salesprice_set.get(product=self.product)
-            child_sales_price.amount = amount
-            child_sales_price.discount_amount = discount_amount
-            child_sales_price.save()
-        except SalesPrice.DoesNotExist:
-            child_sales_price = SalesPrice.objects.create(
-                multi_tenant_company=self.multi_tenant_company,
-                product=self.product,
-                currency=currency,
-                amount=amount)
+        child_sales_price, _ = SalesPrice.objects.get_or_create(
+            product=self.product,
+            currency=currency,
+            multi_tenant_company=self.multi_tenant_company)
+
+        child_sales_price.amount = amount
+        child_sales_price.discount_amount = discount_amount
+        child_sales_price.save()
 
     def _update_self(self):
         # If you're part of an inhertiance, update yourself:

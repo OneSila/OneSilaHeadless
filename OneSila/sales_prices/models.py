@@ -58,7 +58,7 @@ class SalesPrice(models.Model):
         try:
             sales_price = self.currency.inherits_from.salesprice_set.get(product=self.product)
             return sales_price.discount_amount
-        except AttributeError:  # happens when iherits_from is null
+        except AttributeError:  # happens when iherits_from is null, or in other words you are the parent.
             return self.discount_amount
 
     class Meta:
