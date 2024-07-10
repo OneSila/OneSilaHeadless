@@ -1,5 +1,7 @@
 import math
 from decimal import Decimal
+
+
 def roundup(x, ceil):
     ''' Roundup a number to the nearest ceiling
     For example:  roundup(111, 20) returns 120
@@ -16,7 +18,6 @@ def roundup(x, ceil):
             return Decimal(integral_part) + 1 + ceil
     else:
         return Decimal(math.ceil(x / ceil) * ceil)
-
 
 
 def currency_convert(round_prices_up_to, exchange_rate, price):
