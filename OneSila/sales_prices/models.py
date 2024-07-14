@@ -81,6 +81,9 @@ class SalesPriceList(models.Model):
     vat_included = models.BooleanField(default=False)
     auto_update = models.BooleanField(default=True)
 
+    start_date = models.DateField(_("start date"), blank=True, null=True)
+    end_date = models.DateField(_("end date"), blank=True, null=True)
+
     customers = models.ManyToManyField('contacts.Company', blank=True)
 
     objects = SalesPriceListManager()
