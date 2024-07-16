@@ -45,5 +45,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(forwards)
+        # this breaks the tests because of order in installed apps
+        # if we change the order we break the demo data
+        # converted it in a commnad to run in the shell one time only
+        # migrations.RunPython(forwards)
     ]
