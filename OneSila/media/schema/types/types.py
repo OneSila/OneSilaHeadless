@@ -58,6 +58,7 @@ class FileType(relay.Node, GetQuerysetMultiTenantMixin):
 class MediaProductThroughType(relay.Node, GetQuerysetMultiTenantMixin):
     media: MediaType
     product: ProductType
+
     @field()
     def product_id(self, info) -> str:
         return to_base64(ProductType, self.product.id)
