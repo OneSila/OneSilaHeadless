@@ -4,6 +4,7 @@ import random
 
 registry = DemoDataLibrary()
 
+
 def generate_company_types(is_first=False):
     if is_first:
         # If it's the first company, make it an internal company
@@ -20,6 +21,8 @@ def generate_company_types(is_first=False):
             'is_influencer': random.choice([True, False]),
             'is_internal_company': False
         }
+
+
 @registry.register_private_app
 def contacts_company_demo(multi_tenant_company):
     from contacts.models import Company, Person, Address

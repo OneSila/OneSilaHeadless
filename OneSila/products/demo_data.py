@@ -16,7 +16,7 @@ class ProductDataGenerator(PrivateDataGenerator):
     field_mapper = {
         'always_on_stock': fake.boolean,
         'active': fake.boolean,
-        'for_sale': fake.boolean,
+        'for_sale': True,
     }
 
     def prep_baker_kwargs(self, seed):

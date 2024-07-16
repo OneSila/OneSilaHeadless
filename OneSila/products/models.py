@@ -6,13 +6,15 @@ from django.db import IntegrityError, transaction
 from django.utils.translation import gettext_lazy as _
 from translations.models import TranslationFieldsMixin
 from taxes.models import VatRate
-from .managers import ProductManager, UmbrellaManager, BundleManager, VariationManager, SupplierProductManager, ManufacturableManager, DropshipManager
+from .managers import ProductManager, UmbrellaManager, BundleManager, VariationManager, \
+    SupplierProductManager, ManufacturableManager, DropshipManager
 import shortuuid
 from hashlib import shake_256
 
 
 class Product(models.Model):
-    from products.product_types import UMBRELLA, BUNDLE, MANUFACTURABLE, DROPSHIP, SUPPLIER, SIMPLE, PRODUCT_TYPE_CHOICES
+    from products.product_types import UMBRELLA, BUNDLE, MANUFACTURABLE, DROPSHIP, SUPPLIER, SIMPLE, \
+        PRODUCT_TYPE_CHOICES, HAS_PRICES_TYPES
 
     # Mandatory
     sku = models.CharField(max_length=100, db_index=True, blank=True, null=True)
@@ -30,7 +32,7 @@ class Product(models.Model):
     supplier = models.ForeignKey('contacts.Company', on_delete=models.CASCADE, null=True, blank=True)
     base_products = models.ManyToManyField('self', symmetrical=False, related_name='supplier_products', blank=True)
 
-    #Manufacturer product fields
+    # Manufacturer product fields
     production_time = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     umbrella_variations = models.ManyToManyField('self',
@@ -44,7 +46,6 @@ class Product(models.Model):
         symmetrical=False,
         blank=True,
         related_name='bundles')
-
 
     bom_variations = models.ManyToManyField(
         'self',
@@ -81,6 +82,7 @@ class Product(models.Model):
             name = translation.name
 
         return f"{name}"
+
     def __str__(self):
         return f"{self.name}"
 
@@ -112,6 +114,7 @@ class Product(models.Model):
 
     def is_not_manufacturable(self):
         return self.type != self.MANUFACTURABLE
+
     def is_manufacturable(self):
         return self.type == self.MANUFACTURABLE
 
@@ -161,6 +164,7 @@ class Product(models.Model):
             )
         ]
 
+
 class BundleProduct(Product):
     from products.product_types import BUNDLE
 
@@ -193,6 +197,7 @@ class SimpleProduct(Product):
         proxy = True
         search_terms = ['sku']
 
+
 class ManufacturableProduct(Product):
     from products.product_types import MANUFACTURABLE
 
@@ -213,6 +218,7 @@ class DropshipProduct(Product):
     class Meta:
         proxy = True
         search_terms = ['sku']
+
 
 class UmbrellaVariation(models.Model):
     umbrella = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="umbrellavariation_umbrellas")
@@ -254,6 +260,7 @@ class BundleVariation(models.Model):
     class Meta:
         unique_together = ("umbrella", "variation")
 
+
 class BillOfMaterial(models.Model):
     umbrella = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_manufacturables")
     variation = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_components")
@@ -273,6 +280,7 @@ class BillOfMaterial(models.Model):
 
     class Meta:
         unique_together = ("umbrella", "variation")
+
 
 class ProductTranslation(TranslationFieldsMixin, models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations")
@@ -304,12 +312,12 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
 
         super().save(*args, **kwargs)
 
-
     class Meta:
         unique_together = (
             ('product', 'language'),
             ('url_key', 'multi_tenant_company'),
         )
+
 
 class SupplierProduct(Product):
     from products.product_types import SUPPLIER
@@ -332,6 +340,7 @@ class SupplierProduct(Product):
         self.for_sale = False
 
         super().save(*args, **kwargs)
+
 
 class SupplierPrices(models.Model):
     supplier_product = models.ForeignKey(SupplierProduct, on_delete=models.CASCADE, related_name='details')

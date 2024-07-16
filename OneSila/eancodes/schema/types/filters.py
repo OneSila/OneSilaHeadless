@@ -10,4 +10,7 @@ class EanCodeFilter(SearchFilterMixin):
     search: str | None
     id: auto
     ean_code: auto
-    product: ProductFilter
+    internal: auto
+    already_used: auto
+    product: ProductFilter | None
+    inherit_to: ProductFilter | None

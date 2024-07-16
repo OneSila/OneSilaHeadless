@@ -6,10 +6,14 @@ from .managers import SalesPriceManager, SalesPriceListItemManager, SalesPriceLi
 
 class SalesPrice(models.Model):
     '''
-    Once a price for a product is created, the 'children' will be created automaically.
+    Once a price for a product is created, the 'children' will be created and updated automaically.
 
     Meaning, if price in EUR is created, all child currency prices like GBP, CHF,
-    all will get a new price
+    all will get a new price.
+
+    Or if the EUR prices changes, the rest is adjusted based on the known currencies.
+
+    But also if the rate changes on ex CHF, the children will receive an update.
     '''
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
     currency = models.ForeignKey('currencies.Currency', on_delete=models.CASCADE)
@@ -54,15 +58,8 @@ class SalesPrice(models.Model):
         try:
             sales_price = self.currency.inherits_from.salesprice_set.get(product=self.product)
             return sales_price.discount_amount
-        except AttributeError:  # happens when iherits_from is null
+        except AttributeError:  # happens when iherits_from is null, or in other words you are the parent.
             return self.discount_amount
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-
-        # Go and update you children...
-        from .tasks import sales_price_update_create_task
-        sales_price_update_create_task(self.id)
 
     class Meta:
         unique_together = ('product', 'currency')
@@ -74,6 +71,8 @@ class SalesPriceList(models.Model):
     For example retail-customers or wholesale customers.
 
     They can either be auto-updating based on a discount. Or you can manually set prices.
+
+    Items are not to be automatically added. This should be a manual process.
     """
     name = models.CharField(max_length=100)
     discount = models.FloatField(null=True, blank=True)
@@ -81,6 +80,9 @@ class SalesPriceList(models.Model):
     notes = models.TextField(blank=True, null=True)
     vat_included = models.BooleanField(default=False)
     auto_update = models.BooleanField(default=True)
+
+    start_date = models.DateField(_("start date"), blank=True, null=True)
+    end_date = models.DateField(_("end date"), blank=True, null=True)
 
     customers = models.ManyToManyField('contacts.Company', blank=True)
 
@@ -91,6 +93,7 @@ class SalesPriceList(models.Model):
 
     class Meta:
         search_terms = ['name']
+
 
 class SalesPriceListItem(models.Model):
     salespricelist = models.ForeignKey(SalesPriceList, on_delete=models.CASCADE)
