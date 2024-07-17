@@ -4,11 +4,9 @@ from strawberry_django.optimizer import DjangoOptimizerExtension
 from core.schema.core.mixins import GetCurrentUserMixin
 from core.schema.core.mutations import Info, Any
 from core.schema.core.mutations import type, CreateMutation, UpdateMutation
-from eancodes.flows.generate_eancodes import GenerateEancodesFlow
 from django.utils.translation import gettext_lazy as _
-from core.schema.core.mutations import models
 from eancodes.models import EanCode
-from products.models import Product
+from eancodes.tasks import eancodes__ean_code__generate_task
 
 
 class GenerateEancodesMutation(CreateMutation):
@@ -25,18 +23,12 @@ class GenerateEancodesMutation(CreateMutation):
             if not isinstance(prefix, str) or not prefix.isdigit():
                 raise IntegrityError(_("Prefix should be containing only numbers"))
 
-            if len(prefix) > 13:
-                raise IntegrityError(_("Prefix should have a maximum length of 13"))
+            if not (7 <= len(prefix) <= 12):
+                raise IntegrityError(_("Prefix should have a length between 7 and 12 characters"))
 
-            eancode_generator = GenerateEancodesFlow(multi_tenant_company=multi_tenant_company, prefix=prefix)
-            eancode_generator.flow()
+            eancodes__ean_code__generate_task(prefix=prefix, multi_tenant_company=multi_tenant_company)
 
-            ean_codes = eancode_generator.ean_codes
-
-            if ean_codes is None:
-                raise IntegrityError(_("Something went wrong"))
-
-            return ean_codes.first()
+            return None
 
 class AssignEanCodeMutation(CreateMutation, GetCurrentUserMixin):
     def create(self, data: dict[str, Any], *, info: Info):

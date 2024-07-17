@@ -1,3 +1,5 @@
+from typing import Optional
+
 from core.schema.core.mutations import type
 from core.schema.core.mutations import create, update, delete, type, List
 from .fields import generate_eancodes, assign_ean_code, release_ean_code
@@ -13,6 +15,6 @@ class EanCodesMutation:
     delete_ean_code: EanCodeType = delete()
     delete_ean_codes: List[EanCodeType] = delete()
 
-    generate_ean_codes: EanCodeType = generate_eancodes()
+    generate_ean_codes: Optional[EanCodeType] = generate_eancodes()
     assign_ean_code: EanCodeType = assign_ean_code()
     release_ean_code: EanCodeType = release_ean_code()
