@@ -7,6 +7,7 @@ from core.schema.multi_tenant.types.types import MultiTenantCompanyType
 from contacts.models import Company, Supplier, Customer, Influencer, \
     InternalCompany, Person, Address, ShippingAddress, InvoiceAddress, InternalShippingAddress
 from currencies.schema.types.types import CurrencyType
+from currencies.models import Currency
 from .filters import CompanyFilter, SupplierFilter, AddressFilter, PersonFilter, CustomerFilter, \
     ShippingAddressFilter, InvoiceAddressFilter, InternalShippingAddressFilter
 from .ordering import CompanyOrder, SupplierOrder, CustomerOrder, PersonOrder
@@ -24,6 +25,13 @@ class CompanyType(relay.Node, GetQuerysetMultiTenantMixin):
             return InvoiceAddress.objects.filter_multi_tenant(self.multi_tenant_company).filter(company=self).first().get_country_display()
         except Exception:
             return None
+
+    @field()
+    def currency_symbol(self, info) -> str | None:
+        if self.currency is not None:
+            return self.currency.symbol
+
+        return Currency.objects.filter_multi_tenant(self.multi_tenant_company).filter(is_default_currency=True).first().symbol
 
 @type(Supplier, filters=SupplierFilter, order=SupplierOrder, pagination=True, fields="__all__")
 class SupplierType(relay.Node, GetQuerysetMultiTenantMixin):
