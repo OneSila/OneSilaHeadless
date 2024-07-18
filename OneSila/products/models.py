@@ -333,10 +333,6 @@ class SupplierProduct(Product):
         if self.id and not all(bp.type in [self.SIMPLE, self.DROPSHIP] for bp in self.base_products.all()):
             raise IntegrityError(_("SupplierProduct can only be attached to SIMPLE or DROPSHIP products."))
 
-        if self.supplier and not self.supplier.is_supplier:
-            self.supplier.is_supplier = True
-            self.supplier.save()
-
         self.for_sale = False
 
         super().save(*args, **kwargs)
