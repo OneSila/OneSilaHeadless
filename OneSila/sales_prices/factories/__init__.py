@@ -1,2 +1,2 @@
 from .salespricelist_items import SalesPriceListItemGeneratorUpdater
-from .salesprices import SalesPriceUpdateCreateFactory
+from .salesprices import SalesPriceUpdateCreateFactory, SalesPriceCreateForCurrencyFactory

@@ -23,9 +23,18 @@ def sales_prices__currencies__exchange_rate_changes(sender, instance, **kwargs):
     """
     When currencies change rates, most likely your prices need an update as well.
     """
-    from .tasks import salesprices__createupdate__task
-    for sales_price in instance.salesprice_set.all().iterator():
-        salesprices__createupdate__task(sales_price)
+    from .tasks import salesprice__create_for_currency__task
+    salesprice__create_for_currency__task(instance)
+
+
+@receiver(post_save, sender=Currency)
+def sales_prices__currencies__exchange_rate_changes(sender, instance, created, **kwargs):
+    """
+    When currencies are added, most likely your prices need an update as well.
+    """
+    if created:
+        from .tasks import salesprice__create_for_currency__task
+        salesprice__create_for_currency__task(instance)
 
 
 @receiver(post_save, sender=SalesPriceList)

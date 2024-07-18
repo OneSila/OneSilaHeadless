@@ -1,8 +1,34 @@
 from sales_prices.models import SalesPrice
 from currencies.helpers import currency_convert
+from products.models import Product
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+class SalesPriceCreateForCurrencyFactory:
+    """
+    This factory has 1 job: create Salesprices when a new currency is introduced.
+    The prices get populated later on by another flow.
+    """
+
+    def __init__(self, currency):
+        self.multi_tenant_company = currency.multi_tenant_company
+        self.currency = currency
+
+    def set_product_qs(self):
+        self.product_qs = Product.objects.filter_multi_tenant(self.multi_tenant_company)
+
+    def create_salesprices(self):
+        for prod in self.product_qs.iterator():
+            prod.salesprice_set.get_or_create(
+                multi_tenant_company=self.multi_tenant_company,
+                currency=self.currency
+            )
+
+    def run(self):
+        self.set_product_qs()
+        self.create_salesprices()
 
 
 class SalesPriceUpdateCreateFactory:
@@ -77,72 +103,3 @@ class SalesPriceUpdateCreateFactory:
         self._set_inheriting_currencies()
         self._update_self()
         self._cycle_through_currencies()
-
-
-# @db_task()
-# def sales_price_update_create_task(sales_price_id):
-#     # @TODO: Move this in a flow.
-#     '''
-#     Acts as task to create the necessary child-prices or force updates on child prices.
-#     if the price acts as a maaster-price there is no need for updates.
-#     '''
-#     sales_price = SalesPrice.objects.get(id=sales_price_id)
-#     product = sales_price.product
-
-#     # force updates on all children throug its currencies.
-#     inheritance = sales_price.currency.passes_to.all()
-#     for currency in inheritance:
-
-#         # amount = currency_convert(
-#         #     round_prices_up_to=currency.round_prices_up_to,
-#         #     exchange_rate=currency.exchange_rate,
-#         #     price=sales_price.parent_aware_amount
-#         # )
-
-#         # if sales_price.parent_aware_discount_amount:
-#         #     discount_amount = currency_convert(
-#         #         round_prices_up_to=currency.round_prices_up_to,
-#         #         exchange_rate=currency.exchange_rate,
-#         #         price=sales_price.parent_aware_discount_amount
-#         #     )
-#         # else:
-#         #     discount_amount = None
-
-#         # try:
-#         #     child_sales_price = currency.salesprice_set.get(product=product)
-#         #     child_sales_price.amount = amount
-#         #     child_sales_price.discount_amount = discount_amount
-#         #     child_sales_price.save()
-#         # except SalesPrice.DoesNotExist:
-#         #     child_sales_price = SalesPrice.objects.create(
-#         #         product=product,
-#         #         currency=currency,
-#         #         amount=amount)
-
-#     # If you're part of an inhertiance, update yourself:
-#     if sales_price.currency.inherits_from:
-#         currency = sales_price.currency
-
-#         amount = currency_convert(
-#             round_prices_up_to=currency.round_prices_up_to,
-#             exchange_rate=currency.exchange_rate,
-#             price=sales_price.parent_aware_amount
-#         )
-
-#         if sales_price.parent_aware_discount_amount:
-#             discount_amount = currency_convert(
-#                 round_prices_up_to=currency.round_prices_up_to,
-#                 exchange_rate=currency.exchange_rate,
-#                 price=sales_price.parent_aware_discount_amount
-#             )
-#         else:
-#             discount_amount = None
-
-#         # There seems to be an issue trying to save below the .save() way.
-#         # Workarround by updating the queryset.  This doesn't trigger any
-#         # signals - which is great - since it avoids needing to deal with
-#         # upating 'self' and ending up in a loop.
-#         sales_price_queryset = SalesPrice.objects.filter(id=sales_price_id)
-#         sales_price_queryset.update(amount=amount, discount_amount=discount_amount)
-
-#     return True
