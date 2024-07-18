@@ -1,13 +1,12 @@
-from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator
-from faker.providers import BaseProvider
-import random
+from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator
 from currencies.models import Currency
 from products.models import Product
-from .models import SalesPrice
+from sales_prices.models import SalesPrice, SalesPriceList, SalesPriceListItem
+from datetime import datetime
 
 registry = DemoDataLibrary()
 
-
+@registry.register_private_app
 class SalesPriceGenerator(PrivateDataGenerator):
     model = SalesPrice
     count = 1
@@ -40,6 +39,48 @@ class SalesPriceGenerator(PrivateDataGenerator):
             salesprice.amount = fake.price()
             salesprice.discount_amount = fake.price_discount(salesprice.amount)
             salesprice.save()
+@registry.register_private_app
+class SalesPriceListGenerator(PrivateDataGenerator):
+    model = SalesPriceList
+    count = 20
+
+    field_mapper = {
+        'name': lambda: fake.date_between_dates(date_start=datetime(2024, 1, 1), date_end=datetime(2030, 12, 31)).strftime("%B %Y"),
+        'discount': lambda: round(fake.random_number(digits=2) + fake.pyfloat(left_digits=0, right_digits=2, min_value=0, max_value=1), 2),
+        'notes': fake.text,
+        'vat_included': lambda: fake.boolean(),
+        'auto_update': lambda: fake.boolean()
+    }
+
+    def prep_baker_kwargs(self, seed):
+        kwargs = super().prep_baker_kwargs(seed)
+        multi_tenant_company = kwargs['multi_tenant_company']
+        currency = Currency.objects.filter(multi_tenant_company=multi_tenant_company).order_by('?').first()
+        kwargs['currency'] = currency
+
+        return kwargs
 
 
-registry.register_private_app(SalesPriceGenerator)
+@registry.register_private_app
+class SalesPriceListItemGenerator(PrivateDataGenerator):
+    model = SalesPriceListItem
+    count = 200
+
+    field_mapper = {
+        'salesprice': lambda: round(fake.random_number(digits=3) + fake.pyfloat(left_digits=0, right_digits=2, min_value=0, max_value=1), 2)
+    }
+
+    def prep_baker_kwargs(self, seed):
+        kwargs = super().prep_baker_kwargs(seed)
+        multi_tenant_company = kwargs['multi_tenant_company']
+
+        salespricelist = SalesPriceList.objects.filter(multi_tenant_company=multi_tenant_company).order_by('?').first()
+        existing_product_ids = SalesPriceListItem.objects.filter(salespricelist=salespricelist, multi_tenant_company=multi_tenant_company).values_list(
+            'product_id', flat=True)
+
+        product = Product.objects.filter(multi_tenant_company=multi_tenant_company).exclude(id__in=existing_product_ids).order_by('?').first()
+        kwargs['product'] = product
+        kwargs['salespricelist'] = salespricelist
+
+        return kwargs
+

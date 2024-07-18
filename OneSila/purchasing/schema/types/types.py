@@ -35,3 +35,7 @@ class PurchaseOrderType(relay.Node, GetQuerysetMultiTenantMixin):
 class PurchaseOrderItemType(relay.Node, GetQuerysetMultiTenantMixin):
     purchase_order: PurchaseOrderType
     item: SupplierProductType
+
+    @field()
+    def price_with_currency(self) -> str | None:
+        return f'{self.purchase_order.currency.symbol} {self.unit_price}'

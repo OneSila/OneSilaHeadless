@@ -3,13 +3,16 @@ from django.db.models import Q
 from currencies.signals import exchange_rate_official__pre_save, \
     exchange_rate_official__post_save, exchange_rate__post_save, \
     exchange_rate__pre_save
-from core.models import MultiTenantAwareMixin
 from core.decorators import trigger_pre_and_post_save
 from django.utils.translation import gettext_lazy as _
 
-from datetime import datetime
-from functools import wraps
+class PublicCurrency(models.SharedModel):
+    iso_code = models.CharField(max_length=3)
+    name = models.CharField(max_length=30)
+    symbol = models.CharField(max_length=3)
 
+    def __str__(self):
+        return self.iso_code
 
 class Currency(models.Model):
     '''
@@ -53,5 +56,10 @@ class Currency(models.Model):
                 condition=Q(is_default_currency=True),
                 name='unique_is_default_currency',
                 violation_error_message=_("You can only have one default currency.")
+            ),
+            models.UniqueConstraint(
+                fields=['iso_code', 'multi_tenant_company'],
+                name='unique_iso_code_multi_tenant_company',
+                violation_error_message=_("This currency already exists.")
             ),
         ]

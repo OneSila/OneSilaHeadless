@@ -35,6 +35,10 @@ class OrderItemType(relay.Node, GetQuerysetMultiTenantMixin):
     order: OrderType
     product: ProductType
 
+    @field()
+    def price_with_currency(self) -> str | None:
+        return f'{self.order.currency.symbol} {self.price}'
+
 
 @type(OrderNote, filters=OrderNoteFilter, order=OrderNoteOrder, pagination=True, fields="__all__")
 class OrderNoteType(relay.Node, GetQuerysetMultiTenantMixin):
