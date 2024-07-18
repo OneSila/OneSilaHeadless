@@ -79,7 +79,8 @@ class SalesPriceList(models.Model):
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
     notes = models.TextField(blank=True, null=True)
     vat_included = models.BooleanField(default=False)
-    auto_update = models.BooleanField(default=True)
+    auto_update = models.BooleanField(default=True)  # Unclear what this means
+    # include_all_products = models.BooleanField(default=False) # new line
 
     start_date = models.DateField(_("start date"), blank=True, null=True)
     end_date = models.DateField(_("end date"), blank=True, null=True)
