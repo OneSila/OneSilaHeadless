@@ -21,8 +21,6 @@ class CreateWithPublicIdMutation(CreateMutation, GetCurrentUserMixin):
             for c in to_check:
                 data[c] = getattr(public_currency, c)
 
-
-        print(data)
         return super().create(data=data, info=info)
 
 class UpdateWithPublicIdMutation(UpdateMutation, GetCurrentUserMixin):
