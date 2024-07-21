@@ -2,4 +2,4 @@ from django.views.generic import TemplateView
 
 
 class EmptyTemplateView(TemplateView):
-    pass
+    template_name = "core/empty_template_view.html"
