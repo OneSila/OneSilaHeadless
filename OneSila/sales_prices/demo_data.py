@@ -45,44 +45,20 @@ class SalesPriceGenerator(PrivateDataGenerator):
 @registry.register_private_app
 class SalesPriceListGenerator(PrivateDataGenerator):
     model = SalesPriceList
-    count = 20
+    count = 1
 
     field_mapper = {
-        'name': lambda: fake.date_between_dates(date_start=datetime(2024, 1, 1), date_end=datetime(2030, 12, 31)).strftime("%B %Y"),
-        'discount': lambda: round(fake.random_number(digits=2) + fake.pyfloat(left_digits=0, right_digits=2, min_value=0, max_value=1), 2),
-        'notes': fake.text,
-        'vat_included': lambda: fake.boolean(),
-        'auto_update_prices': lambda: fake.boolean()
+        'name': "30% Discount for dropshippers",
+        'discount': 30,
+        'vat_included': True,
+        'auto_update_prices': True,
+        'auto_add_products': True,
     }
 
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)
         multi_tenant_company = kwargs['multi_tenant_company']
-        currency = Currency.objects.filter(multi_tenant_company=multi_tenant_company).order_by('?').first()
+        currency = Currency.objects.filter(multi_tenant_company=multi_tenant_company).get(is_default_currency=True)
         kwargs['currency'] = currency
-
-        return kwargs
-
-
-@registry.register_private_app
-class SalesPriceListItemGenerator(PrivateDataGenerator):
-    model = SalesPriceListItem
-    count = 200
-
-    field_mapper = {
-        'salesprice': lambda: round(fake.random_number(digits=3) + fake.pyfloat(left_digits=0, right_digits=2, min_value=0, max_value=1), 2)
-    }
-
-    def prep_baker_kwargs(self, seed):
-        kwargs = super().prep_baker_kwargs(seed)
-        multi_tenant_company = kwargs['multi_tenant_company']
-
-        salespricelist = SalesPriceList.objects.filter(multi_tenant_company=multi_tenant_company).order_by('?').first()
-        existing_product_ids = SalesPriceListItem.objects.filter(salespricelist=salespricelist, multi_tenant_company=multi_tenant_company).values_list(
-            'product_id', flat=True)
-
-        product = Product.objects.filter(multi_tenant_company=multi_tenant_company).exclude(id__in=existing_product_ids).order_by('?').first()
-        kwargs['product'] = product
-        kwargs['salespricelist'] = salespricelist
 
         return kwargs

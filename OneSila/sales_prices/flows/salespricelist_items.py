@@ -11,7 +11,7 @@ def sales_price_list__salespricelistitem__create_update_flow(salespricelist):
 
 
 def sales_price__salespricelistitem__update_prices_flow(sales_price):
-    from sales_prices.factories import SalesPriceForSalesPriceListItemUpdateFactory
+    from sales_prices.factories import SalesPriceForSalesPriceListItemUpdatePricesFactory
     f = SalesPriceForSalesPriceListItemUpdatePricesFactory(sales_price)
     f.run()
 

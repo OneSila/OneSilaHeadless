@@ -80,20 +80,15 @@ class SalesPriceList(models.Model):
     end_date = models.DateField(_("end date"), blank=True, null=True)
     customers = models.ManyToManyField('contacts.Company', blank=True)
 
-    # FIXME: What happens if the relevant pricelist doesnt match with the customer
-    # currency
+    # FIXME: What happens if the relevant pricelist doesnt match with the customer currency
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
     vat_included = models.BooleanField(_("Price list includes VAT"),
         default=False)
     auto_update_prices = models.BooleanField(_("Auto Update Price and Discount Price"),
         default=True)
     auto_add_products = models.BooleanField(_("Auto add all products"),
-        default=False)  # new line
-    # Some kind of name that will explain that this price can increase or decrease
-    # the price with x percent
+        default=False)
     price_change_pcnt = models.FloatField(null=True, blank=True)
-    # Some kind of name that will explain that this discount can increase or decrease
-    # the price with x percent
     discount_pcnt = models.FloatField(null=True, blank=True)
     notes = models.TextField(blank=True, null=True)
 
