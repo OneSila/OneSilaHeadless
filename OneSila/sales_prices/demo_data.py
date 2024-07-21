@@ -49,7 +49,7 @@ class SalesPriceListGenerator(PrivateDataGenerator):
 
     field_mapper = {
         'name': "30% Discount for dropshippers",
-        'discount': 30,
+        'discount_pcnt': 30,
         'vat_included': True,
         'auto_update_prices': True,
         'auto_add_products': True,

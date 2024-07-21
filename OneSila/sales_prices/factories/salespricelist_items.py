@@ -1,3 +1,4 @@
+from decimal import Decimal
 from currencies.models import Currency
 from currencies.helpers import roundup
 from sales_prices.models import SalesPriceList, SalesPriceListItem, SalesPrice
@@ -41,6 +42,9 @@ class SalesPriceItemAutoPriceUpdateMixin:
     def calculate_price(from_price, conversion_factor, round_prices_up_to, is_discount=True):
         if conversion_factor is None:
             return from_price
+
+        from_price = Decimal(from_price)
+        conversion_factor = Decimal(conversion_factor)
 
         price_diff = from_price / (conversion_factor / 100)
 

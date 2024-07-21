@@ -19,7 +19,8 @@ class SalesPrice(models.Model):
     currency = models.ForeignKey('currencies.Currency', on_delete=models.CASCADE)
 
     rrp = models.DecimalField(_("Reccomended Retail Price"),
-        default=0.0, decimal_places=2, max_digits=10)
+        default=0.0, decimal_places=2, max_digits=10,
+        null=True, blank=True)
     price = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=10)
 
     objects = SalesPriceManager()
@@ -49,6 +50,8 @@ class SalesPrice(models.Model):
             return sales_price.rrp
         except AttributeError:  # happens when iherits_from is null
             return self.rrp
+        except self.DoesNotExist:
+            return None
 
     @property
     def parent_aware_price(self):
@@ -61,6 +64,11 @@ class SalesPrice(models.Model):
             return sales_price.price
         except AttributeError:  # happens when iherits_from is null, or in other words you are the parent.
             return self.price
+        except self.DoesNotExist:
+            return None
+
+    def highest_price(self):
+        return max([self.rrp or 0, self.price or 0])
 
     class Meta:
         unique_together = ('product', 'currency', 'multi_tenant_company')
