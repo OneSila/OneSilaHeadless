@@ -16,7 +16,7 @@ class SalesPriceListItemQuerySetTestCase(TestCase):
         price_override = 700
 
         discount_auto = 600
-        discount_override = 500
+        discount_override = None
 
         product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         currency, _ = Currency.objects.get_or_create(
@@ -47,13 +47,18 @@ class SalesPriceListItemQuerySetTestCase(TestCase):
         )
         price_list_price = SalesPriceListItem.objects.get(id=price_list_price.id)
 
+        # When the price list is auto-updating, we expect overrides to be more
+        # important then auto fields. But if there is no override, we expect an auto-field.
         self.assertTrue(price_list.auto_update_prices)
-        self.assertTrue(price_list_price.price == price_auto)
-        self.assertTrue(price_list_price.discount == discount_auto)
+        self.assertEqual(price_list_price.price, price_list_price.price_override)
+        self.assertEqual(price_list_price.discount, price_list_price.discount_auto)
 
         price_list.auto_update_prices = False
         price_list.save()
+        price_list_price.refresh_from_db()
 
+        # When the price list is not auto-updating you expect to receive only the override
+        # field.
         self.assertFalse(price_list.auto_update_prices)
-        self.assertTrue(price_list_price.price == price_override)
-        self.assertTrue(price_list_price.discount == discount_override)
+        self.assertEqual(price_list_price.price, price_list_price.price_override)
+        self.assertEqual(price_list_price.discount, price_list_price.discount_override)

@@ -58,14 +58,23 @@ class SalesPriceListItemQuerySet(MultiTenantQuerySet):
 
         return self.annotate(
             price=Case(
-                When(price_override__gt=0, then=F('price_override')),
-                default=F('price_auto')
+                When(
+                    salespricelist__auto_update_prices=True,
+                    then=Case(
+                        When(price_override__gt=0, then=F('price_override')),
+                        default=F('price_auto')
+                    )),
+                default=F('price_override'),
             ),
             discount=Case(
-                When(discount_override__gt=0, then=F('discount_override')),
-                default=F('discount_auto')
+                When(
+                    salespricelist__auto_update_prices=True,
+                    then=Case(
+                        When(discount_override__gt=0, then=F('discount_override')),
+                        default=F('discount_auto')
+                    )),
+                default=F('discount_override'),
             )
-
         )
 
 
