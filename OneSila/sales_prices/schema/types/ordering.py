@@ -15,7 +15,7 @@ class SalesPriceListOrder:
     id: auto
     name: auto
     vat_included: auto
-    auto_update: auto
+    auto_update_prices: auto
 
 
 @order(SalesPriceListItem)

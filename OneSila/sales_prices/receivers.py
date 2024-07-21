@@ -1,4 +1,4 @@
-from django.db.models.signals import post_save
+from core.signals import post_save, post_create
 from django.dispatch import receiver
 from sales_prices.models import SalesPrice, SalesPriceList, SalesPriceListItem
 from currencies.models import Currency
@@ -38,6 +38,14 @@ def sales_prices__currencies__exchange_rate_changes(sender, instance, created, *
 
 
 @receiver(post_save, sender=SalesPriceList)
-def sales_prices__salespricelist__post_save(sender, instance, **kwargs):
-    # When a pricelist is updated, most likely the prices associated need an update as well.
-    pass
+def sales_prices__salespricelist__post_create(sender, instance, **kwargs):
+    """When a SalesPriceList is created we may want to create all kinds of relevant SalesPriceListItems"""
+    from .tasks import salespricelistitem__create_for_salespricelist__task
+    salespricelistitem__create_for_salespricelist__task(instance)
+
+
+@receiver(post_create, sender=SalesPrice)
+def sales_prices__sales_price__post_create(sender, instance, **kwargs):
+    """When a salesprice is created, you probably want to create the relevant SalesPriceListItems"""
+    from .tasks import salespricelistitem__create_for_salesprice__task
+    salespricelistitem__create_for_salesprice__task(instance)

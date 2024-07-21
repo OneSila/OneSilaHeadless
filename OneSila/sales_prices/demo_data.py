@@ -6,6 +6,7 @@ from datetime import datetime
 
 registry = DemoDataLibrary()
 
+
 @registry.register_private_app
 class SalesPriceGenerator(PrivateDataGenerator):
     model = SalesPrice
@@ -36,9 +37,11 @@ class SalesPriceGenerator(PrivateDataGenerator):
             }
 
             salesprice, _ = SalesPrice.objects.get_or_create(**base_kwargs)
-            salesprice.amount = fake.price()
-            salesprice.discount_amount = fake.price_discount(salesprice.amount)
+            salesprice.rrp = fake.price()
+            salesprice.price = fake.price_discount(salesprice.rrp)
             salesprice.save()
+
+
 @registry.register_private_app
 class SalesPriceListGenerator(PrivateDataGenerator):
     model = SalesPriceList
@@ -49,7 +52,7 @@ class SalesPriceListGenerator(PrivateDataGenerator):
         'discount': lambda: round(fake.random_number(digits=2) + fake.pyfloat(left_digits=0, right_digits=2, min_value=0, max_value=1), 2),
         'notes': fake.text,
         'vat_included': lambda: fake.boolean(),
-        'auto_update': lambda: fake.boolean()
+        'auto_update_prices': lambda: fake.boolean()
     }
 
     def prep_baker_kwargs(self, seed):
@@ -83,4 +86,3 @@ class SalesPriceListItemGenerator(PrivateDataGenerator):
         kwargs['salespricelist'] = salespricelist
 
         return kwargs
-

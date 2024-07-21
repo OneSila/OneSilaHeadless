@@ -18,51 +18,52 @@ class SalesPrice(models.Model):
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
     currency = models.ForeignKey('currencies.Currency', on_delete=models.CASCADE)
 
-    amount = models.DecimalField(default=0.0, decimal_places=2, max_digits=10)
-    discount_amount = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=10)
+    rrp = models.DecimalField(_("Reccomended Retail Price"),
+        default=0.0, decimal_places=2, max_digits=10)
+    price = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=10)
 
     objects = SalesPriceManager()
 
     def __str__(self):
-        return '{} {}'.format(self.amount, self.currency)
+        return '{} {}'.format(self.rrp, self.currency)
 
     @property
     def tax_rate(self):
         return self.product.taxassign.tax.rate
 
     @property
-    def amount_ex_vat(self):
+    def rrp_ex_vat(self):
         '''
         Prices are incl VAT.  Calculate and return the net amount.
         '''
-        return self.amount - (self.amount / self.tax_rate)
+        return self.rrp - (self.rrp / self.tax_rate)
 
     @property
-    def parent_aware_amount(self):
+    def parent_aware_rrp(self):
         '''
         If the currency has a parent, then one needs this price to calculate
         the new price
         '''
         try:
             sales_price = self.currency.inherits_from.salesprice_set.get(product=self.product)
-            return sales_price.amount
+            return sales_price.rrp
         except AttributeError:  # happens when iherits_from is null
-            return self.amount
+            return self.rrp
 
     @property
-    def parent_aware_discount_amount(self):
+    def parent_aware_price(self):
         '''
         If the currency has a parent, then one needs this price to calculate
-        the new discount_amount
+        the new price
         '''
         try:
             sales_price = self.currency.inherits_from.salesprice_set.get(product=self.product)
-            return sales_price.discount_amount
+            return sales_price.price
         except AttributeError:  # happens when iherits_from is null, or in other words you are the parent.
-            return self.discount_amount
+            return self.price
 
     class Meta:
-        unique_together = ('product', 'currency')
+        unique_together = ('product', 'currency', 'multi_tenant_company')
 
 
 class SalesPriceList(models.Model):
@@ -75,22 +76,26 @@ class SalesPriceList(models.Model):
     Items are not to be automatically added. This should be a manual process.
     """
     name = models.CharField(max_length=100)
-    price_auto = models.FloatField(null=True, blank=True)
-    discount_auto = models.FloatField(null=True, blank=True)
-
-    price_override
-    disocunt_override
-
-    currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
-    notes = models.TextField(blank=True, null=True)
-    vat_included = models.BooleanField(default=False)
-    auto_update = models.BooleanField(default=True)  # Unclear what this means
-    # include_all_products = models.BooleanField(default=False) # new line
-
     start_date = models.DateField(_("start date"), blank=True, null=True)
     end_date = models.DateField(_("end date"), blank=True, null=True)
-
     customers = models.ManyToManyField('contacts.Company', blank=True)
+
+    # FIXME: What happens if the relevant pricelist doesnt match with the customer
+    # currency
+    currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
+    vat_included = models.BooleanField(_("Price list includes VAT"),
+        default=False)
+    auto_update_prices = models.BooleanField(_("Auto Update Price and Discount Price"),
+        default=True)
+    auto_add_products = models.BooleanField(_("Auto add all products"),
+        default=False)  # new line
+    # Some kind of name that will explain that this price can increase or decrease
+    # the price with x percent
+    price_change_pcnt = models.FloatField(null=True, blank=True)
+    # Some kind of name that will explain that this discount can increase or decrease
+    # the price with x percent
+    discount_pcnt = models.FloatField(null=True, blank=True)
+    notes = models.TextField(blank=True, null=True)
 
     objects = SalesPriceListManager()
 
@@ -110,7 +115,11 @@ class SalesPriceList(models.Model):
 class SalesPriceListItem(models.Model):
     salespricelist = models.ForeignKey(SalesPriceList, on_delete=models.CASCADE)
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
-    salesprice = models.FloatField(blank=True, null=True)
+
+    price_auto = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=10)
+    discount_auto = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=10)
+    price_override = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=10)
+    discount_override = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=10)
 
     objects = SalesPriceListItemManager()
 
@@ -128,4 +137,5 @@ class SalesPriceListItem(models.Model):
             self.salespricelist.currency.iso_code)
 
     class Meta:
-        unique_together = ('product', 'salespricelist')
+        unique_together = ('product', 'salespricelist', 'multi_tenant_company')
+        base_manager_name = 'objects'

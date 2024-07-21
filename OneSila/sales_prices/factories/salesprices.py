@@ -51,16 +51,16 @@ class SalesPriceUpdateCreateFactory:
         return currency.exchange_rate
 
     def _update_create_salesprice(self, currency):
-        amount = currency_convert(
+        rrp = currency_convert(
             round_prices_up_to=currency.round_prices_up_to,
             exchange_rate=self.get_exchange_rate(currency),
-            price=self.sales_price.parent_aware_amount
+            price=self.sales_price.parent_aware_rrp
         )
 
-        discount_amount = currency_convert(
+        price = currency_convert(
             round_prices_up_to=currency.round_prices_up_to,
             exchange_rate=self.get_exchange_rate(currency),
-            price=self.sales_price.parent_aware_discount_amount
+            price=self.sales_price.parent_aware_price
         )
 
         child_sales_price, _ = SalesPrice.objects.get_or_create(
@@ -68,8 +68,8 @@ class SalesPriceUpdateCreateFactory:
             currency=currency,
             multi_tenant_company=self.multi_tenant_company)
 
-        child_sales_price.amount = amount
-        child_sales_price.discount_amount = discount_amount
+        child_sales_price.rrp = rrp
+        child_sales_price.price = price
         child_sales_price.save()
 
     def _update_self(self):
@@ -77,27 +77,27 @@ class SalesPriceUpdateCreateFactory:
         if self.sales_price.currency.inherits_from:
             currency = self.sales_price.currency
 
-            amount = currency_convert(
+            rrp = currency_convert(
                 round_prices_up_to=currency.round_prices_up_to,
                 exchange_rate=currency.exchange_rate,
-                price=self.sales_price.parent_aware_amount
+                price=self.sales_price.parent_aware_rrp
             )
 
-            if self.sales_price.parent_aware_discount_amount:
-                discount_amount = currency_convert(
+            if self.sales_price.parent_aware_price:
+                price = currency_convert(
                     round_prices_up_to=currency.round_prices_up_to,
                     exchange_rate=currency.exchange_rate,
-                    price=self.sales_price.parent_aware_discount_amount
+                    price=self.sales_price.parent_aware_price
                 )
             else:
-                discount_amount = None
+                price = None
 
             # There seems to be an issue trying to save below the .save() way.
             # Workarround by updating the queryset.  This doesn't trigger any
             # signals - which is great - since it avoids needing to deal with
             # upating 'self' and ending up in a loop.
             sales_price_queryset = SalesPrice.objects.filter(id=self.sales_price.id)
-            sales_price_queryset.update(amount=amount, discount_amount=discount_amount)
+            sales_price_queryset.update(rrp=rrp, price=price)
 
     def run(self):
         self._set_inheriting_currencies()

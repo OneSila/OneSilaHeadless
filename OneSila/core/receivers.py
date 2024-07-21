@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from core.models.multi_tenant import MultiTenantUser, MultiTenantCompany
-
+from core.signals import post_create
 from core.schema.core.subscriptions import refresh_subscription_receiver
 
 
@@ -18,3 +18,9 @@ def core__subscription__post_save(sender, instance, **kwargs):
         # of which many can fail if they are not models as we use them in our apps.
         # That's why we don't let AttributeErrors fail our method.
         pass
+
+
+@receiver(post_save)
+def core__post_save__trigger(sender, instance, created, **kwargs):
+    if created:
+        post_create.send(sender=sender.__class__, instance=instance, **kwargs)
