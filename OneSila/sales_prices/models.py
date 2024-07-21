@@ -75,7 +75,12 @@ class SalesPriceList(models.Model):
     Items are not to be automatically added. This should be a manual process.
     """
     name = models.CharField(max_length=100)
-    discount = models.FloatField(null=True, blank=True)
+    price_auto = models.FloatField(null=True, blank=True)
+    discount_auto = models.FloatField(null=True, blank=True)
+
+    price_override
+    disocunt_override
+
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
     notes = models.TextField(blank=True, null=True)
     vat_included = models.BooleanField(default=False)
@@ -88,6 +93,12 @@ class SalesPriceList(models.Model):
     customers = models.ManyToManyField('contacts.Company', blank=True)
 
     objects = SalesPriceListManager()
+
+    def get_discount(self):
+        if self.price_list.auto_price_mode:
+            return self.discount_override or self.discount_auto
+        else:
+            return self.discount_override
 
     def __str__(self):
         return '{} {}'.format(self.name, self.currency)
