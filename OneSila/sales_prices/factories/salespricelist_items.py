@@ -1,4 +1,5 @@
 from currencies.models import Currency
+from currencies.helpers import roundup
 from sales_prices.models import SalesPriceList, SalesPriceListItem, SalesPrice
 
 """
@@ -21,8 +22,6 @@ Missing field? include_all_products
 rename field? discount_amount to discount_percentage
 rename Field? auto_update to auto_update_prices? and make discount_percentage dependent on this one?
 
-When a SalesPrice is Created
-- Create the relevant salespricelist-items when the lists are set to auto-product add mode.
 
 When a SalesPrice is updated
 - update the relevant salespricelist-item price when the lists are set to auto-price updates
@@ -30,26 +29,115 @@ When a SalesPrice is updated
 When a currency rate is updated:
 - update the relevant prices where the price-list is set to auto-price updates
 
-
-Sales Price adjustment
-- price -> RRP (Reccomended Retail Price)
-- discount -> Price
-
-And then our price lists can be used for discounts.
-And we restrict overusage of price lists.
 """
 
-# old code:
+
+class SalesPriceItemAutoPriceUpdateMixin:
+    def run_update_cycle(self):
+        for spi in self.salespricelistitems:
+            self.update_salespricelistitem(spi)
+
+    @staticmethod
+    def calculate_price(from_price, conversion_factor, round_prices_up_to, is_discount=True):
+        if conversion_factor is None:
+            return from_price
+
+        price_diff = from_price / (conversion_factor / 100)
+
+        if conversion_factor > 1:
+            conversion_factor = conversion_factor / 100
+
+        price_diff = from_price * conversion_factor
+
+        if is_discount:
+            to_price = from_price - price_diff
+        else:
+            to_price = from_price + price_diff
+
+        return roundup(to_price, round_prices_up_to)
+
+    def get_salesprice(self, salespricelistitem):
+        return salespricelistitem.product.salesprice_set.get(
+            currency=self.currency,
+            multi_tenant_company=self.multi_tenant_company)
+
+    def update_salespricelistitem(self, salespricelistitem):
+        # Two fields need updating:
+        # - price_auto
+        # - discount_auto
+        # and they need to respect the rounding on the currency
+
+        # We calculate the new price and discount based on the highest price received from the SalesPrice
+        sales_price = self.get_salesprice(salespricelistitem)
+        higest_price = sales_price.highest_price()
+
+        conversion_factor = salespricelistitem.salespricelist.price_change_pcnt
+        salespricelistitem.price = self.calculate_price(higest_price,
+            conversion_factor=conversion_factor,
+            round_prices_up_to=self.currency.round_prices_up_to,
+            is_discount=False)
+
+        conversion_factor = salespricelistitem.salespricelist.discount_pcnt
+        salespricelistitem.discount = self.calculate_price(higest_price,
+            conversion_factor=conversion_factor,
+            round_prices_up_to=self.currency.round_prices_up_to,
+            is_discount=True)
+
+        salespricelistitem.save()
 
 
-# SalesPriceList:
-# - signal auto_add_products field changed
-# - signal salesprice created
-# - auto_add_products = Grab and use all of the salesprice items that use the relevan currency
+class SalesPriceListForSalesPriceListItemUpdatePricesFactory(SalesPriceItemAutoPriceUpdateMixin):
+    """
+    When a salesprice is adjusted, we need to revisit all attached
+    salespricelistitem items if auto-price-update is switched on.
+    """
 
-# What to do?
-# - factory to create the relevant items
-# - factory to update prices on the relevant items when auto_update_prices (also for the created ones)
+    def __init__(self, salespricelist):
+        self.salespricelist = salespricelist
+        self.currency = salespricelist.currency
+        self.multi_tenant_company = salespricelist.multi_tenant_company
+
+    def preflight_approval(self):
+        return self.salespricelist.auto_update_prices
+
+    def set_salespricelistitems(self):
+        self.salespricelistitems = self.salespricelist.salespricelistitem_set.all()
+
+    def run(self):
+        if self.preflight_approval():
+            self.set_salespricelistitems()
+            self.run_update_cycle()
+
+
+class SalesPriceForSalesPriceListItemUpdatePricesFactory(SalesPriceItemAutoPriceUpdateMixin):
+    """
+    When a sales-prices changes, we want to update all relevant SalesPriceListItems
+    when marked as auto-update-prices
+    """
+
+    def __init__(self, sales_price):
+        self.sales_price = sales_price
+        self.product = sales_price.product
+        self.currency = sales_price.currency
+        self.multi_tenant_company = sales_price.multi_tenant_company
+
+    def set_salespricelists(self):
+        self.salespricelists = SalesPriceList.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            auto_update_prices=True,
+            currency=self.currency)
+
+    def set_salespricelistitems(self):
+        self.salespricelistitems = SalesPriceListItem.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            salespricelist__in=self.salespricelists
+        )
+
+    def run(self):
+        self.set_salespricelists()
+        self.set_salespricelistitems()
+        self.run_update_cycle()
 
 
 class SalesPriceForSalesPriceListItemCreateFactory:
@@ -114,32 +202,6 @@ class SalesPriceListForSalesPriceListItemsCreateUpdateFactory:
         if self.preflight_approval():
             self.set_salesprices()
             self.create_salespricelistpriceitems()
-
-
-# class SalesPriceListItemGeneratorUpdater:
-#     def __init__(self, pricelist, product):
-#         self.pricelist = pricelist
-#         self.currency_iso = pricelist.currency.iso_code
-#         self.discount = pricelist.discount
-#         self.product = product
-
-#     def _create_item(self):
-#         old_price = self.product.salesprice_set.get_currency_price(self.currency_iso).amount
-#         new_price = old_price - old_price * (self.discount / 100)
-
-#         try:
-#             self.item = self.pricelist.salespricelistitem_set.get(
-#                 product=self.product)
-#             self.item.set_new_salesprice(new_price)
-#             self.item_created = False
-#         except SalesPriceListItem.DoesNotExist:
-#             self.item = self.pricelist.salespricelistitem_set.create(
-#                 product=self.product,
-#                 salesprice=new_price)
-#             self.item_created = True
-
-#     def run(self):
-#         self._create_item()
 
 
 class SalesPriceGenerator:

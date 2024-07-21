@@ -1,3 +1,4 @@
 from .salespricelist_items import SalesPriceForSalesPriceListItemCreateFactory, SalesPriceGenerator, \
-    SalesPriceListForSalesPriceListItemsCreateUpdateFactory
+    SalesPriceListForSalesPriceListItemsCreateUpdateFactory, SalesPriceListForSalesPriceListItemUpdatePricesFactory, \
+    SalesPriceForSalesPriceListItemUpdatePricesFactory, SalesPriceItemAutoPriceUpdateMixin
 from .salesprices import SalesPriceUpdateCreateFactory, SalesPriceCreateForCurrencyFactory

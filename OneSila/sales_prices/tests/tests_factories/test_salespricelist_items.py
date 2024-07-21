@@ -3,8 +3,58 @@ from products.models import SimpleProduct
 from currencies.models import Currency
 from sales_prices.models import SalesPriceList, SalesPriceListItem, SalesPrice
 from sales_prices.factories import SalesPriceForSalesPriceListItemCreateFactory, \
-    SalesPriceListForSalesPriceListItemsCreateUpdateFactory
+    SalesPriceListForSalesPriceListItemsCreateUpdateFactory, SalesPriceItemAutoPriceUpdateMixin
 from currencies.currencies import currencies
+
+
+class SalesPriceItemAutoPriceUpdateMixinTestCase(TestCase):
+    def test_calculate_price_price_up(self):
+        kwargs = {
+            "from_price": 100,
+            "conversion_factor": 10,
+            "round_prices_up_to": None,
+            "is_discount": False
+        }
+        expected = 110
+
+        resp = SalesPriceItemAutoPriceUpdateMixin.calculate_price(**kwargs)
+        self.assertEqual(expected, resp)
+
+    def test_calculate_price_price_down(self):
+        kwargs = {
+            "from_price": 100,
+            "conversion_factor": -10,
+            "round_prices_up_to": None,
+            "is_discount": False
+        }
+        expected = 90
+
+        resp = SalesPriceItemAutoPriceUpdateMixin.calculate_price(**kwargs)
+        self.assertEqual(expected, resp)
+
+    def test_calculate_price_discount_up(self):
+        kwargs = {
+            "from_price": 100,
+            "conversion_factor": -10,
+            "round_prices_up_to": None,
+            "is_discount": True
+        }
+        expected = 110
+
+        resp = SalesPriceItemAutoPriceUpdateMixin.calculate_price(**kwargs)
+        self.assertEqual(expected, resp)
+
+    def test_calculate_price_discount_down(self):
+        kwargs = {
+            "from_price": 100,
+            "conversion_factor": 10,
+            "round_prices_up_to": None,
+            "is_discount": True
+        }
+        expected = 90
+
+        resp = SalesPriceItemAutoPriceUpdateMixin.calculate_price(**kwargs)
+        self.assertEqual(expected, resp)
 
 
 class SalesPriceListForSalesPriceListItemsCreateUpdateFactoryTestCase(TestCase):

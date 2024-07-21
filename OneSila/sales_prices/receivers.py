@@ -9,12 +9,23 @@ logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender=SalesPrice)
-def sales_prices__salesprice__post_save(sender, instance, **kwargs):
+def sales_prices__salesprice__post_save(sender, instance, created, **kwargs):
     """
     Time to populate the prices
     """
-    from .tasks import salesprices__createupdate__task
+    from .tasks import salesprices__createupdate__task, \
+        sales_price__salespricelistitem__update_prices_task, \
+        salespricelistitem__create_for_salesprice__task
+
+    if created:
+        # When a salesprice is created, you probably want to create the relevant SalesPriceListItems
+        salespricelistitem__create_for_salesprice__task(instance)
+
+    # When a salesprice has been saved, child prices may need updating.
     salesprices__createupdate__task(instance)
+
+    # When a salesprice has been saved, the relavant salespriceitems may need updating
+    sales_price__salespricelistitem__update_prices_task(instance)
 
 
 @receiver(exchange_rate__post_save, sender=Currency)
@@ -39,13 +50,10 @@ def sales_prices__currencies__exchange_rate_changes(sender, instance, created, *
 
 @receiver(post_save, sender=SalesPriceList)
 def sales_prices__salespricelist__post_create(sender, instance, **kwargs):
-    """When a SalesPriceList is created we may want to create all kinds of relevant SalesPriceListItems"""
-    from .tasks import salespricelistitem__create_for_salespricelist__task
+    from .tasks import salespricelistitem__create_for_salespricelist__task, \
+        sales_price_list__salespricelistitem__update_prices_task
+
+    # When a SalesPriceList is created we may want to create all kinds of relevant SalesPriceListItems
     salespricelistitem__create_for_salespricelist__task(instance)
-
-
-@receiver(post_create, sender=SalesPrice)
-def sales_prices__sales_price__post_create(sender, instance, **kwargs):
-    """When a salesprice is created, you probably want to create the relevant SalesPriceListItems"""
-    from .tasks import salespricelistitem__create_for_salesprice__task
-    salespricelistitem__create_for_salesprice__task(instance)
+    # When a price list is saved, we may need to update the relevant salespriceitems
+    sales_price_list__salespricelistitem__update_prices_task(instance)

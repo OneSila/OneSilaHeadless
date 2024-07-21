@@ -30,3 +30,15 @@ def salespricelistitem__create_for_salespricelist__task(salespricelist):
 def salespricelistitem__create_for_salesprice__task(sales_price):
     from sales_prices.flows import salespricelistitem_create_flow
     sales_price__salespricelistitem__create_flow(sales_price)
+
+
+@db_task()
+def sales_price__salespricelistitem__update_prices_task(sales_price):
+    from sales_prices.flows import sales_price__salespricelistitem__update_prices_flow
+    sales_price__salespricelistitem__update_prices_flow(sales_price)
+
+
+@db_task()
+def sales_price_list__salespricelistitem__update_prices_task(salespricelist):
+    from sales_prices.flows import sales_price_list__salespricelistitem__update_prices_flow
+    sales_price_list__salespricelistitem__update_prices_flow(salespricelist)
