@@ -4,6 +4,7 @@ from django.apps import AppConfig
 # One the Meta Fields, we should set this.
 import django.db.models.options as options
 options.DEFAULT_NAMES = (*options.DEFAULT_NAMES, 'search_terms',)
+options.DEFAULT_NAMES = (*options.DEFAULT_NAMES, 'translated_field',)
 
 
 class CoreConfig(AppConfig):

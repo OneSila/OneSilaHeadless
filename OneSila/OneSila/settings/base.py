@@ -215,7 +215,7 @@ CORS_ALLOWED_METHODS = [
 
 HUEY = {
     'huey_class': 'huey.RedisHuey',  # Huey implementation to use.
-    'name': 'huey',  # Use db name for huey.
+    'name': 'hueyonesilaheadless',  # Use db name for huey.
     'results': True,  # Store return values of tasks.
     'store_none': False,  # If a task returns None, do not save to results.
     'immediate': DEBUG,  # If DEBUG=True, run synchronously.

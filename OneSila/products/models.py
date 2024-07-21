@@ -4,7 +4,7 @@ from django.utils.text import slugify
 from core import models
 from django.db import IntegrityError, transaction
 from django.utils.translation import gettext_lazy as _
-from translations.models import TranslationFieldsMixin
+from translations.models import TranslationFieldsMixin, TranslatedModelMixin
 from taxes.models import VatRate
 from .managers import ProductManager, UmbrellaManager, BundleManager, VariationManager, \
     SupplierProductManager, ManufacturableManager, DropshipManager
@@ -12,7 +12,7 @@ import shortuuid
 from hashlib import shake_256
 
 
-class Product(models.Model):
+class Product(TranslatedModelMixin, models.Model):
     from products.product_types import UMBRELLA, BUNDLE, MANUFACTURABLE, DROPSHIP, SUPPLIER, SIMPLE, \
         PRODUCT_TYPE_CHOICES, HAS_PRICES_TYPES
 
@@ -64,24 +64,8 @@ class Product(models.Model):
     supplier_products = SupplierProductManager()
 
     @property
-    def name(self):
-        translations = self.translations.all()
-
-        if self.multi_tenant_company is None:
-            return self.sku
-
-        lang = self.multi_tenant_company.language
-        name = self.sku
-
-        if translations:
-            try:
-                translation = translations.get(language=lang)
-            except ProductTranslation.DoesNotExist:
-                translation = translations.last()
-
-            name = translation.name
-
-        return f"{name}"
+    def name(self, language=None):
+        return self._get_translated_value(field_name='name', related_name='translations', language=language, fallback='sku')
 
     def __str__(self):
         return f"{self.name}"
@@ -312,7 +296,9 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
 
         super().save(*args, **kwargs)
 
+
     class Meta:
+        translated_field = 'product'
         unique_together = (
             ('product', 'language'),
             ('url_key', 'multi_tenant_company'),

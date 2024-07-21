@@ -1,8 +1,9 @@
 from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
-from properties.models import Property, PropertyTranslation, PropertySelectValue, ProductProperty
+from properties.models import Property, PropertyTranslation, PropertySelectValue, ProductProperty, ProductPropertyTextTranslation, \
+    PropertySelectValueTranslation
 from properties.schema.types.types import PropertyType, PropertyTranslationType, \
-    PropertySelectValueType, ProductPropertyType
+    PropertySelectValueType, ProductPropertyType, ProductPropertyTextTranslationType, PropertySelectValueTranslationType
 
 
 @type(name="Subscription")
@@ -18,7 +19,7 @@ class PropertiesSubscription:
             yield i
 
     @subscription
-    async def propertyselect_value(self, info: Info, pk: str) -> AsyncGenerator[PropertySelectValueType, None]:
+    async def property_select_value(self, info: Info, pk: str) -> AsyncGenerator[PropertySelectValueType, None]:
         async for i in model_subscriber(info=info, pk=pk, model=PropertySelectValue):
             yield i
 
@@ -26,3 +27,14 @@ class PropertiesSubscription:
     async def product_property(self, info: Info, pk: str) -> AsyncGenerator[ProductPropertyType, None]:
         async for i in model_subscriber(info=info, pk=pk, model=ProductProperty):
             yield i
+
+    @subscription
+    async def product_property_text_translation(self, info: Info, pk: str) -> AsyncGenerator[ProductPropertyTextTranslationType, None]:
+        async for i in model_subscriber(info=info, pk=pk, model=ProductPropertyTextTranslation):
+            yield i
+
+    @subscription
+    async def property_select_value_translation(self, info: Info, pk: str) -> AsyncGenerator[PropertySelectValueTranslationType, None]:
+        async for i in model_subscriber(info=info, pk=pk, model=PropertySelectValueTranslation):
+            yield i
+
