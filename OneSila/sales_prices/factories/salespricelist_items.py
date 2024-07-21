@@ -44,7 +44,7 @@ class SalesPriceItemAutoPriceUpdateMixin:
 
         price_diff = from_price / (conversion_factor / 100)
 
-        if conversion_factor > 1:
+        if conversion_factor < 0 or conversion_factor > 1:
             conversion_factor = conversion_factor / 100
 
         price_diff = from_price * conversion_factor
