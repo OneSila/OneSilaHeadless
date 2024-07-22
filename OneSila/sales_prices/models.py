@@ -21,7 +21,8 @@ class SalesPrice(models.Model):
     rrp = models.DecimalField(_("Reccomended Retail Price"),
         default=0.0, decimal_places=2, max_digits=10,
         null=True, blank=True)
-    price = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=10)
+    price = models.DecimalField(decimal_places=2, max_digits=10,
+        blank=True, null=True)
 
     objects = SalesPriceManager()
 
