@@ -1,7 +1,8 @@
 from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field
 
-from typing import List
+from typing import List, Optional
 
+from media.schema.types.types import ImageType
 from properties.models import Property, PropertyTranslation, \
     PropertySelectValue, ProductProperty, ProductPropertyTextTranslation, PropertySelectValueTranslation
 from .filters import PropertyFilter, PropertyTranslationFilter, \
@@ -26,6 +27,8 @@ class PropertyTranslationType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(PropertySelectValue, filters=PropertySelectValueFilter, order=PropertySelectValueOrder, pagination=True, fields="__all__")
 class PropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
     property: PropertyType
+    image: Optional[ImageType]
+
     @field()
     def value(self, info) -> str | None:
         return self.value

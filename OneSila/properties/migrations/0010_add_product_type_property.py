@@ -40,4 +40,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(add_product_type_property)
     ]
