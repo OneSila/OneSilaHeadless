@@ -58,6 +58,7 @@ class SalesPriceListItemQuerySetTestCase(TestCase):
 
         # FIXME: You seem to have to reload the object to get the right results below.
         # Unclear whether this is Django cache related or dirty-field related.
+        # Related to? https://code.djangoproject.com/ticket/29263#no1
         price_list_price = SalesPriceListItem.objects.get(id=price_list_price.id)
 
         # When the price list is not auto-updating you expect to receive only the override
