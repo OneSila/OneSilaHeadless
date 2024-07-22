@@ -55,10 +55,14 @@ class SalesPriceListItemQuerySetTestCase(TestCase):
 
         price_list.auto_update_prices = False
         price_list.save()
-        price_list_price.refresh_from_db()
+
+        # FIXME: You seem to have to reload the object to get the right results below.
+        # Unclear whether this is Django cache related or dirty-field related.
+        price_list_price = SalesPriceListItem.objects.get(id=price_list_price.id)
 
         # When the price list is not auto-updating you expect to receive only the override
         # field.
         self.assertFalse(price_list.auto_update_prices)
+        self.assertFalse(price_list_price.salespricelist.auto_update_prices)
         self.assertEqual(price_list_price.price, price_list_price.price_override)
         self.assertEqual(price_list_price.discount, price_list_price.discount_override)
