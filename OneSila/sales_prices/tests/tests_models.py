@@ -1,8 +1,69 @@
+from django.db.utils import IntegrityError
 from core.tests import TestCase
 from products.models import SimpleProduct
 from sales_prices.models import SalesPriceList, SalesPriceListItem
 from currencies.models import Currency
 from currencies.currencies import currencies
+
+
+class SalesPriceConstraintTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        self.currency, _ = Currency.objects.get_or_create(
+            is_default_currency=True,
+            multi_tenant_company=self.multi_tenant_company,
+            **currencies['GB'])
+
+    def test_rrp_only(self):
+        rrp = 1000
+        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        salesprice = product.salesprice_set.create(
+            multi_tenant_company=self.multi_tenant_company,
+            currency=self.currency,
+            rrp=rrp)
+        self.assertEqual(salesprice.rrp, rrp)
+
+    def test_price_only(self):
+        price = 100
+        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        salesprice = product.salesprice_set.create(
+            multi_tenant_company=self.multi_tenant_company,
+            currency=self.currency,
+            price=price)
+        self.assertEqual(salesprice.price, price)
+
+    def test_no_price(self):
+        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+        with self.assertRaises(IntegrityError):
+            salesprice = product.salesprice_set.create(
+                multi_tenant_company=self.multi_tenant_company,
+                currency=self.currency)
+
+    def test_both_prices(self):
+        rrp = 100
+        price = 90
+        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        salesprice = product.salesprice_set.create(
+            multi_tenant_company=self.multi_tenant_company,
+            currency=self.currency,
+            rrp=rrp,
+            price=price)
+        self.assertEqual(salesprice.rrp, rrp)
+        self.assertEqual(salesprice.price, price)
+
+    def test_rrp_gt_price(self):
+        rrp = 90
+        price = 100
+        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+        with self.assertRaises(IntegrityError):
+            salesprice = product.salesprice_set.create(
+                multi_tenant_company=self.multi_tenant_company,
+                currency=self.currency,
+                rrp=rrp,
+                price=price)
 
 
 class SalesPriceListItemQuerySetTestCase(TestCase):

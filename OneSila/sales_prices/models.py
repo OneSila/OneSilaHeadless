@@ -73,6 +73,14 @@ class SalesPrice(models.Model):
 
     class Meta:
         unique_together = ('product', 'currency', 'multi_tenant_company')
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(rrp__isnull=False) | models.Q(price__isnull=False)
+                ),
+                name='rrp_or_price'
+            ),
+        ]
 
 
 class SalesPriceList(models.Model):

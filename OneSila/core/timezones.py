@@ -1,4 +1,5 @@
-import zoneinfo
+from pytz import common_timezones_set
 
-
-TIMEZONE_CHOICES = [(i, i) for i in zoneinfo.available_timezones()]
+# https://stackoverflow.com/a/13867319/5731101
+TIMEZONE_CHOICES = sorted([(i, i) for i in common_timezones_set])
+DEFAULT_TIMEZONE = 'Europe/London'
