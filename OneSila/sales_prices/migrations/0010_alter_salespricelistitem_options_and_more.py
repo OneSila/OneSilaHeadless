@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='salesprice',
             name='rrp',
-            field=models.DecimalField(blank=True, decimal_places=2, default=0.0, max_digits=10, null=True, verbose_name='Reccomended Retail Price'),
+            field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True, verbose_name='Reccomended Retail Price'),
         ),
         migrations.AlterUniqueTogether(
             name='salespricelistitem',

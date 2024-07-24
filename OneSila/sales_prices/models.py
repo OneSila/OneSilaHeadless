@@ -1,7 +1,9 @@
 from core import models
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from .managers import SalesPriceManager, SalesPriceListItemManager, SalesPriceListManager
+from decimal import Decimal
 
 
 class SalesPrice(models.Model):
@@ -18,16 +20,38 @@ class SalesPrice(models.Model):
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
     currency = models.ForeignKey('currencies.Currency', on_delete=models.CASCADE)
 
-    rrp = models.DecimalField(_("Reccomended Retail Price"),
-        default=0.0, decimal_places=2, max_digits=10,
+    rrp = models.DecimalField(_("Reccomended Retail Price"), decimal_places=2, max_digits=10,
         null=True, blank=True)
     price = models.DecimalField(decimal_places=2, max_digits=10,
-        blank=True, null=True)
+        null=True, blank=True)
 
     objects = SalesPriceManager()
 
+    class Meta:
+        unique_together = ('product', 'currency', 'multi_tenant_company')
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(rrp__gt=models.F("price")),
+                name=_("RRP cannot be less then the price"),
+            ),
+            models.CheckConstraint(
+                check=models.Q(rrp__gte='0.01'),
+                name=_("RRP cannot be 0"),
+            ),
+            models.CheckConstraint(
+                check=models.Q(price__gte='0.01'),
+                name=_("Price cannot be 0"),
+            ),
+        ]
+
     def __str__(self):
         return '{} {}'.format(self.rrp, self.currency)
+
+    def clean(self):
+        super().clean()
+
+        if self.rrp is None and self.price is None:
+            raise ValidationError(_("You need to supply either RRP or Price."))
 
     @property
     def tax_rate(self):
@@ -70,17 +94,6 @@ class SalesPrice(models.Model):
 
     def highest_price(self):
         return max([self.rrp or 0, self.price or 0])
-
-    class Meta:
-        unique_together = ('product', 'currency', 'multi_tenant_company')
-        constraints = [
-            models.CheckConstraint(
-                check=(
-                    models.Q(rrp__isnull=False) | models.Q(price__isnull=False)
-                ),
-                name='rrp_or_price'
-            ),
-        ]
 
 
 class SalesPriceList(models.Model):

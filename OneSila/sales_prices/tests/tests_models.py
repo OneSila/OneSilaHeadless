@@ -1,4 +1,5 @@
 from django.db.utils import IntegrityError
+from django.core.exceptions import ValidationError
 from core.tests import TestCase
 from products.models import SimpleProduct
 from sales_prices.models import SalesPriceList, SalesPriceListItem
@@ -40,6 +41,32 @@ class SalesPriceConstraintTestCase(TestCase):
             salesprice = product.salesprice_set.create(
                 multi_tenant_company=self.multi_tenant_company,
                 currency=self.currency)
+            salesprice.price = 0
+            salesprice.rrp = 0
+            salesprice.save()
+
+    def test_none_price(self):
+        # None prices are needed for backend purposes.
+        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+        salesprice = product.salesprice_set.create(
+            multi_tenant_company=self.multi_tenant_company,
+            currency=self.currency)
+        salesprice.price = None
+        salesprice.rrp = None
+        salesprice.save()
+
+    def test_none_prices_clean(self):
+        # None prices are not desirable from the frontend.
+        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+        with self.assertRaises(ValidationError):
+            salesprice = product.salesprice_set.create(
+                multi_tenant_company=self.multi_tenant_company,
+                currency=self.currency)
+            salesprice.price = None
+            salesprice.rrp = None
+            salesprice.clean()
 
     def test_both_prices(self):
         rrp = 100
