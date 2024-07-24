@@ -186,3 +186,66 @@ class ProductPropertyTextTranslation(TranslationFieldsMixin, models.Model):
         translated_field = 'product_property'
         search_terms = ['value_text', 'value_description']
         unique_together = ("product_property", "language")
+
+class ProductPropertiesRule(models.Model):
+    product_type = models.ForeignKey(
+        PropertySelectValue,
+        on_delete=models.CASCADE,
+        verbose_name=_('Product Type')
+    )
+
+    def __str__(self):
+        return f"{self.product_type} < {self.multi_tenant_company}>"
+
+    def save(self, *args, **kwargs):
+
+        if not self.product_type.property.is_product_type:
+            raise ValidationError(_("Invalid product type."))
+
+        super().save(*args, **kwargs)
+
+    class Meta:
+        verbose_name_plural = _("Product Properties Rules")
+        unique_together = ("product_type", "multi_tenant_company")
+
+
+class ProductPropertiesRuleItem(models.Model):
+    REQUIRED_IN_CONFIGURATOR = 'REQUIRED_IN_CONFIGURATOR'
+    OPTIONAL_IN_CONFIGURATOR = 'OPTIONAL_IN_CONFIGURATOR'
+    REQUIRED = 'REQUIRED'
+    OPTIONAL = 'OPTIONAL'
+
+    RULE_TYPES = [
+        (REQUIRED_IN_CONFIGURATOR, _('Required in Configurator')),
+        (OPTIONAL_IN_CONFIGURATOR, _('Optional in Configurator')),
+        (REQUIRED, _('Required')),
+        (OPTIONAL, _('Optional')),
+    ]
+
+    rule = models.ForeignKey(ProductPropertiesRule, related_name='items', on_delete=models.CASCADE, verbose_name=_('Rule'))
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, verbose_name=_('Property'))
+    type = models.CharField(max_length=25, choices=RULE_TYPES, verbose_name=_('Type'))
+    sort_order = models.PositiveIntegerField(default=0, verbose_name=_('Sort Order'))
+
+    def save(self, *args, **kwargs):
+        # Ensure property is not a product type
+        if self.property.is_product_type:
+            raise ValidationError(_("Property cannot be a product type."))
+
+        # Ensure that if type is REQUIRED_IN_CONFIGURATOR, property type must be SELECT or MULTISELECT
+        if self.type in [self.REQUIRED_IN_CONFIGURATOR, self.OPTIONAL_IN_CONFIGURATOR] and self.property.type != Property.TYPES.SELECT:
+            raise ValidationError(_("Property must be of type SELECT."))
+
+        # Ensure rule cannot have OPTIONAL_IN_CONFIGURATOR without a REQUIRED_IN_CONFIGURATOR
+        if self.type == self.OPTIONAL_IN_CONFIGURATOR and not self.rule.items.filter(type=self.REQUIRED_IN_CONFIGURATOR).exists():
+            raise ValidationError(_("Cannot have optional in configurator without a required in configurator."))
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.rule} - {self.property} ({self.type})"
+
+    class Meta:
+        verbose_name_plural = _("Product Properties Rule Items")
+        unique_together = ("property", "rule", "multi_tenant_company")
+        ordering = ('sort_order',)

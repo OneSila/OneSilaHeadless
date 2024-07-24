@@ -2,7 +2,7 @@ from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial
 
 from properties.models import Property, PropertyTranslation, \
-    PropertySelectValue, ProductProperty, ProductPropertyTextTranslation, PropertySelectValueTranslation
+    PropertySelectValue, ProductProperty, ProductPropertyTextTranslation, PropertySelectValueTranslation, ProductPropertiesRule, ProductPropertiesRuleItem
 
 
 @input(Property, fields="__all__")
@@ -59,4 +59,20 @@ class ProductPropertyTextTranslationInput:
 
 @partial(ProductPropertyTextTranslation, fields="__all__")
 class ProductPropertyTextTranslationPartialInput(NodeInput):
+    pass
+
+@input(ProductPropertiesRule, fields="__all__")
+class ProductPropertiesRuleInput:
+    pass
+
+@partial(ProductPropertiesRule, fields="__all__")
+class ProductPropertiesRulePartialInput(NodeInput):
+    pass
+
+@input(ProductPropertiesRuleItem, fields="__all__")
+class ProductPropertiesRuleItemInput:
+    pass
+
+@partial(ProductPropertiesRuleItem, fields="__all__")
+class ProductPropertiesRuleItemPartialInput(NodeInput):
     pass
