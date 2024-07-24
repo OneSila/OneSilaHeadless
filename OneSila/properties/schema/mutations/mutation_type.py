@@ -3,10 +3,11 @@ from core.schema.core.mutations import create, update, delete, type, List
 from .fields import create_property, create_property_select_value
 
 from ..types.types import PropertyType, PropertyTranslationType, PropertySelectValueType, ProductPropertyType, ProductPropertyTextTranslationType, \
-    PropertySelectValueTranslationType
+    PropertySelectValueTranslationType, ProductPropertiesRuleType, ProductPropertiesRuleItemType
 from ..types.input import PropertyInput, PropertyTranslationInput, PropertySelectValueInput, ProductPropertyInput, \
     PropertyPartialInput, PropertyTranslationPartialInput, PropertySelectValuePartialInput, ProductPropertyPartialInput, ProductPropertyTextTranslationInput, \
-    PropertySelectValueTranslationInput, PropertySelectValueTranslationPartialInput, ProductPropertyTextTranslationPartialInput
+    PropertySelectValueTranslationInput, PropertySelectValueTranslationPartialInput, ProductPropertyTextTranslationPartialInput, ProductPropertiesRuleInput, \
+    ProductPropertiesRulePartialInput, ProductPropertiesRuleItemInput, ProductPropertiesRuleItemPartialInput
 
 
 @type(name="Mutation")
@@ -47,3 +48,14 @@ class PropertiesMutation:
     delete_property_select_value_translation: PropertySelectValueTranslationType = delete()
     delete_property_select_value_translations: List[PropertySelectValueTranslationType] = delete()
 
+    create_product_properties_rule: ProductPropertiesRuleType = create(ProductPropertiesRuleInput)
+    create_product_properties_rules: List[ProductPropertiesRuleType] = create(ProductPropertiesRuleInput)
+    update_product_properties_rule: ProductPropertiesRuleType = update(ProductPropertiesRulePartialInput)
+    delete_product_properties_rule: ProductPropertiesRuleType = delete()
+    delete_product_properties_rules: List[ProductPropertiesRuleType] = delete()
+
+    create_product_properties_rule_item: ProductPropertiesRuleItemType = create(ProductPropertiesRuleItemInput)
+    create_product_properties_rule_items: List[ProductPropertiesRuleItemType] = create(ProductPropertiesRuleItemInput)
+    update_product_properties_rule_item: ProductPropertiesRuleItemType = update(ProductPropertiesRuleItemPartialInput)
+    delete_product_properties_rule_item: ProductPropertiesRuleItemType = delete()
+    delete_product_properties_rule_items: List[ProductPropertiesRuleItemType] = delete()

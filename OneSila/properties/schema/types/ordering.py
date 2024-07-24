@@ -2,7 +2,7 @@ from core.schema.core.types.ordering import order
 from core.schema.core.types.types import auto
 
 from properties.models import Property, PropertySelectValue, \
-    ProductProperty, PropertyTranslation, ProductPropertyTextTranslation, PropertySelectValueTranslation
+    ProductProperty, PropertyTranslation, ProductPropertyTextTranslation, PropertySelectValueTranslation, ProductPropertiesRuleItem, ProductPropertiesRule
 
 
 @order(Property)
@@ -35,3 +35,12 @@ class PropertyTranslationOrder:
 @order(ProductPropertyTextTranslation)
 class ProductPropertyTextTranslationOrder:
     id: auto
+
+@order(ProductPropertiesRule)
+class ProductPropertiesRuleOrder:
+    id: auto
+    product_type: auto
+
+@order(ProductPropertiesRuleItem)
+class ProductPropertiesRuleItemOrder:
+    sort_order: auto
