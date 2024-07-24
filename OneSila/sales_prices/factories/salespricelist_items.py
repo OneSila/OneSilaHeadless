@@ -35,7 +35,7 @@ When a currency rate is updated:
 
 class SalesPriceItemAutoPriceUpdateMixin:
     def run_update_cycle(self):
-        for spi in self.salespricelistitems:
+        for spi in self.salespricelistitems.iterator():
             self.update_salespricelistitem(spi)
 
     @staticmethod
@@ -73,16 +73,16 @@ class SalesPriceItemAutoPriceUpdateMixin:
 
         # We calculate the new price and discount based on the highest price received from the SalesPrice
         sales_price = self.get_salesprice(salespricelistitem)
-        higest_price = sales_price.highest_price()
+        highest_price = sales_price.highest_price()
 
         conversion_factor = salespricelistitem.salespricelist.price_change_pcnt
-        salespricelistitem.price = self.calculate_price(higest_price,
+        salespricelistitem.price = self.calculate_price(highest_price,
             conversion_factor=conversion_factor,
             round_prices_up_to=self.currency.round_prices_up_to,
             is_discount=False)
 
         conversion_factor = salespricelistitem.salespricelist.discount_pcnt
-        salespricelistitem.discount = self.calculate_price(higest_price,
+        salespricelistitem.discount = self.calculate_price(highest_price,
             conversion_factor=conversion_factor,
             round_prices_up_to=self.currency.round_prices_up_to,
             is_discount=True)
