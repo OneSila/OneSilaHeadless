@@ -4,7 +4,8 @@ from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin
 
 from properties.models import Property, ProductProperty, \
-    ProductProperty, PropertySelectValue, PropertyTranslation, ProductPropertyTextTranslation, PropertySelectValueTranslation
+    ProductProperty, PropertySelectValue, PropertyTranslation, ProductPropertyTextTranslation, PropertySelectValueTranslation, ProductPropertiesRule, \
+    ProductPropertiesRuleItem
 from products.schema.types.filters import ProductFilter
 
 
@@ -13,6 +14,7 @@ class PropertyFilter(SearchFilterMixin):
     search: str | None
     id: auto
     is_public_information: auto
+    is_product_type: auto
     type: auto
 
 
@@ -50,3 +52,16 @@ class PropertyTranslationFilter:
 @filter(ProductPropertyTextTranslation)
 class ProductPropertyTextTranslationFilter:
     id: auto
+    product_property: Optional[ProductPropertyFilter]
+
+@filter(ProductPropertiesRule)
+class ProductPropertiesRuleFilter:
+    id: auto
+    product_type: Optional[PropertyFilter]
+
+@filter(ProductPropertiesRuleItem)
+class ProductPropertiesRuleItemFilter:
+    id: auto
+    rule: Optional[ProductPropertiesRuleFilter]
+    property: Optional[PropertyFilter]
+    type: auto

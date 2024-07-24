@@ -3,7 +3,8 @@ from typing import List
 
 
 from .types.types import PropertyType, PropertyTranslationType, \
-    PropertySelectValueType, ProductPropertyType, ProductPropertyTextTranslationType, PropertySelectValueTranslationType
+    PropertySelectValueType, ProductPropertyType, ProductPropertyTextTranslationType, PropertySelectValueTranslationType, ProductPropertiesRuleType, \
+    ProductPropertiesRuleItemType
 
 
 @type(name="Query")
@@ -26,3 +27,8 @@ class PropertiesQuery:
     property_select_value_translation: PropertySelectValueTranslationType = node()
     property_select_value_translations: ListConnectionWithTotalCount[PropertySelectValueTranslationType] = connection()
 
+    product_properties_rule: ProductPropertiesRuleType = node()
+    product_properties_rules: ListConnectionWithTotalCount[ProductPropertiesRuleType] = connection()
+
+    product_properties_rule_item: ProductPropertiesRuleItemType = node()
+    product_properties_rule_items: ListConnectionWithTotalCount[ProductPropertiesRuleItemType] = connection()

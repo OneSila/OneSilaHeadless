@@ -1,9 +1,10 @@
 from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
 from properties.models import Property, PropertyTranslation, PropertySelectValue, ProductProperty, ProductPropertyTextTranslation, \
-    PropertySelectValueTranslation
+    PropertySelectValueTranslation, ProductPropertiesRule, ProductPropertiesRuleItem
 from properties.schema.types.types import PropertyType, PropertyTranslationType, \
-    PropertySelectValueType, ProductPropertyType, ProductPropertyTextTranslationType, PropertySelectValueTranslationType
+    PropertySelectValueType, ProductPropertyType, ProductPropertyTextTranslationType, PropertySelectValueTranslationType, ProductPropertiesRuleType, \
+    ProductPropertiesRuleItemType
 
 
 @type(name="Subscription")
@@ -38,3 +39,12 @@ class PropertiesSubscription:
         async for i in model_subscriber(info=info, pk=pk, model=PropertySelectValueTranslation):
             yield i
 
+    @subscription
+    async def product_properties_rule(self, info: Info, pk: str) -> AsyncGenerator[ProductPropertiesRuleType, None]:
+        async for i in model_subscriber(info=info, pk=pk, model=ProductPropertiesRule):
+            yield i
+
+    @subscription
+    async def product_properties_rule_item(self, info: Info, pk: str) -> AsyncGenerator[ProductPropertiesRuleItemType, None]:
+        async for i in model_subscriber(info=info, pk=pk, model=ProductPropertiesRuleItem):
+            yield i
