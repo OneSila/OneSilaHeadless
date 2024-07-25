@@ -10,7 +10,7 @@ from properties.schema.types.types import PropertyType, PropertyTranslationType,
 @type(name="Subscription")
 class PropertiesSubscription:
     @subscription
-    async def property(self, info: Info, pk: str) -> AsyncGenerator[PropertyTranslationType, None]:
+    async def property(self, info: Info, pk: str) -> AsyncGenerator[PropertyType, None]:
         async for i in model_subscriber(info=info, pk=pk, model=Property):
             yield i
 

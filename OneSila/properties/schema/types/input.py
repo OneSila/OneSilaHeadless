@@ -1,3 +1,5 @@
+from typing import List, Optional
+
 from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial
 
@@ -45,12 +47,11 @@ class PropertySelectValueTranslationPartialInput(NodeInput):
 
 @input(ProductProperty, fields="__all__")
 class ProductPropertyInput:
-    pass
-
+    value_multi_select: Optional[List[PropertySelectValuePartialInput]]
 
 @partial(ProductProperty, fields="__all__")
 class ProductPropertyPartialInput(NodeInput):
-    pass
+    value_multi_select: Optional[List[PropertySelectValuePartialInput]]
 
 @input(ProductPropertyTextTranslation, fields="__all__")
 class ProductPropertyTextTranslationInput:

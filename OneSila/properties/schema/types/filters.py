@@ -52,12 +52,14 @@ class PropertyTranslationFilter:
 @filter(ProductPropertyTextTranslation)
 class ProductPropertyTextTranslationFilter:
     id: auto
+    language: auto
     product_property: Optional[ProductPropertyFilter]
 
 @filter(ProductPropertiesRule)
 class ProductPropertiesRuleFilter:
     id: auto
     product_type: Optional[PropertyFilter]
+    search: str | None
 
 @filter(ProductPropertiesRuleItem)
 class ProductPropertiesRuleItemFilter:
