@@ -53,45 +53,6 @@ class SalesPrice(models.Model):
         if self.rrp is None and self.price is None:
             raise ValidationError(_("You need to supply either RRP or Price."))
 
-    @property
-    def tax_rate(self):
-        return self.product.taxassign.tax.rate
-
-    @property
-    def rrp_ex_vat(self):
-        '''
-        Prices are incl VAT.  Calculate and return the net amount.
-        '''
-        return self.rrp - (self.rrp / self.tax_rate)
-
-    @property
-    def parent_aware_rrp(self):
-        '''
-        If the currency has a parent, then one needs this price to calculate
-        the new price
-        '''
-        try:
-            sales_price = self.currency.inherits_from.salesprice_set.get(product=self.product)
-            return sales_price.rrp
-        except AttributeError:  # happens when iherits_from is null
-            return self.rrp
-        except self.DoesNotExist:
-            return None
-
-    @property
-    def parent_aware_price(self):
-        '''
-        If the currency has a parent, then one needs this price to calculate
-        the new price
-        '''
-        try:
-            sales_price = self.currency.inherits_from.salesprice_set.get(product=self.product)
-            return sales_price.price
-        except AttributeError:  # happens when iherits_from is null, or in other words you are the parent.
-            return self.price
-        except self.DoesNotExist:
-            return None
-
     def highest_price(self):
         return max([self.rrp or 0, self.price or 0])
 
@@ -111,6 +72,7 @@ class SalesPriceList(models.Model):
     customers = models.ManyToManyField('contacts.Company', blank=True)
 
     # FIXME: What happens if the relevant pricelist doesnt match with the customer currency
+    # Answer: The order should be set the the detected pricelist currency
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
     vat_included = models.BooleanField(_("Price list includes VAT"),
         default=False)
@@ -123,12 +85,6 @@ class SalesPriceList(models.Model):
     notes = models.TextField(blank=True, null=True)
 
     objects = SalesPriceListManager()
-
-    def get_discount(self):
-        if self.price_list.auto_price_mode:
-            return self.discount_override or self.discount_auto
-        else:
-            return self.discount_override
 
     def __str__(self):
         return '{} {}'.format(self.name, self.currency)
@@ -150,16 +106,6 @@ class SalesPriceListItem(models.Model):
 
     def __str__(self):
         return '{} {}'.format(self.product, self.salespricelist)
-
-    def set_new_salesprice(self, new_price):
-        self.salesprice = new_price
-        self.save()
-
-    @property
-    def retail_price(self):
-        '''return the currency aware retail price'''
-        return self.product.salesprice_set.get_currency_price(
-            self.salespricelist.currency.iso_code)
 
     class Meta:
         unique_together = ('product', 'salespricelist', 'multi_tenant_company')

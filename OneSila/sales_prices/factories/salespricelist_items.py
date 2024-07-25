@@ -40,6 +40,9 @@ class SalesPriceItemAutoPriceUpdateMixin:
 
     @staticmethod
     def calculate_price(from_price, conversion_factor, round_prices_up_to, is_discount=True):
+        if conversion_factor == 0:
+            raise ValueError("Conversion Factor cannot be 0. Did you mean None?")
+
         if conversion_factor is None:
             return from_price
 

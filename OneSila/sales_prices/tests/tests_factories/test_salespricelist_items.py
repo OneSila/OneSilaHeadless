@@ -8,6 +8,29 @@ from currencies.currencies import currencies
 
 
 class SalesPriceItemAutoPriceUpdateMixinTestCase(TestCase):
+    def test_calculate_price_no_conversion(self):
+        expected = 100
+        kwargs = {
+            "from_price": expected,
+            "conversion_factor": 0,
+            "round_prices_up_to": None,
+            "is_discount": False
+        }
+
+        with self.assertRaises(ValueError):
+            resp = SalesPriceItemAutoPriceUpdateMixin.calculate_price(**kwargs)
+
+    def test_calculate_price_no_conversion(self):
+        expected = 100
+        kwargs = {
+            "from_price": expected,
+            "conversion_factor": None,
+            "round_prices_up_to": None,
+            "is_discount": False
+        }
+        resp = SalesPriceItemAutoPriceUpdateMixin.calculate_price(**kwargs)
+        self.assertEqual(expected, resp)
+
     def test_calculate_price_price_up(self):
         kwargs = {
             "from_price": 100,
