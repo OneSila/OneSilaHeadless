@@ -3,35 +3,6 @@ from currencies.models import Currency
 from currencies.helpers import roundup
 from sales_prices.models import SalesPriceList, SalesPriceListItem, SalesPrice
 
-"""
-Possible scenarios:
-- B2B client with specific price = manual price update + manual product assign
-- B2C list for BFCM = massive discounts on some products = manual product assign + possible auto-price updates + time restriction
-- B2B list for all customers with fixed discount in another geographical region = auto-price + auto-assign
-
-
-
-A few jobs need doing
-When a price list is created or updated
-- eg discount changed
-- auto flag is changed
-- date range is changed or empty (dont update if in the past)
-- related currency rate is changed
-1. Create SalesPriceListItems if the thing is auto-populate.
-2. Update the prices when currency rates change
-Missing field? include_all_products
-rename field? discount_amount to discount_percentage
-rename Field? auto_update to auto_update_prices? and make discount_percentage dependent on this one?
-
-
-When a SalesPrice is updated
-- update the relevant salespricelist-item price when the lists are set to auto-price updates
-
-When a currency rate is updated:
-- update the relevant prices where the price-list is set to auto-price updates
-
-"""
-
 
 class SalesPriceItemAutoPriceUpdateMixin:
     def run_update_cycle(self):

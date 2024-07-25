@@ -82,6 +82,3 @@ class SalesPriceListItemManager(MultiTenantManager):
     def get_queryset(self):
         return SalesPriceListItemQuerySet(self.model, using=self._db).\
             annotate_prices()
-
-    def get_or_create__with_auto_price(self, product, salespricelist=None):
-        self.get_queryset().get_or_create__with_auto_price(product, salespricelist or self.instance)

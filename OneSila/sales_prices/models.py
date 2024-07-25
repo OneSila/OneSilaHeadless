@@ -53,6 +53,45 @@ class SalesPrice(models.Model):
         if self.rrp is None and self.price is None:
             raise ValidationError(_("You need to supply either RRP or Price."))
 
+    @property
+    def tax_rate(self):
+        return self.product.taxassign.tax.rate
+
+    @property
+    def rrp_ex_vat(self):
+        '''
+        Prices are incl VAT.  Calculate and return the net amount.
+        '''
+        return self.rrp - (self.rrp / self.tax_rate)
+
+    @property
+    def parent_aware_rrp(self):
+        '''
+        If the currency has a parent, then one needs this price to calculate
+        the new price
+        '''
+        try:
+            sales_price = self.currency.inherits_from.salesprice_set.get(product=self.product)
+            return sales_price.rrp
+        except AttributeError:  # happens when iherits_from is null
+            return self.rrp
+        except self.DoesNotExist:
+            return None
+
+    @property
+    def parent_aware_price(self):
+        '''
+        If the currency has a parent, then one needs this price to calculate
+        the new price
+        '''
+        try:
+            sales_price = self.currency.inherits_from.salesprice_set.get(product=self.product)
+            return sales_price.price
+        except AttributeError:  # happens when iherits_from is null, or in other words you are the parent.
+            return self.price
+        except self.DoesNotExist:
+            return None
+
     def highest_price(self):
         return max([self.rrp or 0, self.price or 0])
 
