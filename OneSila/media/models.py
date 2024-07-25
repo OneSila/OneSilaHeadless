@@ -52,6 +52,8 @@ class Media(models.Model):
         null=True, blank=True)
     image_web = ImageSpecField(source='image',
         id='mediapp:image:imagewebspec')
+    onesila_thumbnail = ImageSpecField(source='image',
+        id='mediapp:image:onesilathumbnail')
 
     file = models.FileField(_('File'),
         upload_to='files/', validators=[validate_file_extensions, no_dots_in_filename],
@@ -81,6 +83,12 @@ class Media(models.Model):
     def image_web_url(self):
         if self.image:
             return f"{generate_absolute_url(trailing_slash=False)}{self.image_web.url}"
+
+        return None
+
+    def onesila_thumbnail_url(self):
+        if self.image:
+            return f"{generate_absolute_url(trailing_slash=False)}{self.onesila_thumbnail.url}"
 
         return None
 
