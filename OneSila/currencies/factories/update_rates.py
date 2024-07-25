@@ -20,9 +20,11 @@ class UpdateOfficialRateFactory(UpdateCurrencyPairMixin):
     """
 
     def set_base_currency_queryset(self):
+        # Why not filter on `follow_official_rate`?
+        # We want all currencies to have the right rate in case someone switches settings.
+        # This will also avoid RecursionErrors later down the line.
         self.base_currency_queryset = Currency.objects.\
             filter(
-                follow_official_rate=True,
                 inherits_from__isnull=False
             )
 

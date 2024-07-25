@@ -1,5 +1,6 @@
 from django import dispatch
-from django.db.models.signals import ModelSignal
+from django.db.models.signals import ModelSignal, post_save
+
 
 registered = ModelSignal(use_caching=True)
 invited = ModelSignal(use_caching=True)

@@ -1,4 +1,4 @@
-from core.signals import post_create, post_update
+from core.signals import post_save, post_create
 from django.dispatch import receiver
 from core.models import MultiTenantCompany
 from currencies.models import Currency
@@ -8,8 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# @receiver(post_create, sender=Currency)
-# @receiver(post_update, sender=Currency)
+@receiver(post_create, sender=Currency)
 def currencies__currency__post_create(sender, instance, **kwargs):
     """
     When a currency is created, we want to populate the rates immediately.
