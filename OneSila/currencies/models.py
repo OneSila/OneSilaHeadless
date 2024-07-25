@@ -1,10 +1,12 @@
 from core import models
+from .managers import CurrencyManager
 from django.db.models import Q
 from currencies.signals import exchange_rate_official__pre_save, \
     exchange_rate_official__post_save, exchange_rate__post_save, \
     exchange_rate__pre_save
 from core.decorators import trigger_pre_and_post_save
 from django.utils.translation import gettext_lazy as _
+
 
 class PublicCurrency(models.SharedModel):
     iso_code = models.CharField(max_length=3)
@@ -13,6 +15,7 @@ class PublicCurrency(models.SharedModel):
 
     def __str__(self):
         return self.iso_code
+
 
 class Currency(models.Model):
     '''
@@ -32,6 +35,8 @@ class Currency(models.Model):
     round_prices_up_to = models.IntegerField(default=1, null=True, blank=True)
     is_default_currency = models.BooleanField(default=False)
     comment = models.TextField(null=True, blank=True)
+
+    objects = CurrencyManager()
 
     def __str__(self):
         return self.name
