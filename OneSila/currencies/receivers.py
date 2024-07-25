@@ -1,8 +1,8 @@
 from core.signals import post_save, post_create
 from django.dispatch import receiver
 from core.models import MultiTenantCompany
+from .signals import exchange_rate_change
 from currencies.models import Currency
-from currencies.signals import exchange_rate_official__post_save
 
 import logging
 logger = logging.getLogger(__name__)
