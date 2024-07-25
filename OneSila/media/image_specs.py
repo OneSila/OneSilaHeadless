@@ -5,6 +5,12 @@ from imagekit.utils import get_field_info
 import os
 
 
+class OneSilaThumbnail(ImageSpec):
+    processors = [ResizeToFill(560, 480)]
+    format = 'JPEG'
+    options = {'quality': 60}
+
+
 class ImageWebSpec(ImageSpec):
     '''
     Image spec class to resize images with resizetofit.
@@ -73,3 +79,4 @@ class ImageWebSpec(ImageSpec):
 
 
 register.generator('mediapp:image:imagewebspec', ImageWebSpec)
+register.generator('mediapp:image:onesilathumbnail', OneSilaThumbnail)

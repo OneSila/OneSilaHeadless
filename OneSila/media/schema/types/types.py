@@ -18,6 +18,7 @@ class MediaType(relay.Node, GetQuerysetMultiTenantMixin):
     image_web: DjangoImageType | None
     image_web_url: str | None
     file_url: str | None
+    onesila_thumbnail_url: str | None
     owner: MultiTenantUserType
 
     @field()
@@ -39,6 +40,7 @@ class ImageType(relay.Node, GetQuerysetMultiTenantMixin):
     image_web: DjangoImageType | None
     image_web_url: str | None
     image_url: str | None
+    onesila_thumbnail_url: str | None
     owner: MultiTenantUserType
 
 

@@ -26,3 +26,18 @@ class MediaTestCase(TestCase):
             # Cached images are converted to jpg, no matter what the source.
             self.assertTrue(url.endswith('.jpg'))
             self.assertTrue(url.startswith('http'))
+
+    def test_onesila_thumbnail_url(self):
+        fname = 'red.png'
+        image_path = os.path.join(settings.BASE_DIR.parent, 'core', 'tests', 'image_files', fname)
+        image = baker.make(Media)
+
+        with open(image_path, 'rb') as f:
+            image.image.save(fname, File(f))
+            image.full_clean()
+            image.save()
+            url = image.onesila_thumbnail_url()
+
+            # Cached images are converted to jpg, no matter what the source.
+            self.assertTrue(url.endswith('.jpg'))
+            self.assertTrue(url.startswith('http'))
