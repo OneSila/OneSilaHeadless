@@ -3,7 +3,8 @@ from products.models import SimpleProduct
 from currencies.models import Currency
 from sales_prices.models import SalesPriceList, SalesPriceListItem, SalesPrice
 from sales_prices.factories import SalesPriceForSalesPriceListItemCreateFactory, \
-    SalesPriceListForSalesPriceListItemsCreateUpdateFactory, SalesPriceItemAutoPriceUpdateMixin
+    SalesPriceListForSalesPriceListItemsCreateUpdateFactory, SalesPriceItemAutoPriceUpdateMixin, \
+    SalesPriceListForSalesPriceListItemUpdatePricesFactory, SalesPriceForSalesPriceListItemUpdatePricesFactory
 from currencies.currencies import currencies
 
 
@@ -208,3 +209,11 @@ class SalesPriceForSalesPriceListItemCreateFactoryTestCase(TestCase):
         self.assertFalse(price_list_gbp_nonauto.salespricelistitem_set.filter(product=product).exists())
         self.assertTrue(price_list_eur_auto.salespricelistitem_set.filter(product=product).exists())
         self.assertFalse(price_list_eur_nonauto.salespricelistitem_set.filter(product=product).exists())
+
+        # We also want to ensure the change factory runs without breakage
+        f = SalesPriceListForSalesPriceListItemUpdatePricesFactory(price_list_gbp_auto)
+        f.run()
+
+        # Let's also ensure the update happen when a salesprice changes
+        f = SalesPriceForSalesPriceListItemUpdatePricesFactory(salesprice_gbp)
+        f.run()

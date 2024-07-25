@@ -66,7 +66,7 @@ class SalesPriceItemAutoPriceUpdateMixin:
 
 class SalesPriceListForSalesPriceListItemUpdatePricesFactory(SalesPriceItemAutoPriceUpdateMixin):
     """
-    When a salesprice is adjusted, we need to revisit all attached
+    When a salespricelist is adjusted, we need to revisit all attached
     salespricelistitem items if auto-price-update is switched on.
     """
 
@@ -182,47 +182,47 @@ class SalesPriceListForSalesPriceListItemsCreateUpdateFactory:
             self.create_salespricelistpriceitems()
 
 
-class SalesPriceGenerator:
-    """
-    this generator is used to generate demo-data.
-    """
+# class SalesPriceGenerator:
+#     """
+#     this generator is used to generate demo-data.
+#     """
 
-    def __init__(self, name, discount, currency_iso, product_list):
-        self.currency = Currency.objects.get(iso_code=currency_iso)
-        self.name = name
-        self.discount = discount
-        self.product_list = product_list
+#     def __init__(self, name, discount, currency_iso, product_list):
+#         self.currency = Currency.objects.get(iso_code=currency_iso)
+#         self.name = name
+#         self.discount = discount
+#         self.product_list = product_list
 
-    def _create_pricelist(self):
-        self.salespricelist = SalesPriceList.objects.create(
-            name=self.name,
-            currency=self.currency,
-            discount=self.discount)
+#     def _create_pricelist(self):
+#         self.salespricelist = SalesPriceList.objects.create(
+#             name=self.name,
+#             currency=self.currency,
+#             discount=self.discount)
 
-    def _destroy_pricelist(self):
-        self.salespricelist.delete()
+#     def _destroy_pricelist(self):
+#         self.salespricelist.delete()
 
-    def _create_pricelistitem(self, product):
-        try:
-            ori_price = product.salesprice_set.get_currency_price(self.currency.iso_code).amount
-            new_price = ori_price - ori_price * (self.discount / 100)
+#     def _create_pricelistitem(self, product):
+#         try:
+#             ori_price = product.salesprice_set.get_currency_price(self.currency.iso_code).amount
+#             new_price = ori_price - ori_price * (self.discount / 100)
 
-            SalesPriceListItem.objects.create(
-                salespricelist=self.salespricelist,
-                product=product,
-                salesprice=new_price)
-        except Exception as e:
-            raise Exception('Failed to create item for product {}'.format(product)).with_traceback(e.__traceback__)
+#             SalesPriceListItem.objects.create(
+#                 salespricelist=self.salespricelist,
+#                 product=product,
+#                 salesprice=new_price)
+#         except Exception as e:
+#             raise Exception('Failed to create item for product {}'.format(product)).with_traceback(e.__traceback__)
 
-    def _run_pricelistitems(self):
-        for prod in self.product_list:
-            self._create_pricelistitem(prod)
+#     def _run_pricelistitems(self):
+#         for prod in self.product_list:
+#             self._create_pricelistitem(prod)
 
-    def run(self):
-        self._create_pricelist()
+#     def run(self):
+#         self._create_pricelist()
 
-        try:
-            self._run_pricelistitems()
-        except Exception as e:
-            self._destroy_pricelist()
-            raise
+#         try:
+#             self._run_pricelistitems()
+#         except Exception as e:
+#             self._destroy_pricelist()
+#             raise
