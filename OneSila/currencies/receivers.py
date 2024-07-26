@@ -19,11 +19,6 @@ def currencies__currency__exchange_rate_official__receiver(sender, instance, **k
 
 @receiver(post_save, sender=MultiTenantCompany)
 def currencies__multi_tenant_company__populate_defaults(sender, instance, created, **kwargs):
-    from currencies.currencies import currencies
-
     if created:
-        currency = currencies.get(instance.country, None)
-        if currency:
-            currency['is_default_currency'] = True
-            currency['multi_tenant_company'] = instance
-            Currency.objects.create(**currency)
+        from currencies.flows.default_currency import CreateDefaultCurrencyForMultiTenantCompanyFlow
+        CreateDefaultCurrencyForMultiTenantCompanyFlow(instance).flow()

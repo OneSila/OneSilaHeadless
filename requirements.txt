@@ -29,6 +29,9 @@ faker-commerce
 sentry-sdk[django]
 
 # version stuck to 0.32.1, filters need upgrading before increasing version number
+# also pin the stawberry-graphql version.  Pip doesnt seem to manage to install the right version
+# which causes instability on freshly deployed systems like the auto testing in github.
+# To find the right version, go to the strawberry-graphql-django repo and inpect the peotry.lock file
 strawberry-graphql==0.219.1
 strawberry-graphql-django==0.32.1
 django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absolute_url.git@master

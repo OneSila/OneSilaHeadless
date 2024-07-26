@@ -6,6 +6,7 @@ from currencies.signals import exchange_rate_official__pre_save, \
 from core.decorators import trigger_pre_and_post_save
 from django.utils.translation import gettext_lazy as _
 
+
 class PublicCurrency(models.SharedModel):
     iso_code = models.CharField(max_length=3)
     name = models.CharField(max_length=30)
@@ -13,6 +14,7 @@ class PublicCurrency(models.SharedModel):
 
     def __str__(self):
         return self.iso_code
+
 
 class Currency(models.Model):
     '''

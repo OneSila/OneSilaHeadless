@@ -1,0 +1,11 @@
+[run]
+omit =
+    venv/
+    venv_fabric/
+    tests/*
+    migrations/*
+
+[report]
+show_missing = True
+skip_covered = False
+skip_empty = False
