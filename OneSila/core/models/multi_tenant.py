@@ -78,16 +78,16 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     A: Because starwberry-django will break and rewriting this field is not something
     that's in the cards today.
     '''
-    from core.timezones import TIMEZONE_CHOICES
+    from core.timezones import TIMEZONE_CHOICES, DEFAULT_TIMEZONE
 
-    ADD_COMPANY = 'ADD_COMPANY' # - add owner company + create internal company + internal company address out of it
-    ADD_CURRENCY = 'ADD_CURRENCY' # - add default currency
-    CONFIRM_VAT_RATE = 'CONFIRM_VAT_RATE' # - edit / create VAT Rate
-    CREATE_INVENTORY_LOCATION = 'CREATE_INVENTORY_LOCATION' # add inventory location (can be skipped)
-    GENERATE_DEMO_DATA = 'GENERATE_DEMO_DATA' # - Ask if want demo data
-    DASHBOARD_CARDS_PRESENTATION = 'DASHBOARD_CARDS_PRESENTATION' # Presentation of dashboard Tutorial Carads
-    COMPLETE_DASHBOARD_CARDS = 'COMPLETE_DASHBOARD_CARDS' # Dashboard cards still not completed
-    DONE = 'DONE' # Everything is done
+    ADD_COMPANY = 'ADD_COMPANY'  # - add owner company + create internal company + internal company address out of it
+    ADD_CURRENCY = 'ADD_CURRENCY'  # - add default currency
+    CONFIRM_VAT_RATE = 'CONFIRM_VAT_RATE'  # - edit / create VAT Rate
+    CREATE_INVENTORY_LOCATION = 'CREATE_INVENTORY_LOCATION'  # add inventory location (can be skipped)
+    GENERATE_DEMO_DATA = 'GENERATE_DEMO_DATA'  # - Ask if want demo data
+    DASHBOARD_CARDS_PRESENTATION = 'DASHBOARD_CARDS_PRESENTATION'  # Presentation of dashboard Tutorial Carads
+    COMPLETE_DASHBOARD_CARDS = 'COMPLETE_DASHBOARD_CARDS'  # Dashboard cards still not completed
+    DONE = 'DONE'  # Everything is done
 
     ONBOARDING_STATUS_CHOICES = (
         (GENERATE_DEMO_DATA, _('Generate Demo Data')),
@@ -101,7 +101,6 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     )
 
     LANGUAGE_CHOICES = get_languages()
-    DEFAULT_TIMEZONE = 'Europe/London'
 
     username = models.EmailField(unique=True, help_text=_('Email Address'))
 
@@ -126,7 +125,6 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
                             processors=[ResizeToFill(100, 100)],
                             format='JPEG',
                             options={'quality': 70})
-
 
     def __str__(self):
         return f"{self.username} <{self.multi_tenant_company}>"
@@ -207,4 +205,3 @@ class MultiTenantUserLoginToken(models.Model):
 
     def is_valid(self, now=timezone.now()):
         return self.expires_at >= now
-

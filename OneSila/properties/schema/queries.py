@@ -3,13 +3,14 @@ from typing import List
 
 
 from .types.types import PropertyType, PropertyTranslationType, \
-    PropertySelectValueType, ProductPropertyType
+    PropertySelectValueType, ProductPropertyType, ProductPropertyTextTranslationType, PropertySelectValueTranslationType, ProductPropertiesRuleType, \
+    ProductPropertiesRuleItemType
 
 
 @type(name="Query")
 class PropertiesQuery:
-    property_type: PropertyType = node()
-    property_types: ListConnectionWithTotalCount[PropertyType] = connection()
+    property: PropertyType = node()
+    properties: ListConnectionWithTotalCount[PropertyType] = connection()
 
     property_translation: PropertyTranslationType = node()
     property_translations: ListConnectionWithTotalCount[PropertyTranslationType] = connection()
@@ -17,5 +18,17 @@ class PropertiesQuery:
     property_select_value: PropertySelectValueType = node()
     property_select_values: ListConnectionWithTotalCount[PropertySelectValueType] = connection()
 
-    product_property_type: ProductPropertyType = node()
-    product_property_types: ListConnectionWithTotalCount[ProductPropertyType] = connection()
+    product_property: ProductPropertyType = node()
+    product_properties: ListConnectionWithTotalCount[ProductPropertyType] = connection()
+
+    product_property_text_translation: ProductPropertyTextTranslationType = node()
+    product_property_text_translations: ListConnectionWithTotalCount[ProductPropertyTextTranslationType] = connection()
+
+    property_select_value_translation: PropertySelectValueTranslationType = node()
+    property_select_value_translations: ListConnectionWithTotalCount[PropertySelectValueTranslationType] = connection()
+
+    product_properties_rule: ProductPropertiesRuleType = node()
+    product_properties_rules: ListConnectionWithTotalCount[ProductPropertiesRuleType] = connection()
+
+    product_properties_rule_item: ProductPropertiesRuleItemType = node()
+    product_properties_rule_items: ListConnectionWithTotalCount[ProductPropertiesRuleItemType] = connection()

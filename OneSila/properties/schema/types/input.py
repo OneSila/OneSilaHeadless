@@ -1,13 +1,15 @@
+from typing import List, Optional
+
 from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial
 
 from properties.models import Property, PropertyTranslation, \
-    PropertySelectValue, ProductProperty
+    PropertySelectValue, ProductProperty, ProductPropertyTextTranslation, PropertySelectValueTranslation, ProductPropertiesRule, ProductPropertiesRuleItem
 
 
 @input(Property, fields="__all__")
 class PropertyInput:
-    pass
+    name: str
 
 
 @partial(Property, fields="__all__")
@@ -27,19 +29,51 @@ class PropertyTranslationPartialInput(NodeInput):
 
 @input(PropertySelectValue, fields="__all__")
 class PropertySelectValueInput:
-    pass
+    value: str
 
 
 @partial(PropertySelectValue, fields="__all__")
 class PropertySelectValuePartialInput(NodeInput):
     pass
 
-
-@input(ProductProperty, fields="__all__")
-class ProductPropertyInput:
+@input(PropertySelectValueTranslation, fields="__all__")
+class PropertySelectValueTranslationInput:
     pass
 
 
+@partial(PropertySelectValueTranslation, fields="__all__")
+class PropertySelectValueTranslationPartialInput(NodeInput):
+    pass
+
+@input(ProductProperty, fields="__all__")
+class ProductPropertyInput:
+    value_multi_select: Optional[List[PropertySelectValuePartialInput]]
+
 @partial(ProductProperty, fields="__all__")
 class ProductPropertyPartialInput(NodeInput):
+    value_multi_select: Optional[List[PropertySelectValuePartialInput]]
+
+@input(ProductPropertyTextTranslation, fields="__all__")
+class ProductPropertyTextTranslationInput:
+    pass
+
+
+@partial(ProductPropertyTextTranslation, fields="__all__")
+class ProductPropertyTextTranslationPartialInput(NodeInput):
+    pass
+
+@input(ProductPropertiesRule, fields="__all__")
+class ProductPropertiesRuleInput:
+    pass
+
+@partial(ProductPropertiesRule, fields="__all__")
+class ProductPropertiesRulePartialInput(NodeInput):
+    pass
+
+@input(ProductPropertiesRuleItem, fields="__all__")
+class ProductPropertiesRuleItemInput:
+    pass
+
+@partial(ProductPropertiesRuleItem, fields="__all__")
+class ProductPropertiesRuleItemPartialInput(NodeInput):
     pass
