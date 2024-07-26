@@ -3,10 +3,11 @@ from django.utils.translation import gettext_lazy as _
 
 from properties.managers import PropertyManager
 from translations.models import TranslationFieldsMixin, TranslatedModelMixin
-from builtins import property as django_property # in this file we will use property as django property because we have fields named property
+from builtins import property as django_property  # in this file we will use property as django property because we have fields named property
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
+
 
 class Property(TranslatedModelMixin, models.Model):
     """https://github.com/TweaveTech/django-classifier/blob/master/classifier/models.py"""
@@ -87,6 +88,7 @@ class Property(TranslatedModelMixin, models.Model):
             ),
         ]
 
+
 class PropertyTranslation(TranslationFieldsMixin, models.Model):
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
     name = models.CharField(max_length=200, verbose_name=_('Name'))
@@ -119,7 +121,8 @@ class PropertySelectValueTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         translated_field = 'propertyselectvalue'
         search_terms = ['value']
-        unique_together = ("value", "language", "multi_tenant_company") # added language as well because some words translates the same in different languages
+        unique_together = ("value", "language", "multi_tenant_company")  # added language as well because some words translates the same in different languages
+
 
 class ProductProperty(TranslatedModelMixin, models.Model):
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
@@ -172,6 +175,7 @@ class ProductProperty(TranslatedModelMixin, models.Model):
         verbose_name_plural = _("Product Properties")
         unique_together = ("product", "property")
 
+
 class ProductPropertyTextTranslation(TranslationFieldsMixin, models.Model):
     product_property = models.ForeignKey(ProductProperty, on_delete=models.CASCADE)
     value_text = models.CharField(max_length=255, null=True, blank=True, verbose_name=_('Text'))
@@ -181,6 +185,7 @@ class ProductPropertyTextTranslation(TranslationFieldsMixin, models.Model):
         translated_field = 'product_property'
         search_terms = ['value_text', 'value_description']
         unique_together = ("product_property", "language")
+
 
 class ProductPropertiesRule(models.Model):
     product_type = models.ForeignKey(
@@ -203,6 +208,7 @@ class ProductPropertiesRule(models.Model):
         verbose_name_plural = _("Product Properties Rules")
         unique_together = ("product_type", "multi_tenant_company")
 
+
 class ProductPropertiesRuleItem(models.Model):
     REQUIRED_IN_CONFIGURATOR = 'REQUIRED_IN_CONFIGURATOR'
     OPTIONAL_IN_CONFIGURATOR = 'OPTIONAL_IN_CONFIGURATOR'
@@ -216,7 +222,7 @@ class ProductPropertiesRuleItem(models.Model):
         (OPTIONAL, _('Optional')),
     ]
 
-    rule = models.ForeignKey(ProductPropertiesRule, related_name='items', on_delete=models.PROTECT, verbose_name=_('Rule'))
+    rule = models.ForeignKey(ProductPropertiesRule, related_name='items', on_delete=models.CASCADE, verbose_name=_('Rule'))
     property = models.ForeignKey(Property, on_delete=models.PROTECT, verbose_name=_('Property'))
     type = models.CharField(max_length=25, choices=RULE_TYPES, verbose_name=_('Type'))
     sort_order = models.PositiveIntegerField(default=0, verbose_name=_('Sort Order'))
