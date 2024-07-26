@@ -5,27 +5,27 @@ from products.models import SupplierPrices
 from units.models import Unit
 
 
-class CreateProductMutation(CreateMutation):
-    def create(self, data: dict[str, Any], *, info: Info):
-        from products.models import ProductTranslation
+# class CreateProductMutation(CreateMutation):
+#     def create(self, data: dict[str, Any], *, info: Info):
+#         from products.models import ProductTranslation
 
-        with DjangoOptimizerExtension.disabled():
+#         with DjangoOptimizerExtension.disabled():
 
-            multi_tenant_company = self.get_multi_tenant_company(info, fail_silently=False)
-            language = multi_tenant_company.language
+#             multi_tenant_company = self.get_multi_tenant_company(info, fail_silently=False)
+#             language = multi_tenant_company.language
 
-            data['multi_tenant_company'] = multi_tenant_company
+#             data['multi_tenant_company'] = multi_tenant_company
 
-            product = super().create(data=data, info=info)
+#             product = super().create(data=data, info=info)
 
-            ProductTranslation.objects.create(
-                product=product,
-                language=language,
-                name=data['name'],
-                multi_tenant_company=multi_tenant_company,
-            )
-            product.refresh_from_db()
-            return product
+#             ProductTranslation.objects.create(
+#                 product=product,
+#                 language=language,
+#                 name=data['name'],
+#                 multi_tenant_company=multi_tenant_company,
+#             )
+#             product.refresh_from_db()
+#             return product
 
 
 class CreateSupplierProductMutation(CreateProductMutation):

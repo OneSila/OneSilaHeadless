@@ -16,6 +16,7 @@ from currencies.schema import CurrenciesQuery, CurrenciesMutation, CurrenciesSub
 from customs.schema import CustomsQuery, CustomsMutation, CustomsSubscription
 from eancodes.schema import EanCodesQuery, EanCodesMutation, EanCodesSubscription
 from inventory.schema import InventoryQuery, InventoryMutation, InventorySubscription
+from lead_times.schema import LeadTimesQuery, LeadTimesMutation, LeadTimesSubscription
 from media.schema import MediaQuery, MediaMutation, MediaSubscription
 from orders.schema import OrdersQuery, OrdersMutation, OrdersSubscription
 from products.schema import ProductsQuery, ProductsMutation, ProductsSubscription
