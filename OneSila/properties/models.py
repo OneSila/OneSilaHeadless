@@ -191,11 +191,11 @@ class ProductPropertiesRule(models.Model):
     product_type = models.ForeignKey(
         PropertySelectValue,
         on_delete=models.PROTECT,
-        verbose_name=_('Product Type')
+        verbose_name=_('Product Type'),
     )
 
     def __str__(self):
-        return f"{self.product_type} < {self.multi_tenant_company}>"
+        return f"{self.product_type} <{self.multi_tenant_company}>"
 
     def save(self, *args, **kwargs):
 
@@ -243,7 +243,7 @@ class ProductPropertiesRuleItem(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.rule} - {self.property} ({self.type})"
+        return f"{self.property} <{self.rule.product_type}>"
 
     class Meta:
         verbose_name_plural = _("Product Properties Rule Items")
