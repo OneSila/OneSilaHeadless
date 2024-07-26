@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 @receiver(exchange_rate_change, sender=SalesPrice)
 @receiver(post_save, sender=SalesPrice)
-def sales_prices__salesprice__post_save(sender, instance, created, **kwargs):
+def sales_prices__salesprice__post_save(sender, instance, created=False, **kwargs):
     """
     Time to populate the prices
     """
