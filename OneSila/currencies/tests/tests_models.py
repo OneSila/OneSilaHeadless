@@ -30,7 +30,7 @@ class CurrencyTestCase(TestCase):
             raise
 
         try:
-            currency_mtc_two = Currency.objects.get_or_create(
+            currency_mtc_two, _ = Currency.objects.get_or_create(
                 **currencies['PL'],
                 is_default_currency=True, follow_official_rate=True, multi_tenant_company=mtc)
             self.fail("You should not be able to create two default currencies under the same multi_tenant_company")
