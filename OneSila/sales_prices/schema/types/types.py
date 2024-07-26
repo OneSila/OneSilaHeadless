@@ -1,5 +1,5 @@
 from contacts.schema.types.types import CompanyType
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin
+from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field
 
 from typing import List, Optional
 
@@ -30,3 +30,11 @@ class SalesPriceListType(relay.Node, GetQuerysetMultiTenantMixin):
 class SalesPriceListItemType(relay.Node, GetQuerysetMultiTenantMixin):
     product: ProductType
     salespricelist: SalesPriceListType
+
+    @field
+    def price(self) -> float:
+        return self.price
+
+    @field
+    def discount(self) -> float:
+        return self.discount
