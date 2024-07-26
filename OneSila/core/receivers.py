@@ -21,7 +21,7 @@ def core__subscription__post_save(sender, instance, **kwargs):
 
 
 @receiver(post_save)
-def core__post_create_update_triggres(sender, instance, created, **kwargs):
+def core__post_create_update_triggers(sender, instance, created, **kwargs):
     """
     Let's create some new signals to handle cleaner create/update for cleaner controle.
     """

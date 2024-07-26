@@ -21,7 +21,7 @@ class PropertyQuerySet(MultiTenantQuerySet):
 
         property_instance = self.create(
             type='SELECT', # we are using the text instead the constant because it created issues in the migration command
-            is_public_information=False,
+            is_public_information=True,
             is_product_type=True,
             internal_name=internal_name,
             multi_tenant_company=multi_tenant_company

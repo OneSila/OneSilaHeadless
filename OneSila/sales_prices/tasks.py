@@ -20,18 +20,31 @@ def salesprice__currency_change__task(currency):
     salesprice_currency_change_flow(currency)
 
 
-# @db_task()
-# def salespricelistitem__update_task(sales_price_id):
-#     '''
-#     grab the product, find the mathing salespricelistitems and update them if the pricelist
-#     has the auto_update flag
-#     '''
-#     from .factories import SalesPriceListItemGeneratorUpdater
-#     from products.models import Product
+@db_task()
+def salesprice__create_for_currency__task(currency):
+    from sales_prices.flows import salesprice_create_for_currency_flow
+    salesprice_create_for_currency_flow(currency)
 
-#     product = Product.objects.get(salesprice__id=sales_price_id)
-#     salespricelistitems = product.salespricelistitem_set.filter(salespricelist__auto_update=True)
 
-#     for i in salespricelistitems:
-#         fac = SalesPriceListItemGeneratorUpdater(i.salespricelist, i.product)
-#         fac.run()
+@db_task()
+def salespricelistitem__create_for_salespricelist__task(salespricelist):
+    from sales_prices.flows import sales_price_list__salespricelistitem__create_update_flow
+    sales_price_list__salespricelistitem__create_update_flow(salespricelist)
+
+
+@db_task()
+def salespricelistitem__create_for_salesprice__task(sales_price):
+    from sales_prices.flows import sales_price__salespricelistitem__create_update_flow
+    sales_price__salespricelistitem__create_update_flow(sales_price)
+
+
+@db_task()
+def sales_price__salespricelistitem__update_prices_task(sales_price):
+    from sales_prices.flows import sales_price__salespricelistitem__update_prices_flow
+    sales_price__salespricelistitem__update_prices_flow(sales_price)
+
+
+@db_task()
+def sales_price_list__salespricelistitem__update_prices_task(salespricelist):
+    from sales_prices.flows import sales_price_list__salespricelistitem__update_prices_flow
+    sales_price_list__salespricelistitem__update_prices_flow(salespricelist)

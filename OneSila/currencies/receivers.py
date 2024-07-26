@@ -19,10 +19,5 @@ def currencies__currency__post_create(sender, instance, **kwargs):
 
 @receiver(post_create, sender=MultiTenantCompany)
 def currencies__multi_tenant_company__populate_defaults(sender, instance, **kwargs):
-    from currencies.currencies import currencies
-
-    currency = currencies.get(instance.country, None)
-    if currency:
-        currency['is_default_currency'] = True
-        currency['multi_tenant_company'] = instance
-        Currency.objects.create(**currency)
+    from currencies.flows.default_currency import CreateDefaultCurrencyForMultiTenantCompanyFlow
+    CreateDefaultCurrencyForMultiTenantCompanyFlow(instance).flow()

@@ -3,10 +3,11 @@ from django.utils.translation import gettext_lazy as _
 
 from properties.managers import PropertyManager
 from translations.models import TranslationFieldsMixin, TranslatedModelMixin
-from builtins import property as django_property # in this file we will use property as django property because we have fields named property
+from builtins import property as django_property  # in this file we will use property as django property because we have fields named property
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
+
 
 class Property(TranslatedModelMixin, models.Model):
     """https://github.com/TweaveTech/django-classifier/blob/master/classifier/models.py"""
@@ -62,13 +63,13 @@ class Property(TranslatedModelMixin, models.Model):
         return self._get_translated_value(field_name='name', related_name='propertytranslation_set')
 
     def delete(self, *args, **kwargs):
-        if self.is_product_type:
-            raise ValidationError(_("Property with is_product_type=True cannot be deleted."))
+        # if self.is_product_type:
+        #     raise ValidationError(_("Product type cannot be deleted."))
         super().delete(*args, **kwargs)
 
     def save(self, *args, **kwargs):
         if self.pk and self.is_dirty_field('is_product_type'):
-            raise ValidationError(_("is_product_type cannot be changed after creation."))
+            raise ValidationError(_("Product type cannot be changed after creation."))
 
         super().save(*args, **kwargs)
 
@@ -87,17 +88,10 @@ class Property(TranslatedModelMixin, models.Model):
             ),
         ]
 
+
 class PropertyTranslation(TranslationFieldsMixin, models.Model):
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
     name = models.CharField(max_length=200, verbose_name=_('Name'))
-
-    def save(self, *args, **kwargs):
-        # @TODO: Move in singal
-        if not self.property.internal_name:
-            self.property.internal_name = slugify(self.name).replace('-', '_')
-            self.property.save(update_fields=['internal_name'])
-
-        super().save(*args, **kwargs)
 
     class Meta:
         translated_field = 'property'
@@ -106,7 +100,7 @@ class PropertyTranslation(TranslationFieldsMixin, models.Model):
 
 
 class PropertySelectValue(TranslatedModelMixin, models.Model):
-    property = models.ForeignKey(Property, on_delete=models.CASCADE)
+    property = models.ForeignKey(Property, on_delete=models.PROTECT)
     image = models.ForeignKey('media.Image', null=True, blank=True, on_delete=models.CASCADE)
 
     @django_property
@@ -116,6 +110,9 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
     def __str__(self):
         return f"{self.value} <{self.property}>"
 
+    class Meta:
+        search_terms = ['propertyselectvaluetranslation__value']
+
 
 class PropertySelectValueTranslation(TranslationFieldsMixin, models.Model):
     propertyselectvalue = models.ForeignKey(PropertySelectValue, on_delete=models.CASCADE)
@@ -124,7 +121,8 @@ class PropertySelectValueTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         translated_field = 'propertyselectvalue'
         search_terms = ['value']
-        unique_together = ("value", "language", "multi_tenant_company") # added language as well because some words translates the same in different languages
+        unique_together = ("value", "language", "multi_tenant_company")  # added language as well because some words translates the same in different languages
+
 
 class ProductProperty(TranslatedModelMixin, models.Model):
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
@@ -134,8 +132,8 @@ class ProductProperty(TranslatedModelMixin, models.Model):
     value_float = models.FloatField(null=True, blank=True)
     value_date = models.DateField(null=True, blank=True)
     value_datetime = models.DateTimeField(null=True, blank=True)
-    value_select = models.ForeignKey(PropertySelectValue, on_delete=models.CASCADE, related_name='value_select_set')
-    value_multi_select = models.ManyToManyField(PropertySelectValue, related_name='value_multi_select_set')
+    value_select = models.ForeignKey(PropertySelectValue, on_delete=models.CASCADE, related_name='value_select_set', null=True, blank=True)
+    value_multi_select = models.ManyToManyField(PropertySelectValue, related_name='value_multi_select_set', blank=True)
 
     def __str__(self):
         return f"{self.product} < {self.property}>"
@@ -177,6 +175,7 @@ class ProductProperty(TranslatedModelMixin, models.Model):
         verbose_name_plural = _("Product Properties")
         unique_together = ("product", "property")
 
+
 class ProductPropertyTextTranslation(TranslationFieldsMixin, models.Model):
     product_property = models.ForeignKey(ProductProperty, on_delete=models.CASCADE)
     value_text = models.CharField(max_length=255, null=True, blank=True, verbose_name=_('Text'))
@@ -187,10 +186,11 @@ class ProductPropertyTextTranslation(TranslationFieldsMixin, models.Model):
         search_terms = ['value_text', 'value_description']
         unique_together = ("product_property", "language")
 
+
 class ProductPropertiesRule(models.Model):
     product_type = models.ForeignKey(
         PropertySelectValue,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         verbose_name=_('Product Type')
     )
 
@@ -223,7 +223,7 @@ class ProductPropertiesRuleItem(models.Model):
     ]
 
     rule = models.ForeignKey(ProductPropertiesRule, related_name='items', on_delete=models.CASCADE, verbose_name=_('Rule'))
-    property = models.ForeignKey(Property, on_delete=models.CASCADE, verbose_name=_('Property'))
+    property = models.ForeignKey(Property, on_delete=models.PROTECT, verbose_name=_('Property'))
     type = models.CharField(max_length=25, choices=RULE_TYPES, verbose_name=_('Type'))
     sort_order = models.PositiveIntegerField(default=0, verbose_name=_('Sort Order'))
 

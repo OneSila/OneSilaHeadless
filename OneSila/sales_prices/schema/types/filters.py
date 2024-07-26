@@ -15,6 +15,7 @@ class SalesPriceFilter(SearchFilterMixin):
     product: ProductFilter | None
     currency: CurrencyFilter | None
 
+
 @filter(SalesPriceList)
 class SalesPriceListFilter(SearchFilterMixin):
     search: str | None
@@ -22,7 +23,10 @@ class SalesPriceListFilter(SearchFilterMixin):
     name: auto
     currency: Optional[CurrencyFilter]
     vat_included: auto
-    auto_update: auto
+    auto_update_prices: auto
+    auto_add_products: auto
+    start_date: auto
+    end_date: auto
     customers: Optional[CustomerFilter]
     salespricelistitem: Optional[lazy['SalesPriceListItemFilter', "sales_prices.schema.types.filters"]]
 

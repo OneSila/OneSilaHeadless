@@ -36,6 +36,14 @@ class Company(models.Model):
     def __str__(self):
         return self.name
 
+    def set_is_customer(self):
+        self.is_customer = True
+        self.save()
+
+    def set_is_supplier(self):
+        self.is_supplier = True
+        self.save()
+
     class Meta:
         search_terms = ['name']
         unique_together = ("name", "multi_tenant_company")

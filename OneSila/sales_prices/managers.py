@@ -1,4 +1,6 @@
 from core.managers import MultiTenantQuerySet, MultiTenantManager
+from django.db.models import Case, F, When, Value
+
 
 class SalesPriceListQuerySet(MultiTenantQuerySet):
     pass
@@ -7,6 +9,7 @@ class SalesPriceListQuerySet(MultiTenantQuerySet):
 class SalesPriceListManager(MultiTenantManager):
     def get_queryset(self):
         return SalesPriceListQuerySet(self.model, using=self._db)
+
 
 class SalesPriceQuerySet(MultiTenantQuerySet):
     def get_default_price(self):
@@ -18,8 +21,8 @@ class SalesPriceQuerySet(MultiTenantQuerySet):
     def filter_salesprices(self):
         return self.all()
 
-    def filter_auto_update(self):
-        return self.filter(auto_update=True)
+    def filter_auto_update_prices(self):
+        return self.filter(auto_update_prices=True)
 
 
 class SalesPriceManager(MultiTenantManager):
@@ -35,26 +38,47 @@ class SalesPriceManager(MultiTenantManager):
     def filter_salesprices(self):
         return self.get_queryset().filter_salesprices()
 
-    def filter_auto_update(self):
-        return self.get_queryset().filter_auto_update()
+    def filter_auto_update_prices(self):
+        return self.get_queryset().filter_auto_update_prices()
 
 
 class SalesPriceListItemQuerySet(MultiTenantQuerySet):
-    def get_or_create__with_auto_price(self, product, salespricelist):
-        from .factories import SalesPriceListItemGeneratorUpdater
+    def annotate_prices(self):
+        # Let's think about this:
+        # We can have automated pricelists which have auto-prices.
+        # if the pricelist is automated, then field_override matters more
+        # BUT if the price list is not automated, then only the override fields matter.
 
-        if not salespricelist.auto_update:
-            raise TypeError('Salespricelist not marked for auto_update')
+        # Both of this means that if the override contains value, you should give return that
+        # or else you return the auto-price.
 
-        fac = SalesPriceListItemGeneratorUpdater(salespricelist, product)
-        fac.run()
+        # however, if you change the setting of the pricelist from auto to manual, what do you do?
+        # only return the override?  For now, no - let's start off simplified and treat the entire thing
+        # as override over auto.
 
-        return fac.item, fac.item_created
+        return self.annotate(
+            price=Case(
+                When(
+                    salespricelist__auto_update_prices=True,
+                    then=Case(
+                        When(price_override__gt=0, then=F('price_override')),
+                        default=F('price_auto')
+                    )),
+                default=F('price_override'),
+            ),
+            discount=Case(
+                When(
+                    salespricelist__auto_update_prices=True,
+                    then=Case(
+                        When(discount_override__gt=0, then=F('discount_override')),
+                        default=F('discount_auto')
+                    )),
+                default=F('discount_override'),
+            )
+        )
 
 
 class SalesPriceListItemManager(MultiTenantManager):
     def get_queryset(self):
-        return SalesPriceListItemQuerySet(self.model, using=self._db)  # Important!
-
-    def get_or_create__with_auto_price(self, product, salespricelist=None):
-        self.get_queryset().get_or_create__with_auto_price(product, salespricelist or self.instance)
+        return SalesPriceListItemQuerySet(self.model, using=self._db).\
+            annotate_prices()

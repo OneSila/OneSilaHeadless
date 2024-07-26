@@ -3,6 +3,7 @@ from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixi
 from typing import List, Optional
 
 from media.schema.types.types import ImageType
+from products.schema.types.types import ProductType
 from properties.models import Property, PropertyTranslation, \
     PropertySelectValue, ProductProperty, ProductPropertyTextTranslation, PropertySelectValueTranslation, ProductPropertiesRule, ProductPropertiesRuleItem
 from .filters import PropertyFilter, PropertyTranslationFilter, \
@@ -44,22 +45,25 @@ class PropertySelectValueTranslationType(relay.Node, GetQuerysetMultiTenantMixin
 
 @type(ProductProperty, filters=ProductPropertyFilter, order=ProductPropertyOrder, pagination=True, fields="__all__")
 class ProductPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
-    pass
+    product: Optional[ProductType]
+    property: Optional[PropertyType]
+    value_select: Optional[PropertySelectValueType]
+    value_multi_select: List[Annotated['PropertySelectValueType', lazy("properties.schema.types.types")]]
 
 
 @type(ProductPropertyTextTranslation, filters=ProductPropertyTextTranslationFilter, order=ProductPropertyTextTranslationOrder, pagination=True,
       fields="__all__")
 class ProductPropertyTextTranslationType(relay.Node, GetQuerysetMultiTenantMixin):
-    pass
+    product_property: ProductPropertyType
 
 
 @type(ProductPropertiesRule, filters=ProductPropertiesRuleFilter, order=ProductPropertiesRuleOrder, pagination=True, fields="__all__")
-class ProductPropertiesRuleType(relay.Node):
+class ProductPropertiesRuleType(relay.Node, GetQuerysetMultiTenantMixin):
     product_type: PropertySelectValueType
     items: List[Annotated['ProductPropertiesRuleItemType', lazy("properties.schema.types.types")]]
 
 
 @type(ProductPropertiesRuleItem, filters=ProductPropertiesRuleItemFilter, order=ProductPropertiesRuleItemOrder, pagination=True, fields="__all__")
-class ProductPropertiesRuleItemType(relay.Node):
+class ProductPropertiesRuleItemType(relay.Node, GetQuerysetMultiTenantMixin):
     rule: ProductPropertiesRuleType
     property: PropertyType
