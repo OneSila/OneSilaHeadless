@@ -15,6 +15,12 @@ def salesprices__createupdate__task(sales_price):
 
 
 @db_task()
+def salesprice__currency_change__task(currency):
+    from sales_prices.flows import salesprice_currency_change_flow
+    salesprice_currency_change_flow(currency)
+
+
+@db_task()
 def salesprice__create_for_currency__task(currency):
     from sales_prices.flows import salesprice_create_for_currency_flow
     salesprice_create_for_currency_flow(currency)

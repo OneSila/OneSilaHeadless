@@ -45,10 +45,7 @@ class SalesPriceUpdateCreateFactory:
             self._update_create_salesprice(currency)
 
     def get_exchange_rate(self, currency):
-        if currency.follow_official_rate:
-            return currency.exchange_rate_official
-
-        return currency.exchange_rate
+        return currency.rate
 
     def _update_create_salesprice(self, currency):
         rrp = currency_convert(
@@ -79,14 +76,14 @@ class SalesPriceUpdateCreateFactory:
 
             rrp = currency_convert(
                 round_prices_up_to=currency.round_prices_up_to,
-                exchange_rate=currency.exchange_rate,
+                exchange_rate=currency.rate,
                 price=self.sales_price.parent_aware_rrp
             )
 
             if self.sales_price.parent_aware_price:
                 price = currency_convert(
                     round_prices_up_to=currency.round_prices_up_to,
-                    exchange_rate=currency.exchange_rate,
+                    exchange_rate=currency.rate,
                     price=self.sales_price.parent_aware_price
                 )
             else:

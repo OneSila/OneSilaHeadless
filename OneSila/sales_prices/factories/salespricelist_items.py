@@ -35,7 +35,8 @@ class SalesPriceItemAutoPriceUpdateMixin:
         return roundup(to_price, round_prices_up_to)
 
     def get_salesprice(self, salespricelistitem):
-        return salespricelistitem.product.salesprice_set.get(
+        return SalesPrice.objects.get(
+            product=salespricelistitem.product,
             currency=self.currency,
             multi_tenant_company=self.multi_tenant_company)
 
@@ -50,13 +51,13 @@ class SalesPriceItemAutoPriceUpdateMixin:
         highest_price = sales_price.highest_price()
 
         conversion_factor = salespricelistitem.salespricelist.price_change_pcnt
-        salespricelistitem.price = self.calculate_price(highest_price,
+        salespricelistitem.price_auto = self.calculate_price(highest_price,
             conversion_factor=conversion_factor,
             round_prices_up_to=self.currency.round_prices_up_to,
             is_discount=False)
 
         conversion_factor = salespricelistitem.salespricelist.discount_pcnt
-        salespricelistitem.discount = self.calculate_price(highest_price,
+        salespricelistitem.discount_auto = self.calculate_price(highest_price,
             conversion_factor=conversion_factor,
             round_prices_up_to=self.currency.round_prices_up_to,
             is_discount=True)

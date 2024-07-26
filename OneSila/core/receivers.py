@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from core.models.multi_tenant import MultiTenantUser, MultiTenantCompany
-from core.signals import post_create
+from core.signals import post_create, post_update
 from core.schema.core.subscriptions import refresh_subscription_receiver
 
 
@@ -21,6 +21,11 @@ def core__subscription__post_save(sender, instance, **kwargs):
 
 
 @receiver(post_save)
-def core__post_save__trigger(sender, instance, created, **kwargs):
+def core__post_create_update_triggers(sender, instance, created, **kwargs):
+    """
+    Let's create some new signals to handle cleaner create/update for cleaner controle.
+    """
     if created:
-        post_create.send(sender=sender.__class__, instance=instance, **kwargs)
+        post_create.send(sender=instance.__class__, instance=instance)
+    else:
+        post_update.send(sender=instance.__class__, instance=instance)
