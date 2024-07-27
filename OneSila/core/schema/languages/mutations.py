@@ -4,8 +4,8 @@ from core.schema.core.mutations import type, CreateMutation
 
 
 class TranslatableCreateMutation(CreateMutation):
-    def __init__(self, *args, **kwargs, translation_model, translation_field, translation_model_to_model_field):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, extensions, translation_model, translation_field, translation_model_to_model_field, **kwargs):
+        super().__init__(*args, extensions=extensions, **kwargs)
         self.translation_model = translation_model
         self.translation_field = translation_field
         self.translation_model_to_model_field = translation_model_to_model_field

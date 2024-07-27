@@ -3,32 +3,13 @@ from core.schema.core.mutations import Info, Any
 from core.schema.core.mutations import type, CreateMutation
 from products.models import SupplierPrices
 from units.models import Unit
+from core.schema.languages.mutations import TranslatableCreateMutation
 
 
-# class CreateProductMutation(CreateMutation):
-#     def create(self, data: dict[str, Any], *, info: Info):
-#         from products.models import ProductTranslation
+class CreateSupplierProductMutation(TranslatableCreateMutation):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-#         with DjangoOptimizerExtension.disabled():
-
-#             multi_tenant_company = self.get_multi_tenant_company(info, fail_silently=False)
-#             language = multi_tenant_company.language
-
-#             data['multi_tenant_company'] = multi_tenant_company
-
-#             product = super().create(data=data, info=info)
-
-#             ProductTranslation.objects.create(
-#                 product=product,
-#                 language=language,
-#                 name=data['name'],
-#                 multi_tenant_company=multi_tenant_company,
-#             )
-#             product.refresh_from_db()
-#             return product
-
-
-class CreateSupplierProductMutation(CreateProductMutation):
     def create(self, data: dict[str, Any], *, info: Info):
         unit = data.pop('unit', None)
         quantity = data.pop('quantity', None)

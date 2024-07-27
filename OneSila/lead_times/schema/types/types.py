@@ -1,4 +1,5 @@
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin
+from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, \
+    strawberry_type
 
 from typing import List
 
@@ -15,3 +16,9 @@ class LeadTimeType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(LeadTimeTranslation, filters=LeadTimeTranslationFilter, order=LeadTimeTranslationOrder, pagination=True, fields="__all__")
 class LeadTimeTranslationType(relay.Node, GetQuerysetMultiTenantMixin):
     pass
+
+
+@strawberry_type
+class LeadTimeUnitType:
+    code: str
+    name: str
