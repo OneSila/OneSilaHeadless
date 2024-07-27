@@ -7,7 +7,7 @@ from lead_times.models import LeadTime
 
 
 def get_lead_time_units() -> List[LeadTimeUnitType]:
-    return [CountryType(code=code, name=name) for code, name in LeadTime.UNIT_CHOICES]
+    return [LeadTimeUnitType(code=code, name=name) for code, name in LeadTime.UNIT_CHOICES]
 
 
 @type(name="Query")

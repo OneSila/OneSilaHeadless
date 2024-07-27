@@ -6,7 +6,7 @@ from lead_times.models import LeadTime, LeadTimeTranslation
 
 @input(LeadTime, fields="__all__")
 class LeadTimeInput:
-    pass
+    name: str
 
 
 @partial(LeadTime, fields="__all__")

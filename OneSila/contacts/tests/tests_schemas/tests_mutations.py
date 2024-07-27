@@ -21,7 +21,7 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         company_name = 'test_company_create'
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutation,
             variables={"name": company_name}
         )
@@ -46,7 +46,7 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         company_global_id = self.to_global_id(model_class=Company, instance_id=company.id)
         company_name = 'test_company_update'
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutation,
             variables={"id": company_global_id, "name": company_name}
         )
@@ -71,7 +71,7 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         """
         company_name = 'test_supplier'
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutation,
             variables={"name": company_name}
         )
@@ -96,7 +96,7 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         company_global_id = self.to_global_id(model_class=Supplier, instance_id=company.id)
         company_name = 'test_supplier_update'
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutation,
             variables={"name": company_name, "id": company_global_id},
             asserts_errors=False,
@@ -126,7 +126,7 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         company_global_id = self.to_global_id(model_class=Supplier, instance_id=company.id)
         company_name = 'test_company_to_supplier_update'
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutation,
             variables={"name": company_name, "id": company_global_id},
             asserts_errors=False,

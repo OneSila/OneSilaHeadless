@@ -24,7 +24,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         """
         simple_product, _ = SimpleProduct.objects.get_or_create(sku='test_salesprice_none_prices',
             multi_tenant_company=self.multi_tenant_company)
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=query,
             variables={"sku": simple_product.sku},
         )
@@ -43,7 +43,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         """
         currency, _ = Currency.objects.get_or_create(multi_tenant_company=self.multi_tenant_company,
             **currencies['GB'])
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=query,
         )
         currency_id = resp.data['currencies']['edges'][0]['node']['id']
@@ -61,7 +61,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 }
               }
         """
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             asserts_errors=False,
             query=mutation,
             variables={'data': {
@@ -85,7 +85,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 }
               }
         """
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutation,
             variables={'data': {
                 "product": {"id": simple_product_id},
@@ -111,7 +111,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 }
               }
         """
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutation,
             variables={'data': {
                 "product": {"id": simple_product_id},
@@ -139,7 +139,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 }
               }
         """
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutation,
             variables={'data': {
                 "product": {"id": simple_product_id},
@@ -168,7 +168,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 }
               }
         """
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutation,
             asserts_errors=False,
             variables={'data': {

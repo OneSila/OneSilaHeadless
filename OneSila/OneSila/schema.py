@@ -34,7 +34,7 @@ from translations.schema import TranslationsQuery
 
 @strawberry.type
 class Query(ContactsQuery, CurrenciesQuery, CustomsQuery, CountryQuery, EanCodesQuery,
-        InventoryQuery, LanguageQuery, MediaQuery, MultiTenantQuery, OrdersQuery,
+        InventoryQuery, LanguageQuery, LeadTimesQuery, MediaQuery, MultiTenantQuery, OrdersQuery,
         ProductsQuery, PropertiesQuery, PurchasingQuery, SalesPricesQuery, TaxesQuery,
         TimeZoneQuery, UnitsQuery, TranslationsQuery):
     pass
@@ -42,7 +42,7 @@ class Query(ContactsQuery, CurrenciesQuery, CustomsQuery, CountryQuery, EanCodes
 
 @strawberry.type
 class Mutation(ContactsMutation, CurrenciesMutation, CustomsMutation, EanCodesMutation,
-        InventoryMutation, MediaMutation, MultiTenantMutation, OrdersMutation,
+        InventoryMutation, LeadTimesMutation, MediaMutation, MultiTenantMutation, OrdersMutation,
         ProductsMutation, PropertiesMutation, PurchasingMutation, SalesPricesMutation,
         TaxesMutation, UnitsMutation):
     pass
@@ -51,9 +51,10 @@ class Mutation(ContactsMutation, CurrenciesMutation, CustomsMutation, EanCodesMu
 @strawberry.type
 class Subscription(ContactsSubscription, CurrenciesSubscription,
         CustomsSubscription, EanCodesSubscription, InventorySubscription,
-        MediaSubscription, MultiTenantSubscription, OrdersSubscription,
-        ProductsSubscription, PropertiesSubscription, PurchasingSubscription,
-        SalesPriceSubscription, TaxSubscription, UnitsSubscription):
+        LeadTimesSubscription, MediaSubscription, MultiTenantSubscription,
+        OrdersSubscription, ProductsSubscription, PropertiesSubscription,
+        PurchasingSubscription, SalesPriceSubscription, TaxSubscription,
+        UnitsSubscription):
     pass
 
 #

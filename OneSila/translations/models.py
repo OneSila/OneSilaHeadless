@@ -6,6 +6,7 @@ from django.conf import settings
 from core.helpers import get_languages
 from django.db.models import Model as OldModel
 
+
 class TranslationFieldsMixin(models.Model):
     """
     Languages we can translate content into.
@@ -30,9 +31,9 @@ class TranslationFieldsMixin(models.Model):
 
         super().save(*args, **kwargs)
 
-class TranslatedModelMixin(OldModel):
 
-    def _get_translated_value(self, *, field_name, related_name, language=None, fallback=None):
+class TranslatedModelMixin(OldModel):
+    def _get_translated_value(self, *, field_name, language=None, related_name='translations', fallback=None):
         # we use '' (empty string) instead of None here because some of the translated values severs as __str__
         # __str__ can't be None. In the same process we also create the translation but if we have __str__ None then the process will not work
         translated_value = ''

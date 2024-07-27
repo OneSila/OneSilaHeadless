@@ -3,7 +3,7 @@ from core.schema.core.mutations import Info, Any
 from core.schema.core.mutations import type, CreateMutation
 from products.models import SupplierPrices
 from units.models import Unit
-from core.schema.languages.mutations import TranslatableCreateMutation
+from translations.schema.mutations import TranslatableCreateMutation
 
 
 class CreateSupplierProductMutation(TranslatableCreateMutation):

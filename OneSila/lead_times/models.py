@@ -20,6 +20,10 @@ class LeadTime(TranslatedModelMixin, models.Model):
     max_time = models.IntegerField()
     unit = models.CharField(max_length=5, choices=UNIT_CHOICES)
 
+    @property
+    def name(self):
+        return self._get_translated_value(field_name='name')
+
     def __str__(self):
         return f"{self.name}"
 
@@ -29,7 +33,6 @@ class LeadTime(TranslatedModelMixin, models.Model):
 
 class LeadTimeTranslation(TranslationFieldsMixin, models.Model):
     lead_time = models.ForeignKey(LeadTime, on_delete=models.CASCADE, related_name="translations")
-
     name = models.CharField(max_length=100)
 
     def __str__(self):
@@ -37,3 +40,4 @@ class LeadTimeTranslation(TranslationFieldsMixin, models.Model):
 
     class Meta:
         search_terms = ['name']
+        unique_together = ['lead_time', 'language']

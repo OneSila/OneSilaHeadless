@@ -1,7 +1,7 @@
 from products.models import ProductTranslation
 from products.schema.mutations.mutation_classes import CreateSupplierProductMutation
 from products.schema.types.input import ProductInput, SupplierProductInput
-from core.schema.languages.mutations import TranslatableCreateMutation
+from translations.schema.mutations import TranslatableCreateMutation
 from products.schema.mutations.mutation_classes import CreateSupplierProductMutation
 
 
