@@ -30,6 +30,7 @@ SKELETON_STRUCTURE = [
     'schema/types/__init__.py',
     'tests',
     'tests/helpers.py',
+    'tests/__init__.py',
     'tests/tests_schemas/',
     'tests/tests_schemas/__init__.py',
     'tests/tests_schemas/tests_queries.py',
