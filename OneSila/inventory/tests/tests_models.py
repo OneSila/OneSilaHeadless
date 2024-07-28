@@ -1,0 +1,44 @@
+from core.tests import TestCase
+from django.db import IntegrityError
+from inventory.models import Inventory, InventoryLocation
+from products.models import SupplierProduct, UmbrellaProduct, \
+    SimpleProduct, BundleProduct, DropshipProduct, ManufacturableProduct
+
+
+class InventoryTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.inventory_location = InventoryLocation.objects.create(
+            name='InventoryTestCase',
+            multi_tenant_company=self.multi_tenant_company)
+
+    def test_inventory_on_configurable_product(self):
+        prod = UmbrellaProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company)
+        quantity = 10
+
+        with self.assertRaises(IntegrityError):
+            inv = Inventory.objects.create(product=prod,
+                    stocklocation=self.inventory_location,
+                    multi_tenant_company=self.multi_tenant_company,
+                    quantity=quantity)
+
+    def test_inventory_on_manufacturable_product(self):
+        prod = ManufacturableProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company)
+        quantity = 10
+        inv = Inventory.objects.create(product=prod,
+                stocklocation=self.inventory_location,
+                multi_tenant_company=self.multi_tenant_company,
+                quantity=quantity)
+        self.assertEqual(prod.stock.physical(), quantity)
+
+    def test_inventory_on_simple_product(self):
+        prod = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company)
+
+        with self.assertRaises(IntegrityError):
+            Inventory.objects.create(product=prod,
+                stocklocation=self.inventory_location,
+                multi_tenant_company=self.multi_tenant_company,
+                quantity=10)

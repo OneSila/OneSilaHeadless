@@ -24,8 +24,8 @@ class Inventory(models.Model):
         return '{}: {}@{}'.format(self.product, self.stocklocation, self.quantity)
 
     def save(self, *args, **kwargs):
-        if not self.product.is_supplier_product():
-            raise IntegrityError(_("Inventory can only be attached to a SUPPLIER PRODUCT. Not a {}".format(self.product.type)))
+        if not (self.product.is_supplier_product() or self.product.is_manufacturable()):
+            raise IntegrityError(_("Inventory can only be attached to a SUPPLIER or MANUFACTURABLE PRODUCT. Not a {}".format(self.product.type)))
 
         super().save(*args, **kwargs)
 
@@ -42,7 +42,6 @@ class InventoryLocation(models.Model):
     location = models.ForeignKey('contacts.InternalShippingAddress', on_delete=models.CASCADE, null=True)
 
     precise = models.BooleanField(default=False)
-
 
     def __str__(self):
         return self.name
