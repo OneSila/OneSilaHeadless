@@ -37,7 +37,7 @@ class InventoryLocation(models.Model):
     - Location inside of location: Shelf 1, Rack B, Col 3
     Just remember to chain the locatons.
     '''
-    name = models.CharField(max_length=10)
+    name = models.CharField(max_length=20)
     description = models.TextField(null=True, blank=True)
     location = models.ForeignKey('contacts.InternalShippingAddress', on_delete=models.CASCADE, null=True)
 
