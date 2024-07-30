@@ -9,7 +9,7 @@ from contacts.models import ShippingAddress
 class LeadTimeQueriesTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def test_lead_time_create(self):
         query = """
-            mutation createLeadTime($name: String!, $unit: String!, $minTime: Int!, $maxTime: Int!) {
+            mutation createLeadTime($name: String!, $unit: Int!, $minTime: Int!, $maxTime: Int!) {
               createLeadTime(
                 data: {unit: $unit, minTime: $minTime, maxTime: $maxTime, name: $name}
               ) {
@@ -22,7 +22,7 @@ class LeadTimeQueriesTestCase(TransactionTestCaseMixin, TransactionTestCase):
         unit = LeadTime.HOUR
         min_time = 1
         max_time = 2
-        name = "Delivery <2 hours"
+        name = "Delivery <2 hours test"
 
         resp = self.strawberry_test_client(
             query=query,
@@ -40,7 +40,7 @@ class LeadTimeQueriesTestCase(TransactionTestCaseMixin, TransactionTestCase):
 class LeadTimeForShippingAddressTestCase(TestWithDemoDataMixin, TransactionTestCaseMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
-        self.lead_time, _ = LeadTime.objects.get_or_create(min_time=1, max_time=3, unit=LeadTime.DAY,
+        self.lead_time, _ = LeadTime.objects.get_or_create(min_time=1, max_time=10, unit=LeadTime.DAY,
             multi_tenant_company=self.multi_tenant_company)
         self.shipping_address = ShippingAddress.objects.filter(multi_tenant_company=self.multi_tenant_company).last()
 

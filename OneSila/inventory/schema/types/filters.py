@@ -14,7 +14,7 @@ class InventoryLocationFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     exclude_demo_data: Optional[bool]
     id: auto
     name: auto
-    location: Optional[InternalShippingAddressFilter]
+    shippingaddress: Optional[InternalShippingAddressFilter]
 
 
 @filter(Inventory)

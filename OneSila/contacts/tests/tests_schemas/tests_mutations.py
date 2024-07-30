@@ -132,6 +132,8 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             asserts_errors=False,
         )
 
+        print(resp.errors)
+
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
 

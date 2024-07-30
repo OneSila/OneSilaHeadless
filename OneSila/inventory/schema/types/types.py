@@ -11,7 +11,7 @@ from .ordering import InventoryOrder, InventoryLocationOrder
 
 @type(InventoryLocation, filters=InventoryLocationFilter, order=InventoryLocationOrder, pagination=True, fields="__all__")
 class InventoryLocationType(relay.Node, GetQuerysetMultiTenantMixin):
-    location: Optional[InternalShippingAddressType]
+    shippingaddress: Optional[InternalShippingAddressType]
 
 
 @type(Inventory, filters=InventoryFilter, order=InventoryOrder, pagination=True, fields="__all__")

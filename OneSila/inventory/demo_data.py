@@ -18,7 +18,7 @@ class InventoryLocationGenerator(PrivateDataGenerator):
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)
         multi_tenant_company = kwargs['multi_tenant_company']
-        kwargs['location'] = InternalShippingAddress.objects.\
+        kwargs['shippingaddress'] = InternalShippingAddress.objects.\
             filter_multi_tenant(multi_tenant_company).\
             last()
         return kwargs
