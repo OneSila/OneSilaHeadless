@@ -119,9 +119,9 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 }
             }
         """
-        company = Company.objects.create(name='test_company_to_supplier_update_ori', multi_tenant_company=self.multi_tenant_company)
-        company.is_supplier = True
-        company.save()
+        company = Supplier.objects.create(name='test_company_to_supplier_update_ori', multi_tenant_company=self.multi_tenant_company)
+        # company.is_supplier = True
+        # company.save()
 
         company_global_id = self.to_global_id(instance=company)
         company_name = 'test_company_to_supplier_update'
@@ -131,8 +131,6 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             variables={"name": company_name, "id": company_global_id},
             asserts_errors=False,
         )
-
-        print(resp.errors)
 
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
