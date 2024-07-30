@@ -43,7 +43,7 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
         company = Company.objects.create(name='test_company_update_ori', multi_tenant_company=self.multi_tenant_company)
-        company_global_id = self.to_global_id(model_class=Company, instance_id=company.id)
+        company_global_id = self.to_global_id(instance=company)
         company_name = 'test_company_update'
 
         resp = self.strawberry_test_client(
@@ -93,7 +93,7 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
         company = Supplier.objects.create(name='test_supplier_update_ori', multi_tenant_company=self.multi_tenant_company)
-        company_global_id = self.to_global_id(model_class=Supplier, instance_id=company.id)
+        company_global_id = self.to_global_id(instance=company)
         company_name = 'test_supplier_update'
 
         resp = self.strawberry_test_client(
@@ -123,7 +123,7 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         company.is_supplier = True
         company.save()
 
-        company_global_id = self.to_global_id(model_class=Supplier, instance_id=company.id)
+        company_global_id = self.to_global_id(instance=company)
         company_name = 'test_company_to_supplier_update'
 
         resp = self.strawberry_test_client(

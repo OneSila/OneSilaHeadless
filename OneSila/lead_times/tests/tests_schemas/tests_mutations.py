@@ -1,9 +1,9 @@
-from django.test import TestCase, TransactionTestCase
+from core.tests import TestCase, TransactionTestCase, \
+    TransactionTestCaseMixin, TestWithDemoDataMixin
 from model_bakery import baker
 from OneSila.schema import schema
-from core.tests import TestCaseWithDemoData
-from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 from lead_times.models import LeadTime
+from contacts.models import ShippingAddress
 
 
 class LeadTimeQueriesTestCase(TransactionTestCaseMixin, TransactionTestCase):
@@ -35,3 +35,22 @@ class LeadTimeQueriesTestCase(TransactionTestCaseMixin, TransactionTestCase):
         )
         self.assertTrue(resp.errors is None)
         self.assertEqual(resp.data['createLeadTime']['name'], name)
+
+
+class LeadTimeForShippingAddressTestCase(TestWithDemoDataMixin, TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.lead_time, _ = LeadTime.objects.get_or_create(min_time=1, max_time=3, unit=LeadTime.DAY,
+            multi_tenant_company=self.multi_tenant_company)
+        self.shipping_address = ShippingAddress.objects.filter(multi_tenant_company=self.multi_tenant_company).last()
+
+    def test_leadtime_for_shippingaddress(self):
+        from .mutations import create_leadtime_for_shippingaddress
+        from lead_times.schema.types.types import LeadTimeForShippingAddressType, LeadTimeType
+        shippingid = self.to_global_id(instance=self.shipping_address)
+        leadtimeid = self.to_global_id(instance=self.lead_time)
+
+        resp = self.strawberry_test_client(
+            query=create_leadtime_for_shippingaddress,
+            variables={'shippingid': shippingid, 'leadtimeid': leadtimeid})
+        self.assertTrue(resp.errors is None)

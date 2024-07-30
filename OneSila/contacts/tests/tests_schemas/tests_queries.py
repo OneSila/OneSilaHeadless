@@ -79,7 +79,7 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
         company = self.companies[0]
-        company_global_id = self.to_global_id(model_class=Company, instance_id=company.id)
+        company_global_id = self.to_global_id(instance=company)
         resp = self.strawberry_test_client(
             query=query,
             variables={"id": company_global_id}
@@ -135,7 +135,7 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
         supplier = self.suppliers[0]
-        supplier_global_id = self.to_global_id(model_class=Supplier, instance_id=supplier.id)
+        supplier_global_id = self.to_global_id(instance=supplier)
         resp = self.strawberry_test_client(
             query=query,
             variables={"id": supplier_global_id}
@@ -191,7 +191,7 @@ class CustomerQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
         customer = self.customers[0]
-        customer_global_id = self.to_global_id(model_class=Customer, instance_id=customer.id)
+        customer_global_id = self.to_global_id(instance=customer)
         resp = self.strawberry_test_client(
             query=query,
             variables={"id": customer_global_id}

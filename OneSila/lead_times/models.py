@@ -1,6 +1,7 @@
 from core import models
 from django.utils.translation import gettext_lazy as _
 from translations.models import TranslationFieldsMixin, TranslatedModelMixin
+from contacts.models import ShippingAddress
 
 
 class LeadTime(TranslatedModelMixin, models.Model):
@@ -41,3 +42,14 @@ class LeadTimeTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         search_terms = ['name']
         unique_together = ['lead_time', 'language']
+
+
+class LeadTimeForShippingAddress(models.Model):
+    shippingaddress = models.ForeignKey(ShippingAddress, on_delete=models.CASCADE)
+    leadtime = models.ForeignKey(LeadTime, on_delete=models.PROTECT, null=True)
+
+    def __str__(self):
+        return f"{self.shippingaddress} <{self.leadtime.name}>"
+
+    class Meta:
+        unique_together = ['multi_tenant_company', 'shippingaddress', 'leadtime']

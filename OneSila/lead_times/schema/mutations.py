@@ -1,12 +1,12 @@
 from core.schema.core.mutations import type
 from core.schema.core.mutations import create, update, delete, type, List
 
-from .types.types import LeadTimeType, LeadTimeTranslationType
-from .types.input import LeadTimeInput, LeadTimePartialInput, \
-    LeadTimeTranslationInput, LeadTimeTranslationPartialInput
-
 from lead_times.models import LeadTimeTranslation
-from lead_times.schema.types.input import LeadTimeInput
+from .types.types import LeadTimeType, LeadTimeTranslationType, LeadTimeForShippingAddressType
+from .types.input import LeadTimeInput, LeadTimePartialInput, \
+    LeadTimeTranslationInput, LeadTimeTranslationPartialInput, \
+    LeadTimeForShippingAddressInput, LeadTimeForShippingAddressPartialInput
+
 from translations.schema.mutations import TranslatableCreateMutation
 
 
@@ -32,3 +32,9 @@ class LeadTimesMutation:
     update_lead_time_translation: LeadTimeTranslationType = update(LeadTimeTranslationPartialInput)
     delete_lead_time_translation: LeadTimeTranslationType = delete()
     delete_lead_time_translations: List[LeadTimeTranslationType] = delete()
+
+    create_lead_time_for_shippingaddress: LeadTimeForShippingAddressType = create(LeadTimeForShippingAddressInput)
+    create_lead_time_for_shippingaddresses: List[LeadTimeForShippingAddressType] = create(LeadTimeForShippingAddressInput)
+    update_lead_time_for_shippingaddress: LeadTimeForShippingAddressType = update(LeadTimeForShippingAddressPartialInput)
+    delete_lead_time_for_shippingaddress: LeadTimeForShippingAddressType = delete()
+    delete_lead_times_for_shippingaddress: List[LeadTimeForShippingAddressType] = delete()

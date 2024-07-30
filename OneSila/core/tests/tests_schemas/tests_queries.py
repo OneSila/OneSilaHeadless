@@ -14,9 +14,9 @@ class TransactionTestCaseMixin:
         self.multi_tenant_company = baker.make(MultiTenantCompany)
         self.user = baker.make(get_user_model(), multi_tenant_company=self.multi_tenant_company)
 
-    def to_global_id(self, *, model_class, instance_id):
-        type_name = f"{model_class.__name__}Type"
-        return to_base64(type_name, instance_id)
+    def to_global_id(self, *, instance):
+        type_name = f"{instance.__class__.__name__}Type"
+        return to_base64(type_name, instance.id)
 
     def strawberry_raw_client(self):
         return TestClient('/graphql/')

@@ -2,8 +2,8 @@ from core.schema.core.queries import node, connection, ListConnectionWithTotalCo
     anonymous_field
 from typing import List
 
-from .types.types import LeadTimeType, LeadTimeTranslationType, LeadTimeUnitType
-from lead_times.models import LeadTime
+from .types.types import LeadTimeType, LeadTimeTranslationType, LeadTimeUnitType, LeadTimeForShippingAddressType
+from lead_times.models import LeadTime, LeadTimeForShippingAddress
 
 
 def get_lead_time_units() -> List[LeadTimeUnitType]:
@@ -19,3 +19,6 @@ class LeadTimesQuery:
     lead_time_translations: ListConnectionWithTotalCount[LeadTimeTranslationType] = connection()
 
     lead_time_units: List[LeadTimeUnitType] = anonymous_field(resolver=get_lead_time_units)
+
+    lead_time_for_shippingaddress: LeadTimeForShippingAddressType = node()
+    lead_time_for_shippingaddresses: ListConnectionWithTotalCount[LeadTimeForShippingAddressType] = connection()
