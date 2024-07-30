@@ -52,7 +52,7 @@ class InventoryQuerySet(MultiTenantQuerySet):
 
     def salable(self):
         """Items that are available for sale"""
-        if self._hints['instance'].product.always_on_stock:
+        if self._hints['instance'].product.allow_backorder:
             return 99999
 
         return self.physical() - self.reserved()

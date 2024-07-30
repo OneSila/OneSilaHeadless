@@ -25,8 +25,8 @@ class Product(TranslatedModelMixin, models.Model):
     vat_rate = models.ForeignKey(VatRate, on_delete=models.PROTECT, null=True, blank=True)
     for_sale = models.BooleanField(default=True)
 
-    # for simple products
-    always_on_stock = models.BooleanField(default=False)
+    # for simple and dropshipping products, meaning allow product to be sold even when no physical stock is present.
+    allow_backorder = models.BooleanField(default=False)
 
     # Supplier Product Fields
     supplier = models.ForeignKey('contacts.Company', on_delete=models.CASCADE, null=True, blank=True)

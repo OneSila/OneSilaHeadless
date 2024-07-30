@@ -14,7 +14,7 @@ class ProductDataGenerator(PrivateDataGenerator):
     model = Product
     count = 100
     field_mapper = {
-        'always_on_stock': fake.boolean,
+        'allow_backorder': fake.boolean,
         'active': fake.boolean,
         'for_sale': True,
     }

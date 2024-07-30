@@ -6,6 +6,19 @@ from .tests_models import InventoryTestCaseMixin
 
 
 class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
+    def test_reserved_zero(self):
+        simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier.base_products.add(simple)
+
+        qty = 1223
+        Inventory.objects.create(inventorylocation=self.inventory_location,
+            quantity=qty,
+            multi_tenant_company=self.multi_tenant_company,
+            product=supplier)
+
+        self.assertEqual(simple.inventory.reserved(), 0)
+
     def test_physical_simple_physical(self):
         simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
