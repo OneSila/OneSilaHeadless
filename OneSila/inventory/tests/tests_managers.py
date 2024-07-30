@@ -2,15 +2,10 @@ from core.tests import TestCase
 from inventory.models import InventoryLocation, Inventory
 from products.models import SimpleProduct, SupplierProduct, BundleProduct, \
     DropshipProduct, UmbrellaProduct, ManufacturableProduct, BundleVariation
+from .tests_models import InventoryTestCaseMixin
 
 
-class InventoryQuerySetPhysicalTestCase(TestCase):
-    def setUp(self):
-        super().setUp()
-        self.inventory_location, _ = InventoryLocation.objects.get_or_create(
-            name='InventoryQuerySetPhysicalTestCase',
-            multi_tenant_company=self.multi_tenant_company)
-
+class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
     def test_physical_simple_physical(self):
         simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)

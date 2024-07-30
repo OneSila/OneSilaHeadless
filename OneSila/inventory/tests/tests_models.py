@@ -5,13 +5,15 @@ from products.models import SupplierProduct, UmbrellaProduct, \
     SimpleProduct, BundleProduct, DropshipProduct, ManufacturableProduct
 
 
-class InventoryTestCase(TestCase):
+class InventoryTestCaseMixin:
     def setUp(self):
         super().setUp()
         self.inventory_location, _ = InventoryLocation.objects.get_or_create(
             name='InventoryTestCase',
             multi_tenant_company=self.multi_tenant_company)
 
+
+class InventoryTestCase(InventoryTestCaseMixin, TestCase):
     def test_inventory_on_configurable_product(self):
         prod = UmbrellaProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company)
