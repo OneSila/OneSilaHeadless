@@ -8,7 +8,7 @@ from products.models import SupplierProduct, UmbrellaProduct, \
 class InventoryTestCase(TestCase):
     def setUp(self):
         super().setUp()
-        self.inventory_location = InventoryLocation.objects.create(
+        self.inventory_location, _ = InventoryLocation.objects.get_or_create(
             name='InventoryTestCase',
             multi_tenant_company=self.multi_tenant_company)
 
@@ -19,7 +19,7 @@ class InventoryTestCase(TestCase):
 
         with self.assertRaises(IntegrityError):
             inv = Inventory.objects.create(product=prod,
-                    stocklocation=self.inventory_location,
+                    inventorylocation=self.inventory_location,
                     multi_tenant_company=self.multi_tenant_company,
                     quantity=quantity)
 
@@ -28,10 +28,10 @@ class InventoryTestCase(TestCase):
             multi_tenant_company=self.multi_tenant_company)
         quantity = 10
         inv = Inventory.objects.create(product=prod,
-                stocklocation=self.inventory_location,
+                inventorylocation=self.inventory_location,
                 multi_tenant_company=self.multi_tenant_company,
                 quantity=quantity)
-        self.assertEqual(prod.stock.physical(), quantity)
+        self.assertEqual(prod.inventory.physical(), quantity)
 
     def test_inventory_on_simple_product(self):
         prod = SimpleProduct.objects.create(
@@ -39,6 +39,6 @@ class InventoryTestCase(TestCase):
 
         with self.assertRaises(IntegrityError):
             Inventory.objects.create(product=prod,
-                stocklocation=self.inventory_location,
+                inventorylocation=self.inventory_location,
                 multi_tenant_company=self.multi_tenant_company,
                 quantity=10)

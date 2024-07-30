@@ -22,5 +22,5 @@ class InventoryFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     search: str | None
     exclude_demo_data: Optional[bool]
     id: auto
-    stocklocation: InventoryLocationFilter | None
+    inventorylocation: InventoryLocationFilter | None
     product: SupplierProductFilter | None

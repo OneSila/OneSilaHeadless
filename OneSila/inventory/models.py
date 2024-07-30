@@ -9,19 +9,19 @@ class Inventory(models.Model):
     Class to store quantity of products on stock
     '''
     product = models.ForeignKey('products.Product', on_delete=models.PROTECT,
-        related_name='stock')
-    stocklocation = models.ForeignKey('InventoryLocation', on_delete=models.PROTECT)
+        related_name='inventory')
+    inventorylocation = models.ForeignKey('InventoryLocation', on_delete=models.PROTECT)
     quantity = models.IntegerField()
 
     objects = InventoryManager()
 
     class Meta:
-        search_terms = ['product__sku', 'stocklocation__name', 'product__supplier__name']
-        unique_together = ('product', 'stocklocation')
+        search_terms = ['product__sku', 'inventorylocation__name', 'product__supplier__name']
+        unique_together = ('product', 'inventorylocation')
         verbose_name_plural = "inventories"
 
     def __str__(self):
-        return '{}: {}@{}'.format(self.product, self.stocklocation, self.quantity)
+        return '{}: {}@{}'.format(self.product, self.inventorylocation, self.quantity)
 
     def save(self, *args, **kwargs):
         if not (self.product.is_supplier_product() or self.product.is_manufacturable()):

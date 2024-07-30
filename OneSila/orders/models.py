@@ -173,7 +173,7 @@ class OrderItem(models.Model):
                 order__id__lt=self.order.id,
                 product=self.product).exclude(order__status__in=Order.DONE_TYPES)
             older_required_quantity = sum([i.quantity for i in older_orderitems_with_identical_items])
-            return self.product.stock.physical() - older_required_quantity
+            return self.product.inventory.physical() - older_required_quantity
 
     @property
     def value_gbp(self):

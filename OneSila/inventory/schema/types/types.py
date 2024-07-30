@@ -17,4 +17,4 @@ class InventoryLocationType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(Inventory, filters=InventoryFilter, order=InventoryOrder, pagination=True, fields="__all__")
 class InventoryType(relay.Node, GetQuerysetMultiTenantMixin):
     product: ProductType
-    stocklocation: InventoryLocationType
+    inventorylocation: InventoryLocationType

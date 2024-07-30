@@ -64,11 +64,11 @@ class Product(TranslatedModelMixin, models.Model):
     supplier_products = SupplierProductManager()
 
     @property
-    def name(self, language=None):
-        return self._get_translated_value(field_name='name', related_name='translations', language=language, fallback='sku')
+    def name(self):
+        return self._get_translated_value(field_name='name', related_name='translations', fallback='sku')
 
     def __str__(self):
-        return f"{self.name}"
+        return f"{self.name} <{self.sku}>"
 
     def set_active(self):
         self.active = True
@@ -295,7 +295,6 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
             self.url_key = self._get_default_url_key()
 
         super().save(*args, **kwargs)
-
 
     class Meta:
         translated_field = 'product'
