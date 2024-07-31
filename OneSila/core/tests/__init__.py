@@ -36,6 +36,7 @@ class TestWithDemoDataMixin:
 
     def tearDown(self):
         self.demo_data_registry.delete_demo_data(multi_tenant_company=self.multi_tenant_company)
+        self.demo_data_generated = False
 
 
 class TestCaseWithDemoData(TestWithDemoDataMixin, TestCase):

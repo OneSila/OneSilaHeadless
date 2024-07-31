@@ -12,8 +12,10 @@ from faker.providers import DynamicProvider, BaseProvider
 import faker_commerce
 from core.countries import COUNTRY_CHOICES, num_countries
 import types
-
 from products.models import Product
+
+import logging
+logger = logging.getLogger(__name__)
 
 fake = Faker()
 
@@ -171,6 +173,7 @@ class DemoDataGeneratorMixin:
     # }
     # model = Model
     # count = 10
+    use_baker = True
 
     def __init__(self):
         self.generated_instances = []
@@ -199,7 +202,15 @@ class DemoDataGeneratorMixin:
         return baker_kwargs
 
     def create_instance(self, kwargs):
-        return baker.make(self.get_model(), **kwargs)
+        Model = self.get_model()
+
+        if not self.use_baker:
+            logger.debug(f"About to create {Model=} with {kwargs=}")
+            instance, _ = Model.objects.get_or_create(**kwargs)
+            return instance
+        else:
+            logger.debug(f"About to bake {Model=} with {kwargs=}")
+            return baker.make(Model, **kwargs)
 
     def post_generate_instance(self, instance):
         pass
@@ -216,6 +227,8 @@ class PrivateDataGenerator(DemoDataGeneratorMixin, CreatePrivateDataRelationMixi
     def __init__(self, multi_tenant_company):
         super().__init__()
         self.multi_tenant_company = multi_tenant_company
+
+        logger.debug(f"about to generate private demo-data for {self.__class__.__name__}")
 
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)
