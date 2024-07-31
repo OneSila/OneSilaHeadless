@@ -205,11 +205,9 @@ class DemoDataGeneratorMixin:
         Model = self.get_model()
 
         if not self.use_baker:
-            logger.debug(f"About to create {Model=} with {kwargs=}")
             instance, _ = Model.objects.get_or_create(**kwargs)
             return instance
         else:
-            logger.debug(f"About to bake {Model=} with {kwargs=}")
             return baker.make(Model, **kwargs)
 
     def post_generate_instance(self, instance):
