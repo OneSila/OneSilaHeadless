@@ -1,4 +1,5 @@
 from sales_prices.models import SalesPrice
+from currencies.models import Currency
 from currencies.helpers import currency_convert
 from products.models import Product
 
@@ -38,7 +39,7 @@ class SalesPriceUpdateCreateFactory:
         self.multi_tenant_company = sales_price.multi_tenant_company
 
     def _set_inheriting_currencies(self):
-        self.inheriting_currencies = self.sales_price.currency.passes_to.all()
+        self.inheriting_currencies = self.sales_price.currency.passes_to.all().annotate_rate()
 
     def _cycle_through_currencies(self):
         for currency in self.inheriting_currencies:
@@ -72,7 +73,8 @@ class SalesPriceUpdateCreateFactory:
     def _update_self(self):
         # If you're part of an inhertiance, update yourself:
         if self.sales_price.currency.inherits_from:
-            currency = self.sales_price.currency
+            # Why get the currency? To ensure .rate annotation is available.
+            currency = Currency.objects.get(id=self.sales_price.currency.id)
 
             rrp = currency_convert(
                 round_prices_up_to=currency.round_prices_up_to,
