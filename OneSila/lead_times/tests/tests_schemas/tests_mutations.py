@@ -2,27 +2,25 @@ from core.tests import TestCase, TransactionTestCase, \
     TransactionTestCaseMixin, TestWithDemoDataMixin
 from model_bakery import baker
 from OneSila.schema import schema
-from lead_times.models import LeadTime
+from lead_times.models import LeadTime, LeadTimeForShippingAddress
 from contacts.models import ShippingAddress
 
 
 class LeadTimeQueriesTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def test_lead_time_create(self):
         query = """
-            mutation createLeadTime($name: String!, $unit: Int!, $minTime: Int!, $maxTime: Int!) {
+            mutation createLeadTime($unit: Int!, $minTime: Int!, $maxTime: Int!) {
               createLeadTime(
-                data: {unit: $unit, minTime: $minTime, maxTime: $maxTime, name: $name}
+                data: {unit: $unit, minTime: $minTime, maxTime: $maxTime}
               ) {
                 id
                 unit
-                name
               }
             }
         """
-        unit = LeadTime.HOUR
-        min_time = 1
-        max_time = 2
-        name = "Delivery <2 hours test"
+        unit = LeadTime.WEEK
+        min_time = 5
+        max_time = 10
 
         resp = self.strawberry_test_client(
             query=query,
@@ -30,11 +28,10 @@ class LeadTimeQueriesTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 'unit': unit,
                 'minTime': min_time,
                 'maxTime': max_time,
-                'name': name,
             },
         )
+        print(resp.errors)
         self.assertTrue(resp.errors is None)
-        self.assertEqual(resp.data['createLeadTime']['name'], name)
 
 
 class LeadTimeForShippingAddressTestCase(TestWithDemoDataMixin, TransactionTestCaseMixin, TransactionTestCase):
@@ -49,6 +46,10 @@ class LeadTimeForShippingAddressTestCase(TestWithDemoDataMixin, TransactionTestC
         from lead_times.schema.types.types import LeadTimeForShippingAddressType, LeadTimeType
         shippingid = self.to_global_id(instance=self.shipping_address)
         leadtimeid = self.to_global_id(instance=self.lead_time)
+
+        LeadTimeForShippingAddress.objects.\
+            filter(shippingaddress=self.shipping_address, multi_tenant_company=self.multi_tenant_company).\
+            delete()
 
         resp = self.strawberry_test_client(
             query=create_leadtime_for_shippingaddress,

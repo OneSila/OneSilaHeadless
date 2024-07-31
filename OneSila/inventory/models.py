@@ -16,6 +16,7 @@ class Inventory(models.Model):
     objects = InventoryManager()
 
     class Meta:
+        backorder_item_count = 99999
         search_terms = ['product__sku', 'inventorylocation__name', 'product__supplier__name']
         unique_together = ('product', 'inventorylocation')
         verbose_name_plural = "inventories"

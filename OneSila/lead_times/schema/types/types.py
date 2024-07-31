@@ -3,20 +3,13 @@ from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixi
 
 from typing import List
 
-from lead_times.models import LeadTime, LeadTimeTranslation, LeadTimeForShippingAddress
-from .filters import LeadTimeFilter, LeadTimeTranslationFilter, LeadTimeForShippingAddressFilter
-from .ordering import LeadTimeOrder, LeadTimeTranslationOrder, LeadTimeForShippingAddressOrder
+from lead_times.models import LeadTime, LeadTimeForShippingAddress
+from .filters import LeadTimeFilter, LeadTimeForShippingAddressFilter
+from .ordering import LeadTimeOrder, LeadTimeForShippingAddressOrder
 
 
 @type(LeadTime, filters=LeadTimeFilter, order=LeadTimeOrder, pagination=True, fields="__all__")
 class LeadTimeType(relay.Node, GetQuerysetMultiTenantMixin):
-    @field
-    def name(self) -> str | None:
-        return self.name
-
-
-@type(LeadTimeTranslation, filters=LeadTimeTranslationFilter, order=LeadTimeTranslationOrder, pagination=True, fields="__all__")
-class LeadTimeTranslationType(relay.Node, GetQuerysetMultiTenantMixin):
     pass
 
 

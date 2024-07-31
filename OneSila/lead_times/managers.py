@@ -1,9 +1,36 @@
 from core.managers import MultiTenantQuerySet, MultiTenantManager
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class LeadTimeQuerySet(MultiTenantQuerySet):
     def order_by_fastest(self):
         return self.order_by('unit', 'max_time', 'min_time')
+
+    def get_leadtimes_for_inventory(self, inventory_qs):
+        from .models import LeadTimeForShippingAddress
+
+        logger.debug(f"Going to get leadtimes for {inventory_qs=}")
+
+        adresses_ids = inventory_qs.\
+            filter(inventorylocation__shippingaddress__isnull=False).\
+            values_list('inventorylocation__shippingaddress_id', flat=True)
+
+        logger.debug(F"{adresses_ids=} discovered for {inventory_qs=}")
+
+        leadtime_ids = LeadTimeForShippingAddress.objects.\
+            filter(shippingaddress__in=adresses_ids).\
+            values_list('id', flat=True)
+        leadtimes = self.filter(id__in=leadtime_ids)
+
+        logging.debug(f"Discovered {leadtimes=} for {inventory_qs=}")
+        return leadtimes
+
+    def leadtime_for_inventorylocations(self, inventory_qs):
+        logger.debug(f"Looking for fastest lead-time for {inventory_qs=}")
+        leadtimes = self.get_leadtimes_for_inventory(inventory_qs)
+        return self.filter_fastest(leadtimes)
 
     def filter_fastest(self, leadtimes):
         # In order to filter on fast, we need to order the
@@ -13,7 +40,9 @@ class LeadTimeQuerySet(MultiTenantQuerySet):
         if isinstance(leadtimes, list):
             leadtimes = self.model.objects.filter(id__in=leadtimes)
 
-        return self.order_by_fastest().first()
+        logger.debug(f"We found following lead-times {leadtimes=}")
+
+        return leadtimes.order_by_fastest().first()
 
 
 class LeadTimeManager(MultiTenantManager):
@@ -25,3 +54,6 @@ class LeadTimeManager(MultiTenantManager):
 
     def order_by_fastest(self):
         return self.get_queryset().order_by_fastest()
+
+    def leadtime_for_inventorylocations(self, inventory_qs):
+        return self.get_queryset().leadtime_for_inventorylocations(inventory_qs=inventory_qs)

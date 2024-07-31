@@ -6,6 +6,36 @@ from .tests_models import InventoryTestCaseMixin
 
 
 class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
+    def test_salable(self):
+        simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier.base_products.add(simple)
+
+        qty = 321
+        Inventory.objects.create(inventorylocation=self.inventory_location,
+            quantity=qty,
+            multi_tenant_company=self.multi_tenant_company,
+            product=supplier)
+
+        salable = simple.inventory.salable()
+
+        self.assertEqual(salable, qty)
+
+    def test_salable_allow_backorder(self):
+        simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company, allow_backorder=True)
+        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier.base_products.add(simple)
+
+        qty = 321
+        Inventory.objects.create(inventorylocation=self.inventory_location,
+            quantity=qty,
+            multi_tenant_company=self.multi_tenant_company,
+            product=supplier)
+
+        salable = simple.inventory.salable()
+
+        self.assertTrue(salable > qty)
+
     def test_reserved_zero(self):
         simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
@@ -17,7 +47,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             product=supplier)
 
-        reserved, _ = simple.inventory.reserved()
+        reserved = simple.inventory.reserved()
 
         self.assertEqual(reserved, 0)
 
@@ -32,7 +62,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             product=supplier)
 
-        physical, _ = simple.inventory.physical()
+        physical = simple.inventory.physical()
         self.assertEqual(physical, qty)
 
     def test_physical_dropship_physical(self):
@@ -46,7 +76,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             product=supplier)
 
-        physical, _ = drop.inventory.physical()
+        physical = drop.inventory.physical()
         self.assertEqual(physical, qty)
 
     def test_physical_supplier_physical(self):
@@ -57,7 +87,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             product=supplier)
 
-        physical, _ = supplier.inventory.physical()
+        physical = supplier.inventory.physical()
         self.assertEqual(physical, qty)
 
     def test_physical_manufacturable_physical(self):
@@ -68,7 +98,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             product=manu)
 
-        physical, _ = manu.inventory.physical()
+        physical = manu.inventory.physical()
         self.assertEqual(physical, qty)
 
     def test_physical_nested_bundles_with_simple(self):
@@ -102,7 +132,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             product=supplier_two)
 
-        physical, _ = bundle.inventory.physical()
+        physical = bundle.inventory.physical()
         self.assertEqual(physical, min(qty_one / bundle_qty, qty_two / bundle_qty))
 
     def test_physical_nested_bundles_with_bundle(self):
@@ -144,7 +174,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             product=supplier_two)
 
-        physical, _ = bundle.inventory.physical()
+        physical = bundle.inventory.physical()
         self.assertEqual(physical, min(qty_one / bundle_qty, qty_two / bundle_qty))
 
     def test_physical_nested_bundles_with_manufacturable(self):
@@ -173,7 +203,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             product=prod_two)
 
-        physical, _ = bundle.inventory.physical()
+        physical = bundle.inventory.physical()
         self.assertEqual(physical, min(qty_one / bundle_qty, qty_two / bundle_qty))
 
     def test_physical_nested_bundles_with_dropship(self):
@@ -209,7 +239,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
             product=sup_two)
 
         expected = min(int(qty_one / bundle_qty), int(qty_two / bundle_qty))
-        physical, _ = bundle.inventory.physical()
+        physical = bundle.inventory.physical()
         self.assertEqual(physical, expected)
 
     def test_physical_nested_bundles_with_simple_manufacturable(self):
@@ -241,7 +271,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             product=sup_two)
 
-        physical, _ = bundle.inventory.physical()
+        physical = bundle.inventory.physical()
         self.assertEqual(physical, min(qty_one / bundle_qty, qty_two / bundle_qty))
 
     def test_physical_nested_bundles_with_simple_dropship(self):
@@ -277,7 +307,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
             product=sup_two)
 
         expected = min(int(qty_one / bundle_qty), int(qty_two / bundle_qty))
-        physical, _ = bundle.inventory.physical()
+        physical = bundle.inventory.physical()
         self.assertEqual(physical, expected)
 
     def test_physical_nested_bundles_with_simple_dropship_manufacturable_bundle(self):
@@ -324,5 +354,5 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
             product=prod_three)
 
         expected = min(int(qty_one / bundle_qty_one), int(qty_two / bundle_qty_two), int(qty_three / bundle_qty_three))
-        physical, _ = bundle.inventory.physical()
+        physical = bundle.inventory.physical()
         self.assertEqual(physical, expected)

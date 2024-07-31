@@ -2,7 +2,6 @@ from core import models
 from core.models import Sum
 from core.managers import MultiTenantQuerySet, MultiTenantManager
 from orders.models import Order
-from lead_times.models import LeadTime, LeadTimeForShippingAddress
 from products.models import Product, BundleVariation
 from products.product_types import HAS_INDIRECT_INVENTORY_TYPES, \
     HAS_DIRECT_INVENTORY_TYPES, BUNDLE
@@ -12,12 +11,23 @@ logger = logging.getLogger(__name__)
 
 
 class InventoryQuerySet(MultiTenantQuerySet):
-    @staticmethod
-    def get_leadtime_ids(qs):
-        adresses = qs.\
-            filter(inventorylocation__shippingaddress__isnull=False).\
-            values('inventorylocation__shippingaddress_id')
-        return LeadTimeForShippingAddress.objects.filter(shippingaddress__in=adresses).values_list('id', flat=True)
+    def physical_inventory_locations(self):
+        """ Return the locations where a given product is located."""
+        product = self._hints['instance']
+
+        if product.type in HAS_DIRECT_INVENTORY_TYPES:
+            return self.filter(quantity__gt=0)
+
+        if product.type in HAS_INDIRECT_INVENTORY_TYPES:
+            supplier_product_ids = product.supplier_products.\
+                all().\
+                values('id')
+            return self.model.objects.\
+                filter(product_id__in=supplier_product_ids)
+
+        if product.type in [BUNDLE]:
+            # FIXME: What to do about bundle-products?  Nested? Or parts with querysets?
+            raise Exception("Not implemented")
 
     def physical(self):
         """
@@ -27,23 +37,10 @@ class InventoryQuerySet(MultiTenantQuerySet):
 
         # Calculate your directly attached inventory (For manufacturable products)
         product = self._hints['instance']
-        qty = 0
-        leadtime_ids = []
 
-        if product.type in HAS_DIRECT_INVENTORY_TYPES:
-            inventory_qs = self.filter(quantity__gt=0)
-            qty += inventory_qs.aggregate(Sum('quantity'))['quantity__sum'] or 0
-            leadtime_ids.extend(list(self.get_leadtime_ids(inventory_qs)))
-
-        if product.type in HAS_INDIRECT_INVENTORY_TYPES:
-            supplier_product_ids = product.supplier_products.\
-                all().\
-                values('id')
-            indirect_qs = self.model.objects.\
-                filter(product_id__in=supplier_product_ids)
-
-            qty += indirect_qs.aggregate(Sum('quantity'))['quantity__sum'] or 0
-            leadtime_ids.extend(list(self.get_leadtime_ids(indirect_qs)))
+        if product.type in HAS_DIRECT_INVENTORY_TYPES or product.type in HAS_INDIRECT_INVENTORY_TYPES:
+            inventory_qs = self.physical_inventory_locations()
+            return inventory_qs.aggregate(Sum('quantity'))['quantity__sum'] or 0
 
         if product.type in [BUNDLE]:
             # Even though we can attach a variety of bundles, we must ensure we
@@ -51,36 +48,29 @@ class InventoryQuerySet(MultiTenantQuerySet):
             # Phone: 100 items
             # Cover: 30
             # That means we can only ship 15x Phone+cover since the cover only has 30 pieces of which 2 are needed.
+            qty = 0
             try:
                 # int() will round down which is what we want.
                 available_parts = []
                 for through in BundleVariation.objects.filter(umbrella=product):
-                    physical, leadtime = through.variation.inventory.physical()
+                    physical = through.variation.inventory.physical()
                     available_parts.append(int(physical / through.quantity))
-
-                    if leadtime:
-                        leadtime_ids.append(leadtime.id)
-
-                    logger.debug(f"Calc BundleVariation Leadtim{through=} for {product=}, {leadtime=}")
 
                 qty += min(available_parts)
             except ValueError:
                 pass
-            # qty += min([i.inventory.physical() for i in product.bundle_variations.all()])
 
-        leadtime = LeadTime.objects.filter_fastest(leadtime_ids)
-
-        return qty, leadtime
+        return qty
 
     def salable(self):
         """Items that are available for sale"""
-        if self._hints['instance'].product.allow_backorder:
-            return 99999
+        if self._hints['instance'].allow_backorder:
+            return self.model._meta.backorder_item_count
 
-        physical, leadtime = self.physical()
+        physical = self.physical()
         salable = physical - self.reserved()
 
-        return salable, leadtime
+        return salable
 
     def reserved(self):
         """Items that have been sold but not shipped"""
@@ -90,7 +80,7 @@ class InventoryQuerySet(MultiTenantQuerySet):
                 order__status__in=Order.DONE_TYPES).\
             aggregate(Sum('quantity'))['quantity__sum'] or 0
 
-        return sold_agg, None
+        return sold_agg
 
 
 class InventoryManager(MultiTenantManager):
@@ -105,3 +95,6 @@ class InventoryManager(MultiTenantManager):
 
     def reserved(self):
         return self.get_queryset().reserved()
+
+    def physical_inventory_locations(self):
+        return self.get_queryset().physical_inventory_locations()

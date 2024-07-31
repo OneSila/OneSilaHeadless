@@ -33,7 +33,7 @@ class InventoryTestCase(InventoryTestCaseMixin, TestCase):
                 inventorylocation=self.inventory_location,
                 multi_tenant_company=self.multi_tenant_company,
                 quantity=quantity)
-        physical, _ = prod.inventory.physical()
+        physical = prod.inventory.physical()
         self.assertEqual(physical, quantity)
 
     def test_inventory_on_simple_product(self):

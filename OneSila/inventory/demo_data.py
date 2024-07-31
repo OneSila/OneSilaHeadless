@@ -10,9 +10,10 @@ registry = DemoDataLibrary()
 class InventoryLocationGenerator(PrivateDataGenerator):
     model = InventoryLocation
     count = 4
+    use_baker = False
     field_mapper = {
         'name': fake.city_suffix,
-        'precise': fake.boolean,
+        'precise': False,
     }
 
     def prep_baker_kwargs(self, seed):

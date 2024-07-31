@@ -1,5 +1,4 @@
-source venv/bin/activate
-cd OneSila
+source ../venv/bin/activate
 coverage run ./manage.py test $1
 coverage html
 

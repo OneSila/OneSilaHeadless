@@ -31,28 +31,26 @@ class LeadTime(TranslatedModelMixin, models.Model):
 
     objects = LeadTimeManager()
 
-    @property
-    def name(self):
-        return self._get_translated_value(field_name='name')
-
     def __str__(self):
         return f"{self.min_time} - {self.max_time} {self.get_unit_display()}(s)"
 
     class Meta:
-        search_terms = ['translations__name']
+        search_terms = []
         unique_together = ['multi_tenant_company', 'min_time', 'max_time', 'unit']
-
-
-class LeadTimeTranslation(TranslationFieldsMixin, models.Model):
-    lead_time = models.ForeignKey(LeadTime, on_delete=models.CASCADE, related_name="translations")
-    name = models.CharField(max_length=100)
-
-    def __str__(self):
-        return f"{self.lead_time} <{self.language}>"
-
-    class Meta:
-        search_terms = ['name']
-        unique_together = ['lead_time', 'language']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(max_time__gte=models.F("min_time")),
+                name=_("Maximum Time cannot be less then Minimum Time"),
+            ),
+            models.CheckConstraint(
+                check=models.Q(max_time__gte=0),
+                name=_("Maximum time cannot be 0"),
+            ),
+            models.CheckConstraint(
+                check=models.Q(min_time__gte=0),
+                name=_("Minimum Time cannot be 0"),
+            ),
+        ]
 
 
 class LeadTimeForShippingAddress(models.Model):
@@ -63,4 +61,4 @@ class LeadTimeForShippingAddress(models.Model):
         return f"{self.shippingaddress} <{self.leadtime.name}>"
 
     class Meta:
-        unique_together = ['multi_tenant_company', 'shippingaddress', 'leadtime']
+        unique_together = ['multi_tenant_company', 'shippingaddress']
