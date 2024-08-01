@@ -14,16 +14,17 @@ class InventoryQuerySet(MultiTenantQuerySet):
     def physical_inventory_locations(self):
         """ Return the locations where a given product is located."""
         product = self._hints['instance']
+        multi_tenant_company = product.multi_tenant_company
 
         if product.type in HAS_DIRECT_INVENTORY_TYPES:
-            return self.filter(quantity__gt=0)
+            return self.filter(quantity__gt=0, multi_tenant_company=multi_tenant_company)
 
         if product.type in HAS_INDIRECT_INVENTORY_TYPES:
             supplier_product_ids = product.supplier_products.\
-                all().\
+                filter(multi_tenant_company=multi_tenant_company).\
                 values('id')
             return self.model.objects.\
-                filter(product_id__in=supplier_product_ids)
+                filter(product_id__in=supplier_product_ids, multi_tenant_company=multi_tenant_company)
 
         if product.type in [BUNDLE]:
             # FIXME: What to do about bundle-products?  Nested? Or parts with querysets?
@@ -37,6 +38,7 @@ class InventoryQuerySet(MultiTenantQuerySet):
 
         # Calculate your directly attached inventory (For manufacturable products)
         product = self._hints['instance']
+        multi_tenant_company = product.multi_tenant_company
 
         if product.type in HAS_DIRECT_INVENTORY_TYPES or product.type in HAS_INDIRECT_INVENTORY_TYPES:
             inventory_qs = self.physical_inventory_locations()
@@ -52,7 +54,7 @@ class InventoryQuerySet(MultiTenantQuerySet):
             try:
                 # int() will round down which is what we want.
                 available_parts = []
-                for through in BundleVariation.objects.filter(umbrella=product):
+                for through in BundleVariation.objects.filter(umbrella=product, multi_tenant_company=multi_tenant_company):
                     physical = through.variation.inventory.physical()
                     available_parts.append(int(physical / through.quantity))
 
@@ -74,8 +76,11 @@ class InventoryQuerySet(MultiTenantQuerySet):
 
     def reserved(self):
         """Items that have been sold but not shipped"""
-        sold_agg = self._hints['instance'].orderitem_set.\
-            all().\
+        product = self._hints['instance']
+        multi_tenant_company = product.multi_tenant_company
+
+        sold_agg = product.orderitem_set.\
+            filter(multi_tenant_company=multi_tenant_company).\
             exclude(
                 order__status__in=Order.DONE_TYPES).\
             aggregate(Sum('quantity'))['quantity__sum'] or 0
