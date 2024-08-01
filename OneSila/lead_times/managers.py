@@ -8,6 +8,10 @@ class LeadTimeQuerySet(MultiTenantQuerySet):
     def order_by_fastest(self):
         return self.order_by('unit', 'max_time', 'min_time')
 
+    def get_product_leadtime(self, product):
+        inventory_qs = product.inventory.physical_inventory_locations()
+        return self.leadtime_for_inventorylocations(inventory_qs)
+
     def get_leadtimes_for_inventory(self, inventory_qs):
         from .models import LeadTimeForShippingAddress
 
@@ -57,3 +61,6 @@ class LeadTimeManager(MultiTenantManager):
 
     def leadtime_for_inventorylocations(self, inventory_qs):
         return self.get_queryset().leadtime_for_inventorylocations(inventory_qs=inventory_qs)
+
+    def get_product_leadtime(self, product):
+        return self.get_queryset().get_product_leadtime(product=product)

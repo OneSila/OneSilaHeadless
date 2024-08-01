@@ -55,3 +55,6 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
         locations = simple.inventory.physical_inventory_locations()
         lead_time = LeadTime.objects.leadtime_for_inventorylocations(locations)
         self.assertEqual(lead_time, leadtime_for_shipping_address.leadtime)
+
+        lead_time_product = LeadTime.objects.get_product_leadtime(simple)
+        self.assertEqual(lead_time_product, leadtime_for_shipping_address.leadtime)
