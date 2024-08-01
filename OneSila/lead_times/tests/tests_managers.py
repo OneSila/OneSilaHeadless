@@ -53,6 +53,9 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
         self.assertEqual(leadtime_for_shipping_address.leadtime, self.lead_time_overlap)
 
         locations = simple.inventory.physical_inventory_locations()
+        location_ids = list(locations.values_list('id', flat=True))
+        self.assertEqual(location_ids, [inventory_location.id])
+
         lead_time = LeadTime.objects.leadtime_for_inventorylocations(locations)
         self.assertEqual(lead_time, leadtime_for_shipping_address.leadtime)
 
