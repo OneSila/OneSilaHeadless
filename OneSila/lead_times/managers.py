@@ -37,11 +37,14 @@ class LeadTimeQuerySet(MultiTenantQuerySet):
         leadtimes = self.get_leadtimes_for_inventory(inventory_qs)
         return self.filter_fastest(leadtimes)
 
-    def filter_fastest(self, leadtimes):
+    def filter_fastest(self, leadtimes=None):
         # In order to filter on fast, we need to order the
         # units.  Probably a numeric value is really what the right
         # way to go is. 1 is fast, 3 is slow.  Then we just need
         # to order by unit, max_time and min_time and grab the first one.
+        if leadtimes is None:
+            leadtimes = self
+
         if isinstance(leadtimes, list):
             leadtimes = self.model.objects.filter(id__in=leadtimes)
 
@@ -54,8 +57,8 @@ class LeadTimeManager(MultiTenantManager):
     def get_queryset(self):
         return LeadTimeQuerySet(self.model, using=self._db)
 
-    def filter_fastest(self, leadtimes):
-        return self.get_queryset().filter_fastest(leadtimes)
+    def filter_fastest(self, leadtimes=None):
+        return self.get_queryset().filter_fastest(leadtimes=leadtimes)
 
     def order_by_fastest(self):
         return self.get_queryset().order_by_fastest()

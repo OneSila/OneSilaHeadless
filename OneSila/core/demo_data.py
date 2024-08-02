@@ -225,8 +225,8 @@ class PrivateDataGenerator(DemoDataGeneratorMixin, CreatePrivateDataRelationMixi
     def __init__(self, multi_tenant_company):
         super().__init__()
         self.multi_tenant_company = multi_tenant_company
-
-        logger.debug(f"about to generate private demo-data for {self.__class__.__name__}")
+        clsname = self.__class__.__name__
+        logger.debug(f"about to generate private demo-data {multi_tenant_company.id=}, {clsname=}")
 
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)

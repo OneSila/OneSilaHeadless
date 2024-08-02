@@ -21,6 +21,12 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
 
         self.assertEqual(filtered, self.lead_time_fast)
 
+    def test_filter_fastest_qs(self):
+        filtered = LeadTime.objects.filter(multi_tenant_company=self.multi_tenant_company)
+        fastest = filtered.filter_fastest()
+
+        self.assertEqual(fastest, self.lead_time_fast)
+
     def test_lead_time_for_inventories(self):
         supplier = Supplier.objects.filter(multi_tenant_company=self.multi_tenant_company).last()
         shippingaddress = ShippingAddress.objects.filter(
@@ -54,6 +60,8 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
 
         locations = simple.inventory.physical_inventory_locations()
         location_ids = list(locations.values_list('id', flat=True))
+        location_ids_mtc = list(locations.values_list('multi_tenant_company', flat=True))
+        self.assertEqual(location_ids_mtc, [inventory_location.multi_tenant_company.id])
         self.assertEqual(location_ids, [inventory_location.id])
 
         lead_time = LeadTime.objects.leadtime_for_inventorylocations(locations)
