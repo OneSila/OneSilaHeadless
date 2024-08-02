@@ -15,7 +15,8 @@ class LeadTimeQuerySet(MultiTenantQuerySet):
     def get_leadtimes_for_inventory(self, inventory_qs):
         from .models import LeadTimeForShippingAddress
 
-        logger.debug(f"Going to get leadtimes for {inventory_qs=}")
+        inventory_qs_vals = inventory_qs.values_list('id')
+        logger.debug(f"Going to get leadtimes for {inventory_qs_vals=}")
 
         adresses_ids = inventory_qs.\
             filter(inventorylocation__shippingaddress__isnull=False).\
