@@ -1,11 +1,10 @@
 from core import models
 from django.utils.translation import gettext_lazy as _
-from translations.models import TranslationFieldsMixin, TranslatedModelMixin
 from contacts.models import ShippingAddress
 from .managers import LeadTimeManager
 
 
-class LeadTime(TranslatedModelMixin, models.Model):
+class LeadTime(models.Model):
     HOUR = 1
     DAY = 2
     WEEK = 3
