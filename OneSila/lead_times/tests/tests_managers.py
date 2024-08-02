@@ -35,7 +35,6 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
         leadtime_for_shipping_address.leadtime = self.lead_time_overlap
         leadtime_for_shipping_address.save()
         leadtime_for_shipping_address.refresh_from_db()
-        inventory_location.refresh_from_db()
 
         self.assertEqual(leadtime_for_shipping_address.leadtime, self.lead_time_overlap)
 
