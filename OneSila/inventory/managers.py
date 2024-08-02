@@ -13,18 +13,23 @@ logger = logging.getLogger(__name__)
 class InventoryQuerySet(MultiTenantQuerySet):
     def physical_inventory_locations(self):
         """ Return the locations where a given product is located."""
+        from .models import InventoryLocation
+
         product = self._hints['instance']
         multi_tenant_company = product.multi_tenant_company
 
         if product.type in HAS_DIRECT_INVENTORY_TYPES:
-            return self.filter(quantity__gt=0, multi_tenant_company=multi_tenant_company)
+            location_ids = self.filter(quantity__gt=0, multi_tenant_company=multi_tenant_company).values_list('inventorylocation', flat=True)
+            return InventoryLocation.objects.filter(id__in=location_ids)
 
         if product.type in HAS_INDIRECT_INVENTORY_TYPES:
             supplier_product_ids = product.supplier_products.\
                 filter(multi_tenant_company=multi_tenant_company).\
                 values('id')
-            return self.model.objects.\
-                filter(product_id__in=supplier_product_ids, multi_tenant_company=multi_tenant_company)
+            location_ids = self.model.objects.\
+                filter(product_id__in=supplier_product_ids, multi_tenant_company=multi_tenant_company).values_list('inventorylocation', flat=True)
+
+            return InventoryLocation.objects.filter(id__in=location_ids)
 
         if product.type in [BUNDLE]:
             # FIXME: What to do about bundle-products?  Nested? Or parts with querysets?

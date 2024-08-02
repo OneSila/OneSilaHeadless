@@ -26,14 +26,16 @@ class LeadTimeQuerySet(MultiTenantQuerySet):
 
         leadtime_ids = LeadTimeForShippingAddress.objects.\
             filter(shippingaddress__in=adresses_ids).\
-            values_list('id', flat=True)
+            values_list('leadtime_id', flat=True)
         leadtimes = self.filter(id__in=leadtime_ids)
 
         logging.debug(f"Discovered {leadtimes=} for {inventory_qs=}")
         return leadtimes
 
-    def leadtime_for_inventorylocations(self, inventory_qs):
-        logger.debug(f"Looking for fastest lead-time for {inventory_qs=}")
+    def leadtime_for_inventorylocations(self, inventory_locations_qs):
+        from inventory.models import Inventory
+        logger.debug(f"Looking for fastest lead-time for {inventory_locations_qs=}")
+        inventory_qs = Inventory.objects.filter(inventorylocation__in=inventory_locations_qs)
         leadtimes = self.get_leadtimes_for_inventory(inventory_qs)
         return self.filter_fastest(leadtimes)
 
@@ -63,8 +65,8 @@ class LeadTimeManager(MultiTenantManager):
     def order_by_fastest(self):
         return self.get_queryset().order_by_fastest()
 
-    def leadtime_for_inventorylocations(self, inventory_qs):
-        return self.get_queryset().leadtime_for_inventorylocations(inventory_qs=inventory_qs)
+    def leadtime_for_inventorylocations(self, inventory_locations_qs):
+        return self.get_queryset().leadtime_for_inventorylocations(inventory_locations_qs=inventory_locations_qs)
 
     def get_product_leadtime(self, product):
         return self.get_queryset().get_product_leadtime(product=product)
