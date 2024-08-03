@@ -18,6 +18,9 @@ class TransactionTestCaseMixin:
         type_name = f"{instance.__class__.__name__}Type"
         return to_base64(type_name, instance.id)
 
+    def from_global_id(self, global_id):
+        return from_base64(global_id)
+
     def strawberry_raw_client(self):
         return TestClient('/graphql/')
 

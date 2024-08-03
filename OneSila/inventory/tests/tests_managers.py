@@ -57,13 +57,13 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         supplier.base_products.add(simple)
 
         qty = 1223
-        Inventory.objects.create(inventorylocation=self.inventory_location,
+        inventory = Inventory.objects.create(inventorylocation=self.inventory_location,
             quantity=qty,
             multi_tenant_company=self.multi_tenant_company,
             product=supplier)
 
-        recieved_location_ids = list(simple.inventory.filter_physical().values_list('id', flat=True))
-        self.assertEqual(recieved_location_ids, [self.inventory_location.id])
+        inventory_ids = list(simple.inventory.filter_physical().values_list('id', flat=True))
+        self.assertEqual(inventory_ids, [inventory.id])
 
         physical = simple.inventory.physical()
         self.assertEqual(physical, qty)

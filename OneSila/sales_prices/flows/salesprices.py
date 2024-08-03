@@ -8,5 +8,6 @@ def salesprice_updatecreate_flow(sales_price):
 
 
 def salesprice_create_for_currency_flow(currency):
-    f = SalesPriceCreateForCurrencyFactory(currency)
-    f.run()
+    if not currency.is_default_currency:
+        f = SalesPriceCreateForCurrencyFactory(currency)
+        f.run()

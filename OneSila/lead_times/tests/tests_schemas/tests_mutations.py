@@ -30,7 +30,6 @@ class LeadTimeQueriesTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 'maxTime': max_time,
             },
         )
-        print(resp.errors)
         self.assertTrue(resp.errors is None)
 
 

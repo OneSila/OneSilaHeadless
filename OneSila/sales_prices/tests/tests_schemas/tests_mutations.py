@@ -48,11 +48,12 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         # )
         # currency_id = resp.data['currencies']['edges'][0]['node']['id']
         simple_product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        simple_product_id = self.to_global_id(simple_product)
+        simple_product_id = self.to_global_id(instance=simple_product)
         currency, _ = Currency.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
+            is_default_currency=True,
             **currencies['GB'])
-        currency_id = self.to_global_id(currency)
+        currency_id = self.to_global_id(instance=currency)
 
         return simple_product_id, currency_id
 
@@ -82,6 +83,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def test_salesprice_rrp_only(self):
         simple_product_id, currency_id = self.get_currency_and_product_ids()
         rrp = 100.1
+
         mutation = """
             mutation createSalesPrice($data: SalesPriceInput!) {
                 createSalesPrice(data: $data) {
@@ -110,6 +112,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def test_salesprice_price_only(self):
         simple_product_id, currency_id = self.get_currency_and_product_ids()
         price = 200.1
+
         mutation = """
             mutation createSalesPrice($data: SalesPriceInput!) {
                 createSalesPrice(data: $data) {
@@ -121,6 +124,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         """
         resp = self.strawberry_test_client(
             query=mutation,
+            asserts_errors=False,
             variables={'data': {
                 "product": {"id": simple_product_id},
                 "currency": {"id": currency_id},
