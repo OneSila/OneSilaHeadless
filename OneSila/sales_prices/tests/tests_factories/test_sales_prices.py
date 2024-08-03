@@ -38,12 +38,11 @@ class SalesPriceUpdateCreateFactoryTestCase(TestCase):
             exchange_rate=1.3,
             **currencies['GB'])
 
-        ori_main_price_instance = SalesPrice.objects.create(
+        ori_main_price_instance, _ = SalesPrice.objects.get_or_create(
             product=product,
             currency=currency,
-            multi_tenant_company=self.multi_tenant_company,
-            rrp=100,
-            price=90)
+            multi_tenant_company=self.multi_tenant_company)
+        ori_main_price_instance.set_prices(rrp=100, price=90)
         ori_main_price_instance.refresh_from_db()
 
         f = SalesPriceUpdateCreateFactory(ori_main_price_instance)
@@ -94,12 +93,11 @@ class SalesPriceUpdateCreateFactoryTestCase(TestCase):
             exchange_rate=1.3,
             **currencies['GB'])
 
-        ori_main_price_instance = SalesPrice.objects.create(
+        ori_main_price_instance, _ = SalesPrice.objects.get_or_create(
             product=product,
             currency=currency,
-            multi_tenant_company=self.multi_tenant_company,
-            rrp=100,
-            price=None)
+            multi_tenant_company=self.multi_tenant_company)
+        ori_main_price_instance.set_prices(rrp=100, price=None)
         ori_main_price_instance.refresh_from_db()
 
         f = SalesPriceUpdateCreateFactory(ori_main_price_instance)
