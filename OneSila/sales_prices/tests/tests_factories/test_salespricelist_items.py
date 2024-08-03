@@ -92,11 +92,10 @@ class SalesPriceListForSalesPriceListItemsCreateUpdateFactoryTestCase(TestCase):
             is_default_currency=True,
             multi_tenant_company=self.multi_tenant_company,
             **currencies['GB'])
-        salesprice_gbp = product.salesprice_set.create(
+        salesprice_gbp, _ = product.salesprice_set.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
-            currency=currency_gbp,
-            rrp=rrp,
-            price=price)
+            currency=currency_gbp)
+        salesprice_gbp.set_prices(rrp=rrp, price=price)
         price_list_gbp_auto = SalesPriceList.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             currency=currency_gbp,
@@ -118,11 +117,10 @@ class SalesPriceListForSalesPriceListItemsCreateUpdateFactoryTestCase(TestCase):
             is_default_currency=True,
             multi_tenant_company=self.multi_tenant_company,
             **currencies['GB'])
-        salesprice_gbp = product.salesprice_set.create(
+        salesprice_gbp, _ = product.salesprice_set.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
-            currency=currency_gbp,
-            rrp=rrp,
-            price=price)
+            currency=currency_gbp)
+        salesprice_gbp.set_prices(rrp=rrp, price=price)
         price_list_gbp_nonauto = SalesPriceList.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             currency=currency_gbp,
@@ -167,16 +165,15 @@ class SalesPriceForSalesPriceListItemCreateFactoryTestCase(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             **currencies['FR'])
 
-        salesprice_gbp = product.salesprice_set.create(
+        salesprice_gbp, _ = product.salesprice_set.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
-            currency=currency_gbp,
-            rrp=rrp,
-            price=price)
-        salesprice_eur = product.salesprice_set.create(
+            currency=currency_gbp)
+        salesprice_gbp.set_prices(rrp=rrp, price=price)
+
+        salesprice_eur, _ = product.salesprice_set.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
-            currency=currency_eur,
-            rrp=rrp,
-            price=price)
+            currency=currency_eur)
+        salesprice_eur.set_prices(rrp=rrp, price=price)
 
         price_list_gbp_auto = SalesPriceList.objects.create(
             multi_tenant_company=self.multi_tenant_company,

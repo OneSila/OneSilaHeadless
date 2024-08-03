@@ -11,42 +11,53 @@ from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 
 class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def get_currency_and_product_ids(self):
-        query = """
-            query simpleProducts($sku: String!){
-              simpleProducts(filters: {sku: {exact: $sku}}) {
-                edges {
-                  node {
-                    id
-                  }
-                }
-              }
-            }
-        """
-        simple_product, _ = SimpleProduct.objects.get_or_create(sku='test_salesprice_none_prices',
-            multi_tenant_company=self.multi_tenant_company)
-        resp = self.stawberry_test_client(
-            query=query,
-            variables={"sku": simple_product.sku},
-        )
-        simple_product_id = resp.data['simpleProducts']['edges'][0]['node']['id']
-
-        query = """
-            {
-              currencies {
-                edges {
-                  node {
-                    id
-                  }
-                }
-              }
-            }
-        """
-        currency, _ = Currency.objects.get_or_create(multi_tenant_company=self.multi_tenant_company,
+        simple_product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        simple_product_id = self.to_global_id(
+            model_class=SimpleProduct.__class__,
+            instance_id=simple_product.id)
+        currency, _ = Currency.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
             **currencies['GB'])
-        resp = self.stawberry_test_client(
-            query=query,
-        )
-        currency_id = resp.data['currencies']['edges'][0]['node']['id']
+        currency_id = self.to_global_id(
+            model_class=Currency.__class__,
+            instance_id=currency.id)
+
+        # query = """
+        #     query simpleProducts($sku: String!){
+        #       simpleProducts(filters: {sku: {exact: $sku}}) {
+        #         edges {
+        #           node {
+        #             id
+        #           }
+        #         }
+        #       }
+        #     }
+        # """
+        # simple_product = SimpleProduct.objects.create(
+        #     multi_tenant_company=self.multi_tenant_company)
+        # resp = self.stawberry_test_client(
+        #     query=query,
+        #     variables={"sku": simple_product.sku},
+        # )
+        # simple_product_id = resp.data['simpleProducts']['edges'][0]['node']['id']
+
+        # query = """
+        #     {
+        #       currencies {
+        #         edges {
+        #           node {
+        #             id
+        #           }
+        #         }
+        #       }
+        #     }
+        # """
+        # currency, _ = Currency.objects.get_or_create(multi_tenant_company=self.multi_tenant_company,
+        #     **currencies['GB'])
+        # resp = self.stawberry_test_client(
+        #     query=query,
+        # )
+        # currency_id = resp.data['currencies']['edges'][0]['node']['id']
 
         return simple_product_id, currency_id
 
@@ -87,6 +98,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         """
         resp = self.stawberry_test_client(
             query=mutation,
+            asserts_errors=False,
             variables={'data': {
                 "product": {"id": simple_product_id},
                 "currency": {"id": currency_id},
@@ -94,6 +106,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
             }}
         )
+        self.assertEqual(resp.errors, None)
         rrp_received = float(resp.data['createSalesPrice']['rrp'])
         price_received = resp.data['createSalesPrice']['price']
         self.assertEqual(rrp_received, rrp)

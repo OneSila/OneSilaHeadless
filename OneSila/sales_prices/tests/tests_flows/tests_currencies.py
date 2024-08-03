@@ -29,16 +29,16 @@ class CurrencyChangeTestCase(TestCase):
             follow_official_rate=False,
             **currencies['FR'])
 
-        salesprice_gbp = product.salesprice_set.create(
+        salesprice_gbp, _ = product.salesprice_set.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
-            currency=currency_gbp,
-            rrp=rrp,
-            price=price)
-        salesprice_eur = product.salesprice_set.create(
+            currency=currency_gbp)
+        salesprice_gbp.set_prices(rrp=rrp, price=price)
+
+        salesprice_eur, _ = product.salesprice_set.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             currency=currency_eur)
 
-        price_list_eur_auto = SalesPriceList.objects.create(
+        price_list_eur_auto, _ = SalesPriceList.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             currency=currency_eur,
             auto_add_products=True,

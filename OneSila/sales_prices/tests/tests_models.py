@@ -111,11 +111,10 @@ class SalesPriceListItemQuerySetTestCase(TestCase):
             is_default_currency=True,
             multi_tenant_company=self.multi_tenant_company,
             **currencies['GB'])
-        salesprice = product.salesprice_set.create(
+        salesprice, _ = product.salesprice_set.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
-            currency=currency,
-            rrp=rrp,
-            price=price)
+            currency=currency)
+        salesprice.set_prices(rrp=rrp, price=price)
 
         price_list = SalesPriceList.objects.create(
             multi_tenant_company=self.multi_tenant_company,

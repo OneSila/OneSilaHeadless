@@ -95,6 +95,11 @@ class SalesPrice(models.Model):
     def highest_price(self):
         return max([self.rrp or 0, self.price or 0])
 
+    def set_prices(self, *, rrp, price):
+        self.rrp = rrp
+        self.price = price
+        self.save()
+
 
 class SalesPriceList(models.Model):
     """
