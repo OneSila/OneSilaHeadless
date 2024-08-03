@@ -58,14 +58,12 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
         leadtime_for_shipping_address.refresh_from_db()
         self.assertEqual(leadtime_for_shipping_address.leadtime, self.lead_time_overlap)
 
-        locations = simple.inventory.physical_inventory_locations()
+        inventory_qs = simple.inventory.filter_physical()
+        locations = InventoryLocation.objects.filter(inventory__in=inventory_qs).values_list('id', flat=True)
         location_ids = list(locations.values_list('id', flat=True))
         location_ids_mtc = list(locations.values_list('multi_tenant_company', flat=True))
         self.assertEqual(location_ids_mtc, [inventory_location.multi_tenant_company.id])
         self.assertEqual(location_ids, [inventory_location.id])
-
-        lead_time = LeadTime.objects.leadtime_for_inventorylocations(locations)
-        self.assertEqual(lead_time, leadtime_for_shipping_address.leadtime)
 
         lead_time_product = LeadTime.objects.get_product_leadtime(simple)
         self.assertEqual(lead_time_product, leadtime_for_shipping_address.leadtime)

@@ -11,25 +11,22 @@ logger = logging.getLogger(__name__)
 
 
 class InventoryQuerySet(MultiTenantQuerySet):
-    def physical_inventory_locations(self):
-        """ Return the locations where a given product is located."""
-        from .models import InventoryLocation
+    def filter_physical(self, product=None):
+        """ Return the inventories where a given product is located."""
+        if product is None:
+            product = self._hints['instance']
 
-        product = self._hints['instance']
         multi_tenant_company = product.multi_tenant_company
 
         if product.type in HAS_DIRECT_INVENTORY_TYPES:
-            location_ids = self.filter(quantity__gt=0, multi_tenant_company=multi_tenant_company).values_list('inventorylocation', flat=True)
-            return InventoryLocation.objects.filter(id__in=location_ids)
+            return self.filter(quantity__gt=0, multi_tenant_company=multi_tenant_company)
 
         if product.type in HAS_INDIRECT_INVENTORY_TYPES:
             supplier_product_ids = product.supplier_products.\
                 filter(multi_tenant_company=multi_tenant_company).\
                 values('id')
-            location_ids = self.model.objects.\
-                filter(product_id__in=supplier_product_ids, multi_tenant_company=multi_tenant_company).values_list('inventorylocation', flat=True)
-
-            return InventoryLocation.objects.filter(id__in=location_ids)
+            return self.model.objects.\
+                filter(product_id__in=supplier_product_ids, multi_tenant_company=multi_tenant_company)
 
         if product.type in [BUNDLE]:
             # FIXME: What to do about bundle-products?  Nested? Or parts with querysets?
@@ -46,7 +43,7 @@ class InventoryQuerySet(MultiTenantQuerySet):
         multi_tenant_company = product.multi_tenant_company
 
         if product.type in HAS_DIRECT_INVENTORY_TYPES or product.type in HAS_INDIRECT_INVENTORY_TYPES:
-            inventory_qs = self.physical_inventory_locations()
+            inventory_qs = self.filter_physical()
             return inventory_qs.aggregate(Sum('quantity'))['quantity__sum'] or 0
 
         if product.type in [BUNDLE]:
@@ -106,5 +103,5 @@ class InventoryManager(MultiTenantManager):
     def reserved(self):
         return self.get_queryset().reserved()
 
-    def physical_inventory_locations(self):
-        return self.get_queryset().physical_inventory_locations()
+    def filter_physical(self, product=None):
+        return self.get_queryset().filter_physical(product=product)
