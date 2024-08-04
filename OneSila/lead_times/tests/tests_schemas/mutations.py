@@ -13,3 +13,19 @@ create_leadtime_for_shippingaddress = """
       }
     }
 """
+
+create_lead_time_product_outofstock = """
+    mutation($productid: GlobalID!, $leadtimeid: GlobalID!) {
+      createLeadTimeProductOutOfStock(
+        data: {product: {id: $productid}, leadtimeOutofstock: {id: $leadtimeid}}
+      ) {
+        id
+        leadtimeOutofstock {
+          id
+        }
+        product {
+          id
+        }
+      }
+    }
+"""

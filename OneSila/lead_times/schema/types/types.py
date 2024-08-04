@@ -3,9 +3,9 @@ from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixi
 
 from typing import List
 
-from lead_times.models import LeadTime, LeadTimeForShippingAddress
-from .filters import LeadTimeFilter, LeadTimeForShippingAddressFilter
-from .ordering import LeadTimeOrder, LeadTimeForShippingAddressOrder
+from lead_times.models import LeadTime, LeadTimeForShippingAddress, LeadTimeProductOutOfStock
+from .filters import LeadTimeFilter, LeadTimeForShippingAddressFilter, LeadTimeProductOutOfStockFilter
+from .ordering import LeadTimeOrder, LeadTimeForShippingAddressOrder, LeadTimeProductOutOfStockOrder
 
 
 @type(LeadTime, filters=LeadTimeFilter, order=LeadTimeOrder, pagination=True, fields="__all__")
@@ -15,6 +15,11 @@ class LeadTimeType(relay.Node, GetQuerysetMultiTenantMixin):
 
 @type(LeadTimeForShippingAddress, filters=LeadTimeForShippingAddressFilter, order=LeadTimeForShippingAddressOrder, pagination=True, fields="__all__")
 class LeadTimeForShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
+    pass
+
+
+@type(LeadTimeProductOutOfStock, filters=LeadTimeProductOutOfStockFilter, order=LeadTimeProductOutOfStockOrder, pagination=True, fields="__all__")
+class LeadTimeProductOutOfStockType(relay.Node, GetQuerysetMultiTenantMixin):
     pass
 
 
