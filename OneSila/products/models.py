@@ -35,8 +35,8 @@ class Product(TranslatedModelMixin, models.Model):
     # Manufacturer product fields
     production_time = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
-    umbrella_variations = models.ManyToManyField('self',
-        through='UmbrellaVariation',
+    configurable_variations = models.ManyToManyField('self',
+        through='ConfigurableVariation',
         symmetrical=False,
         blank=True,
         related_name='umbrellas')
@@ -204,45 +204,45 @@ class DropshipProduct(Product):
         search_terms = ['sku']
 
 
-class UmbrellaVariation(models.Model):
-    umbrella = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="umbrellavariation_umbrellas")
-    variation = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="umbrellavariation_variations")
+class ConfigurableVariation(models.Model):
+    parent = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="ConfigurableVariation_umbrellas")
+    variation = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="ConfigurableVariation_variations")
 
     def save(self, *args, **kwargs):
-        if self.umbrella.is_not_umbrella():
-            raise IntegrityError(_("umbrella needs to a product of type UMBRELLA. Not %s" % (self.umbrella.type)))
+        if self.parent.is_not_umbrella():
+            raise IntegrityError(_("parent needs to a product of type UMBRELLA. Not %s" % (self.parent.type)))
 
         if self.variation.is_umbrella():
-            raise IntegrityError(_("variation needs to a product of type BUNDLE or SIMPLE. Not %s" % (self.umbrella.type)))
+            raise IntegrityError(_("variation needs to a product of type BUNDLE or SIMPLE. Not %s" % (self.parent.type)))
 
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.umbrella} x {self.variation}"
+        return f"{self.parent} x {self.variation}"
 
     class Meta:
-        unique_together = ("umbrella", "variation")
+        unique_together = ("parent", "variation")
 
 
 class BundleVariation(models.Model):
-    umbrella = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_umbrellas")
+    parent = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_umbrellas")
     variation = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_variations")
     quantity = models.FloatField(default=1)
 
     def __str__(self):
-        return f"{self.umbrella} x {self.quantity} {self.variation}"
+        return f"{self.parent} x {self.quantity} {self.variation}"
 
     def save(self, *args, **kwargs):
-        if self.umbrella.is_not_bundle():
-            raise IntegrityError(_("umbrella needs to a product of type BUNDLE. Not %s" % (self.umbrella.type)))
+        if self.parent.is_not_bundle():
+            raise IntegrityError(_("parent needs to a product of type BUNDLE. Not %s" % (self.parent.type)))
 
         if self.variation.is_umbrella():
-            raise IntegrityError(_("variation needs to a product of type BUNDLE or SIMPLE. Not %s" % (self.umbrella.type)))
+            raise IntegrityError(_("variation needs to a product of type BUNDLE or SIMPLE. Not %s" % (self.parent.type)))
 
         super().save(*args, **kwargs)
 
     class Meta:
-        unique_together = ("umbrella", "variation")
+        unique_together = ("parent", "variation")
 
 
 class BillOfMaterial(models.Model):
@@ -290,12 +290,10 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
         return None
 
     def save(self, *args, **kwargs):
-
         if not self.url_key:
             self.url_key = self._get_default_url_key()
 
         super().save(*args, **kwargs)
-
 
     class Meta:
         translated_field = 'product'

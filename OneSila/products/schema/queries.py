@@ -2,7 +2,7 @@ from core.schema.core.queries import node, connection, ListConnectionWithTotalCo
 from typing import List
 
 from .types.types import ProductType, BundleProductType, UmbrellaProductType, \
-    SimpleProductType, ProductTranslationType, UmbrellaVariationType, \
+    SimpleProductType, ProductTranslationType, ConfigurableVariationType, \
     BundleVariationType, ManufacturableProductType, DropshipProductType, SupplierProductType, BillOfMaterialType, SupplierPricesType
 
 
@@ -23,8 +23,8 @@ class ProductsQuery:
     product_translation: ProductTranslationType = node()
     product_translations: ListConnectionWithTotalCount[ProductTranslationType] = connection()
 
-    umbrella_variation: UmbrellaVariationType = node()
-    umbrella_variations: ListConnectionWithTotalCount[UmbrellaVariationType] = connection()
+    configurable_variation: ConfigurableVariationType = node()
+    configurable_variations: ListConnectionWithTotalCount[ConfigurableVariationType] = connection()
 
     bundle_variation: BundleVariationType = node()
     bundle_variations: ListConnectionWithTotalCount[BundleVariationType] = connection()

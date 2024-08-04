@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import BundleProductListView, BundleProductDetailViev, BundleProductUpdateView, BundleProductDeleteView, BundleVariationListView, BundleVariationDetailViev, BundleVariationUpdateView, BundleVariationDeleteView, ProductListView, ProductDetailViev, ProductUpdateView, ProductDeleteView, ProductTranslationListView, ProductTranslationDetailViev, ProductTranslationUpdateView, ProductTranslationDeleteView, SimpleProductListView, SimpleProductDetailViev, SimpleProductUpdateView, SimpleProductDeleteView, UmbrellaProductListView, UmbrellaProductDetailViev, UmbrellaProductUpdateView, UmbrellaProductDeleteView, UmbrellaVariationListView, UmbrellaVariationDetailViev, UmbrellaVariationUpdateView, UmbrellaVariationDeleteView
+from .views import BundleProductListView, BundleProductDetailViev, BundleProductUpdateView, BundleProductDeleteView, BundleVariationListView, BundleVariationDetailViev, BundleVariationUpdateView, BundleVariationDeleteView, ProductListView, ProductDetailViev, ProductUpdateView, ProductDeleteView, ProductTranslationListView, ProductTranslationDetailViev, ProductTranslationUpdateView, ProductTranslationDeleteView, SimpleProductListView, SimpleProductDetailViev, SimpleProductUpdateView, SimpleProductDeleteView, UmbrellaProductListView, UmbrellaProductDetailViev, UmbrellaProductUpdateView, UmbrellaProductDeleteView, ConfigurableVariationListView, ConfigurableVariationDetailViev, ConfigurableVariationUpdateView, ConfigurableVariationDeleteView
 
 app_name = 'products'
 
@@ -28,8 +28,8 @@ urlpatterns = [
     path('umbrella-products/<str:pk>/', UmbrellaProductDetailViev.as_view(), name='umbrella_product_detail'),
     path('umbrella-products/<str:pk>/update/', UmbrellaProductUpdateView.as_view(), name='umbrella_product_update'),
     path('umbrella-products/<str:pk>/delete/', UmbrellaProductDeleteView.as_view(), name='umbrella_product_delete'),
-    path('umbrella-variations/', UmbrellaVariationListView.as_view(), name='umbrella_variations_list'),
-    path('umbrella-variations/<str:pk>/', UmbrellaVariationDetailViev.as_view(), name='umbrella_variation_detail'),
-    path('umbrella-variations/<str:pk>/update/', UmbrellaVariationUpdateView.as_view(), name='umbrella_variation_update'),
-    path('umbrella-variations/<str:pk>/delete/', UmbrellaVariationDeleteView.as_view(), name='umbrella_variation_delete'),
+    path('configurable-variations/', ConfigurableVariationListView.as_view(), name='configurable_variations_list'),
+    path('configurable-variations/<str:pk>/', ConfigurableVariationDetailViev.as_view(), name='configurable_variation_detail'),
+    path('configurable-variations/<str:pk>/update/', ConfigurableVariationUpdateView.as_view(), name='configurable_variation_update'),
+    path('configurable-variations/<str:pk>/delete/', ConfigurableVariationDeleteView.as_view(), name='configurable_variation_delete'),
 ]

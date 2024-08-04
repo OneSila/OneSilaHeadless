@@ -5,7 +5,7 @@ from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin, lazy
 
 from products.models import Product, BundleProduct, UmbrellaProduct, \
-    SimpleProduct, ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, \
+    SimpleProduct, ProductTranslation, ConfigurableVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, \
     SupplierPrices
 from taxes.schema.types.filters import VatRateFilter
 from units.schema.types.filters import UnitFilter
@@ -20,6 +20,7 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     for_sale: auto
     vat_rate: Optional[VatRateFilter]
     exclude_demo_data: Optional[bool]
+
 
 @filter(BundleProduct)
 class BundleProductFilter(SearchFilterMixin):
@@ -52,16 +53,17 @@ class ProductTranslationFilter:
     language: auto
 
 
-@filter(UmbrellaVariation)
-class UmbrellaVariationFilter:
+@filter(ConfigurableVariation)
+class ConfigurableVariationFilter:
     id: auto
-    umbrella: Optional[ProductFilter]
+    parent: Optional[ProductFilter]
 
 
 @filter(BundleVariation)
 class BundleVariationFilter:
     id: auto
-    umbrella: Optional[ProductFilter]
+    parent: Optional[ProductFilter]
+
 
 @filter(ManufacturableProduct)
 class ManufacturableProductFilter(SearchFilterMixin):
@@ -88,11 +90,11 @@ class SupplierProductFilter(SearchFilterMixin):
     base_products: Optional[lazy['ProductFilter', "products.schema.types.filters"]]
 
 
-
 @filter(BillOfMaterial)
 class BillOfMaterialFilter:
     id: auto
     umbrella: Optional[ProductFilter]
+
 
 @filter(SupplierPrices)
 class SupplierPricesFilter(SearchFilterMixin):

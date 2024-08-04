@@ -2,7 +2,7 @@ from core.schema.core.types.ordering import order
 from core.schema.core.types.types import auto
 
 from products.models import Product, BundleProduct, UmbrellaProduct, \
-    SimpleProduct, ProductTranslation, UmbrellaVariation, \
+    SimpleProduct, ProductTranslation, ConfigurableVariation, \
     BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrices
 
 
@@ -35,14 +35,15 @@ class ProductTranslationOrder:
     id: auto
 
 
-@order(UmbrellaVariation)
-class UmbrellaVariationOrder:
+@order(ConfigurableVariation)
+class ConfigurableVariationOrder:
     id: auto
 
 
 @order(BundleVariation)
 class BundleVariationOrder:
     id: auto
+
 
 @order(ManufacturableProduct)
 class ManufacturableProductOrder:
@@ -65,6 +66,7 @@ class SupplierProductOrder:
 @order(BillOfMaterial)
 class BillOfMaterialOrder:
     id: auto
+
 
 @order(SupplierPrices)
 class SupplierPricesOrder:

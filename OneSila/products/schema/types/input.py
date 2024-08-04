@@ -4,7 +4,7 @@ from core.schema.core.types.input import NodeInput, input, partial
 from core.schema.core.types.types import Annotated, lazy
 
 from products.models import Product, BundleProduct, UmbrellaProduct, SimpleProduct, \
-    ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrices
+    ProductTranslation, ConfigurableVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrices
 
 
 @input(Product, fields="__all__")
@@ -57,13 +57,13 @@ class ProductTranslationPartialInput(NodeInput):
     pass
 
 
-@input(UmbrellaVariation, fields="__all__")
-class UmbrellaVariationInput:
+@input(ConfigurableVariation, fields="__all__")
+class ConfigurableVariationInput:
     pass
 
 
-@partial(UmbrellaVariation, fields="__all__")
-class UmbrellaVariationPartialInput(NodeInput):
+@partial(ConfigurableVariation, fields="__all__")
+class ConfigurableVariationPartialInput(NodeInput):
     pass
 
 
@@ -122,6 +122,7 @@ class BillOfMaterialInput:
 @partial(BillOfMaterial, fields="__all__")
 class BillOfMaterialPartialInput(NodeInput):
     pass
+
 
 @input(SupplierPrices, fields="__all__")
 class SupplierPricesInput:
