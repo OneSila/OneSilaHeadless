@@ -2,7 +2,8 @@ from core.tests import TestCase, TestWithDemoDataMixin
 from contacts.models import ShippingAddress, Supplier
 from inventory.models import InventoryLocation, Inventory
 from products.models import SimpleProduct, SupplierProduct
-from lead_times.models import LeadTime, LeadTimeForShippingAddress
+from lead_times.models import LeadTime, LeadTimeForShippingAddress, \
+    LeadTimeProductOutOfStock
 
 
 class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
@@ -26,6 +27,15 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
         fastest = filtered.filter_fastest()
 
         self.assertEqual(fastest, self.lead_time_fast)
+
+    def test_leadtime_for_outofstock_product(self):
+        product = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        LeadTimeProductOutOfStock.objects.create(multi_tenant_company=self.multi_tenant_company,
+            product=product, leadtime_outofstock=self.lead_time_slow)
+
+        lead_time_resp = LeadTime.objects.get_product_leadtime(product)
+
+        self.assertEqual(lead_time_resp, self.lead_time_slow)
 
     def test_lead_time_for_inventories(self):
         supplier = Supplier.objects.filter(multi_tenant_company=self.multi_tenant_company).last()

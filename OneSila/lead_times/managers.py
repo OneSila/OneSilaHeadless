@@ -1,5 +1,5 @@
 from core.managers import MultiTenantQuerySet, MultiTenantManager
-
+from products.product_types import HAS_DIRECT_INVENTORY_TYPES, HAS_INDIRECT_INVENTORY_TYPES
 import logging
 logger = logging.getLogger(__name__)
 
@@ -9,10 +9,27 @@ class LeadTimeQuerySet(MultiTenantQuerySet):
         return self.order_by('unit', 'max_time', 'min_time')
 
     def get_product_leadtime(self, product):
+        from .models import LeadTimeProductOutOfStock
+
         inventory_qs = product.inventory.filter_physical()
         leadtime = self.\
             filter_leadtimes_for_inventory(inventory_qs).\
             filter_fastest()
+
+        if not leadtime:
+            if product.type in HAS_DIRECT_INVENTORY_TYPES:
+                try:
+                    leadtime_product = LeadTimeProductOutOfStock.objects.get(product=product)
+                    leadtime = leadtime_product.leadtime_outofstock
+                except LeadTimeProductOutOfStock.DoesNotExist:
+                    pass
+            elif product.type in HAS_INDIRECT_INVENTORY_TYPES:
+                supplier_products = product.supplier_products.all()
+                leadtimes_outofstock_ids = LeadTimeProductOutOfStock.objects.\
+                    filter(product__in=supplier_products).\
+                    values('leadtime_outofstock')
+                leadtimes = self.model.objects.filter(id__in=leadtimes_outofstock_ids, multi_tenant_company=product.multi_tenant_company)
+                leadtime = leadtimes.filter_fastest()
 
         if not leadtime:
             raise self.model.DoesNotExist(f"No LeadTime found for Product.id {product.id}")
