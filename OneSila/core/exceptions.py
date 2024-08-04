@@ -10,3 +10,7 @@ class RequiredFieldException(Exception):
 
 class NotDemoDataGeneratorError(Exception):
     pass
+
+
+class SanityCheckError(Exception):
+    pass

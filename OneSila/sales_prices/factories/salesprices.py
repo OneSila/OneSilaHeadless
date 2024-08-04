@@ -1,3 +1,4 @@
+from core.exceptions import SanityCheckError
 from sales_prices.models import SalesPrice
 from currencies.models import Currency
 from currencies.helpers import currency_convert
@@ -17,6 +18,10 @@ class SalesPriceCreateForCurrencyFactory:
         self.multi_tenant_company = currency.multi_tenant_company
         self.currency = currency
 
+    def _sanity_check(self):
+        if self.currency.is_default_currency:
+            raise SanityCheckError(f"Cannot create salesprices for default currency")
+
     def set_product_qs(self):
         self.product_qs = Product.objects.filter_multi_tenant(self.multi_tenant_company)
 
@@ -28,6 +33,7 @@ class SalesPriceCreateForCurrencyFactory:
             )
 
     def run(self):
+        self._sanity_check()
         self.set_product_qs()
         self.create_salesprices()
 
