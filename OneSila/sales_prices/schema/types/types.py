@@ -32,9 +32,9 @@ class SalesPriceListItemType(relay.Node, GetQuerysetMultiTenantMixin):
     salespricelist: SalesPriceListType
 
     @field
-    def price(self) -> float:
+    def price(self) -> float | None:
         return self.price
 
     @field
-    def discount(self) -> float:
+    def discount(self) -> float | None:
         return self.discount
