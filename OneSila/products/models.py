@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils.text import slugify
 
@@ -128,6 +129,12 @@ class Product(TranslatedModelMixin, models.Model):
         self.sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
 
     def save(self, *args, **kwargs):
+        if self.type == self.SUPPLIER and self.supplier is None:
+            raise ValidationError(_("Supplier is missing."))
+
+        if self.type == self.SUPPLIER and not self.sku:
+            raise ValidationError(_("SKU is missing."))
+
         if not self.sku:
             self._generate_sku()
 
