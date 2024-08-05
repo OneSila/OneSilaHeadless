@@ -1,12 +1,21 @@
-from properties.schema.mutations.mutation_classes import CreatePropertyMutation, CreatePropertySelectValueMutation
 from properties.schema.types.input import PropertyInput, PropertySelectValueInput
+from properties.models import PropertyTranslation, PropertySelectValueTranslation
+from translations.schema.mutations import TranslatableCreateMutation
 
 
 def create_property():
     extensions = []
-    return CreatePropertyMutation(PropertyInput, extensions=extensions)
+    return TranslatableCreateMutation(PropertyInput,
+        extensions=extensions,
+        translation_model=PropertyTranslation,
+        translation_field='name',
+        translation_model_to_model_field='property')
 
 
 def create_property_select_value():
     extensions = []
-    return CreatePropertySelectValueMutation(PropertySelectValueInput, extensions=extensions)
+    return TranslatableCreateMutation(PropertySelectValueInput,
+        extensions=extensions,
+        translation_model=PropertySelectValueTranslation,
+        translation_field='value',
+        translation_model_to_model_field='propertyselectvalue')

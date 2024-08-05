@@ -1,4 +1,6 @@
+from core.exceptions import SanityCheckError
 from sales_prices.models import SalesPrice
+from currencies.models import Currency
 from currencies.helpers import currency_convert
 from products.models import Product
 
@@ -16,6 +18,10 @@ class SalesPriceCreateForCurrencyFactory:
         self.multi_tenant_company = currency.multi_tenant_company
         self.currency = currency
 
+    def _sanity_check(self):
+        if self.currency.is_default_currency:
+            raise SanityCheckError(f"Cannot create salesprices for default currency")
+
     def set_product_qs(self):
         self.product_qs = Product.objects.filter_multi_tenant(self.multi_tenant_company)
 
@@ -27,6 +33,7 @@ class SalesPriceCreateForCurrencyFactory:
             )
 
     def run(self):
+        self._sanity_check()
         self.set_product_qs()
         self.create_salesprices()
 
@@ -38,7 +45,7 @@ class SalesPriceUpdateCreateFactory:
         self.multi_tenant_company = sales_price.multi_tenant_company
 
     def _set_inheriting_currencies(self):
-        self.inheriting_currencies = self.sales_price.currency.passes_to.all()
+        self.inheriting_currencies = self.sales_price.currency.passes_to.all().annotate_rate()
 
     def _cycle_through_currencies(self):
         for currency in self.inheriting_currencies:
@@ -72,7 +79,8 @@ class SalesPriceUpdateCreateFactory:
     def _update_self(self):
         # If you're part of an inhertiance, update yourself:
         if self.sales_price.currency.inherits_from:
-            currency = self.sales_price.currency
+            # Why get the currency? To ensure .rate annotation is available.
+            currency = Currency.objects.get(id=self.sales_price.currency.id)
 
             rrp = currency_convert(
                 round_prices_up_to=currency.round_prices_up_to,

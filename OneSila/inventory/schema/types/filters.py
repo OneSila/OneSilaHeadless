@@ -14,7 +14,7 @@ class InventoryLocationFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     exclude_demo_data: Optional[bool]
     id: auto
     name: auto
-    location: Optional[InternalShippingAddressFilter]
+    shippingaddress: Optional[InternalShippingAddressFilter]
 
 
 @filter(Inventory)
@@ -22,5 +22,5 @@ class InventoryFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     search: str | None
     exclude_demo_data: Optional[bool]
     id: auto
-    stocklocation: InventoryLocationFilter | None
+    inventorylocation: InventoryLocationFilter | None
     product: SupplierProductFilter | None

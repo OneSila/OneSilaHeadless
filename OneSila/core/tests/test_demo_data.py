@@ -3,7 +3,7 @@ from core.demo_data import DemoDataLibrary
 
 
 class DemoDataTestCase(TestCase):
-    def test_populate(self):
+    def test_populate_demo_data(self):
         # You should be able to create test-data, remove it - and add it again.
         # failure to do so means that there are one or more generators that are
         # not registering relations and triggering unique integrity errors

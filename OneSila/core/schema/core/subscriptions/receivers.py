@@ -12,5 +12,3 @@ def refresh_subscription_receiver(instance):
 
     channel_layer = channels.layers.get_channel_layer()
     async_to_sync(channel_layer.group_send)(group=group, message=msg)
-
-    logger.debug(f"Send post_save message {instance.__class__} for '{instance}' to group '{group}' with msg: {msg}")

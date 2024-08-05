@@ -22,7 +22,7 @@ class TranslationsQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=query,
         )
         self.assertTrue(resp.errors is None)

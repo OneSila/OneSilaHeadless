@@ -11,17 +11,6 @@ from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 
 class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def get_currency_and_product_ids(self):
-        simple_product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        simple_product_id = self.to_global_id(
-            model_class=SimpleProduct.__class__,
-            instance_id=simple_product.id)
-        currency, _ = Currency.objects.get_or_create(
-            multi_tenant_company=self.multi_tenant_company,
-            **currencies['GB'])
-        currency_id = self.to_global_id(
-            model_class=Currency.__class__,
-            instance_id=currency.id)
-
         # query = """
         #     query simpleProducts($sku: String!){
         #       simpleProducts(filters: {sku: {exact: $sku}}) {
@@ -33,9 +22,9 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         #       }
         #     }
         # """
-        # simple_product = SimpleProduct.objects.create(
+        # simple_product, _ = SimpleProduct.objects.get_or_create(sku='test_salesprice_none_prices',
         #     multi_tenant_company=self.multi_tenant_company)
-        # resp = self.stawberry_test_client(
+        # resp = self.strawberry_test_client(
         #     query=query,
         #     variables={"sku": simple_product.sku},
         # )
@@ -54,10 +43,17 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         # """
         # currency, _ = Currency.objects.get_or_create(multi_tenant_company=self.multi_tenant_company,
         #     **currencies['GB'])
-        # resp = self.stawberry_test_client(
+        # resp = self.strawberry_test_client(
         #     query=query,
         # )
         # currency_id = resp.data['currencies']['edges'][0]['node']['id']
+        simple_product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        simple_product_id = self.to_global_id(instance=simple_product)
+        currency, _ = Currency.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            is_default_currency=True,
+            **currencies['GB'])
+        currency_id = self.to_global_id(instance=currency)
 
         return simple_product_id, currency_id
 
@@ -72,7 +68,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 }
               }
         """
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             asserts_errors=False,
             query=mutation,
             variables={'data': {
@@ -87,6 +83,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def test_salesprice_rrp_only(self):
         simple_product_id, currency_id = self.get_currency_and_product_ids()
         rrp = 100.1
+
         mutation = """
             mutation createSalesPrice($data: SalesPriceInput!) {
                 createSalesPrice(data: $data) {
@@ -96,7 +93,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 }
               }
         """
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutation,
             asserts_errors=False,
             variables={'data': {
@@ -115,6 +112,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def test_salesprice_price_only(self):
         simple_product_id, currency_id = self.get_currency_and_product_ids()
         price = 200.1
+
         mutation = """
             mutation createSalesPrice($data: SalesPriceInput!) {
                 createSalesPrice(data: $data) {
@@ -124,8 +122,9 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 }
               }
         """
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutation,
+            asserts_errors=False,
             variables={'data': {
                 "product": {"id": simple_product_id},
                 "currency": {"id": currency_id},
@@ -152,7 +151,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 }
               }
         """
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutation,
             variables={'data': {
                 "product": {"id": simple_product_id},
@@ -181,7 +180,7 @@ class SalesPriceQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
                 }
               }
         """
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutation,
             asserts_errors=False,
             variables={'data': {
