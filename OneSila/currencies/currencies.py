@@ -26,6 +26,7 @@ currencies = {
     'SI': {'name': 'Euro', 'iso_code': 'EUR', 'symbol': '€'},
     'ES': {'name': 'Euro', 'iso_code': 'EUR', 'symbol': '€'},
     'SE': {'name': 'Swedish Krona', 'iso_code': 'SEK', 'symbol': 'kr'},
+    'TH': {'name': 'Thai Baht', 'iso_code': 'THB', 'symbol': '฿'},
     'GB': {'name': 'Pound Sterling', 'iso_code': 'GBP', 'symbol': '£'},
     'US': {'name': 'United States Dollar', 'iso_code': 'USD', 'symbol': '$'},
     'CA': {'name': 'Canadian Dollar', 'iso_code': 'CAD', 'symbol': '$'},
