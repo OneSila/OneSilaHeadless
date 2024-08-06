@@ -2,6 +2,8 @@ from core.tests import TestCase
 from products.models import SimpleProduct
 from currencies.models import Currency
 from sales_prices.models import SalesPriceList, SalesPriceListItem, SalesPrice
+from sales_prices.flows import sales_price__salespricelistitem__update_prices_flow, \
+    salespricelistitem__update_prices_flow
 from sales_prices.factories import SalesPriceForSalesPriceListItemCreateFactory, \
     SalesPriceListForSalesPriceListItemsCreateUpdateFactory, SalesPriceItemAutoPriceUpdateMixin, \
     SalesPriceListForSalesPriceListItemUpdatePricesFactory, SalesPriceForSalesPriceListItemUpdatePricesFactory
@@ -134,6 +136,50 @@ class SalesPriceListForSalesPriceListItemsCreateUpdateFactoryTestCase(TestCase):
 
 
 class SalesPriceForSalesPriceListItemCreateFactoryTestCase(TestCase):
+    def test_salespriceitem_created_on_manuallyadded_products(self):
+        """
+        When a product is added to a pricelist which is set as auto_add_products=False and has auto_update_prices=True
+        """
+        rrp = 100
+        price = 90
+
+        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        currency_gbp, _ = Currency.objects.get_or_create(
+            is_default_currency=True,
+            multi_tenant_company=self.multi_tenant_company,
+            **currencies['GB'])
+        currency_thb, _ = Currency.objects.get_or_create(
+            is_default_currency=False,
+            multi_tenant_company=self.multi_tenant_company,
+            **currencies['TH'])
+
+        salesprice_gbp, _ = product.salesprice_set.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            currency=currency_gbp)
+        salesprice_gbp.set_prices(rrp=rrp, price=price)
+
+        salesprice_thb, _ = product.salesprice_set.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            currency=currency_thb)
+        salesprice_thb.set_prices(rrp=rrp, price=price)
+
+        price_list_thb_nonauto = SalesPriceList.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            currency=currency_thb,
+            auto_add_products=False,
+            auto_update_prices=True,
+        )
+
+        self.assertFalse(price_list_thb_nonauto.salespricelistitem_set.filter(product=product).exists())
+        salespricelistitem_thb, _ = price_list_thb_nonauto.salespricelistitem_set.get_or_create(product=product,
+            multi_tenant_company=self.multi_tenant_company)
+
+        salespricelistitem__update_prices_flow(salespricelistitem_thb)
+        salespricelistitem_thb.refresh_from_db()
+
+        self.assertTrue(salespricelistitem_thb.price_auto != None)
+        self.assertTrue(salespricelistitem_thb.discount_auto != None)
+
     def test_create_items(self):
         """ We want to ensure that the right items are created
         when adding salesprices and price lists exist.

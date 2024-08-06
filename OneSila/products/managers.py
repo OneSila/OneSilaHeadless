@@ -31,7 +31,7 @@ class UmbrellaQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
     pass
 
 
-class UmbrellaManager():
+class UmbrellaManager(ProductManager):
     def get_queryset(self):
         return UmbrellaQuerySet(self.model, using=self._db)
 

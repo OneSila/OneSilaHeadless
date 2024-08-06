@@ -30,7 +30,7 @@ class AddressTestCase(TestCaseWithDemoData, TransactionTestCaseMixin, Transactio
             }
         """
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=query,
         )
         self.assertTrue(resp.errors is None)
@@ -59,7 +59,7 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=query,
         )
         self.assertTrue(resp.errors is None)
@@ -79,8 +79,8 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
         company = self.companies[0]
-        company_global_id = self.to_global_id(model_class=Company, instance_id=company.id)
-        resp = self.stawberry_test_client(
+        company_global_id = self.to_global_id(instance=company)
+        resp = self.strawberry_test_client(
             query=query,
             variables={"id": company_global_id}
         )
@@ -115,7 +115,7 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         """
 
         # resp = await schema.execute(query, variable_values={"title": "The Great Gatsby"})
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=query,
         )
         self.assertTrue(resp.errors is None)
@@ -135,8 +135,8 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
         supplier = self.suppliers[0]
-        supplier_global_id = self.to_global_id(model_class=Supplier, instance_id=supplier.id)
-        resp = self.stawberry_test_client(
+        supplier_global_id = self.to_global_id(instance=supplier)
+        resp = self.strawberry_test_client(
             query=query,
             variables={"id": supplier_global_id}
         )
@@ -170,7 +170,7 @@ class CustomerQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         """
 
         # resp = await schema.execute(query, variable_values={"title": "The Great Gatsby"})
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=query,
         )
         self.assertTrue(resp.errors is None)
@@ -191,8 +191,8 @@ class CustomerQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
         customer = self.customers[0]
-        customer_global_id = self.to_global_id(model_class=Customer, instance_id=customer.id)
-        resp = self.stawberry_test_client(
+        customer_global_id = self.to_global_id(instance=customer)
+        resp = self.strawberry_test_client(
             query=query,
             variables={"id": customer_global_id}
         )

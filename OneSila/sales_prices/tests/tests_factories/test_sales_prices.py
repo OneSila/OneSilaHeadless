@@ -1,4 +1,5 @@
-from sales_prices.factories import SalesPriceUpdateCreateFactory, SalesPriceCreateForCurrencyFactory
+from sales_prices.factories import SalesPriceUpdateCreateFactory
+from sales_prices.flows import salesprice_create_for_currency_flow
 from core.tests import TestCase
 
 from products.models import SimpleProduct
@@ -15,12 +16,15 @@ logger = logging.getLogger(__name__)
 class SalesPriceCreateForCurrencyFactoryTestCase(TestCase):
     def test_new_currency_created_for_company(self):
         product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company, for_sale=True, active=True)
-        currency, _ = Currency.objects.get_or_create(is_default_currency=True, multi_tenant_company=self.multi_tenant_company, **currencies['GB'])
+        currency_default, _ = Currency.objects.get_or_create(is_default_currency=True, multi_tenant_company=self.multi_tenant_company, **currencies['GB'])
+        salesprice_create_for_currency_flow(currency_default)
 
-        f = SalesPriceCreateForCurrencyFactory(currency)
-        f.run()
+        self.assertFalse(product.salesprice_set.filter(currency=currency_default).exists())
 
-        self.assertTrue(product.salesprice_set.filter(currency=currency).exists())
+        currency_non_default, _ = Currency.objects.get_or_create(is_default_currency=False, multi_tenant_company=self.multi_tenant_company, **currencies['BE'])
+        salesprice_create_for_currency_flow(currency_non_default)
+
+        self.assertTrue(product.salesprice_set.filter(currency=currency_non_default).exists())
 
 
 class SalesPriceUpdateCreateFactoryTestCase(TestCase):

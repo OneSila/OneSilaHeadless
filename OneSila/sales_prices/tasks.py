@@ -48,3 +48,9 @@ def sales_price__salespricelistitem__update_prices_task(sales_price):
 def sales_price_list__salespricelistitem__update_prices_task(salespricelist):
     from sales_prices.flows import sales_price_list__salespricelistitem__update_prices_flow
     sales_price_list__salespricelistitem__update_prices_flow(salespricelist)
+
+
+@db_task()
+def salespricelistitem__update_prices_task(salespricelistitem):
+    from sales_prices.flows import salespricelistitem__update_prices_flow
+    salespricelistitem__update_prices_task(salespricelistitem)

@@ -50,11 +50,23 @@ def salesprices__salesprice_change_on_currency_rate_change(sender, instance, **k
 
 
 @receiver(post_save, sender=SalesPriceList)
-def sales_prices__salespricelist__post_create(sender, instance, **kwargs):
+def sales_prices__salespricelist__post_create(sender, instance, created, **kwargs):
     from .tasks import salespricelistitem__create_for_salespricelist__task, \
         sales_price_list__salespricelistitem__update_prices_task
 
-    # When a SalesPriceList is created we may want to create all kinds of relevant SalesPriceListItems
-    salespricelistitem__create_for_salespricelist__task(instance)
+    if created:
+        # When a SalesPriceList is created we may want to create all kinds of relevant SalesPriceListItems
+        salespricelistitem__create_for_salespricelist__task(instance)
+
     # When a price list is saved, we may need to update the relevant salespriceitems
     sales_price_list__salespricelistitem__update_prices_task(instance)
+
+
+@receiver(post_create, sender=SalesPriceListItem)
+def salespricelistitem__salespricelist__post_create(sender, instance, **kwargs):
+    from .tasks import salespricelistitem__update_prices_task
+
+    # When a salespricelist item has been created, we need to update the prices for it.
+    # This manual route is needed for when a product is added to a price list where products
+    # are added manually
+    salespricelistitem__update_prices_task(instance)

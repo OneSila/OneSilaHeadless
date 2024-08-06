@@ -1,3 +1,4 @@
+from core.exceptions import SanityCheckError
 from sales_prices.factories import SalesPriceUpdateCreateFactory, \
     SalesPriceCreateForCurrencyFactory
 
@@ -8,5 +9,8 @@ def salesprice_updatecreate_flow(sales_price):
 
 
 def salesprice_create_for_currency_flow(currency):
-    f = SalesPriceCreateForCurrencyFactory(currency)
-    f.run()
+    try:
+        f = SalesPriceCreateForCurrencyFactory(currency)
+        f.run()
+    except SanityCheckError:
+        pass

@@ -124,8 +124,10 @@ class SalesPriceList(models.Model):
         default=True)
     auto_add_products = models.BooleanField(_("Auto add all products"),
         default=False)
-    price_change_pcnt = models.FloatField(null=True, blank=True)
-    discount_pcnt = models.FloatField(null=True, blank=True)
+    price_change_pcnt = models.FloatField(null=True, blank=True,
+        help_text=_("How would you like to influence the max price?  Write 20 to increase it with 20%.  Or -20 to decrease with 20\%"))
+    discount_pcnt = models.FloatField(null=True, blank=True,
+        help_text=_("What percentage discount would you like to apply?  For a 20\% discount, write 20"))
     notes = models.TextField(blank=True, null=True)
 
     objects = SalesPriceListManager()

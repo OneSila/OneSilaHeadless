@@ -20,3 +20,9 @@ def sales_price_list__salespricelistitem__update_prices_flow(salespricelist):
     from sales_prices.factories import SalesPriceListForSalesPriceListItemUpdatePricesFactory
     f = SalesPriceListForSalesPriceListItemUpdatePricesFactory(salespricelist)
     f.run()
+
+
+def salespricelistitem__update_prices_flow(salespricelisitem):
+    from sales_prices.factories import SalesPriceListItemUpdatePricesFactory
+    f = SalesPriceListItemUpdatePricesFactory(salespricelisitem)
+    f.run()

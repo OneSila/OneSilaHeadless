@@ -46,7 +46,7 @@ class AuthenticateTokenTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def test_update_my_password(self):
         mutations = CHANGE_PASSWORD_MUTATION
         password = "Bla112k11!"
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutations,
             variables={"password": password},
             asserts_errors=False
@@ -58,7 +58,7 @@ class AuthenticateTokenTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def test_update_my_password_fail(self):
         mutations = CHANGE_PASSWORD_MUTATION
         password = "broken"
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=mutations,
             variables={"password": password},
             asserts_errors=False
@@ -76,7 +76,7 @@ class AuthenticateTokenTestCase(TransactionTestCaseMixin, TransactionTestCase):
         }
         """
 
-        resp = self.stawberry_anonymous_test_client(
+        resp = self.strawberry_anonymous_test_client(
             query=mutations,
             variables={"username": self.user.username}
         )
@@ -86,7 +86,7 @@ class AuthenticateTokenTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         token = MultiTenantUserLoginToken.objects.filter(multi_tenant_user=self.user).last()
 
-        resp = self.stawberry_anonymous_test_client(
+        resp = self.strawberry_anonymous_test_client(
             query=AUTHENTICATE_TOKEN,
             variables={"token": token.token}
         )
@@ -103,7 +103,7 @@ class AuthenticateTokenTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
 
-        resp = self.stawberry_anonymous_test_client(
+        resp = self.strawberry_anonymous_test_client(
             query=mutations,
             variables={"username": self.user.username}
         )
@@ -113,7 +113,7 @@ class AuthenticateTokenTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         token = MultiTenantUserLoginToken.objects.filter(multi_tenant_user=self.user).last()
 
-        resp = self.stawberry_anonymous_test_client(
+        resp = self.strawberry_anonymous_test_client(
             query=AUTHENTICATE_TOKEN,
             variables={"token": token.token}
         )
@@ -151,7 +151,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         country = 'BE'
         phone_number = '+939393939'
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=register_user_mutation,
             asserts_errors=False,
             variables={"username": username, "password": password, 'language': language}
@@ -164,7 +164,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         self.assertEqual(username, resp_username)
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=register_multi_tenant_company_mutation,
             asserts_errors=False,
             variables={"name": company, "country": country, "phoneNumber": phone_number}
@@ -175,7 +175,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         company_id = resp.data['registerMyMultiTenantCompany']['id']
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=me_query,
             asserts_errors=False,
         )
@@ -193,7 +193,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         }
         """
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=my_multi_tenant_company_query)
 
         me_company_id = resp.data['myMultiTenantCompany']['id']
@@ -207,7 +207,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         langauge = 'nl'
 
         try:
-            resp = self.stawberry_test_client(
+            resp = self.strawberry_test_client(
                 query=register_user_mutation,
                 variables={"username": username, "password": password, "language": language}
             )
@@ -221,14 +221,14 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         user.set_password(password)
         user.save()
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=LOGIN_MUTATION,
             variables={"username": user.username, "password": password}
         )
 
         self.assertTrue(resp.errors is None)
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=LOGOUT_MUTATION,
             variables={}
         )
@@ -243,12 +243,12 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         user.set_password(password)
         user.save()
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=LOGIN_MUTATION,
             variables={"username": user.username, "password": password},
         )
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=me_query,
             variables={},
             asserts_errors=False
@@ -265,7 +265,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         user_id = to_base64("MultiTenantUserType", user.id)
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=LOGIN_MUTATION,
             variables={"username": user.username, "password": password}
         )
@@ -282,7 +282,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         username = "invite@kdka.com"
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=invite_mutation,
             variables={'username': username, 'language': 'nl'}
         )
@@ -291,7 +291,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         self.assertTrue(resp.data['inviteUser']['isActive'])
         self.assertFalse(resp.data['inviteUser']['invitationAccepted'])
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=LOGOUT_MUTATION,
             variables={}
         )
@@ -306,7 +306,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
             }
         """
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=accept_mutation,
             variables={'language': 'NL', 'password': "SomePaddk@2k2"},
         )
@@ -334,7 +334,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         }
         """
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=enable_query,
             variables={"id": user_id}
         )
@@ -351,7 +351,7 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         }
         """
 
-        resp = self.stawberry_test_client(
+        resp = self.strawberry_test_client(
             query=disable_query,
             variables={"id": user_id}
         )

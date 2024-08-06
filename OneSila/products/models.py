@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils.text import slugify
 
@@ -25,8 +26,8 @@ class Product(TranslatedModelMixin, models.Model):
     vat_rate = models.ForeignKey(VatRate, on_delete=models.PROTECT, null=True, blank=True)
     for_sale = models.BooleanField(default=True)
 
-    # for simple products
-    always_on_stock = models.BooleanField(default=False)
+    # for simple and dropshipping products, meaning allow product to be sold even when no physical stock is present.
+    allow_backorder = models.BooleanField(default=False)
 
     # Supplier Product Fields
     supplier = models.ForeignKey('contacts.Company', on_delete=models.CASCADE, null=True, blank=True)
@@ -64,11 +65,11 @@ class Product(TranslatedModelMixin, models.Model):
     supplier_products = SupplierProductManager()
 
     @property
-    def name(self, language=None):
-        return self._get_translated_value(field_name='name', related_name='translations', language=language, fallback='sku')
+    def name(self):
+        return self._get_translated_value(field_name='name', related_name='translations', fallback='sku')
 
     def __str__(self):
-        return f"{self.name}"
+        return f"{self.name} <{self.sku}>"
 
     def set_active(self):
         self.active = True
@@ -128,6 +129,12 @@ class Product(TranslatedModelMixin, models.Model):
         self.sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
 
     def save(self, *args, **kwargs):
+        if self.type == self.SUPPLIER and self.supplier is None:
+            raise ValidationError(_("Supplier is missing."))
+
+        if self.type == self.SUPPLIER and not self.sku:
+            raise ValidationError(_("SKU is missing."))
+
         if not self.sku:
             self._generate_sku()
 

@@ -47,6 +47,7 @@ INSTALLED_LOCAL_APPS = [
 
     'customs',
     'eancodes',
+    'lead_times',
     'media',
     'notifications',
     'inventory',

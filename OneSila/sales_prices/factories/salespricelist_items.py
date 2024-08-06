@@ -3,6 +3,9 @@ from currencies.models import Currency
 from currencies.helpers import roundup
 from sales_prices.models import SalesPriceList, SalesPriceListItem, SalesPrice
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class SalesPriceItemAutoPriceUpdateMixin:
     def run_update_cycle(self):
@@ -47,22 +50,27 @@ class SalesPriceItemAutoPriceUpdateMixin:
         # and they need to respect the rounding on the currency
 
         # We calculate the new price and discount based on the highest price received from the SalesPrice
+        logger.debug(f"Updating salespricelistitem {salespricelistitem=}")
+
         sales_price = self.get_salesprice(salespricelistitem)
         highest_price = sales_price.highest_price()
 
         conversion_factor = salespricelistitem.salespricelist.price_change_pcnt
-        salespricelistitem.price_auto = self.calculate_price(highest_price,
+        price_auto = self.calculate_price(highest_price,
             conversion_factor=conversion_factor,
             round_prices_up_to=self.currency.round_prices_up_to,
             is_discount=False)
+        salespricelistitem.price_auto = price_auto
 
         conversion_factor = salespricelistitem.salespricelist.discount_pcnt
-        salespricelistitem.discount_auto = self.calculate_price(highest_price,
+        discount_auto = self.calculate_price(highest_price,
             conversion_factor=conversion_factor,
             round_prices_up_to=self.currency.round_prices_up_to,
             is_discount=True)
-
+        salespricelistitem.discount_auto = discount_auto
         salespricelistitem.save()
+
+        logger.debug(f"New prices saved: {price_auto=} and {discount_auto=}")
 
 
 class SalesPriceListForSalesPriceListItemUpdatePricesFactory(SalesPriceItemAutoPriceUpdateMixin):
@@ -106,12 +114,16 @@ class SalesPriceForSalesPriceListItemUpdatePricesFactory(SalesPriceItemAutoPrice
             auto_update_prices=True,
             currency=self.currency)
 
+        logger.debug(f"About to update {self.salespricelists=}")
+
     def set_salespricelistitems(self):
         self.salespricelistitems = SalesPriceListItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,
             salespricelist__in=self.salespricelists
         )
+
+        logger.debug(f"About to update {self.salespricelistitems=}")
 
     def run(self):
         self.set_salespricelists()
@@ -181,3 +193,18 @@ class SalesPriceListForSalesPriceListItemsCreateUpdateFactory:
         if self.preflight_approval():
             self.set_salesprices()
             self.create_salespricelistpriceitems()
+
+
+class SalesPriceListItemUpdatePricesFactory(SalesPriceItemAutoPriceUpdateMixin):
+    """
+    When a salespricelistitem is created, we want to update it's prices.
+    """
+
+    def __init__(self, salespricelistitem):
+        self.salespricelistitem = salespricelistitem
+        self.multi_tenant_company = salespricelistitem.multi_tenant_company
+        self.salespricelist = salespricelistitem.salespricelist
+        self.currency = self.salespricelist.currency
+
+    def run(self):
+        self.update_salespricelistitem(self.salespricelistitem)
