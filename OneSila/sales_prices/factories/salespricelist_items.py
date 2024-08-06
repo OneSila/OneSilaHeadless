@@ -193,3 +193,18 @@ class SalesPriceListForSalesPriceListItemsCreateUpdateFactory:
         if self.preflight_approval():
             self.set_salesprices()
             self.create_salespricelistpriceitems()
+
+
+class SalesPriceListItemUpdatePricesFactory(SalesPriceItemAutoPriceUpdateMixin):
+    """
+    When a salespricelistitem is created, we want to update it's prices.
+    """
+
+    def __init__(self, salespricelistitem):
+        self.salespricelistitem = salespricelistitem
+        self.multi_tenant_company = salespricelistitem.multi_tenant_company
+        self.salespricelist = salespricelistitem.salespricelist
+        self.currency = self.salespricelist.currency
+
+    def run(self):
+        self.update_salespricelistitem(self.salespricelistitem)

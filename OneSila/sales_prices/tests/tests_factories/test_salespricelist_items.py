@@ -2,7 +2,8 @@ from core.tests import TestCase
 from products.models import SimpleProduct
 from currencies.models import Currency
 from sales_prices.models import SalesPriceList, SalesPriceListItem, SalesPrice
-from sales_prices.flows import sales_price__salespricelistitem__update_prices_flow
+from sales_prices.flows import sales_price__salespricelistitem__update_prices_flow, \
+    salespricelistitem__update_prices_flow
 from sales_prices.factories import SalesPriceForSalesPriceListItemCreateFactory, \
     SalesPriceListForSalesPriceListItemsCreateUpdateFactory, SalesPriceItemAutoPriceUpdateMixin, \
     SalesPriceListForSalesPriceListItemUpdatePricesFactory, SalesPriceForSalesPriceListItemUpdatePricesFactory
@@ -173,9 +174,7 @@ class SalesPriceForSalesPriceListItemCreateFactoryTestCase(TestCase):
         salespricelistitem_thb, _ = price_list_thb_nonauto.salespricelistitem_set.get_or_create(product=product,
             multi_tenant_company=self.multi_tenant_company)
 
-        sales_price__salespricelistitem__update_prices_flow(salesprice_gbp)
-        sales_price__salespricelistitem__update_prices_flow(salesprice_thb)
-
+        salespricelistitem__update_prices_flow(salespricelistitem_thb)
         salespricelistitem_thb.refresh_from_db()
 
         self.assertTrue(salespricelistitem_thb.price_auto != None)
