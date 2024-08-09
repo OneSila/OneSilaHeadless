@@ -139,12 +139,14 @@ class Product(TranslatedModelMixin, models.Model):
         search_terms = ['sku', 'translations__name']
         constraints = [
             models.CheckConstraint(
-                check=models.Q(type=Value(SUPPLIER), sku__isnull=False),
-                name=_("Supplier products require an sku"),
+                check=~Q(type=Value(SUPPLIER)) | Q(sku__isnull=False),
+                name='sku_required_for_supplier_product',
+                violation_error_message=_("Supplier products require an sku"),
             ),
             models.CheckConstraint(
-                check=models.Q(type=Value(SUPPLIER), supplier__isnull=False),
-                name=_("Supplier products require a Supplier"),
+                check=~Q(type=Value(SUPPLIER)) | Q(supplier__isnull=False),
+                name='supplier_required_for_supplier_product',
+                violation_error_message=_("Supplier products require a Supplier"),
             ),
             models.UniqueConstraint(
                 fields=['sku', 'supplier', 'multi_tenant_company'],
