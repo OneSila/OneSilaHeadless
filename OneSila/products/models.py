@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Q
+from django.db.models import Q, Value
 from django.utils.text import slugify
 
 from core import models
@@ -11,6 +11,7 @@ from .managers import ProductManager, UmbrellaManager, BundleManager, VariationM
     SupplierProductManager, ManufacturableManager, DropshipManager
 import shortuuid
 from hashlib import shake_256
+from products.product_types import SUPPLIER
 
 
 class Product(TranslatedModelMixin, models.Model):
@@ -129,12 +130,6 @@ class Product(TranslatedModelMixin, models.Model):
         self.sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
 
     def save(self, *args, **kwargs):
-        if self.type == self.SUPPLIER and self.supplier is None:
-            raise ValidationError(_("Supplier is missing."))
-
-        if self.type == self.SUPPLIER and not self.sku:
-            raise ValidationError(_("SKU is missing."))
-
         if not self.sku:
             self._generate_sku()
 
@@ -143,6 +138,14 @@ class Product(TranslatedModelMixin, models.Model):
     class Meta:
         search_terms = ['sku', 'translations__name']
         constraints = [
+            models.CheckConstraint(
+                check=models.Q(type=Value(SUPPLIER), sku__isnull=False),
+                name=_("Supplier products require an sku"),
+            ),
+            models.CheckConstraint(
+                check=models.Q(type=Value(SUPPLIER), supplier__isnull=False),
+                name=_("Supplier products require a Supplier"),
+            ),
             models.UniqueConstraint(
                 fields=['sku', 'supplier', 'multi_tenant_company'],
                 name='unique_sku_with_supplier',
