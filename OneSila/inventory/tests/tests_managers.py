@@ -8,7 +8,7 @@ from .tests_models import InventoryTestCaseMixin
 class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
     def test_salable(self):
         simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
         supplier.base_products.add(simple)
 
         qty = 321
@@ -23,7 +23,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
 
     def test_salable_allow_backorder(self):
         simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company, allow_backorder=True)
-        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
         supplier.base_products.add(simple)
 
         qty = 321
@@ -38,7 +38,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
 
     def test_reserved_zero(self):
         simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
         supplier.base_products.add(simple)
 
         qty = 1223
@@ -53,7 +53,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
 
     def test_physical_simple_physical(self):
         simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
         supplier.base_products.add(simple)
 
         qty = 1223
@@ -70,7 +70,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
 
     def test_physical_dropship_physical(self):
         drop = DropshipProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
         supplier.base_products.add(drop)
 
         qty = 23325
@@ -83,7 +83,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         self.assertEqual(physical, qty)
 
     def test_physical_supplier_physical(self):
-        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
         qty = 923
         Inventory.objects.create(inventorylocation=self.inventory_location,
             quantity=qty,
@@ -108,11 +108,11 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         bundle = BundleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
 
         simple_one = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        supplier_one = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier_one = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
         simple_one.supplier_products.add(supplier_one)
 
         simple_two = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        supplier_two = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier_two = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-1234")
         simple_two.supplier_products.add(supplier_two)
 
         bundle_qty = 2
@@ -143,7 +143,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
 
         bundle_one = BundleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         simple_one = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        supplier_one = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier_one = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
         simple_one.supplier_products.add(supplier_one)
 
         BundleVariation.objects.create(umbrella=bundle_one, variation=simple_one, quantity=1,
@@ -151,7 +151,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
 
         bundle_two = BundleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         simple_two = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        supplier_two = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier_two = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-1234")
         simple_two.supplier_products.add(supplier_two)
 
         BundleVariation.objects.create(umbrella=bundle_two, variation=simple_two, quantity=1,
@@ -215,8 +215,8 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         prod_one = DropshipProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         prod_two = DropshipProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
 
-        sup_one = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        sup_two = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        sup_one = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
+        sup_two = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-1234")
 
         prod_one.supplier_products.add(sup_one)
         prod_two.supplier_products.add(sup_two)
@@ -251,7 +251,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         prod_one = ManufacturableProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         prod_two = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
 
-        sup_two = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        sup_two = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-1234")
         prod_two.supplier_products.add(sup_two)
 
         bundle_qty = 2
@@ -283,8 +283,8 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         prod_one = DropshipProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         prod_two = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
 
-        sup_one = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        sup_two = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        sup_one = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
+        sup_two = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-1234")
 
         prod_one.supplier_products.add(sup_one)
         prod_two.supplier_products.add(sup_two)
@@ -320,8 +320,8 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         prod_two = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         prod_three = ManufacturableProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
 
-        sup_one = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        sup_two = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        sup_one = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
+        sup_two = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-1234")
 
         prod_one.supplier_products.add(sup_one)
         prod_two.supplier_products.add(sup_two)

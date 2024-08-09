@@ -1,7 +1,7 @@
 from core import models
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
-from contacts.models import ShippingAddress
+from contacts.models import ShippingAddress, InventoryShippingAddress
 from .managers import LeadTimeManager
 from products.models import Product
 from products.product_types import MANUFACTURABLE, SUPPLIER
@@ -41,6 +41,10 @@ class LeadTime(models.Model):
     objects = LeadTimeManager()
 
     def __str__(self):
+        return self.name
+
+    @property
+    def name(self):
         return f"{self.min_time} - {self.max_time} {self.get_unit_display()}(s)"
 
     class Meta:

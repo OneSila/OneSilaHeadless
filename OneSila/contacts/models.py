@@ -3,10 +3,10 @@ from django.db.models import UniqueConstraint
 from core.exceptions import RequiredFieldException
 from core import models
 from django.utils.translation import gettext_lazy as _
-
+from django.db.models import Q
 from .managers import SupplierManager, CustomerManager, InfluencerManager, \
     InvoiceAddressManager, ShippingAddressManager, InternalCompanyManager, \
-    CompanyManager, InternalShippingAddressManager
+    CompanyManager, InventoryShippingAddressManager, InternalShippingAddressManager
 
 
 class Company(models.Model):
@@ -203,6 +203,17 @@ class InvoiceAddress(Address):
         search_terms = ['person__email', 'company__name']
         verbose_name_plural = 'invoice addresses'
 
+
+class InventoryShippingAddress(Address):
+    # this is either an internal company address or supplier address
+    objects = InventoryShippingAddressManager()
+    proxy_filter_fields = {'is_shipping_address': True}
+    additional_filter_fields = Q(company__is_internal_company=True) | Q(company__is_supplier=True)
+
+    class Meta:
+        proxy = True
+        search_terms = ['person__email', 'company__name']
+        verbose_name_plural = 'inventory shipping addresses'
 
 class InternalShippingAddress(Address):
     objects = InternalShippingAddressManager()

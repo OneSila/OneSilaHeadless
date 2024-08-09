@@ -80,6 +80,14 @@ class InvoiceAddressManager(MultiTenantManager):
         return InvoiceAddressQuerySet(self.model, using=self._db)
 
 
+class InventoryShippingAddressQuerySet(QuerySetProxyModelMixin, AddressQuerySet):
+    pass
+
+
+class InventoryShippingAddressManager(MultiTenantManager):
+    def get_queryset(self):
+        return InventoryShippingAddressQuerySet(self.model, using=self._db)
+
 class InternalShippingAddressQuerySet(QuerySetProxyModelMixin, AddressQuerySet):
     pass
 

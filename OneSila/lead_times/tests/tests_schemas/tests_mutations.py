@@ -4,7 +4,7 @@ from model_bakery import baker
 from OneSila.schema import schema
 from lead_times.models import LeadTime, LeadTimeForShippingAddress, \
     LeadTimeProductOutOfStock
-from contacts.models import ShippingAddress
+from contacts.models import ShippingAddress, Supplier
 from products.models import Product, SupplierProduct
 
 
@@ -41,6 +41,7 @@ class LeadTimeForShippingAddressTestCase(TestWithDemoDataMixin, TransactionTestC
         self.lead_time, _ = LeadTime.objects.get_or_create(min_time=1, max_time=10, unit=LeadTime.DAY,
             multi_tenant_company=self.multi_tenant_company)
         self.shipping_address = ShippingAddress.objects.filter(multi_tenant_company=self.multi_tenant_company).last()
+        self.supplier = Supplier.objects.create(name="Supplier Company", multi_tenant_company=self.multi_tenant_company)
 
     def test_leadtime_for_shippingaddress(self):
         from .mutations import create_leadtime_for_shippingaddress
@@ -61,7 +62,7 @@ class LeadTimeForShippingAddressTestCase(TestWithDemoDataMixin, TransactionTestC
 class LeadTimeProductOutOfStockTestCase(LeadTimeForShippingAddressTestCase):
     def setUp(self):
         super().setUp()
-        self.supplier_product = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        self.supplier_product = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
 
     def test_lead_time_product_outofstock(self):
         from .mutations import create_lead_time_product_outofstock

@@ -1,4 +1,4 @@
-from contacts.models import InternalShippingAddress
+from contacts.models import InventoryShippingAddress
 from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator
 from inventory.models import InventoryLocation, Inventory
 from products.models import SupplierProduct
@@ -19,7 +19,7 @@ class InventoryLocationGenerator(PrivateDataGenerator):
     def prep_baker_kwargs(self, seed):
         kwargs = super().prep_baker_kwargs(seed)
         multi_tenant_company = kwargs['multi_tenant_company']
-        kwargs['shippingaddress'] = InternalShippingAddress.objects.\
+        kwargs['shippingaddress'] = InventoryShippingAddress.objects.\
             filter_multi_tenant(multi_tenant_company).\
             last()
         return kwargs
