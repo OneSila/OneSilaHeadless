@@ -46,13 +46,14 @@ class InventoryQuerySet(MultiTenantQuerySet):
             inventory_qs = self.filter_physical()
             return inventory_qs.aggregate(Sum('quantity'))['quantity__sum'] or 0
 
+        # put the qty here so umbrella / configurable products to have 0 instead of error
+        qty = 0
         if product.type in [BUNDLE]:
             # Even though we can attach a variety of bundles, we must ensure we
             # dont sum them, but use min.  Why? Let's take an example. A bundle existing of a phone + 2 covers:
             # Phone: 100 items
             # Cover: 30
             # That means we can only ship 15x Phone+cover since the cover only has 30 pieces of which 2 are needed.
-            qty = 0
             try:
                 # int() will round down which is what we want.
                 available_parts = []

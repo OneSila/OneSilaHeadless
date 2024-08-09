@@ -1,10 +1,10 @@
 from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
 from contacts.models import Company, Supplier, Customer, Influencer, InternalCompany, \
-    Person, Address, ShippingAddress, InvoiceAddress, InternalShippingAddress
+    Person, Address, ShippingAddress, InvoiceAddress, InventoryShippingAddress
 from .types.types import CompanyType, SupplierType, CustomerType, InfluencerType, \
     InternalCompanyType, PersonType, AddressType, ShippingAddressType, InvoiceAddressType, \
-    InternalShippingAddressType
+    InventoryShippingAddressType
 
 import logging
 logger = logging.getLogger(__name__)
@@ -60,6 +60,6 @@ class ContactsSubscription:
             yield i
 
     @subscription
-    async def internal_shipping_address(self, info: Info, pk: str) -> AsyncGenerator[InternalShippingAddressType, None]:
-        async for i in model_subscriber(info=info, pk=pk, model=InternalShippingAddress):
+    async def inventory_shipping_address(self, info: Info, pk: str) -> AsyncGenerator[InventoryShippingAddressType, None]:
+        async for i in model_subscriber(info=info, pk=pk, model=InventoryShippingAddress):
             yield i

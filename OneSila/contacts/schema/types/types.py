@@ -5,11 +5,11 @@ from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from core.schema.multi_tenant.types.types import MultiTenantCompanyType
 
 from contacts.models import Company, Supplier, Customer, Influencer, \
-    InternalCompany, Person, Address, ShippingAddress, InvoiceAddress, InternalShippingAddress
+    InternalCompany, Person, Address, ShippingAddress, InvoiceAddress, InventoryShippingAddress
 from currencies.schema.types.types import CurrencyType
 from currencies.models import Currency
 from .filters import CompanyFilter, SupplierFilter, AddressFilter, PersonFilter, CustomerFilter, \
-    ShippingAddressFilter, InvoiceAddressFilter, InternalShippingAddressFilter
+    ShippingAddressFilter, InvoiceAddressFilter, InventoryShippingAddressFilter
 from .ordering import CompanyOrder, SupplierOrder, CustomerOrder, PersonOrder
 
 
@@ -105,8 +105,8 @@ class InvoiceAddressType(relay.Node, GetQuerysetMultiTenantMixin):
         return self.full_address
 
 
-@type(InternalShippingAddress, filters=InternalShippingAddressFilter, pagination=True, fields="__all__")
-class InternalShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
+@type(InventoryShippingAddress, filters=InventoryShippingAddressFilter, pagination=True, fields="__all__")
+class InventoryShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     company: CompanyType
     person: Optional[PersonType]

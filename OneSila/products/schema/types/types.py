@@ -59,6 +59,18 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
 
         return None
 
+    @field()
+    def inventory_physical(self, info) -> str | None:
+        return self.inventory.physical()
+
+    @field()
+    def inventory_salable(self, info) -> str | None:
+        return self.inventory.salable()
+
+    @field()
+    def inventory_reserved(self, info) -> str | None:
+        return self.inventory.reserved()
+
 @type(ProductTranslation, filters=ProductTranslationFilter, order=ProductTranslationOrder, pagination=True, fields="__all__")
 class ProductTranslationType(relay.Node, GetQuerysetMultiTenantMixin):
     pass

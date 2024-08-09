@@ -6,7 +6,7 @@ from django.db import IntegrityError
 from core.managers.search import SearchQuerySetMixin, SearchManagerMixin
 from core.managers.decorators import multi_tenant_company_required
 from django.utils.translation import gettext_lazy as _
-
+from django.db.models import Q
 
 class MultiTenantUserLoginTokenQuerySet(DjangoQueryset):
     def get_by_token(self, token):
@@ -127,8 +127,13 @@ class QuerySetProxyModelMixin(MultiTenantQuerySet):
 
     # @multi_tenant_company_required()
     def filter(self, *args, **kwargs):
-        kwargs.update(self.model.proxy_filter_fields)
-        return super().filter(*args, **kwargs)
+        if hasattr(self.model, 'additional_filter_fields'):
+            # additional_filter_fields filters are Q filters that allows OR
+            combined_filter = Q(**self.model.proxy_filter_fields) & self.model.additional_filter_fields
+            return super().filter(combined_filter, *args, **kwargs)
+        else:
+            kwargs.update(self.model.proxy_filter_fields)
+            return super().filter(*args, **kwargs)
 
     @multi_tenant_company_required()
     def create(self, **kwargs):

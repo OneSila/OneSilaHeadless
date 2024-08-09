@@ -30,5 +30,5 @@ class LeadTimeProductOutOfStockInput:
 
 
 @partial(LeadTimeProductOutOfStock, fields="__all__")
-class LeadTimeProductOutOfStockPartialInput:
+class LeadTimeProductOutOfStockPartialInput(NodeInput):
     pass
