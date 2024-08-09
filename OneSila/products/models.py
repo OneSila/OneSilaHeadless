@@ -130,7 +130,7 @@ class Product(TranslatedModelMixin, models.Model):
         self.sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
 
     def save(self, *args, **kwargs):
-        if not self.sku:
+        if not self.sku and self.type != SUPPLIER:
             self._generate_sku()
 
         super().save(*args, **kwargs)

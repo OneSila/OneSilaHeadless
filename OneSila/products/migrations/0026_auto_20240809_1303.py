@@ -32,6 +32,7 @@ def delete_traversed_content_object(content_object):
 class Migration(migrations.Migration):
 
     dependencies = [
+        ('contacts', '0018_delete_internalshippingaddress'),
         ('products', '0025_rename_always_on_stock_product_allow_backorder'),
     ]
 

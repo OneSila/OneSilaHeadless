@@ -87,3 +87,11 @@ class InventoryShippingAddressQuerySet(QuerySetProxyModelMixin, AddressQuerySet)
 class InventoryShippingAddressManager(MultiTenantManager):
     def get_queryset(self):
         return InventoryShippingAddressQuerySet(self.model, using=self._db)
+
+class InternalShippingAddressQuerySet(QuerySetProxyModelMixin, AddressQuerySet):
+    pass
+
+
+class InternalShippingAddressManager(MultiTenantManager):
+    def get_queryset(self):
+        return InternalShippingAddressQuerySet(self.model, using=self._db)

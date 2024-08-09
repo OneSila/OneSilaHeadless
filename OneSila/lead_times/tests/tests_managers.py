@@ -15,6 +15,8 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
             min_time=2, max_time=5, unit=LeadTime.HOUR)
         self.lead_time_slow, _ = LeadTime.objects.get_or_create(multi_tenant_company=self.multi_tenant_company,
             min_time=1, max_time=2, unit=LeadTime.DAY)
+        self.supplier = Supplier.objects.create(name="Supplier Company", multi_tenant_company=self.multi_tenant_company)
+        self.shipping_address = ShippingAddress.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.supplier)
 
     def test_filter_fastest(self):
         filtered = LeadTime.objects.\
@@ -29,7 +31,7 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
         self.assertEqual(fastest, self.lead_time_fast)
 
     def test_leadtime_for_outofstock_product(self):
-        product = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        product = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
         LeadTimeProductOutOfStock.objects.create(multi_tenant_company=self.multi_tenant_company,
             product=product, leadtime_outofstock=self.lead_time_slow)
 
@@ -56,7 +58,7 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
 
         simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         supplier_product = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company,
-            supplier=supplier)
+            supplier=supplier, sku="SUP-123")
         supplier_product.base_products.add(simple)
 
         qty = 1223
