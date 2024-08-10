@@ -13,4 +13,4 @@ fi
 
 
 cd OneSila
-./manage.py run_huey --huey-verbose
+./manage.py run_huey
