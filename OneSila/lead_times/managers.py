@@ -25,11 +25,16 @@ class LeadTimeQuerySet(MultiTenantQuerySet):
                     pass
             leadtime = self.filter_slowest(leadtimes=leadtime_ids)
         else:
+            # Items that are not bundles should return a physical location if there inventory.
+            # These locations have lead times.
             inventory_qs = product.inventory.filter_physical()
             leadtime = self.\
                 filter_leadtimes_for_inventory(inventory_qs).\
                 filter_fastest()
 
+            # If there is not leadtime detected, most likely there was no inventory
+            # present for that location. (that or there was no setting on the shipping address)
+            # So we start digging for out-of-stock inventory settings.
             if not leadtime:
                 if product.type in HAS_DIRECT_INVENTORY_TYPES:
                     try:
