@@ -1,7 +1,7 @@
 from core.tests import TestCase
 from inventory.models import InventoryLocation, Inventory
 from products.models import SimpleProduct, SupplierProduct, BundleProduct, \
-    DropshipProduct, UmbrellaProduct, ManufacturableProduct, BundleVariation
+    DropshipProduct, ManufacturableProduct, BundleVariation
 from .tests_models import InventoryTestCaseMixin
 
 
@@ -116,9 +116,9 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         simple_two.supplier_products.add(supplier_two)
 
         bundle_qty = 2
-        BundleVariation.objects.create(umbrella=bundle, variation=simple_one, quantity=bundle_qty,
+        BundleVariation.objects.create(parent=bundle, variation=simple_one, quantity=bundle_qty,
             multi_tenant_company=self.multi_tenant_company)
-        BundleVariation.objects.create(umbrella=bundle, variation=simple_two, quantity=bundle_qty,
+        BundleVariation.objects.create(parent=bundle, variation=simple_two, quantity=bundle_qty,
             multi_tenant_company=self.multi_tenant_company)
 
         self.assertEqual(bundle.bundle_variations.all().count(), 2)
@@ -146,7 +146,7 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         supplier_one = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
         simple_one.supplier_products.add(supplier_one)
 
-        BundleVariation.objects.create(umbrella=bundle_one, variation=simple_one, quantity=1,
+        BundleVariation.objects.create(parent=bundle_one, variation=simple_one, quantity=1,
             multi_tenant_company=self.multi_tenant_company)
 
         bundle_two = BundleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
@@ -154,13 +154,13 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         supplier_two = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-1234")
         simple_two.supplier_products.add(supplier_two)
 
-        BundleVariation.objects.create(umbrella=bundle_two, variation=simple_two, quantity=1,
+        BundleVariation.objects.create(parent=bundle_two, variation=simple_two, quantity=1,
             multi_tenant_company=self.multi_tenant_company)
 
         bundle_qty = 2
-        BundleVariation.objects.create(umbrella=bundle, variation=bundle_one, quantity=bundle_qty,
+        BundleVariation.objects.create(parent=bundle, variation=bundle_one, quantity=bundle_qty,
             multi_tenant_company=self.multi_tenant_company)
-        BundleVariation.objects.create(umbrella=bundle, variation=bundle_two, quantity=bundle_qty,
+        BundleVariation.objects.create(parent=bundle, variation=bundle_two, quantity=bundle_qty,
             multi_tenant_company=self.multi_tenant_company)
 
         self.assertEqual(bundle.bundle_variations.all().count(), 2)
@@ -187,9 +187,9 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         prod_two = ManufacturableProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
 
         bundle_qty = 2
-        BundleVariation.objects.create(umbrella=bundle, variation=prod_one, quantity=bundle_qty,
+        BundleVariation.objects.create(parent=bundle, variation=prod_one, quantity=bundle_qty,
             multi_tenant_company=self.multi_tenant_company)
-        BundleVariation.objects.create(umbrella=bundle, variation=prod_two, quantity=bundle_qty,
+        BundleVariation.objects.create(parent=bundle, variation=prod_two, quantity=bundle_qty,
             multi_tenant_company=self.multi_tenant_company)
 
         self.assertEqual(bundle.bundle_variations.all().count(), 2)
@@ -222,9 +222,9 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         prod_two.supplier_products.add(sup_two)
 
         bundle_qty = 3
-        BundleVariation.objects.create(umbrella=bundle, variation=prod_one, quantity=bundle_qty,
+        BundleVariation.objects.create(parent=bundle, variation=prod_one, quantity=bundle_qty,
             multi_tenant_company=self.multi_tenant_company)
-        BundleVariation.objects.create(umbrella=bundle, variation=prod_two, quantity=bundle_qty,
+        BundleVariation.objects.create(parent=bundle, variation=prod_two, quantity=bundle_qty,
             multi_tenant_company=self.multi_tenant_company)
 
         self.assertEqual(bundle.bundle_variations.all().count(), 2)
@@ -255,9 +255,9 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         prod_two.supplier_products.add(sup_two)
 
         bundle_qty = 2
-        BundleVariation.objects.create(umbrella=bundle, variation=prod_one, quantity=bundle_qty,
+        BundleVariation.objects.create(parent=bundle, variation=prod_one, quantity=bundle_qty,
             multi_tenant_company=self.multi_tenant_company)
-        BundleVariation.objects.create(umbrella=bundle, variation=prod_two, quantity=bundle_qty,
+        BundleVariation.objects.create(parent=bundle, variation=prod_two, quantity=bundle_qty,
             multi_tenant_company=self.multi_tenant_company)
 
         self.assertEqual(bundle.bundle_variations.all().count(), 2)
@@ -290,9 +290,9 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         prod_two.supplier_products.add(sup_two)
 
         bundle_qty = 3
-        BundleVariation.objects.create(umbrella=bundle, variation=prod_one, quantity=bundle_qty,
+        BundleVariation.objects.create(parent=bundle, variation=prod_one, quantity=bundle_qty,
             multi_tenant_company=self.multi_tenant_company)
-        BundleVariation.objects.create(umbrella=bundle, variation=prod_two, quantity=bundle_qty,
+        BundleVariation.objects.create(parent=bundle, variation=prod_two, quantity=bundle_qty,
             multi_tenant_company=self.multi_tenant_company)
 
         self.assertEqual(bundle.bundle_variations.all().count(), 2)
@@ -329,11 +329,11 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         bundle_qty_one = 3
         bundle_qty_two = 2
         bundle_qty_three = 1
-        BundleVariation.objects.create(umbrella=bundle, variation=prod_one, quantity=bundle_qty_one,
+        BundleVariation.objects.create(parent=bundle, variation=prod_one, quantity=bundle_qty_one,
             multi_tenant_company=self.multi_tenant_company)
-        BundleVariation.objects.create(umbrella=bundle, variation=prod_two, quantity=bundle_qty_two,
+        BundleVariation.objects.create(parent=bundle, variation=prod_two, quantity=bundle_qty_two,
             multi_tenant_company=self.multi_tenant_company)
-        BundleVariation.objects.create(umbrella=bundle, variation=prod_three, quantity=bundle_qty_three,
+        BundleVariation.objects.create(parent=bundle, variation=prod_three, quantity=bundle_qty_three,
             multi_tenant_company=self.multi_tenant_company)
 
         self.assertEqual(bundle.bundle_variations.all().count(), 3)

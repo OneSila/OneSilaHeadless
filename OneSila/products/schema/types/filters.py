@@ -4,7 +4,7 @@ from contacts.schema.types.filters import SupplierFilter
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin, lazy
 
-from products.models import Product, BundleProduct, UmbrellaProduct, \
+from products.models import Product, BundleProduct, ConfigurableProduct, \
     SimpleProduct, ProductTranslation, ConfigurableVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, \
     SupplierPrices
 from taxes.schema.types.filters import VatRateFilter
@@ -30,8 +30,8 @@ class BundleProductFilter(SearchFilterMixin):
     vat_rate: Optional[VatRateFilter]
 
 
-@filter(UmbrellaProduct)
-class UmbrellaProductFilter(SearchFilterMixin):
+@filter(ConfigurableProduct)
+class ConfigurableProductFilter(SearchFilterMixin):
     search: str | None
     id: auto
     sku: auto
@@ -93,7 +93,7 @@ class SupplierProductFilter(SearchFilterMixin):
 @filter(BillOfMaterial)
 class BillOfMaterialFilter:
     id: auto
-    umbrella: Optional[ProductFilter]
+    configurable: Optional[ProductFilter]
 
 
 @filter(SupplierPrices)

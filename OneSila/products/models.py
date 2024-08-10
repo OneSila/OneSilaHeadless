@@ -7,7 +7,7 @@ from django.db import IntegrityError, transaction
 from django.utils.translation import gettext_lazy as _
 from translations.models import TranslationFieldsMixin, TranslatedModelMixin
 from taxes.models import VatRate
-from .managers import ProductManager, UmbrellaManager, BundleManager, VariationManager, \
+from .managers import ProductManager, ConfigurableManager, BundleManager, VariationManager, \
     SupplierProductManager, ManufacturableManager, DropshipManager
 import shortuuid
 from hashlib import shake_256
@@ -15,7 +15,7 @@ from products.product_types import SUPPLIER
 
 
 class Product(TranslatedModelMixin, models.Model):
-    from products.product_types import UMBRELLA, BUNDLE, MANUFACTURABLE, DROPSHIP, SUPPLIER, SIMPLE, \
+    from products.product_types import CONFIGURABLE, BUNDLE, MANUFACTURABLE, DROPSHIP, SUPPLIER, SIMPLE, \
         PRODUCT_TYPE_CHOICES, HAS_PRICES_TYPES
 
     # Mandatory
@@ -41,7 +41,7 @@ class Product(TranslatedModelMixin, models.Model):
         through='ConfigurableVariation',
         symmetrical=False,
         blank=True,
-        related_name='umbrellas')
+        related_name='configurables')
 
     bundle_variations = models.ManyToManyField('self',
         through='BundleVariation',
@@ -60,7 +60,7 @@ class Product(TranslatedModelMixin, models.Model):
     objects = ProductManager()
     variations = VariationManager()
     bundles = BundleManager()
-    umbrellas = UmbrellaManager()
+    configurables = ConfigurableManager()
     manufacturables = ManufacturableManager()
     dropships = DropshipManager()
     supplier_products = SupplierProductManager()
@@ -80,11 +80,11 @@ class Product(TranslatedModelMixin, models.Model):
         self.active = False
         self.save()
 
-    def is_umbrella(self):
-        return self.type == self.UMBRELLA
+    def is_configurable(self):
+        return self.type == self.CONFIGURABLE
 
-    def is_not_umbrella(self):
-        return self.type != self.UMBRELLA
+    def is_not_configurable(self):
+        return self.type != self.CONFIGURABLE
 
     def is_bundle(self):
         return self.type == self.BUNDLE
@@ -115,8 +115,8 @@ class Product(TranslatedModelMixin, models.Model):
             return SimpleProduct.objects.get(pk=self.pk)
         elif self.is_bundle():
             return BundleProduct.objects.get(pk=self.pk)
-        elif self.is_umbrella():
-            return UmbrellaProduct.objects.get(pk=self.pk)
+        elif self.is_configurable():
+            return ConfigurableProduct.objects.get(pk=self.pk)
         elif self.is_manufacturable():
             return ManufacturableProduct.objects.get(pk=self.pk)
         elif self.is_dropship():
@@ -172,11 +172,11 @@ class BundleProduct(Product):
         search_terms = ['sku']
 
 
-class UmbrellaProduct(Product):
-    from .product_types import UMBRELLA
+class ConfigurableProduct(Product):
+    from .product_types import CONFIGURABLE
 
-    objects = UmbrellaManager()
-    proxy_filter_fields = {'type': UMBRELLA}
+    objects = ConfigurableManager()
+    proxy_filter_fields = {'type': CONFIGURABLE}
 
     class Meta:
         proxy = True
@@ -217,14 +217,14 @@ class DropshipProduct(Product):
 
 
 class ConfigurableVariation(models.Model):
-    parent = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="ConfigurableVariation_umbrellas")
-    variation = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="ConfigurableVariation_variations")
+    parent = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="configurablevariation_through_parents")
+    variation = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="configurablevariation_through_variations")
 
     def save(self, *args, **kwargs):
-        if self.parent.is_not_umbrella():
-            raise IntegrityError(_("parent needs to a product of type UMBRELLA. Not %s" % (self.parent.type)))
+        if self.parent.is_not_configurable():
+            raise IntegrityError(_("parent needs to a product of type CONFIGURABLE. Not %s" % (self.parent.type)))
 
-        if self.variation.is_umbrella():
+        if self.variation.is_configurable():
             raise IntegrityError(_("variation needs to a product of type BUNDLE or SIMPLE. Not %s" % (self.parent.type)))
 
         super().save(*args, **kwargs)
@@ -237,8 +237,8 @@ class ConfigurableVariation(models.Model):
 
 
 class BundleVariation(models.Model):
-    parent = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_umbrellas")
-    variation = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_variations")
+    parent = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_through_parents")
+    variation = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="bundlevariation_through_variations")
     quantity = models.FloatField(default=1)
 
     def __str__(self):
@@ -248,7 +248,7 @@ class BundleVariation(models.Model):
         if self.parent.is_not_bundle():
             raise IntegrityError(_("parent needs to a product of type BUNDLE. Not %s" % (self.parent.type)))
 
-        if self.variation.is_umbrella():
+        if self.variation.is_configurable():
             raise IntegrityError(_("variation needs to a product of type BUNDLE or SIMPLE. Not %s" % (self.parent.type)))
 
         super().save(*args, **kwargs)
@@ -258,16 +258,16 @@ class BundleVariation(models.Model):
 
 
 class BillOfMaterial(models.Model):
-    umbrella = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_manufacturables")
-    variation = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_components")
+    parent = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_through_parents")
+    variation = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_through_variations")
     quantity = models.FloatField(default=1)
 
     def __str__(self):
-        return f"{self.umbrella} x {self.quantity} {self.variation}"
+        return f"{self.parent} x {self.quantity} {self.variation}"
 
     def save(self, *args, **kwargs):
-        if self.umbrella.is_not_manufacturable():
-            raise IntegrityError(_("Product needs to be of type MANUFACTURABLE. Not %s" % self.umbrella.type))
+        if self.parent.is_not_manufacturable():
+            raise IntegrityError(_("Product needs to be of type MANUFACTURABLE. Not %s" % self.parent.type))
 
         if self.variation.type not in [Product.SIMPLE, Product.MANUFACTURABLE]:
             raise IntegrityError(_("variation needs to a product of type BUNDLE or MANUFACTURABLE. Not %s" % (self.variation.type)))
@@ -275,7 +275,7 @@ class BillOfMaterial(models.Model):
         super().save(*args, **kwargs)
 
     class Meta:
-        unique_together = ("umbrella", "variation")
+        unique_together = ("parent", "variation")
 
 
 class ProductTranslation(TranslationFieldsMixin, models.Model):

@@ -3,7 +3,7 @@ from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin, \
 
 
 class ProductQuerySet(MultiTenantQuerySet):
-    def filter_umbrella(self):
+    def filter_configurable(self):
         return self.filter(type=self.model.UMBRELLA)
 
     def filter_variation(self):
@@ -27,13 +27,13 @@ class ProductManager(MultiTenantManager):
         return ProductQuerySet(self.model, using=self._db)
 
 
-class UmbrellaQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+class ConfigurableQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
     pass
 
 
-class UmbrellaManager(ProductManager):
+class ConfigurableManager(ProductManager):
     def get_queryset(self):
-        return UmbrellaQuerySet(self.model, using=self._db)
+        return ConfigurableQuerySet(self.model, using=self._db)
 
 
 class VariationQuerySet(QuerySetProxyModelMixin, ProductQuerySet):

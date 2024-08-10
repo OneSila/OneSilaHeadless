@@ -1,10 +1,10 @@
 from .fields import create_product, create_supplier_product
-from ..types.types import ProductType, BundleProductType, UmbrellaProductType, \
+from ..types.types import ProductType, BundleProductType, ConfigurableProductType, \
     SimpleProductType, ProductTranslationType, ConfigurableVariationType, \
     BundleVariationType, ManufacturableProductType, DropshipProductType, SupplierProductType, BillOfMaterialType, SupplierPricesType
-from ..types.input import ProductInput, BundleProductInput, UmbrellaProductInput, \
+from ..types.input import ProductInput, BundleProductInput, ConfigurableProductInput, \
     SimpleProductInput, ProductTranslationInput, ConfigurableVariationInput, \
-    BundleVariationInput, ProductPartialInput, UmbrellaProductPartialInput, \
+    BundleVariationInput, ProductPartialInput, ConfigurableProductPartialInput, \
     BundleProductPartialInput, SimpleProductPartialInput, \
     ProductTranslationPartialInput, ConfigurableVariationPartialInput, \
     BundleVariationPartialInput, ManufacturableProductInput, ManufacturableProductPartialInput, DropshipProductInput, DropshipProductPartialInput, \
@@ -26,11 +26,11 @@ class ProductsMutation:
     delete_bundle_product: BundleProductType = delete()
     delete_bundle_products: List[BundleProductType] = delete()
 
-    create_umbrella_product: UmbrellaProductType = create(UmbrellaProductInput)
-    create_umbrella_products: List[UmbrellaProductType] = create(UmbrellaProductInput)
-    update_umbrella_product: UmbrellaProductType = update(UmbrellaProductPartialInput)
-    delete_umbrella_product: UmbrellaProductType = delete()
-    delete_umbrella_products: List[UmbrellaProductType] = delete()
+    create_configurable_product: ConfigurableProductType = create(ConfigurableProductInput)
+    create_configurable_products: List[ConfigurableProductType] = create(ConfigurableProductInput)
+    update_configurable_product: ConfigurableProductType = update(ConfigurableProductPartialInput)
+    delete_configurable_product: ConfigurableProductType = delete()
+    delete_configurable_products: List[ConfigurableProductType] = delete()
 
     create_simple_product: SimpleProductType = create(SimpleProductInput)
     create_simple_products: List[SimpleProductType] = create(SimpleProductInput)

@@ -7,14 +7,14 @@ from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixi
 from typing import List, Optional
 
 from media.models import Media
-from products.models import Product, BundleProduct, UmbrellaProduct, SimpleProduct, \
+from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
     ProductTranslation, ConfigurableVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrices
 from taxes.schema.types.types import VatRateType
 from units.schema.types.types import UnitType
-from .filters import ProductFilter, BundleProductFilter, UmbrellaProductFilter, \
+from .filters import ProductFilter, BundleProductFilter, ConfigurableProductFilter, \
     SimpleProductFilter, ProductTranslationFilter, ConfigurableVariationFilter, BundleVariationFilter, BillOfMaterialFilter, SupplierProductFilter, \
     DropshipProductFilter, ManufacturableProductFilter, SupplierPricesFilter
-from .ordering import ProductOrder, BundleProductOrder, UmbrellaProductOrder, \
+from .ordering import ProductOrder, BundleProductOrder, ConfigurableProductOrder, \
     SimpleProductOrder, ProductTranslationOrder, ConfigurableVariationOrder, BundleVariationOrder, BillOfMaterialOrder, SupplierProductOrder, \
     DropshipProductOrder, ManufacturableProductOrder, SupplierPricesOrder
 
@@ -32,8 +32,8 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
             graphql_type = SimpleProductType
         elif self.is_bundle():
             graphql_type = BundleProductType
-        elif self.is_umbrella():
-            graphql_type = UmbrellaProductType
+        elif self.is_configurable():
+            graphql_type = ConfigurableProductType
         elif self.is_manufacturable():
             graphql_type = ManufacturableProductType
         elif self.is_dropship():
@@ -82,8 +82,8 @@ class BundleProductType(relay.Node, GetQuerysetMultiTenantMixin):
     pass
 
 
-@type(UmbrellaProduct, filters=UmbrellaProductFilter, order=UmbrellaProductOrder, pagination=True, fields="__all__")
-class UmbrellaProductType(relay.Node, GetQuerysetMultiTenantMixin):
+@type(ConfigurableProduct, filters=ConfigurableProductFilter, order=ConfigurableProductOrder, pagination=True, fields="__all__")
+class ConfigurableProductType(relay.Node, GetQuerysetMultiTenantMixin):
     pass
 
 
@@ -96,19 +96,19 @@ class SimpleProductType(relay.Node, GetQuerysetMultiTenantMixin):
 
 @type(ConfigurableVariation, filters=ConfigurableVariationFilter, order=ConfigurableVariationOrder, pagination=True, fields="__all__")
 class ConfigurableVariationType(relay.Node, GetQuerysetMultiTenantMixin):
-    umbrella: Optional[ProductType]
+    configurable: Optional[ProductType]
     variation: Optional[ProductType]
 
 
 @type(BundleVariation, filters=BundleVariationFilter, order=BundleVariationOrder, pagination=True, fields="__all__")
 class BundleVariationType(relay.Node, GetQuerysetMultiTenantMixin):
-    umbrella: Optional[ProductType]
+    configurable: Optional[ProductType]
     variation: Optional[ProductType]
 
 
 @type(BillOfMaterial, filters=BillOfMaterialFilter, order=BillOfMaterialOrder, pagination=True, fields="__all__")
 class BillOfMaterialType(relay.Node, GetQuerysetMultiTenantMixin):
-    umbrella: Optional[ProductType]
+    configurable: Optional[ProductType]
     variation: Optional[ProductType]
 
 

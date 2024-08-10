@@ -1,8 +1,8 @@
 from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
-from products.models import Product, BundleProduct, UmbrellaProduct, SimpleProduct, ProductTranslation, \
+from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, ProductTranslation, \
     ConfigurableVariation, BundleVariation, ManufacturableProduct, DropshipProduct, SupplierProduct, BillOfMaterial
-from products.schema.types.types import ProductType, BundleProductType, UmbrellaProductType, \
+from products.schema.types.types import ProductType, BundleProductType, ConfigurableProductType, \
     SimpleProductType, ProductTranslationType, ConfigurableVariationType, BundleVariationType, ManufacturableProductType, DropshipProductType, \
     SupplierProductType, BillOfMaterialType
 
@@ -20,8 +20,8 @@ class ProductsSubscription:
             yield i
 
     @subscription
-    async def umbrella_product(self, info: Info, pk: str) -> AsyncGenerator[UmbrellaProductType, None]:
-        async for i in model_subscriber(info=info, pk=pk, model=UmbrellaProduct):
+    async def configurable_product(self, info: Info, pk: str) -> AsyncGenerator[ConfigurableProductType, None]:
+        async for i in model_subscriber(info=info, pk=pk, model=ConfigurableProduct):
             yield i
 
     @subscription
@@ -35,7 +35,7 @@ class ProductsSubscription:
             yield i
 
     @subscription
-    async def umbrella_variation(self, info: Info, pk: str) -> AsyncGenerator[ConfigurableVariationType, None]:
+    async def configurable_variation(self, info: Info, pk: str) -> AsyncGenerator[ConfigurableVariationType, None]:
         async for i in model_subscriber(info=info, pk=pk, model=ConfigurableVariation):
             yield i
 

@@ -3,7 +3,7 @@ from typing import List, Optional
 from core.schema.core.types.input import NodeInput, input, partial
 from core.schema.core.types.types import Annotated, lazy
 
-from products.models import Product, BundleProduct, UmbrellaProduct, SimpleProduct, \
+from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
     ProductTranslation, ConfigurableVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrices
 
 
@@ -27,13 +27,13 @@ class BundleProductPartialInput(NodeInput):
     pass
 
 
-@input(UmbrellaProduct, fields="__all__")
-class UmbrellaProductInput:
+@input(ConfigurableProduct, fields="__all__")
+class ConfigurableProductInput:
     pass
 
 
-@partial(UmbrellaProduct, fields="__all__")
-class UmbrellaProductPartialInput(NodeInput):
+@partial(ConfigurableProduct, fields="__all__")
+class ConfigurableProductPartialInput(NodeInput):
     pass
 
 

@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import BundleProductListView, BundleProductDetailViev, BundleProductUpdateView, BundleProductDeleteView, BundleVariationListView, BundleVariationDetailViev, BundleVariationUpdateView, BundleVariationDeleteView, ProductListView, ProductDetailViev, ProductUpdateView, ProductDeleteView, ProductTranslationListView, ProductTranslationDetailViev, ProductTranslationUpdateView, ProductTranslationDeleteView, SimpleProductListView, SimpleProductDetailViev, SimpleProductUpdateView, SimpleProductDeleteView, UmbrellaProductListView, UmbrellaProductDetailViev, UmbrellaProductUpdateView, UmbrellaProductDeleteView, ConfigurableVariationListView, ConfigurableVariationDetailViev, ConfigurableVariationUpdateView, ConfigurableVariationDeleteView
+from .views import BundleProductListView, BundleProductDetailViev, BundleProductUpdateView, BundleProductDeleteView, BundleVariationListView, BundleVariationDetailViev, BundleVariationUpdateView, BundleVariationDeleteView, ProductListView, ProductDetailViev, ProductUpdateView, ProductDeleteView, ProductTranslationListView, ProductTranslationDetailViev, ProductTranslationUpdateView, ProductTranslationDeleteView, SimpleProductListView, SimpleProductDetailViev, SimpleProductUpdateView, SimpleProductDeleteView, ConfigurableProductListView, ConfigurableProductDetailViev, ConfigurableProductUpdateView, ConfigurableProductDeleteView, ConfigurableVariationListView, ConfigurableVariationDetailViev, ConfigurableVariationUpdateView, ConfigurableVariationDeleteView
 
 app_name = 'products'
 
@@ -24,10 +24,10 @@ urlpatterns = [
     path('product-variations/<str:pk>/', SimpleProductDetailViev.as_view(), name='simple_product_detail'),
     path('product-variations/<str:pk>/update/', SimpleProductUpdateView.as_view(), name='simple_product_update'),
     path('product-variations/<str:pk>/delete/', SimpleProductDeleteView.as_view(), name='simple_product_delete'),
-    path('umbrella-products/', UmbrellaProductListView.as_view(), name='umbrella_products_list'),
-    path('umbrella-products/<str:pk>/', UmbrellaProductDetailViev.as_view(), name='umbrella_product_detail'),
-    path('umbrella-products/<str:pk>/update/', UmbrellaProductUpdateView.as_view(), name='umbrella_product_update'),
-    path('umbrella-products/<str:pk>/delete/', UmbrellaProductDeleteView.as_view(), name='umbrella_product_delete'),
+    path('configurable-products/', ConfigurableProductListView.as_view(), name='configurable_products_list'),
+    path('configurable-products/<str:pk>/', ConfigurableProductDetailViev.as_view(), name='configurable_product_detail'),
+    path('configurable-products/<str:pk>/update/', ConfigurableProductUpdateView.as_view(), name='configurable_product_update'),
+    path('configurable-products/<str:pk>/delete/', ConfigurableProductDeleteView.as_view(), name='configurable_product_delete'),
     path('configurable-variations/', ConfigurableVariationListView.as_view(), name='configurable_variations_list'),
     path('configurable-variations/<str:pk>/', ConfigurableVariationDetailViev.as_view(), name='configurable_variation_detail'),
     path('configurable-variations/<str:pk>/update/', ConfigurableVariationUpdateView.as_view(), name='configurable_variation_update'),
