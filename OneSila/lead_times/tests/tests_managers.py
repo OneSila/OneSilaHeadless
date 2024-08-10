@@ -81,7 +81,7 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
         lead_time_product = LeadTime.objects.get_product_leadtime(simple)
         self.assertEqual(lead_time_product, leadtime_for_shipping_address.leadtime)
 
-    def test_lead_time_for_bundle(self):
+    def test_lead_time_for_bundle_and_simples(self):
         # Base setup first product
         supplier = Supplier.objects.filter(multi_tenant_company=self.multi_tenant_company).first()
         shippingaddress = ShippingAddress.objects.filter(
@@ -106,6 +106,9 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
             quantity=qty,
             multi_tenant_company=self.multi_tenant_company,
             product=supplier_product)
+
+        simple_leadtime = LeadTime.objects.get_product_leadtime(simple)
+        self.assertEqual(simple_leadtime, self.lead_time_overlap)
 
         # Second simple product
         supplier_two = Supplier.objects.filter(multi_tenant_company=self.multi_tenant_company).last()
@@ -136,6 +139,9 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
             quantity=qty,
             multi_tenant_company=self.multi_tenant_company,
             product=supplier_product_two)
+
+        simple_two_leadtime = LeadTime.objects.get_product_leadtime(simple_two)
+        self.assertEqual(simple_two_leadtime, self.lead_time_slow)
 
         # Now the final piece, add the bundle items.
         bundle = BundleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
