@@ -1,5 +1,8 @@
 from core.managers import MultiTenantQuerySet, MultiTenantManager
-from products.product_types import HAS_DIRECT_INVENTORY_TYPES, HAS_INDIRECT_INVENTORY_TYPES
+from products.product_types import HAS_DIRECT_INVENTORY_TYPES, \
+    HAS_INDIRECT_INVENTORY_TYPES, BUNDLE
+from products.models import BundleVariation
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -30,6 +33,16 @@ class LeadTimeQuerySet(MultiTenantQuerySet):
                     values('leadtime_outofstock')
                 leadtimes = self.model.objects.filter(id__in=leadtimes_outofstock_ids, multi_tenant_company=product.multi_tenant_company)
                 leadtime = leadtimes.filter_fastest()
+            elif product.type == BUNDLE:
+                bundlevariation_ids = BundleVariation.objects.filter(umbrella=product).values('variation_id')
+                leadtime_ids = []
+                for variation_id in bundlevariation_ids:
+                    product = Product.objects.get(id=variation_id)
+                    try:
+                        leadtime_ids.append(self.model.objects.get_product_leadtime(product).id)
+                    except self.model.DoesNotExist:
+                        pass
+                leadtime = self.filter_slowest(leadtime_ids=leadtime_ids)
 
         if not leadtime:
             raise self.model.DoesNotExist(f"No LeadTime found for Product.id {product.id}")
@@ -52,7 +65,7 @@ class LeadTimeQuerySet(MultiTenantQuerySet):
 
     def filter_fastest(self, leadtimes=None):
         # In order to filter on fast, we need to order the
-        # units.  Probably a numeric value is really what the right
+        # units, a numeric value is really what the right
         # way to go is. 1 is fast, 3 is slow.  Then we just need
         # to order by unit, max_time and min_time and grab the first one.
         if leadtimes is None:
@@ -61,9 +74,17 @@ class LeadTimeQuerySet(MultiTenantQuerySet):
         if isinstance(leadtimes, list):
             leadtimes = self.model.objects.filter(id__in=leadtimes)
 
-        logger.debug(f"We found following lead-times {leadtimes=}")
-
         return leadtimes.order_by_fastest().first()
+
+    def filter_slowest(self, leadtimes=None):
+        # We can just order by fastest and take the last.
+        if leadtimes is None:
+            leadtimes = self
+
+        if isinstance(leadtimes, list):
+            leadtimes = self.model.objects.filter(id__in=leadtimes)
+
+        return leadtimes.order_by_fastest().last()
 
 
 class LeadTimeManager(MultiTenantManager):

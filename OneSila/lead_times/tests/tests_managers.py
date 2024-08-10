@@ -1,7 +1,8 @@
 from core.tests import TestCase, TestWithDemoDataMixin
 from contacts.models import ShippingAddress, Supplier
 from inventory.models import InventoryLocation, Inventory
-from products.models import SimpleProduct, SupplierProduct
+from products.models import SimpleProduct, SupplierProduct, BundleProduct, \
+    BundleVariation
 from lead_times.models import LeadTime, LeadTimeForShippingAddress, \
     LeadTimeProductOutOfStock
 
@@ -79,3 +80,68 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
 
         lead_time_product = LeadTime.objects.get_product_leadtime(simple)
         self.assertEqual(lead_time_product, leadtime_for_shipping_address.leadtime)
+
+    def test_lead_time_for_bundle(self):
+        # Base setup first product
+        supplier = Supplier.objects.filter(multi_tenant_company=self.multi_tenant_company).first()
+        shippingaddress = ShippingAddress.objects.filter(
+            company=supplier,
+            multi_tenant_company=self.multi_tenant_company).last()
+
+        inventory_location, _ = InventoryLocation.objects.get_or_create(multi_tenant_company=self.multi_tenant_company,
+            name='for_inv_bundle_one', shippingaddress=shippingaddress)
+        leadtime_for_shipping_address, _ = LeadTimeForShippingAddress.objects.get_or_create(shippingaddress=shippingaddress,
+            multi_tenant_company=self.multi_tenant_company)
+
+        leadtime_for_shipping_address.leadtime = self.lead_time_overlap
+        leadtime_for_shipping_address.save()
+
+        simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier_product = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company,
+            supplier=supplier, sku="SUP-123")
+        supplier_product.base_products.add(simple)
+
+        qty = 1223
+        Inventory.objects.create(inventorylocation=inventory_location,
+            quantity=qty,
+            multi_tenant_company=self.multi_tenant_company,
+            product=supplier_product)
+
+        # Second simple product
+        supplier_two = Supplier.objects.filter(multi_tenant_company=self.multi_tenant_company).last()
+        self.assertFalse(supplier_two == supplier)
+
+        shippingaddress_two = ShippingAddress.objects.filter(
+            company=supplier_two,
+            multi_tenant_company=self.multi_tenant_company).first()
+        self.assertFalse(shippingaddress == shippingaddress_two)
+
+        inventory_location_two, _ = InventoryLocation.objects.get_or_create(multi_tenant_company=self.multi_tenant_company,
+            name='for_inv_bundle_two', shippingaddress=shippingaddress_two)
+        leadtime_for_shipping_address_two, _ = LeadTimeForShippingAddress.objects.get_or_create(
+            shippingaddress=shippingaddress_two,
+            multi_tenant_company=self.multi_tenant_company)
+
+        leadtime_for_shipping_address_two.leadtime = self.lead_time_slow
+        leadtime_for_shipping_address_two.save()
+
+        simple_two = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier_product_two = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company,
+            supplier=supplier_two, sku="SUP-123-BIS")
+        supplier_product_two.base_products.add(simple_two)
+
+        # We force the _two items to be used by setting a lower qty
+        qty = 123
+        Inventory.objects.create(inventorylocation=inventory_location_two,
+            quantity=qty,
+            multi_tenant_company=self.multi_tenant_company,
+            product=supplier_product_two)
+
+        # Now the final piece, add the bundle items.
+        bundle = BundleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        BundleVariation.objects.create(umbrella=bundle, variation=simple, multi_tenant_company=self.multi_tenant_company)
+        BundleVariation.objects.create(umbrella=bundle, variation=simple_two, multi_tenant_company=self.multi_tenant_company)
+
+        bundle_leadtime = LeadTime.objects.get_product_leadtime(bundle)
+
+        self.assertEqual(bundle_leadtime, self.lead_time_slow)
