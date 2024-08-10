@@ -94,6 +94,9 @@ class LeadTimeManager(MultiTenantManager):
     def filter_fastest(self, leadtimes=None):
         return self.get_queryset().filter_fastest(leadtimes=leadtimes)
 
+    def filter_slowest(self, leadtimes=None):
+        return self.get_queryset().filter_slowest(leadtimes=leadtimes)
+
     def order_by_fastest(self):
         return self.get_queryset().order_by_fastest()
 
