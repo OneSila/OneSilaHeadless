@@ -10,6 +10,7 @@ SKELETON_STRUCTURE = [
     'decorators.py',
     'demo_data.py',
     'exceptions.py',
+    'models.py',
     'tasks.py',
     'flows',
     'flows/__init__.py',
@@ -43,17 +44,35 @@ SKELETON_STRUCTURE = [
     'tests/tests_tasks.py',
     'tests/tests_models.py',
     'urls.py',
+    'views.py',
 ]
 
 
 SKELETON_STRUCTURE_DELETE = [
     'tests.py',
+    'models.py',
+    'views.py',
 ]
 
 
 RECEIVERS_CODE = """
     def ready(self):
         from . import receivers
+"""
+
+MODELS_CODE = """
+from core import models
+
+# class MyModel(models.Model):
+#     pass
+"""
+
+VIEWS_CODE = """
+from core.views import EmptyTemplateView
+
+# class SomeModelView(EmptyTemplateView):
+#    pass
+
 """
 
 DEMO_DATA_CODE = """
@@ -163,6 +182,14 @@ def set_demo_data_code(app_name):
     set_code(app_name, 'demo_data.py', DEMO_DATA_CODE)
 
 
+def set_models_code(app_name):
+    set_code(app_name, 'models.py', MODELS_CODE)
+
+
+def set_views_code(app_name):
+    set_code(app_name, 'views.py', VIEWS_CODE)
+
+
 class Command(BaseCommand):
     help = ("Create the skeleton files and folder structure for a given app_name in the current path. ex: schema, flows,..  \n"
         "Use 'all' to create in every local app")
@@ -182,10 +209,12 @@ class Command(BaseCommand):
                     self.style.ERROR(f"No such app: {app_name}")
                 )
             else:
-                create_structure(app_name)
                 delete_structure(app_name)
+                create_structure(app_name)
                 set_receiver_code(app_name)
                 set_demo_data_code(app_name)
+                set_models_code(app_name)
+                set_views_code(app_name)
 
                 self.stdout.write(
                     self.style.SUCCESS('Created skeleton file and folder structure for "%s"' % app_name)

@@ -1,7 +1,7 @@
 from core import models
 from core.validators import validate_pdf_extension
 from django.utils.translation import gettext_lazy as _
-from .models_helpers import get_customs_document_folder_upload_path, \
+from .models_helpers import get_shippinglabel_folder_upload_path, \
     get_customs_document_folder_upload_path
 
 
