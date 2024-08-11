@@ -6,14 +6,16 @@ from .models_helpers import get_shippinglabel_folder_upload_path, \
 
 
 class Shipment(models.Model):
-    from_address = models.ForeignKey('contacts.ShippingAddress', on_delete=models.PROTECT)
-    to_address = models.ForeignKey('contacts.ShippingAddress', on_delete=models.PROTECT)
+    from_address = models.ForeignKey('contacts.ShippingAddress', on_delete=models.PROTECT,
+        related_name='shipments_from')
+    to_address = models.ForeignKey('contacts.ShippingAddress', on_delete=models.PROTECT,
+        related_name='shipments_to')
 
     # Can be set to null/blank to allow internal orders
-    order = models.ForeignKey('orders.SalesOrder',
+    order = models.ForeignKey('orders.Order',
         on_delete=models.PROTECT,
         null=True,
-        blank=True
+        blank=True,
                               )
 
 
@@ -38,7 +40,7 @@ class Package(models.Model):
         (DISPATCHED, _("Dispatched")),
     )
 
-    type = models.CharField(max_length=3, choices=TYPE_CHOICES)
+    type = models.CharField(max_length=6, choices=TYPE_CHOICES)
     shipment = models.ForeignKey(Shipment, on_delete=models.PROTECT)
 
     status = models.CharField(max_length=11, choices=STATUS_CHOICES, default=NEW)
