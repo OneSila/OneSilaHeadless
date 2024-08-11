@@ -6,14 +6,16 @@ from shipping.models import Shipment, Package, PackageItem
 
 @order(Shipment)
 class ShipmentOrder:
-    pass
+    id: auto
 
 
 @order(Package)
 class PackageOrder:
-    pass
+    id: auto
+    type: auto
+    status: auto
 
 
 @order(PackageItem)
 class PackageItemOrder:
-    pass
+    id: auto

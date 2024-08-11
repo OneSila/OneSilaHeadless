@@ -7,14 +7,18 @@ from shipping.models import Shipment, Package, PackageItem
 
 @filter(Shipment)
 class ShipmentFilter(SearchFilterMixin):
-    pass
+    order: auto
+    from_address: auto
+    to_address: auto
 
 
 @filter(Package)
 class PackageFilter(SearchFilterMixin):
-    pass
+    shipment: auto
+    type: auto
+    status: auto
 
 
 @filter(PackageItem)
 class PackageItemFilter(SearchFilterMixin):
-    pass
+    package: auto
