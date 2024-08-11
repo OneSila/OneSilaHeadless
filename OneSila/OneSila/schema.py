@@ -23,6 +23,7 @@ from products.schema import ProductsQuery, ProductsMutation, ProductsSubscriptio
 from properties.schema import PropertiesQuery, PropertiesMutation, PropertiesSubscription
 from purchasing.schema import PurchasingQuery, PurchasingMutation, PurchasingSubscription
 from sales_prices.schema import SalesPricesQuery, SalesPricesMutation, SalesPriceSubscription
+from shipping.schema import ShippingMutation, ShippingQuery, ShippingSubscription
 from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
 from units.schema import UnitsQuery, UnitsMutation, UnitsSubscription
 from translations.schema import TranslationsQuery
@@ -35,8 +36,8 @@ from translations.schema import TranslationsQuery
 @strawberry.type
 class Query(ContactsQuery, CurrenciesQuery, CustomsQuery, CountryQuery, EanCodesQuery,
         InventoryQuery, LanguageQuery, LeadTimesQuery, MediaQuery, MultiTenantQuery, OrdersQuery,
-        ProductsQuery, PropertiesQuery, PurchasingQuery, SalesPricesQuery, TaxesQuery,
-        TimeZoneQuery, UnitsQuery, TranslationsQuery):
+        ProductsQuery, PropertiesQuery, PurchasingQuery, SalesPricesQuery, ShippingQuery,
+        TaxesQuery, TimeZoneQuery, UnitsQuery, TranslationsQuery):
     pass
 
 
@@ -44,7 +45,7 @@ class Query(ContactsQuery, CurrenciesQuery, CustomsQuery, CountryQuery, EanCodes
 class Mutation(ContactsMutation, CurrenciesMutation, CustomsMutation, EanCodesMutation,
         InventoryMutation, LeadTimesMutation, MediaMutation, MultiTenantMutation, OrdersMutation,
         ProductsMutation, PropertiesMutation, PurchasingMutation, SalesPricesMutation,
-        TaxesMutation, UnitsMutation):
+        ShippingMutation, TaxesMutation, UnitsMutation):
     pass
 
 
@@ -53,8 +54,8 @@ class Subscription(ContactsSubscription, CurrenciesSubscription,
         CustomsSubscription, EanCodesSubscription, InventorySubscription,
         LeadTimesSubscription, MediaSubscription, MultiTenantSubscription,
         OrdersSubscription, ProductsSubscription, PropertiesSubscription,
-        PurchasingSubscription, SalesPriceSubscription, TaxSubscription,
-        UnitsSubscription):
+        PurchasingSubscription, SalesPriceSubscription, ShippingSubscription,
+        TaxSubscription, UnitsSubscription):
     pass
 
 #
