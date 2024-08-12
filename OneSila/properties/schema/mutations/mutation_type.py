@@ -13,7 +13,7 @@ from ..types.input import PropertyInput, PropertyTranslationInput, PropertySelec
 @type(name="Mutation")
 class PropertiesMutation:
     create_property: PropertyType = create_property()
-    create_properties: List[PropertyType] = create_property()
+    create_properties: List[PropertyType] = create(PropertyInput)
     update_property: PropertyType = update(PropertyPartialInput)
     delete_property: PropertyType = delete()
     delete_properties: List[PropertyType] = delete()
@@ -25,7 +25,7 @@ class PropertiesMutation:
     delete_property_translations: List[PropertyTranslationType] = delete()
 
     create_property_select_value: PropertySelectValueType = create_property_select_value()
-    create_property_select_values: List[PropertySelectValueType] = create_property_select_value()
+    create_property_select_values: List[PropertySelectValueType] = create(PropertySelectValueInput)
     update_property_select_value: PropertySelectValueType = update(PropertySelectValuePartialInput)
     delete_property_select_value: PropertySelectValueType = delete()
     delete_property_select_values: List[PropertySelectValueType] = delete()
