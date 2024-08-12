@@ -15,7 +15,7 @@ from core.schema.core.mutations import create, update, delete, type, List
 @type(name="Mutation")
 class ProductsMutation:
     create_product: ProductType = create_product()
-    create_products: List[ProductType] = create(ProductInput)
+    create_products: List[ProductType] = create_product()
     update_product: ProductType = update(ProductPartialInput)
     delete_product: ProductType = delete()
     delete_products: List[ProductType] = delete()
@@ -69,7 +69,7 @@ class ProductsMutation:
     delete_dropship_products: List[DropshipProductType] = delete()
 
     create_supplier_product: SupplierProductType = create_supplier_product()
-    create_supplier_products: List[SupplierProductType] = create(SupplierProductInput)
+    create_supplier_products: List[SupplierProductType] = create_supplier_product()
     update_supplier_product: SupplierProductType = update(SupplierProductPartialInput)
     delete_supplier_product: SupplierProductType = delete()
     delete_supplier_products: List[SupplierProductType] = delete()
