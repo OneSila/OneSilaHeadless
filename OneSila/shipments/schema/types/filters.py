@@ -2,7 +2,7 @@ from typing import Optional
 
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin
-from shipping.models import Shipment, Package, PackageItem
+from shipments.models import Shipment, Package, PackageItem
 
 
 @filter(Shipment)

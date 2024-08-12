@@ -1,7 +1,7 @@
 from core.schema.core.types.ordering import order
 from core.schema.core.types.types import auto
 
-from shipping.models import Shipment, Package, PackageItem
+from shipments.models import Shipment, Package, PackageItem
 
 
 @order(Shipment)

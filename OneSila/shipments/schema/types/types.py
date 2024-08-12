@@ -4,7 +4,7 @@ from core.schema.core.types.types import type, relay, List, Annotated, lazy, str
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from core.schema.multi_tenant.types.types import MultiTenantCompanyType
 
-from shipping.models import Shipment, Package, PackageItem
+from shipments.models import Shipment, Package, PackageItem
 from .filters import ShipmentFilter, PackageFilter, PackageItemFilter
 from .ordering import ShipmentOrder, PackageOrder, PackageItemOrder
 

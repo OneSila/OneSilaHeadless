@@ -1,6 +1,6 @@
 from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
-from shipping.models import Shipment, Package, PackageItem
+from shipments.models import Shipment, Package, PackageItem
 from .types.types import ShipmentType, PackageType, PackageItemType
 
 import logging
@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 @type(name="Subscription")
-class ShippingSubscription:
+class ShipmentsSubscription:
     @subscription
     async def shipment(self, info: Info, pk: str) -> AsyncGenerator[ShipmentType, None]:
         async for i in model_subscriber(info=info, pk=pk, model=Shipment):

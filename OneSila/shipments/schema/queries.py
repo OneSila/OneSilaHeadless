@@ -5,7 +5,7 @@ from .types.types import ShipmentType, PackageType, PackageItemType
 
 
 @type(name="Query")
-class ShippingQuery:
+class ShipmentsQuery:
     shipment: ShipmentType = node()
     shipments: ListConnectionWithTotalCount[ShipmentType] = connection()
 

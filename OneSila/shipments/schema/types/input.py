@@ -1,7 +1,7 @@
 from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial, List
 
-from shipping.models import Shipment, Package, PackageItem
+from shipments.models import Shipment, Package, PackageItem
 
 
 @input(Shipment, fields="__all__")

@@ -23,7 +23,7 @@ from products.schema import ProductsQuery, ProductsMutation, ProductsSubscriptio
 from properties.schema import PropertiesQuery, PropertiesMutation, PropertiesSubscription
 from purchasing.schema import PurchasingQuery, PurchasingMutation, PurchasingSubscription
 from sales_prices.schema import SalesPricesQuery, SalesPricesMutation, SalesPriceSubscription
-from shipping.schema import ShippingMutation, ShippingQuery, ShippingSubscription
+from shipments.schema import ShipmentsMutation, ShipmentsQuery, ShipmentsSubscription
 from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
 from units.schema import UnitsQuery, UnitsMutation, UnitsSubscription
 from translations.schema import TranslationsQuery
@@ -36,7 +36,7 @@ from translations.schema import TranslationsQuery
 @strawberry.type
 class Query(ContactsQuery, CurrenciesQuery, CustomsQuery, CountryQuery, EanCodesQuery,
         InventoryQuery, LanguageQuery, LeadTimesQuery, MediaQuery, MultiTenantQuery, OrdersQuery,
-        ProductsQuery, PropertiesQuery, PurchasingQuery, SalesPricesQuery, ShippingQuery,
+        ProductsQuery, PropertiesQuery, PurchasingQuery, SalesPricesQuery, ShipmentsQuery,
         TaxesQuery, TimeZoneQuery, UnitsQuery, TranslationsQuery):
     pass
 
@@ -45,7 +45,7 @@ class Query(ContactsQuery, CurrenciesQuery, CustomsQuery, CountryQuery, EanCodes
 class Mutation(ContactsMutation, CurrenciesMutation, CustomsMutation, EanCodesMutation,
         InventoryMutation, LeadTimesMutation, MediaMutation, MultiTenantMutation, OrdersMutation,
         ProductsMutation, PropertiesMutation, PurchasingMutation, SalesPricesMutation,
-        ShippingMutation, TaxesMutation, UnitsMutation):
+        ShipmentsMutation, TaxesMutation, UnitsMutation):
     pass
 
 
@@ -54,7 +54,7 @@ class Subscription(ContactsSubscription, CurrenciesSubscription,
         CustomsSubscription, EanCodesSubscription, InventorySubscription,
         LeadTimesSubscription, MediaSubscription, MultiTenantSubscription,
         OrdersSubscription, ProductsSubscription, PropertiesSubscription,
-        PurchasingSubscription, SalesPriceSubscription, ShippingSubscription,
+        PurchasingSubscription, SalesPriceSubscription, ShipmentsSubscription,
         TaxSubscription, UnitsSubscription):
     pass
 

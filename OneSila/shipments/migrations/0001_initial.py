@@ -3,7 +3,7 @@
 import core.validators
 import dirtyfields.dirtyfields
 import django.db.models.deletion
-import shipping.models_helpers
+import shipments.models_helpers
 from django.db import migrations, models
 
 
@@ -30,9 +30,9 @@ class Migration(migrations.Migration):
                 ('tracking_code', models.CharField(blank=True, max_length=254, null=True)),
                 ('tracking_link', models.URLField(blank=True, max_length=254, null=True)),
                 ('shipping_label', models.FileField(blank=True, null=True,
-                 upload_to=shipping.models_helpers.get_shippinglabel_folder_upload_path, validators=[core.validators.validate_pdf_extension])),
+                 upload_to=shipments.models_helpers.get_shippinglabel_folder_upload_path, validators=[core.validators.validate_pdf_extension])),
                 ('customs_document', models.FileField(blank=True, null=True,
-                 upload_to=shipping.models_helpers.get_customs_document_folder_upload_path, validators=[core.validators.validate_pdf_extension])),
+                 upload_to=shipments.models_helpers.get_customs_document_folder_upload_path, validators=[core.validators.validate_pdf_extension])),
                 ('multi_tenant_company', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='core.multitenantcompany')),
             ],
             options={
@@ -48,7 +48,7 @@ class Migration(migrations.Migration):
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('qty', models.IntegerField()),
                 ('multi_tenant_company', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='core.multitenantcompany')),
-                ('package', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='shipping.package')),
+                ('package', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='shipments.package')),
             ],
             options={
                 'abstract': False,
@@ -74,6 +74,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='package',
             name='shipment',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='shipping.shipment'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='shipments.shipment'),
         ),
     ]

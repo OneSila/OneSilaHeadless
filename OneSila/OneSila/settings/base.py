@@ -56,7 +56,7 @@ INSTALLED_LOCAL_APPS = [
     'properties',
     'purchasing',
     'sales_prices',
-    'shipping',
+    'shipments',
 
     'huey.contrib.djhuey',
 ]

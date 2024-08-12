@@ -6,6 +6,20 @@ from .models_helpers import get_shippinglabel_folder_upload_path, \
 
 
 class Shipment(models.Model):
+    """each for a given location"""
+    TODO = "TODO"
+    IN_PROGRESS = "IN_PROGRESS"
+    DONE = "DONE"
+    CANCELLED = "CANCELLED"
+
+    STATUS_CHOICES = (
+        (TODO, _("Todo")),
+        (IN_PROGRESS, _("In Progress")),
+        (DONE, _("Done")),
+        (CANCELLED, _("Cancelled")),
+    )
+
+    status = models.CharField(max_length=11, choices=STATUS_CHOICES, default=TODO)
     from_address = models.ForeignKey('contacts.ShippingAddress', on_delete=models.PROTECT,
         related_name='shipments_from')
     to_address = models.ForeignKey('contacts.ShippingAddress', on_delete=models.PROTECT,
@@ -15,8 +29,15 @@ class Shipment(models.Model):
     order = models.ForeignKey('orders.Order',
         on_delete=models.PROTECT,
         null=True,
-        blank=True,
-                              )
+        blank=True)
+
+
+class ShipmentItemToShip(models.Model):
+    """ Shipment items are auto-populated based on availablity for a given location"""
+    orderitem = models.ForeignKey("orders.OrderItem", on_delete=models.PROTECT)
+    product = models.ForeignKey("products.Product", on_delete=models.PROTECT)
+    quantity = models.IntegerField()
+    shipment = models.ForeignKey(Shipment, on_delete=models.PROTECT)
 
 
 class Package(models.Model):

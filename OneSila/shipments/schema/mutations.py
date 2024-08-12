@@ -7,7 +7,7 @@ from .types.input import ShipmentInput, ShipmentPartialInput, \
 
 
 @type(name="Mutation")
-class ShippingMutation:
+class ShipmentsMutation:
     create_shipment: ShipmentType = create(ShipmentInput)
     create_shipments: List[ShipmentType] = create(ShipmentInput)
     update_shipment: ShipmentType = update(ShipmentPartialInput)
