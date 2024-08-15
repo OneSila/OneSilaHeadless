@@ -145,8 +145,8 @@ class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
 
         # Now the final piece, add the bundle items.
         bundle = BundleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        BundleVariation.objects.create(umbrella=bundle, variation=simple, multi_tenant_company=self.multi_tenant_company)
-        BundleVariation.objects.create(umbrella=bundle, variation=simple_two, multi_tenant_company=self.multi_tenant_company)
+        BundleVariation.objects.create(parent=bundle, variation=simple, multi_tenant_company=self.multi_tenant_company)
+        BundleVariation.objects.create(parent=bundle, variation=simple_two, multi_tenant_company=self.multi_tenant_company)
 
         bundle_leadtime = LeadTime.objects.get_product_leadtime(bundle)
 

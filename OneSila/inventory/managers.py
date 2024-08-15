@@ -37,7 +37,7 @@ class InventoryQuerySet(MultiTenantQuerySet):
 
             # NOTE This will NOT return the real availabiltiy as this should be divided by
             # the quantity on the BundleVariation.
-            variations = BundleVariation.objects.filter(umbrella=product)
+            variations = BundleVariation.objects.filter(parent=product)
             variation_physicals = {i.variation: i.variation.inventory.physical() for i in variations}
             # sorted will return a list of tuples.  Eg [(variation, physical_stock), ...].
             least_stock_product = sorted(variation_physicals.items(), key=operator.itemgetter(1), reverse=False)[0][0]

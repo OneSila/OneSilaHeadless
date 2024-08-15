@@ -153,7 +153,7 @@ class InspectorCreateOrUpdateFactory(SaveInspectorMixin):
         product_type_map = {
             SIMPLE: 'simple_product_applicability',
             BUNDLE: 'bundle_product_applicability',
-            CONFIGURABLE: 'configurable_product_applicability',  # For now, treating umbrella as configurable
+            CONFIGURABLE: 'configurable_product_applicability',
             MANUFACTURABLE: 'manufacturable_product_applicability',
             DROPSHIP: 'dropship_product_applicability',
             SUPPLIER: 'supplier_product_applicability',
