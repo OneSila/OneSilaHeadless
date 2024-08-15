@@ -2,12 +2,15 @@ from core.models import MultiTenantCompany
 from django.contrib.auth import get_user_model
 from model_bakery import baker
 from django.test import TestCase as DjangoTestCase
+from django.test import TransactionTestCase
+from .tests_schemas.tests_queries import TransactionTestCaseMixin
 
 from core.demo_data import DemoDataLibrary
 
 
 class TestCaseMixin:
     def setUp(self):
+        super().setUp()
         self.multi_tenant_company = baker.make(MultiTenantCompany)
         self.user = baker.make(get_user_model(), multi_tenant_company=self.multi_tenant_company)
 
@@ -16,7 +19,7 @@ class TestCase(TestCaseMixin, DjangoTestCase):
     pass
 
 
-class TestCaseWithDemoData(TestCase):
+class TestWithDemoDataMixin:
     # This variable will be shared across all TestCases subsclassed from here.
     # That will ensure we only try to generate the demo-data once.
     demo_data_generated = False
@@ -33,3 +36,8 @@ class TestCaseWithDemoData(TestCase):
 
     def tearDown(self):
         self.demo_data_registry.delete_demo_data(multi_tenant_company=self.multi_tenant_company)
+        self.demo_data_generated = False
+
+
+class TestCaseWithDemoData(TestWithDemoDataMixin, TestCase):
+    pass

@@ -1,17 +1,11 @@
-from currencies.factories.update_rates import UpdateOfficialRateFactory, FollowerRateFactory
+from currencies.factories.update_rates import UpdateOfficialRateFactory, UpdateSingleRate
 
 
-class UpdateOfficialRateFlow:
-    def __init__(self):
-        self.factory = UpdateOfficialRateFactory()
-
-    def flow(self):
-        self.factory.run()
+def update_rate_flow():
+    f = UpdateOfficialRateFactory()
+    f.run()
 
 
-class UpdateFollowerRateFlow:
-    def __init__(self, currency):
-        self.factory = FollowerRateFactory(currency)
-
-    def flow(self):
-        self.factory.run()
+def update_single_rate_flow(currency):
+    f = UpdateSingleRate(currency)
+    f.run()

@@ -16,9 +16,11 @@ from currencies.schema import CurrenciesQuery, CurrenciesMutation, CurrenciesSub
 from customs.schema import CustomsQuery, CustomsMutation, CustomsSubscription
 from eancodes.schema import EanCodesQuery, EanCodesMutation, EanCodesSubscription
 from inventory.schema import InventoryQuery, InventoryMutation, InventorySubscription
+from lead_times.schema import LeadTimesQuery, LeadTimesMutation, LeadTimesSubscription
 from media.schema import MediaQuery, MediaMutation, MediaSubscription
 from orders.schema import OrdersQuery, OrdersMutation, OrdersSubscription
 from products.schema import ProductsQuery, ProductsMutation, ProductsSubscription
+from products_inspector.schema import InspectorsSubscription, InspectorMutation
 from properties.schema import PropertiesQuery, PropertiesMutation, PropertiesSubscription
 from purchasing.schema import PurchasingQuery, PurchasingMutation, PurchasingSubscription
 from sales_prices.schema import SalesPricesQuery, SalesPricesMutation, SalesPriceSubscription
@@ -33,7 +35,7 @@ from translations.schema import TranslationsQuery
 
 @strawberry.type
 class Query(ContactsQuery, CurrenciesQuery, CustomsQuery, CountryQuery, EanCodesQuery,
-        InventoryQuery, LanguageQuery, MediaQuery, MultiTenantQuery, OrdersQuery,
+        InventoryQuery, LanguageQuery, LeadTimesQuery, MediaQuery, MultiTenantQuery, OrdersQuery,
         ProductsQuery, PropertiesQuery, PurchasingQuery, SalesPricesQuery, TaxesQuery,
         TimeZoneQuery, UnitsQuery, TranslationsQuery):
     pass
@@ -41,18 +43,19 @@ class Query(ContactsQuery, CurrenciesQuery, CustomsQuery, CountryQuery, EanCodes
 
 @strawberry.type
 class Mutation(ContactsMutation, CurrenciesMutation, CustomsMutation, EanCodesMutation,
-        InventoryMutation, MediaMutation, MultiTenantMutation, OrdersMutation,
+        InventoryMutation, LeadTimesMutation, MediaMutation, MultiTenantMutation, OrdersMutation,
         ProductsMutation, PropertiesMutation, PurchasingMutation, SalesPricesMutation,
-        TaxesMutation, UnitsMutation):
+        TaxesMutation, UnitsMutation, InspectorMutation):
     pass
 
 
 @strawberry.type
 class Subscription(ContactsSubscription, CurrenciesSubscription,
         CustomsSubscription, EanCodesSubscription, InventorySubscription,
-        MediaSubscription, MultiTenantSubscription, OrdersSubscription,
-        ProductsSubscription, PropertiesSubscription, PurchasingSubscription,
-        SalesPriceSubscription, TaxSubscription, UnitsSubscription):
+        LeadTimesSubscription, MediaSubscription, MultiTenantSubscription,
+        OrdersSubscription, ProductsSubscription, PropertiesSubscription,
+        PurchasingSubscription, SalesPriceSubscription, TaxSubscription,
+        UnitsSubscription, InspectorsSubscription):
     pass
 
 #

@@ -7,6 +7,9 @@ def roundup(x, ceil):
     For example:  roundup(111, 20) returns 120
     If roundup < 1 we round up to the ceil itself
     '''
+    if ceil is None:
+        return x
+
     ceil = Decimal(ceil)
     integral_part = int(x)
     fractional_part = x - integral_part

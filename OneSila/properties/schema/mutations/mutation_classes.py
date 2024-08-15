@@ -1,49 +1,32 @@
-from core.schema.core.mutations import CreateMutation
+from core.schema.core.mixins import GetCurrentUserMixin
+from core.schema.core.mutations import CreateMutation, UpdateMutation
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from core.schema.core.mutations import Info, Any
-
-class CreatePropertyMutation(CreateMutation):
+from properties.models import ProductPropertiesRule
+from strawberry_django.mutations.types import UNSET
+class CompleteCreateProductPropertiesRule(CreateMutation):
     def create(self, data: dict[str, Any], *, info: Info):
-        from properties.models import PropertyTranslation
 
         with DjangoOptimizerExtension.disabled():
-
             multi_tenant_company = self.get_multi_tenant_company(info, fail_silently=False)
-            language = multi_tenant_company.language
+            items = data.get("items")
+            product_type = data.get("product_type")
 
-            data['multi_tenant_company'] = multi_tenant_company
+            if items == UNSET:
+                items = []
 
-            property = super().create(data=data, info=info)
+            rule = ProductPropertiesRule.objects.create_rule(multi_tenant_company, product_type, items)
+            return rule
 
-            PropertyTranslation.objects.create(
-                property=property,
-                language=language,
-                name=data['name'],
-                multi_tenant_company=multi_tenant_company,
-            )
-            property.refresh_from_db()
 
-            return property
 
-class CreatePropertySelectValueMutation(CreateMutation):
-    def create(self, data: dict[str, Any], *, info: Info):
-        from properties.models import PropertySelectValueTranslation
+class CompleteUpdateProductPropertiesRule(UpdateMutation, GetCurrentUserMixin):
+    def update(self, info: Info, instance: ProductPropertiesRule, data: dict[str, Any]):
 
         with DjangoOptimizerExtension.disabled():
+            items = data.get("items")
+            if items == UNSET:
+                items = []
 
-            multi_tenant_company = self.get_multi_tenant_company(info, fail_silently=False)
-            language = multi_tenant_company.language
-
-            data['multi_tenant_company'] = multi_tenant_company
-
-            property_select_value = super().create(data=data, info=info)
-
-            PropertySelectValueTranslation.objects.create(
-                propertyselectvalue=property_select_value,
-                language=language,
-                value=data['value'],
-                multi_tenant_company=multi_tenant_company,
-            )
-            property_select_value.refresh_from_db()
-
-            return property_select_value
+            rule = ProductPropertiesRule.objects.update_rule(instance, items)
+            return rule

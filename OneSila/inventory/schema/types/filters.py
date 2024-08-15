@@ -5,7 +5,7 @@ from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDe
 
 from inventory.models import Inventory, InventoryLocation
 from products.schema.types.filters import SupplierProductFilter
-from contacts.schema.types.filters import InternalShippingAddressFilter
+from contacts.schema.types.filters import InventoryShippingAddressFilter
 
 
 @filter(InventoryLocation)
@@ -14,7 +14,7 @@ class InventoryLocationFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     exclude_demo_data: Optional[bool]
     id: auto
     name: auto
-    location: Optional[InternalShippingAddressFilter]
+    shippingaddress: Optional[InventoryShippingAddressFilter]
 
 
 @filter(Inventory)
@@ -22,5 +22,5 @@ class InventoryFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     search: str | None
     exclude_demo_data: Optional[bool]
     id: auto
-    stocklocation: InventoryLocationFilter | None
+    inventorylocation: InventoryLocationFilter | None
     product: SupplierProductFilter | None

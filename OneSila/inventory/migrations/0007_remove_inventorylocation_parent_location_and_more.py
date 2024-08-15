@@ -7,7 +7,6 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('contacts', '0009_internalshippingaddress'),
         ('inventory', '0006_alter_inventorylocation_description'),
     ]
 

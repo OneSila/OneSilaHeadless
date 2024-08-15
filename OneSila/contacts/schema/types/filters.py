@@ -3,7 +3,7 @@ from typing import Optional
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin
 from contacts.models import Company, Address, Person, Supplier, \
-    InvoiceAddress, ShippingAddress, Customer, InternalShippingAddress
+    InvoiceAddress, ShippingAddress, Customer, InventoryShippingAddress
 
 
 @filter(Company)
@@ -67,8 +67,8 @@ class ShippingAddressFilter(SearchFilterMixin):
     company: CompanyFilter | None
 
 
-@filter(InternalShippingAddress)
-class InternalShippingAddressFilter(SearchFilterMixin):
+@filter(InventoryShippingAddress)
+class InventoryShippingAddressFilter(SearchFilterMixin):
     id: auto
     search: str | None
     company: CompanyFilter | None

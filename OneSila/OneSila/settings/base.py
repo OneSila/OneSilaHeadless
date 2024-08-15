@@ -42,11 +42,13 @@ INSTALLED_LOCAL_APPS = [
     'currencies',
     'taxes',
     'products',
+    'products_inspector',
     'units',
     'translations',
 
     'customs',
     'eancodes',
+    'lead_times',
     'media',
     'notifications',
     'inventory',

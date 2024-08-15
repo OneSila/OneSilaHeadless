@@ -1,6 +1,6 @@
 name: Run Tests
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build:
@@ -8,7 +8,7 @@ jobs:
     name: Test OneSilaHeadless
     services:
       postgres:
-        image: postgres:12
+        image: postgres:15
         env:
           POSTGRES_USER: fake
           POSTGRES_PASSWORD: fake
@@ -41,7 +41,7 @@ jobs:
         POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
         REDIS_HOST: localhost
         REDIS_PORT: ${{ job.services.redis.ports[6379] }}
-      run: cd OneSila && coverage run --source='.' manage.py test && coverage json
+      run: cd OneSila && coverage run --source='.' manage.py test --parallel auto && coverage json
     - name: Upload coverage reports to Codecov with GitHub Action
       uses: codecov/codecov-action@v3
       env:

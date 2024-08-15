@@ -1,7 +1,7 @@
 from core import models
 from django.utils.translation import gettext_lazy as _
 
-from properties.managers import PropertyManager
+from properties.managers import PropertyManager, ProductPropertiesRuleManager
 from translations.models import TranslationFieldsMixin, TranslatedModelMixin
 from builtins import property as django_property  # in this file we will use property as django property because we have fields named property
 from django.db.models import Q
@@ -74,7 +74,7 @@ class Property(TranslatedModelMixin, models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.name} < {self.multi_tenant_company}>"
+        return f"{self.multi_tenant_company} -> {self.name}"
 
     class Meta:
         verbose_name_plural = _("Properties")
@@ -136,9 +136,9 @@ class ProductProperty(TranslatedModelMixin, models.Model):
     value_multi_select = models.ManyToManyField(PropertySelectValue, related_name='value_multi_select_set', blank=True)
 
     def __str__(self):
-        return f"{self.product} < {self.property}>"
+        return f"{self.product} {self.property} > {self.get_value()}"
 
-    def get_value(self, value):
+    def get_value(self):
         """
         Converts the various values and returns you the right type/value for the given property.
         """
@@ -191,11 +191,13 @@ class ProductPropertiesRule(models.Model):
     product_type = models.ForeignKey(
         PropertySelectValue,
         on_delete=models.PROTECT,
-        verbose_name=_('Product Type')
+        verbose_name=_('Product Type'),
     )
 
+    objects = ProductPropertiesRuleManager()
+
     def __str__(self):
-        return f"{self.product_type} < {self.multi_tenant_company}>"
+        return f"{self.product_type} <{self.multi_tenant_company}>"
 
     def save(self, *args, **kwargs):
 
@@ -243,7 +245,7 @@ class ProductPropertiesRuleItem(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.rule} - {self.property} ({self.type})"
+        return f"{self.property} <{self.rule.product_type}>"
 
     class Meta:
         verbose_name_plural = _("Product Properties Rule Items")

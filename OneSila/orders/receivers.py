@@ -17,3 +17,11 @@ def orders__order_item__pre_save(sender, instance, **kwargs):
     # fac = OrderItemPriceSetFactory(instance)
     # fac.run()
     pass
+
+
+@receiver(post_save, sender=Order)
+def orders__order__post_save_set_customer(sender, instance, **kwargs):
+    """
+    When an order is saved, we must at least make sure they are marked as a customer.
+    """
+    instance.customer.set_is_customer()

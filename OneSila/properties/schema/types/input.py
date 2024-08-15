@@ -1,4 +1,6 @@
 from typing import List, Optional
+from strawberry.relay.types import GlobalID
+import strawberry
 
 from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial
@@ -62,14 +64,6 @@ class ProductPropertyTextTranslationInput:
 class ProductPropertyTextTranslationPartialInput(NodeInput):
     pass
 
-@input(ProductPropertiesRule, fields="__all__")
-class ProductPropertiesRuleInput:
-    pass
-
-@partial(ProductPropertiesRule, fields="__all__")
-class ProductPropertiesRulePartialInput(NodeInput):
-    pass
-
 @input(ProductPropertiesRuleItem, fields="__all__")
 class ProductPropertiesRuleItemInput:
     pass
@@ -77,3 +71,18 @@ class ProductPropertiesRuleItemInput:
 @partial(ProductPropertiesRuleItem, fields="__all__")
 class ProductPropertiesRuleItemPartialInput(NodeInput):
     pass
+
+@strawberry.input
+class CustomProductPropertiesRuleItemInput:
+    id: GlobalID | None = None
+    property: PropertyPartialInput
+    type: str
+    sort_order: Optional[int] = 0
+
+@input(ProductPropertiesRule, fields="__all__")
+class ProductPropertiesRuleInput:
+    items: Optional[List[CustomProductPropertiesRuleItemInput]]
+
+@partial(ProductPropertiesRule, fields="__all__")
+class ProductPropertiesRulePartialInput(NodeInput):
+    items: Optional[List[CustomProductPropertiesRuleItemInput]]

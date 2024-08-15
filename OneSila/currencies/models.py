@@ -1,10 +1,11 @@
 from core import models
+from .signals import exchange_rate_change
+from .managers import CurrencyManager
 from django.db.models import Q
-from currencies.signals import exchange_rate_official__pre_save, \
-    exchange_rate_official__post_save, exchange_rate__post_save, \
-    exchange_rate__pre_save
+
 from core.decorators import trigger_pre_and_post_save
 from django.utils.translation import gettext_lazy as _
+
 
 class PublicCurrency(models.SharedModel):
     iso_code = models.CharField(max_length=3)
@@ -13,6 +14,7 @@ class PublicCurrency(models.SharedModel):
 
     def __str__(self):
         return self.iso_code
+
 
 class Currency(models.Model):
     '''
@@ -33,13 +35,23 @@ class Currency(models.Model):
     is_default_currency = models.BooleanField(default=False)
     comment = models.TextField(null=True, blank=True)
 
+    objects = CurrencyManager()
+
     def __str__(self):
         return self.name
 
-    @trigger_pre_and_post_save('exchange_rate', exchange_rate__pre_save, exchange_rate__post_save)
-    @trigger_pre_and_post_save('exchange_rate_official', exchange_rate_official__pre_save, exchange_rate_official__post_save)
     def save(self, *args, **kwargs):
+        has_changed_exchange_rate = False
+        if self.is_dirty_field('exchange_rate') and not self.follow_official_rate:
+            has_changed_exchange_rate = True
+
+        if self.is_dirty_field('exchange_rate_official') and self.follow_official_rate:
+            has_changed_exchange_rate = True
+
         super().save(*args, **kwargs)
+
+        if has_changed_exchange_rate:
+            exchange_rate_change.send(sender=self.__class__, instance=self)
 
     def set_exchange_rate_official(self, new_rate, force_save=False):
         self.exchange_rate_official = new_rate

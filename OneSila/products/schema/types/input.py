@@ -3,8 +3,8 @@ from typing import List, Optional
 from core.schema.core.types.input import NodeInput, input, partial
 from core.schema.core.types.types import Annotated, lazy
 
-from products.models import Product, BundleProduct, UmbrellaProduct, SimpleProduct, \
-    ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrices
+from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
+    ProductTranslation, ConfigurableVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrices
 
 
 @input(Product, fields="__all__")
@@ -27,13 +27,13 @@ class BundleProductPartialInput(NodeInput):
     pass
 
 
-@input(UmbrellaProduct, fields="__all__")
-class UmbrellaProductInput:
+@input(ConfigurableProduct, fields="__all__")
+class ConfigurableProductInput:
     pass
 
 
-@partial(UmbrellaProduct, fields="__all__")
-class UmbrellaProductPartialInput(NodeInput):
+@partial(ConfigurableProduct, fields="__all__")
+class ConfigurableProductPartialInput(NodeInput):
     pass
 
 
@@ -57,13 +57,13 @@ class ProductTranslationPartialInput(NodeInput):
     pass
 
 
-@input(UmbrellaVariation, fields="__all__")
-class UmbrellaVariationInput:
+@input(ConfigurableVariation, fields="__all__")
+class ConfigurableVariationInput:
     pass
 
 
-@partial(UmbrellaVariation, fields="__all__")
-class UmbrellaVariationPartialInput(NodeInput):
+@partial(ConfigurableVariation, fields="__all__")
+class ConfigurableVariationPartialInput(NodeInput):
     pass
 
 
@@ -122,6 +122,7 @@ class BillOfMaterialInput:
 @partial(BillOfMaterial, fields="__all__")
 class BillOfMaterialPartialInput(NodeInput):
     pass
+
 
 @input(SupplierPrices, fields="__all__")
 class SupplierPricesInput:

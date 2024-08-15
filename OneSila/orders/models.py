@@ -141,14 +141,13 @@ class Order(models.Model):
         search_terms = ['reference', 'customer__name']
 
     def save(self, *args, **kwargs):
-
         # if we buy from someone it mean it become a customer if is not already
         if not self.customer.is_customer:
             self.customer.is_customer = True
             self.customer.save()
 
-
         super().save(*args, **kwargs)
+
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.PROTECT)
@@ -174,7 +173,7 @@ class OrderItem(models.Model):
                 order__id__lt=self.order.id,
                 product=self.product).exclude(order__status__in=Order.DONE_TYPES)
             older_required_quantity = sum([i.quantity for i in older_orderitems_with_identical_items])
-            return self.product.stock.physical() - older_required_quantity
+            return self.product.inventory.physical() - older_required_quantity
 
     @property
     def value_gbp(self):
