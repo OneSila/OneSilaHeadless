@@ -25,6 +25,7 @@ shortuuid
 pytz
 hypercorn
 Faker
+reportlab>=4.2.2
 faker-commerce
 sentry-sdk[django]
 

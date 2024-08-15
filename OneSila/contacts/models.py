@@ -44,6 +44,18 @@ class Company(models.Model):
         self.is_supplier = True
         self.save()
 
+    def get_currency(self):
+        from currencies.models import Currency
+        if self.currency:
+            currency = self.currency
+        else:
+            # using filter to ensure a soft-fail.
+            currency = Currency.objects.\
+                filter(multi_tenant_company=self.multi_tenant_company, is_default_currency=True).\
+                last()
+
+        return currency
+
     class Meta:
         search_terms = ['name']
         unique_together = ("name", "multi_tenant_company")
@@ -214,6 +226,7 @@ class InventoryShippingAddress(Address):
         proxy = True
         search_terms = ['person__email', 'company__name']
         verbose_name_plural = 'inventory shipping addresses'
+
 
 class InternalShippingAddress(Address):
     objects = InternalShippingAddressManager()

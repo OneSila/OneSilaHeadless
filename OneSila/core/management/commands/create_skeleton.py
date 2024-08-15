@@ -88,8 +88,12 @@ registry = DemoDataLibrary()
 #         'field_other': (function, {"kwarg": 393}),
 #         'field_value': 12121,
 #     }
-#     baker.make("MyModel", **demo_data)
-#
+#     instance = baker.make("MyModel", **demo_data)
+#     #
+#     # DONT FORGET TO REGISTER THE INSTANCE CREATED
+#     # OTHERWISE DELETE WILL NOT REMOVE IT OR FAIL
+#     registry.create_demo_data_relation(instance)
+
 # # A demo-data generator for a public app could look like:
 # @registry.register_public_app
 # def populate_some_public_data():

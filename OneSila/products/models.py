@@ -13,6 +13,9 @@ import shortuuid
 from hashlib import shake_256
 from products.product_types import SUPPLIER
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Product(TranslatedModelMixin, models.Model):
     from products.product_types import UMBRELLA, BUNDLE, MANUFACTURABLE, DROPSHIP, SUPPLIER, SIMPLE, \
@@ -109,6 +112,27 @@ class Product(TranslatedModelMixin, models.Model):
 
     def is_supplier_product(self):
         return self.type == self.SUPPLIER
+
+    def deflate_bundle(self):
+        """Return all BundleVariation items"""
+
+        logger.debug(f"Trying to deflate {self} with {self.type=}")
+
+        if self.type not in [self.BUNDLE]:
+            raise ValueError(f"This only works for bundle products.")
+
+        all_variation_ids = []
+
+        variations = BundleVariation.objects.filter(umbrella=self)
+        all_variation_ids.extend(variations.values_list('id', flat=True))
+
+        for variation in variations:
+            if variation.variation.is_bundle():
+                all_variation_ids.extend(variation.variation.deflate_bundle().values_list('id', flat=True))
+            else:
+                all_variation_ids.append(variation.id)
+
+        return BundleVariation.objects.filter(id__in=all_variation_ids)
 
     def get_proxy_instance(self):
         if self.is_simple():

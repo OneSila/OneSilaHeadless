@@ -54,7 +54,7 @@ class Order(models.Model):
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
     price_incl_vat = models.BooleanField(default=True)
 
-    status = models.CharField(max_length=17, choices=STATUS_CHOICES, default=DRAFT)
+    status = models.CharField(max_length=24, choices=STATUS_CHOICES, default=DRAFT)
     reason_for_sale = models.CharField(max_length=10, choices=REASON_CHOICES, default=SALE)
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -1,61 +1,135 @@
-from core.demo_data import DemoDataLibrary, baker, fake
+from core.demo_data import DemoDataLibrary, baker, fake, PrivateStructuredDataGenerator
 from faker.providers import BaseProvider
 import random
+
+from contacts.models import Company, Person, Address, InternalShippingAddress, InternalCompany
 
 registry = DemoDataLibrary()
 
 
-def generate_company_types(is_first=False):
-    if is_first:
-        # If it's the first company, make it an internal company
-        return {
-            'is_supplier': False,
-            'is_customer': False,
-            'is_influencer': False,
-            'is_internal_company': True
-        }
-    else:
-        return {
-            'is_supplier': random.choice([True, False]),
-            'is_customer': random.choice([True, False]),
-            'is_influencer': random.choice([True, False]),
-            'is_internal_company': False
-        }
+FABRIC_SUPPLIER_NAME = "Midlands Fabric Wholesales ltd"
+CUSTOMER_B2B = "Fashion Shop srl"
 
 
 @registry.register_private_app
-def contacts_company_demo(multi_tenant_company):
-    from contacts.models import Company, Person, Address
+class CompanyDataGenerator(PrivateStructuredDataGenerator):
+    model = Company
 
-    for i in range(50):
-        fake.seed_instance(i)
-        country_code = fake.country_code()
-        types = generate_company_types(is_first=(i == 0))
-        company = baker.make(Company,
-            name=fake.company(),
-            email=fake.email(),
-            language=random.choice(['EN', 'FR', 'RU', 'DE', 'NL', 'NL']),
-            multi_tenant_company=multi_tenant_company, **types)
-        registry.create_demo_data_relation(company)
+    def get_structure(self):
+        return [
+            {
+                'instance_data': {
+                    "name": FABRIC_SUPPLIER_NAME,
+                    "email": "mfw@example.com",
+                    "language": "GB",
+                    "is_supplier": True,
+                },
+                'post_data': {},
+            },
+            {
+                'instance_data': {
+                    "name": CUSTOMER_B2B,
+                    "email": "cb2b@example.com",
+                    "language": "GB",
+                    "is_customer": True,
+                },
+                'post_data': {},
+            }
+        ]
 
-        person = baker.make(Person,
-                            first_name=fake.first_name(),
-                            last_name=fake.last_name(),
-                            phone=fake.phone_number(),
-                            email=fake.email(),
-                            company=company,
-                            multi_tenant_company=multi_tenant_company)
-        registry.create_demo_data_relation(person)
 
-        address = baker.make(Address,
-            company=company,
-            vat_number=fake.vat_number(country_code),
-            address1=fake.street_address(),
-            city=fake.city(),
-            postcode=fake.postcode(),
-            country=country_code,
-            is_shipping_address=True,
-            is_invoice_address=True,
-            multi_tenant_company=multi_tenant_company,
-            person=person)
-        registry.create_demo_data_relation(address)
+@registry.register_private_app
+class PersonDataGenerator(PrivateStructuredDataGenerator):
+    model = Person
+
+    def get_structure(self):
+        return [
+            {
+                'instance_data': {
+                    "company": Company.objects.get(multi_tenant_company=self.multi_tenant_company, name=FABRIC_SUPPLIER_NAME),
+                    "first_name": "Jenna",
+                    "last_name": "Smith",
+                    "email": fake.email(),
+                    "phone": fake.phone_number(),
+                },
+                'post_data': {},
+            },
+            {
+                'instance_data': {
+                    "company": Company.objects.get(multi_tenant_company=self.multi_tenant_company, name=CUSTOMER_B2B),
+                    "first_name": "James",
+                    "last_name": "Dunn",
+                    "email": fake.email(),
+                    "phone": fake.phone_number(),
+                },
+                'post_data': {},
+            }
+        ]
+
+
+@registry.register_private_app
+class AddressDataGenerator(PrivateStructuredDataGenerator):
+    model = Address
+
+    def get_structure(self):
+        return [
+            {
+                'instance_data': {
+                    "company": Company.objects.get(multi_tenant_company=self.multi_tenant_company, name=FABRIC_SUPPLIER_NAME),
+                    "vat_number": fake.vat_number("GB"),
+                    "address1": fake.street_address(),
+                    "city": fake.city(),
+                    "postcode": fake.postcode(),
+                    "country": "GB",
+                    "is_shipping_address": True,
+                    "is_invoice_address": True,
+                    "person": Person.objects.get(
+                        company=Company.objects.get(multi_tenant_company=self.multi_tenant_company, name=FABRIC_SUPPLIER_NAME)
+                    )
+                },
+                'post_data': {},
+            },
+            {
+                'instance_data': {
+                    "company": Company.objects.get(multi_tenant_company=self.multi_tenant_company, name=CUSTOMER_B2B),
+                    "vat_number": fake.vat_number("GB"),
+                    "address1": fake.street_address(),
+                    "city": fake.city(),
+                    "postcode": fake.postcode(),
+                    "country": "GB",
+                    "is_shipping_address": True,
+                    "is_invoice_address": True,
+                    "person": Person.objects.get(
+                        company=Company.objects.get(multi_tenant_company=self.multi_tenant_company, name=CUSTOMER_B2B)
+                    ),
+                },
+                'post_data': {},
+            },
+        ]
+
+
+@registry.register_private_app
+def optional_internal_address_generation(multi_tenant_company):
+    # This code really only applies in tests as frontend generated
+    # accounts will have a internal data created through the wizard
+    # before demo-data is created.
+    try:
+        address = InternalShippingAddress.objects.get(multi_tenant_company=multi_tenant_company)
+    except InternalShippingAddress.DoesNotExist:
+        try:
+            internal_company = InternalCompany.objects.get(multi_tenant_company=multi_tenant_company)
+        except InternalCompany.DoesNotExist:
+            internal_company = InternalCompany.objects.create(
+                multi_tenant_company=multi_tenant_company,
+                name='Internal Company')
+        address = InternalShippingAddress.objects.create(multi_tenant_company=multi_tenant_company,
+            company=internal_company,
+            address1='Street',
+            postcode='Postcode',
+            city='City',
+            country='GB')
+
+    address.is_invoice_address = True
+    address.is_shipping_address = True
+    address.save()
+    registry.create_demo_data_relation(address)

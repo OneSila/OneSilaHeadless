@@ -13,6 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 class InventoryQuerySet(MultiTenantQuerySet):
+    def order_by_least(self):
+        return self.order_by("quantity")
+
+    def filter_internal(self):
+        """Filter to only return inventory thats attached to an internal shipping address"""
+        return self.filteer(inventorylocation__company__is_internal_company=True)
+
     def filter_physical(self, product=None):
         """ Return the inventories where a given product is located."""
         if product is None:
@@ -106,6 +113,9 @@ class InventoryManager(MultiTenantManager):
     def get_queryset(self):
         return InventoryQuerySet(self.model, using=self._db)
 
+    def order_by_least(self):
+        return self.get_queryset().order_by_least()
+
     def salable(self):
         return self.get_queryset().salable()
 
@@ -117,3 +127,33 @@ class InventoryManager(MultiTenantManager):
 
     def filter_physical(self, product=None):
         return self.get_queryset().filter_physical(product=product)
+
+    def filter_internal(self):
+        return self.get_queryset().filter_internal()
+
+
+class InventoryLocationQuerySet(MultiTenantQuerySet):
+    def filter_locations_for_product(self, product, qty):
+        # this all needs tranlating into either manufacturable or supplier products to get the right locations.
+        if product.is_manufacturable() or product.is_supplier():
+            return self.filter(multi_tenant_company=multi_tenant_company,
+                product=product)
+        elif product.is_simple():
+            products = product.supplier_products.all()
+            return self.filter(inventory__product__in=products)
+        elif product.is_bundle():
+            products = product.deflate_bundle()
+            location_ids = []
+
+            for p in products:
+                for location in self.filter_locations_for_product(p):
+                    location_ids.append(location.id)
+
+            return self.filter(id__in=location_ids)
+        else:
+            raise ValueError(f"Product type {produt.type} not implemented.")
+
+
+class InventoryLocationManager(MultiTenantManager):
+    def get_queryset(self):
+        return InventoryLocationQuerySet(self.model, using=self._db)

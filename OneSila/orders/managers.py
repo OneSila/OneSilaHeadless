@@ -3,6 +3,7 @@ from core.managers import MultiTenantQuerySet, MultiTenantManager
 from core.models import Sum, F, FloatField, Count
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
+from products.models import Product
 
 from datetime import timedelta
 
@@ -87,6 +88,9 @@ class OrderReportManager(MultiTenantManager):
 # ########## #
 
 class OrderItemQuerySet(MultiTenantQuerySet):
+    def exclude_dropshipping(self):
+        return self.exclude(product__type=Product.DROPSHIP)
+
     def total_value(self):
         '''
         is the sum of all price * quantity
@@ -115,6 +119,9 @@ class OrderItemQuerySet(MultiTenantQuerySet):
 class OrderItemManager(MultiTenantManager):
     def get_queryset(self):
         return OrderItemQuerySet(self.model, using=self._db)  # Important!
+
+    def exclude_dropshipping(self):
+        return self.get_queryset().exclude_dropshipping()
 
     def total_value(self):
         return self.get_queryset().total_value()

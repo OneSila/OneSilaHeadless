@@ -1,58 +1,83 @@
-from contacts.models import InventoryShippingAddress
-from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator
+from contacts.models import InventoryShippingAddress, InternalShippingAddress
+from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PrivateStructuredDataGenerator, \
+    PublicDataGenerator
 from inventory.models import InventoryLocation, Inventory
 from products.models import SupplierProduct
+from products.demo_data import SUPPLIER_BLACK_TIGER_FABRIC
 
 registry = DemoDataLibrary()
 
 
+LOCATION_WAREHOUSE_A = "Warehouse A"
+LOCATION_B21AC = "B21AC"
+LOCATION_B21AD = "B21AD"
+LOCATION_B21AF = "B21AF"
+
+
 @registry.register_private_app
-class InventoryLocationGenerator(PrivateDataGenerator):
+class InventoryLocationGenerator(PrivateStructuredDataGenerator):
     model = InventoryLocation
-    count = 4
-    use_baker = False
-    field_mapper = {
-        'name': fake.city_suffix,
-        'precise': False,
-    }
 
-    def prep_baker_kwargs(self, seed):
-        kwargs = super().prep_baker_kwargs(seed)
-        multi_tenant_company = kwargs['multi_tenant_company']
-        kwargs['shippingaddress'] = InventoryShippingAddress.objects.\
-            filter_multi_tenant(multi_tenant_company).\
-            last()
-        return kwargs
+    def get_structure(self):
+        return [
+            {
+                'instance_data': {
+                    "name": LOCATION_WAREHOUSE_A,
+                    "precise": False,
+                    "shippingaddress": InternalShippingAddress.objects.get(multi_tenant_company=self.multi_tenant_company),
+                },
+                'post_data': {},
+            },
+            {
+                'instance_data': {
+                    "name": LOCATION_B21AC,
+                    "precise": True,
+                    "shippingaddress": InternalShippingAddress.objects.get(multi_tenant_company=self.multi_tenant_company),
+                },
+                'post_data': {},
+            },
+            {
+                'instance_data': {
+                    "name": LOCATION_B21AD,
+                    "precise": True,
+                    "shippingaddress": InternalShippingAddress.objects.get(multi_tenant_company=self.multi_tenant_company),
+                },
+                'post_data': {},
+            },
+            {
+                'instance_data': {
+                    "name": LOCATION_B21AF,
+                    "precise": True,
+                    "shippingaddress": InternalShippingAddress.objects.get(multi_tenant_company=self.multi_tenant_company),
+                },
+                'post_data': {},
+            }
+        ]
 
 
 @registry.register_private_app
-class InventoryGenerator(PrivateDataGenerator):
+class InventoryGenerator(PrivateStructuredDataGenerator):
     model = Inventory
-    count = 100
-    priority = 40
-    field_mapper = {
-        'quantity': lambda: fake.random_int(min=1, max=50),
-    }
 
-    def prep_baker_kwargs(self, seed):
-        kwargs = super().prep_baker_kwargs(seed)
-        multi_tenant_company = kwargs['multi_tenant_company']
-        inventorylocation = InventoryLocation.objects.\
-            filter_multi_tenant(multi_tenant_company=multi_tenant_company).\
-            order_by('?').\
-            first()
-        existing_product_ids = Inventory.objects.\
-            filter_multi_tenant(multi_tenant_company=multi_tenant_company).\
-            filter(inventorylocation=inventorylocation).\
-            values_list('product_id', flat=True)
+    def get_structure(self):
+        return [
+            {
+                'instance_data': {
+                    "quantity": 1,
+                    "inventorylocation": InventoryLocation.objects.get(name=LOCATION_WAREHOUSE_A, multi_tenant_company=self.multi_tenant_company),
+                    "product": SupplierProduct.objects.get(sku=SUPPLIER_BLACK_TIGER_FABRIC, multi_tenant_company=self.multi_tenant_company),
 
-        supplier_product = SupplierProduct.objects.\
-            filter_multi_tenant(multi_tenant_company=multi_tenant_company).\
-            exclude(id__in=existing_product_ids).\
-            order_by('?').\
-            first()
+                },
+                'post_data': {},
+            },
+            {
+                'instance_data': {
+                    "quantity": 10,
+                    "inventorylocation": InventoryLocation.objects.get(name=LOCATION_B21AC, multi_tenant_company=self.multi_tenant_company),
+                    "product": SupplierProduct.objects.get(sku=SUPPLIER_BLACK_TIGER_FABRIC, multi_tenant_company=self.multi_tenant_company),
 
-        kwargs['inventorylocation'] = inventorylocation
-        kwargs['product'] = supplier_product
+                },
+                'post_data': {},
+            },
 
-        return kwargs
+        ]
