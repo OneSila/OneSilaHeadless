@@ -43,7 +43,7 @@ class EanCode(models.Model):
 
     def clean(self):
         if not self.ean_code and not self.inherit_to:
-            raise IntegrityError("Either ean_code or inherit_to must be provided.")
+            raise IntegrityError("Either Ean Code or Inherit To must be provided.")
         if self.product and self.product.is_umbrella():
             raise IntegrityError("You cannot assign an ean_code to an UMBRELLA. It needs to be BUNDLE or SIMPLE")
 

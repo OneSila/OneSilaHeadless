@@ -1,0 +1,2 @@
+class InspectorBlockFailed(Exception):
+    pass

@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from strawberry.relay.utils import to_base64
 from contacts.schema.types.types import CompanyType
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, Annotated, lazy
+from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, Annotated, lazy, strawberry_lazy
 
 from typing import List, Optional
 
@@ -17,11 +17,10 @@ from .filters import ProductFilter, BundleProductFilter, UmbrellaProductFilter, 
 from .ordering import ProductOrder, BundleProductOrder, UmbrellaProductOrder, \
     SimpleProductOrder, ProductTranslationOrder, UmbrellaVariationOrder, BundleVariationOrder, BillOfMaterialOrder, SupplierProductOrder, \
     DropshipProductOrder, ManufacturableProductOrder, SupplierPricesOrder
-
-
 @type(Product, filters=ProductFilter, order=ProductOrder, pagination=True, fields="__all__")
 class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
     vat_rate: Optional[VatRateType]
+    inspector: Optional[strawberry_lazy['InspectorType', 'products_inspector.schema.types.types']]
     base_products: List[Annotated['ProductType', lazy("products.schema.types.types")]]
 
     supplier: Optional[CompanyType]

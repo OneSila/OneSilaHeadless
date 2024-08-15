@@ -6,6 +6,7 @@ from core.schema.core.mutations import Info, Any
 from core.schema.core.mutations import type, CreateMutation, UpdateMutation
 from django.utils.translation import gettext_lazy as _
 from eancodes.models import EanCode
+from eancodes.signals import ean_code_released_for_product
 from eancodes.tasks import eancodes__ean_code__generate_task
 
 
@@ -47,8 +48,15 @@ class AssignEanCodeMutation(CreateMutation, GetCurrentUserMixin):
 class ReleaseEanCodeMutation(UpdateMutation, GetCurrentUserMixin):
     def update(self, info: Info, instance: EanCode, data: dict[str, Any]):
 
+        old_product = None
+        if instance.product is not None:
+            old_product = instance.product
+
         instance.product = None
         instance.already_used = True
         instance.save()
+
+        if old_product is not None:
+            ean_code_released_for_product.send(sender=old_product.__class__, instance=old_product)
 
         return instance
