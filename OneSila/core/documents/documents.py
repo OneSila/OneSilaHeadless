@@ -100,7 +100,7 @@ class OneSilaBaseDocument:
         for row in table_data:
             processed_row = []
 
-            if table_data.index(row) is 0 and bold_header_row:
+            if table_data.index(row) == 0 and bold_header_row:
                 column_style = self.styles['Bold']
             else:
                 column_style = self.styles['BodyText']
