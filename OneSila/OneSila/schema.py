@@ -20,6 +20,7 @@ from lead_times.schema import LeadTimesQuery, LeadTimesMutation, LeadTimesSubscr
 from media.schema import MediaQuery, MediaMutation, MediaSubscription
 from orders.schema import OrdersQuery, OrdersMutation, OrdersSubscription
 from products.schema import ProductsQuery, ProductsMutation, ProductsSubscription
+from products_inspector.schema import InspectorsSubscription, InspectorMutation
 from properties.schema import PropertiesQuery, PropertiesMutation, PropertiesSubscription
 from purchasing.schema import PurchasingQuery, PurchasingMutation, PurchasingSubscription
 from sales_prices.schema import SalesPricesQuery, SalesPricesMutation, SalesPriceSubscription
@@ -44,7 +45,7 @@ class Query(ContactsQuery, CurrenciesQuery, CustomsQuery, CountryQuery, EanCodes
 class Mutation(ContactsMutation, CurrenciesMutation, CustomsMutation, EanCodesMutation,
         InventoryMutation, LeadTimesMutation, MediaMutation, MultiTenantMutation, OrdersMutation,
         ProductsMutation, PropertiesMutation, PurchasingMutation, SalesPricesMutation,
-        TaxesMutation, UnitsMutation):
+        TaxesMutation, UnitsMutation, InspectorMutation):
     pass
 
 
@@ -54,7 +55,7 @@ class Subscription(ContactsSubscription, CurrenciesSubscription,
         LeadTimesSubscription, MediaSubscription, MultiTenantSubscription,
         OrdersSubscription, ProductsSubscription, PropertiesSubscription,
         PurchasingSubscription, SalesPriceSubscription, TaxSubscription,
-        UnitsSubscription):
+        UnitsSubscription, InspectorsSubscription):
     pass
 
 #
