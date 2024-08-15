@@ -93,7 +93,7 @@ class SupplierProductFilter(SearchFilterMixin):
 @filter(BillOfMaterial)
 class BillOfMaterialFilter:
     id: auto
-    configurable: Optional[ProductFilter]
+    parent: Optional[ProductFilter]
 
 
 @filter(SupplierPrices)

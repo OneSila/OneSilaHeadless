@@ -56,14 +56,14 @@ class InspectorBlock(models.Model):
         ]
 
     def get_target_field_key(self):
-        from products.product_types import SIMPLE, BUNDLE, UMBRELLA, MANUFACTURABLE, DROPSHIP, SUPPLIER
+        from products.product_types import SIMPLE, BUNDLE, CONFIGURABLE, MANUFACTURABLE, DROPSHIP, SUPPLIER
         """
         Determines the appropriate target field key based on the associated product's type.
         """
         product_type_map = {
             SIMPLE: 'simple_product_applicability',
             BUNDLE: 'bundle_product_applicability',
-            UMBRELLA: 'configurable_product_applicability',
+            CONFIGURABLE: 'configurable_product_applicability',
             MANUFACTURABLE: 'manufacturable_product_applicability',
             DROPSHIP: 'dropship_product_applicability',
             SUPPLIER: 'supplier_product_applicability',

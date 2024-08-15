@@ -182,7 +182,7 @@ class Product(TranslatedModelMixin, models.Model):
             rule=product_rule,
         ).select_related('property')
 
-    def get_unique_umbrella_variations(self):
+    def get_unique_configurable_variations(self):
         from properties.models import ProductProperty
         from django.db.models import Prefetch
 
@@ -191,7 +191,7 @@ class Product(TranslatedModelMixin, models.Model):
         if len(duplicate_decide_property_ids) == 0:
             return Product.objects.none()
 
-        umbrella_variations = self.umbrella_variations.prefetch_related(
+        configurable_variations = self.configurable_variations.prefetch_related(
             Prefetch(
                 'productproperty_set',
                 queryset=ProductProperty.objects.filter(property_id__in=duplicate_decide_property_ids),
@@ -201,7 +201,7 @@ class Product(TranslatedModelMixin, models.Model):
 
         seen_keys = set()
         unique_variations_ids = set()
-        for variation in umbrella_variations:
+        for variation in configurable_variations:
             key = tuple(sorted(getattr(prop, 'value_select_id', None) for prop in variation.relevant_properties))
 
             if key not in seen_keys or attributes_len != len(key):

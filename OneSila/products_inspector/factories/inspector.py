@@ -2,7 +2,7 @@ from django.db import transaction
 from django.db.models import Q
 from products_inspector.constants import blocks, REQUIRED, OPTIONAL, NONE
 from products_inspector.models import Inspector, InspectorBlock
-from products.product_types import SIMPLE, BUNDLE, UMBRELLA, MANUFACTURABLE, DROPSHIP, SUPPLIER
+from products.product_types import SIMPLE, BUNDLE, CONFIGURABLE, MANUFACTURABLE, DROPSHIP, SUPPLIER
 import logging
 
 from products_inspector.signals import inspector_missing_info_detected, inspector_missing_info_resolved, inspector_missing_optional_info_detected, \
@@ -153,7 +153,7 @@ class InspectorCreateOrUpdateFactory(SaveInspectorMixin):
         product_type_map = {
             SIMPLE: 'simple_product_applicability',
             BUNDLE: 'bundle_product_applicability',
-            UMBRELLA: 'configurable_product_applicability',  # For now, treating umbrella as configurable
+            CONFIGURABLE: 'configurable_product_applicability',  # For now, treating umbrella as configurable
             MANUFACTURABLE: 'manufacturable_product_applicability',
             DROPSHIP: 'dropship_product_applicability',
             SUPPLIER: 'supplier_product_applicability',

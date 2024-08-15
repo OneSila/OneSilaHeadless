@@ -95,19 +95,19 @@ class SimpleProductType(relay.Node, GetQuerysetMultiTenantMixin):
 
 @type(ConfigurableVariation, filters=ConfigurableVariationFilter, order=ConfigurableVariationOrder, pagination=True, fields="__all__")
 class ConfigurableVariationType(relay.Node, GetQuerysetMultiTenantMixin):
-    configurable: Optional[ProductType]
+    parent: Optional[ProductType]
     variation: Optional[ProductType]
 
 
 @type(BundleVariation, filters=BundleVariationFilter, order=BundleVariationOrder, pagination=True, fields="__all__")
 class BundleVariationType(relay.Node, GetQuerysetMultiTenantMixin):
-    configurable: Optional[ProductType]
+    parent: Optional[ProductType]
     variation: Optional[ProductType]
 
 
 @type(BillOfMaterial, filters=BillOfMaterialFilter, order=BillOfMaterialOrder, pagination=True, fields="__all__")
 class BillOfMaterialType(relay.Node, GetQuerysetMultiTenantMixin):
-    configurable: Optional[ProductType]
+    parent: Optional[ProductType]
     variation: Optional[ProductType]
 
 

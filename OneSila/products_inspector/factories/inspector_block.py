@@ -217,8 +217,8 @@ class MissingVariationInspectorBlockFactory(InspectorBlockFactory):
                          save_inspector=save_inspector)
 
     def _check(self):
-        from products.models import UmbrellaVariation
-        if not UmbrellaVariation.objects.filter_multi_tenant(self.multi_tenant_company).filter(umbrella=self.product, variation__active=True).exists():
+        from products.models import ConfigurableVariation
+        if not ConfigurableVariation.objects.filter_multi_tenant(self.multi_tenant_company).filter(parent=self.product, variation__active=True).exists():
             raise InspectorBlockFailed(f"Configurable Product have no variation")
 
 
@@ -230,7 +230,7 @@ class MissingBundleItemsInspectorBlockFactory(InspectorBlockFactory):
 
     def _check(self):
         from products.models import BundleVariation
-        if not BundleVariation.objects.filter_multi_tenant(self.multi_tenant_company).filter(umbrella=self.product).exists():
+        if not BundleVariation.objects.filter_multi_tenant(self.multi_tenant_company).filter(parent=self.product).exists():
             raise InspectorBlockFailed(f"Bundle Product have no items")
 
 
@@ -242,7 +242,7 @@ class MissingBillOfMaterialsInspectorBlockFactory(InspectorBlockFactory):
 
     def _check(self):
         from products.models import BillOfMaterial
-        if not BillOfMaterial.objects.filter_multi_tenant(self.multi_tenant_company).filter(umbrella=self.product).exists():
+        if not BillOfMaterial.objects.filter_multi_tenant(self.multi_tenant_company).filter(parent=self.product).exists():
             raise InspectorBlockFailed(f"Bundle Product have no items")
 
 
@@ -379,7 +379,7 @@ class VariationMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
 
     def _check(self):
         from properties.models import ProductProperty
-        from products.models import UmbrellaVariation
+        from products.models import ConfigurableVariation
 
         product_type_value_id = ProductProperty.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
@@ -387,8 +387,8 @@ class VariationMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
             property__is_product_type=True
         ).values_list('value_select', flat=True).first()
 
-        variation_ids = UmbrellaVariation.objects.filter_multi_tenant(self.multi_tenant_company).\
-                         filter(umbrella=self.product).values_list('variation_id', flat=True)
+        variation_ids = ConfigurableVariation.objects.filter_multi_tenant(self.multi_tenant_company).\
+                         filter(parent=self.product).values_list('variation_id', flat=True)
 
         variations_product_type_value = ProductProperty.objects.filter(multi_tenant_company=self.multi_tenant_company,
                                                                        product_id__in=variation_ids,
@@ -422,7 +422,7 @@ class ItemsMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
         ).values_list('value_select', flat=True).first()
 
         item_ids = BundleVariation.objects.filter_multi_tenant(self.multi_tenant_company). \
-            filter(umbrella=self.product).values_list('variation_id', flat=True)
+            filter(parent=self.product).values_list('variation_id', flat=True)
 
         items_product_type_value = ProductProperty.objects.filter(multi_tenant_company=self.multi_tenant_company,
                                                                   product_id__in=item_ids,
@@ -458,7 +458,7 @@ class BomMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
         ).values_list('value_select', flat=True).first()
 
         bom_ids = BillOfMaterial.objects.filter_multi_tenant(self.multi_tenant_company). \
-            filter(umbrella=self.product).values_list('variation_id', flat=True)
+            filter(parent=self.product).values_list('variation_id', flat=True)
 
         bom_product_type_value = ProductProperty.objects.filter(multi_tenant_company=self.multi_tenant_company,
                                                                 product_id__in=bom_ids,
@@ -486,7 +486,7 @@ class ItemsMissingMandatoryInformationInspectorBlockFactory(InspectorBlockFactor
         from ..models import Inspector
 
         items_ids = BundleVariation.objects.filter_multi_tenant(self.multi_tenant_company). \
-            filter(umbrella=self.product).values_list('variation_id', flat=True)
+            filter(parent=self.product).values_list('variation_id', flat=True)
 
         if Inspector.objects.filter_multi_tenant(self.multi_tenant_company).filter(product_id__in=items_ids, has_missing_information=True).exists():
             raise InspectorBlockFailed("Bundle items has missing information")
@@ -499,11 +499,11 @@ class VariationsMissingMandatoryInformationInspectorBlockFactory(InspectorBlockF
                          save_inspector=save_inspector)
 
     def _check(self):
-        from products.models import UmbrellaVariation
+        from products.models import ConfigurableVariation
         from ..models import Inspector
 
-        variation_ids = UmbrellaVariation.objects.filter_multi_tenant(self.multi_tenant_company). \
-            filter(umbrella=self.product, variation__active=True).values_list('variation_id', flat=True)
+        variation_ids = ConfigurableVariation.objects.filter_multi_tenant(self.multi_tenant_company). \
+            filter(parent=self.product, variation__active=True).values_list('variation_id', flat=True)
 
         if Inspector.objects.filter_multi_tenant(self.multi_tenant_company).filter(product_id__in=variation_ids, has_missing_information=True).exists():
             raise InspectorBlockFailed("Variations has missing information")
@@ -519,7 +519,7 @@ class BomMissingMandatoryInformationInspectorBlockFactory(InspectorBlockFactory)
         from ..models import Inspector
 
         bom_ids = BillOfMaterial.objects.filter_multi_tenant(self.multi_tenant_company). \
-            filter(umbrella=self.product).values_list('variation_id', flat=True)
+            filter(parent=self.product).values_list('variation_id', flat=True)
 
 
         if Inspector.objects.filter_multi_tenant(self.multi_tenant_company).filter(product_id__in=bom_ids, has_missing_information=True).exists():
@@ -536,19 +536,19 @@ class DuplicateVariationsInspectorBlockFactory(InspectorBlockFactory):
         )
 
     def _check(self):
-        from products.models import UmbrellaVariation
+        from products.models import ConfigurableVariation
 
-        variation_ids = UmbrellaVariation.objects.filter_multi_tenant(self.multi_tenant_company).\
-                         filter(umbrella=self.product).values_list('variation_id', flat=True)
+        variation_ids = ConfigurableVariation.objects.filter_multi_tenant(self.multi_tenant_company).\
+                         filter(parent=self.product).values_list('variation_id', flat=True)
 
         if variation_ids.count() == 0:
             return
 
-        unique_variations_cnt = self.product.get_unique_umbrella_variations().count()
+        unique_variations_cnt = self.product.get_unique_configurable_variations().count()
         if unique_variations_cnt == 0:
             return
 
-        if self.product.umbrella_variations.all().count() != self.product.get_unique_umbrella_variations().count():
+        if self.product.configurable_variations.all().count() != unique_variations_cnt:
             raise InspectorBlockFailed("Product has duplicate variations with the same property combination.")
 
 
@@ -563,7 +563,7 @@ class NonConfigurableRuleInspectorBlockFactory(InspectorBlockFactory):
         )
 
     def _check(self):
-        if not self.product.is_umbrella():
+        if not self.product.is_configurable():
             return
 
         configurator_properties_count = self.product.get_configurator_properties().count()

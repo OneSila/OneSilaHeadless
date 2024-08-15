@@ -19,7 +19,7 @@ from properties.signals import product_properties_rule_created, product_properti
 # BASIC RECEIVERS FOR FUNCTIONALITY ---------------------------------------------
 @receiver(post_create, sender='products.Product')
 @receiver(post_create, sender='products.SimpleProduct')
-@receiver(post_create, sender='products.UmbrellaProduct')
+@receiver(post_create, sender='products.ConfigurableProduct')
 @receiver(post_create, sender='products.ManufacturableProduct')
 @receiver(post_create, sender='products.BundleProduct')
 @receiver(post_create, sender='products.DropshipProduct')
@@ -85,11 +85,11 @@ def products_inspector__inspector__trigger_block_bom_change(sender, instance, **
     from products_inspector.flows.inspector_block import recursively_check_components
 
     error_codes = [INACTIVE_BILL_OF_MATERIALS_ERROR, INACTIVE_BUNDLE_ITEMS_ERROR]
-    recursively_check_components(instance.umbrella, add_recursive_bundle=True, add_recursive_bom=True, add_recursive_variations=False, error_codes=error_codes)
+    recursively_check_components(instance.parent, add_recursive_bundle=True, add_recursive_bom=True, add_recursive_variations=False, error_codes=error_codes)
 
-    inspector_block_refresh.send(sender=instance.umbrella.inspector.__class__, instance=instance.umbrella.inspector, error_code=MISSING_BUNDLE_ITEMS_ERROR,
+    inspector_block_refresh.send(sender=instance.parent.inspector.__class__, instance=instance.parent.inspector, error_code=MISSING_BUNDLE_ITEMS_ERROR,
                                  run_async=False)
-    inspector_block_refresh.send(sender=instance.umbrella.inspector.__class__, instance=instance.umbrella.inspector, error_code=MISSING_BILL_OF_MATERIALS_ERROR,
+    inspector_block_refresh.send(sender=instance.parent.inspector.__class__, instance=instance.parent.inspector, error_code=MISSING_BILL_OF_MATERIALS_ERROR,
                                  run_async=False)
 
 
@@ -107,10 +107,10 @@ def products_inspector__inspector__trigger_block_bundle_items_component_active_s
     recursively_check_components(instance, add_recursive_bundle=True, add_recursive_bom=True, add_recursive_variations=True, error_codes=error_codes)
 
 
-@receiver(post_create, sender='products.UmbrellaVariation')
-@receiver(post_delete, sender='products.UmbrellaVariation')
-def products_inspector__inspector__trigger_block_umbrella_variations_change(sender, instance, **kwargs):
-    inspector_block_refresh.send(sender=instance.umbrella.inspector.__class__, instance=instance.umbrella.inspector, error_code=MISSING_VARIATION_ERROR,
+@receiver(post_create, sender='products.ConfigurableVariation')
+@receiver(post_delete, sender='products.ConfigurableVariation')
+def products_inspector__inspector__trigger_block_parent_variations_change(sender, instance, **kwargs):
+    inspector_block_refresh.send(sender=instance.parent.inspector.__class__, instance=instance.parent.inspector, error_code=MISSING_VARIATION_ERROR,
                                  run_async=False)
 
 
@@ -304,7 +304,7 @@ def products_inspector__inspector__trigger_block_sales_pricelist_delete(sender, 
 @receiver(post_create, sender='properties.ProductProperty')
 @receiver(post_update, sender='properties.ProductProperty')
 def products_inspector__inspector__trigger_block_product_type_variations_mismatch(sender, instance, **kwargs):
-    from products.models import UmbrellaVariation, BundleVariation, BillOfMaterial
+    from products.models import ConfigurableVariation, BundleVariation, BillOfMaterial
 
     if not instance.property.is_product_type:
         return
@@ -322,64 +322,64 @@ def products_inspector__inspector__trigger_block_product_type_variations_mismatc
                                      error_code=error_code,
                                      run_async=False)
 
-    for variation in UmbrellaVariation.objects.filter(variation=product).iterator():
-        inspector_block_refresh.send(sender=variation.umbrella.inspector.__class__,
-                                     instance=variation.umbrella.inspector,
+    for variation in ConfigurableVariation.objects.filter(variation=product).iterator():
+        inspector_block_refresh.send(sender=variation.parent.inspector.__class__,
+                                     instance=variation.parent.inspector,
                                      error_code=VARIATION_MISMATCH_PRODUCT_TYPE_ERROR,
                                      run_async=False)
 
     for item in BundleVariation.objects.filter(variation=product).iterator():
-        inspector_block_refresh.send(sender=item.umbrella.inspector.__class__,
-                                     instance=item.umbrella.inspector,
+        inspector_block_refresh.send(sender=item.parent.inspector.__class__,
+                                     instance=item.parent.inspector,
                                      error_code=ITEMS_MISMATCH_PRODUCT_TYPE_ERROR,
                                      run_async=False)
 
     for bom in BillOfMaterial.objects.filter(variation=product).iterator():
-        inspector_block_refresh.send(sender=bom.umbrella.inspector.__class__,
-                                     instance=bom.umbrella.inspector,
+        inspector_block_refresh.send(sender=bom.parent.inspector.__class__,
+                                     instance=bom.parent.inspector,
                                      error_code=BOM_MISMATCH_PRODUCT_TYPE_ERROR,
                                      run_async=False)
 
 
-@receiver(post_create, sender='products.UmbrellaVariation')
-@receiver(post_delete, sender='products.UmbrellaVariation')
+@receiver(post_create, sender='products.ConfigurableVariation')
+@receiver(post_delete, sender='products.ConfigurableVariation')
 @receiver(post_create, sender='products.BundleVariation')
 @receiver(post_delete, sender='products.BundleVariation')
 @receiver(post_create, sender='products.BillOfMaterial')
 @receiver(post_delete, sender='products.BillOfMaterial')
 def products_inspector__inspector__trigger_block_product_mismatch_variation_changes(sender, instance, **kwargs):
-    inspector_block_refresh.send(sender=instance.umbrella.inspector.__class__,
-                                 instance=instance.umbrella.inspector,
+    inspector_block_refresh.send(sender=instance.parent.inspector.__class__,
+                                 instance=instance.parent.inspector,
                                  error_code=VARIATION_MISMATCH_PRODUCT_TYPE_ERROR,
                                  run_async=False)
 
-    inspector_block_refresh.send(sender=instance.umbrella.inspector.__class__,
-                                 instance=instance.umbrella.inspector,
+    inspector_block_refresh.send(sender=instance.parent.inspector.__class__,
+                                 instance=instance.parent.inspector,
                                  error_code=ITEMS_MISMATCH_PRODUCT_TYPE_ERROR,
                                  run_async=False)
 
-    inspector_block_refresh.send(sender=instance.umbrella.inspector.__class__,
-                                 instance=instance.umbrella.inspector,
+    inspector_block_refresh.send(sender=instance.parent.inspector.__class__,
+                                 instance=instance.parent.inspector,
                                  error_code=BOM_MISMATCH_PRODUCT_TYPE_ERROR,
                                  run_async=False)
 
-    inspector_block_refresh.send(sender=instance.umbrella.inspector.__class__,
-                                 instance=instance.umbrella.inspector,
+    inspector_block_refresh.send(sender=instance.parent.inspector.__class__,
+                                 instance=instance.parent.inspector,
                                  error_code=ITEMS_MISSING_MANDATORY_INFORMATION_ERROR,
                                  run_async=False)
 
-    inspector_block_refresh.send(sender=instance.umbrella.inspector.__class__,
-                                 instance=instance.umbrella.inspector,
+    inspector_block_refresh.send(sender=instance.parent.inspector.__class__,
+                                 instance=instance.parent.inspector,
                                  error_code=VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR,
                                  run_async=False)
 
-    inspector_block_refresh.send(sender=instance.umbrella.inspector.__class__,
-                                 instance=instance.umbrella.inspector,
+    inspector_block_refresh.send(sender=instance.parent.inspector.__class__,
+                                 instance=instance.parent.inspector,
                                  error_code=BOM_MISSING_MANDATORY_INFORMATION_ERROR,
                                  run_async=False)
 
-    inspector_block_refresh.send(sender=instance.umbrella.inspector.__class__,
-                                 instance=instance.umbrella.inspector,
+    inspector_block_refresh.send(sender=instance.parent.inspector.__class__,
+                                 instance=instance.parent.inspector,
                                  error_code=DUPLICATE_VARIATIONS_ERROR,
                                  run_async=False)
 
@@ -395,23 +395,23 @@ def products_inspector__inspector__trigger_block_product_mismatch_variation_chan
 @receiver(inspector_missing_info_resolved, sender='products.BundleProduct')
 @receiver(inspector_missing_info_resolved, sender='products.DropshipProduct')
 def products_inspector__inspector__trigger_block_product_inspector_change(sender, instance, **kwargs):
-    from products.models import UmbrellaVariation, BundleVariation, BillOfMaterial
+    from products.models import ConfigurableVariation, BundleVariation, BillOfMaterial
 
-    for variation in UmbrellaVariation.objects.filter(variation=instance).iterator():
-        inspector_block_refresh.send(sender=variation.umbrella.inspector.__class__,
-                                     instance=variation.umbrella.inspector,
+    for variation in ConfigurableVariation.objects.filter(variation=instance).iterator():
+        inspector_block_refresh.send(sender=variation.parent.inspector.__class__,
+                                     instance=variation.parent.inspector,
                                      error_code=VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR,
                                      run_async=False)
 
     for item in BundleVariation.objects.filter(variation=instance).iterator():
-        inspector_block_refresh.send(sender=item.umbrella.inspector.__class__,
-                                     instance=item.umbrella.inspector,
+        inspector_block_refresh.send(sender=item.parent.inspector.__class__,
+                                     instance=item.parent.inspector,
                                      error_code=ITEMS_MISSING_MANDATORY_INFORMATION_ERROR,
                                      run_async=False)
 
     for bom in BillOfMaterial.objects.filter(variation=instance).iterator():
-        inspector_block_refresh.send(sender=bom.umbrella.inspector.__class__,
-                                     instance=bom.umbrella.inspector,
+        inspector_block_refresh.send(sender=bom.parent.inspector.__class__,
+                                     instance=bom.parent.inspector,
                                      error_code=BOM_MISSING_MANDATORY_INFORMATION_ERROR,
                                      run_async=False)
 
@@ -423,13 +423,13 @@ def products_inspector__inspector__trigger_block_product_inspector_change(sender
 @receiver(post_update, sender='products.DropshipProduct')
 @trigger_signal_for_dirty_fields('active')
 def products_inspector__inspector__trigger_block_product_inspector_because_of_active_status_change(sender, instance, **kwargs):
-    from products.models import UmbrellaVariation
+    from products.models import ConfigurableVariation
 
     # bundle and manufacturable are not allowed to have non active variations at all
     # so making an item / bom active / inactive don't have any effect (remove this error but add the other one so it won't turn green)
-    for variation in UmbrellaVariation.objects.filter(variation=instance).iterator():
-        inspector_block_refresh.send(sender=variation.umbrella.inspector.__class__,
-                                     instance=variation.umbrella.inspector,
+    for variation in ConfigurableVariation.objects.filter(variation=instance).iterator():
+        inspector_block_refresh.send(sender=variation.parent.inspector.__class__,
+                                     instance=variation.parent.inspector,
                                      error_code=VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR,
                                      run_async=False)
 
@@ -438,15 +438,15 @@ def products_inspector__inspector__trigger_block_product_inspector_because_of_ac
 @receiver(post_update, sender='properties.ProductProperty')
 @receiver(post_create, sender='properties.ProductProperty')
 def products_inspector__inspector__trigger_block_duplicate_variations_check(sender, instance, **kwargs):
-    from products.models import UmbrellaVariation
+    from products.models import ConfigurableVariation
 
     product = instance.product
-    for variation in UmbrellaVariation.objects.filter(variation=product).iterator():
-        umbrella = variation.umbrella
-        properties_required_in_configurator = umbrella.get_configurator_properties().values_list('property_id', flat=True)
+    for variation in ConfigurableVariation.objects.filter(variation=product).iterator():
+        parent = variation.parent
+        properties_required_in_configurator = parent.get_configurator_properties().values_list('property_id', flat=True)
         if instance.property.id in properties_required_in_configurator:
-            inspector_block_refresh.send(sender=umbrella.inspector.__class__,
-                                         instance=umbrella.inspector,
+            inspector_block_refresh.send(sender=parent.inspector.__class__,
+                                         instance=parent.inspector,
                                          error_code=DUPLICATE_VARIATIONS_ERROR,
                                          run_async=False)
 
