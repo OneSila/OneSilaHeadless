@@ -3,8 +3,8 @@ from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin, \
 
 
 class ProductQuerySet(MultiTenantQuerySet):
-    def filter_umbrella(self):
-        return self.filter(type=self.model.UMBRELLA)
+    def filter_configurable(self):
+        return self.filter(type=self.model.CONFIGURABLE)
 
     def filter_variation(self):
         return self.filter(type=self.model.SIMPLE)
@@ -35,13 +35,13 @@ class ProductManager(MultiTenantManager):
         return self.get_queryset().filter_by_properties_rule(rule)
 
 
-class UmbrellaQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+class ConfigurableQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
     pass
 
 
-class UmbrellaManager(ProductManager):
+class ConfigurableManager(ProductManager):
     def get_queryset(self):
-        return UmbrellaQuerySet(self.model, using=self._db)
+        return ConfigurableQuerySet(self.model, using=self._db)
 
 
 class VariationQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
@@ -67,12 +67,12 @@ class BundleQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
                 collected_ids = set()
 
             # Get direct BundleVariation components
-            direct_components = BundleVariation.objects.filter(umbrella=product).values_list('variation_id', flat=True)
+            direct_components = BundleVariation.objects.filter(parent=product).values_list('variation_id', flat=True)
             new_ids = set(direct_components) - collected_ids
 
             # Get direct BillOfMaterial components for manufacturable products
             if product.is_manufacturable():
-                bom_components = BillOfMaterial.objects.filter(umbrella=product).values_list('variation_id', flat=True)
+                bom_components = BillOfMaterial.objects.filter(parent=product).values_list('variation_id', flat=True)
                 new_ids.update(set(bom_components) - collected_ids)
 
             if not new_ids:
@@ -115,7 +115,7 @@ class ManufacturableQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
                 collected_ids = set()
 
             # Get direct BOM components
-            direct_components = BillOfMaterial.objects.filter(umbrella=product).values_list('variation_id', flat=True)
+            direct_components = BillOfMaterial.objects.filter(parent=product).values_list('variation_id', flat=True)
             new_ids = set(direct_components) - collected_ids
 
             if not new_ids:

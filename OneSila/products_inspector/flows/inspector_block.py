@@ -33,14 +33,14 @@ def recursively_check_components(product, add_recursive_bom=True, add_recursive_
     from products_inspector.signals import inspector_block_refresh
 
     """
-    Recursively check all BOM, Bundle, and UmbrellaVariation components where the given product is a variation.
-    Trigger inspector refresh for the umbrella products and their ancestors based on the provided flags.
+    Recursively check all BOM, Bundle, and ConfigurableVariation components where the given product is a variation.
+    Trigger inspector refresh for the parent products and their ancestors based on the provided flags.
     """
-    def refresh_inspector(umbrella_product):
+    def refresh_inspector(parent_product):
         for error_code in error_codes:
             inspector_block_refresh.send(
-                sender=umbrella_product.inspector.__class__,
-                instance=umbrella_product.inspector,
+                sender=parent_product.inspector.__class__,
+                instance=parent_product.inspector,
                 error_code=error_code,
                 run_async=run_async
             )
@@ -50,27 +50,27 @@ def recursively_check_components(product, add_recursive_bom=True, add_recursive_
 
         bill_of_materials = BillOfMaterial.objects.filter(variation=prod).iterator()
         for bill_of_material in bill_of_materials:
-            umbrella_product = bill_of_material.umbrella
-            refresh_inspector(umbrella_product)
-            recursively_check_variations(umbrella_product)
+            parent_product = bill_of_material.parent
+            refresh_inspector(parent_product)
+            recursively_check_variations(parent_product)
 
     def add_recursive_bundle_check(prod):
         from products.models import BundleVariation
 
         bundle_variations = BundleVariation.objects.filter(variation=prod).iterator()
         for bundle_variation in bundle_variations:
-            umbrella_product = bundle_variation.umbrella
-            refresh_inspector(umbrella_product)
-            recursively_check_variations(umbrella_product)
+            parent_product = bundle_variation.parent
+            refresh_inspector(parent_product)
+            recursively_check_variations(parent_product)
 
     def add_recursive_variations_check(prod):
-        from products.models import UmbrellaVariation
+        from products.models import ConfigurableVariation
 
-        umbrella_variations = UmbrellaVariation.objects.filter(variation=prod).iterator()
-        for umbrella_variation in umbrella_variations:
-            umbrella_product = umbrella_variation.umbrella
-            refresh_inspector(umbrella_product)
-            recursively_check_variations(umbrella_product)
+        parent_variations = ConfigurableVariation.objects.filter(variation=prod).iterator()
+        for parent_variation in parent_variations:
+            parent_product = parent_variation.parent
+            refresh_inspector(parent_product)
+            recursively_check_variations(parent_product)
 
     def recursively_check_variations(prod):
         if add_recursive_bom:

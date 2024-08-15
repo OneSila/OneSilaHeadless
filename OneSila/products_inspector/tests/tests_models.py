@@ -7,7 +7,7 @@ from eancodes.models import EanCode
 from eancodes.signals import ean_code_released_for_product
 from inventory.models import Inventory, InventoryLocation
 from lead_times.models import LeadTimeProductOutOfStock, LeadTime
-from products.models import UmbrellaProduct, SimpleProduct, BillOfMaterial, ManufacturableProduct, BundleVariation, BundleProduct, UmbrellaVariation, \
+from products.models import ConfigurableProduct, SimpleProduct, BillOfMaterial, ManufacturableProduct, BundleVariation, BundleProduct, ConfigurableVariation, \
     SupplierProduct, DropshipProduct, SupplierPrices
 from media.models import MediaProductThrough, Media
 from products_inspector.constants import *
@@ -23,8 +23,8 @@ from units.models import Unit
 class InspectorBlockHasImageTest(TestCase):
 
     def test_inspector_block_for_has_images(self):
-        # Step 1: Create a configurable product (UmbrellaProduct)
-        product = UmbrellaProduct.objects.create(
+        # Step 1: Create a configurable product (ConfigurableProduct)
+        product = ConfigurableProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company
         )
 
@@ -155,7 +155,7 @@ class InspectorBlockInactivePiecesTest(TestCase):
         )
         BillOfMaterial.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=product,
+            parent=product,
             variation=active_component,
             quantity=1.0
         )
@@ -174,7 +174,7 @@ class InspectorBlockInactivePiecesTest(TestCase):
         )
         BillOfMaterial.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=product,
+            parent=product,
             variation=inactive_component,
             quantity=1.0
         )
@@ -200,7 +200,7 @@ class InspectorBlockInactivePiecesTest(TestCase):
         )
         BillOfMaterial.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=product,
+            parent=product,
             variation=inactive_component,
             quantity=1.0
         )
@@ -237,7 +237,7 @@ class InspectorBlockInactivePiecesTest(TestCase):
         )
         BillOfMaterial.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=product,
+            parent=product,
             variation=inactive_component,
             quantity=1.0
         )
@@ -275,7 +275,7 @@ class InspectorBlockInactiveBundleItemsTest(TestCase):
             active=True
         )
         BundleVariation.objects.create(
-            umbrella=product,
+            parent=product,
             variation=active_item,
             quantity=1.0,
             multi_tenant_company=self.multi_tenant_company
@@ -294,7 +294,7 @@ class InspectorBlockInactiveBundleItemsTest(TestCase):
             active=False  # The item is inactive
         )
         BundleVariation.objects.create(
-            umbrella=product,
+            parent=product,
             variation=inactive_item,
             quantity=1.0,
             multi_tenant_company=self.multi_tenant_company
@@ -320,7 +320,7 @@ class InspectorBlockInactiveBundleItemsTest(TestCase):
             active=False  # The item is inactive
         )
         BundleVariation.objects.create(
-            umbrella=product,
+            parent=product,
             variation=inactive_item,
             quantity=1.0,
             multi_tenant_company=self.multi_tenant_company
@@ -357,7 +357,7 @@ class InspectorBlockInactiveBundleItemsTest(TestCase):
             active=False  # The item is inactive
         )
         bundle_variation = BundleVariation.objects.create(
-            umbrella=product,
+            parent=product,
             variation=inactive_item,
             quantity=1.0,
             multi_tenant_company=self.multi_tenant_company
@@ -383,8 +383,8 @@ class InspectorBlockInactiveBundleItemsTest(TestCase):
 class InspectorBlockMissingComponentsTest(TestCase):
 
     def test_inspector_block_for_missing_variation(self):
-        # Step 1: Create a required product (e.g., UmbrellaProduct)
-        product = UmbrellaProduct.objects.create(
+        # Step 1: Create a required product (e.g., ConfigurableProduct)
+        product = ConfigurableProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             active=True,  # The product is active
             for_sale=True  # The product is for sale
@@ -402,8 +402,8 @@ class InspectorBlockMissingComponentsTest(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             active=True
         )
-        UmbrellaVariation.objects.create(
-            umbrella=product,
+        ConfigurableVariation.objects.create(
+            parent=product,
             variation=variation,
             multi_tenant_company=self.multi_tenant_company
         )
@@ -435,7 +435,7 @@ class InspectorBlockMissingComponentsTest(TestCase):
             active=True
         )
         BundleVariation.objects.create(
-            umbrella=product,
+            parent=product,
             variation=bundle_item,
             multi_tenant_company=self.multi_tenant_company
         )
@@ -467,7 +467,7 @@ class InspectorBlockMissingComponentsTest(TestCase):
             active=True
         )
         BillOfMaterial.objects.create(
-            umbrella=product,
+            parent=product,
             variation=bom_item,
             quantity=1.0,
             multi_tenant_company=self.multi_tenant_company
@@ -1255,7 +1255,7 @@ class InspectorBlockProductTypeMismatchTest(TestCase):
         )
 
         # Set up a Configurable Product, Bundle Product, and Manufacturable Product for testing
-        self.configurable_product = UmbrellaProduct.objects.create(
+        self.configurable_product = ConfigurableProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             active=True,
             for_sale=True
@@ -1310,14 +1310,14 @@ class InspectorBlockProductTypeMismatchTest(TestCase):
         )
 
         # Link variations to configurable product
-        UmbrellaVariation.objects.create(
+        ConfigurableVariation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=self.configurable_product,
+            parent=self.configurable_product,
             variation=self.simple_product_1
         )
-        UmbrellaVariation.objects.create(
+        ConfigurableVariation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=self.configurable_product,
+            parent=self.configurable_product,
             variation=self.simple_product_2
         )
 
@@ -1361,12 +1361,12 @@ class InspectorBlockProductTypeMismatchTest(TestCase):
         # Link items to bundle product
         BundleVariation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=self.bundle_product,
+            parent=self.bundle_product,
             variation=self.simple_product_1
         )
         future_broken = BundleVariation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=self.bundle_product,
+            parent=self.bundle_product,
             variation=self.simple_product_2
         )
 
@@ -1412,12 +1412,12 @@ class InspectorBlockProductTypeMismatchTest(TestCase):
         # Link BOM components to manufacturable product
         BillOfMaterial.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=self.manufacturable_product,
+            parent=self.manufacturable_product,
             variation=self.simple_product_1
         )
         future_broken = BillOfMaterial.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=self.manufacturable_product,
+            parent=self.manufacturable_product,
             variation=self.simple_product_2
         )
 
@@ -1455,7 +1455,7 @@ class InspectorBlockMissingMandatoryInformationTest(TestCase):
             for_sale=True
         )
 
-        self.configurable_product = UmbrellaProduct.objects.create(
+        self.configurable_product = ConfigurableProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             active=True,
             for_sale=True
@@ -1474,21 +1474,21 @@ class InspectorBlockMissingMandatoryInformationTest(TestCase):
         )
 
         # Link variations, items, and BOMs
-        UmbrellaVariation.objects.create(
+        ConfigurableVariation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=self.configurable_product,
+            parent=self.configurable_product,
             variation=self.simple_product_1
         )
 
         BundleVariation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=self.bundle_product,
+            parent=self.bundle_product,
             variation=self.simple_product_2
         )
 
         BillOfMaterial.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=self.manufacturable_product,
+            parent=self.manufacturable_product,
             variation=self.simple_product_1
         )
 
@@ -1515,7 +1515,7 @@ class InspectorBlockMissingMandatoryInformationTest(TestCase):
         self.assertTrue(inspector_block.successfully_checked)
 
         # Break it again, delete the variation, and check if it's fixed
-        UmbrellaVariation.objects.filter(variation=self.simple_product_1).delete()
+        ConfigurableVariation.objects.filter(variation=self.simple_product_1).delete()
         inspector_block.refresh_from_db()
         self.assertTrue(inspector_block.successfully_checked)
 
@@ -1580,7 +1580,7 @@ class InspectorBlockNonConfigurableRuleTest(TestCase):
         super().setUp()
 
         # Step 1: Set up the ConfigurableProduct
-        self.product = UmbrellaProduct.objects.create(
+        self.product = ConfigurableProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             active=True,
             for_sale=True
@@ -1670,7 +1670,7 @@ class InspectorBlockDuplicateVariationsTest(TestCase):
         super().setUp()
 
         # Step 1: Set up the ConfigurableProduct
-        self.configurable_product = UmbrellaProduct.objects.create(
+        self.configurable_product = ConfigurableProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             active=True,
             for_sale=True
@@ -1742,16 +1742,16 @@ class InspectorBlockDuplicateVariationsTest(TestCase):
             value_select=self.product_type_value
         )
 
-        # Step 7: Add both variations to the ConfigurableProduct's umbrella
-        UmbrellaVariation.objects.create(
+        # Step 7: Add both variations to the ConfigurableProduct's parent
+        ConfigurableVariation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=self.configurable_product,
+            parent=self.configurable_product,
             variation=self.variation1
         )
 
-        UmbrellaVariation.objects.create(
+        ConfigurableVariation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            umbrella=self.configurable_product,
+            parent=self.configurable_product,
             variation=self.variation2
         )
 

@@ -2,7 +2,7 @@ from django.db import IntegrityError
 
 from contacts.models import Supplier
 from core.tests import TestCase
-from products.models import SupplierProduct, UmbrellaProduct, SimpleProduct, BundleProduct, DropshipProduct, ManufacturableProduct
+from products.models import SupplierProduct, ConfigurableProduct, SimpleProduct, BundleProduct, DropshipProduct, ManufacturableProduct
 
 # class ProductIntegrityTestCase(TestCase):
 #     def test_supplier_on_bundle_product(self):
@@ -11,6 +11,7 @@ from products.models import SupplierProduct, UmbrellaProduct, SimpleProduct, Bun
 
 #         with self.assertRaises(IntegrityError):
 #             prod.bundle_variations.add(sup)
+
 
 class ProductModelTest(TestCase):
     def setUp(self):
@@ -47,10 +48,10 @@ class ProductModelTest(TestCase):
 
     def test_other_product_types_without_supplier_and_sku(self):
         # Should allow creating without supplier and sku
-        umbrella_product = UmbrellaProduct.objects.create(
+        configurable_product = ConfigurableProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company
         )
-        self.assertIsNotNone(umbrella_product.sku)
+        self.assertIsNotNone(configurable_product.sku)
 
         simple_product = SimpleProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company

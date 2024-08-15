@@ -2,7 +2,7 @@ from contacts.models import Supplier, ShippingAddress
 from core.tests import TestCase
 from django.db import IntegrityError
 from inventory.models import Inventory, InventoryLocation
-from products.models import SupplierProduct, UmbrellaProduct, \
+from products.models import SupplierProduct, ConfigurableProduct, \
     SimpleProduct, BundleProduct, DropshipProduct, ManufacturableProduct
 
 
@@ -12,13 +12,14 @@ class InventoryTestCaseMixin:
         self.supplier = Supplier.objects.create(name="Supplier Company", multi_tenant_company=self.multi_tenant_company)
         self.shipping_address = ShippingAddress.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.supplier)
         self.inventory_location, _ = InventoryLocation.objects.get_or_create(
-            shippingaddress= self.shipping_address,
+            shippingaddress=self.shipping_address,
             name='InventoryTestCase',
             multi_tenant_company=self.multi_tenant_company)
 
+
 class InventoryTestCase(InventoryTestCaseMixin, TestCase):
     def test_inventory_on_configurable_product(self):
-        prod = UmbrellaProduct.objects.create(
+        prod = ConfigurableProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company)
         quantity = 10
 
