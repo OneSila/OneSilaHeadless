@@ -7,39 +7,27 @@ from .managers import OrderItemManager, OrderManager, OrderReportManager
 
 class Order(models.Model):
     DRAFT = 'DRAFT'
-    PENDING = 'PENDING'
-    PENDING_INVENTORY = 'PENDING_INVENTORY'
-    TO_PICK = 'TOPICK'
-    TO_SHIP = 'TOSHIP'
-    DONE = 'DONE'
-    CANCELLED = 'CANCELLED'
-    HOLD = 'HOLD'
-    EXCHANGED = 'EXCHANGED'
-    REFUNDED = 'REFUNDED'
-    LOST = 'LOST'
-    MERGED = 'MERGED'
-    DAMAGED = 'DAMAGED'
-    VOID = 'VOID'
+    PENDING_PROCESSING = 'PENDING_PROCESSING'  # Set by scripts after draft. It means 'ready to start'
+    PENDING_APPROVE_SHIPPING = "PENDING_APPROVE_SHIPPING"
+    TO_SHIP = "TO_SHIP"
+    AWAIT_INVENTORY = "AWAIT_INVENTORY"
+    SHIPPED = "SHIPPED"
+    CANCELLED = "CANCELLED"
+    HOLD = "HOLD"
 
-    UNPROCESSED = [PENDING]
-    DONE_TYPES = [DONE, CANCELLED, HOLD, EXCHANGED, REFUNDED, LOST, MERGED, DAMAGED]
-    HELD = [HOLD, PENDING_INVENTORY]
+    UNPROCESSED = [PENDING_PROCESSING]
+    DONE_TYPES = [SHIPPED, CANCELLED, HOLD]
+    HELD = [HOLD, PENDING_APPROVE_SHIPPING, AWAIT_INVENTORY]
 
     STATUS_CHOICES = (
         (DRAFT, _('Draft')),
-        (PENDING, _('Pending')),
-        (PENDING_INVENTORY, _('Pending Inventory')),
-        (TO_PICK, _('To Pick')),
+        (PENDING_PROCESSING, _('Pending Processing')),
+        (PENDING_APPROVE_SHIPPING, _('Pending Shipping Approval')),
         (TO_SHIP, _('To Ship')),
-        (DONE, _('Done')),
+        (AWAIT_INVENTORY, _('Awaiting Inventory')),
+        (SHIPPED, _('Shipped')),
         (CANCELLED, _('Cancelled')),
         (HOLD, _('On Hold')),
-        (EXCHANGED, _('Exchanged')),
-        (REFUNDED, _('Refunded')),
-        (LOST, _('Lost')),
-        (MERGED, _('Merged')),
-        (DAMAGED, _('Damaged')),
-        (VOID, _('Void')),
     )
 
     SALE = 'SALE'
@@ -50,10 +38,10 @@ class Order(models.Model):
 
     REASON_CHOICES = (
         (SALE, _('Sale')),
-        (RETURNGOODS, _('Return goods')),
+        # (RETURNGOODS, _('Return goods')),
         (SAMPLE, _('Commercial Sample')),
         (GIFT, _('Gift')),
-        (DOCUMENTS, _('Documents'))
+        # (DOCUMENTS, _('Documents'))
     )
 
     reference = models.CharField(max_length=100, blank=True, null=True)
@@ -101,13 +89,6 @@ class Order(models.Model):
                     return False
             return True
 
-    @property
-    def contains_custom_products(self):
-        if 'custom' in ' '.join(self.orderitem_set.all().values_list('product__name', flat=True)).lower():
-            return True
-        else:
-            return False
-
     def __str__(self):
         return '#{}'.format(self.id)
 
@@ -126,15 +107,42 @@ class Order(models.Model):
             return self.total_value
 
     def set_status_processing(self):
-        self.status = self.PENDING
+        self.status = self.PENDING_PROCESSING
         self.save()
 
     def set_status_done(self):
         self.status = self.DONE
         self.save()
 
+    def is_draft(self):
+        return self.status == self.DRAFT
+
+    def is_pending_processing(self):
+        return self.status == self.PENDING_PROCESSING
+
+    def is_pending_dropshipping_po(self):
+        return self.status == self.PENDING_DROPSHIPPING_PO
+
+    def is_pending_approve_shipping(self):
+        return self.status == self.PENDING_APPROVE_SHIPPING
+
     def is_done(self):
         return self.status == self.DONE
+
+    def is_to_ship(self):
+        return self.status == self.TO_SHIP
+
+    def is_await_inventory(self):
+        return self.status == self.AWAIT_INVENTORY
+
+    def is_shipped(self):
+        return self.status == self.SHIPPED
+
+    def is_cancelled(self):
+        return self.status == self.CANCELLED
+
+    def is_hold(self):
+        return self.status == self.HOLD
 
     class Meta:
         ordering = ('-created_at',)
