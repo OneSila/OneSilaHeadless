@@ -126,6 +126,90 @@ class Product(TranslatedModelMixin, models.Model):
         else:
             return self
 
+    def get_product_rule(self):
+        from properties.models import ProductPropertiesRule
+        from django.core.exceptions import ObjectDoesNotExist
+
+        try:
+            product_type_value = self.productproperty_set.get(property__is_product_type=True)
+            return ProductPropertiesRule.objects.get(product_type_id=product_type_value.value_select.id, multi_tenant_company=self.multi_tenant_company)
+        except ObjectDoesNotExist:
+            return None
+
+    def get_configurator_properties(self):
+        from properties.models import ProductPropertiesRuleItem
+
+        product_rule = self.get_product_rule()
+        return ProductPropertiesRuleItem.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=product_rule,
+            type__in=[
+                ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
+                ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
+            ]
+        ).select_related('property')
+
+    def get_required_properties(self):
+        from properties.models import ProductPropertiesRuleItem
+
+        product_rule = self.get_product_rule()
+        return ProductPropertiesRuleItem.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=product_rule,
+            type__in=[
+                ProductPropertiesRuleItem.REQUIRED,
+                ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
+                ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
+            ]
+        ).select_related('property')
+
+    def get_optional_properties(self):
+        from properties.models import ProductPropertiesRuleItem
+
+        product_rule = self.get_product_rule()
+        return ProductPropertiesRuleItem.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=product_rule,
+            type=ProductPropertiesRuleItem.OPTIONAL
+        ).select_related('property')
+
+    def get_required_and_optional_properties(self):
+        from properties.models import ProductPropertiesRuleItem
+
+        product_rule = self.get_product_rule()
+        return ProductPropertiesRuleItem.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=product_rule,
+        ).select_related('property')
+
+    def get_unique_umbrella_variations(self):
+        from properties.models import ProductProperty
+        from django.db.models import Prefetch
+
+        duplicate_decide_property_ids = self.get_configurator_properties().values_list('property_id', flat=True)
+        attributes_len = len(duplicate_decide_property_ids)
+        if len(duplicate_decide_property_ids) == 0:
+            return Product.objects.none()
+
+        umbrella_variations = self.umbrella_variations.prefetch_related(
+            Prefetch(
+                'productproperty_set',
+                queryset=ProductProperty.objects.filter(property_id__in=duplicate_decide_property_ids),
+                to_attr="relevant_properties"
+            )
+        )
+
+        seen_keys = set()
+        unique_variations_ids = set()
+        for variation in umbrella_variations:
+            key = tuple(sorted(getattr(prop, 'value_select_id', None) for prop in variation.relevant_properties))
+
+            if key not in seen_keys or attributes_len != len(key):
+                seen_keys.add(key)
+                unique_variations_ids.add(variation.id)
+
+        return Product.objects.filter(id__in=unique_variations_ids)
+
     def _generate_sku(self, save=False):
         self.sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
 

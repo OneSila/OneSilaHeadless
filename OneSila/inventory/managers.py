@@ -1,3 +1,5 @@
+import operator
+
 from core import models
 from core.models import Sum
 from core.managers import MultiTenantQuerySet, MultiTenantManager
@@ -30,7 +32,16 @@ class InventoryQuerySet(MultiTenantQuerySet):
 
         if product.type in [BUNDLE]:
             # FIXME: What to do about bundle-products?  Nested? Or parts with querysets?
-            raise Exception("Not implemented")
+            # This should be the inventory(ies) of the product that is least available as we need the
+            # min availble products.
+
+            # NOTE This will NOT return the real availabiltiy as this should be divided by
+            # the quantity on the BundleVariation.
+            variations = BundleVariation.objects.filter(umbrella=product)
+            variation_physicals = {i.variation: i.variation.inventory.physical() for i in variations}
+            # sorted will return a list of tuples.  Eg [(variation, physical_stock), ...].
+            least_stock_product = sorted(variation_physicals.items(), key=operator.itemgetter(1), reverse=False)[0][0]
+            return least_stock_product.inventory.filter_physical()
 
     def physical(self):
         """

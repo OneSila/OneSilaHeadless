@@ -1,8 +1,9 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from media.models import Media, Image, Video, MediaProductThrough
-
+from core.schema.core.subscriptions import refresh_subscription_receiver
+from media.models import MediaProductThrough
 import logging
+
 logger = logging.getLogger(__name__)
 
 
