@@ -69,11 +69,10 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
         if self.registry_private_apps.get(method_name):
             raise ValidationError(f"Method {method} is already present in the private app registry. You should pick a unique name.")
 
-        priority = 50
         try:
             priority = method.priority
-        except:
-            pass
+        except AttributeError:
+            priority = 50
 
         self.registry_private_apps[method_name] = {
             'method': method,
@@ -86,11 +85,10 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
         if self.registry_public_apps.get(method_name):
             raise ValidationError(f"Method {method} is already present in the public app registry. You should pick a unique name.")
 
-        priority = 50
         try:
             priority = method.priority
-        except:
-            pass
+        except AttributeError:
+            priority = 50
 
         self.registry_public_apps[method_name] = {
             'method': method,
@@ -106,7 +104,7 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
             except ModuleNotFoundError:
                 # This approach will try to load demo-data from every app, but
                 # this will not always be present - especially on external packages.
-                pass
+                logger.warning(f"No demo_data.py found for {app}")
 
     def populate_db(self, *, multi_tenant_company):
         sorted_public_vals = sorted(self.registry_public_apps.values(), key=lambda x: x['priority'], reverse=True)
@@ -118,8 +116,11 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
                     c.generate()
                 else:
                     raise NotDemoDataGeneratorError(f"{val.__name__} is not a subclass of PublicDataGenerator")
-            except TypeError:
-                val()
+            except TypeError as e:
+                if "issubclass" in str(e):
+                    val()
+                else:
+                    raise
 
         sorted_private_vals = sorted(self.registry_private_apps.values(), key=lambda x: x['priority'], reverse=True)
         for v in sorted_private_vals:
@@ -130,8 +131,11 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
                     c.generate()
                 else:
                     raise NotDemoDataGeneratorError(f"{val.__name__} is not a subclass of PrivateDataGenerator")
-            except TypeError:
-                val(multi_tenant_company)
+            except TypeError as e:
+                if "issubclass" in str(e):
+                    val(multi_tenant_company)
+                else:
+                    raise
 
     def run(self, *, multi_tenant_company):
         self.load_apps()
