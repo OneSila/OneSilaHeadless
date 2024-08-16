@@ -34,6 +34,9 @@ class PurchaseOrderGenerator(PrivateStructuredDataGenerator):
     def get_currency(self):
         return self.get_supplier().get_currency()
 
+    def get_supplier_product(self, sku):
+        return SupplierProduct.objects.get(sku=sku, multi_tenant_company=self.multi_tenant_company)
+
     def get_structure(self):
         return [
             {
@@ -48,8 +51,9 @@ class PurchaseOrderGenerator(PrivateStructuredDataGenerator):
                 'post_data': {
                     'purchaseorderitems': [
                         {
-                            'product': SupplierProduct.objects.get(sku=SUPPLIER_BLACK_TIGER_FABRIC, multi_tenant_company=self.multi_tenant_company),
+                            'product': self.get_supplier_product(SUPPLIER_BLACK_TIGER_FABRIC),
                             'quantity': 12,
+                            'unit_price': SupplierPrices.objects.get(supplier_product=self.get_supplier_product(SUPPLIER_BLACK_TIGER_FABRIC), quantity=1).unit_price,
                         }
                     ]
                 },

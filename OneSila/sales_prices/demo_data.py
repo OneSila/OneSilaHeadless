@@ -1,10 +1,32 @@
-from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator
+from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, \
+    PrivateStructuredDataGenerator
 from currencies.models import Currency
 from products.models import Product
 from sales_prices.models import SalesPrice, SalesPriceList, SalesPriceListItem
 from datetime import datetime
 
 registry = DemoDataLibrary()
+
+
+# @registry.register_private_app
+# class SalesPriceDemoDataGenerator(PrivateStructuredDataGenerator)
+#     model = SalesPrice
+
+#     def get_structure(self):
+#         return [
+#             {
+#                 'instance_data': {
+#                     'product':
+#                     'currency':
+#                     'rrp':
+#                     'price':
+
+#                 },
+#                 'post_data': {
+
+#                 },
+#             },
+#         ]
 
 
 @registry.register_private_app

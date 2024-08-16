@@ -64,7 +64,6 @@ class PurchaseOrder(models.Model):
             self.supplier.is_supplier = True
             self.supplier.save()
 
-
         super().save(*args, **kwargs)
 
     class Meta:
@@ -77,10 +76,10 @@ class PurchaseOrderItem(models.Model):
     Items being purchased from through a given purchase order
     """
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE)
-    item = models.ForeignKey(SupplierProduct, on_delete=models.PROTECT)
+    product = models.ForeignKey(SupplierProduct, on_delete=models.PROTECT)
     quantity = models.IntegerField()
     unit_price = models.FloatField()
 
     class Meta:
         search_terms = ['purchase_order__order_reference', 'purchase_order__supplier__name']
-        unique_together = ("purchase_order", "item")
+        unique_together = ("purchase_order", "product")

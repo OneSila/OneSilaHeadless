@@ -24,13 +24,19 @@ class SalesOrderGenerator(PrivateStructuredDataGenerator):
         days_ago = randint(1, 50)
         return timezone.now() - timezone.timedelta(days=days_ago)
 
+    def get_product(self, sku):
+        return Product.objects.get(sku=sku, multi_tenant_company=self.multi_tenant_company)
+
+    def get_currency(self, customer_name):
+        return self.get_customer(customer_name).get_currency()
+
     def get_structure(self):
         return [
             {
                 'instance_data': {
                     'reference': 'Demo Order AF192',
                     'customer': self.get_customer(CUSTOMER_B2B),
-                    'currency': Currency.objects.get(is_default_currency=True, multi_tenant_company=self.multi_tenant_company),
+                    'currency': self.get_currency(CUSTOMER_B2B),
                     'invoice_address': InvoiceAddress.objects.get(company=self.get_customer(CUSTOMER_B2B), multi_tenant_company=self.multi_tenant_company),
                     'shipping_address': ShippingAddress.objects.get(company=self.get_customer(CUSTOMER_B2B), multi_tenant_company=self.multi_tenant_company),
                     'created_at': self.get_created_at(),
@@ -38,9 +44,10 @@ class SalesOrderGenerator(PrivateStructuredDataGenerator):
                 'post_data': {
                     'orderitem_set': [
                         {
-                            'product': Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company),
+                            'product': self.get_product(SIMPLE_BLACK_FABRIC_PRODUCT_SKU),
                             'quantity': 1,
-                        }
+                            'price': self.get_product(SIMPLE_BLACK_FABRIC_PRODUCT_SKU).salesprice_set.get(currency=self.get_currency(CUSTOMER_B2B)).get_real_price(),
+                        },
                     ]
 
                 },

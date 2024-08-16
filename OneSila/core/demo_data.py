@@ -219,7 +219,7 @@ class DemoDataGeneratorMixin:
     def generate(self):
         for i in range(self.get_count()):
             kwargs = self.prep_baker_kwargs(i)
-            instance = self.create_instance(kwargs)
+            instance = self.create_instance(**kwargs)
             self.generated_instances.append(instance)
             self.post_data_generate(instance)
 

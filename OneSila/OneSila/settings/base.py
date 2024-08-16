@@ -51,11 +51,10 @@ INSTALLED_LOCAL_APPS = [
     'media',
     'notifications',
     'inventory',
-    'orders',
-
-    'properties',
-    'purchasing',
     'sales_prices',
+    'properties',
+    'orders',
+    'purchasing',
     'shipments',
 
     'huey.contrib.djhuey',
