@@ -41,3 +41,6 @@ django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absol
 # in channels issue https://github.com/django/channels/issues/1247
 # Docs for middleware: https://www.starlette.io/middleware/#corsmiddleware
 starlette
+
+git+https://github.com/jazzband/django-polymorphic.git@v4.0.0a#egg=django-polymorphic
+git+ssh://git@github.com/OneSila/OneSilaMagento2Api.git@v1.0.0#egg=OneSilaMagento2Api

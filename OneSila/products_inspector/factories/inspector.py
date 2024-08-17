@@ -118,7 +118,7 @@ class InspectorCreateOrUpdateFactory(SaveInspectorMixin):
         """
         self.inspector, created = Inspector.objects.get_or_create(
             product=self.product,
-            multi_tenant_company= self.multi_tenant_company
+            multi_tenant_company=self.multi_tenant_company
         )
 
         if created:
