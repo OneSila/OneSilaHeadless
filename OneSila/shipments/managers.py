@@ -1,6 +1,9 @@
 from core.managers import MultiTenantQuerySet, MultiTenantManager
 from django.db.models import Case, F, When, Value, Sum
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 def get_orderitem(self, orderitem=None):
     from orders.models import OrderItem
@@ -20,7 +23,10 @@ class ShipmentItemQuerySet(MultiTenantQuerySet):
         qty = orderitem.quantity
         qty_done = self.done(orderitem)
         qty_in_progress = self.in_progress(orderitem)
-        return qty - qty_done - qty_in_progress
+
+        todo = qty - qty_done - qty_in_progress
+        logger.debug(f"{orderitem=} with {todo=}")
+        return todo
 
     def in_progress(self, orderitem=None):
         from .models import Shipment

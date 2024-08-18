@@ -198,7 +198,6 @@ class PrepareShipmentsFactory(ShipOrderSanityCheckMixin):
         self.order = order
         self.orderitems = order.orderitem_set.all()
         self.country = order.shipping_address.country
-        self.order_items = order.orderitem_set.all()
         self.shipments = []
         self.shipmentitems = []
         self.shipmentfororder_factories = []
@@ -217,7 +216,23 @@ class PrepareShipmentsFactory(ShipOrderSanityCheckMixin):
         for shipment in self.shipments:
             shipment.set_status_todo()
 
+    def mark_order_status(self):
+        items_pending_shipping = 0
+
+        for orderitem in self.orderitems:
+            num_todo = orderitem.shipmentitem_set.todo()
+            logger.debug(f"{orderitem=} with {num_todo=}")
+            items_pending_shipping += num_todo
+
+        logger.debug(f"{items_pending_shipping=}")
+
+        if items_pending_shipping > 0:
+            self.order.set_status_await_inventory()
+        else:
+            self.order.set_status_shipped()
+
     def run(self):
         self._sanity_check()
         self.populate_shipments()
         self.mark_shipments_as_todo()
+        self.mark_order_status()

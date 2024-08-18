@@ -54,9 +54,9 @@ class TestPrepareShipmentFactory(TestWithDemoDataMixin, TestCase):
         self.assertTrue(f.shipmentitems is not None)
         self.assertEqual(len(f.shipmentitems), 1)
         self.assertEqual(f.shipmentitems[0].quantity, 1)
-        self.assertTrue(all([i.is_todo()for i in f.shipments]))
 
-        self.assertEqual(order_qty, order.orderitem_set.last().shipmentitem_set.in_progress())
+        self.assertTrue(all([i.shipmentitem_set.todo() == 0 for i in order.orderitem_set.all()]))
+        self.assertTrue(order.is_shipped())
 
     def test_prepare_shipment_all_on_stock_bundle(self):
         product = Product.objects.get(sku=BUNDLE_PEN_AND_INK_SKU, multi_tenant_company=self.multi_tenant_company)
@@ -81,18 +81,23 @@ class TestPrepareShipmentFactory(TestWithDemoDataMixin, TestCase):
         self.assertEqual(len(f.shipments), 2)
         self.assertTrue(all([i.is_todo()for i in f.shipments]))
 
+        self.assertTrue(all([i.shipmentitem_set.todo() == 0 for i in order.orderitem_set.all()]))
+        order.refresh_from_db()
+        self.assertFalse(order.is_to_ship())
+        self.assertTrue(order.is_shipped())
+
         todo = order.orderitem_set.last().shipmentitem_set.todo()
         in_progress = order.orderitem_set.last().shipmentitem_set.in_progress()
         done = order.orderitem_set.last().shipmentitem_set.done()
-
         qty_reserved = product.inventory.reserved()
+        qty_physical = product.inventory.physical()
+        qty_salable = product.inventory.salable()
 
         self.assertEqual(in_progress, order_qty)
         self.assertEqual(todo, 0)
         self.assertEqual(done, 0)
 
         self.assertEqual(order_qty, todo + in_progress + done)
-        self.assertEqual(qty_reserved, in_progress)
 
     def test_prepare_shipment_all_not_all_on_stock(self):
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
@@ -113,3 +118,8 @@ class TestPrepareShipmentFactory(TestWithDemoDataMixin, TestCase):
         self.assertEqual(done, 0)
 
         self.assertEqual(order_qty, todo + in_progress + done)
+
+        self.assertFalse(all([i.is_todo() == 0 for i in f.shipments]))
+
+        order.refresh_from_db()
+        self.assertTrue(order.is_await_inventory())

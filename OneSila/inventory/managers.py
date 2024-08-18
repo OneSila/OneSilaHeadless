@@ -116,9 +116,11 @@ class InventoryQuerySet(MultiTenantQuerySet):
         multi_tenant_company = product.multi_tenant_company
 
         sold_agg = product.orderitem_set.\
-            filter(multi_tenant_company=multi_tenant_company).\
-            exclude(
-                order__status__in=Order.DONE_TYPES).\
+            filter(
+                multi_tenant_company=multi_tenant_company,
+                order__status__in=Order.DONE_TYPES
+            ).\
+            distinct().\
             aggregate(Sum('quantity'))['quantity__sum'] or 0
 
         return sold_agg

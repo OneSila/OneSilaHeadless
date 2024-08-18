@@ -18,6 +18,7 @@ class Order(models.Model):
     UNPROCESSED = [PENDING_PROCESSING]
     DONE_TYPES = [SHIPPED, CANCELLED, HOLD]
     HELD = [HOLD, PENDING_APPROVE_SHIPPING, AWAIT_INVENTORY]
+    RESERVE_STOCK_TYPES = [PENDING_PROCESSING, HOLD, PENDING_APPROVE_SHIPPING, AWAIT_INVENTORY]
 
     STATUS_CHOICES = (
         (DRAFT, _('Draft')),
@@ -116,6 +117,14 @@ class Order(models.Model):
 
     def set_status_to_ship(self):
         self.status = self.TO_SHIP
+        self.save()
+
+    def set_status_await_inventory(self):
+        self.status = self.AWAIT_INVENTORY
+        self.save()
+
+    def set_status_shipped(self):
+        self.status = self.SHIPPED
         self.save()
 
     def is_draft(self):
