@@ -1,6 +1,7 @@
 from core import models
 from core.validators import validate_pdf_extension
 from django.utils.translation import gettext_lazy as _
+from .managers import ShipmentItemManager
 from .models_helpers import get_shippinglabel_folder_upload_path, \
     get_customs_document_folder_upload_path
 
@@ -12,6 +13,9 @@ class Shipment(models.Model):
     IN_PROGRESS = "IN_PROGRESS"
     DONE = "DONE"
     CANCELLED = "CANCELLED"
+
+    IN_PROGRESS_STATUS_LIST = [DRAFT, TODO, IN_PROGRESS]
+    DONE_STATUS_LIST = [DONE, CANCELLED]
 
     STATUS_CHOICES = (
         (DRAFT, _("Draft")),
@@ -39,6 +43,16 @@ class Shipment(models.Model):
 
     def is_todo(self):
         return self.status == self.TODO
+
+
+class ShipmentItem(models.Model):
+    """Shipment item to be used to determine how many items have been shipped in an order
+    of the actually sold product"""
+    shipments = models.ManyToManyField(Shipment, blank=True)
+    orderitem = models.ForeignKey('orders.OrderItem', on_delete=models.CASCADE)
+    quantity = models.IntegerField()
+
+    objects = ShipmentItemManager()
 
 
 class ShipmentItemToShip(models.Model):

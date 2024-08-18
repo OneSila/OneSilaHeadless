@@ -163,7 +163,6 @@ class Order(models.Model):
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.PROTECT)
-
     product = models.ForeignKey('products.Product', on_delete=models.PROTECT)
     quantity = models.IntegerField()
     # Price can be blank as we'll do auto-pricing in certain cases.

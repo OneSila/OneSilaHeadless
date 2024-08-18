@@ -2,7 +2,7 @@ from django.db import transaction
 
 from core.exceptions import SanityCheckError
 from contacts.models import ShippingAddress
-from shipments.models import Shipment, ShipmentItemToShip
+from shipments.models import Shipment, ShipmentItemToShip, ShipmentItem
 from inventory.models import InventoryLocation
 from shipments.exceptions import NoShippingAddressError, NotEnoughStockError
 
@@ -45,13 +45,29 @@ class ShipmentForOrderItemFactory(ShipOrderSanityCheckMixin):
     def _sanity_check(self):
         super()._sanity_check()
 
-        quantity_available = self.product.inventory.physical()
-        if self.quantity > quantity_available:
+        if not self.product.inventory.physical():
             msg = (
-                f"Not enough stock to ship order {self.order} product {self.product}. "
-                f"Needed: {self.quantity}. Available: {quantity_available}"
+                f"product {self.product}. Has no stock."
             )
             raise SanityCheckError(msg)
+
+    def set_quantity_toship(self):
+        qty_to_ship = self.orderitem.shipmentitem_set.todo()
+
+        if self.product.inventory.physical() >= qty_to_ship:
+            self.quantity_toship = qty_to_ship
+        else:
+            self.quantity_toship = self.product.inventory.physical()
+
+    def create_shipment_item(self):
+        self.shipmentitem = ShipmentItem.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            quantity=self.quantity_toship,
+            orderitem=self.orderitem,
+        )
+
+        for shipment in self.shipments:
+            self.shipmentitem.shipments.add(shipment)
 
     def get_product_inventory(self, product, shippingaddress=None):
         # In order to prepare shipments we want to order the inventory for each item needed and give the most
@@ -84,7 +100,7 @@ class ShipmentForOrderItemFactory(ShipOrderSanityCheckMixin):
 
             items = {}
             for bv in bundle_variations:
-                quantity_adjusted = bv.quantity * self.quantity
+                quantity_adjusted = bv.quantity * self.quantity_toship
                 try:
                     items[bv.variation] += quantity_adjusted
                 except KeyError:
@@ -96,7 +112,7 @@ class ShipmentForOrderItemFactory(ShipOrderSanityCheckMixin):
         else:
             raise ValueError(f"Product with type {self.product.type} is not supported.")
 
-    def create_shipment_item(self, inv, quantity):
+    def create_shipmenttoship_item(self, inv, quantity):
         shippingaddress = inv.inventorylocation.shippingaddress
         product = inv.product
 
@@ -124,7 +140,6 @@ class ShipmentForOrderItemFactory(ShipOrderSanityCheckMixin):
             orderitem=self.orderitem)
         self.shipmentitems.append(shipmentitem)
 
-    @transaction.atomic
     def ship_items(self):
         """Since we now know what we need to ship, we need to figure out where we will ship from
         whilst prioritising the most useful shipping location.
@@ -132,7 +147,7 @@ class ShipmentForOrderItemFactory(ShipOrderSanityCheckMixin):
         At the moment, that is based on the country. But needs serious work to make it 'intelligent'.
 
         We will create a shipment on the given shippingaddress of the best shipping location found
-        for the quantity needed.
+        for the quantity needed/available.
         """
         for item, quantity in self.orderitem_contents:
             # Get all of the low level items which will actually get shipped.
@@ -146,24 +161,23 @@ class ShipmentForOrderItemFactory(ShipOrderSanityCheckMixin):
                     inv = inventory_list.pop()
 
                     if inv.quantity >= quantity:
-                        self.create_shipment_item(inv, quantity)
+                        self.create_shipmenttoship_item(inv, quantity)
                         logger.debug(f"Partial shipment created for {inv.product} with qty {quantity}. {inv=}")
                         quantity = 0
                     else:
-                        self.create_shipment_item(inv, inv.quantity)
+                        self.create_shipmenttoship_item(inv, inv.quantity)
                         logger.debug(f"Final Partial or full shipment created for {inv.product} with qty {inv.quantity}. {inv=}")
                         quantity -= inv.quantity
                 except IndexError as e:
-                    msg = (
-                        f"No more inventory available for {item=}. Quantity still needed: {quantity}."
-                        "This should not happen as the SanityCheckError should have caught this item."
-                    )
-                    raise NotEnoughStockError(msg) from e
+                    break
 
+    @transaction.atomic
     def run(self):
         self._sanity_check()
+        self.set_quantity_toship()
         self.set_orderitem_contents()
         self.ship_items()
+        self.create_shipment_item()
 
 
 class PrepareShipmentsFactory(ShipOrderSanityCheckMixin):

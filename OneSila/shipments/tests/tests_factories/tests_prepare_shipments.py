@@ -43,7 +43,8 @@ class TestPrepareShipmentFactory(TestWithDemoDataMixin, TestCase):
 
     def test_prepare_shipment_all_on_stock_simple_single_supplier_product(self):
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
-        order = self.create_test_order('test_prepare_shipment', product, 1)
+        order_qty = 1
+        order = self.create_test_order('test_prepare_shipment', product, order_qty)
         order.set_status_to_ship()
 
         f = PrepareShipmentsFactory(order)
@@ -55,9 +56,12 @@ class TestPrepareShipmentFactory(TestWithDemoDataMixin, TestCase):
         self.assertEqual(f.shipmentitems[0].quantity, 1)
         self.assertTrue(all([i.is_todo()for i in f.shipments]))
 
+        self.assertEqual(order_qty, order.orderitem_set.last().shipmentitem_set.in_progress())
+
     def test_prepare_shipment_all_on_stock_bundle(self):
         product = Product.objects.get(sku=BUNDLE_PEN_AND_INK_SKU, multi_tenant_company=self.multi_tenant_company)
-        order = self.create_test_order('test_prepare_shipment', product, 1)
+        order_qty = 1
+        order = self.create_test_order('test_prepare_shipment', product, order_qty)
         order.set_status_to_ship()
 
         logger.debug(f"{order=} with {order.orderitem_set.all()}")
@@ -77,11 +81,35 @@ class TestPrepareShipmentFactory(TestWithDemoDataMixin, TestCase):
         self.assertEqual(len(f.shipments), 2)
         self.assertTrue(all([i.is_todo()for i in f.shipments]))
 
+        todo = order.orderitem_set.last().shipmentitem_set.todo()
+        in_progress = order.orderitem_set.last().shipmentitem_set.in_progress()
+        done = order.orderitem_set.last().shipmentitem_set.done()
+
+        qty_reserved = product.inventory.reserved()
+
+        self.assertEqual(in_progress, order_qty)
+        self.assertEqual(todo, 0)
+        self.assertEqual(done, 0)
+
+        self.assertEqual(order_qty, todo + in_progress + done)
+        self.assertEqual(qty_reserved, in_progress)
+
     def test_prepare_shipment_all_not_all_on_stock(self):
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
-        order = self.create_test_order('test_prepare_shipment', product, 15)
+        order_qty = 15
+        order = self.create_test_order('test_prepare_shipment', product, order_qty)
         order.set_status_to_ship()
+        qty_available = product.inventory.physical()
 
-        with self.assertRaises(SanityCheckError):
-            f = PrepareShipmentsFactory(order)
-            f.run()
+        f = PrepareShipmentsFactory(order)
+        f.run()
+
+        todo = order.orderitem_set.last().shipmentitem_set.todo()
+        in_progress = order.orderitem_set.last().shipmentitem_set.in_progress()
+        done = order.orderitem_set.last().shipmentitem_set.done()
+
+        self.assertEqual(in_progress, qty_available)
+        self.assertEqual(todo, order_qty - qty_available)
+        self.assertEqual(done, 0)
+
+        self.assertEqual(order_qty, todo + in_progress + done)
