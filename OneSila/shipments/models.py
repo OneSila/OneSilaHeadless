@@ -41,8 +41,20 @@ class Shipment(models.Model):
         self.status = self.TODO
         self.save()
 
+    def is_draft(self):
+        return self.status == self.DRAFT
+
     def is_todo(self):
         return self.status == self.TODO
+
+    def is_in_progress(self):
+        return self.status == self.IN_PROGRESS
+
+    def is_done(self):
+        return self.status == self.DONE
+
+    def is_cancelled(self):
+        return self.status == self.CANCELLED
 
 
 class ShipmentItem(models.Model):
