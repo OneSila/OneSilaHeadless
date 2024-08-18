@@ -37,6 +37,9 @@ class Shipment(models.Model):
         self.status = self.TODO
         self.save()
 
+    def is_todo(self):
+        return self.status == self.TODO
+
 
 class ShipmentItemToShip(models.Model):
     """ Shipment items are auto-populated based on availablity for a given location"""

@@ -199,6 +199,11 @@ class PrepareShipmentsFactory(ShipOrderSanityCheckMixin):
 
         self.shipments = list(set(self.shipments))
 
+    def mark_shipments_as_todo(self):
+        for shipment in self.shipments:
+            shipment.set_status_todo()
+
     def run(self):
         self._sanity_check()
         self.populate_shipments()
+        self.mark_shipments_as_todo()

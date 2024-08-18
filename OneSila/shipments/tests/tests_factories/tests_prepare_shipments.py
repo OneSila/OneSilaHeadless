@@ -53,6 +53,7 @@ class TestPrepareShipmentFactory(TestWithDemoDataMixin, TestCase):
         self.assertTrue(f.shipmentitems is not None)
         self.assertEqual(len(f.shipmentitems), 1)
         self.assertEqual(f.shipmentitems[0].quantity, 1)
+        self.assertTrue(all([i.is_todo()for i in f.shipments]))
 
     def test_prepare_shipment_all_on_stock_bundle(self):
         product = Product.objects.get(sku=BUNDLE_PEN_AND_INK_SKU, multi_tenant_company=self.multi_tenant_company)
@@ -74,6 +75,7 @@ class TestPrepareShipmentFactory(TestWithDemoDataMixin, TestCase):
         # The pen and some of the cartridges are on location one
         # the rest of the ink cartridges are on another location
         self.assertEqual(len(f.shipments), 2)
+        self.assertTrue(all([i.is_todo()for i in f.shipments]))
 
     def test_prepare_shipment_all_not_all_on_stock(self):
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)

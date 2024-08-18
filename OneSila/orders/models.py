@@ -8,7 +8,7 @@ from .managers import OrderItemManager, OrderManager, OrderReportManager
 class Order(models.Model):
     DRAFT = 'DRAFT'
     PENDING_PROCESSING = 'PENDING_PROCESSING'  # Set by scripts after draft. It means 'ready to start'
-    PENDING_APPROVE_SHIPPING = "PENDING_APPROVE_SHIPPING"
+    PENDING_APPROVE_SHIPPING = "PENDING_APPROVE_SHIPPING"  # used with partial shipments.  Needs to_ship or await_inventory or hold
     TO_SHIP = "TO_SHIP"
     AWAIT_INVENTORY = "AWAIT_INVENTORY"
     SHIPPED = "SHIPPED"
