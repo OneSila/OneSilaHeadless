@@ -104,7 +104,7 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
             except ModuleNotFoundError:
                 # This approach will try to load demo-data from every app, but
                 # this will not always be present - especially on external packages.
-                logger.warning(f"No demo_data.py found for {app}")
+                logger.debug(f"No demo_data.py found for {app}")
 
     def populate_db(self, *, multi_tenant_company):
         sorted_public_vals = sorted(self.registry_public_apps.values(), key=lambda x: x['priority'], reverse=True)

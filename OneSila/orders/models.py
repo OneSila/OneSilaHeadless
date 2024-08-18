@@ -114,6 +114,10 @@ class Order(models.Model):
         self.status = self.DONE
         self.save()
 
+    def set_status_to_ship(self):
+        self.status = self.TO_SHIP
+        self.save()
+
     def is_draft(self):
         return self.status == self.DRAFT
 

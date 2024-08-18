@@ -3,12 +3,13 @@ from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, P
     PublicDataGenerator
 from inventory.models import InventoryLocation, Inventory
 from products.models import SupplierProduct
-from products.demo_data import SUPPLIER_BLACK_TIGER_FABRIC
-
+from products.demo_data import SUPPLIER_BLACK_TIGER_FABRIC, SUPPLIER_PEN_SKU_ONE, SUPPLIER_PEN_SKU_TWO, SUPPLIER_INK_SKU
+from contacts.demo_data import INTERNAL_SHIPPING_STREET_ONE, INTERNAL_SHIPPING_STREET_TWO
 registry = DemoDataLibrary()
 
 
 LOCATION_WAREHOUSE_A = "Warehouse A"
+LOCATION_WAREHOUSE_B = "Warehouse B"
 LOCATION_B21AC = "B21AC"
 LOCATION_B21AD = "B21AD"
 LOCATION_B21AF = "B21AF"
@@ -18,13 +19,25 @@ LOCATION_B21AF = "B21AF"
 class InventoryLocationGenerator(PrivateStructuredDataGenerator):
     model = InventoryLocation
 
+    def get_internal_shipping_address(self, street):
+        return InternalShippingAddress.objects.get(multi_tenant_company=self.multi_tenant_company,
+            address1=street)
+
     def get_structure(self):
         return [
             {
                 'instance_data': {
                     "name": LOCATION_WAREHOUSE_A,
                     "precise": False,
-                    "shippingaddress": InternalShippingAddress.objects.get(multi_tenant_company=self.multi_tenant_company),
+                    "shippingaddress": self.get_internal_shipping_address(INTERNAL_SHIPPING_STREET_ONE),
+                },
+                'post_data': {},
+            },
+            {
+                'instance_data': {
+                    "name": LOCATION_WAREHOUSE_B,
+                    "precise": False,
+                    "shippingaddress": self.get_internal_shipping_address(INTERNAL_SHIPPING_STREET_ONE),
                 },
                 'post_data': {},
             },
@@ -32,7 +45,7 @@ class InventoryLocationGenerator(PrivateStructuredDataGenerator):
                 'instance_data': {
                     "name": LOCATION_B21AC,
                     "precise": True,
-                    "shippingaddress": InternalShippingAddress.objects.get(multi_tenant_company=self.multi_tenant_company),
+                    "shippingaddress": self.get_internal_shipping_address(INTERNAL_SHIPPING_STREET_TWO),
                 },
                 'post_data': {},
             },
@@ -40,7 +53,7 @@ class InventoryLocationGenerator(PrivateStructuredDataGenerator):
                 'instance_data': {
                     "name": LOCATION_B21AD,
                     "precise": True,
-                    "shippingaddress": InternalShippingAddress.objects.get(multi_tenant_company=self.multi_tenant_company),
+                    "shippingaddress": self.get_internal_shipping_address(INTERNAL_SHIPPING_STREET_TWO),
                 },
                 'post_data': {},
             },
@@ -48,7 +61,7 @@ class InventoryLocationGenerator(PrivateStructuredDataGenerator):
                 'instance_data': {
                     "name": LOCATION_B21AF,
                     "precise": True,
-                    "shippingaddress": InternalShippingAddress.objects.get(multi_tenant_company=self.multi_tenant_company),
+                    "shippingaddress": self.get_internal_shipping_address(INTERNAL_SHIPPING_STREET_TWO),
                 },
                 'post_data': {},
             }
@@ -59,13 +72,19 @@ class InventoryLocationGenerator(PrivateStructuredDataGenerator):
 class InventoryGenerator(PrivateStructuredDataGenerator):
     model = Inventory
 
+    def get_inventory_location(self, name):
+        return InventoryLocation.objects.get(name=name, multi_tenant_company=self.multi_tenant_company)
+
+    def get_supplier_product(self, sku):
+        return SupplierProduct.objects.get(sku=sku, multi_tenant_company=self.multi_tenant_company)
+
     def get_structure(self):
         return [
             {
                 'instance_data': {
                     "quantity": 1,
-                    "inventorylocation": InventoryLocation.objects.get(name=LOCATION_WAREHOUSE_A, multi_tenant_company=self.multi_tenant_company),
-                    "product": SupplierProduct.objects.get(sku=SUPPLIER_BLACK_TIGER_FABRIC, multi_tenant_company=self.multi_tenant_company),
+                    "inventorylocation": self.get_inventory_location(LOCATION_WAREHOUSE_A),
+                    "product": self.get_supplier_product(SUPPLIER_BLACK_TIGER_FABRIC),
 
                 },
                 'post_data': {},
@@ -73,11 +92,46 @@ class InventoryGenerator(PrivateStructuredDataGenerator):
             {
                 'instance_data': {
                     "quantity": 10,
-                    "inventorylocation": InventoryLocation.objects.get(name=LOCATION_B21AC, multi_tenant_company=self.multi_tenant_company),
-                    "product": SupplierProduct.objects.get(sku=SUPPLIER_BLACK_TIGER_FABRIC, multi_tenant_company=self.multi_tenant_company),
+                    "inventorylocation": self.get_inventory_location(LOCATION_B21AC),
+                    "product": self.get_supplier_product(SUPPLIER_BLACK_TIGER_FABRIC),
 
                 },
                 'post_data': {},
             },
+            {
+                'instance_data': {
+                    "quantity": 1,
+                    "inventorylocation": self.get_inventory_location(LOCATION_B21AD),
+                    "product": self.get_supplier_product(SUPPLIER_PEN_SKU_ONE),
 
+                },
+                'post_data': {},
+            },
+            {
+                'instance_data': {
+                    "quantity": 10,
+                    "inventorylocation": self.get_inventory_location(LOCATION_B21AF),
+                    "product": self.get_supplier_product(SUPPLIER_PEN_SKU_TWO),
+
+                },
+                'post_data': {},
+            },
+            {
+                'instance_data': {
+                    "quantity": 2,
+                    "inventorylocation": self.get_inventory_location(LOCATION_WAREHOUSE_A),
+                    "product": self.get_supplier_product(SUPPLIER_INK_SKU),
+
+                },
+                'post_data': {},
+            },
+            {
+                'instance_data': {
+                    "quantity": 4,
+                    "inventorylocation": self.get_inventory_location(LOCATION_WAREHOUSE_B),
+                    "product": self.get_supplier_product(SUPPLIER_INK_SKU),
+
+                },
+                'post_data': {},
+            },
         ]

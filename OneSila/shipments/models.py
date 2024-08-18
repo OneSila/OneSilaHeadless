@@ -7,19 +7,21 @@ from .models_helpers import get_shippinglabel_folder_upload_path, \
 
 class Shipment(models.Model):
     """each for a given location"""
+    DRAFT = "DRAFT"
     TODO = "TODO"
     IN_PROGRESS = "IN_PROGRESS"
     DONE = "DONE"
     CANCELLED = "CANCELLED"
 
     STATUS_CHOICES = (
+        (DRAFT, _("Draft")),
         (TODO, _("Todo")),
         (IN_PROGRESS, _("In Progress")),
         (DONE, _("Done")),
         (CANCELLED, _("Cancelled")),
     )
 
-    status = models.CharField(max_length=11, choices=STATUS_CHOICES, default=TODO)
+    status = models.CharField(max_length=11, choices=STATUS_CHOICES, default=DRAFT)
     from_address = models.ForeignKey('contacts.ShippingAddress', on_delete=models.PROTECT,
         related_name='shipments_from')
     to_address = models.ForeignKey('contacts.ShippingAddress', on_delete=models.PROTECT,
@@ -31,13 +33,17 @@ class Shipment(models.Model):
         null=True,
         blank=True)
 
+    def set_status_todo(self):
+        self.status = self.TODO
+        self.save()
+
 
 class ShipmentItemToShip(models.Model):
     """ Shipment items are auto-populated based on availablity for a given location"""
-    orderitem = models.ForeignKey("orders.OrderItem", on_delete=models.PROTECT)
     product = models.ForeignKey("products.Product", on_delete=models.PROTECT)
     quantity = models.IntegerField()
     shipment = models.ForeignKey(Shipment, on_delete=models.PROTECT)
+    orderitem = models.ForeignKey('orders.OrderItem', on_delete=models.PROTECT)
 
 
 class Package(models.Model):

@@ -5,7 +5,7 @@ from currencies.models import Currency
 from units.models import Unit
 from .models import PurchaseOrder, PurchaseOrderItem
 from products.models import SupplierProduct, Product, ProductTranslation, SupplierPrices
-from contacts.demo_data import FABRIC_SUPPLIER_NAME
+from contacts.demo_data import FABRIC_SUPPLIER_NAME, INTERNAL_SHIPPING_STREET_ONE
 from products.demo_data import SUPPLIER_BLACK_TIGER_FABRIC
 
 registry = DemoDataLibrary()
@@ -26,7 +26,8 @@ class PurchaseOrderGenerator(PrivateStructuredDataGenerator):
     def get_shipping_address(self):
         return ShippingAddress.objects.get(
             multi_tenant_company=self.multi_tenant_company,
-            company=self.get_internal_company())
+            company=self.get_internal_company(),
+            address1=INTERNAL_SHIPPING_STREET_ONE)
 
     def get_supplier(self):
         return Supplier.objects.get(name=FABRIC_SUPPLIER_NAME, multi_tenant_company=self.multi_tenant_company)

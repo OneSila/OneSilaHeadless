@@ -1,5 +1,5 @@
 import operator
-
+from django.db.models import Case, When, F, Value
 from core import models
 from core.models import Sum
 from core.managers import MultiTenantQuerySet, MultiTenantManager
@@ -16,9 +16,24 @@ class InventoryQuerySet(MultiTenantQuerySet):
     def order_by_least(self):
         return self.order_by("quantity")
 
+    def filter_shippingaddress(self, shippingaddress):
+        return self.filter(inventorylocation__shippingaddress=shippingaddress)
+
+    def order_by_relevant_shippinglocation(self, country_code):
+        # FIXME: This could really do with sorting out some kind of distance
+        # from the country_code somewhow.
+        return self.annotate(
+            country=F('inventorylocation__shippingaddress__country'),
+            is_relevant_country=Case(
+                When(country=Value(country_code), then=1),
+                default=2,
+                output_field=models.IntegerField()
+            )
+        ).order_by('-is_relevant_country', '-inventorylocation__shippingaddress')
+
     def filter_internal(self):
         """Filter to only return inventory thats attached to an internal shipping address"""
-        return self.filteer(inventorylocation__company__is_internal_company=True)
+        return self.filter(inventorylocation__shippingaddress__company__is_internal_company=True)
 
     def filter_physical(self, product=None):
         """ Return the inventories where a given product is located."""
@@ -131,11 +146,20 @@ class InventoryManager(MultiTenantManager):
     def filter_internal(self):
         return self.get_queryset().filter_internal()
 
+    def filter_shippingaddress(self):
+        return self.get_queryset().filter_shippingaddress()
+
+    def order_by_relevant_shippinglocation(self):
+        return self.get_queryset().order_by_relevant_shippinglocation()
+
 
 class InventoryLocationQuerySet(MultiTenantQuerySet):
-    def filter_locations_for_product(self, product, qty):
+    def filter_by_shippingaddress_set(self, shippingaddress_set):
+        return self.filter(shippingaddress__in=shippingaddress_set)
+
+    def filter_locations_for_product(self, product):
         # this all needs tranlating into either manufacturable or supplier products to get the right locations.
-        if product.is_manufacturable() or product.is_supplier():
+        if product.is_manufacturable() or product.is_supplier_product():
             return self.filter(multi_tenant_company=multi_tenant_company,
                 product=product)
         elif product.is_simple():
@@ -157,3 +181,9 @@ class InventoryLocationQuerySet(MultiTenantQuerySet):
 class InventoryLocationManager(MultiTenantManager):
     def get_queryset(self):
         return InventoryLocationQuerySet(self.model, using=self._db)
+
+    def filter_by_shippingaddress_set(self, shippingaddress_set):
+        return self.get_queryset().filter_by_shippingaddress_set(shippingaddress_set)
+
+    def filter_locations_for_product(product, qty):
+        return self.get_queryset().filter_locations_for_product(product, qty)
