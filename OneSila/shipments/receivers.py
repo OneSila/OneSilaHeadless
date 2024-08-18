@@ -1,8 +1,8 @@
 from orders.signals import to_ship
 from orders.models import Order
 from core.receivers import post_save, receiver
-from shipments.signals import draft, todo, in_progress,
-done, cancelled
+from shipments.signals import draft, todo, in_progress, \
+    done, cancelled
 
 
 @receiver(to_ship, sender=Order)
