@@ -1,8 +1,20 @@
 from orders.signals import to_ship
 from orders.models import Order
 from core.receivers import post_save, receiver
+from inventory.signals import product_inventory_change
 from shipments.signals import draft, todo, in_progress, \
     done, cancelled, pending_processing
+
+
+@receiver(product_inventory_change, sender='products.Product'):
+def orders__product__inventory_change__shipping_retrigger(sender, instance, **kwargs):
+    """
+    Check to see if some orders need the shipping_status retriggered.
+    """
+    # FIXME: Trace back all order_items owned by this product filtered
+    # by an order that's in pending_inventory.
+    # You can simply run the pre-approval flow on this one.
+    pass
 
 
 @receiver(pending_processing, sender=Order)
