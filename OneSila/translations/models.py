@@ -32,6 +32,7 @@ class TranslationFieldsMixin(models.Model):
         super().save(*args, **kwargs)
 
 
+# @TODO: This maybe should inherit models.Model?
 class TranslatedModelMixin(OldModel):
     def _get_translated_value(self, *, field_name, language=None, related_name='translations', fallback=None):
         # we use '' (empty string) instead of None here because some of the translated values severs as __str__

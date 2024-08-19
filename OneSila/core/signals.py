@@ -12,3 +12,6 @@ recovery_token_created = ModelSignal(use_caching=True)
 password_changed = ModelSignal(use_caching=True)
 post_create = ModelSignal(use_caching=True)
 post_update = ModelSignal(use_caching=True)
+
+mutation_update = ModelSignal(use_caching=True)
+mutation_create = ModelSignal(use_caching=True)

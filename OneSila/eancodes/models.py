@@ -44,8 +44,8 @@ class EanCode(models.Model):
     def clean(self):
         if not self.ean_code and not self.inherit_to:
             raise IntegrityError("Either ean_code or inherit_to must be provided.")
-        if self.product and self.product.is_umbrella():
-            raise IntegrityError("You cannot assign an ean_code to an UMBRELLA. It needs to be BUNDLE or SIMPLE")
+        if self.product and self.product.is_configurable():
+            raise IntegrityError("You cannot assign an ean_code to an CONFIGURABLE. It needs to be BUNDLE or SIMPLE")
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -58,7 +58,8 @@ class EanCode(models.Model):
                 fields=['multi_tenant_company', 'ean_code'],
                 name='unique_ean_code_per_tenant',
                 condition=models.Q(ean_code__isnull=False),
-                violation_error_message=_("Ean code already exists") # for now this will not apply but it can in the future https://github.com/django/django/pull/17723
+                # for now this will not apply but it can in the future https://github.com/django/django/pull/17723
+                violation_error_message=_("Ean code already exists")
             ),
 
             models.CheckConstraint(

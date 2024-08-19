@@ -230,7 +230,7 @@ class BundleProductDataGenerator(ProductGetDataMixin, PrivateStructuredDataGener
             variation = self.get_product(sku)
             BundleVariation.objects.create(
                 multi_tenant_company=self.multi_tenant_company,
-                umbrella=instance,
+                parent=instance,
                 variation=variation,
                 quantity=qty,
             )

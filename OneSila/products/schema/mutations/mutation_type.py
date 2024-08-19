@@ -1,12 +1,12 @@
 from .fields import create_product, create_supplier_product
-from ..types.types import ProductType, BundleProductType, UmbrellaProductType, \
-    SimpleProductType, ProductTranslationType, UmbrellaVariationType, \
+from ..types.types import ProductType, BundleProductType, ConfigurableProductType, \
+    SimpleProductType, ProductTranslationType, ConfigurableVariationType, \
     BundleVariationType, ManufacturableProductType, DropshipProductType, SupplierProductType, BillOfMaterialType, SupplierPricesType
-from ..types.input import ProductInput, BundleProductInput, UmbrellaProductInput, \
-    SimpleProductInput, ProductTranslationInput, UmbrellaVariationInput, \
-    BundleVariationInput, ProductPartialInput, UmbrellaProductPartialInput, \
+from ..types.input import ProductInput, BundleProductInput, ConfigurableProductInput, \
+    SimpleProductInput, ProductTranslationInput, ConfigurableVariationInput, \
+    BundleVariationInput, ProductPartialInput, ConfigurableProductPartialInput, \
     BundleProductPartialInput, SimpleProductPartialInput, \
-    ProductTranslationPartialInput, UmbrellaVariationPartialInput, \
+    ProductTranslationPartialInput, ConfigurableVariationPartialInput, \
     BundleVariationPartialInput, ManufacturableProductInput, ManufacturableProductPartialInput, DropshipProductInput, DropshipProductPartialInput, \
     SupplierProductInput, SupplierProductPartialInput, BillOfMaterialInput, BillOfMaterialPartialInput, SupplierPricesPartialInput, SupplierPricesInput
 from core.schema.core.mutations import create, update, delete, type, List
@@ -26,11 +26,11 @@ class ProductsMutation:
     delete_bundle_product: BundleProductType = delete()
     delete_bundle_products: List[BundleProductType] = delete()
 
-    create_umbrella_product: UmbrellaProductType = create(UmbrellaProductInput)
-    create_umbrella_products: List[UmbrellaProductType] = create(UmbrellaProductInput)
-    update_umbrella_product: UmbrellaProductType = update(UmbrellaProductPartialInput)
-    delete_umbrella_product: UmbrellaProductType = delete()
-    delete_umbrella_products: List[UmbrellaProductType] = delete()
+    create_configurable_product: ConfigurableProductType = create(ConfigurableProductInput)
+    create_configurable_products: List[ConfigurableProductType] = create(ConfigurableProductInput)
+    update_configurable_product: ConfigurableProductType = update(ConfigurableProductPartialInput)
+    delete_configurable_product: ConfigurableProductType = delete()
+    delete_configurable_products: List[ConfigurableProductType] = delete()
 
     create_simple_product: SimpleProductType = create(SimpleProductInput)
     create_simple_products: List[SimpleProductType] = create(SimpleProductInput)
@@ -44,11 +44,11 @@ class ProductsMutation:
     delete_product_translation: ProductTranslationType = delete()
     delete_product_translations: List[ProductTranslationType] = delete()
 
-    create_umbrella_variation: UmbrellaVariationType = create(UmbrellaVariationInput)
-    create_umbrella_variations: List[UmbrellaVariationType] = create(UmbrellaVariationInput)
-    update_umbrella_variation: UmbrellaVariationType = update(UmbrellaVariationPartialInput)
-    delete_umbrella_variation: UmbrellaVariationType = delete()
-    delete_umbrella_variations: List[UmbrellaVariationType] = delete()
+    create_configurable_variation: ConfigurableVariationType = create(ConfigurableVariationInput)
+    create_configurable_variations: List[ConfigurableVariationType] = create(ConfigurableVariationInput)
+    update_configurable_variation: ConfigurableVariationType = update(ConfigurableVariationPartialInput)
+    delete_configurable_variation: ConfigurableVariationType = delete()
+    delete_configurable_variations: List[ConfigurableVariationType] = delete()
 
     create_bundle_variation: BundleVariationType = create(BundleVariationInput)
     create_bundle_variations: List[BundleVariationType] = create(BundleVariationInput)

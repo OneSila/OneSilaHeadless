@@ -14,6 +14,7 @@ from typing import List
 from .decorators import multi_tenant_owner_protection
 from .mixins import GetMultiTenantCompanyMixin, GetCurrentUserMixin
 from .extensions import default_extensions
+from ...signals import mutation_update, mutation_create
 
 
 class CreateMutation(GetMultiTenantCompanyMixin, DjangoCreateMutation):
@@ -24,7 +25,9 @@ class CreateMutation(GetMultiTenantCompanyMixin, DjangoCreateMutation):
     def create(self, data: dict[str, Any], *, info: Info):
         multi_tenant_company = self.get_multi_tenant_company(info, fail_silently=False)
         data['multi_tenant_company'] = multi_tenant_company
-        return super().create(data=data, info=info)
+        created_instance = super().create(data=data, info=info)
+        mutation_create.send(sender=created_instance.__class__, instance=created_instance)
+        return created_instance
 
 
 class UpdateMutation(GetMultiTenantCompanyMixin, DjangoUpdateMutation):
@@ -35,7 +38,9 @@ class UpdateMutation(GetMultiTenantCompanyMixin, DjangoUpdateMutation):
     def update(self, info: Info, instance: models.Model | Iterable[models.Model], data: dict[str, Any],):
         multi_tenant_company = self.get_multi_tenant_company(info, fail_silently=False)
         data['multi_tenant_company'] = multi_tenant_company
-        return super().update(info=info, instance=instance, data=data)
+        updated_instance = super().update(info=info, instance=instance, data=data)
+        mutation_update.send(sender=updated_instance.__class__, instance=updated_instance)
+        return updated_instance
 
 
 class DeleteMutation(GetMultiTenantCompanyMixin, DjangoDeleteMutation):

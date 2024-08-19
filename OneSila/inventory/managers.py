@@ -59,7 +59,7 @@ class InventoryQuerySet(MultiTenantQuerySet):
 
             # NOTE This will NOT return the real availabiltiy as this should be divided by
             # the quantity on the BundleVariation.
-            variations = BundleVariation.objects.filter(umbrella=product)
+            variations = BundleVariation.objects.filter(parent=product)
             variation_physicals = {i.variation: i.variation.inventory.physical() for i in variations}
             # sorted will return a list of tuples.  Eg [(variation, physical_stock), ...].
             least_stock_product = sorted(variation_physicals.items(), key=operator.itemgetter(1), reverse=False)[0][0]
@@ -79,7 +79,7 @@ class InventoryQuerySet(MultiTenantQuerySet):
             inventory_qs = self.filter_physical()
             return inventory_qs.aggregate(Sum('quantity'))['quantity__sum'] or 0
 
-        # put the qty here so umbrella / configurable products to have 0 instead of error
+        # put the qty here so configurable products to have 0 instead of error
         qty = 0
         if product.type in [BUNDLE]:
             # Even though we can attach a variety of bundles, we must ensure we
@@ -90,7 +90,7 @@ class InventoryQuerySet(MultiTenantQuerySet):
             try:
                 # int() will round down which is what we want.
                 available_parts = []
-                for through in BundleVariation.objects.filter(umbrella=product, multi_tenant_company=multi_tenant_company):
+                for through in BundleVariation.objects.filter(parent=product, multi_tenant_company=multi_tenant_company):
                     physical = through.variation.inventory.physical()
                     available_parts.append(int(physical / through.quantity))
 

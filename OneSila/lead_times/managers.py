@@ -15,7 +15,7 @@ class LeadTimeQuerySet(MultiTenantQuerySet):
         from .models import LeadTimeProductOutOfStock
 
         if product.type == BUNDLE:
-            bundlevariations = BundleVariation.objects.filter(umbrella=product)
+            bundlevariations = BundleVariation.objects.filter(parent=product)
             leadtime_ids = []
             for bv in bundlevariations:
                 product = bv.variation

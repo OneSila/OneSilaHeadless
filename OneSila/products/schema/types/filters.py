@@ -4,8 +4,8 @@ from contacts.schema.types.filters import SupplierFilter
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin, lazy
 
-from products.models import Product, BundleProduct, UmbrellaProduct, \
-    SimpleProduct, ProductTranslation, UmbrellaVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, \
+from products.models import Product, BundleProduct, ConfigurableProduct, \
+    SimpleProduct, ProductTranslation, ConfigurableVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, \
     SupplierPrices
 from taxes.schema.types.filters import VatRateFilter
 from units.schema.types.filters import UnitFilter
@@ -21,6 +21,7 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     vat_rate: Optional[VatRateFilter]
     exclude_demo_data: Optional[bool]
 
+
 @filter(BundleProduct)
 class BundleProductFilter(SearchFilterMixin):
     search: str | None
@@ -29,8 +30,8 @@ class BundleProductFilter(SearchFilterMixin):
     vat_rate: Optional[VatRateFilter]
 
 
-@filter(UmbrellaProduct)
-class UmbrellaProductFilter(SearchFilterMixin):
+@filter(ConfigurableProduct)
+class ConfigurableProductFilter(SearchFilterMixin):
     search: str | None
     id: auto
     sku: auto
@@ -52,16 +53,17 @@ class ProductTranslationFilter:
     language: auto
 
 
-@filter(UmbrellaVariation)
-class UmbrellaVariationFilter:
+@filter(ConfigurableVariation)
+class ConfigurableVariationFilter:
     id: auto
-    umbrella: Optional[ProductFilter]
+    parent: Optional[ProductFilter]
 
 
 @filter(BundleVariation)
 class BundleVariationFilter:
     id: auto
-    umbrella: Optional[ProductFilter]
+    parent: Optional[ProductFilter]
+
 
 @filter(ManufacturableProduct)
 class ManufacturableProductFilter(SearchFilterMixin):
@@ -88,11 +90,11 @@ class SupplierProductFilter(SearchFilterMixin):
     base_products: Optional[lazy['ProductFilter', "products.schema.types.filters"]]
 
 
-
 @filter(BillOfMaterial)
 class BillOfMaterialFilter:
     id: auto
-    umbrella: Optional[ProductFilter]
+    parent: Optional[ProductFilter]
+
 
 @filter(SupplierPrices)
 class SupplierPricesFilter(SearchFilterMixin):
