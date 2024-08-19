@@ -67,7 +67,7 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
         method_name = self.method_name(method)
 
         if self.registry_private_apps.get(method_name):
-            raise ValidationError(f"Method {method} is already present in the private app registry. You should pick a unique name.")
+            raise ValidationError(f"Method {method.__name__} is already present in the private app registry. You should pick a unique name.")
 
         try:
             priority = method.priority

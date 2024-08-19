@@ -1,4 +1,4 @@
-from core.tests import TestCase, TestWithDemoDataMixin
+from core.tests import TestCase, TestCaseDemoDataMixin
 from core.exceptions import SanityCheckError
 from shipments.factories import PreApproveShippingFactory
 from orders.models import Order
@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class TestPreApproveShippingFactory(CreateTestOrderMixin, TestWithDemoDataMixin, TestCase):
+class TestPreApproveShippingFactory(CreateTestOrderMixin, TestCaseDemoDataMixin, TestCase):
     def test_pre_approve_shipping_in_stock(self):
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
         order_qty = 1

@@ -19,7 +19,7 @@ class TestCase(TestCaseMixin, DjangoTestCase):
     pass
 
 
-class TestWithDemoDataMixin:
+class TestCaseDemoDataMixin:
     # This variable will be shared across all TestCases subsclassed from here.
     # That will ensure we only try to generate the demo-data once.
     demo_data_generated = False
@@ -39,5 +39,5 @@ class TestWithDemoDataMixin:
         self.demo_data_generated = False
 
 
-class TestCaseWithDemoData(TestWithDemoDataMixin, TestCase):
+class TestCaseWithDemoData(TestCaseDemoDataMixin, TestCase):
     pass

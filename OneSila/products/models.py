@@ -8,7 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from translations.models import TranslationFieldsMixin, TranslatedModelMixin
 from taxes.models import VatRate
 from .managers import ProductManager, ConfigurableManager, BundleManager, VariationManager, \
-    SupplierProductManager, ManufacturableManager, DropshipManager
+    SupplierProductManager, ManufacturableManager, DropshipManager, SupplierPriceManager
 import shortuuid
 from hashlib import shake_256
 from products.product_types import SUPPLIER
@@ -112,6 +112,18 @@ class Product(TranslatedModelMixin, models.Model):
 
     def is_supplier_product(self):
         return self.type == self.SUPPLIER
+
+    def defalte_dropshipping(self, active_only=True):
+        return self.deflate_simple(active_only=active_only)
+
+    def deflate_simple(self, active_only=True):
+        """Return all of the supplier products for a given simple product"""
+        qs = self.supplier_products.all()
+
+        if active_only:
+            qs = qs.filter(active=True)
+
+        return qs
 
     def deflate_bundle(self):
         """Return all BundleVariation items"""
@@ -448,6 +460,8 @@ class SupplierPrices(models.Model):
     unit = models.ForeignKey('units.Unit', on_delete=models.PROTECT)
     quantity = models.IntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    objects = SupplierPriceManager()
 
     class Meta:
         search_terms = ['supplier_product__product__sku', 'supplier_product__supplier__name']

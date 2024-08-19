@@ -1,4 +1,4 @@
-from core.tests import TestCase, TestWithDemoDataMixin
+from core.tests import TestCase, TestCaseDemoDataMixin
 from core.exceptions import SanityCheckError
 from shipments.factories import PrepareShipmentsFactory
 from orders.models import Order
@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class TestPrepareShipmentFactory(CreateTestOrderMixin, TestWithDemoDataMixin, TestCase):
+class TestPrepareShipmentFactory(CreateTestOrderMixin, TestCaseDemoDataMixin, TestCase):
 
     def test_prepare_shipment_sanity_check(self):
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)

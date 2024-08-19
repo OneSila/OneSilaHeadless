@@ -156,9 +156,42 @@ class DropshipManager(ProductManager):
 
 
 class SupplierProductQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
-    pass
+    def get_cheapest_for_qty(self, qty):
+        """For a given qty, find the cheapest supplier product."""
+        supplier_product = self.\
+            filter(supplierprices__quantity__lte=qty).\
+            order_by('supplierprices__unit_price').\
+            distinct().\
+            first()
+
+        if not supplier_product:
+            raise self.model.DoestNotExist(f"Could not find cheapest option with {qty=}")
+
+        return supplier_product
 
 
 class SupplierProductManager(ProductManager):
     def get_queryset(self):
         return SupplierProductQuerySet(self.model, using=self._db)
+
+    def get_cheapest_for_qty(self, qty):
+        return self.get_queryset().get_cheapest_for_qty(qty=qty)
+
+
+class SupplierPriceQuerySet(MultiTenantQuerySet):
+    def find_cheapest(self, supplierproducts, quantity):
+        return self.\
+            filter(
+                supplier_product__in=supplierproducts,
+                quantity__lte=quantity,
+            ).\
+            order_by('unit_price').\
+            first()
+
+
+class SupplierPriceManager(MultiTenantManager):
+    def get_queryset(self):
+        return SupplierPriceQuerySet(self.model, using=self._db)
+
+    def find_cheapest(self, supplierproducts, quantity):
+        return self.get_queryset().find_cheapest(supplierproducts, quantity)

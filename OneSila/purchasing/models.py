@@ -11,6 +11,7 @@ class PurchaseOrder(models.Model):
     Buying your items is crucial of course.
     """
     DRAFT = 'DRAFT'
+    TO_ORDER = 'TO_ORDER'
     ORDERED = 'ORDERED'
     CONFIRMED = 'CONFIRMED'
     PENDING_DELIVERY = 'PENDING_DELIVERY'
@@ -18,6 +19,7 @@ class PurchaseOrder(models.Model):
 
     PO_STATUS_CHOICES = (
         (DRAFT, _("Draft")),
+        (TO_ORDER, _("To Order")),
         (ORDERED, _("Ordered")),
         (CONFIRMED, _("Confirmation Received")),
         (PENDING_DELIVERY, _("Pending Delivery")),
@@ -28,9 +30,50 @@ class PurchaseOrder(models.Model):
     supplier = models.ForeignKey('contacts.Company', on_delete=models.PROTECT)
     order_reference = models.CharField(max_length=100, blank=True, null=True)
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
+    order = models.ForeignKey('orders.Order', blank=True, null=True, on_delete=models.PROTECT)
 
     invoice_address = models.ForeignKey(InvoiceAddress, on_delete=models.PROTECT, related_name="invoice_address_set")
     shipping_address = models.ForeignKey(ShippingAddress, on_delete=models.PROTECT, related_name="shipping_address_set")
+
+    def is_draft(self):
+        return self.status == self.DRAFT
+
+    def is_to_order(self):
+        return self.status == self.TO_ORDER
+
+    def is_ordered(self):
+        return self.status == self.ORDERED
+
+    def is_confirmed(self):
+        return self.status == self.CONFIRMED
+
+    def is_pending_delivery(self):
+        return self.status == self.PENDING_DELIVERY
+
+    def is_delivered(self):
+        return self.status == self.DELIVERED
+
+    def set_status(self, status):
+        self.status = status
+        self.save()
+
+    def set_status_draft(self):
+        self.set_status(self.DRAFT)
+
+    def set_status_to_order(self):
+        self.set_status(self.TO_ORDER)
+
+    def set_status_ordered(self):
+        self.set_status(self.ORDERED)
+
+    def set_status_confirmed(self):
+        self.set_status(self.CONFIRMED)
+
+    def set_status_pending_delivey(self):
+        self.set_status(self.PENDING_DELIVERY)
+
+    def set_status_delivered(self):
+        self.set_status(self.DELIVERED)
 
     @property
     def total_value(self):
@@ -55,7 +98,7 @@ class PurchaseOrder(models.Model):
         return f"PO{self.id}"
 
     def __str__(self):
-        return self.reference()
+        return self.order_reference or self.reference()
 
     def save(self, *args, **kwargs):
 
@@ -68,7 +111,7 @@ class PurchaseOrder(models.Model):
 
     class Meta:
         ordering = ('-created_at',)
-        search_terms = ['supplier__name', 'order_reference']
+        search_terms = ['supplier__name', 'reference']
 
 
 class PurchaseOrderItem(models.Model):
@@ -79,7 +122,9 @@ class PurchaseOrderItem(models.Model):
     product = models.ForeignKey(SupplierProduct, on_delete=models.PROTECT)
     quantity = models.IntegerField()
     unit_price = models.FloatField()
+    orderitem = models.ForeignKey('orders.OrderItem', null=True, blank=True,
+        on_delete=models.CASCADE)
 
     class Meta:
-        search_terms = ['purchase_order__order_reference', 'purchase_order__supplier__name']
+        search_terms = ['purchase_order__reference', 'purchase_order__supplier__name']
         unique_together = ("purchase_order", "product")
