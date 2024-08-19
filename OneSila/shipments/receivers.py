@@ -2,7 +2,17 @@ from orders.signals import to_ship
 from orders.models import Order
 from core.receivers import post_save, receiver
 from shipments.signals import draft, todo, in_progress, \
-    done, cancelled
+    done, cancelled, pending_shipping
+
+
+@receiver(pending_shipping, sender=Order)
+def shipments__order__ship_pre_approval(sender, instance, **kwargs):
+    """
+    When an order is ready for shipping, check if it has all
+    inventory present and mark for approval when required.
+    """
+    from .tasks import pre_approve_shipping_task
+    pre_approve_shipping_task(instance)
 
 
 @receiver(to_ship, sender=Order)

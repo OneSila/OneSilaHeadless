@@ -7,30 +7,13 @@ from contacts.models import Customer, ShippingAddress, InvoiceAddress
 from products.models import Product
 from sales_prices.models import SalesPrice
 from products.demo_data import SIMPLE_BLACK_FABRIC_PRODUCT_SKU, BUNDLE_PEN_AND_INK_SKU
+from .mixins import CreateTestOrderMixin
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class TestPrepareShipmentFactory(TestWithDemoDataMixin, TestCase):
-    def create_test_order(self, reference, product, quantity):
-        customer = Customer.objects.get(multi_tenant_company=self.multi_tenant_company,
-            name=CUSTOMER_B2B)
-        shipping_address = ShippingAddress.objects.get(company=customer, multi_tenant_company=self.multi_tenant_company)
-        invoice_address = InvoiceAddress.objects.get(company=customer, multi_tenant_company=self.multi_tenant_company)
-        product_price = SalesPrice.objects.get(product=product, currency=customer.get_currency(), multi_tenant_company=self.multi_tenant_company)
-
-        logger.debug(f"test product has physical={product.inventory.physical()}")
-
-        order = Order.objects.create(
-            reference=reference,
-            multi_tenant_company=self.multi_tenant_company,
-            customer=customer,
-            currency=customer.get_currency(),
-            shipping_address=shipping_address,
-            invoice_address=invoice_address)
-        order.orderitem_set.create(product=product, quantity=quantity, price=product_price.get_real_price(), multi_tenant_company=self.multi_tenant_company)
-        return order
+class TestPrepareShipmentFactory(CreateTestOrderMixin, TestWithDemoDataMixin, TestCase):
 
     def test_prepare_shipment_sanity_check(self):
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
@@ -50,11 +33,16 @@ class TestPrepareShipmentFactory(TestWithDemoDataMixin, TestCase):
         f = PrepareShipmentsFactory(order)
         f.run()
 
+        # Verify you have shipments and items.  And that these shipments contains items.
         self.assertTrue(f.shipments is not None)
         self.assertTrue(f.shipmentitems is not None)
         self.assertEqual(len(f.shipmentitems), 1)
         self.assertEqual(f.shipmentitems[0].quantity, 1)
 
+        # Verify your shipments are reacy to be picked
+        self.assertTrue(all([i.is_todo() for i in f.shipments]))
+
+        # Verify that the orderitems can detect if everything was shipped or if there is more inventory needed
         self.assertTrue(all([i.shipmentitem_set.todo() == 0 for i in order.orderitem_set.all()]))
         self.assertTrue(order.is_shipped())
 
@@ -118,7 +106,6 @@ class TestPrepareShipmentFactory(TestWithDemoDataMixin, TestCase):
         self.assertEqual(done, 0)
 
         self.assertEqual(order_qty, todo + in_progress + done)
-
         self.assertFalse(all([i.is_todo() == 0 for i in f.shipments]))
 
         order.refresh_from_db()
