@@ -34,7 +34,7 @@ class PurchaseOrder(models.Model):
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
     order = models.ForeignKey('orders.Order', blank=True, null=True, on_delete=models.PROTECT)
 
-    internal_contact = models.ForeignKey('core.MultiTenantUser', on_delete=models.PROTECT)
+    internal_contact = models.ForeignKey('core.MultiTenantUser', on_delete=models.PROTECT, null=True)
     invoice_address = models.ForeignKey(InvoiceAddress, on_delete=models.PROTECT, related_name="invoice_address_set")
     shipping_address = models.ForeignKey(ShippingAddress, on_delete=models.PROTECT, related_name="shipping_address_set")
 

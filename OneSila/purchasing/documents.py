@@ -14,7 +14,7 @@ class PrintPurchaseOrder(OneSilaBaseDocument):
 
     def add_address_headers(self, supplier, invoice_address, delivery_address):
         table_data = [
-            ['Vendor', 'Invoicing Address', 'Delivery Address'],
+            ['Vendor', 'Invoice To', 'Delivery At'],
             [supplier, invoice_address, delivery_address],
         ]
         self.add_table(table_data, [0.33, 0.33, 0.33], line_under_header_row=False)
