@@ -4,6 +4,8 @@ from core import models
 from django.utils.translation import gettext_lazy as _
 from contacts.models import ShippingAddress, InvoiceAddress
 from products.models import SupplierProduct
+from .documents import PrintPurchaseOrder
+from .managers import PurchaseOrderItemManager
 
 
 class PurchaseOrder(models.Model):
@@ -32,8 +34,14 @@ class PurchaseOrder(models.Model):
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
     order = models.ForeignKey('orders.Order', blank=True, null=True, on_delete=models.PROTECT)
 
+    internal_contact = models.ForeignKey('core.MultiTenantUser', on_delete=models.PROTECT)
     invoice_address = models.ForeignKey(InvoiceAddress, on_delete=models.PROTECT, related_name="invoice_address_set")
     shipping_address = models.ForeignKey(ShippingAddress, on_delete=models.PROTECT, related_name="shipping_address_set")
+
+    def print(self):
+        printer = PrintPurchaseOrder(self)
+        printer.generate()
+        return printer.pdf
 
     def is_draft(self):
         return self.status == self.DRAFT
@@ -77,22 +85,10 @@ class PurchaseOrder(models.Model):
 
     @property
     def total_value(self):
-        from django.db.models import Sum, F
+        return round(self.purchaseorderitem_set.total(), 2)
 
-        sum = self.purchaseorderitem_set.aggregate(
-            total_sum=Sum(F('quantity') * F('unit_price'))
-        )['total_sum']
-
-        if sum is None:
-            return f"0 {self.currency.symbol}"
-
-        total = round(sum, 2)
-
-        if total is None:
-            return f"0 {self.currency.symbol}"
-
-        # Return the total sum with the currency symbol
-        return f"{total} {self.currency.symbol}"
+    def total_value_string(self):
+        return f"{self.currency.symbol} {self.total_value}"
 
     def reference(self):
         return f"PO{self.id}"
@@ -124,6 +120,20 @@ class PurchaseOrderItem(models.Model):
     unit_price = models.FloatField()
     orderitem = models.ForeignKey('orders.OrderItem', null=True, blank=True,
         on_delete=models.CASCADE)
+
+    objects = PurchaseOrderItemManager()
+
+    def subtotal(self):
+        return round(self.unit_price * self.quantity, 2)
+
+    def currency(self):
+        return self.purchase_order.currency
+
+    def subtotal_string(self):
+        return f"{self.currency().symbol} {self.subtotal()}"
+
+    def unit_price_string(self):
+        return f"{self.currency().symbol} {self.unit_price}"
 
     class Meta:
         search_terms = ['purchase_order__reference', 'purchase_order__supplier__name']

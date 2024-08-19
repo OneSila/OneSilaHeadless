@@ -1,3 +1,4 @@
+from core.models import MultiTenantUser
 from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, \
     PrivateStructuredDataGenerator
 from contacts.models import InvoiceAddress, ShippingAddress, Supplier, Company, InternalCompany
@@ -14,6 +15,9 @@ registry = DemoDataLibrary()
 @registry.register_private_app
 class PurchaseOrderGenerator(PrivateStructuredDataGenerator):
     model = PurchaseOrder
+
+    def get_user(self):
+        return MultiTenantUser.objects.filter(multi_tenant_company=self.multi_tenant_company).last()
 
     def get_internal_company(self):
         return InternalCompany.objects.get(multi_tenant_company=self.multi_tenant_company)
@@ -46,6 +50,7 @@ class PurchaseOrderGenerator(PrivateStructuredDataGenerator):
                     'currency': self.get_currency(),
                     'order_reference': "SUP1038",
                     'status': PurchaseOrder.ORDERED,
+                    'internal_contact': self.get_user(),
                     'invoice_address': self.get_invoice_address(),
                     'shipping_address': self.get_shipping_address(),
                 },

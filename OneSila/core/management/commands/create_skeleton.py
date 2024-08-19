@@ -9,6 +9,7 @@ SKELETON_STRUCTURE = [
     'defaults.py',
     'decorators.py',
     'demo_data.py',
+    'documents.py',
     'exceptions.py',
     'models.py',
     'tasks.py',
@@ -72,6 +73,14 @@ from core.views import EmptyTemplateView
 
 # class SomeModelView(EmptyTemplateView):
 #    pass
+
+"""
+
+DOCUMENTS_CODE = """
+from core.documents import OneSilaBaseDocument
+
+# class MyAppDocument:
+# ...
 
 """
 
@@ -217,6 +226,10 @@ def set_receivers_code(app_name):
     set_code(app_name, 'receivers.py', RECEIVERS_CODE)
 
 
+def set_documents_code(app_name):
+    set_code(app_name, 'documents.py', DOCUMENTS_CODE)
+
+
 class Command(BaseCommand):
     help = ("Create the skeleton files and folder structure for a given app_name in the current path. ex: schema, flows,..  \n"
         "Use 'all' to create in every local app")
@@ -244,6 +257,7 @@ class Command(BaseCommand):
                 set_views_code(app_name)
                 set_signals_code(app_name)
                 set_receivers_code(app_name)
+                set_documents_code(app_name)
 
                 self.stdout.write(
                     self.style.SUCCESS('Created skeleton file and folder structure for "%s"' % app_name)

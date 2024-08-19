@@ -27,12 +27,14 @@ class OneSilaBaseDocument:
         self.buffer = BytesIO()
         self.elements = []
         self.styles = stylesheet()
-        self.margin = 20 * mm
+        # self.margin = 20 * mm  # used in combo with the suzys letterhead.
+        self.margin = 10 * mm
         self.page_number = page_number
         self.doc = SimpleDocTemplate(self.buffer,
             rightMargin=self.margin,
             leftMargin=self.margin,
-            topMargin=50 * mm,
+            # topMargin=50 * mm,  # used in combo with the suzys letterhead.
+            topMargin=self.margin,
             bottomMargin=self.margin,
             pagesize=A4)
 
@@ -71,7 +73,7 @@ class OneSilaBaseDocument:
         self.add_table(table_data, [0.33, 0.33, 0.33], line_under_header_row=False)
         self.add_vertical_space(10)
 
-    def add_text(self, content, style):
+    def add_text(self, content, style='BodyTextCenter'):
         ''' expects content and a style that is present in the default stylesheet'''
         self.elements.append(Paragraph(content.replace('\n', "<br></br>"), self.styles[style]))
 
@@ -153,7 +155,7 @@ class OneSilaBaseDocument:
         height = width * aspect_ratio
         self.elements.append(Image(path, width, height))
 
-    def add_vertical_space(self, height_in_mm):
+    def add_vertical_space(self, height_in_mm=10):
         self.elements.append(Spacer(width=0, height=height_in_mm * mm))
 
     def add_page_break(self):
@@ -164,7 +166,10 @@ class OneSilaBaseDocument:
         self.doc.build(self.elements)
         pdf = self.buffer.getvalue()
         self.buffer.close()
-        return pdf
+        self.pdf = pdf
+
+    def generate(self):
+        self.print_document()
 
 
 class ImageTable:

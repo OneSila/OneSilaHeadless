@@ -36,6 +36,11 @@ class Company(models.Model):
     def __str__(self):
         return self.name
 
+    def html(self):
+        fields = [self.name, self.email]
+        fields = [i for i in fields if i is not None]
+        return '<br>'.join(fields)
+
     def set_is_customer(self):
         self.is_customer = True
         self.save()
@@ -167,6 +172,18 @@ class Address(models.Model):
     # So a new company should be added, and related to the current one.
     is_invoice_address = models.BooleanField(default=False)
     is_shipping_address = models.BooleanField(default=False)
+
+    def html(self):
+        postcode_line = [self.postcode, self.city]
+        postcode_line = ' '.join([i for i in postcode_line if i is not None])
+
+        full_name = None
+        if self.person:
+            full_name = self.person.full_name()
+
+        fields = [self.company.name, full_name, self.address1,
+            self.address2, self.address3, postcode_line, self.country]
+        return "<br />".join([i for i in fields if i is not None])
 
     @property
     def full_address(self):
