@@ -3,7 +3,6 @@ from core.signals import post_create
 from django.db.models.signals import post_save, pre_save
 from orders.models import Order, OrderItem, OrderNote
 
-
 import logging
 logger = logging.getLogger(__name__)
 

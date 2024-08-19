@@ -18,7 +18,7 @@ class PreApproveShippingFactory:
         self.multi_tenant_company = order.multi_tenant_company
 
     def _sanity_check(self):
-        if not self.order.is_pending_processing():
+        if not self.order.is_pending_processing() or self.order.is_await_inventory():
             raise SanityCheckError(f"Cannot pre-approve order {self.order}.  Status is not {Order.PENDING_SHIPPING}")
 
     def set_order_in_stock(self):

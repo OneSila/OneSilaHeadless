@@ -55,7 +55,7 @@ SKELETON_STRUCTURE_DELETE = [
 ]
 
 
-RECEIVERS_CODE = """
+APPS_CODE = """
     def ready(self):
         from . import receivers
 """
@@ -121,6 +121,21 @@ registry = DemoDataLibrary()
 #    }
 """
 
+SIGNALS_CODE = """
+from core.signals import ModelSignal
+
+# signal_name = ModelSignal(use_caching=True)
+"""
+
+RECEIVERS_CODE = """
+from core.receivers import receiver
+from core.signals import post_create, post_update
+
+# @receiver(post_update, sender='app_name.Model')
+# def app_name__model__action__example(sender, instance, **kwargs):
+#     do_something()
+"""
+
 
 def get_app_path(app_name):
     pwd = os.getcwd()
@@ -178,8 +193,8 @@ def set_code(app_name, filename, string_to_set):
     return True
 
 
-def set_receiver_code(app_name):
-    set_code(app_name, 'apps.py', RECEIVERS_CODE)
+def set_apps_code(app_name):
+    set_code(app_name, 'apps.py', APPS_CODE)
 
 
 def set_demo_data_code(app_name):
@@ -192,6 +207,14 @@ def set_models_code(app_name):
 
 def set_views_code(app_name):
     set_code(app_name, 'views.py', VIEWS_CODE)
+
+
+def set_signals_code(app_name):
+    set_code(app_name, 'signals.py', SIGNALS_CODE)
+
+
+def set_receivers_code(app_name):
+    set_code(app_name, 'receivers.py', RECEIVERS_CODE)
 
 
 class Command(BaseCommand):
@@ -215,10 +238,12 @@ class Command(BaseCommand):
             else:
                 delete_structure(app_name)
                 create_structure(app_name)
-                set_receiver_code(app_name)
+                set_apps_code(app_name)
                 set_demo_data_code(app_name)
                 set_models_code(app_name)
                 set_views_code(app_name)
+                set_signals_code(app_name)
+                set_receivers_code(app_name)
 
                 self.stdout.write(
                     self.style.SUCCESS('Created skeleton file and folder structure for "%s"' % app_name)
