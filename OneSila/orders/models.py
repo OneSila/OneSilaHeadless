@@ -8,7 +8,6 @@ from .managers import OrderItemManager, OrderManager, OrderReportManager
 class Order(models.Model):
     DRAFT = 'DRAFT'
     PENDING_PROCESSING = 'PENDING_PROCESSING'  # Set by scripts after draft. It means 'ready to do whatever you need to do before shipping'
-    PENDING_SHIPPING = "PENDING_SHIPPING"  # used with partial shipments.  Needs to_ship or await_inventory or hold
     PENDING_SHIPPING_APPROVAL = "PENDING_SHIPPING_APPROVAL"  # Choices should be: to-ship or await-inventory
     TO_SHIP = "TO_SHIP"
     AWAIT_INVENTORY = "AWAIT_INVENTORY"
@@ -19,12 +18,11 @@ class Order(models.Model):
     UNPROCESSED = [PENDING_PROCESSING]
     DONE_TYPES = [SHIPPED, CANCELLED, HOLD]
     HELD = [HOLD, PENDING_SHIPPING_APPROVAL, AWAIT_INVENTORY]
-    RESERVE_STOCK_TYPES = [PENDING_PROCESSING, HOLD, PENDING_SHIPPING, PENDING_SHIPPING_APPROVAL, AWAIT_INVENTORY]
+    RESERVE_STOCK_TYPES = [PENDING_PROCESSING, HOLD, PENDING_SHIPPING_APPROVAL, AWAIT_INVENTORY]
 
     STATUS_CHOICES = (
         (DRAFT, _('Draft')),
         (PENDING_PROCESSING, _('Pending Processing')),
-        (PENDING_SHIPPING, _('Pending Shipment Processing')),
         (PENDING_SHIPPING_APPROVAL, _('Pending Shipping Approval')),
         (TO_SHIP, _('To Ship')),
         (AWAIT_INVENTORY, _('Awaiting Inventory')),
@@ -116,8 +114,8 @@ class Order(models.Model):
     def set_status_processing(self):
         self.set_status(self.PENDING_PROCESSING)
 
-    def set_status_pending_shipping(self):
-        self.set_status(self.PENDING_SHIPPING)
+    def set_status_pending_processing(self):
+        self.set_status(self.PENDING_PROCESSING)
 
     def set_status_pending_shipping_approval(self):
         self.set_status(self.PENDING_SHIPPING_APPROVAL)
@@ -139,9 +137,6 @@ class Order(models.Model):
 
     def is_pending_processing(self):
         return self.status == self.PENDING_PROCESSING
-
-    def is_pending_shipping(self):
-        return self.status == self.PENDING_SHIPPING
 
     def is_pending_shipping_approval(self):
         return self.status == self.PENDING_SHIPPING_APPROVAL

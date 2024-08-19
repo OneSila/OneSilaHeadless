@@ -10,7 +10,7 @@ class BuyDropshippingProductsTestCase(CreateTestOrderMixin, TestCaseDemoDataMixi
         product = DropshipProduct.objects.get(
             sku=DROPSHIP_PRODUCT_VISCONTI_SKU, multi_tenant_company=self.multi_tenant_company)
         order = self.create_test_order('test_buydropshippingproducts_flow', product, 1)
-        order.set_status_processing()
+        order.set_status_pending_processing()
 
         buy_dropshippingproducts_flow(order)
 

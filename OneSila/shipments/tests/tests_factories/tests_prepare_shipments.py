@@ -18,7 +18,7 @@ class TestPrepareShipmentFactory(CreateTestOrderMixin, TestCaseDemoDataMixin, Te
     def test_prepare_shipment_sanity_check(self):
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
         order = self.create_test_order('test_prepare_shipment', product, 1)
-        order.set_status_processing()
+        order.set_status_pending_processing()
 
         with self.assertRaises(SanityCheckError):
             f = PrepareShipmentsFactory(order)

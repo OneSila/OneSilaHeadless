@@ -18,7 +18,7 @@ class TestPreApproveShippingFactory(CreateTestOrderMixin, TestCaseDemoDataMixin,
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
         order_qty = 1
         order = self.create_test_order('test_pre_approve_shipping_in_stock', product, order_qty)
-        order.set_status_processing()
+        order.set_status_draft()
 
         with self.assertRaises(SanityCheckError):
             f = PreApproveShippingFactory(order)
@@ -28,7 +28,7 @@ class TestPreApproveShippingFactory(CreateTestOrderMixin, TestCaseDemoDataMixin,
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
         order_qty = 1
         order = self.create_test_order('test_pre_approve_shipping_in_stock', product, order_qty)
-        order.set_status_pending_shipping()
+        order.set_status_pending_processing()
 
         f = PreApproveShippingFactory(order)
         f.run()
@@ -39,7 +39,7 @@ class TestPreApproveShippingFactory(CreateTestOrderMixin, TestCaseDemoDataMixin,
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
         order_qty = 15
         order = self.create_test_order('test_prepare_shipment', product, order_qty)
-        order.set_status_pending_shipping()
+        order.set_status_pending_processing()
 
         f = PreApproveShippingFactory(order)
         f.run()

@@ -126,7 +126,7 @@ class InspectorBlockFactory(SaveInspectorMixin):
             logger.info(f"Block {self.block.error_code} successfully checked for product {self.product.sku}.")
         except InspectorBlockFailed as e:
             self.block.successfully_checked = False
-            logger.warning(f"Block {self.block.error_code} failed for product {self.product.sku}: {str(e)}")
+            logger.info(f"Block {self.block.error_code} failed for product {self.product.sku}: {str(e)}")
 
         self.block.save()
 

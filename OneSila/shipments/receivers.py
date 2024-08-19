@@ -2,10 +2,10 @@ from orders.signals import to_ship
 from orders.models import Order
 from core.receivers import post_save, receiver
 from shipments.signals import draft, todo, in_progress, \
-    done, cancelled, pending_shipping
+    done, cancelled, pending_processing
 
 
-@receiver(pending_shipping, sender=Order)
+@receiver(pending_processing, sender=Order)
 def shipments__order__ship_pre_approval(sender, instance, **kwargs):
     """
     When an order is ready for shipping, check if it has all

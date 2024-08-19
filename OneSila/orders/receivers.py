@@ -33,7 +33,7 @@ def orders__order__status_signals_sender(sender, instance, **kwargs):
     """
     When an order gets specific status we want to send out some signals
     """
-    from .signals import draft, pending_processing, pending_shipping, \
+    from .signals import draft, pending_processing, \
         pending_shipping_approval, to_ship, await_inventory, shipped, hold, \
         cancelled
 
@@ -43,8 +43,6 @@ def orders__order__status_signals_sender(sender, instance, **kwargs):
         signals.append(draft)
     elif instance.is_pending_processing():
         signals.append(pending_processing)
-    elif instance.is_pending_shipping():
-        signals.append(pending_shipping)
     elif instance.is_pending_shipping_approval():
         signals.append(pending_shipping_approval)
     elif instance.is_to_ship():
