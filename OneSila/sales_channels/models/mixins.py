@@ -15,6 +15,10 @@ class RemoteObjectMixin(models.Model):
     # to avoid that we have this field
     successfully_created = models.BooleanField(default=True, help_text="Indicates if the object was successfully created in the remote system.")
 
+    # this should be overriden in the save we should make a qs on the logs to all the different identifier of the latest versions
+    # they all need to be success for this to be true
+    outdated = models.BooleanField(default=False, help_text="Indicates if the remote product is outdated due to an error.")
+
     class Meta:
         abstract = True
 

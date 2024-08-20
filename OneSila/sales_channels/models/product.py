@@ -1,4 +1,5 @@
 from core import models
+from .log import RemoteLog
 from .mixins import RemoteObjectMixin
 from polymorphic.models import PolymorphicModel
 
@@ -12,8 +13,12 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
     is_variation = models.BooleanField(default=False, help_text="Indicates if this product is a variation.")
     remote_parent_product = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, help_text="The remote parent product for variations.")
     payload = models.JSONField(help_text="The JSON payload representing this product in the remote system.")
-    utdated = models.BooleanField(default=False, help_text="Indicates if the remote product is outdated due to an error.")
-    outdated_since = models.DateTimeField(null=True, blank=True, help_text="The timestamp when this remote product became outdated.")
+
+
+
+    # user wants last error
+    # admin wants all the errors
+    # in frontend show only the user errors. If the errors are admin we show a generic message but still let them resync so it maybe fixed
 
     class Meta:
         unique_together = ('sales_channel', 'product')

@@ -1,6 +1,7 @@
 from core import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+
 class RemoteLog(models.Model):
     """
     A generic log model to track actions related to various objects in the system.
@@ -12,6 +13,7 @@ class RemoteLog(models.Model):
     ACTION_CREATE = 'CREATE'
     ACTION_UPDATE = 'UPDATE'
     ACTION_DELETE = 'DELETE'
+
     ACTION_CHOICES = [
         (ACTION_CREATE, 'Create'),
         (ACTION_UPDATE, 'Update'),
@@ -21,13 +23,20 @@ class RemoteLog(models.Model):
     # Constants for status choices
     STATUS_SUCCESS = 'SUCCESS'
     STATUS_FAILED = 'FAILED'
-    STATUS_TIMEOUT = 'TIMEOUT'
+
     STATUS_CHOICES = [
         (STATUS_SUCCESS, 'Success'),
         (STATUS_FAILED, 'Failed'),
-        (STATUS_TIMEOUT, 'Timeout'),
     ]
 
+    # identifier = ... factory class name ClassName:methodName
+    # is_useer error
+    # try:
+    #     someting()
+    # except self.sales_channel._user_errors as e:
+    #     self.model.add_user_error(e)
+    # except Exception as e:
+    #     self.model.add_admin_error(e)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
