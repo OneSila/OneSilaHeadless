@@ -1,6 +1,7 @@
 from core import models
 from core.validators import validate_pdf_extension
 from django.utils.translation import gettext_lazy as _
+from .documents import PickingListDocumentPrinter
 from .managers import ShipmentItemManager
 from .models_helpers import get_shippinglabel_folder_upload_path, \
     get_customs_document_folder_upload_path
@@ -36,6 +37,15 @@ class Shipment(models.Model):
         on_delete=models.PROTECT,
         null=True,
         blank=True)
+
+    @property
+    def reference(self):
+        return f"SH-{self.id}"
+
+    def print(self):
+        printer = PickingListDocumentPrinter(self)
+        printer.generate()
+        return printer.pdf
 
     def set_status_todo(self):
         self.status = self.TODO

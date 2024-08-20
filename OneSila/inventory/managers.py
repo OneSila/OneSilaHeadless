@@ -35,6 +35,33 @@ class InventoryQuerySet(MultiTenantQuerySet):
         """Filter to only return inventory thats attached to an internal shipping address"""
         return self.filter(inventorylocation__shippingaddress__company__is_internal_company=True)
 
+    def determine_picking_locations(self, product, shipping_address, quantity) -> dict:
+        """
+        Find the locations with the quantity untill you run out of quanity.
+        Used for picking goods.
+
+        Returns a dict
+        """
+        locations = list(self.filter(
+            multi_tenant_company=product.multi_tenant_company,
+            inventorylocation__shippingaddress=shipping_address,
+            product=product,
+        ))
+        d = {}
+
+        while quantity:
+            loc = locations.pop()
+            available_qty = loc.quantity
+
+            if available_qty <= quantity:
+                d[loc] = available_qty
+                quantity -= available_qty
+            else:
+                d[loc] = quantity
+                quantity = 0
+
+        return d
+
     def filter_physical(self, product=None):
         """ Return the inventories where a given product is located."""
         if product is None:
@@ -153,6 +180,9 @@ class InventoryManager(MultiTenantManager):
 
     def order_by_relevant_shippinglocation(self):
         return self.get_queryset().order_by_relevant_shippinglocation()
+
+    def determine_picking_locations(self, product, shipping_address, qty):
+        return self.get_queryset().determine_picking_locations(product, shipping_address, qty)
 
 
 class InventoryLocationQuerySet(MultiTenantQuerySet):
