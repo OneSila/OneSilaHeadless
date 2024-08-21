@@ -45,7 +45,8 @@ class Shipment(models.Model):
     def print(self):
         printer = PickingListDocumentPrinter(self)
         printer.generate()
-        return printer.pdf
+        filename = f"{self.reference}.pdf"
+        return filename, printer.pdf
 
     def set_status_todo(self):
         self.status = self.TODO

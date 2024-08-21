@@ -41,7 +41,8 @@ class PurchaseOrder(models.Model):
     def print(self):
         printer = PrintPurchaseOrder(self)
         printer.generate()
-        return printer.pdf
+        filename = f"{self.reference()}.pdf"
+        return filename, printer.pdf
 
     def is_draft(self):
         return self.status == self.DRAFT

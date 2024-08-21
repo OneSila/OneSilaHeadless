@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from currency_converter import CurrencyConverter, RateNotFoundError
 
 from .managers import OrderItemManager, OrderManager, OrderReportManager
+from .documents import PrintOrder
 
 
 class Order(models.Model):
@@ -92,6 +93,13 @@ class Order(models.Model):
 
     def __str__(self):
         return '#{}'.format(self.id)
+
+    def print(self):
+        filename = f"{self.reference or self.__str__()}.pdf"
+        printer = PrintOrder(self)
+        printer.generate()
+        pdf = printer.pdf
+        return filename, pdf
 
     def tax_rate(self):
         return self.invoice_address.tax_rate
@@ -183,6 +191,14 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return '{} x {} : {}'.format(self.product.sku, self.quantity, self.order)
+
+    def subtotal(self):
+        return round(self.quantity * self.price, 2)
+
+    def subtotal_string(self):
+        currency_symbol = self.order.currency.symbol
+        subtotal = self.subtotal()
+        return f"{currency_symbol} {subtotal}"
 
     def qty_on_stock(self):
         # Firstly, dont bother calculating this for order-items that dont need processing
