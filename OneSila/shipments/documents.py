@@ -13,14 +13,6 @@ class PickingListDocumentPrinter(OneSilaBaseDocument):
         self.shipmentitems = shipment.shipmentitemtoship_set.all()
         self.customer = shipment.order.customer
 
-    # def add_address_headers(self, supplier, invoice_address, delivery_address):
-    #     table_data = [
-    #         ['Vendor', 'Invoice To', 'Delivery At'],
-    #         [supplier, invoice_address, delivery_address],
-    #     ]
-    #     self.add_table(table_data, [0.33, 0.33, 0.33], line_under_header_row=False)
-    #     self.add_vertical_space()
-
     def add_shipment_details(self):
         widths = [0.4, 0.3, 0.3]
         reference = self.order.reference
@@ -34,9 +26,9 @@ class PickingListDocumentPrinter(OneSilaBaseDocument):
         self.add_vertical_space()
 
     def add_items(self):
-        widths = [0.25, 0.25, 0.35, 0.15]
+        widths = [0.05, 0.2, 0.15, 0.25, 0.35]
         data = [
-            ['Location', 'Sku', 'Description', 'Qty'],
+            ['', 'Location', 'Qty', 'Sku', 'Product Name'],
         ]
 
         for item in self.shipmentitems:
@@ -46,10 +38,11 @@ class PickingListDocumentPrinter(OneSilaBaseDocument):
 
             for location, qty in picking_locations.items():
                 data.append([
+                    '☐',
                     location.inventorylocation.name,
+                    qty,
                     product.sku,
                     product.name,
-                    qty
                 ])
 
         self.add_table(data, widths, bold_header_row=True, line_under_header_row=True,
@@ -67,10 +60,6 @@ class PickingListDocumentPrinter(OneSilaBaseDocument):
     def generate(self):
         self.add_title(f"Picking List {self.shipment.reference}")
         self.add_vertical_space()
-        # self.add_address_headers(
-        #     supplier=self.get_supplier_html(),
-        #     invoice_address=self.invoicing_address.html(),
-        #     delivery_address=self.shipping_address.html())
         self.add_shipment_details()
         self.add_items()
         self.add_vertical_space()
