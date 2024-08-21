@@ -1,4 +1,4 @@
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin
+from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, auto
 
 from typing import List, Optional, Self
 
@@ -12,6 +12,10 @@ from .ordering import InventoryOrder, InventoryLocationOrder
 @type(InventoryLocation, filters=InventoryLocationFilter, order=InventoryLocationOrder, pagination=True, fields="__all__")
 class InventoryLocationType(relay.Node, GetQuerysetMultiTenantMixin):
     shippingaddress: Optional[InventoryShippingAddressType]
+
+    @field()
+    def is_internal_location(self, info) -> bool:
+        return self.is_internal_location
 
 
 @type(Inventory, filters=InventoryFilter, order=InventoryOrder, pagination=True, fields="__all__")

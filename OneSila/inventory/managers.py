@@ -186,6 +186,9 @@ class InventoryManager(MultiTenantManager):
 
 
 class InventoryLocationQuerySet(MultiTenantQuerySet):
+    def annotate_is_external_location(self):
+        return self.annotate(is_internal_location=F('shippingaddress__company__is_internal_company'))
+
     def filter_by_shippingaddress_set(self, shippingaddress_set):
         return self.filter(shippingaddress__in=shippingaddress_set)
 
@@ -212,7 +215,8 @@ class InventoryLocationQuerySet(MultiTenantQuerySet):
 
 class InventoryLocationManager(MultiTenantManager):
     def get_queryset(self):
-        return InventoryLocationQuerySet(self.model, using=self._db)
+        return InventoryLocationQuerySet(self.model, using=self._db).\
+            annotate_is_external_location()
 
     def filter_by_shippingaddress_set(self, shippingaddress_set):
         return self.get_queryset().filter_by_shippingaddress_set(shippingaddress_set)

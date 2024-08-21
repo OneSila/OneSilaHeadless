@@ -49,6 +49,10 @@ class InventoryLocation(models.Model):
     def __str__(self):
         return self.name
 
+    # @property
+    # def is_internal_location(self):
+    #     return self.shippingaddress.company.is_internal_company
+
     class Meta:
         search_terms = ['name']
         unique_together = ("name", "multi_tenant_company")
