@@ -6,7 +6,7 @@ from shipments.signals import draft, todo, in_progress, \
     done, cancelled, pending_processing
 
 
-@receiver(product_inventory_change, sender='products.Product'):
+@receiver(product_inventory_change, sender='products.Product')
 def orders__product__inventory_change__shipping_retrigger(sender, instance, **kwargs):
     """
     Check to see if some orders need the shipping_status retriggered.
