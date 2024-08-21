@@ -9,7 +9,13 @@ def get_languages():
     return settings.LANGUAGES
 
 
+def is_or_create_folder(path):
+    if not os.path.isdir(path):
+        os.mkdir(path)
+
+
 def save_test_file(filename, file_contents):
+    is_or_create_folder(settings.SAVE_TEST_FILES_ROOT)
     filepath = os.path.join(settings.SAVE_TEST_FILES_ROOT, filename)
     with open(filepath, 'wb') as f:
         f.write(file_contents)
