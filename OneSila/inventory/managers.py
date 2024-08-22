@@ -20,7 +20,7 @@ class InventoryQuerySet(MultiTenantQuerySet):
     def find_inventory_shippingaddresses(self):
         # You cant directly filter for the product from the qs
         # as the inventory can be assigned in many ways.
-        qs = self.filter_salable()
+        qs = self.filter_physical()
         shippingaddress_ids = qs.values('inventorylocation__shippingaddress')
         return ShippingAddress.objects.filter(id__in=shippingaddress_ids)
 
