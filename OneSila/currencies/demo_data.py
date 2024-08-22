@@ -25,6 +25,7 @@ class CurrencyDefaultDataGenerator(PrivateStructuredDataGenerator):
         ]
 
 
+@registry.register_private_app
 class CurrencyNonDefaultDataGenerator(PrivateStructuredDataGenerator):
     model = Currency
 
