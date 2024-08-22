@@ -61,7 +61,7 @@ def single_file_httpresponse(filedata, filename):
     try:
         content_type = content_types[extension]
     except KeyError:
-        raise Exception('Content-Type for extension {} unkown'.format(extension))
+        raise TypeError(f'Unkown Content-Type for extension {extension}')
 
     response = HttpResponse(content_type=content_type)
 

@@ -2,7 +2,7 @@ from core import models
 from django.utils.translation import gettext_lazy as _
 from currency_converter import CurrencyConverter, RateNotFoundError
 
-from .managers import OrderItemManager, OrderManager, OrderReportManager
+from .managers import OrderItemManager, OrderManager
 from .documents import PrintOrder
 
 
@@ -63,7 +63,6 @@ class Order(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     objects = OrderManager()
-    reports = OrderReportManager()
 
     @property
     def total_value(self):

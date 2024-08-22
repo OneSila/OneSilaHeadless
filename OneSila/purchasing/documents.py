@@ -21,14 +21,14 @@ class PrintPurchaseOrder(OneSilaBaseDocument):
         self.add_vertical_space()
 
     def add_po_details(self):
-        widths = [0.2, 0.2, 0.3, 0.3]
+        widths = [0.15, 0.15, 0.35, 0.35]
         reference = self.purchaseorder.order_reference
         date = self.purchaseorder.created_at.date().isoformat()
         user = self.purchaseorder.internal_contact
         user_contact = "<br />".join([i for i in [user.email, user.mobile_number] if i is not None]) or ''
         data = [
-            ['PO Reference', 'Ordered on date', 'Contact', 'Email'],
-            [reference, date, user.full_name(), ],
+            ['PO Ref.', 'Ordered on', 'Contact Name', 'Contact Details'],
+            [reference, date, user.full_name(), user_contact],
         ]
         self.add_table(data, widths, line_under_header_row=True, box_line=True)
         self.add_vertical_space()
@@ -70,7 +70,7 @@ class PrintPurchaseOrder(OneSilaBaseDocument):
             return self.supplier.html()
 
     def generate(self):
-        self.add_title(f"Purchase order from {self.invoicing_address.company.name}")
+        self.add_title(f"Purchase order {self.purchaseorder.reference()}")
         self.add_vertical_space()
         self.add_address_headers(
             supplier=self.get_supplier_html(),

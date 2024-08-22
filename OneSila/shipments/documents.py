@@ -48,15 +48,6 @@ class PickingListDocumentPrinter(OneSilaBaseDocument):
         self.add_table(data, widths, bold_header_row=True, line_under_header_row=True,
             box_line=False, row_line=False)
 
-    def get_supplier_html(self):
-        try:
-            invoice_address = InvoiceAddress.objects.get(
-                multi_tenant_company=self.multi_tenant_company,
-                company=self.supplier)
-            return invoice_address.html()
-        except InvoiceAddress.DoesNotExist:
-            return self.supplier.html()
-
     def generate(self):
         self.add_title(f"Picking List {self.shipment.reference}")
         self.add_vertical_space()
