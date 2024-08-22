@@ -138,6 +138,8 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
         physical = bundle.inventory.physical()
         self.assertEqual(physical, min(qty_one / bundle_qty, qty_two / bundle_qty))
 
+        bundle.inventory.filter_physical()
+
     def test_physical_nested_bundles_with_bundle(self):
         bundle = BundleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
 

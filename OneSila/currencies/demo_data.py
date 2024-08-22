@@ -25,7 +25,7 @@ class CurrencyDefaultDataGenerator(PrivateStructuredDataGenerator):
         ]
 
 
-class CurrencyDefaultDataGenerator(PrivateStructuredDataGenerator):
+class CurrencyNonDefaultDataGenerator(PrivateStructuredDataGenerator):
     model = Currency
 
     def get_structure(self):
