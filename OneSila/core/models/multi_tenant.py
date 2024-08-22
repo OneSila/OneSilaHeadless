@@ -139,6 +139,9 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
 
         return None
 
+    def full_name(self):
+        return ' '.join([i for i in [self.first_name, self.last_name] if i is not None])
+
     def language_detail(self):
         return LanguageType(**get_language_info(self.language))
 

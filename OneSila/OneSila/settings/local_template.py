@@ -19,6 +19,7 @@ DATABASES = {
 STATIC_ROOT = '/home/onesila/static/'
 MEDIA_ROOT = '/home/onesila/mediafiles/'
 APP_ROOT = '/home/onesila/OneSilaHeadless/OneSila/'
+SAVE_TEST_FILES_ROOT = '/home/onesila/testfiles/'
 
 #
 # Localhost settings if your localhost has poor hostname resolve for

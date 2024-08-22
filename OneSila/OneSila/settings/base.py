@@ -52,11 +52,11 @@ INSTALLED_LOCAL_APPS = [
     'media',
     'notifications',
     'inventory',
-    'orders',
-
-    'properties',
-    'purchasing',
     'sales_prices',
+    'properties',
+    'orders',
+    'purchasing',
+    'shipments',
 
     'huey.contrib.djhuey',
 ]
@@ -166,6 +166,10 @@ MANAGERS = ADMINS
 
 STATIC_URL = 'static/'
 MEDIA_URL = 'media/'
+
+# Forced here for test-deployment purposes
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+SAVE_TEST_FILES_ROOT = os.path.join(BASE_DIR, 'test_files_root')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

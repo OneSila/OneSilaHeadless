@@ -1,0 +1,1 @@
+from .inventory_update_triggers import inventory_update_trigger_flow

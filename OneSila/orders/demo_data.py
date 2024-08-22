@@ -1,79 +1,63 @@
-from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator
+from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator, \
+    PrivateStructuredDataGenerator
 from currencies.models import Currency
+from contacts.models import Customer
 from orders.models import Order, OrderItem
 from contacts.models import Customer, InvoiceAddress, ShippingAddress
 from products.models import Product
 from django.utils import timezone
 from random import randint
+from products.demo_data import SIMPLE_BLACK_FABRIC_PRODUCT_SKU
+from contacts.demo_data import CUSTOMER_B2B
 
 registry = DemoDataLibrary()
 
 
 @registry.register_private_app
-class SalesOrderGenerator(PrivateDataGenerator):
+class SalesOrderGenerator(PrivateStructuredDataGenerator):
     model = Order
-    count = 100
-    field_mapper = {
-        'reference': fake.order_reference,
-        'status': lambda: fake.random_element(elements=(Order.DRAFT,
-                                                        Order.PENDING,
-                                                        Order.PENDING_INVENTORY,
-                                                        Order.TO_PICK,
-                                                        Order.TO_SHIP,
-                                                        Order.DONE,
-                                                        Order.CANCELLED,
-                                                        Order.HOLD,
-                                                        Order.EXCHANGED,
-                                                        Order.REFUNDED,
-                                                        Order.LOST,
-                                                        Order.MERGED,
-                                                        Order.DAMAGED,
-                                                        Order.VOID))}
 
-    def prep_baker_kwargs(self, seed):
-        kwargs = super().prep_baker_kwargs(seed)
-        multi_tenant_company = kwargs['multi_tenant_company']
+    def get_customer(self, name):
+        return Customer.objects.get(name=name, multi_tenant_company=self.multi_tenant_company)
 
-        customer = Customer.objects.filter(is_customer=True, multi_tenant_company=multi_tenant_company).order_by('?').first()
-        currency = Currency.objects.filter(iso_code__in=['GBP', 'USD', 'EUR', 'THB'], multi_tenant_company=multi_tenant_company).order_by('?').first()
-
-        invoice_address = InvoiceAddress.objects.filter(company=customer, multi_tenant_company=multi_tenant_company).last()
-        if not invoice_address:
-            invoice_address = InvoiceAddress.objects.filter(multi_tenant_company=multi_tenant_company).first()
-
-        shipping_address = ShippingAddress.objects.filter(company=customer, multi_tenant_company=multi_tenant_company).last()
-        if not shipping_address:
-            shipping_address = ShippingAddress.objects.filter(multi_tenant_company=multi_tenant_company).first()
-
+    def get_created_at(self):
         days_ago = randint(1, 50)
-        new_created_at = timezone.now() - timezone.timedelta(days=days_ago)
+        return timezone.now() - timezone.timedelta(days=days_ago)
 
-        kwargs['customer'] = customer
-        kwargs['currency'] = currency
-        kwargs['created_at'] = new_created_at
-        kwargs['invoice_address'] = invoice_address
-        kwargs['shipping_address'] = shipping_address
-        return kwargs
+    def get_product(self, sku):
+        return Product.objects.get(sku=sku, multi_tenant_company=self.multi_tenant_company)
 
+    def get_currency(self, customer_name):
+        return self.get_customer(customer_name).get_currency()
 
-@registry.register_private_app
-class OrderItemGenerator(PrivateDataGenerator):
-    model = OrderItem
-    count = 200
+    def get_structure(self):
+        return [
+            {
+                'instance_data': {
+                    'reference': 'Demo Order AF192',
+                    'customer': self.get_customer(CUSTOMER_B2B),
+                    'currency': self.get_currency(CUSTOMER_B2B),
+                    'invoice_address': InvoiceAddress.objects.get(company=self.get_customer(CUSTOMER_B2B), multi_tenant_company=self.multi_tenant_company),
+                    'shipping_address': ShippingAddress.objects.get(company=self.get_customer(CUSTOMER_B2B), multi_tenant_company=self.multi_tenant_company),
+                    'created_at': self.get_created_at(),
+                },
+                'post_data': {
+                    'orderitem_set': [
+                        {
+                            'product': self.get_product(SIMPLE_BLACK_FABRIC_PRODUCT_SKU),
+                            'quantity': 1,
+                            'price': self.get_product(SIMPLE_BLACK_FABRIC_PRODUCT_SKU).salesprice_set.get(currency=self.get_currency(CUSTOMER_B2B)).get_real_price(),
+                        },
+                    ]
 
-    field_mapper = {
-        'quantity': lambda: fake.random_int(min=1, max=4),
-        'price': lambda: round(fake.random_number(digits=2) + fake.pyfloat(left_digits=0, right_digits=2, min_value=0, max_value=1), 2)
-    }
+                },
+            },
+        ]
 
-    def prep_baker_kwargs(self, seed):
-        kwargs = super().prep_baker_kwargs(seed)
-        multi_tenant_company = kwargs['multi_tenant_company']
-        order = Order.objects.filter(multi_tenant_company=multi_tenant_company).order_by('?').first()
-        existing_product_ids = OrderItem.objects.filter(order=order, multi_tenant_company=multi_tenant_company).values_list('product_id', flat=True)
-        product = Product.objects.filter(multi_tenant_company=multi_tenant_company).exclude(id__in=existing_product_ids).order_by('?').first()
-
-        kwargs['product'] = product
-        kwargs['order'] = order
-
-        return kwargs
+    def post_data_generate(self, instance, **kwargs):
+        items = kwargs['orderitem_set']
+        for item in items:
+            instance.orderitem_set.create(
+                multi_tenant_company=self.multi_tenant_company,
+                **item
+            )
