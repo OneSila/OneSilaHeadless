@@ -78,7 +78,7 @@ class ShipmentForOrderItemFactory(ShipOrderSanityCheckMixin):
             filter_physical()
 
         if shippingaddress:
-            qs = qs.filter_shippingaddress(shippingaddress)
+            qs = qs.filter_by_shippingaddress(shippingaddress)
 
         return qs.order_by_relevant_shippinglocation(self.country)
 

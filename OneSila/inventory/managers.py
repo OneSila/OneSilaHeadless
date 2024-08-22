@@ -4,6 +4,7 @@ from core import models
 from core.models import Sum
 from core.managers import MultiTenantQuerySet, MultiTenantManager
 from orders.models import Order
+from contacts.models import ShippingAddress
 from products.models import Product, BundleVariation
 from products.product_types import HAS_INDIRECT_INVENTORY_TYPES, \
     HAS_DIRECT_INVENTORY_TYPES, BUNDLE
@@ -16,7 +17,14 @@ class InventoryQuerySet(MultiTenantQuerySet):
     def order_by_least(self):
         return self.order_by("quantity")
 
-    def filter_shippingaddress(self, shippingaddress):
+    def find_inventory_shippingaddresses(self):
+        # You cant directly filter for the product from the qs
+        # as the inventory can be assigned in many ways.
+        qs = self.filter_salable()
+        shippingaddress_ids = qs.values('inventorylocation__shippingaddress')
+        return ShippingAddress.objects.filter(id__in=shippingaddress_ids)
+
+    def filter_by_shippingaddress(self, shippingaddress):
         return self.filter(inventorylocation__shippingaddress=shippingaddress)
 
     def order_by_relevant_shippinglocation(self, country_code):
@@ -175,8 +183,11 @@ class InventoryManager(MultiTenantManager):
     def filter_internal(self):
         return self.get_queryset().filter_internal()
 
-    def filter_shippingaddress(self):
-        return self.get_queryset().filter_shippingaddress()
+    def find_inventory_shippingaddresses(self):
+        return self.get_queryset().find_inventory_shippingaddresses()
+
+    def filter_by_shippingaddress(self, shippingaddress):
+        return self.get_queryset().filter_by_shippingaddress(shippingaddress=shippingaddress)
 
     def order_by_relevant_shippinglocation(self):
         return self.get_queryset().order_by_relevant_shippinglocation()
