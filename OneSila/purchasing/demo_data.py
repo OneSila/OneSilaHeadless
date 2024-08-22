@@ -53,6 +53,7 @@ class PurchaseOrderGenerator(PrivateStructuredDataGenerator):
                     'internal_contact': self.get_user(),
                     'invoice_address': self.get_invoice_address(),
                     'shipping_address': self.get_shipping_address(),
+                    'internal_contact': self.get_user(),
                 },
                 'post_data': {
                     'purchaseorderitems': [

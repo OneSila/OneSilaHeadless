@@ -1,6 +1,7 @@
 from products.models import DropshipProduct, SupplierPrices
 from purchasing.models import PurchaseOrder
 from contacts.models import InternalCompany
+from core.exceptions import SanityCheckError
 
 import logging
 logger = logging.getLogger(__name__)
@@ -16,7 +17,8 @@ class BuyDropShippingProductsFactory:
         self.internal_contact = self.multi_tenant_company.multitenantuser_set.filter(is_multi_tenant_company_owner=True).first()
 
     def _sanity_check(self):
-        pass
+        if not self.internal_contact:
+            raise SanityCheckError(f"Cannot create a purchase order without an internal contact")
 
     def get_reference(self, supplier):
         self.reference = f"POD-{supplier.id}-{self.order.reference}"
