@@ -143,6 +143,9 @@ class InventoryQuerySet(MultiTenantQuerySet):
         physical = self.physical()
         salable = physical - self.reserved()
 
+        if salable < 0:
+            salable = 0
+
         return salable
 
     def reserved(self):
@@ -153,12 +156,38 @@ class InventoryQuerySet(MultiTenantQuerySet):
         sold_agg = product.orderitem_set.\
             filter(
                 multi_tenant_company=multi_tenant_company,
-                order__status__in=Order.DONE_TYPES
+                order__status__in=Order.RESERVE_STOCK_TYPES
             ).\
             distinct().\
             aggregate(Sum('quantity'))['quantity__sum'] or 0
 
         return sold_agg
+
+    def await_inventory(self):
+        # NOTE: Technically this should be inventory pending status
+        # however, in practice, it's also the negative number of salable stock
+        # product = self._hints['instance']
+        # multi_tenant_company = product.multi_tenant_company
+
+        # pending_agg = product.orderitem_set.\
+        #     filter(
+        #         multi_tenant_company=multi_tenant_company,
+        #         order__status=Order.AWAIT_INVENTORY
+        #     ).\
+        #     distinct().\
+        #     aggregate(Sum('quantity'))['quantity__sum'] or 0
+
+        # return pending_agg
+
+        physical = self.physical()
+        await_inventory = physical - self.reserved()
+
+        if await_inventory < 0:
+            await_inventory = await_inventory * -1
+        else:
+            await_inventory = 0
+
+        return await_inventory
 
 
 class InventoryManager(MultiTenantManager):
@@ -176,6 +205,9 @@ class InventoryManager(MultiTenantManager):
 
     def reserved(self):
         return self.get_queryset().reserved()
+
+    def await_inventory(self):
+        return self.get_queryset().await_inventory()
 
     def filter_physical(self, product=None):
         return self.get_queryset().filter_physical(product=product)
