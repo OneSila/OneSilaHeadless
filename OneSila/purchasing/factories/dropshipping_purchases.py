@@ -13,6 +13,7 @@ class BuyDropShippingProductsFactory:
         self.multi_tenant_company = order.multi_tenant_company
         self.address_to = order.shipping_address
         self.purchaseorders_for_supplier = {}
+        self.internal_contact = self.multi_tenant_company.multitenantuser_set.filter(is_multi_tenant_company_owner=True).first()
 
     def _sanity_check(self):
         pass
@@ -53,7 +54,8 @@ class BuyDropShippingProductsFactory:
                     supplier=supplier,
                     currency=supplier.get_currency(),
                     invoice_address=self.get_invoice_address(),
-                    shipping_address=self.address_to)
+                    shipping_address=self.address_to,
+                    internal_contact=self.internal_contact)
 
                 self.purchaseorders_for_supplier[supplier] = purchase_order
                 logger.debug(f"Create PO {purchase_order}")
