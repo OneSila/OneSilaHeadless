@@ -189,8 +189,8 @@ class InventoryManager(MultiTenantManager):
     def filter_by_shippingaddress(self, shippingaddress):
         return self.get_queryset().filter_by_shippingaddress(shippingaddress=shippingaddress)
 
-    def order_by_relevant_shippinglocation(self):
-        return self.get_queryset().order_by_relevant_shippinglocation()
+    def order_by_relevant_shippinglocation(self, country_code):
+        return self.get_queryset().order_by_relevant_shippinglocation(country_code=country_code)
 
     def determine_picking_locations(self, product, shipping_address, qty):
         return self.get_queryset().determine_picking_locations(product, shipping_address, qty)

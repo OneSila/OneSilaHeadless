@@ -17,6 +17,23 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
             multi_tenant_company=self.multi_tenant_company,
             product=supplier)
 
+        simple.inventory.\
+            order_by_least().\
+            order_by_relevant_shippinglocation(self.inventory_location.shipping_address.country).\
+            filter_internal().\
+            filter_by_shippingaddress(self.inventory_location.shipping_address)
+
+    def test_salable(self):
+        simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
+        supplier.base_products.add(simple)
+
+        qty = 321
+        Inventory.objects.create(inventorylocation=self.inventory_location,
+            quantity=qty,
+            multi_tenant_company=self.multi_tenant_company,
+            product=supplier)
+
         salable = simple.inventory.salable()
 
         self.assertEqual(salable, qty)
