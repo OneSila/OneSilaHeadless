@@ -10,12 +10,14 @@ def migrate_umbrella_to_configurable(apps, schema_editor):
         config.type = "CONFIGURABLE"
         config.save()
 
+
 def migrate_configurable_to_umbrella(apps, schema_editor):
     Product = apps.get_model('products', 'Product')
 
     for config in Product.objects.filter(type='CONFIGURABLE').iterator():
         config.type = "UMBRELLA"
         config.save()
+
 
 class Migration(migrations.Migration):
 

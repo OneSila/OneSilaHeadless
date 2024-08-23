@@ -36,6 +36,7 @@ class MultiTenantCompanyType(relay.Node):
 class MultiTenantUserLoginTokenType(relay.Node):
     pass
 
+
 @strawberry.type
 class HasDemoDataType:
     has_demo_data: bool

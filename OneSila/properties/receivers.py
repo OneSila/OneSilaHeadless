@@ -8,10 +8,12 @@ from properties.models import Property, PropertyTranslation, PropertySelectValue
 import logging
 logger = logging.getLogger(__name__)
 
+
 @receiver(post_save, sender=MultiTenantCompany)
 def create_default_product_type_property(sender, instance, created, **kwargs):
     if created:
         Property.objects.create_product_type(instance)
+
 
 @receiver(post_save, sender=PropertyTranslation)
 def properties__property_translation__post_save(sender, instance, created, **kwargs):

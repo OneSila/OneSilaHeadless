@@ -21,6 +21,7 @@ def has_demo_data(info: Info) -> HasDemoDataType:
     multi_tenant_company = get_multi_tenant_company(info)
     return HasDemoDataType(has_demo_data=multi_tenant_company.demodatarelation_set.all().exists())
 
+
 @type(name="Query")
 class MultiTenantQuery:
     me: MultiTenantUserType = auth.current_user()

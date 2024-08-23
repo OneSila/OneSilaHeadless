@@ -27,7 +27,8 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='eancode',
             name='inherit_to',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='inherited_ean_codes', to='products.product'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL,
+                                    related_name='inherited_ean_codes', to='products.product'),
         ),
         migrations.RemoveField(
             model_name='eancode',

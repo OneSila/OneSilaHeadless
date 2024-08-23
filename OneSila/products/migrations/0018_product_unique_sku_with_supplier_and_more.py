@@ -15,10 +15,12 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddConstraint(
             model_name='product',
-            constraint=models.UniqueConstraint(condition=models.Q(('supplier__isnull', False)), fields=('sku', 'supplier', 'multi_tenant_company'), name='unique_sku_with_supplier'),
+            constraint=models.UniqueConstraint(condition=models.Q(('supplier__isnull', False)), fields=(
+                'sku', 'supplier', 'multi_tenant_company'), name='unique_sku_with_supplier'),
         ),
         migrations.AddConstraint(
             model_name='product',
-            constraint=models.UniqueConstraint(condition=models.Q(('supplier__isnull', True)), fields=('sku', 'multi_tenant_company'), name='unique_sku_without_supplier'),
+            constraint=models.UniqueConstraint(condition=models.Q(('supplier__isnull', True)), fields=(
+                'sku', 'multi_tenant_company'), name='unique_sku_without_supplier'),
         ),
     ]
