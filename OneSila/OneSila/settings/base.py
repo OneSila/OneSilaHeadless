@@ -57,7 +57,7 @@ INSTALLED_LOCAL_APPS = [
     'orders',
     'purchasing',
     'shipments',
-    'returns',
+    'order_returns',
 
     'huey.contrib.djhuey',
 ]

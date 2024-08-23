@@ -1,9 +1,9 @@
 from django.apps import AppConfig
 
 
-class ReturnsConfig(AppConfig):
+class OrderReturnsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'returns'
+    name = 'order_returns'
 
 
 def ready(self):

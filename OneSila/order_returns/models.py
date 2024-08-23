@@ -2,7 +2,7 @@ from core import models
 from django.utils.translation import gettext_lazy as _
 
 
-class Return(models.Model):
+class OrderReturn(models.Model):
     ANNOUNCED = 'ANNOUNCED'
     RECEIVED = 'RECEIVED'
     PENDING_APPROVAL = 'PENDING_APPROVAL'
@@ -26,7 +26,8 @@ class Return(models.Model):
     return_reason = models.TextField(null=True, blank=True)
 
 
-class ReturnItem(models.Model):
+class OrderReturnItem(models.Model):
+    # NOTE: Must be limited by the items sold in the related order.
     orderitem = models.ForeignKey('orders.OrderItem', on_delete=models.CASCADE)
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
     quantity = models.IntegerField()
