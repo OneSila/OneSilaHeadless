@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 class OrderReturn(models.Model):
     ANNOUNCED = 'ANNOUNCED'
     RECEIVED = 'RECEIVED'
-    PENDING_APPROVAL = 'PENDING_APPROVAL'
+    PENDING_INSPECTION = 'PENDING_INSPECTION'
     REJECTED = 'REJECTED'
     PENDING_REPAYMENT = 'PENDING_REPAYMENT'
     REFUNDED = 'REFUNDED'
@@ -13,7 +13,7 @@ class OrderReturn(models.Model):
     STATUS_CHOICES = (
         (ANNOUNCED, _("Announced")),
         (RECEIVED, _("Received")),
-        (PENDING_APPROVAL, _("Pending Approval")),
+        (PENDING_INSPECTION, _("Pending Inspection")),
         (REJECTED, _("Rejected")),
         (PENDING_REPAYMENT, _("Pending Repayment")),
         (REFUNDED, _("Refunded")),
@@ -21,7 +21,7 @@ class OrderReturn(models.Model):
 
     order = models.ForeignKey('orders.Order', on_delete=models.CASCADE)
     received_on = models.DateField()
-    status = models.CharField(max_length=17, choices=STATUS_CHOICES, default=ANNOUNCED)
+    status = models.CharField(max_length=18, choices=STATUS_CHOICES, default=ANNOUNCED)
 
     return_reason = models.TextField(null=True, blank=True)
 
