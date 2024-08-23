@@ -108,9 +108,9 @@ This guide outlines the steps to add a new inspector block checker for product v
     @receiver(post_delete, sender=RelevantModel)
     def relevant_model_change_handler(sender, instance, **kwargs):
         inspector_block_refresh.send(
-            sender=instance.product.inspector.__class__, 
-            instance=instance.product.inspector, 
-            error_code=NEW_ERROR_CODE, 
+            sender=instance.product.inspector.__class__,
+            instance=instance.product.inspector,
+            error_code=NEW_ERROR_CODE,
             run_async=False
         )
     ```
@@ -146,4 +146,3 @@ This guide outlines the steps to add a new inspector block checker for product v
 ---
 
 This README provides the steps necessary to create and integrate a new inspector block checker, ensuring a consistent approach across the codebase.
-

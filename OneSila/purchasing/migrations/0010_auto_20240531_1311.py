@@ -2,12 +2,16 @@
 
 from django.db import migrations
 
+
 def delete_all_order_items(apps, schema_editor):
     PurchaseOrderItem = apps.get_model('purchasing', 'PurchaseOrderItem')
     PurchaseOrderItem.objects.all().delete()
 
+
 def reverse_func(apps, schema_editor):
     pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [

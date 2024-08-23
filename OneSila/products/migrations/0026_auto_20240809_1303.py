@@ -3,6 +3,7 @@
 from django.db import migrations
 from django.db.models import ProtectedError, Q
 
+
 def delete_non_compliant_supplier_products(apps, schema_editor):
     Product = apps.get_model('products', 'Product')
 
@@ -28,6 +29,7 @@ def delete_traversed_content_object(content_object):
         for protected_instance in e.protected_objects:
             delete_traversed_content_object(protected_instance)
         content_object.delete()
+
 
 class Migration(migrations.Migration):
 

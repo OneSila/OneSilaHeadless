@@ -21,7 +21,8 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='eancode',
             name='inherit_from',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='inherited_ean_codes', to='products.supplierproduct'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL,
+                                    related_name='inherited_ean_codes', to='products.supplierproduct'),
         ),
         migrations.AddField(
             model_name='eancode',
@@ -43,6 +44,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='eancode',
-            constraint=models.CheckConstraint(check=models.Q(('ean_code__isnull', False), ('inherit_from__isnull', False), _connector='OR'), name='ean_code_or_inherit_from_not_null'),
+            constraint=models.CheckConstraint(check=models.Q(('ean_code__isnull', False), ('inherit_from__isnull', False),
+                                              _connector='OR'), name='ean_code_or_inherit_from_not_null'),
         ),
     ]

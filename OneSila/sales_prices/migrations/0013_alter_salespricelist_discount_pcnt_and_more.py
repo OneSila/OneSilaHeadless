@@ -18,6 +18,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='salespricelist',
             name='price_change_pcnt',
-            field=models.FloatField(blank=True, help_text='How would you like to influence the max price?  Write 20 to increase it with 20%.  Or -20 to decrease with 20\\%', null=True),
+            field=models.FloatField(
+                blank=True, help_text='How would you like to influence the max price?  Write 20 to increase it with 20%.  Or -20 to decrease with 20\\%', null=True),
         ),
     ]

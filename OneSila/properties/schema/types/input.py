@@ -38,6 +38,7 @@ class PropertySelectValueInput:
 class PropertySelectValuePartialInput(NodeInput):
     pass
 
+
 @input(PropertySelectValueTranslation, fields="__all__")
 class PropertySelectValueTranslationInput:
     pass
@@ -47,13 +48,16 @@ class PropertySelectValueTranslationInput:
 class PropertySelectValueTranslationPartialInput(NodeInput):
     pass
 
+
 @input(ProductProperty, fields="__all__")
 class ProductPropertyInput:
     value_multi_select: Optional[List[PropertySelectValuePartialInput]]
 
+
 @partial(ProductProperty, fields="__all__")
 class ProductPropertyPartialInput(NodeInput):
     value_multi_select: Optional[List[PropertySelectValuePartialInput]]
+
 
 @input(ProductPropertyTextTranslation, fields="__all__")
 class ProductPropertyTextTranslationInput:
@@ -64,13 +68,16 @@ class ProductPropertyTextTranslationInput:
 class ProductPropertyTextTranslationPartialInput(NodeInput):
     pass
 
+
 @input(ProductPropertiesRuleItem, fields="__all__")
 class ProductPropertiesRuleItemInput:
     pass
 
+
 @partial(ProductPropertiesRuleItem, fields="__all__")
 class ProductPropertiesRuleItemPartialInput(NodeInput):
     pass
+
 
 @strawberry.input
 class CustomProductPropertiesRuleItemInput:
@@ -79,9 +86,11 @@ class CustomProductPropertiesRuleItemInput:
     type: str
     sort_order: Optional[int] = 0
 
+
 @input(ProductPropertiesRule, fields="__all__")
 class ProductPropertiesRuleInput:
     items: Optional[List[CustomProductPropertiesRuleItemInput]]
+
 
 @partial(ProductPropertiesRule, fields="__all__")
 class ProductPropertiesRulePartialInput(NodeInput):
