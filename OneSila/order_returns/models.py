@@ -24,7 +24,7 @@ class OrderReturn(models.Model):
     order = models.ForeignKey('orders.Order', on_delete=models.CASCADE)
     received_on = models.DateField()
     status = models.CharField(max_length=18, choices=STATUS_CHOICES, default=ANNOUNCED)
-
+    tracking_url = models.URLField(null=True, blank=True)
     return_reason = models.TextField(null=True, blank=True)
 
 
