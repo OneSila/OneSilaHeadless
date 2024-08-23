@@ -11,6 +11,24 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class RemoveInventoryAfterShippingFactory:
+    """
+    When a shipment is done, we remove it from the inventory.
+    Why? Why not when it's picked (that would be the better location).
+    Because the current reserved stock will miscount and cause an incorrect reserved stock.
+    FIXME: This inventory behaviour is incorrect and needs fleshing out.
+    """
+
+    def __init__(self, shipment):
+        self.shipment = shipment
+
+    def remove_inventory(location, qty):
+        pass
+
+    def run(self):
+        self.remove_inventory()
+
+
 class ShipOrderSanityCheckMixin:
     def _sanity_check(self):
         if not self.order.is_to_ship():
@@ -60,10 +78,13 @@ class ShipmentForOrderItemFactory(ShipOrderSanityCheckMixin):
             self.quantity_toship = self.product.inventory.physical()
 
     def create_shipment_item(self):
+        # The shipmentitem uses a M2M relation to ensure we can see
+        # which shipments the orderitem connected is attached to.
         self.shipmentitem = ShipmentItem.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             quantity=self.quantity_toship,
             orderitem=self.orderitem,
+            product=self.product,
         )
 
         for shipment in self.shipments:

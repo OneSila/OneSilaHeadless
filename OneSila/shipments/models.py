@@ -25,6 +25,7 @@ class Shipment(models.Model):
         (DONE, _("Done")),
         (CANCELLED, _("Cancelled")),
     )
+    RESERVED_STOCK_STATUSSES = [TODO, IN_PROGRESS]
 
     status = models.CharField(max_length=11, choices=STATUS_CHOICES, default=DRAFT)
     from_address = models.ForeignKey('contacts.ShippingAddress', on_delete=models.PROTECT,
@@ -73,6 +74,7 @@ class ShipmentItem(models.Model):
     of the actually sold product"""
     shipments = models.ManyToManyField(Shipment, blank=True)
     orderitem = models.ForeignKey('orders.OrderItem', on_delete=models.CASCADE)
+    product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
     quantity = models.IntegerField()
 
     objects = ShipmentItemManager()

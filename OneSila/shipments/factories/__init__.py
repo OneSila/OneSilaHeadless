@@ -1,2 +1,2 @@
-from .prepare_shipments import PrepareShipmentsFactory
+from .prepare_shipments import PrepareShipmentsFactory, RemoveInventoryAfterShippingFactory
 from .shipping_approval import PreApproveShippingFactory

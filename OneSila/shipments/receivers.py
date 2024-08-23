@@ -37,6 +37,13 @@ def shipments__order__ship(sender, instance, **kwargs):
     prepare_shipments_task(instance)
 
 
+@receiver(done, sender=Shipment)
+def shipments__shipment__done(sender, instance, **kwargs):
+    """When a shipment is done, we want to remove the inventory"""
+    from .tasks import remove_inventory_after_shipping_task
+    remove_inventory_after_shipping_task(instance)
+
+
 @receiver(post_save, sender=Shipment)
 def shipments__shipment__signals(sender, instance, **kwargs):
     """

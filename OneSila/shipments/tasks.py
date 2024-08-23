@@ -12,3 +12,9 @@ def prepare_shipments_task(order):
 def pre_approve_shipping_task(order):
     from shipments.flows import pre_approve_shipping_flow
     pre_approve_shipping_flow(order)
+
+
+@db_task()
+def remove_inventory_after_shipping_task(shipment):
+    from shipments.flows import remove_inventory_after_shipping_flow
+    remove_inventory_after_shipping_flow(shipment)

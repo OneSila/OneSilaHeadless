@@ -150,6 +150,8 @@ class InventoryQuerySet(MultiTenantQuerySet):
 
     def reserved(self):
         """Items that have been sold but not shipped"""
+        from shipments.models import Shipment
+
         product = self._hints['instance']
         multi_tenant_company = product.multi_tenant_company
 
@@ -161,7 +163,12 @@ class InventoryQuerySet(MultiTenantQuerySet):
             distinct().\
             aggregate(Sum('quantity'))['quantity__sum'] or 0
 
-        return sold_agg
+        pending_shipment_agg = product.shipmentitem_set.\
+            filter(shipments__status__in=Shipment.RESERVED_STOCK_STATUSSES).\
+            distinct().\
+            aggregate(Sum('quantity'))['quantity__sum'] or 0
+
+        return sold_agg + pending_shipment_agg
 
     def await_inventory(self):
         # NOTE: Technically this should be inventory pending status

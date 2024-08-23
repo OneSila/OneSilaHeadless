@@ -1,2 +1,2 @@
-from .prepare_shipments import prepare_shipments_flow
+from .prepare_shipments import prepare_shipments_flow, remove_inventory_after_shipping_flow
 from .shipping_approval import pre_approve_shipping_flow, inventory_change_trigger_flow
