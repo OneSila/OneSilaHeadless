@@ -1,7 +1,7 @@
 from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from core import models
-from .managers import InventoryManager
+from .managers import InventoryManager, InventoryLocationManager
 
 
 class Inventory(models.Model):
@@ -44,8 +44,14 @@ class InventoryLocation(models.Model):
 
     precise = models.BooleanField(default=False)
 
+    objects = InventoryLocationManager()
+
     def __str__(self):
         return self.name
+
+    # @property
+    # def is_internal_location(self):
+    #     return self.shippingaddress.company.is_internal_company
 
     class Meta:
         search_terms = ['name']

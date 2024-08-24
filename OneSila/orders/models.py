@@ -2,44 +2,34 @@ from core import models
 from django.utils.translation import gettext_lazy as _
 from currency_converter import CurrencyConverter, RateNotFoundError
 
-from .managers import OrderItemManager, OrderManager, OrderReportManager
+from .managers import OrderItemManager, OrderManager
+from .documents import PrintOrder
 
 
 class Order(models.Model):
     DRAFT = 'DRAFT'
-    PENDING = 'PENDING'
-    PENDING_INVENTORY = 'PENDING_INVENTORY'
-    TO_PICK = 'TOPICK'
-    TO_SHIP = 'TOSHIP'
-    DONE = 'DONE'
-    CANCELLED = 'CANCELLED'
-    HOLD = 'HOLD'
-    EXCHANGED = 'EXCHANGED'
-    REFUNDED = 'REFUNDED'
-    LOST = 'LOST'
-    MERGED = 'MERGED'
-    DAMAGED = 'DAMAGED'
-    VOID = 'VOID'
+    PENDING_PROCESSING = 'PENDING_PROCESSING'  # Set by scripts after draft. It means 'ready to do whatever you need to do before shipping'
+    PENDING_SHIPPING_APPROVAL = "PENDING_SHIPPING_APPROVAL"  # Choices should be: to-ship or await-inventory
+    TO_SHIP = "TO_SHIP"
+    AWAIT_INVENTORY = "AWAIT_INVENTORY"
+    SHIPPED = "SHIPPED"
+    CANCELLED = "CANCELLED"
+    HOLD = "HOLD"
 
-    UNPROCESSED = [PENDING]
-    DONE_TYPES = [DONE, CANCELLED, HOLD, EXCHANGED, REFUNDED, LOST, MERGED, DAMAGED]
-    HELD = [HOLD, PENDING_INVENTORY]
+    UNPROCESSED = [PENDING_PROCESSING]
+    DONE_TYPES = [SHIPPED, CANCELLED, HOLD]
+    HELD = [HOLD, PENDING_SHIPPING_APPROVAL, AWAIT_INVENTORY]
+    RESERVE_STOCK_TYPES = [PENDING_PROCESSING, HOLD, PENDING_SHIPPING_APPROVAL, AWAIT_INVENTORY]
 
     STATUS_CHOICES = (
         (DRAFT, _('Draft')),
-        (PENDING, _('Pending')),
-        (PENDING_INVENTORY, _('Pending Inventory')),
-        (TO_PICK, _('To Pick')),
+        (PENDING_PROCESSING, _('Pending Processing')),
+        (PENDING_SHIPPING_APPROVAL, _('Pending Shipping Approval')),
         (TO_SHIP, _('To Ship')),
-        (DONE, _('Done')),
+        (AWAIT_INVENTORY, _('Awaiting Inventory')),
+        (SHIPPED, _('Shipped')),
         (CANCELLED, _('Cancelled')),
         (HOLD, _('On Hold')),
-        (EXCHANGED, _('Exchanged')),
-        (REFUNDED, _('Refunded')),
-        (LOST, _('Lost')),
-        (MERGED, _('Merged')),
-        (DAMAGED, _('Damaged')),
-        (VOID, _('Void')),
     )
 
     SALE = 'SALE'
@@ -50,10 +40,10 @@ class Order(models.Model):
 
     REASON_CHOICES = (
         (SALE, _('Sale')),
-        (RETURNGOODS, _('Return goods')),
+        # (RETURNGOODS, _('Return goods')),
         (SAMPLE, _('Commercial Sample')),
         (GIFT, _('Gift')),
-        (DOCUMENTS, _('Documents'))
+        # (DOCUMENTS, _('Documents'))
     )
 
     reference = models.CharField(max_length=100, blank=True, null=True)
@@ -66,14 +56,13 @@ class Order(models.Model):
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
     price_incl_vat = models.BooleanField(default=True)
 
-    status = models.CharField(max_length=17, choices=STATUS_CHOICES, default=DRAFT)
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=DRAFT)
     reason_for_sale = models.CharField(max_length=10, choices=REASON_CHOICES, default=SALE)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     objects = OrderManager()
-    reports = OrderReportManager()
 
     @property
     def total_value(self):
@@ -101,15 +90,15 @@ class Order(models.Model):
                     return False
             return True
 
-    @property
-    def contains_custom_products(self):
-        if 'custom' in ' '.join(self.orderitem_set.all().values_list('product__name', flat=True)).lower():
-            return True
-        else:
-            return False
-
     def __str__(self):
         return '#{}'.format(self.id)
+
+    def print(self):
+        filename = f"{self.reference or self.__str__()}.pdf"
+        printer = PrintOrder(self)
+        printer.generate()
+        pdf = printer.pdf
+        return filename, pdf
 
     def tax_rate(self):
         return self.invoice_address.tax_rate
@@ -125,16 +114,57 @@ class Order(models.Model):
         else:
             return self.total_value
 
-    def set_status_processing(self):
-        self.status = self.PENDING
+    def set_status(self, status):
+        self.status = status
         self.save()
 
+    def set_status_processing(self):
+        self.set_status(self.PENDING_PROCESSING)
+
+    def set_status_pending_processing(self):
+        self.set_status(self.PENDING_PROCESSING)
+
+    def set_status_pending_shipping_approval(self):
+        self.set_status(self.PENDING_SHIPPING_APPROVAL)
+
     def set_status_done(self):
-        self.status = self.DONE
-        self.save()
+        self.set_status(self.DONE)
+
+    def set_status_to_ship(self):
+        self.set_status(self.TO_SHIP)
+
+    def set_status_await_inventory(self):
+        self.set_status(self.AWAIT_INVENTORY)
+
+    def set_status_shipped(self):
+        self.set_status(self.SHIPPED)
+
+    def is_draft(self):
+        return self.status == self.DRAFT
+
+    def is_pending_processing(self):
+        return self.status == self.PENDING_PROCESSING
+
+    def is_pending_shipping_approval(self):
+        return self.status == self.PENDING_SHIPPING_APPROVAL
 
     def is_done(self):
         return self.status == self.DONE
+
+    def is_to_ship(self):
+        return self.status == self.TO_SHIP
+
+    def is_await_inventory(self):
+        return self.status == self.AWAIT_INVENTORY
+
+    def is_shipped(self):
+        return self.status == self.SHIPPED
+
+    def is_cancelled(self):
+        return self.status == self.CANCELLED
+
+    def is_hold(self):
+        return self.status == self.HOLD
 
     class Meta:
         ordering = ('-created_at',)
@@ -151,7 +181,6 @@ class Order(models.Model):
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.PROTECT)
-
     product = models.ForeignKey('products.Product', on_delete=models.PROTECT)
     quantity = models.IntegerField()
     # Price can be blank as we'll do auto-pricing in certain cases.
@@ -161,6 +190,14 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return '{} x {} : {}'.format(self.product.sku, self.quantity, self.order)
+
+    def subtotal(self):
+        return round(self.quantity * self.price, 2)
+
+    def subtotal_string(self):
+        currency_symbol = self.order.currency.symbol
+        subtotal = self.subtotal()
+        return f"{currency_symbol} {subtotal}"
 
     def qty_on_stock(self):
         # Firstly, dont bother calculating this for order-items that dont need processing

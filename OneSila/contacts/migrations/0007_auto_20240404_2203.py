@@ -2,6 +2,7 @@
 
 from django.db import migrations
 
+
 def enforce_invoice_address_constraint(apps, schema_editor):
     Address = apps.get_model('contacts', 'Address')
     Company = apps.get_model('contacts', 'Company')
@@ -14,8 +15,10 @@ def enforce_invoice_address_constraint(apps, schema_editor):
             first_address.is_invoice_address = True
             first_address.save()
 
+
 def reverse_enforce_invoice_address_constraint(apps, schema_editor):
     return True
+
 
 class Migration(migrations.Migration):
 

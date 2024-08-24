@@ -4,6 +4,7 @@ from strawberry_django.filters import filter as strawberry_filter
 from strawberry import UNSET
 from strawberry import LazyType as lazy
 
+
 class SearchFilterMixin:
     search: str | None
 
@@ -16,6 +17,7 @@ class SearchFilterMixin:
 
 class ExcluideDemoDataFilterMixin:
     exclude_demo_data: Optional[bool]
+
     def filter_exclude_demo_data(self, queryset):
         from django.contrib.contenttypes.models import ContentType
         from core.models import DemoDataRelation
@@ -29,6 +31,7 @@ class ExcluideDemoDataFilterMixin:
             )
 
         return queryset
+
 
 def filter(*args, lookups=True, **kwargs):
     return strawberry_filter(*args, **kwargs, lookups=lookups)

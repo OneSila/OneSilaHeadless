@@ -4,6 +4,7 @@ from properties.models import Property, PropertyTranslation, PropertySelectValue
 
 registry = DemoDataLibrary()
 
+
 @registry.register_private_app
 def create_property_structure(multi_tenant_company):
     """Create properties and related data for the demo."""
@@ -49,7 +50,6 @@ def create_property_structure(multi_tenant_company):
                     value=value
                 )
                 registry.create_demo_data_relation(translation)
-
 
     product_type_property = Property.objects.get(is_product_type=True, multi_tenant_company=multi_tenant_company)
     product_types = ['Table', 'Chair', 'Bed']

@@ -8,9 +8,6 @@ from products_inspector.schema.types.input import InspectorPartialInput
 from products_inspector.schema.types.types import InspectorType
 from core.schema.core.mixins import GetCurrentUserMixin
 
-def refresh_inepsctor():
-    extensions = default_extensions
-    return RefreshInspectorMutation(InspectorPartialInput, extensions=extensions)
 
 class RefreshInspectorMutation(UpdateMutation, GetCurrentUserMixin):
     def update(self, info: Info, instance: Inspector, data: dict[str, Any]):
@@ -18,6 +15,12 @@ class RefreshInspectorMutation(UpdateMutation, GetCurrentUserMixin):
         instance.refresh_from_db()
         return instance
 
+
+def refresh_inspector():
+    extensions = default_extensions
+    return RefreshInspectorMutation(InspectorPartialInput, extensions=extensions)
+
+
 @type(name="Mutation")
-class InspectorMutation:
-    refresh_inepsctor: InspectorType = refresh_inepsctor()
+class ProductsInspectorMutation:
+    refresh_inspector: InspectorType = refresh_inspector()

@@ -17,6 +17,7 @@ def delete_non_p_units(apps, schema_editor):
 
         unit.delete()
 
+
 class Migration(migrations.Migration):
 
     dependencies = [

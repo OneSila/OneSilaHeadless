@@ -17,6 +17,8 @@ from .filters import ProductFilter, BundleProductFilter, ConfigurableProductFilt
 from .ordering import ProductOrder, BundleProductOrder, ConfigurableProductOrder, \
     SimpleProductOrder, ProductTranslationOrder, ConfigurableVariationOrder, BundleVariationOrder, BillOfMaterialOrder, SupplierProductOrder, \
     DropshipProductOrder, ManufacturableProductOrder, SupplierPricesOrder
+
+
 @type(Product, filters=ProductFilter, order=ProductOrder, pagination=True, fields="__all__")
 class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
     vat_rate: Optional[VatRateType]
@@ -59,16 +61,20 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
         return None
 
     @field()
-    def inventory_physical(self, info) -> str | None:
+    def inventory_physical(self, info) -> int | None:
         return self.inventory.physical()
 
     @field()
-    def inventory_salable(self, info) -> str | None:
+    def inventory_salable(self, info) -> int | None:
         return self.inventory.salable()
 
     @field()
-    def inventory_reserved(self, info) -> str | None:
+    def inventory_reserved(self, info) -> int | None:
         return self.inventory.reserved()
+
+    @field()
+    def inventory_await_inventory(self, info) -> int | None:
+        return self.inventory.await_inventory()
 
 
 @type(ProductTranslation, filters=ProductTranslationFilter, order=ProductTranslationOrder, pagination=True, fields="__all__")

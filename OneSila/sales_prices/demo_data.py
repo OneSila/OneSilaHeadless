@@ -1,4 +1,5 @@
-from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator
+from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, \
+    PrivateStructuredDataGenerator
 from currencies.models import Currency
 from products.models import Product
 from sales_prices.models import SalesPrice, SalesPriceList, SalesPriceListItem
@@ -7,32 +8,52 @@ from datetime import datetime
 registry = DemoDataLibrary()
 
 
+# @registry.register_private_app
+# class SalesPriceDemoDataGenerator(PrivateStructuredDataGenerator)
+#     model = SalesPrice
+
+#     def get_structure(self):
+#         return [
+#             {
+#                 'instance_data': {
+#                     'product':
+#                     'currency':
+#                     'rrp':
+#                     'price':
+
+#                 },
+#                 'post_data': {
+
+#                 },
+#             },
+#         ]
+
+
 @registry.register_private_app
 class SalesPriceGenerator(PrivateDataGenerator):
     model = SalesPrice
     count = 1
     field_mapper = {}
 
-    def set_product_qs(self):
-        self.product_qs = Product.objects.\
+    def get_product_qs(self):
+        return Product.objects.\
             filter_multi_tenant(self.multi_tenant_company).\
             filter_has_prices()
 
-    def set_currency(self):
-        self.currency = Currency.objects.\
-            filter_multi_tenant(self.multi_tenant_company).\
-            get(is_default_currency=True)
+    def get_currency(self):
+        return Currency.objects.\
+            get(is_default_currency=True, multi_tenant_company=self.multi_tenant_company)
 
     def generate(self):
         # We override the generate function as we'll just be adding prices
         # to all existing products found.
-        self.set_product_qs()
-        self.set_currency()
+        product_qs = self.get_product_qs()
+        currency = self.get_currency()
 
-        for product in self.product_qs:
+        for product in product_qs:
             base_kwargs = {
                 'multi_tenant_company': self.multi_tenant_company,
-                'currency': self.currency,
+                'currency': currency,
                 'product': product,
             }
 

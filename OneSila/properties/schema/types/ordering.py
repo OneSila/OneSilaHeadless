@@ -21,6 +21,7 @@ class PropertySelectValueTranslationOrder:
     id: auto
     value: auto
 
+
 @order(ProductProperty)
 class ProductPropertyOrder:
     id: auto
@@ -32,14 +33,17 @@ class ProductPropertyOrder:
 class PropertyTranslationOrder:
     id: auto
 
+
 @order(ProductPropertyTextTranslation)
 class ProductPropertyTextTranslationOrder:
     id: auto
+
 
 @order(ProductPropertiesRule)
 class ProductPropertiesRuleOrder:
     id: auto
     product_type: auto
+
 
 @order(ProductPropertiesRuleItem)
 class ProductPropertiesRuleItemOrder:

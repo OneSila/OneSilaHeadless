@@ -25,8 +25,10 @@ shortuuid
 pytz
 hypercorn
 Faker
+reportlab>=4.2.2
 faker-commerce
 sentry-sdk[django]
+tblib
 
 # version stuck to 0.32.1, filters need upgrading before increasing version number
 # also pin the stawberry-graphql version.  Pip doesnt seem to manage to install the right version

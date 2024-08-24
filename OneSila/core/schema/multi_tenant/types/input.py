@@ -59,6 +59,7 @@ class MultiTenantInviteUserInput:
     first_name: auto
     last_name: auto
 
+
 @strawberry_input
 class MultiTenantLoginLinkInput:
     username: str
@@ -68,9 +69,11 @@ class MultiTenantLoginLinkInput:
 class MultiTenantUserLoginTokenInput:
     username: str
 
+
 @strawberry_input
 class UpdateOnboardingStatusInput:
     onboarding_status: str
+
 
 @partial(MultiTenantUserLoginToken)
 class MultiTenantUserAuthenticateTokenInput:
