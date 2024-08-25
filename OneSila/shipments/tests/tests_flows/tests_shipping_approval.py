@@ -56,4 +56,4 @@ class InventoryChangeTriggerFlowTestCase(CreateTestOrderMixin, TestCaseDemoDataM
 
         inventory_change_trigger_flow(order)
         order.refresh_from_db()
-        self.assertTrue(order.is_pending_shipping_approval())
+        self.assertEqual(order.PENDING_SHIPPING_APPROVAL, order.status)

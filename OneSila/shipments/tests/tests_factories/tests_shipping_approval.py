@@ -38,4 +38,4 @@ class TestPreApproveShippingFactory(CreateTestOrderMixin, TestCaseDemoDataMixin,
         order = self.create_test_order('test_prepare_shipment', product, order_qty)
         order.set_status_pending_processing()
 
-        self.assertTrue(order.is_pending_shipping_approval())
+        self.assertEqual(order.PENDING_SHIPPING_APPROVAL, order.status)
