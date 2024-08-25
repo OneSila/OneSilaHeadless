@@ -44,7 +44,8 @@ class InventoryChangeTriggerFlowTestCase(CreateTestOrderMixin, TestCaseDemoDataM
         supplier_product = product.supplier_products.last()
         order_qty = 15
         order = self.create_test_order('test_prepare_shipment', product, order_qty)
-        order.set_status_pending_processing()
+        Order.objects.filter(id=order.id).update(status=order.AWAIT_INVENTORY)
+        order.refresh_from_db()
         location = InventoryLocation.objects.get(multi_tenant_company=self.multi_tenant_company,
             name=LOCATION_WAREHOUSE_B)
 
