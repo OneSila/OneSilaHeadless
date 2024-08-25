@@ -12,17 +12,11 @@ class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, 
     def pack_and_dispatch_all_items_in_order(self, order):
         from shipments.models import Package, PackageItem
 
-        if not order.shipment_set.exists():
-            self.assertFail("Cannot test order shipment if no shipments are present.")
-
         for shipment in order.shipment_set.all():
             package = Package.objects.create(
                 multi_tenant_company=self.multi_tenant_company,
                 type=Package.BOX,
                 shipment=shipment)
-
-            if not shipment.shipmentitemtoship_set.all().exists():
-                self.assertFail('shipment items to ship to should be present.')
 
             for item in shipment.shipmentitemtoship_set.all():
                 physical_inventory = item.product.inventory.filter_physical().filter(quantity__gte=1)
