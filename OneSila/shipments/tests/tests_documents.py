@@ -17,8 +17,6 @@ class PickingListDocumentTestCase(CreateTestOrderMixin, TestCaseDemoDataMixin, T
         order = self.create_test_order('test_prepare_shipment', product, order_qty)
         order.set_status_to_ship()
 
-        prepare_shipments_flow(order)
-
         shipment = order.shipment_set.all().last()
         filename, pdf = shipment.print()
         filepath = save_test_file(filename, pdf)

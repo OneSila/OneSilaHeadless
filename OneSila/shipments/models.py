@@ -7,7 +7,7 @@ from .models_helpers import get_shippinglabel_folder_upload_path, \
     get_customs_document_folder_upload_path
 
 
-class Shipment(models.Model):
+class Shipment(models.SetStatusMixin, models.Model):
     """each for a given location"""
     DRAFT = "DRAFT"
     TODO = "TODO"
@@ -25,6 +25,7 @@ class Shipment(models.Model):
         (DONE, _("Done")),
         (CANCELLED, _("Cancelled")),
     )
+
     RESERVED_STOCK_STATUSSES = [TODO, IN_PROGRESS]
 
     status = models.CharField(max_length=11, choices=STATUS_CHOICES, default=DRAFT)
@@ -50,8 +51,10 @@ class Shipment(models.Model):
         return filename, printer.pdf
 
     def set_status_todo(self):
-        self.status = self.TODO
-        self.save()
+        self.set_status(self.TODO)
+
+    def set_status_done(self):
+        self.set_status(self.DONE)
 
     def is_draft(self):
         return self.status == self.DRAFT
@@ -88,7 +91,7 @@ class ShipmentItemToShip(models.Model):
     orderitem = models.ForeignKey('orders.OrderItem', on_delete=models.PROTECT)
 
 
-class Package(models.Model):
+class Package(models.SetStatusMixin, models.Model):
     BOX = "BOX"
     PALLET = "PALLET"
 
@@ -99,15 +102,16 @@ class Package(models.Model):
 
     NEW = 'NEW'
     IN_PROGRESS = 'IN_PROGRESS'
-    PACKAGED = 'PACKAGED'
+    PACKED = 'PACKED'
     DISPATCHED = 'DISPATCHED'
 
     STATUS_CHOICES = (
         (NEW, _("New")),
         (IN_PROGRESS, _("In Progress")),
-        (PACKAGED, _("Packaged")),
+        (PACKED, _("Packed")),
         (DISPATCHED, _("Dispatched")),
     )
+    RESERVED_STOCK_STATUSSES = [IN_PROGRESS]
 
     type = models.CharField(max_length=6, choices=TYPE_CHOICES)
     shipment = models.ForeignKey(Shipment, on_delete=models.PROTECT)
@@ -121,7 +125,33 @@ class Package(models.Model):
     customs_document = models.FileField(upload_to=get_customs_document_folder_upload_path,
         validators=[validate_pdf_extension], blank=True, null=True)
 
+    def set_status_new(self):
+        self.set_status(self.NEW)
+
+    def set_status_in_progress(self):
+        self.set_status(self.IN_PROGRESS)
+
+    def set_status_packed(self):
+        self.set_status(self.PACKED)
+
+    def set_status_dispatched(self):
+        self.set_status(self.DISPATCHED)
+
+    def is_new(self):
+        return self.status == self.NEW
+
+    def is_in_progress(self):
+        return self.status == self.IN_PROGRESS
+
+    def is_packed(self):
+        return self.status == self.PACKED
+
+    def is_dispatched(self):
+        return self.status == self.DISPATCHED
+
 
 class PackageItem(models.Model):
     package = models.ForeignKey(Package, on_delete=models.PROTECT)
-    qty = models.IntegerField()
+    inventory = models.ForeignKey('inventory.Inventory', on_delete=models.PROTECT)
+    product = models.ForeignKey('products.Product', on_delete=models.PROTECT)
+    quantity = models.IntegerField()

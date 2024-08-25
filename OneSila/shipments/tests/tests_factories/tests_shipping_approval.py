@@ -30,18 +30,12 @@ class TestPreApproveShippingFactory(CreateTestOrderMixin, TestCaseDemoDataMixin,
         order = self.create_test_order('test_pre_approve_shipping_in_stock', product, order_qty)
         order.set_status_pending_processing()
 
-        f = PreApproveShippingFactory(order)
-        f.run()
-
-        self.assertTrue(order.is_to_ship())
+        self.assertEqual(order.SHIPPED, order.status)
 
     def test_pre_approve_shipping_partial_stock(self):
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
         order_qty = 15
         order = self.create_test_order('test_prepare_shipment', product, order_qty)
         order.set_status_pending_processing()
-
-        f = PreApproveShippingFactory(order)
-        f.run()
 
         self.assertTrue(order.is_pending_shipping_approval())

@@ -1,9 +1,12 @@
 from orders.signals import to_ship
 from orders.models import Order
 from core.receivers import post_save, receiver
+from core.signals import post_create
+from orders.signals import pending_processing
 from inventory.signals import product_inventory_change
 from shipments.signals import draft, todo, in_progress, \
-    done, cancelled, pending_processing
+    done, cancelled, new, packed, dispatched
+from shipments.models import Shipment, Package, PackageItem
 
 
 @receiver(product_inventory_change, sender='products.Product')
@@ -37,13 +40,6 @@ def shipments__order__ship(sender, instance, **kwargs):
     prepare_shipments_task(instance)
 
 
-@receiver(done, sender=Shipment)
-def shipments__shipment__done(sender, instance, **kwargs):
-    """When a shipment is done, we want to remove the inventory"""
-    from .tasks import remove_inventory_after_shipping_task
-    remove_inventory_after_shipping_task(instance)
-
-
 @receiver(post_save, sender=Shipment)
 def shipments__shipment__signals(sender, instance, **kwargs):
     """
@@ -64,3 +60,32 @@ def shipments__shipment__signals(sender, instance, **kwargs):
 
     for signal in signals:
         signal.send(sender=instance.__class__, instance=instance)
+
+
+@receiver(post_save, sender=Package)
+def shipments__package__signals(sender, instance, **kwargs):
+    signals = []
+
+    if instance.is_new():
+        signals.append(new)
+    elif instance.is_in_progress():
+        signals.append(in_progress)
+    elif instance.is_packed():
+        signals.append(packed)
+    elif instance.is_dispatched():
+        signals.append(dispatched)
+
+    for signal in signals:
+        signal.send(sender=instance.__class__, instance=instance)
+
+
+@receiver(post_save, sender=PackageItem)
+def shipment__packageitem__reduce(sender, instance, **kwargs):
+    from shipments.flows import packageitem_inventory_move_flow
+    packageitem_inventory_move_flow(instance)
+
+
+@receiver(dispatched, sender=Package)
+def shipments__package__complete_shipment(sender, instance, **kwargs):
+    from shipments.flows import shipment_completed_flow
+    shipment_completed_flow(instance.shipment)

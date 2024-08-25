@@ -5,28 +5,33 @@ from contacts.models import ShippingAddress
 from shipments.models import Shipment, ShipmentItemToShip, ShipmentItem
 from inventory.models import InventoryLocation
 from shipments.exceptions import NoShippingAddressError, NotEnoughStockError
+from products.models import Product
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class RemoveInventoryAfterShippingFactory:
-    """
-    When a shipment is done, we remove it from the inventory.
-    Why? Why not when it's picked (that would be the better location).
-    Because the current reserved stock will miscount and cause an incorrect reserved stock.
-    FIXME: This inventory behaviour is incorrect and needs fleshing out.
-    """
+class ShipmentCompletedFactory:
+    """When packages are shipped, we need to verify if the
+    complete shipment is done and mark it as completed"""
 
     def __init__(self, shipment):
         self.shipment = shipment
 
-    def remove_inventory(location, qty):
-        pass
+    def set_all_packages_dispatched(self):
+        self.all_packages_dispatched = all([i.is_dispatched() for i in self.shipment.package_set.all()])
+
+    def mark_shipment_done(self):
+        if self.all_packages_dispatched:
+            logger.debug(f"About to mark {self.shipment} as done.")
+            self.shipment.set_status_done()
+        else:
+            logger.debug(f"Cannot {self.shipment} as done, not all packages are dispatched")
 
     def run(self):
-        self.remove_inventory()
+        self.set_all_packages_dispatched()
+        self.mark_shipment_done()
 
 
 class ShipOrderSanityCheckMixin:
@@ -217,7 +222,7 @@ class PrepareShipmentsFactory(ShipOrderSanityCheckMixin):
     def __init__(self, order):
         self.multi_tenant_company = order.multi_tenant_company
         self.order = order
-        self.orderitems = order.orderitem_set.all()
+        self.orderitems = order.orderitem_set.exclude(product__type=Product.DROPSHIP)
         self.country = order.shipping_address.country
         self.shipments = []
         self.shipmentitems = []

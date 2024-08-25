@@ -1,4 +1,4 @@
-from shipments.factories import PrepareShipmentsFactory
+from shipments.factories import PrepareShipmentsFactory, ShipmentCompletedFactory
 
 
 def prepare_shipments_flow(order):
@@ -6,6 +6,6 @@ def prepare_shipments_flow(order):
     f.run()
 
 
-def remove_inventory_after_shipping_flow(shipment):
-    f = RemoveInventoryAfterShippingFactory(shipment)
+def shipment_completed_flow(shipment):
+    f = ShipmentCompletedFactory(shipment)
     f.run()

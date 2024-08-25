@@ -5,38 +5,79 @@ from products.models import SimpleProduct, SupplierProduct, BundleProduct, \
 from .tests_models import InventoryTestCaseMixin
 from orders.tests.tests_factories.mixins import CreateTestOrderMixin
 from products.demo_data import SIMPLE_BLACK_FABRIC_PRODUCT_SKU
+from shipments.flows import prepare_shipments_flow, pre_approve_shipping_flow
 
 
 class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, InventoryTestCaseMixin, TestCase):
+    def pack_and_dispatch_all_items_in_order(self, order):
+        from shipments.models import Package, PackageItem
+
+        if not order.shipment_set.exists():
+            self.assertFail("Cannot test order shipment if no shipments are present.")
+
+        for shipment in order.shipment_set.all():
+            package = Package.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                type=Package.BOX,
+                shipment=shipment)
+
+            if not shipment.shipmentitemtoship_set.all().exists():
+                self.assertFail('shipment items to ship to should be present.')
+
+            for item in shipment.shipmentitemtoship_set.all():
+                physical_inventory = item.product.inventory.filter_physical().filter(quantity__gte=1)
+
+                pre_physical = item.product.inventory.physical()
+
+                package_item = package.packageitem_set.create(
+                    multi_tenant_company=self.multi_tenant_company,
+                    product=item.product,
+                    inventory=physical_inventory.first(),
+                    quantity=item.quantity)
+
+                post_physical = item.product.inventory.physical()
+
+                self.assertFalse(post_physical == pre_physical)
+                self.assertTrue(post_physical < pre_physical)
+
+            package.set_status_dispatched()
+
     def test_inventory_number(self):
         # We start with a simple product with one supplier product and 10 items on stock
         # 1) We sell 1 - but leave the order on draft.
         #   So we should have 10 physically on stock, 0 reserved and 10 salable.
         # 2) When we change the status and mark it as processing, it should adjust the items to
         #   So we should have 10 physically on stock, 1 reserved and 9 salable.
+        # 3) Ship the items, we still expect all the same items to be in the state before
+        #   shipping
+        # 4) Time for packing.  Pack and ship the items.
+        #   items should be removed from physical and reserved stock
 
         simple = SimpleProduct.objects.get(multi_tenant_company=self.multi_tenant_company,
             sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU)
         supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
         supplier.base_products.add(simple)
 
-        physical = simple.inventory.physical()
-        reserved = simple.inventory.reserved()
-        salable = simple.inventory.salable()
+        pre_order_physical = simple.inventory.physical()
+        pre_order_reserved = simple.inventory.reserved()
+        pre_order_salable = simple.inventory.salable()
 
         order_qty = 1
 
         order = self.create_test_order('test_inventory_number', simple, order_qty)
 
-        self.assertEqual(simple.inventory.physical(), physical)
-        self.assertEqual(simple.inventory.salable(), salable)
-        self.assertEqual(simple.inventory.reserved(), reserved)
+        self.assertEqual(simple.inventory.physical(), pre_order_physical)
+        self.assertEqual(simple.inventory.salable(), pre_order_salable)
+        self.assertEqual(simple.inventory.reserved(), pre_order_reserved)
 
-        order.set_status_processing()
+        # No need to take more action, the automated flows should just ship
+        # these items without further action.
+        order.set_status_pending_processing()
+        self.pack_and_dispatch_all_items_in_order(order)
 
-        self.assertEqual(simple.inventory.physical(), physical)
-        self.assertEqual(simple.inventory.reserved(), reserved + order_qty)
-        self.assertEqual(simple.inventory.salable(), salable - order_qty)
+        self.assertEqual(simple.inventory.physical(), pre_order_physical - order_qty)
+        self.assertEqual(simple.inventory.reserved(), pre_order_reserved)
+        self.assertEqual(simple.inventory.salable(), pre_order_salable - order_qty)
 
     def test_inventory_number_oversold(self):
         # We start with a simple product with one supplier product and 10 items on stock
@@ -62,7 +103,7 @@ class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, 
         self.assertEqual(simple.inventory.salable(), salable)
         self.assertEqual(simple.inventory.reserved(), reserved)
 
-        order.set_status_processing()
+        order.set_status_pending_processing()
 
         self.assertEqual(simple.inventory.physical(), physical)
         self.assertEqual(simple.inventory.reserved(), reserved + order_qty)
