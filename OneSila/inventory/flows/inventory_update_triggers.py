@@ -1,5 +1,5 @@
-def inventory_update_trigger_flow(inventory):
-    from inventory.factories import InventoryUpdateTriggerFactory
+def inventory_change_product_update_trigger_flow(inventory):
+    from inventory.factories import InventoryChangeProductUpdateTriggerFactory
 
-    f = InventoryUpdateTriggerFactory(inventory)
+    f = InventoryChangeProductUpdateTriggerFactory(inventory)
     f.run()

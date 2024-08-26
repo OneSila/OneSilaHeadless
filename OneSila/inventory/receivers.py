@@ -15,5 +15,5 @@ def inventories__inventory__product_trigger(sender, instance, **kwargs):
 
     This can be used for shipment retries, frontend updates and more.
     """
-    from inventory.flows import inventory_update_trigger_flow
-    inventory_update_trigger_flow(instance)
+    from inventory.flows import inventory_change_product_update_trigger_flow
+    inventory_change_product_update_trigger_flow(instance)
