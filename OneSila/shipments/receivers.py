@@ -4,6 +4,7 @@ from core.receivers import post_save, receiver
 from core.signals import post_create
 from orders.signals import pending_processing
 from inventory.signals import product_inventory_change
+from shipments.flows import inventory_change_trigger_flow
 from shipments.signals import draft, todo, in_progress, \
     done, cancelled, new, packed, dispatched
 from shipments.models import Shipment, Package, PackageItem
@@ -14,10 +15,7 @@ def orders__product__inventory_change__shipping_retrigger(sender, instance, **kw
     """
     Check to see if some orders need the shipping_status retriggered.
     """
-    # FIXME: Trace back all order_items owned by this product filtered
-    # by an order that's in pending_inventory.
-    # You can simply run the pre-approval flow on this one.
-    pass
+    inventory_change_trigger_flow(instance)
 
 
 @receiver(pending_processing, sender=Order)
