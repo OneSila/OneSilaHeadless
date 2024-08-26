@@ -15,7 +15,7 @@ class PickingListDocumentTestCase(CreateTestOrderMixin, TestCaseDemoDataMixin, T
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
         order_qty = 1
         order = self.create_test_order('test_prepare_shipment', product, order_qty)
-        order.set_status_to_ship()
+        order.set_status_pending_processing()
 
         shipment = order.shipment_set.all().last()
         filename, pdf = shipment.print()

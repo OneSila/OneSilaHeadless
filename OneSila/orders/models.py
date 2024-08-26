@@ -120,6 +120,9 @@ class Order(models.SetStatusMixin, models.Model):
     def set_status_pending_shipping_approval(self):
         self.set_status(self.PENDING_SHIPPING_APPROVAL)
 
+    def set_status_draft(self):
+        self.set_status(self.DRAFT)
+
     def set_status_done(self):
         self.set_status(self.DONE)
 
