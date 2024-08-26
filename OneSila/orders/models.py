@@ -6,7 +6,7 @@ from .managers import OrderItemManager, OrderManager
 from .documents import PrintOrder
 
 
-class Order(models.Model):
+class Order(models.SetStatusMixin, models.Model):
     DRAFT = 'DRAFT'
     PENDING_PROCESSING = 'PENDING_PROCESSING'  # Set by scripts after draft. It means 'ready to do whatever you need to do before shipping'
     PENDING_SHIPPING_APPROVAL = "PENDING_SHIPPING_APPROVAL"  # Choices should be: to-ship or await-inventory
@@ -19,7 +19,7 @@ class Order(models.Model):
     UNPROCESSED = [PENDING_PROCESSING]
     DONE_TYPES = [SHIPPED, CANCELLED, HOLD]
     HELD = [HOLD, PENDING_SHIPPING_APPROVAL, AWAIT_INVENTORY]
-    RESERVE_STOCK_TYPES = [PENDING_PROCESSING, HOLD, PENDING_SHIPPING_APPROVAL, AWAIT_INVENTORY]
+    RESERVE_STOCK_TYPES = [PENDING_PROCESSING, HOLD, PENDING_SHIPPING_APPROVAL, TO_SHIP, AWAIT_INVENTORY]
 
     STATUS_CHOICES = (
         (DRAFT, _('Draft')),
@@ -114,18 +114,14 @@ class Order(models.Model):
         else:
             return self.total_value
 
-    def set_status(self, status):
-        self.status = status
-        self.save()
-
-    def set_status_processing(self):
-        self.set_status(self.PENDING_PROCESSING)
-
     def set_status_pending_processing(self):
         self.set_status(self.PENDING_PROCESSING)
 
     def set_status_pending_shipping_approval(self):
         self.set_status(self.PENDING_SHIPPING_APPROVAL)
+
+    def set_status_draft(self):
+        self.set_status(self.DRAFT)
 
     def set_status_done(self):
         self.set_status(self.DONE)

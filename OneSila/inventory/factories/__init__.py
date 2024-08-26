@@ -1,1 +1,1 @@
-from .inventory_update_triggers import InventoryUpdateTriggerFactory
+from .inventory_update_triggers import InventoryChangeProductUpdateTriggerFactory

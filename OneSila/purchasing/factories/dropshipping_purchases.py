@@ -24,7 +24,7 @@ class BuyDropShippingProductsFactory:
         self.reference = f"POD-{supplier.id}-{self.order.reference}"
 
     def get_invoice_address(self):
-        internal_company = InternalCompany.objects.get(multi_tenant_company=self.multi_tenant_company)
+        internal_company = InternalCompany.objects.filter(multi_tenant_company=self.multi_tenant_company).first()
         return internal_company.address_set.get(is_invoice_address=True)
 
     def _set_dropshipping_orderitems(self):
@@ -40,7 +40,13 @@ class BuyDropShippingProductsFactory:
             # We can have multiple suppliers for a given purchased product.
             # For the qty needed, we'll just take the cheapest one.
             supplierprice = SupplierPrices.objects.find_cheapest(all_supplierproducts, orderitem.quantity)
-            supplierproduct = supplierprice.supplier_product
+
+            try:
+                supplierproduct = supplierprice.supplier_product
+            except AttributeError:
+                # no supplierprice
+                supplierproduct = all_supplierproducts.first()
+
             supplier = supplierproduct.supplier
 
             # Based on the info we gathered, build our purchase-orders.
@@ -62,11 +68,16 @@ class BuyDropShippingProductsFactory:
                 self.purchaseorders_for_supplier[supplier] = purchase_order
                 logger.debug(f"Create PO {purchase_order}")
 
+            try:
+                unit_price = supplierprice.unit_price
+            except AttributeError:
+                unit_price = None
+
             po_item, _ = purchase_order.purchaseorderitem_set.get_or_create(
                 multi_tenant_company=self.multi_tenant_company,
                 product=supplierproduct,
                 quantity=orderitem.quantity,
-                unit_price=supplierprice.unit_price,
+                unit_price=unit_price,
                 orderitem=orderitem)
             logger.debug(f"Create {po_item=} for po {purchase_order} with product {orderitem.product}")
 

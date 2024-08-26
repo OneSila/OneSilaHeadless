@@ -118,7 +118,7 @@ class PurchaseOrderItem(models.Model):
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE)
     product = models.ForeignKey(SupplierProduct, on_delete=models.PROTECT)
     quantity = models.IntegerField()
-    unit_price = models.FloatField()
+    unit_price = models.FloatField(null=True)
     orderitem = models.ForeignKey('orders.OrderItem', null=True, blank=True,
         on_delete=models.CASCADE)
 

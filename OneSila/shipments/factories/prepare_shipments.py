@@ -5,10 +5,33 @@ from contacts.models import ShippingAddress
 from shipments.models import Shipment, ShipmentItemToShip, ShipmentItem
 from inventory.models import InventoryLocation
 from shipments.exceptions import NoShippingAddressError, NotEnoughStockError
+from products.models import Product
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class ShipmentCompletedFactory:
+    """When packages are shipped, we need to verify if the
+    complete shipment is done and mark it as completed"""
+
+    def __init__(self, shipment):
+        self.shipment = shipment
+
+    def set_all_packages_dispatched(self):
+        self.all_packages_dispatched = all([i.is_dispatched() for i in self.shipment.package_set.all()])
+
+    def mark_shipment_done(self):
+        if self.all_packages_dispatched:
+            logger.debug(f"About to mark {self.shipment} as done.")
+            self.shipment.set_status_done()
+        else:
+            logger.debug(f"Cannot {self.shipment} as done, not all packages are dispatched")
+
+    def run(self):
+        self.set_all_packages_dispatched()
+        self.mark_shipment_done()
 
 
 class ShipOrderSanityCheckMixin:
@@ -60,10 +83,13 @@ class ShipmentForOrderItemFactory(ShipOrderSanityCheckMixin):
             self.quantity_toship = self.product.inventory.physical()
 
     def create_shipment_item(self):
+        # The shipmentitem uses a M2M relation to ensure we can see
+        # which shipments the orderitem connected is attached to.
         self.shipmentitem = ShipmentItem.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             quantity=self.quantity_toship,
             orderitem=self.orderitem,
+            product=self.product,
         )
 
         for shipment in self.shipments:
@@ -196,7 +222,7 @@ class PrepareShipmentsFactory(ShipOrderSanityCheckMixin):
     def __init__(self, order):
         self.multi_tenant_company = order.multi_tenant_company
         self.order = order
-        self.orderitems = order.orderitem_set.all()
+        self.orderitems = order.orderitem_set.exclude(product__type=Product.DROPSHIP)
         self.country = order.shipping_address.country
         self.shipments = []
         self.shipmentitems = []
