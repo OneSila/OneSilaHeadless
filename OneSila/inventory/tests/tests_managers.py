@@ -48,9 +48,7 @@ class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, 
         #   items should be removed from physical and reserved stock
 
         simple = SimpleProduct.objects.get(multi_tenant_company=self.multi_tenant_company,
-            sku=SIMPLE_PEN_SKU)
-        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
-        supplier.base_products.add(simple)
+            sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU)
 
         pre_order_physical = simple.inventory.physical()
         pre_order_reserved = simple.inventory.reserved()
@@ -67,6 +65,7 @@ class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, 
         # No need to take more action, the automated flows should just ship
         # these items without further action.
         order.set_status_pending_processing()
+        self.assertEqual(order.status, order.SHIPPED)
         self.pack_and_dispatch_all_items_in_order(order)
 
         self.assertEqual(simple.inventory.physical(), pre_order_physical - order_qty)
@@ -91,7 +90,7 @@ class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, 
 
         order_qty = 100
 
-        order = self.create_test_order('test_inventory_number', simple, order_qty)
+        order = self.create_test_order('test_oversold_inventory_number', simple, order_qty)
 
         self.assertEqual(simple.inventory.physical(), physical)
         self.assertEqual(simple.inventory.salable(), salable)
