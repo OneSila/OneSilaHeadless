@@ -1,7 +1,7 @@
 import strawberry
 from django.contrib.auth import get_user_model
 
-from core.schema.core.types.types import type, relay, auto, lazy, Annotated
+from core.schema.core.types.types import type, relay, auto, lazy, Annotated, field
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 
 from core.schema.multi_tenant.types.ordering import MultiTenantUserOrder
@@ -17,13 +17,25 @@ if TYPE_CHECKING:
     from core.schema.languages.types.types import LanguageType
 
 
-@type(MultiTenantUser, filters=MultiTenantUserOrder, order=MultiTenantUserFilter, pagination=True, fields='__all__')
+@type(MultiTenantUser, filters=MultiTenantUserFilter, order=MultiTenantUserOrder, pagination=True, fields=['multi_tenant_company', 'id', 'first_name', 'last_name', 'email', 'is_active'])
+class MinimalMultiTenantUserType(relay.Node, GetQuerysetMultiTenantMixin):
+    multi_tenant_company: Annotated['MultiTenantCompanyType', lazy("core.schema.multi_tenant.types.types")] | None
+
+    @field()
+    def full_name(self, info) -> str | None:
+        return self.full_name
+
+@type(MultiTenantUser, filters=MultiTenantUserFilter, order=MultiTenantUserOrder, pagination=True, fields='__all__')
 class MultiTenantUserType(relay.Node):
     avatar_resized: DjangoImageType | None
     avatar_resized_full_url: str | None
     language_detail: Annotated['LanguageType', lazy("core.schema.languages.types.types")]
     timezone_detail: TimezoneType
     multi_tenant_company: Annotated['MultiTenantCompanyType', lazy("core.schema.multi_tenant.types.types")] | None
+
+    @field()
+    def full_name(self, info) -> str | None:
+        return self.full_name
 
 
 @type(MultiTenantCompany, fields='__all__')
