@@ -4,7 +4,7 @@ from products.models import SimpleProduct, SupplierProduct, BundleProduct, \
     DropshipProduct, ManufacturableProduct, BundleVariation
 from .tests_models import InventoryTestCaseMixin
 from orders.tests.tests_factories.mixins import CreateTestOrderMixin
-from products.demo_data import SIMPLE_BLACK_FABRIC_PRODUCT_SKU
+from products.demo_data import SIMPLE_BLACK_FABRIC_PRODUCT_SKU, SIMPLE_PEN_SKU
 from shipments.flows import prepare_shipments_flow, pre_approve_shipping_flow
 
 
@@ -48,7 +48,7 @@ class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, 
         #   items should be removed from physical and reserved stock
 
         simple = SimpleProduct.objects.get(multi_tenant_company=self.multi_tenant_company,
-            sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU)
+            sku=SIMPLE_PEN_SKU)
         supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
         supplier.base_products.add(simple)
 
@@ -73,7 +73,7 @@ class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, 
         self.assertEqual(simple.inventory.reserved(), pre_order_reserved)
         self.assertEqual(simple.inventory.salable(), pre_order_salable - order_qty)
 
-    def test_inventory_number_oversold(self):
+    def test_oversold_inventory_number(self):
         # We start with a simple product with one supplier product and 10 items on stock
         # 1) We sell 1 - but leave the order on draft.
         #   So we should have 10 physically on stock, 0 reserved and 10 salable.
@@ -98,6 +98,7 @@ class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, 
         self.assertEqual(simple.inventory.reserved(), reserved)
 
         order.set_status_pending_processing()
+        self.assertEqual(order.status, order.PENDING_SHIPPING_APPROVAL)
 
         self.assertEqual(simple.inventory.physical(), physical)
         self.assertEqual(simple.inventory.reserved(), reserved + order_qty)
