@@ -18,6 +18,8 @@ class SearchFilterMixin:
 
     @filter_field()
     def search(self, queryset: QuerySet, value: str, prefix: str) -> tuple:
+        # Docs: https://strawberry.rocks/docs/django/guide/filters
+
         # FIXME: Looks like "search" needs and async version called asearch as well.
         return queryset.search(value)
         # return queryset, Q(**{"_fullname": value})
