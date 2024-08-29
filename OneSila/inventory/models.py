@@ -2,6 +2,45 @@ from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from core import models
 from .managers import InventoryManager, InventoryLocationManager
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
+
+
+class InventoryMovement(models.Model):
+    """
+    Represents an inventory movement record, capable of dynamically referencing different types of sources and destinations.
+    """
+    # Source of inventory movement (e.g., from a warehouse, a purchase order or return)
+    mf_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='inventory_movements_from')
+    mf_object_id = models.PositiveIntegerField()
+    movement_from = GenericForeignKey("mf_content_type", "mf_object_id")
+
+    # Destination of inventory movement (e.g., to a sales order, another warehouse)
+    mt_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='inventory_movements_to')
+    mt_object_id = models.PositiveIntegerField()
+    movement_to = GenericForeignKey("mt_content_type", "mt_object_id")
+
+    quantity = models.IntegerField()
+    multi_tenant_user = models.ForeignKey('core.MultiTenantUser', on_delete=models.PROTECT)
+    notes = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.quantity} from {self.movement_from} to {self.movement_to}"
+
+    def save(self, *args, **kwargs):
+        # FIXME: Verify if the movement_from is either a PO, Return or InventoryLocation
+        # Verify as well if the movement_to is a Package or InventoryLocation
+        super().save(*args, **kwargs)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['mf_content_type', 'mf_object_id']),
+            models.Index(fields=['mt_content_type', 'mt_object_id']),
+            models.Index(fields=['quantity']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['mf_content_type', 'mf_object_id', 'mt_content_type', 'mt_object_id']),
+        ]
+        # ordering = ['-created_at']  # Default ordering by creation date, descending
 
 
 class Inventory(models.Model):
