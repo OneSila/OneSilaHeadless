@@ -3,7 +3,7 @@ from orders.models import Order
 from core.receivers import post_save, receiver
 from core.signals import post_create
 from orders.signals import pending_processing
-from inventory.signals import inventory_change
+from inventory.signals import inventory_change, inventory_received
 from shipments.flows import inventory_change_trigger_flow
 from shipments.signals import draft, todo, in_progress, \
     done, cancelled, new, packed, dispatched
@@ -77,10 +77,13 @@ def shipments__package__signals(sender, instance, **kwargs):
         signal.send(sender=instance.__class__, instance=instance)
 
 
-@receiver(post_save, sender=PackageItem)
-def shipment__packageitem__reduce(sender, instance, **kwargs):
+@receiver(inventory_received, sender=Package)
+def shipments__package__inventory_received(sender, instance, quantity_received, movement_from, **kwargs):
     from shipments.flows import packageitem_inventory_move_flow
-    packageitem_inventory_move_flow(instance)
+    packageitem_inventory_move_flow(
+        package=instance,
+        quantity_received=quantity_received,
+        movement_from=movement_from)
 
 
 @receiver(dispatched, sender=Package)

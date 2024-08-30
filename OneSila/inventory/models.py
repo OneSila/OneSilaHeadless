@@ -9,6 +9,7 @@ from purchasing.models import PurchaseOrder
 # FIXME: Add once returns are merged into the main branch.
 # from order_returns import OrderReturn
 from orders.models import Order
+from shipments.models import Package
 
 from .signals import inventory_received, inventory_sent
 
@@ -77,11 +78,11 @@ class InventoryMovement(models.Model):
     """
     MOVEMENT_FROM_MODELS = [
         PurchaseOrder,
-        InventoryLocation,
+        Inventory,
         # FIXME: Add once returns are merged into the main branch.
         # OrderReturn
     ]
-    MOVEMENT_TO_MODELS = [InventoryLocation, Order]
+    MOVEMENT_TO_MODELS = [Inventory, Package]
 
     # Source of inventory movement (e.g., from a warehouse, a purchase order or return)
     mf_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='inventory_movements_from')
@@ -94,18 +95,19 @@ class InventoryMovement(models.Model):
     movement_to = GenericForeignKey("mt_content_type", "mt_object_id")
 
     quantity = models.IntegerField()
-    multi_tenant_user = models.ForeignKey('core.MultiTenantUser', on_delete=models.PROTECT)
     notes = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.quantity} from {self.movement_from} to {self.movement_to}"
 
     def save(self, *args, **kwargs):
-        if not self.mf_content_type.model_class() in self.MOVEMENT_FROM_MODELS:
-            raise IntegrityError(f"You can only receive inventory from {MOVEMENT_FROM_MODELS}")
+        mf_class = self.mf_content_type.model_class()
+        if not mf_class in self.MOVEMENT_FROM_MODELS:
+            raise IntegrityError(f"You can only receive inventory from {self.MOVEMENT_FROM_MODELS}, not {mf_class}")
 
-        if not self.mt_content_type.model_class() in self.MOVEMENT_TO_MODELS:
-            raise IntegrityError(f"You can only receive inventory from {MOVEMENT_TO_MODELS}")
+        mt_class = self.mt_content_type.model_class()
+        if not mt_class in self.MOVEMENT_TO_MODELS:
+            raise IntegrityError(f"You can only receive inventory from {self.MOVEMENT_TO_MODELS} not {mt_class}")
 
         super().save(*args, **kwargs)
 

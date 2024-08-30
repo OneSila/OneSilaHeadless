@@ -6,6 +6,7 @@ from .tests_models import InventoryTestCaseMixin
 from orders.tests.tests_factories.mixins import CreateTestOrderMixin
 from products.demo_data import SIMPLE_BLACK_FABRIC_PRODUCT_SKU, SIMPLE_PEN_SKU
 from shipments.flows import prepare_shipments_flow, pre_approve_shipping_flow
+from inventory.models import InventoryMovement
 
 
 class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, InventoryTestCaseMixin, TestCase):
@@ -23,11 +24,17 @@ class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, 
 
                 pre_physical = item.product.inventory.physical()
 
-                package_item = package.packageitem_set.create(
+                InventoryMovement.objects.create(
                     multi_tenant_company=self.multi_tenant_company,
-                    product=item.product,
-                    inventory=physical_inventory.first(),
-                    quantity=item.quantity)
+                    movement_from=physical_inventory.first(),
+                    movement_to=package,
+                    quantity=item.quantity
+                )
+                # package_item = package.packageitem_set.create(
+                #     multi_tenant_company=self.multi_tenant_company,
+                #     product=item.product,
+                #     inventory=physical_inventory.first(),
+                #     quantity=item.quantity)
 
                 post_physical = item.product.inventory.physical()
 

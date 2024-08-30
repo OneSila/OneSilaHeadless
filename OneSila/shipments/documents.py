@@ -1,6 +1,4 @@
 from core.documents import OneSilaBaseDocument
-from contacts.models import InvoiceAddress
-from inventory.models import InventoryLocation
 
 
 class PickingListDocumentPrinter(OneSilaBaseDocument):

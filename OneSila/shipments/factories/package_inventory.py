@@ -6,13 +6,21 @@ class PackageItemInventoryMoveFactory:
     """te package got an item. That means it is no longer on stock
     in the inventory location."""
 
-    def __init__(self, packageitem):
-        self.packageitem = packageitem
-        self.inventory = packageitem.inventory
+    def __init__(self, *, package, quantity_received, movement_from):
+        self.package = package
+        self.quantity_received = quantity_received
+        self.movement_from = movement_from
+        self.multi_tenant_company = package.multi_tenant_company
+        self.product = movement_from.product
+        self.inventory = movement_from
 
-    def reduce_inventory(self):
-        reduce_with = self.packageitem.quantity
-        self.inventory.reduce_quantity(reduce_with)
+    def create_packageitem(self):
+        self.packageitem = self.package.packageitem_set.create(
+            multi_tenant_company=self.multi_tenant_company,
+            quantity=self.quantity_received,
+            inventory=self.inventory,
+            product=self.product,
+        )
 
     def run(self):
-        self.reduce_inventory()
+        self.create_packageitem()
