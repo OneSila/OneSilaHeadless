@@ -3,14 +3,14 @@ from orders.models import Order
 from core.receivers import post_save, receiver
 from core.signals import post_create
 from orders.signals import pending_processing
-from inventory.signals import product_inventory_change
+from inventory.signals import inventory_change
 from shipments.flows import inventory_change_trigger_flow
 from shipments.signals import draft, todo, in_progress, \
     done, cancelled, new, packed, dispatched
 from shipments.models import Shipment, Package, PackageItem
 
 
-@receiver(product_inventory_change, sender='products.Product')
+@receiver(inventory_change, sender='products.Product')
 def orders__product__inventory_change__shipping_retrigger(sender, instance, **kwargs):
     """
     Check to see if some orders need the shipping_status retriggered.

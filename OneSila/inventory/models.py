@@ -5,42 +5,12 @@ from .managers import InventoryManager, InventoryLocationManager
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
+from purchasing.models import PurchaseOrder
+# FIXME: Add once returns are merged into the main branch.
+# from order_returns import OrderReturn
+from orders.models import Order
 
-class InventoryMovement(models.Model):
-    """
-    Represents an inventory movement record, capable of dynamically referencing different types of sources and destinations.
-    """
-    # Source of inventory movement (e.g., from a warehouse, a purchase order or return)
-    mf_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='inventory_movements_from')
-    mf_object_id = models.PositiveIntegerField()
-    movement_from = GenericForeignKey("mf_content_type", "mf_object_id")
-
-    # Destination of inventory movement (e.g., to a sales order, another warehouse)
-    mt_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='inventory_movements_to')
-    mt_object_id = models.PositiveIntegerField()
-    movement_to = GenericForeignKey("mt_content_type", "mt_object_id")
-
-    quantity = models.IntegerField()
-    multi_tenant_user = models.ForeignKey('core.MultiTenantUser', on_delete=models.PROTECT)
-    notes = models.TextField(null=True, blank=True)
-
-    def __str__(self):
-        return f"{self.quantity} from {self.movement_from} to {self.movement_to}"
-
-    def save(self, *args, **kwargs):
-        # FIXME: Verify if the movement_from is either a PO, Return or InventoryLocation
-        # Verify as well if the movement_to is a Package or InventoryLocation
-        super().save(*args, **kwargs)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=['mf_content_type', 'mf_object_id']),
-            models.Index(fields=['mt_content_type', 'mt_object_id']),
-            models.Index(fields=['quantity']),
-            models.Index(fields=['created_at']),
-            models.Index(fields=['mf_content_type', 'mf_object_id', 'mt_content_type', 'mt_object_id']),
-        ]
-        # ordering = ['-created_at']  # Default ordering by creation date, descending
+from .signals import inventory_received, inventory_sent
 
 
 class Inventory(models.Model):
@@ -99,3 +69,63 @@ class InventoryLocation(models.Model):
     class Meta:
         search_terms = ['name']
         unique_together = ("name", "multi_tenant_company")
+
+
+class InventoryMovement(models.Model):
+    """
+    Represents an inventory movement record, capable of dynamically referencing different types of sources and destinations.
+    """
+    MOVEMENT_FROM_MODELS = [
+        PurchaseOrder,
+        InventoryLocation,
+        # FIXME: Add once returns are merged into the main branch.
+        # OrderReturn
+    ]
+    MOVEMENT_TO_MODELS = [InventoryLocation, Order]
+
+    # Source of inventory movement (e.g., from a warehouse, a purchase order or return)
+    mf_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='inventory_movements_from')
+    mf_object_id = models.PositiveIntegerField()
+    movement_from = GenericForeignKey("mf_content_type", "mf_object_id")
+
+    # Destination of inventory movement (e.g., to a sales order, another warehouse)
+    mt_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='inventory_movements_to')
+    mt_object_id = models.PositiveIntegerField()
+    movement_to = GenericForeignKey("mt_content_type", "mt_object_id")
+
+    quantity = models.IntegerField()
+    multi_tenant_user = models.ForeignKey('core.MultiTenantUser', on_delete=models.PROTECT)
+    notes = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.quantity} from {self.movement_from} to {self.movement_to}"
+
+    def save(self, *args, **kwargs):
+        if not self.mf_content_type.model_class() in self.MOVEMENT_FROM_MODELS:
+            raise IntegrityError(f"You can only receive inventory from {MOVEMENT_FROM_MODELS}")
+
+        if not self.mt_content_type.model_class() in self.MOVEMENT_TO_MODELS:
+            raise IntegrityError(f"You can only receive inventory from {MOVEMENT_TO_MODELS}")
+
+        super().save(*args, **kwargs)
+
+        # Share the update through OneSila so other apps can
+        # take action where needed.
+        inventory_received.send(
+            sender=self.movement_to.__class__,
+            instance=self.movement_to,
+            quantity_received=self.quantity,
+            movement_from=self.movement_from)
+        inventory_sent.send(
+            sender=self.movement_from.__class__,
+            instance=self.movement_from,
+            quantity_sent=self.quantity,
+            movement_to=self.movement_to)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['mf_content_type', 'mf_object_id']),
+            models.Index(fields=['mt_content_type', 'mt_object_id']),
+            models.Index(fields=['mf_content_type', 'mf_object_id', 'mt_content_type', 'mt_object_id']),
+        ]
+        # ordering = ['-created_at']  # Default ordering by creation date, descending
