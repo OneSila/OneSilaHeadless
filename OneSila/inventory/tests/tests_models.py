@@ -1,7 +1,7 @@
 from contacts.models import Supplier, ShippingAddress
 from core.tests import TestCase, TestCaseDemoDataMixin
 from django.db import IntegrityError
-from inventory.models import Inventory, InventoryLocation
+from inventory.models import Inventory, InventoryLocation, InventoryMovement
 from products.models import SupplierProduct, ConfigurableProduct, Product, \
     SimpleProduct, BundleProduct, DropshipProduct, ManufacturableProduct
 from products.demo_data import SIMPLE_BLACK_FABRIC_NAME
@@ -16,9 +16,39 @@ class InventoryTestCaseMixin:
             shippingaddress=self.shipping_address,
             name='InventoryTestCase',
             multi_tenant_company=self.multi_tenant_company)
+        self.inventory_location_bis, _ = InventoryLocation.objects.get_or_create(
+            shippingaddress=self.shipping_address,
+            name='InventoryTestCaseBis',
+            multi_tenant_company=self.multi_tenant_company)
 
 
 class InventoryTestCase(TestCaseDemoDataMixin, InventoryTestCaseMixin, TestCase):
+    def test_inventory_to_inventory_movement(self):
+        prod = ManufacturableProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company)
+        quantity = 10
+        inv = Inventory.objects.create(product=prod,
+                inventorylocation=self.inventory_location,
+                multi_tenant_company=self.multi_tenant_company,
+                quantity=quantity)
+        inv_qty_ori = inv.quantity
+
+        inv_bis = Inventory.objects.create(product=prod,
+                inventorylocation=self.inventory_location_bis,
+                multi_tenant_company=self.multi_tenant_company,
+                quantity=0)
+        inv_qty_bis_ori = inv_bis.quantity
+
+        movement = InventoryMovement.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            movement_from=inv,
+            movement_to=inv_bis,
+            quantity=quantity,
+            product=prod)
+
+        self.assertEqual(inv_qty_ori - quantity, inv.quantity)
+        self.assertEqual(inv_qty_bis_ori + quantity, inv_bis.quantity)
+
     def test_inventory_on_configurable_product(self):
         prod = ConfigurableProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company)
