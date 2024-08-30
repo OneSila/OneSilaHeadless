@@ -28,7 +28,8 @@ class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, 
                     multi_tenant_company=self.multi_tenant_company,
                     movement_from=physical_inventory.first(),
                     movement_to=package,
-                    quantity=item.quantity
+                    quantity=item.quantity,
+                    product=item.product,
                 )
                 # package_item = package.packageitem_set.create(
                 #     multi_tenant_company=self.multi_tenant_company,

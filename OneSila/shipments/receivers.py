@@ -78,12 +78,13 @@ def shipments__package__signals(sender, instance, **kwargs):
 
 
 @receiver(inventory_received, sender=Package)
-def shipments__package__inventory_received(sender, instance, quantity_received, movement_from, **kwargs):
+def shipments__package__inventory_received(sender, instance, product, quantity_received, movement_from, **kwargs):
     from shipments.flows import packageitem_inventory_move_flow
     packageitem_inventory_move_flow(
         package=instance,
         quantity_received=quantity_received,
-        movement_from=movement_from)
+        movement_from=movement_from,
+        product=product)
 
 
 @receiver(dispatched, sender=Package)
