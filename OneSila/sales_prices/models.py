@@ -149,7 +149,7 @@ class SalesPriceList(models.Model):
 
     class Meta:
         search_terms = ['name']
-        ordering = ['id']
+        ordering = ['-id']
 
 
 class SalesPriceListItem(models.Model):
