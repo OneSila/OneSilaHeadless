@@ -35,6 +35,10 @@ class Inventory(models.Model):
         self.quantity -= quantity
         self.save()
 
+    def increase_quantity(self, quantity):
+        self.quantity += quantity
+        self.save()
+
     def __str__(self):
         return '{}: {}@{}'.format(self.product, self.inventorylocation, self.quantity)
 
@@ -94,6 +98,7 @@ class InventoryMovement(models.Model):
     mt_object_id = models.PositiveIntegerField()
     movement_to = GenericForeignKey("mt_content_type", "mt_object_id")
 
+    product = models.ForeignKey('products.Product', on_delete=models.PROTECT)
     quantity = models.IntegerField()
     notes = models.TextField(null=True, blank=True)
 
@@ -116,11 +121,13 @@ class InventoryMovement(models.Model):
         inventory_received.send(
             sender=self.movement_to.__class__,
             instance=self.movement_to,
+            product=self.product,
             quantity_received=self.quantity,
             movement_from=self.movement_from)
         inventory_sent.send(
             sender=self.movement_from.__class__,
             instance=self.movement_from,
+            product=self.product,
             quantity_sent=self.quantity,
             movement_to=self.movement_to)
 

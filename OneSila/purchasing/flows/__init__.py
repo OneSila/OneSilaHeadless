@@ -1,1 +1,2 @@
 from .dropshipping_purchases import buy_dropshippingproducts_flow
+from .inventory_movements import purchaseorder_inventory_received

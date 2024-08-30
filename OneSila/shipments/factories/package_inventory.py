@@ -6,12 +6,12 @@ class PackageItemInventoryMoveFactory:
     """te package got an item. That means it is no longer on stock
     in the inventory location."""
 
-    def __init__(self, *, package, quantity_received, movement_from):
+    def __init__(self, *, package, product, quantity_received, movement_from):
         self.package = package
         self.quantity_received = quantity_received
         self.movement_from = movement_from
         self.multi_tenant_company = package.multi_tenant_company
-        self.product = movement_from.product
+        self.product = product
         self.inventory = movement_from
 
     def create_packageitem(self):
