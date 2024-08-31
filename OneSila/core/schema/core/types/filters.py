@@ -7,22 +7,30 @@ from strawberry import LazyType as lazy
 from core.managers import QuerySet
 
 
+# class SearchFilterMixin:
+#     search: str | None
+
+#     # def filter_search(self, queryset) -> str | None:
+#     #     if self.search not in (None, UNSET):
+#     #         queryset = queryset.search(self.search)
+
+#     #     return queryset
+
+#     @filter_field()
+#     def search(self, queryset: QuerySet, value: str, prefix: str) -> tuple:
+#         # Docs: https://strawberry.rocks/docs/django/guide/filters
+#         # FIXME: New style filter Not working.....
+#         return queryset.search(value)
+
+
 class SearchFilterMixin:
     search: str | None
 
-    # def filter_search(self, queryset) -> str | None:
-    #     if self.search not in (None, UNSET):
-    #         queryset = queryset.search(self.search)
+    def filter_search(self, queryset) -> str | None:
+        if self.search not in (None, UNSET):
+            queryset = queryset.search(self.search)
 
-    #     return queryset
-
-    @filter_field()
-    def search(self, queryset: QuerySet, value: str, prefix: str) -> tuple:
-        # Docs: https://strawberry.rocks/docs/django/guide/filters
-
-        # FIXME: Looks like "search" needs and async version called asearch as well.
-        return queryset.search(value)
-        # return queryset, Q(**{"_fullname": value})
+        return queryset
 
 
 class ExcluideDemoDataFilterMixin:
