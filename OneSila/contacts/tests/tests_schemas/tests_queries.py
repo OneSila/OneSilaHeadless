@@ -16,22 +16,10 @@ class AddressTestCase(TestCaseWithDemoData, TransactionTestCaseMixin, Transactio
         self.addresses = Address.objects.filter(multi_tenant_company=self.user.multi_tenant_company)
 
     def test_addresses(self):
-        query = """
-            query addresses {
-              addresses {
-                edges {
-                  node {
-                    id
-                    fullAddress
-                  }
-                }
-                totalCount
-              }
-            }
-        """
+        from .queries import ADDRESS_QUERY
 
         resp = self.strawberry_test_client(
-            query=query,
+            query=ADDRESS_QUERY,
         )
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
@@ -46,21 +34,10 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         self.companies = baker.make(Company, multi_tenant_company=self.user.multi_tenant_company, _quantity=3)
 
     def test_companies(self):
-        query = """
-            query companies {
-              companies {
-                edges {
-                  node {
-                    id
-                  }
-                }
-                totalCount
-              }
-            }
-        """
+        from .queries import COMPANIES_QUERY
 
         resp = self.strawberry_test_client(
-            query=query,
+            query=COMPANIES_QUERY,
         )
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
@@ -68,20 +45,23 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         total_count = resp.data['companies']['totalCount']
         self.assertEqual(total_count, len(self.companies))
 
-    def test_company(self):
-        query = """
-            query company($id: GlobalID!) {
-                company(id: $id) {
-                    id
-                    name
-                    __typename
-                }
+    def test_company_list_filter_frontend_page(self):
+        from .queries import COMPANY_LIST_FILTER_FRONTEND
+        query_filter = {"isInternalCompany": False}
+        resp = self.strawberry_test_client(
+            query=COMPANY_LIST_FILTER_FRONTEND,
+            variables={
+                'filter': query_filter,
             }
-        """
+        )
+        self.assertTrue(resp.errors is None)
+
+    def test_company(self):
+        from .queries import COMPANY_GET_QUERY
         company = self.companies[0]
         company_global_id = self.to_global_id(instance=company)
         resp = self.strawberry_test_client(
-            query=query,
+            query=COMPANY_GET_QUERY,
             variables={"id": company_global_id}
         )
         resp_company_name = resp.data['company']['name']
