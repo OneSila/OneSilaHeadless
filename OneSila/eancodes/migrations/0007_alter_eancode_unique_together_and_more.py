@@ -18,12 +18,10 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='eancode',
-            constraint=models.UniqueConstraint(condition=models.Q(('ean_code__isnull', False)), fields=(
-                'multi_tenant_company', 'ean_code'), name='unique_ean_code_per_tenant', violation_error_message='Ean code already exists'),
+            constraint=models.UniqueConstraint(condition=models.Q(('ean_code__isnull', False)), fields=('multi_tenant_company', 'ean_code'), name='unique_ean_code_per_tenant', violation_error_message='Ean code already exists'),
         ),
         migrations.AddConstraint(
             model_name='eancode',
-            constraint=models.CheckConstraint(check=models.Q(('ean_code__isnull', False), ('product__isnull', False),
-                                              ('inherit_to__isnull', False), _connector='OR'), name='ean_code_or_product_to_not_null'),
+            constraint=models.CheckConstraint(check=models.Q(('ean_code__isnull', False), ('product__isnull', False), ('inherit_to__isnull', False), _connector='OR'), name='ean_code_or_product_to_not_null'),
         ),
     ]

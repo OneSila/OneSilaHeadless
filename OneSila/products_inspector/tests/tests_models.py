@@ -20,7 +20,8 @@ from sales_prices.models import SalesPrice, SalesPriceList, SalesPriceListItem
 from units.models import Unit
 
 
-class InspectorBlockHasImageTestCase(TestCase):
+class InspectorBlockHasImageTest(TestCase):
+
     def test_inspector_block_for_has_images(self):
         # Step 1: Create a configurable product (ConfigurableProduct)
         product = ConfigurableProduct.objects.create(
@@ -55,7 +56,7 @@ class InspectorBlockHasImageTestCase(TestCase):
         self.assertTrue(inspector_block.successfully_checked)
 
 
-class InspectorBlockMissingPricesTestCase(TestCase):
+class InspectorBlockMissingPricesTest(TestCase):
 
     def test_inspector_block_for_active_change(self):
         # Step 1: Create a required product (e.g., SimpleProduct)
@@ -136,7 +137,6 @@ class InspectorBlockMissingPricesTestCase(TestCase):
 
         # Step 8: Recheck the inspector block's successfully_checked field - it should now be False (since price is missing again)
         self.assertFalse(inspector_block.successfully_checked)
-
 
 class InspectorBlockInactivePiecesTest(TestCase):
 
@@ -749,15 +749,15 @@ class InspectorBlockMissingProductTypeTest(TestCase):
         )
 
         self.product_type_value = PropertySelectValue.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            property=self.product_tye,
-        )
+                multi_tenant_company=self.multi_tenant_company,
+                property=self.product_tye,
+            )
 
         self.product_type_value_translation = PropertySelectValueTranslation.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            propertyselectvalue=self.product_type_value,
-            value='Chair',
-        )
+                multi_tenant_company=self.multi_tenant_company,
+                propertyselectvalue=self.product_type_value,
+                value='Chair',
+            )
 
         self.product_property = ProductProperty.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -864,6 +864,7 @@ class InspectorBlockMissingPropertiesTest(TestCase):
             property=self.size_property,
             type=ProductPropertiesRuleItem.OPTIONAL
         )
+
 
         # Step 6: Assign product type to the product after the rule is created (for now)
         self.product_property = ProductProperty.objects.create(
@@ -1015,7 +1016,7 @@ class InspectorBlockMissingStockTest(TestCase):
         self.supplier = Supplier.objects.create(name="Supplier Company", multi_tenant_company=self.multi_tenant_company)
         self.shipping_address = ShippingAddress.objects.create(multi_tenant_company=self.multi_tenant_company, company=self.supplier)
         self.inventory_location, _ = InventoryLocation.objects.get_or_create(
-            shippingaddress=self.shipping_address,
+            shippingaddress= self.shipping_address,
             name='InventoryTestCase',
             multi_tenant_company=self.multi_tenant_company)
 
@@ -1142,7 +1143,6 @@ class InspectorBlockMissingLeadTimeTest(TestCase):
         inspector_block.refresh_from_db()
         self.assertTrue(inspector_block.successfully_checked)
 
-
 class InspectorBlockMissingManualPriceListOverrideTest(TestCase):
 
     def setUp(self):
@@ -1156,6 +1156,7 @@ class InspectorBlockMissingManualPriceListOverrideTest(TestCase):
         )
 
         self.currency = Currency.objects.create(is_default_currency=True, multi_tenant_company=self.multi_tenant_company, **currencies['BE'])
+
 
         # Set up a SalesPriceList
         self.sales_price_list = SalesPriceList.objects.create(
@@ -1334,7 +1335,6 @@ class InspectorBlockProductTypeMismatchTest(TestCase):
         future_broken.delete()
         inspector_block.refresh_from_db()
         self.assertTrue(inspector_block.successfully_checked)
-
     def test_items_mismatch_product_type(self):
         # Assign product type to bundle product
         ProductProperty.objects.create(
@@ -1436,7 +1436,6 @@ class InspectorBlockProductTypeMismatchTest(TestCase):
         future_broken.delete()
         inspector_block.refresh_from_db()
         self.assertTrue(inspector_block.successfully_checked)
-
 
 class InspectorBlockMissingMandatoryInformationTest(TestCase):
 

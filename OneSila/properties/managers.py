@@ -21,7 +21,7 @@ class PropertyQuerySet(MultiTenantQuerySet):
         internal_name = slugify(name).replace('-', '_')
 
         property_instance = self.create(
-            type='SELECT',  # we are using the text instead the constant because it created issues in the migration command
+            type='SELECT', # we are using the text instead the constant because it created issues in the migration command
             is_public_information=True,
             is_product_type=True,
             internal_name=internal_name,
@@ -40,7 +40,6 @@ class PropertyQuerySet(MultiTenantQuerySet):
         if self.filter(is_product_type=True).exists():
             raise ValidationError(_("You cannot delete a Property with is_product_type=True."))
         super().delete(*args, **kwargs)
-
 
 class PropertyManager(MultiTenantManager):
     def get_queryset(self):
@@ -96,6 +95,7 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
         from .signals import product_properties_rule_updated
         from strawberry_django.mutations.types import ParsedObject
 
+
         with transaction.atomic():
             final_ids = []
 
@@ -136,7 +136,6 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
             product_properties_rule_updated.send(sender=rule.__class__, instance=rule)
 
             return rule
-
 
 class ProductPropertiesRuleManager(MultiTenantManager):
     def get_queryset(self):

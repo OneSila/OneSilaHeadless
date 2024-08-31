@@ -18,7 +18,6 @@ class EanCodePartialInput(NodeInput):
 class GenerateEancodesInput:
     prefix: str
 
-
 @strawberry_input
 class AssignEancodeInput:
     product: ProductPartialInput

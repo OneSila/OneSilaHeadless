@@ -25,21 +25,17 @@ shortuuid
 pytz
 hypercorn
 Faker
-reportlab>=4.2.2
 faker-commerce
 sentry-sdk[django]
-tblib
 
 # version stuck to 0.32.1, filters need upgrading before increasing version number
 # also pin the stawberry-graphql version.  Pip doesnt seem to manage to install the right version
 # which causes instability on freshly deployed systems like the auto testing in github.
 # To find the right version, go to the strawberry-graphql-django repo and inpect the peotry.lock file
-# strawberry-graphql==0.219.1
-# strawberry-graphql-django==0.32.1
-strawberry-graphql==0.237.3
-strawberry-graphql-django==0.47.1
-
+strawberry-graphql==0.219.1
+strawberry-graphql-django==0.32.1
 django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absolute_url.git@master
+
 
 # Starlette is used for it CORSMiddleware as referenced
 # in channels issue https://github.com/django/channels/issues/1247

@@ -2,16 +2,23 @@ from core.demo_data import DemoDataLibrary, fake, PrivateDataGenerator, PublicDa
 from units.models import Unit
 
 
-UNIT_METER = 'm'
-UNIT_PIECE = 'p'
-
 registry = DemoDataLibrary()
 
 
-@registry.register_private_app
-def populate_units(multi_tenant_company):
-    instance, _ = Unit.objects.get_or_create(multi_tenant_company=multi_tenant_company, unit=UNIT_METER, name='Meter')
-    registry.create_demo_data_relation(instance)
+# FIXME: This provider doesnt supply the correct data.
+# @fake.add_provider
+# class UnitProvider(BaseProvider):
+#     def unit(self) -> str:
+#         return 'piece'
 
-    instance, _ = Unit.objects.get_or_create(multi_tenant_company=multi_tenant_company, unit=UNIT_PIECE, name='Piece')
-    registry.create_demo_data_relation(instance)
+
+# class UnitGenerator(PrivateDataGenerator):
+#     model = Unit
+#     count = 1
+#     field_mapper = {
+#         'name': fake.unit,
+#         'unit': fake.unit,
+#     }
+
+
+# registry.register_private_app(UnitGenerator)

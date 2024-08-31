@@ -27,9 +27,9 @@ class Inspector(models.Model):
     def __str__(self):
         return f"Inspector for {self.product.sku}"
 
-
 class InspectorBlock(models.Model):
     from products_inspector.constants import ERROR_TYPES, MANDATORY_TYPE_CHOICES, NONE
+
 
     inspector = models.ForeignKey('Inspector', on_delete=models.CASCADE, related_name='blocks')
     # maybe in the full resync we will want to controll the order
@@ -73,7 +73,6 @@ class InspectorBlock(models.Model):
     def __str__(self):
         return f"{self.get_error_code_display()} for {self.inspector.product.sku} ({self.successfully_checked})"
 
-
 class InspectorBlockHasImages(InspectorBlock):
     from .constants import has_image_block
 
@@ -83,7 +82,6 @@ class InspectorBlockHasImages(InspectorBlock):
     class Meta:
         proxy = True
         verbose_name = _("Inspector Block Has Images")
-
 
 class InspectorBlockMissingPrices(InspectorBlock):
     from .constants import missing_prices_block
@@ -116,7 +114,6 @@ class InspectorBlockInactiveBundleItems(InspectorBlock):
     class Meta:
         proxy = True
         verbose_name = _("Inspector Block Inactive Bundle Items")
-
 
 class InspectorBlockMissingVariation(InspectorBlock):
     from .constants import missing_variation_block
@@ -183,7 +180,6 @@ class MissingProductTypeInspectorBlock(InspectorBlock):
         proxy = True
         verbose_name = _("Inspector Block Missing Product Type")
 
-
 class MissingRequiredPropertiesInspectorBlock(InspectorBlock):
     from .constants import missing_required_properties_block
 
@@ -193,7 +189,6 @@ class MissingRequiredPropertiesInspectorBlock(InspectorBlock):
     class Meta:
         proxy = True
         verbose_name = _("Inspector Block Missing Required Properties")
-
 
 class MissingOptionalPropertiesInspectorBlock(InspectorBlock):
     from .constants import missing_optional_properties_block
@@ -314,7 +309,6 @@ class BomMissingMandatoryInformationInspectorBlock(InspectorBlock):
     class Meta:
         proxy = True
         verbose_name = _("Inspector Block BOM Missing Mandatory Information")
-
 
 class DuplicateVariationsInspectorBlock(InspectorBlock):
     from .constants import duplicate_variations_block

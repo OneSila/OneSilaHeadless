@@ -66,16 +66,13 @@ def request_login_token():
     extensions = []
     return RequestLoginTokenMutation(MultiTenantLoginLinkInput, extensions=extensions)
 
-
 def go_to_step():
     extensions = default_extensions
     return UpdateOnboardingStatusMutation(UpdateOnboardingStatusInput, extensions=extensions)
 
-
 def create_demo_data():
     extensions = default_extensions
     return CreateDemoDataMutation(extensions=extensions)
-
 
 def delete_demo_data():
     extensions = default_extensions

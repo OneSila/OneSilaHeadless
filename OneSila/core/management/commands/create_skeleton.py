@@ -9,9 +9,7 @@ SKELETON_STRUCTURE = [
     'defaults.py',
     'decorators.py',
     'demo_data.py',
-    'documents.py',
     'exceptions.py',
-    'models.py',
     'tasks.py',
     'flows',
     'flows/__init__.py',
@@ -45,43 +43,17 @@ SKELETON_STRUCTURE = [
     'tests/tests_tasks.py',
     'tests/tests_models.py',
     'urls.py',
-    'views.py',
 ]
 
 
 SKELETON_STRUCTURE_DELETE = [
     'tests.py',
-    'models.py',
-    'views.py',
 ]
 
 
-APPS_CODE = """
+RECEIVERS_CODE = """
     def ready(self):
         from . import receivers
-"""
-
-MODELS_CODE = """
-from core import models
-
-# class MyModel(models.Model):
-#     pass
-"""
-
-VIEWS_CODE = """
-from core.views import EmptyTemplateView
-
-# class SomeModelView(EmptyTemplateView):
-#    pass
-
-"""
-
-DOCUMENTS_CODE = """
-from core.documents import OneSilaBaseDocument
-
-# class MyAppDocument:
-# ...
-
 """
 
 DEMO_DATA_CODE = """
@@ -97,12 +69,8 @@ registry = DemoDataLibrary()
 #         'field_other': (function, {"kwarg": 393}),
 #         'field_value': 12121,
 #     }
-#     instance = baker.make("MyModel", **demo_data)
-#     #
-#     # DONT FORGET TO REGISTER THE INSTANCE CREATED
-#     # OTHERWISE DELETE WILL NOT REMOVE IT OR FAIL
-#     registry.create_demo_data_relation(instance)
-
+#     baker.make("MyModel", **demo_data)
+#
 # # A demo-data generator for a public app could look like:
 # @registry.register_public_app
 # def populate_some_public_data():
@@ -128,21 +96,6 @@ registry = DemoDataLibrary()
 #     field_mapper = {
 #         'unit': some_data_generating_method,
 #    }
-"""
-
-SIGNALS_CODE = """
-from core.signals import ModelSignal
-
-# signal_name = ModelSignal(use_caching=True)
-"""
-
-RECEIVERS_CODE = """
-from core.receivers import receiver
-from core.signals import post_create, post_update
-
-# @receiver(post_update, sender='app_name.Model')
-# def app_name__model__action__example(sender, instance, **kwargs):
-#     do_something()
 """
 
 
@@ -202,32 +155,12 @@ def set_code(app_name, filename, string_to_set):
     return True
 
 
-def set_apps_code(app_name):
-    set_code(app_name, 'apps.py', APPS_CODE)
+def set_receiver_code(app_name):
+    set_code(app_name, 'apps.py', RECEIVERS_CODE)
 
 
 def set_demo_data_code(app_name):
     set_code(app_name, 'demo_data.py', DEMO_DATA_CODE)
-
-
-def set_models_code(app_name):
-    set_code(app_name, 'models.py', MODELS_CODE)
-
-
-def set_views_code(app_name):
-    set_code(app_name, 'views.py', VIEWS_CODE)
-
-
-def set_signals_code(app_name):
-    set_code(app_name, 'signals.py', SIGNALS_CODE)
-
-
-def set_receivers_code(app_name):
-    set_code(app_name, 'receivers.py', RECEIVERS_CODE)
-
-
-def set_documents_code(app_name):
-    set_code(app_name, 'documents.py', DOCUMENTS_CODE)
 
 
 class Command(BaseCommand):
@@ -249,15 +182,10 @@ class Command(BaseCommand):
                     self.style.ERROR(f"No such app: {app_name}")
                 )
             else:
-                delete_structure(app_name)
                 create_structure(app_name)
-                set_apps_code(app_name)
+                delete_structure(app_name)
+                set_receiver_code(app_name)
                 set_demo_data_code(app_name)
-                set_models_code(app_name)
-                set_views_code(app_name)
-                set_signals_code(app_name)
-                set_receivers_code(app_name)
-                set_documents_code(app_name)
 
                 self.stdout.write(
                     self.style.SUCCESS('Created skeleton file and folder structure for "%s"' % app_name)

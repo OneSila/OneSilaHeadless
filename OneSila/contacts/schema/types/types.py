@@ -33,7 +33,6 @@ class CompanyType(relay.Node, GetQuerysetMultiTenantMixin):
 
         return Currency.objects.filter_multi_tenant(self.multi_tenant_company).filter(is_default_currency=True).first().symbol
 
-
 @type(Supplier, filters=SupplierFilter, order=SupplierOrder, pagination=True, fields="__all__")
 class SupplierType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
@@ -65,7 +64,6 @@ class InternalCompanyType(relay.Node, GetQuerysetMultiTenantMixin):
     def full_address(self, info) -> str:
         return self.full_address
 
-
 @type(Person, filters=PersonFilter, order=PersonOrder, pagination=True, fields="__all__")
 class PersonType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
@@ -74,7 +72,6 @@ class PersonType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def full_name(self, info) -> str:
         return self.full_name()
-
 
 @type(Address, filters=AddressFilter, pagination=True, fields="__all__")
 class AddressType(relay.Node, GetQuerysetMultiTenantMixin):
@@ -85,7 +82,6 @@ class AddressType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def full_address(self, info) -> str:
         return self.full_address
-
 
 @type(ShippingAddress, filters=ShippingAddressFilter, pagination=True, fields="__all__")
 class ShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):

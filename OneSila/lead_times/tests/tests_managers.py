@@ -1,4 +1,4 @@
-from core.tests import TestCase, TestCaseDemoDataMixin
+from core.tests import TestCase, TestWithDemoDataMixin
 from contacts.models import ShippingAddress, Supplier
 from inventory.models import InventoryLocation, Inventory
 from products.models import SimpleProduct, SupplierProduct, BundleProduct, \
@@ -7,7 +7,7 @@ from lead_times.models import LeadTime, LeadTimeForShippingAddress, \
     LeadTimeProductOutOfStock
 
 
-class LeadTimeManagerTestCase(TestCaseDemoDataMixin, TestCase):
+class LeadTimeManagerTestCase(TestWithDemoDataMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.lead_time_fast, _ = LeadTime.objects.get_or_create(multi_tenant_company=self.multi_tenant_company,

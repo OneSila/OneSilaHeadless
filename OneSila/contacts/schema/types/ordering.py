@@ -8,12 +8,10 @@ from contacts.models import Company, Supplier, Customer, Person
 class CompanyOrder:
     name: auto
 
-
 @order(Person)
 class PersonOrder:
     first_name: auto
     last_name: auto
-
 
 @order(Supplier)
 class SupplierOrder:

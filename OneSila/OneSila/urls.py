@@ -35,10 +35,10 @@ urlpatterns = [
     path('properties/', include('properties.urls')),
     path('purchasing/', include('purchasing.urls')),
     path('sales-prices/', include('sales_prices.urls')),
-    path('shipments/', include('shipments.urls')),
     path('taxes/', include('taxes.urls')),
     path('units/', include('units.urls')),
-    path('graphql/',
+    path(
+        'graphql/',
         AsyncGraphQLView.as_view(
             schema=schema,
             graphiql=settings.DEBUG,

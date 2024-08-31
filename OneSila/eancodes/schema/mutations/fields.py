@@ -7,11 +7,9 @@ def generate_eancodes():
     extensions = []
     return GenerateEancodesMutation(GenerateEancodesInput, extensions=extensions)
 
-
 def assign_ean_code():
     extensions = []
     return AssignEanCodeMutation(AssignEancodeInput, extensions=extensions)
-
 
 def release_ean_code():
     extensions = []

@@ -42,17 +42,6 @@ class Model(OnlySaveOnChangeMixin, TimeStampMixin, MultiTenantAwareMixin, OldMod
         abstract = True
 
 
-class SetStatusMixin(Model):
-    def set_status(self, status, save=True):
-        self.status = status
-
-        if save:
-            self.save()
-
-    class Meta:
-        abstract = True
-
-
 class SharedModel(TimeStampMixin, OldModel):
     class Meta:
         abstract = True

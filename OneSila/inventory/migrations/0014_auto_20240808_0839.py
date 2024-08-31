@@ -2,14 +2,12 @@
 
 from django.db import migrations
 
-
 def delete_null_shippingaddress(apps, schema_editor):
     InventoryLocation = apps.get_model('inventory', 'InventoryLocation')
     Inventory = apps.get_model('inventory', 'Inventory')
     locations_to_delete = InventoryLocation.objects.filter(shippingaddress__isnull=True)
     Inventory.objects.filter(inventorylocation_id__in=locations_to_delete.values_list('id', flat=True)).delete()
     locations_to_delete.delete()
-
 
 class Migration(migrations.Migration):
 

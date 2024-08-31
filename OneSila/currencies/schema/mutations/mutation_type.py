@@ -2,7 +2,6 @@ from core.schema.core.mutations import delete, type, List
 from .fields import update, create
 from ..types.types import CurrencyType
 
-
 @type(name="Mutation")
 class CurrenciesMutation:
     create_currency: CurrencyType = create()

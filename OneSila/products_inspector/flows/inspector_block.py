@@ -4,12 +4,9 @@ import logging
 
 
 logger = logging.getLogger(__name__)
-
-
 def inspector_block_sync_flow(block):
     block_factory = InspectorBlockFactoryRegistry.get_factory(block.error_code)(block, save_inspector=True)
     block_factory.run()
-
 
 def inspector_sync_block_by_error_code_flow(inspector, error_code, **kwargs):
     from ..tasks import resync_inspector_block_task
@@ -31,7 +28,6 @@ def inspector_sync_block_by_error_code_flow(inspector, error_code, **kwargs):
         # Get the appropriate factory and run it
         block_factory = InspectorBlockFactoryRegistry.get_factory(error_code)(block, save_inspector=True)
         block_factory.run()
-
 
 def recursively_check_components(product, add_recursive_bom=True, add_recursive_bundle=True, add_recursive_variations=True, error_codes=None, run_async=False):
     from products_inspector.signals import inspector_block_refresh

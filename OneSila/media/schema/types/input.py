@@ -36,11 +36,9 @@ class FilePartialInput(NodeInput):
 class VideoInput:
     pass
 
-
 @partial(Video, exclude=['owner', 'type'])
 class VideoPartialInput(NodeInput):
     pass
-
 
 @input(MediaProductThrough, fields="__all__")
 class MediaProductThroughInput:

@@ -1,5 +1,5 @@
 from core.tests import TestCase, TransactionTestCase, \
-    TransactionTestCaseMixin, TestCaseDemoDataMixin
+    TransactionTestCaseMixin, TestWithDemoDataMixin
 from model_bakery import baker
 from OneSila.schema import schema
 from lead_times.models import LeadTime, LeadTimeForShippingAddress, \
@@ -35,7 +35,7 @@ class LeadTimeQueriesTestCase(TransactionTestCaseMixin, TransactionTestCase):
         self.assertTrue(resp.errors is None)
 
 
-class LeadTimeForShippingAddressTestCase(TestCaseDemoDataMixin, TransactionTestCaseMixin, TransactionTestCase):
+class LeadTimeForShippingAddressTestCase(TestWithDemoDataMixin, TransactionTestCaseMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
         self.lead_time, _ = LeadTime.objects.get_or_create(min_time=1, max_time=10, unit=LeadTime.DAY,

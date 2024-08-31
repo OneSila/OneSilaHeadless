@@ -26,7 +26,7 @@ def complete_create_product_properties_rule():
     extensions = []
     return CompleteCreateProductPropertiesRule(ProductPropertiesRuleInput, extensions=extensions)
 
-
 def complete_update_product_properties_rule():
     extensions = []
     return CompleteUpdateProductPropertiesRule(ProductPropertiesRulePartialInput, extensions=extensions)
+

@@ -14,6 +14,7 @@ from products_inspector.signals import *
 from ..constants import blocks
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -126,7 +127,7 @@ class InspectorBlockFactory(SaveInspectorMixin):
             logger.info(f"Block {self.block.error_code} successfully checked for product {self.product.sku}.")
         except InspectorBlockFailed as e:
             self.block.successfully_checked = False
-            logger.info(f"Block {self.block.error_code} failed for product {self.product.sku}: {str(e)}")
+            logger.warning(f"Block {self.block.error_code} failed for product {self.product.sku}: {str(e)}")
 
         self.block.save()
 
@@ -302,7 +303,6 @@ class MissingRequiredPropertiesInspectorBlockFactory(InspectorBlockFactory):
         if product_properties.count() != rule_item_properties_ids.count():
             raise InspectorBlockFailed(f"Product is missing required propertes")
 
-
 @InspectorBlockFactoryRegistry.register(MISSING_OPTIONAL_PROPERTIES_ERROR)
 class MissingOptionalPropertiesInspectorBlockFactory(InspectorBlockFactory):
     def __init__(self, block, save_inspector=True):
@@ -318,7 +318,6 @@ class MissingOptionalPropertiesInspectorBlockFactory(InspectorBlockFactory):
 
         if product_properties.count() != rule_item_properties_ids.count():
             raise InspectorBlockFailed(f"Product is missing optional propertes")
-
 
 @InspectorBlockFactoryRegistry.register(MISSING_SUPPLIER_PRICES_ERROR)
 class MissingSupplierPricesInspectorBlockFactory(InspectorBlockFactory):
@@ -389,12 +388,12 @@ class VariationMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
         ).values_list('value_select', flat=True).first()
 
         variation_ids = ConfigurableVariation.objects.filter_multi_tenant(self.multi_tenant_company).\
-            filter(parent=self.product).values_list('variation_id', flat=True)
+                         filter(parent=self.product).values_list('variation_id', flat=True)
 
         variations_product_type_value = ProductProperty.objects.filter(multi_tenant_company=self.multi_tenant_company,
                                                                        product_id__in=variation_ids,
                                                                        property__is_product_type=True).\
-            values_list('value_select', flat=True).distinct()
+                                                                       values_list('value_select', flat=True).distinct()
 
         if variations_product_type_value.count() == 0 or product_type_value_id is None:
             # this will be another error
@@ -405,7 +404,6 @@ class VariationMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
         else:
             if variations_product_type_value.first() != product_type_value_id:
                 raise InspectorBlockFailed("Variations product type mismatch")
-
 
 @InspectorBlockFactoryRegistry.register(ITEMS_MISMATCH_PRODUCT_TYPE_ERROR)
 class ItemsMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
@@ -429,7 +427,8 @@ class ItemsMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
         items_product_type_value = ProductProperty.objects.filter(multi_tenant_company=self.multi_tenant_company,
                                                                   product_id__in=item_ids,
                                                                   property__is_product_type=True).\
-            values_list('value_select', flat=True).distinct()
+                                                                  values_list('value_select', flat=True).distinct()
+
 
         if items_product_type_value.count() == 0 or product_type_value_id is None:
             return
@@ -439,6 +438,7 @@ class ItemsMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
         else:
             if items_product_type_value.first() != product_type_value_id:
                 raise InspectorBlockFailed("Items products type mismatch")
+
 
 
 @InspectorBlockFactoryRegistry.register(BOM_MISMATCH_PRODUCT_TYPE_ERROR)
@@ -463,7 +463,7 @@ class BomMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
         bom_product_type_value = ProductProperty.objects.filter(multi_tenant_company=self.multi_tenant_company,
                                                                 product_id__in=bom_ids,
                                                                 property__is_product_type=True).\
-            values_list('value_select', flat=True).distinct()
+                                                                values_list('value_select', flat=True).distinct()
 
         if bom_product_type_value.count() == 0 or product_type_value_id is None:
             return
@@ -508,7 +508,6 @@ class VariationsMissingMandatoryInformationInspectorBlockFactory(InspectorBlockF
         if Inspector.objects.filter_multi_tenant(self.multi_tenant_company).filter(product_id__in=variation_ids, has_missing_information=True).exists():
             raise InspectorBlockFailed("Variations has missing information")
 
-
 @InspectorBlockFactoryRegistry.register(BOM_MISSING_MANDATORY_INFORMATION_ERROR)
 class BomMissingMandatoryInformationInspectorBlockFactory(InspectorBlockFactory):
     def __init__(self, block, save_inspector=True):
@@ -522,9 +521,9 @@ class BomMissingMandatoryInformationInspectorBlockFactory(InspectorBlockFactory)
         bom_ids = BillOfMaterial.objects.filter_multi_tenant(self.multi_tenant_company). \
             filter(parent=self.product).values_list('variation_id', flat=True)
 
+
         if Inspector.objects.filter_multi_tenant(self.multi_tenant_company).filter(product_id__in=bom_ids, has_missing_information=True).exists():
             raise InspectorBlockFailed("Bill of materials has missing information")
-
 
 @InspectorBlockFactoryRegistry.register(DUPLICATE_VARIATIONS_ERROR)
 class DuplicateVariationsInspectorBlockFactory(InspectorBlockFactory):
@@ -540,7 +539,7 @@ class DuplicateVariationsInspectorBlockFactory(InspectorBlockFactory):
         from products.models import ConfigurableVariation
 
         variation_ids = ConfigurableVariation.objects.filter_multi_tenant(self.multi_tenant_company).\
-            filter(parent=self.product).values_list('variation_id', flat=True)
+                         filter(parent=self.product).values_list('variation_id', flat=True)
 
         if variation_ids.count() == 0:
             return

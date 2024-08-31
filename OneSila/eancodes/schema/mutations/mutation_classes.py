@@ -31,7 +31,6 @@ class GenerateEancodesMutation(CreateMutation):
 
             return None
 
-
 class AssignEanCodeMutation(CreateMutation, GetCurrentUserMixin):
     def create(self, data: dict[str, Any], *, info: Info):
 
@@ -45,7 +44,6 @@ class AssignEanCodeMutation(CreateMutation, GetCurrentUserMixin):
         to_assign.save()
 
         return to_assign
-
 
 class ReleaseEanCodeMutation(UpdateMutation, GetCurrentUserMixin):
     def update(self, info: Info, instance: EanCode, data: dict[str, Any]):

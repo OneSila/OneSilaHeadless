@@ -15,7 +15,6 @@ def resync_inspector_task(inspector_id):
     factory = ResyncInspectorFactory(inspector)
     factory.run()
 
-
 @db_task()
 def resync_inspector_block_task(block_id):
     from products_inspector.factories.inspector_block import InspectorBlockFactoryRegistry
@@ -26,7 +25,6 @@ def resync_inspector_block_task(block_id):
     block = InspectorBlock.objects.get(id=block_id)
     block_factory = InspectorBlockFactoryRegistry.get_factory(block.error_code)(block, save_inspector=True)
     block_factory.run()
-
 
 @db_task()
 def trigger_rule_dependent_inspector_blocks(rule_id):

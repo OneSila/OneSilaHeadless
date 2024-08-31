@@ -17,7 +17,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='currency',
-            constraint=models.UniqueConstraint(condition=models.Q(('is_default_currency', True)), fields=(
-                'multi_tenant_company',), name='unique_is_default_currency', violation_error_message='You can only have one default currency.'),
+            constraint=models.UniqueConstraint(condition=models.Q(('is_default_currency', True)), fields=('multi_tenant_company',), name='unique_is_default_currency', violation_error_message='You can only have one default currency.'),
         ),
     ]

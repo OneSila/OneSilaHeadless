@@ -7,7 +7,6 @@ from ..types.input import MediaInput, ImageInput, VideoInput, MediaProductThroug
     FileInput, FilePartialInput, MediaPartialInput, ImagePartialInput, \
     VideoPartialInput, MediaProductThroughPartialInput
 
-
 @type(name="Mutation")
 class MediaMutation:
     create_media: MediaType = create(MediaInput)

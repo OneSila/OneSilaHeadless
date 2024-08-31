@@ -1,6 +1,5 @@
 from core.tests import TestCase, baker
 from core.demo_data import DemoDataLibrary
-from django.contrib.auth import get_user_model
 
 
 class DemoDataTestCase(TestCase):
@@ -12,17 +11,11 @@ class DemoDataTestCase(TestCase):
         registry = DemoDataLibrary()
 
         mtc = baker.make('core.multiTenantCompany')
-        user = baker.make(get_user_model(), multi_tenant_company=mtc,
-            is_multi_tenant_company_owner=True)
-
         registry.run(multi_tenant_company=mtc)
         registry.delete_demo_data(multi_tenant_company=mtc)
         registry.run(multi_tenant_company=mtc)
 
         mtc_bis = baker.make('core.multiTenantCompany')
-        user = baker.make(get_user_model(), multi_tenant_company=mtc_bis,
-            is_multi_tenant_company_owner=True)
-
         registry.run(multi_tenant_company=mtc_bis)
         registry.delete_demo_data(multi_tenant_company=mtc_bis)
         registry.run(multi_tenant_company=mtc_bis)

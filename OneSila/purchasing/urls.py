@@ -1,16 +1,11 @@
 from django.urls import path
-from .views import PurchaseOrderListView, PurchaseOrderDetailViev, PurchaseOrderUpdateView, \
-    PurchaseOrderDeleteView, PurchaseOrderItemListView, PurchaseOrderItemDetailViev, \
-    PurchaseOrderItemUpdateView, PurchaseOrderItemDeleteView, SupplierProductListView, \
-    SupplierProductDetailViev, SupplierProductUpdateView, SupplierProductDeleteView, \
-    PurchaseOrderConfirmationFileViev
+from .views import PurchaseOrderListView, PurchaseOrderDetailViev, PurchaseOrderUpdateView, PurchaseOrderDeleteView, PurchaseOrderItemListView, PurchaseOrderItemDetailViev, PurchaseOrderItemUpdateView, PurchaseOrderItemDeleteView, SupplierProductListView, SupplierProductDetailViev, SupplierProductUpdateView, SupplierProductDeleteView
 
 app_name = 'purchasing'
 
 urlpatterns = [
     path('purchase-orders/', PurchaseOrderListView.as_view(), name='purchase_orders_list'),
     path('purchase-orders/<str:pk>/', PurchaseOrderDetailViev.as_view(), name='purchase_order_detail'),
-    path('purchase-orders/<str:pk>/confirmation/', PurchaseOrderConfirmationFileViev.as_view(), name='purchase_order_confirmation_file'),
     path('purchase-orders/<str:pk>/update/', PurchaseOrderUpdateView.as_view(), name='purchase_order_update'),
     path('purchase-orders/<str:pk>/delete/', PurchaseOrderDeleteView.as_view(), name='purchase_order_delete'),
     path('purchase-order-items/', PurchaseOrderItemListView.as_view(), name='purchase_order_items_list'),

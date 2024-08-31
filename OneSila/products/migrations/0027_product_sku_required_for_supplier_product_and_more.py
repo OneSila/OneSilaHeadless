@@ -15,12 +15,10 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddConstraint(
             model_name='product',
-            constraint=models.CheckConstraint(check=models.Q(models.Q(('type', models.Value('SUPPLIER')), _negated=True), ('sku__isnull', False),
-                                              _connector='OR'), name='sku_required_for_supplier_product', violation_error_message='Supplier products require an sku'),
+            constraint=models.CheckConstraint(check=models.Q(models.Q(('type', models.Value('SUPPLIER')), _negated=True), ('sku__isnull', False), _connector='OR'), name='sku_required_for_supplier_product', violation_error_message='Supplier products require an sku'),
         ),
         migrations.AddConstraint(
             model_name='product',
-            constraint=models.CheckConstraint(check=models.Q(models.Q(('type', models.Value('SUPPLIER')), _negated=True), ('supplier__isnull', False),
-                                              _connector='OR'), name='supplier_required_for_supplier_product', violation_error_message='Supplier products require a Supplier'),
+            constraint=models.CheckConstraint(check=models.Q(models.Q(('type', models.Value('SUPPLIER')), _negated=True), ('supplier__isnull', False), _connector='OR'), name='supplier_required_for_supplier_product', violation_error_message='Supplier products require a Supplier'),
         ),
     ]

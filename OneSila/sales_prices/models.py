@@ -44,18 +44,6 @@ class SalesPrice(models.Model):
             ),
         ]
 
-    def get_real_price(self):
-        """Which is applicable?  RRP or Price?"""
-        prices = []
-
-        if self.rrp:
-            prices.append(self.rrp)
-
-        if self.price:
-            prices.append(self.price)
-
-        return min(prices)
-
     def __str__(self):
         return '{} {}'.format(self.rrp, self.currency)
 
@@ -149,7 +137,6 @@ class SalesPriceList(models.Model):
 
     class Meta:
         search_terms = ['name']
-        ordering = ['-id']
 
 
 class SalesPriceListItem(models.Model):

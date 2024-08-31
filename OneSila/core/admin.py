@@ -35,7 +35,6 @@ class MultiTenantUserAdmin(BaseUserAdmin):
 class MultiTenantCompanyAdmin(admin.ModelAdmin):
     pass
 
-
 @admin.register(MultiTenantUserLoginToken)
 class MultiTenantUserLoginTokenAdmin(admin.ModelAdmin):
     pass

@@ -21,7 +21,7 @@ def get_translation_languages_with_default(info) -> TranslationLanguageWithDefau
 
     return TranslationLanguageWithDefaultType(languages=languages, default_language=default_language)
 
-
 @type(name="Query")
 class TranslationsQuery:
     translation_languages: TranslationLanguageWithDefaultType = anonymous_field(resolver=get_translation_languages_with_default)
+

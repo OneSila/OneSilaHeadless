@@ -13,7 +13,6 @@ class MediaFilter(SearchFilterMixin):
     id: auto
     type: auto
 
-
 @filter(Image)
 class ImageFilter(SearchFilterMixin):
     search: str | None
@@ -25,7 +24,6 @@ class ImageFilter(SearchFilterMixin):
 class FileFilter(SearchFilterMixin):
     search: str | None
     id: auto
-
 
 @filter(Video)
 class VideoFilter(SearchFilterMixin):

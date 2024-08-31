@@ -162,22 +162,3 @@ class SupplierProductQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
 class SupplierProductManager(ProductManager):
     def get_queryset(self):
         return SupplierProductQuerySet(self.model, using=self._db)
-
-
-class SupplierPriceQuerySet(MultiTenantQuerySet):
-    def find_cheapest(self, supplierproducts, quantity):
-        return self.\
-            filter(
-                supplier_product__in=supplierproducts,
-                quantity__lte=quantity,
-            ).\
-            order_by('unit_price').\
-            first()
-
-
-class SupplierPriceManager(MultiTenantManager):
-    def get_queryset(self):
-        return SupplierPriceQuerySet(self.model, using=self._db)
-
-    def find_cheapest(self, supplierproducts, quantity):
-        return self.get_queryset().find_cheapest(supplierproducts, quantity)

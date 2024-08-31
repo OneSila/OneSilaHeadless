@@ -214,7 +214,6 @@ class EnableUserFactory:
         self.enable_user()
         self.send_signal()
 
-
 class CreateInternalCompanyFromOwnerCompany:
     def __init__(self, multi_tenant_company):
         multi_tenant_company.refresh_from_db()

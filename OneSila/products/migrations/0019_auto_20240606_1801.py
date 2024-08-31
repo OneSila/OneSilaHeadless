@@ -2,16 +2,13 @@
 
 from django.db import migrations
 
-
 def forwards_func(apps, schema_editor):
     Product = apps.get_model("products", "Product")
     Product.objects.filter(type='VARIATION').update(type='SIMPLE')
 
-
 def reverse_func(apps, schema_editor):
     Product = apps.get_model("products", "Product")
     Product.objects.filter(type='SIMPLE').update(type='VARIATION')
-
 
 class Migration(migrations.Migration):
 
@@ -20,5 +17,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(forwards_func, reverse_func),
+       migrations.RunPython(forwards_func, reverse_func),
     ]

@@ -9,7 +9,6 @@ from .filters import LeadTimeFilter, LeadTimeForShippingAddressFilter, LeadTimeP
 from .ordering import LeadTimeOrder, LeadTimeForShippingAddressOrder, LeadTimeProductOutOfStockOrder
 from contacts.schema.types.types import ShippingAddressType
 
-
 @type(LeadTime, filters=LeadTimeFilter, order=LeadTimeOrder, pagination=True, fields="__all__")
 class LeadTimeType(relay.Node, GetQuerysetMultiTenantMixin):
 

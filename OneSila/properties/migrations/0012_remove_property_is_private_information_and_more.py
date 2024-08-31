@@ -27,7 +27,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='property',
             name='type',
-            field=models.CharField(choices=[('INT', 'Integer'), ('FLOAT', 'Float'), ('TEXT', 'Text'), ('DESCRIPTION', 'Description'), ('BOOLEAN', 'Boolean'), (
-                'DATE', 'Date'), ('DATETIME', 'Date time'), ('SELECT', 'Select'), ('MULTISELECT', 'Multi Select')], db_index=True, max_length=20, verbose_name='Type of property'),
+            field=models.CharField(choices=[('INT', 'Integer'), ('FLOAT', 'Float'), ('TEXT', 'Text'), ('DESCRIPTION', 'Description'), ('BOOLEAN', 'Boolean'), ('DATE', 'Date'), ('DATETIME', 'Date time'), ('SELECT', 'Select'), ('MULTISELECT', 'Multi Select')], db_index=True, max_length=20, verbose_name='Type of property'),
         ),
     ]

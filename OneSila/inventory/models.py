@@ -1,7 +1,7 @@
 from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from core import models
-from .managers import InventoryManager, InventoryLocationManager
+from .managers import InventoryManager
 
 
 class Inventory(models.Model):
@@ -20,10 +20,6 @@ class Inventory(models.Model):
         search_terms = ['product__sku', 'inventorylocation__name', 'product__supplier__name']
         unique_together = ('product', 'inventorylocation')
         verbose_name_plural = "inventories"
-
-    def reduce_quantity(self, quantity):
-        self.quantity -= quantity
-        self.save()
 
     def __str__(self):
         return '{}: {}@{}'.format(self.product, self.inventorylocation, self.quantity)
@@ -48,14 +44,8 @@ class InventoryLocation(models.Model):
 
     precise = models.BooleanField(default=False)
 
-    objects = InventoryLocationManager()
-
     def __str__(self):
         return self.name
-
-    # @property
-    # def is_internal_location(self):
-    #     return self.shippingaddress.company.is_internal_company
 
     class Meta:
         search_terms = ['name']

@@ -8,13 +8,10 @@ from django.utils.translation import gettext_lazy as _
 from translations.models import TranslationFieldsMixin, TranslatedModelMixin
 from taxes.models import VatRate
 from .managers import ProductManager, ConfigurableManager, BundleManager, VariationManager, \
-    SupplierProductManager, ManufacturableManager, DropshipManager, SupplierPriceManager
+    SupplierProductManager, ManufacturableManager, DropshipManager
 import shortuuid
 from hashlib import shake_256
 from products.product_types import SUPPLIER
-
-import logging
-logger = logging.getLogger(__name__)
 
 
 class Product(TranslatedModelMixin, models.Model):
@@ -112,60 +109,6 @@ class Product(TranslatedModelMixin, models.Model):
 
     def is_supplier_product(self):
         return self.type == self.SUPPLIER
-
-    def defalte_dropshipping(self, active_only=True):
-        return self.deflate_simple(active_only=active_only)
-
-    def deflate_simple(self, active_only=True):
-        """Return all of the supplier products for a given simple product"""
-        qs = self.supplier_products.all()
-
-        if active_only:
-            qs = qs.filter(active=True)
-
-        return qs
-
-    def deflate_bundle(self):
-        """Return all BundleVariation items"""
-
-        logger.debug(f"Trying to deflate {self} with {self.type=}")
-
-        if self.type not in [self.BUNDLE]:
-            raise ValueError(f"This only works for bundle products.")
-
-        all_variation_ids = []
-
-        variations = BundleVariation.objects.filter(parent=self)
-        all_variation_ids.extend(variations.values_list('id', flat=True))
-
-        for variation in variations:
-            if variation.variation.is_bundle():
-                all_variation_ids.extend(variation.variation.deflate_bundle().values_list('id', flat=True))
-            else:
-                all_variation_ids.append(variation.id)
-
-        return BundleVariation.objects.filter(id__in=all_variation_ids)
-
-    def get_parent_products(self, ids_only=False):
-        product_ids = set()
-        product_ids.add(self.id)
-
-        for prod in self.base_products.all().iterator():
-            product_ids.add(prod.id)
-
-        bundles = BundleVariation.objects.filter(variation_id__in=product_ids)
-        for bv in bundles.iterator():
-            product_ids.add(bv.parent.id)
-
-            logging.debug(f"Is this a bundle? {bv.parent=}?  {bv.parent.is_bundle()}")
-
-            if bv.parent.is_bundle():
-                product_ids.update(bv.parent.get_parent_products(ids_only=True))
-
-        if ids_only:
-            return product_ids
-
-        return Product.objects.filter(id__in=product_ids)
 
     def get_proxy_instance(self):
         if self.is_simple():
@@ -481,8 +424,6 @@ class SupplierPrices(models.Model):
     unit = models.ForeignKey('units.Unit', on_delete=models.PROTECT)
     quantity = models.IntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
-
-    objects = SupplierPriceManager()
 
     class Meta:
         search_terms = ['supplier_product__product__sku', 'supplier_product__supplier__name']

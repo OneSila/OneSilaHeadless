@@ -55,7 +55,6 @@ class InternalCompanyInput:
 class InternalCompanyPartialInput(NodeInput):
     pass
 
-
 @input(Address, fields="__all__")
 class AddressInput:
     pass

@@ -52,8 +52,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='product',
             name='base_product',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE,
-                                    related_name='supplier_products', to='products.product'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='supplier_products', to='products.product'),
         ),
         migrations.AddField(
             model_name='product',
@@ -73,8 +72,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='product',
             name='type',
-            field=models.CharField(choices=[('BUNDLE', 'Bundle Product'), ('UMBRELLA', 'Umbrella Product'), ('MANUFACTURABLE', 'Manufacturable Product'),
-                                   ('DROPSHIP', 'Dropship Product'), ('SUPPLIER', 'Supplier Product'), ('SIMPLE', 'Simple Product')], max_length=15),
+            field=models.CharField(choices=[('BUNDLE', 'Bundle Product'), ('UMBRELLA', 'Umbrella Product'), ('MANUFACTURABLE', 'Manufacturable Product'), ('DROPSHIP', 'Dropship Product'), ('SUPPLIER', 'Supplier Product'), ('SIMPLE', 'Simple Product')], max_length=15),
         ),
         migrations.AlterField(
             model_name='product',

@@ -13,15 +13,13 @@ class TestCaseMixin:
         super().setUp()
         self.multi_tenant_company = baker.make(MultiTenantCompany)
         self.user = baker.make(get_user_model(), multi_tenant_company=self.multi_tenant_company)
-        self.user.is_multi_tenant_company_owner = True
-        self.user.save()
 
 
 class TestCase(TestCaseMixin, DjangoTestCase):
     pass
 
 
-class TestCaseDemoDataMixin:
+class TestWithDemoDataMixin:
     # This variable will be shared across all TestCases subsclassed from here.
     # That will ensure we only try to generate the demo-data once.
     demo_data_generated = False
@@ -41,5 +39,5 @@ class TestCaseDemoDataMixin:
         self.demo_data_generated = False
 
 
-class TestCaseWithDemoData(TestCaseDemoDataMixin, TestCase):
+class TestCaseWithDemoData(TestWithDemoDataMixin, TestCase):
     pass

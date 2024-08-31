@@ -4,8 +4,6 @@ from strawberry_django.optimizer import DjangoOptimizerExtension
 from core.schema.core.mutations import Info, Any
 from properties.models import ProductPropertiesRule
 from strawberry_django.mutations.types import UNSET
-
-
 class CompleteCreateProductPropertiesRule(CreateMutation):
     def create(self, data: dict[str, Any], *, info: Info):
 
@@ -19,6 +17,7 @@ class CompleteCreateProductPropertiesRule(CreateMutation):
 
             rule = ProductPropertiesRule.objects.create_rule(multi_tenant_company, product_type, items)
             return rule
+
 
 
 class CompleteUpdateProductPropertiesRule(UpdateMutation, GetCurrentUserMixin):

@@ -19,7 +19,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='productproperty',
             name='value_select',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE,
-                                    related_name='value_select_set', to='properties.propertyselectvalue'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='value_select_set', to='properties.propertyselectvalue'),
         ),
     ]

@@ -14,7 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='media',
             name='image',
-            field=models.ImageField(blank=True, null=True, upload_to='images/',
-                                    validators=[core.validators.validate_image_extension], verbose_name='Image (High resolution)'),
+            field=models.ImageField(blank=True, null=True, upload_to='images/', validators=[core.validators.validate_image_extension], verbose_name='Image (High resolution)'),
         ),
     ]

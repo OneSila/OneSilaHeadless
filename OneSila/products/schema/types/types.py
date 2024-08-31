@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from strawberry.relay.utils import to_base64
 from contacts.schema.types.types import CompanyType
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, Annotated, lazy
+from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, Annotated, lazy, strawberry_lazy
 
 from typing import List, Optional
 
@@ -17,12 +17,10 @@ from .filters import ProductFilter, BundleProductFilter, ConfigurableProductFilt
 from .ordering import ProductOrder, BundleProductOrder, ConfigurableProductOrder, \
     SimpleProductOrder, ProductTranslationOrder, ConfigurableVariationOrder, BundleVariationOrder, BillOfMaterialOrder, SupplierProductOrder, \
     DropshipProductOrder, ManufacturableProductOrder, SupplierPricesOrder
-
-
 @type(Product, filters=ProductFilter, order=ProductOrder, pagination=True, fields="__all__")
 class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
     vat_rate: Optional[VatRateType]
-    inspector: Optional[Annotated['InspectorType', lazy('products_inspector.schema.types.types')]]
+    inspector: Optional[strawberry_lazy['InspectorType', 'products_inspector.schema.types.types']]
     base_products: List[Annotated['ProductType', lazy("products.schema.types.types")]]
 
     supplier: Optional[CompanyType]
@@ -61,20 +59,16 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
         return None
 
     @field()
-    def inventory_physical(self, info) -> int | None:
+    def inventory_physical(self, info) -> str | None:
         return self.inventory.physical()
 
     @field()
-    def inventory_salable(self, info) -> int | None:
+    def inventory_salable(self, info) -> str | None:
         return self.inventory.salable()
 
     @field()
-    def inventory_reserved(self, info) -> int | None:
+    def inventory_reserved(self, info) -> str | None:
         return self.inventory.reserved()
-
-    @field()
-    def inventory_await_inventory(self, info) -> int | None:
-        return self.inventory.await_inventory()
 
 
 @type(ProductTranslation, filters=ProductTranslationFilter, order=ProductTranslationOrder, pagination=True, fields="__all__")

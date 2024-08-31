@@ -14,7 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='productpropertiesruleitem',
             name='rule',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='items',
-                                    to='properties.productpropertiesrule', verbose_name='Rule'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='items', to='properties.productpropertiesrule', verbose_name='Rule'),
         ),
     ]
