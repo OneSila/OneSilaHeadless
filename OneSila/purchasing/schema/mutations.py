@@ -1,8 +1,8 @@
 from core.schema.core.mutations import type
 from core.schema.core.mutations import create, update, delete, type, List
 
-from .types.types import  PurchaseOrderType, PurchaseOrderItemType
-from .types.input import  PurchaseOrderInput, PurchaseOrderItemInput, PurchaseOrderPartialInput, PurchaseOrderItemPartialInput
+from .types.types import PurchaseOrderType, PurchaseOrderItemType
+from .types.input import PurchaseOrderInput, PurchaseOrderItemInput, PurchaseOrderPartialInput, PurchaseOrderItemPartialInput
 
 
 @type(name="Mutation")

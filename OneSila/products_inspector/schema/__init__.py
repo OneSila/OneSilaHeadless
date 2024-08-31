@@ -1,2 +1,2 @@
-from .subscriptions import InspectorsSubscription
-from .mutations import InspectorMutation
+from .subscriptions import ProductsInspectorSubscription
+from .mutations import ProductsInspectorMutation

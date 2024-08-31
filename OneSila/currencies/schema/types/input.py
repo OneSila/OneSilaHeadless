@@ -11,6 +11,7 @@ from currencies.schema.types.types import PublicCurrencyType
 class PublicCurrencyIdInput(NodeInput):
     pass
 
+
 @strawberry_django.input(Currency, exclude=['iso_code', 'name', 'symbol'])
 class CurrencyInput:
     public_currency: Optional[PublicCurrencyIdInput] = None

@@ -23,6 +23,7 @@ class CreateWithPublicIdMutation(CreateMutation, GetCurrentUserMixin):
 
         return super().create(data=data, info=info)
 
+
 class UpdateWithPublicIdMutation(UpdateMutation, GetCurrentUserMixin):
     """
     Every create needs to include the company a user is assigned to.

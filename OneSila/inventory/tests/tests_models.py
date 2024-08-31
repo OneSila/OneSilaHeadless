@@ -1,9 +1,10 @@
 from contacts.models import Supplier, ShippingAddress
-from core.tests import TestCase
+from core.tests import TestCase, TestCaseDemoDataMixin
 from django.db import IntegrityError
 from inventory.models import Inventory, InventoryLocation
-from products.models import SupplierProduct, ConfigurableProduct, \
+from products.models import SupplierProduct, ConfigurableProduct, Product, \
     SimpleProduct, BundleProduct, DropshipProduct, ManufacturableProduct
+from products.demo_data import SIMPLE_BLACK_FABRIC_NAME
 
 
 class InventoryTestCaseMixin:
@@ -17,7 +18,7 @@ class InventoryTestCaseMixin:
             multi_tenant_company=self.multi_tenant_company)
 
 
-class InventoryTestCase(InventoryTestCaseMixin, TestCase):
+class InventoryTestCase(TestCaseDemoDataMixin, InventoryTestCaseMixin, TestCase):
     def test_inventory_on_configurable_product(self):
         prod = ConfigurableProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company)
@@ -49,3 +50,19 @@ class InventoryTestCase(InventoryTestCaseMixin, TestCase):
                 inventorylocation=self.inventory_location,
                 multi_tenant_company=self.multi_tenant_company,
                 quantity=10)
+
+    def test_find_inventory_shippingaddresses(self):
+        from contacts.models import ShippingAddress
+        prod = ManufacturableProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company)
+        quantity = 10
+        inv = Inventory.objects.create(product=prod,
+                inventorylocation=self.inventory_location,
+                multi_tenant_company=self.multi_tenant_company,
+                quantity=quantity)
+
+        qs = prod.inventory.find_inventory_shippingaddresses()
+        self.assertTrue(qs.exists())
+        address = qs.first()
+        self.assertTrue(isinstance(address, ShippingAddress))
+        self.assertTrue(address == self.shipping_address)

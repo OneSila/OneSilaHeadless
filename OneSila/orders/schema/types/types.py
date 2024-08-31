@@ -1,5 +1,5 @@
 from contacts.schema.types.types import CompanyType, InvoiceAddressType, ShippingAddressType
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field,  Annotated, lazy
+from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, Annotated, lazy
 
 from typing import List
 

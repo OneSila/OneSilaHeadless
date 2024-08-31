@@ -1,115 +1,75 @@
-from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator
-from contacts.models import InvoiceAddress, ShippingAddress, Supplier
+from core.models import MultiTenantUser
+from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, \
+    PrivateStructuredDataGenerator
+from contacts.models import InvoiceAddress, ShippingAddress, Supplier, Company, InternalCompany
 from currencies.models import Currency
 from units.models import Unit
 from .models import PurchaseOrder, PurchaseOrderItem
 from products.models import SupplierProduct, Product, ProductTranslation, SupplierPrices
+from contacts.demo_data import FABRIC_SUPPLIER_NAME, INTERNAL_SHIPPING_STREET_ONE
+from products.demo_data import SUPPLIER_BLACK_TIGER_FABRIC
 
 registry = DemoDataLibrary()
 
-@registry.register_private_app
-class SupplierProductGenerator(PrivateDataGenerator):
-    model = SupplierProduct
-    count = 100
-
-    field_mapper = {
-        'sku': lambda: fake.bothify(text='SKU-####??'),
-        'type': Product.SUPPLIER
-    }
-
-    def prep_baker_kwargs(self, seed):
-        kwargs = super().prep_baker_kwargs(seed)
-        multi_tenant_company = kwargs['multi_tenant_company']
-        supplier = Supplier.objects.filter(is_supplier=True, multi_tenant_company=multi_tenant_company).order_by('?').first()
-
-        kwargs.update({
-            'supplier': supplier
-        })
-
-        return kwargs
-
-    def post_generate_instance(self, instance, **kwargs):
-        multi_tenant_company = instance.multi_tenant_company
-        language = multi_tenant_company.language
-        unit = Unit.objects.filter(multi_tenant_company=multi_tenant_company).order_by('?').first()
-
-        ProductTranslation.objects.create(
-            product=instance,
-            language=language,
-            name=fake.ecommerce_name(),
-            multi_tenant_company=multi_tenant_company,
-        )
-
-        SupplierPrices.objects.create(
-            supplier_product=instance,
-            unit=unit,
-            quantity=fake.random_int(min=1, max=100),
-            unit_price=fake.random_int(min=1, max=1000),
-            multi_tenant_company=multi_tenant_company,
-        )
-
-        products = list(Product.objects.filter(type__in=[Product.SIMPLE, Product.DROPSHIP], multi_tenant_company=multi_tenant_company).order_by('?')[:3])
-        instance.base_products.set(products)
-        instance.save()
 
 @registry.register_private_app
-class PurchaseOrderGenerator(PrivateDataGenerator):
+class PurchaseOrderGenerator(PrivateStructuredDataGenerator):
     model = PurchaseOrder
-    count = 50
 
-    field_mapper = {
-        'order_reference': fake.order_reference,
-        'status': lambda: fake.random_element(elements=(PurchaseOrder.DRAFT,
-                                                        PurchaseOrder.ORDERED,
-                                                        PurchaseOrder.CONFIRMED,
-                                                        PurchaseOrder.PENDING_DELIVERY,
-                                                        PurchaseOrder.DELIVERED))
-    }
+    def get_user(self):
+        return MultiTenantUser.objects.filter(multi_tenant_company=self.multi_tenant_company).last()
 
-    def prep_baker_kwargs(self, seed):
-        kwargs = super().prep_baker_kwargs(seed)
-        multi_tenant_company = kwargs['multi_tenant_company']
-        supplier = Supplier.objects.filter(is_supplier=True, multi_tenant_company=multi_tenant_company).order_by('?').first()
-        currency = Currency.objects.filter(iso_code__in=['GBP', 'USD', 'EUR', 'THB'], multi_tenant_company=multi_tenant_company).order_by('?').first()
+    def get_internal_company(self):
+        return InternalCompany.objects.get(multi_tenant_company=self.multi_tenant_company)
 
-        invoice_address = InvoiceAddress.objects.filter(company=supplier, multi_tenant_company=multi_tenant_company).last()
-        if not invoice_address:
-            invoice_address = InvoiceAddress.objects.filter(multi_tenant_company=multi_tenant_company).first()
+    def get_invoice_address(self):
+        return InvoiceAddress.objects.get(
+            multi_tenant_company=self.multi_tenant_company,
+            company=self.get_internal_company())
 
-        shipping_address = ShippingAddress.objects.filter(company=supplier, multi_tenant_company=multi_tenant_company).last()
-        if not shipping_address:
-            shipping_address = ShippingAddress.objects.filter(multi_tenant_company=multi_tenant_company).first()
+    def get_shipping_address(self):
+        return ShippingAddress.objects.get(
+            multi_tenant_company=self.multi_tenant_company,
+            company=self.get_internal_company(),
+            address1=INTERNAL_SHIPPING_STREET_ONE)
 
-        kwargs.update({
-            'supplier': supplier,
-            'currency': currency,
-            'invoice_address': invoice_address,
-            'shipping_address': shipping_address
-        })
+    def get_supplier(self):
+        return Supplier.objects.get(name=FABRIC_SUPPLIER_NAME, multi_tenant_company=self.multi_tenant_company)
 
-        return kwargs
+    def get_currency(self):
+        return self.get_supplier().get_currency()
 
-@registry.register_private_app
-class PurchaseOrderItemGenerator(PrivateDataGenerator):
-    model = PurchaseOrderItem
-    count = 500
+    def get_supplier_product(self, sku):
+        return SupplierProduct.objects.get(sku=sku, multi_tenant_company=self.multi_tenant_company)
 
-    field_mapper = {
-        'quantity': lambda: fake.random_int(min=1, max=50),
-        'unit_price': lambda: round(fake.random_number(digits=3) + fake.pyfloat(left_digits=0, right_digits=2, min_value=0, max_value=1), 2)
-    }
+    def get_structure(self):
+        return [
+            {
+                'instance_data': {
+                    'supplier': self.get_supplier(),
+                    'currency': self.get_currency(),
+                    'order_reference': "SUP1038",
+                    'status': PurchaseOrder.ORDERED,
+                    'internal_contact': self.get_user(),
+                    'invoice_address': self.get_invoice_address(),
+                    'shipping_address': self.get_shipping_address(),
+                    'internal_contact': self.get_user(),
+                },
+                'post_data': {
+                    'purchaseorderitems': [
+                        {
+                            'product': self.get_supplier_product(SUPPLIER_BLACK_TIGER_FABRIC),
+                            'quantity': 12,
+                            'unit_price': SupplierPrices.objects.get(supplier_product=self.get_supplier_product(SUPPLIER_BLACK_TIGER_FABRIC), quantity=1).unit_price,
+                        }
+                    ]
+                },
+            },
+        ]
 
-    def prep_baker_kwargs(self, seed):
-        kwargs = super().prep_baker_kwargs(seed)
-        multi_tenant_company = kwargs['multi_tenant_company']
-        purchase_order = PurchaseOrder.objects.filter(multi_tenant_company=multi_tenant_company).order_by('?').first()
-        existing_product_ids = PurchaseOrderItem.objects.filter(purchase_order=purchase_order, multi_tenant_company=multi_tenant_company).values_list('item_id', flat=True)
-        supplier_product = SupplierProduct.objects.filter(multi_tenant_company=multi_tenant_company).exclude(id__in=existing_product_ids).order_by('?').first()
-
-        kwargs.update({
-            'purchase_order': purchase_order,
-            'item': supplier_product,
-            'multi_tenant_company': multi_tenant_company,
-        })
-
-        return kwargs
+    def post_data_generate(self, instance, **kwargs):
+        items = kwargs['purchaseorderitems']
+        for item in items:
+            instance.purchaseorderitem_set.create(
+                multi_tenant_company=self.multi_tenant_company,
+                **item)

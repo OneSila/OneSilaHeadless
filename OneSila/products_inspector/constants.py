@@ -65,7 +65,6 @@ ERROR_TYPES = (
 )
 
 
-
 # BLOCKS CONFIG SECTION
 has_image_block = {
     'error_code': HAS_IMAGES_ERROR,
@@ -333,4 +332,4 @@ blocks = [
     bom_missing_mandatory_information_block,
     duplicate_variations_block,
     non_configurable_rule_block
-    ]
+]

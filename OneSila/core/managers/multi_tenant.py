@@ -8,6 +8,7 @@ from core.managers.decorators import multi_tenant_company_required
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
 
+
 class MultiTenantUserLoginTokenQuerySet(DjangoQueryset):
     def get_by_token(self, token):
         try:
@@ -101,6 +102,7 @@ class MultiTenantUserManager(BaseUserManager):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         extra_fields.setdefault('is_active', True)
+        extra_fields.setdefault('is_multi_tenant_company_owner', True)
 
         if extra_fields.get('is_staff') is not True:
             raise ValueError('Superuser must have is_staff=True.')
@@ -137,7 +139,8 @@ class QuerySetProxyModelMixin(MultiTenantQuerySet):
 
     @multi_tenant_company_required()
     def create(self, **kwargs):
-        kwargs.update(self.model.proxy_filter_fields)
+        proxy_filter_fields = {k: v for k, v in self.model.proxy_filter_fields.items() if '__' not in k}
+        kwargs.update(proxy_filter_fields)
         return super().create(**kwargs)
 
     def all(self, multi_tenant_company):

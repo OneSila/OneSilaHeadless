@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 from products_inspector.models import Inspector
 from products_inspector.factories.inspector_block import InspectorBlockCreateOrUpdateFactory
 
+
 class Command(BaseCommand):
     help = 'Update a specific block in all inspectors based on the provided error_code'
 

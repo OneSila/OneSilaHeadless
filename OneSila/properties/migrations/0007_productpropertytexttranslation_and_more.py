@@ -41,7 +41,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='property',
             name='type',
-            field=models.CharField(choices=[('INT', 'Integer'), ('FLOAT', 'Float'), ('TEXT', 'Text'), ('DESCRIPTION', 'Description'), ('BOOLEAN', 'Boolean'), ('DATE', 'Date'), ('DATETIME', 'Date time')], db_index=True, max_length=20, verbose_name='Type of property'),
+            field=models.CharField(choices=[('INT', 'Integer'), ('FLOAT', 'Float'), ('TEXT', 'Text'), ('DESCRIPTION', 'Description'), ('BOOLEAN',
+                                   'Boolean'), ('DATE', 'Date'), ('DATETIME', 'Date time')], db_index=True, max_length=20, verbose_name='Type of property'),
         ),
         migrations.AlterUniqueTogether(
             name='propertyselectvaluetranslation',
@@ -53,7 +54,8 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='property',
-            constraint=models.UniqueConstraint(condition=models.Q(('is_product_type', True)), fields=('multi_tenant_company',), name='unique_is_product_type', violation_error_message='You can only have one product type per multi-tenant company.'),
+            constraint=models.UniqueConstraint(condition=models.Q(('is_product_type', True)), fields=(
+                'multi_tenant_company',), name='unique_is_product_type', violation_error_message='You can only have one product type per multi-tenant company.'),
         ),
         migrations.AddField(
             model_name='productpropertytexttranslation',

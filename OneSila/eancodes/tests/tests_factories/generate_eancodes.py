@@ -2,6 +2,7 @@ from core.tests import TestCase
 from eancodes.factories.generate_eancodes import GenerateEancodesFactory
 from eancodes.models import EanCode
 
+
 class GenerateEancodesFactoryTestCase(TestCase):
 
     def test_generate_eancodes_with_12_digit_prefix(self):
@@ -43,4 +44,3 @@ class GenerateEancodesFactoryTestCase(TestCase):
             self.assertEqual(len(ean_code), 13, "The generated EAN code should have 13 digits.")
             self.assertTrue(ean_code.startswith(prefix), "The EAN code should start with the given prefix.")
             self.assertEqual(ean_code[-1], str(factory.calculate_checksum(ean_code[:-1])), "The EAN code should have a correct checksum.")
-

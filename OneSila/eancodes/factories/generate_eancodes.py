@@ -1,6 +1,7 @@
 from eancodes.models import EanCode
 from functools import reduce
 
+
 class GenerateEancodesFactory:
     def __init__(self, *, prefix, multi_tenant_company):
         self.ean_code_instances = None
@@ -16,7 +17,7 @@ class GenerateEancodesFactory:
         """
         ean_list = [int(digit) for digit in ean]
         assert len(ean_list) == 12, "EAN must be a list of 12 numbers"
-        sum_ = lambda x, y: int(x) + int(y)
+        def sum_(x, y): return int(x) + int(y)
         evensum = reduce(sum_, ean_list[::2])
         oddsum = reduce(sum_, ean_list[1::2])
         return (10 - ((evensum + oddsum * 3) % 10)) % 10

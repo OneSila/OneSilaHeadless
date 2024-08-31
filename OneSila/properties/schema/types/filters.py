@@ -22,13 +22,15 @@ class PropertyFilter(SearchFilterMixin):
 class PropertySelectValueFilter(SearchFilterMixin):
     search: str | None
     id: auto
-    property:  Optional[PropertyFilter]
+    property: Optional[PropertyFilter]
+
 
 @filter(PropertySelectValueTranslation)
 class PropertySelectValueTranslationFilter:
     id: auto
     value: auto
     propertyselectvalue: Optional[PropertySelectValueFilter]
+
 
 @filter(ProductProperty)
 class ProductPropertyFilter(SearchFilterMixin):
@@ -49,17 +51,20 @@ class PropertyTranslationFilter:
     id: auto
     property: Optional[PropertyFilter]
 
+
 @filter(ProductPropertyTextTranslation)
 class ProductPropertyTextTranslationFilter:
     id: auto
     language: auto
     product_property: Optional[ProductPropertyFilter]
 
+
 @filter(ProductPropertiesRule)
 class ProductPropertiesRuleFilter:
     id: auto
     product_type: Optional[PropertyFilter]
     search: str | None
+
 
 @filter(ProductPropertiesRuleItem)
 class ProductPropertiesRuleItemFilter:

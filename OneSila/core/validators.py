@@ -8,23 +8,27 @@ phone_regex = RegexValidator(
     message=_("Phone number must be entered in the format: '+999999999'. Up to 20 digits allowed."))
 
 
-def validate_image_extension(value):
+def validate_extension(value, valid_extensions):
     '''Validate if the upload has is a jpg or png image'''
     ext = os.path.splitext(value.name)[1]
-    # Images are restricted to "validate_image_extension". Keep in mind if you want to extend this restriction
-    # to also update the frontend, and extend the cropping tools so that no conflicts arise.
-    valid_extensions = ['.jpg', '.png', '.jpeg']
     if not ext.lower() in valid_extensions:
         raise ValidationError(_('Only {} are allowed.'.format(valid_extensions)))
+
+
+def validate_image_extension(value):
+    valid_extensions = ['.jpg', '.png', '.jpeg']
+    validate_extension(value, valid_extensions)
 
 
 def validate_file_extensions(value):
-    ext = os.path.splitext(value.name)[1]
-    # Images are restricted to "validate_image_extension". Keep in mind if you want to extend this restriction
-    # to also update the frontend, and extend the cropping tools so that no conflicts arise.
     valid_extensions = ['.pdf', '.xlsx', '.xls', '.docx', '.doc']
-    if not ext.lower() in valid_extensions:
-        raise ValidationError(_('Only {} are allowed.'.format(valid_extensions)))
+    validate_extension(value, valid_extensions)
+
+
+def validate_pdf_extension(value):
+    '''Validate if the upload has is a jpg or png image'''
+    valid_extensions = ['.pdf']
+    validate_extension(value, valid_extensions)
 
 
 def no_dots_in_filename(value):
