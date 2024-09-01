@@ -5,27 +5,10 @@ from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 
 class InventoryQueryTestCase(TestCaseWithDemoData, TransactionTestCaseMixin, TransactionTestCase):
     def test_inventory_movements(self):
-        query = """
-            query inventoryMovements {
-              inventoryMovements {
-                edges {
-                  node {
-                    id
-                    movementFrom {id}
-                    movementTo {id}
-                    product {id}
-                    quantity
-                    notes
-                  }
-                }
-                totalCount
-              }
-            }
-        """
+        from .queries import INVENTORY_MOVEMENTS_QUERY
 
         resp = self.strawberry_test_client(
-            query=query,
+            query=INVENTORY_MOVEMENTS_QUERY,
         )
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
-        self.assertEqual(total_count, len(self.addresses))

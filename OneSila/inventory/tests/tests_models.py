@@ -23,6 +23,24 @@ class InventoryTestCaseMixin:
 
 
 class InventoryTestCase(TestCaseDemoDataMixin, InventoryTestCaseMixin, TestCase):
+    def test_inventory_to_inventory_not_identical(self):
+        prod = ManufacturableProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company)
+        quantity = 10
+        inv = Inventory.objects.create(product=prod,
+                inventorylocation=self.inventory_location,
+                multi_tenant_company=self.multi_tenant_company,
+                quantity=quantity)
+        inv_qty_ori = inv.quantity
+
+        with self.assertRaises(IntegrityError):
+            InventoryMovement.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                movement_from=inv,
+                movement_to=inv,
+                quantity=quantity,
+                product=prod)
+
     def test_inventory_to_inventory_movement(self):
         prod = ManufacturableProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company)

@@ -106,6 +106,9 @@ class InventoryMovement(models.Model):
         return f"{self.quantity} from {self.movement_from} to {self.movement_to}"
 
     def save(self, *args, **kwargs):
+        if self.movement_from == self.movement_to:
+            raise IntegrityError(f"You cannot move from and to the same location. Ensure movement_to is different from movement_from.")
+
         mf_class = self.mf_content_type.model_class()
         if not mf_class in self.MOVEMENT_FROM_MODELS:
             raise IntegrityError(f"You can only receive inventory from {self.MOVEMENT_FROM_MODELS}, not {mf_class}")
