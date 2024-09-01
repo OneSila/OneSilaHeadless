@@ -1,4 +1,5 @@
 from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, auto
+from core.models import Model
 
 from typing import List, Optional, Self
 
@@ -7,6 +8,8 @@ from products.schema.types.types import ProductType
 from contacts.schema.types.types import InventoryShippingAddressType
 from .filters import InventoryFilter, InventoryLocationFilter
 from .ordering import InventoryOrder, InventoryLocationOrder
+from purchasing.schema.types.types import PurchaseOrderType
+from shipments.schema.types.types import PackageType
 
 
 @type(InventoryLocation, filters=InventoryLocationFilter, order=InventoryLocationOrder, pagination=True, fields="__all__")
@@ -26,7 +29,12 @@ class InventoryType(relay.Node, GetQuerysetMultiTenantMixin):
 
 @type(InventoryMovement, pagination=True, fields="__all__")
 class InventoryMovementType(relay.Node, GetQuerysetMultiTenantMixin):
-    movement_from = auto
-    movement_to = auto
-    product = auto
-    quantity = auto
+    product: ProductType
+
+    @field()
+    def movement_to(self, info) -> PackageType | InventoryType:
+        return self.movement_to
+
+    @field()
+    def movement_from(self, info) -> PurchaseOrderType | InventoryType:
+        return self.movement_from
