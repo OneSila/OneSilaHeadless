@@ -15,7 +15,7 @@ class InventoryLocationType(relay.Node, GetQuerysetMultiTenantMixin):
 
     @field()
     def is_internal_location(self, info) -> bool:
-        return self.is_internal_location
+        return self.shippingaddress.company.is_internal_company
 
 
 @type(Inventory, filters=InventoryFilter, order=InventoryOrder, pagination=True, fields="__all__")

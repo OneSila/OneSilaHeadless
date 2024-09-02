@@ -21,6 +21,10 @@ class Inventory(models.Model):
         unique_together = ('product', 'inventorylocation')
         verbose_name_plural = "inventories"
 
+    def reduce_quantity(self, quantity):
+        self.quantity -= quantity
+        self.save()
+
     def __str__(self):
         return '{}: {}@{}'.format(self.product, self.inventorylocation, self.quantity)
 

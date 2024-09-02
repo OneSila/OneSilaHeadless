@@ -28,7 +28,9 @@ class TestPrepareShipmentFactory(CreateTestOrderMixin, TestCaseDemoDataMixin, Te
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
         order_qty = 1
         order = self.create_test_order('test_prepare_shipment', product, order_qty)
-        order.set_status_to_ship()
+        # Use bulk update method to ensure we dont trigger signals.
+        Order.objects.filter(id=order.id).update(status=order.TO_SHIP)
+        order.refresh_from_db()
 
         f = PrepareShipmentsFactory(order)
         f.run()
@@ -50,7 +52,9 @@ class TestPrepareShipmentFactory(CreateTestOrderMixin, TestCaseDemoDataMixin, Te
         product = Product.objects.get(sku=BUNDLE_PEN_AND_INK_SKU, multi_tenant_company=self.multi_tenant_company)
         order_qty = 1
         order = self.create_test_order('test_prepare_shipment', product, order_qty)
-        order.set_status_to_ship()
+        # Use bulk update method to ensure we dont trigger signals.
+        Order.objects.filter(id=order.id).update(status=order.TO_SHIP)
+        order.refresh_from_db()
 
         logger.debug(f"{order=} with {order.orderitem_set.all()}")
 
@@ -91,7 +95,8 @@ class TestPrepareShipmentFactory(CreateTestOrderMixin, TestCaseDemoDataMixin, Te
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
         order_qty = 15
         order = self.create_test_order('test_prepare_shipment', product, order_qty)
-        order.set_status_to_ship()
+        Order.objects.filter(id=order.id).update(status=order.TO_SHIP)
+        order.refresh_from_db()
         qty_available = product.inventory.physical()
 
         f = PrepareShipmentsFactory(order)

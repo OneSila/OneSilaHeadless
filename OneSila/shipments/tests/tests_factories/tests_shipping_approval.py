@@ -14,10 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 class TestPreApproveShippingFactory(CreateTestOrderMixin, TestCaseDemoDataMixin, TestCase):
-    def test_pre_approve_shipping_in_stock(self):
+    def test_pre_approve_shipping_in_stock_draft_status(self):
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
         order_qty = 1
-        order = self.create_test_order('test_pre_approve_shipping_in_stock', product, order_qty)
+        order = self.create_test_order('test_pre_approve_shipping_in_stock_draft_status', product, order_qty)
         order.set_status_draft()
 
         with self.assertRaises(SanityCheckError):
@@ -30,18 +30,12 @@ class TestPreApproveShippingFactory(CreateTestOrderMixin, TestCaseDemoDataMixin,
         order = self.create_test_order('test_pre_approve_shipping_in_stock', product, order_qty)
         order.set_status_pending_processing()
 
-        f = PreApproveShippingFactory(order)
-        f.run()
+        self.assertEqual(order.SHIPPED, order.status)
 
-        self.assertTrue(order.is_to_ship())
-
-    def test_pre_approve_shipping_partial_stock(self):
+    def test_pre_approve_shipping_partial_stock_factory(self):
         product = Product.objects.get(sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU, multi_tenant_company=self.multi_tenant_company)
         order_qty = 15
         order = self.create_test_order('test_prepare_shipment', product, order_qty)
         order.set_status_pending_processing()
 
-        f = PreApproveShippingFactory(order)
-        f.run()
-
-        self.assertTrue(order.is_pending_shipping_approval())
+        self.assertEqual(order.PENDING_SHIPPING_APPROVAL, order.status)

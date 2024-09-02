@@ -149,7 +149,9 @@ class InventoryQuerySet(MultiTenantQuerySet):
         return salable
 
     def reserved(self):
-        """Items that have been sold but not shipped"""
+        """Items that have been sold but not shipped. How is it shipped?  Look at the packages"""
+        from shipments.models import Package, Shipment
+
         product = self._hints['instance']
         multi_tenant_company = product.multi_tenant_company
 
@@ -161,7 +163,17 @@ class InventoryQuerySet(MultiTenantQuerySet):
             distinct().\
             aggregate(Sum('quantity'))['quantity__sum'] or 0
 
-        return sold_agg
+        pending_shippping_agg = product.shipmentitem_set.\
+            filter(shipments__status__in=Shipment.RESERVED_STOCK_STATUSSES).\
+            distinct().\
+            aggregate(Sum('quantity'))['quantity__sum'] or 0
+
+        pending_packages_agg = product.packageitem_set.\
+            filter(package__status__in=Package.RESERVED_STOCK_STATUSSES).\
+            distinct().\
+            aggregate(Sum('quantity'))['quantity__sum'] or 0
+
+        return sold_agg + pending_shippping_agg + pending_packages_agg
 
     def await_inventory(self):
         # NOTE: Technically this should be inventory pending status
@@ -238,7 +250,7 @@ class InventoryLocationQuerySet(MultiTenantQuerySet):
     def filter_locations_for_product(self, product):
         # this all needs tranlating into either manufacturable or supplier products to get the right locations.
         if product.is_manufacturable() or product.is_supplier_product():
-            return self.filter(multi_tenant_company=multi_tenant_company,
+            return self.filter(multi_tenant_company=product.multi_tenant_company,
                 product=product)
         elif product.is_simple():
             products = product.supplier_products.all()
@@ -253,7 +265,7 @@ class InventoryLocationQuerySet(MultiTenantQuerySet):
 
             return self.filter(id__in=location_ids)
         else:
-            raise ValueError(f"Product type {produt.type} not implemented.")
+            raise ValueError(f"Product type {product.type} not implemented.")
 
 
 class InventoryLocationManager(MultiTenantManager):
@@ -264,5 +276,5 @@ class InventoryLocationManager(MultiTenantManager):
     def filter_by_shippingaddress_set(self, shippingaddress_set):
         return self.get_queryset().filter_by_shippingaddress_set(shippingaddress_set)
 
-    def filter_locations_for_product(product, qty):
+    def filter_locations_for_product(self, product, qty):
         return self.get_queryset().filter_locations_for_product(product, qty)

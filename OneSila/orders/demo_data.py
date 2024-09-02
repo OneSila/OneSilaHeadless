@@ -61,3 +61,4 @@ class SalesOrderGenerator(PrivateStructuredDataGenerator):
                 multi_tenant_company=self.multi_tenant_company,
                 **item
             )
+        instance.set_status_pending_processing()

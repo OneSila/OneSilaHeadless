@@ -146,6 +146,27 @@ class Product(TranslatedModelMixin, models.Model):
 
         return BundleVariation.objects.filter(id__in=all_variation_ids)
 
+    def get_parent_products(self, ids_only=False):
+        product_ids = set()
+        product_ids.add(self.id)
+
+        for prod in self.base_products.all().iterator():
+            product_ids.add(prod.id)
+
+        bundles = BundleVariation.objects.filter(variation_id__in=product_ids)
+        for bv in bundles.iterator():
+            product_ids.add(bv.parent.id)
+
+            logging.debug(f"Is this a bundle? {bv.parent=}?  {bv.parent.is_bundle()}")
+
+            if bv.parent.is_bundle():
+                product_ids.update(bv.parent.get_parent_products(ids_only=True))
+
+        if ids_only:
+            return product_ids
+
+        return Product.objects.filter(id__in=product_ids)
+
     def get_proxy_instance(self):
         if self.is_simple():
             return SimpleProduct.objects.get(pk=self.pk)
