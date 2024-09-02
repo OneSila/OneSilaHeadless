@@ -25,6 +25,11 @@ def validate_file_extensions(value):
     validate_extension(value, valid_extensions)
 
 
+def validate_attachment_extensions(value):
+    valid_extensions = ['.pdf', '.xlsx', '.xls', '.docx', '.doc', '.eml', '.jpg', '.png']
+    validate_extension(value, valid_extensions)
+
+
 def validate_pdf_extension(value):
     '''Validate if the upload has is a jpg or png image'''
     valid_extensions = ['.pdf']
