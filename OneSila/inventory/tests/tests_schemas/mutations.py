@@ -28,7 +28,7 @@ INVENTORY_MOVEMENT_CREATE = """
           id
         }
         movementFrom {
-            ... on InventoryType {
+            ... on InventoryLocationType {
                 id
             }
             ... on PurchaseOrderType {
@@ -36,7 +36,7 @@ INVENTORY_MOVEMENT_CREATE = """
             }
         }
         movementTo {
-            ... on InventoryType {
+            ... on InventoryLocationType {
                 id
             }
             ... on PackageType {

@@ -13,6 +13,9 @@ from shipments.models import Package
 
 from .signals import inventory_received, inventory_sent
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Inventory(models.Model):
     '''
@@ -32,9 +35,6 @@ class Inventory(models.Model):
         verbose_name_plural = "inventories"
 
     def reduce_quantity(self, quantity):
-        if quantity > self.quantity:
-            raise ValidationError(f"Cannot reduce inventory with {quantity}. Available quantity {self.quantity}.")
-
         self.quantity -= quantity
         self.save()
 
@@ -46,6 +46,9 @@ class Inventory(models.Model):
         return '{}: {}@{}'.format(self.product, self.inventorylocation, self.quantity)
 
     def save(self, *args, **kwargs):
+        if self.quantity < 0:
+            raise IntegrityError(f"Inventory cannot have a quantity < 0.")
+
         if not (self.product.is_supplier_product() or self.product.is_manufacturable()):
             raise IntegrityError(_("Inventory can only be attached to a SUPPLIER or MANUFACTURABLE PRODUCT. Not a {}".format(self.product.type)))
 
@@ -67,12 +70,35 @@ class InventoryLocation(models.Model):
 
     objects = InventoryLocationManager()
 
+    def reduce_quantity(self, product, quantity):
+        # Why no try / except / DoestNotExist?
+        # because you cant reduce something that doesnt exist.
+        # NOTE: Perhaps we should remove the locatoin if there
+        # if no more inventory left on the location?
+        try:
+            inv = self.inventory_set.get(
+                multi_tenant_company=self.multi_tenant_company,
+                product=product)
+            inv.reduce_quantity(quantity)
+        except self.inventory_set.model.DoesNotExist:
+            raise IntegrityError(f"There is no inventory present on this location for the given product.")
+
+    def increase_quantity(self, product, quantity):
+        # If this location does not have the product in question, then
+        # we simply create it.
+        try:
+            inv = self.inventory_set.get(
+                multi_tenant_company=self.multi_tenant_company,
+                product=product)
+            inv.increase_quantity(quantity)
+        except self.inventory_set.model.DoesNotExist:
+            inv = self.inventory_set.create(
+                multi_tenant_company=self.multi_tenant_company,
+                product=product,
+                quantity=quantity)
+
     def __str__(self):
         return self.name
-
-    # @property
-    # def is_internal_location(self):
-    #     return self.shippingaddress.company.is_internal_company
 
     class Meta:
         search_terms = ['name']
@@ -85,10 +111,10 @@ class InventoryMovement(models.Model):
     """
     MOVEMENT_FROM_MODELS = [
         PurchaseOrder,
-        Inventory,
+        InventoryLocation,
         OrderReturn
     ]
-    MOVEMENT_TO_MODELS = [Inventory, Package]
+    MOVEMENT_TO_MODELS = [InventoryLocation, Package]
 
     # Source of inventory movement (e.g., from a warehouse, a purchase order or return)
     mf_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='inventory_movements_from')
@@ -142,4 +168,3 @@ class InventoryMovement(models.Model):
             models.Index(fields=['mt_content_type', 'mt_object_id']),
             models.Index(fields=['mf_content_type', 'mf_object_id', 'mt_content_type', 'mt_object_id']),
         ]
-        # ordering = ['-created_at']  # Default ordering by creation date, descending

@@ -9,7 +9,7 @@ from shipments.flows import prepare_shipments_flow, pre_approve_shipping_flow
 from inventory.models import InventoryMovement
 
 
-class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, InventoryTestCaseMixin, TestCase):
+class InventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, InventoryTestCaseMixin, TestCase):
     def pack_and_dispatch_all_items_in_order(self, order):
         from shipments.models import Package, PackageItem
 
@@ -21,22 +21,16 @@ class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, 
 
             for item in shipment.shipmentitemtoship_set.all():
                 physical_inventory = item.product.inventory.filter_physical().filter(quantity__gte=1)
-
+                location = physical_inventory.first().inventorylocation
                 pre_physical = item.product.inventory.physical()
 
                 InventoryMovement.objects.create(
                     multi_tenant_company=self.multi_tenant_company,
-                    movement_from=physical_inventory.first(),
+                    movement_from=location,
                     movement_to=package,
                     quantity=item.quantity,
                     product=item.product,
                 )
-                # package_item = package.packageitem_set.create(
-                #     multi_tenant_company=self.multi_tenant_company,
-                #     product=item.product,
-                #     inventory=physical_inventory.first(),
-                #     quantity=item.quantity)
-
                 post_physical = item.product.inventory.physical()
 
                 self.assertFalse(post_physical == pre_physical)

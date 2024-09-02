@@ -9,7 +9,7 @@ query inventoryMovements{
           id
         }
         movementFrom {
-                    ... on InventoryType {
+                    ... on InventoryLocationType {
                 id
                 }
                 ... on PurchaseOrderType {
@@ -17,7 +17,7 @@ query inventoryMovements{
                   }
         }
         movementTo {
-                    ... on InventoryType {
+                    ... on InventoryLocationType {
                 id
                 }
                 ... on PackageType {

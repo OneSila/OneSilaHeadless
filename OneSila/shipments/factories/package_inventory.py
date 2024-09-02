@@ -12,7 +12,11 @@ class PackageItemInventoryMoveFactory:
         self.movement_from = movement_from
         self.multi_tenant_company = package.multi_tenant_company
         self.product = product
-        self.inventory = movement_from
+        self.inventorylocation = movement_from
+        # NOTE: This inventory workaround is made in order
+        # to grab the inventory object as packageitems use this at
+        # this point.  BUT should they??
+        self.inventory = self.inventorylocation.inventory_set.get(product=product)
 
     def create_packageitem(self):
         self.packageitem = self.package.packageitem_set.create(

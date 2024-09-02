@@ -24,6 +24,28 @@ class InventoryTestCaseMixin:
 
 
 class InventoryTestCase(TestCaseDemoDataMixin, InventoryTestCaseMixin, TestCase):
+    def test_reductions(self):
+        prod = ManufacturableProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company)
+        quantity = 10
+        inv = Inventory.objects.create(product=prod,
+                inventorylocation=self.inventory_location,
+                multi_tenant_company=self.multi_tenant_company,
+                quantity=0)
+        inv.increase_quantity(quantity)
+        self.assertEqual(inv.quantity, quantity)
+
+        inv.reduce_quantity(quantity)
+        self.assertEqual(inv.quantity, 0)
+
+        loc = self.inventory_location
+        loc.increase_quantity(prod, quantity)
+        inv.refresh_from_db()
+        self.assertEqual(inv.quantity, quantity)
+        loc.reduce_quantity(prod, quantity)
+        inv.refresh_from_db()
+        self.assertEqual(inv.quantity, 0)
+
     def test_inventory_reduce_too_much(self):
         prod = ManufacturableProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company)
@@ -33,7 +55,7 @@ class InventoryTestCase(TestCaseDemoDataMixin, InventoryTestCaseMixin, TestCase)
                 multi_tenant_company=self.multi_tenant_company,
                 quantity=quantity)
 
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(IntegrityError):
             inv.reduce_quantity(quantity + 1)
 
     def test_inventory_to_inventory_not_identical(self):
@@ -72,10 +94,13 @@ class InventoryTestCase(TestCaseDemoDataMixin, InventoryTestCaseMixin, TestCase)
 
         movement = InventoryMovement.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            movement_from=inv,
-            movement_to=inv_bis,
+            movement_from=self.inventory_location,
+            movement_to=self.inventory_location_bis,
             quantity=quantity,
             product=prod)
+
+        inv.refresh_from_db()
+        inv_bis.refresh_from_db()
 
         self.assertEqual(inv_qty_ori - quantity, inv.quantity)
         self.assertEqual(inv_qty_bis_ori + quantity, inv_bis.quantity)

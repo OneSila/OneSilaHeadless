@@ -17,12 +17,12 @@ class BuyDropshippingProductsTestCase(CreateTestOrderMixin, TestCaseDemoDataMixi
             inventorylocation__precise=False,
         ).first()
 
-        inventory_qty_original = inventory.quantity
+        qty_original = product.inventory.physical()
 
-        purchase_order = PurchaseOrder.objects.filter(
-            multi_tenant_company=self.multi_tenant_company,
-        ).first(
-        )
+        purchase_order = PurchaseOrder.objects.\
+            filter(
+                multi_tenant_company=self.multi_tenant_company).\
+            first()
         po_item = purchase_order.purchaseorderitem_set.create(
             multi_tenant_company=self.multi_tenant_company,
             quantity=100,
@@ -30,14 +30,14 @@ class BuyDropshippingProductsTestCase(CreateTestOrderMixin, TestCaseDemoDataMixi
         )
 
         qty_received = 10
+        location = inventory.inventorylocation
         InventoryMovement.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             movement_from=purchase_order,
             product=product,
             quantity=qty_received,
-            movement_to=inventory
+            movement_to=location
         )
         po_item.refresh_from_db()
-        inventory.refresh_from_db()
         self.assertEqual(po_item.quantity_received, qty_received)
-        self.assertEqual(inventory_qty_original + qty_received, inventory.quantity)
+        self.assertEqual(qty_original + qty_received, product.inventory.physical())

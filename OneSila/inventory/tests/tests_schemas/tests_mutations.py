@@ -15,25 +15,26 @@ class InventoryMutationTestCase(TestCaseWithDemoData, TransactionTestCaseMixin, 
         loc = InventoryLocation.objects.filter(multi_tenant_company=self.multi_tenant_company).first()
         loc_bis = InventoryLocation.objects.filter(multi_tenant_company=self.multi_tenant_company).last()
 
-        inv = Inventory.objects.create(multi_tenant_company=self.multi_tenant_company,
-            quantity=10, inventorylocation=loc, product=supplier_prod)
-        inv_bis = Inventory.objects.create(multi_tenant_company=self.multi_tenant_company,
-            quantity=10, inventorylocation=loc_bis, product=supplier_prod)
-
-        self.assertTrue(inv is not None)
-        self.assertTrue(inv_bis is not None)
+        self.assertTrue(loc is not None)
+        self.assertTrue(loc_bis is not None)
 
         supplier_prod_id = self.to_global_id(supplier_prod)
-        inv_id = self.to_global_id(inv)
-        inv_bis_id = self.to_global_id(inv_bis)
+        loc_id = self.to_global_id(loc)
+        loc_bis_id = self.to_global_id(loc_bis)
+
+        inv = loc.inventory_set.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=supplier_prod,
+            quantity=5
+        )
 
         resp = self.strawberry_test_client(
             query=INVENTORY_MOVEMENT_CREATE,
             variables={'data': {
                 'product': {'id': supplier_prod_id},  # GlobalID
                 'quantity': 5,
-                'movementToId': inv_id,
-                'movementFromId': inv_bis_id,
+                'movementFromId': loc_id,
+                'movementToId': loc_bis_id,
             }
             }
         )

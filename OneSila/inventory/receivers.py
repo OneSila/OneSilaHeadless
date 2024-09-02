@@ -7,14 +7,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@receiver(inventory_sent, sender=Inventory)
-def inventories__inventory__inventory_sent(sender, instance, quantity_sent, **kwargs):
-    instance.reduce_quantity(quantity_sent)
+@receiver(inventory_sent, sender=InventoryLocation)
+def inventories__inventory__inventory_sent(sender, instance, product, quantity_sent, **kwargs):
+    instance.reduce_quantity(product, quantity_sent)
 
 
-@receiver(inventory_received, sender=Inventory)
-def inventories__inventory__inventory_received(sender, instance, quantity_received, **kwargs):
-    instance.increase_quantity(quantity_received)
+@receiver(inventory_received, sender=InventoryLocation)
+def inventories__inventory__inventory_received(sender, instance, product, quantity_received, **kwargs):
+    instance.increase_quantity(product, quantity_received)
 
 
 @receiver(post_save, sender=Inventory)

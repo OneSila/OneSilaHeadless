@@ -33,9 +33,9 @@ class InventoryMovementType(relay.Node, GetQuerysetMultiTenantMixin):
     product: ProductType
 
     @field()
-    def movement_to(self, info) -> PackageType | InventoryType:
+    def movement_to(self, info) -> PackageType | InventoryLocationType:
         return self.movement_to
 
     @field()
-    def movement_from(self, info) -> PurchaseOrderType | InventoryType | OrderReturnType:
+    def movement_from(self, info) -> PurchaseOrderType | InventoryLocationType | OrderReturnType:
         return self.movement_from
