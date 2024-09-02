@@ -55,6 +55,10 @@ class MultiTenantCompany(models.Model):
 
 class MultiTenantAwareMixin(models.Model):
     multi_tenant_company = models.ForeignKey(MultiTenantCompany, on_delete=models.PROTECT, null=True, blank=True)
+    created_by_multi_tenant_user = models.ForeignKey("core.MultiTenantUser", on_delete=models.PROTECT, null=True, blank=True,
+        related_name='%(class)s_created_by_multi_tenant_user_set')
+    last_update_by_multi_tenant_user = models.ForeignKey("core.MultiTenantUser", on_delete=models.PROTECT, null=True, blank=True,
+        related_name='%(class)s_last_update_by_multi_tenant_user_set')
 
     objects = MultiTenantManager()
 

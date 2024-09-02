@@ -1,5 +1,5 @@
 from products.models import Product, ConfigurableVariation, BundleVariation, SupplierProduct
-from inventory.signals import product_inventory_change
+from inventory.signals import inventory_change
 
 
 import logging
@@ -11,7 +11,7 @@ class InventoryChangeProductUpdateTriggerFactory:
     Trigger a signal for both the products related to the inventory product
     and the product and their real proxy product type.
     """
-    signal = product_inventory_change
+    signal = inventory_change
 
     def __init__(self, inventory):
         self.inventory = inventory
