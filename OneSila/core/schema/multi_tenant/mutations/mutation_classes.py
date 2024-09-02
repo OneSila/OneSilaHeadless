@@ -155,6 +155,7 @@ class EnableUserMutation(DjangoUpdateMutation):
             instance.refresh_from_db()
             return instance
 
+
 class UpdateOnboardingStatusMutation(GetCurrentUserMixin, DjangoUpdateMutation):
     def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
         from core.factories.multi_tenant import CreateInternalCompanyFromOwnerCompany
@@ -174,6 +175,7 @@ class UpdateOnboardingStatusMutation(GetCurrentUserMixin, DjangoUpdateMutation):
                 fac.run()
 
             return user
+
 
 class CreateDemoDataMutation(GetMultiTenantCompanyMixin, DjangoUpdateMutation):
     @django_resolver

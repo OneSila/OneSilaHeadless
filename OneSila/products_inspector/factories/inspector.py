@@ -10,6 +10,7 @@ from products_inspector.signals import inspector_missing_info_detected, inspecto
 
 logger = logging.getLogger(__name__)
 
+
 class SaveInspectorMixin:
     def save_inspector(self):
         applicability_fields = [
@@ -68,6 +69,7 @@ class SaveInspectorMixin:
                 inspector_missing_optional_info_resolved.send(sender=self.product.__class__, instance=self.product)
                 logger.info(f"Signal inspector_missing_optional_info_resolved sent for product {self.product.sku}.")
 
+
 class ResyncInspectorFactory(SaveInspectorMixin):
     def __init__(self, inspector):
         self.inspector = inspector
@@ -105,10 +107,11 @@ class ResyncInspectorFactory(SaveInspectorMixin):
         self._sync_all_blocks()
         self.save_inspector()
 
+
 class InspectorCreateOrUpdateFactory(SaveInspectorMixin):
     def __init__(self, product, clear_blocks=False, run_sync=True):
         self.product = product
-        self.clear_blocks = clear_blocks # if clear blocks is true it will also check if the existent blocks should exist
+        self.clear_blocks = clear_blocks  # if clear blocks is true it will also check if the existent blocks should exist
         self.multi_tenant_company = product.multi_tenant_company
         self.run_sync = run_sync
 

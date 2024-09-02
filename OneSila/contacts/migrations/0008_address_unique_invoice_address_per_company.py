@@ -13,6 +13,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddConstraint(
             model_name='address',
-            constraint=models.UniqueConstraint(condition=models.Q(('is_invoice_address', True)), fields=('company',), name='unique_invoice_address_per_company', violation_error_message='Company already has an invoice address.'),
+            constraint=models.UniqueConstraint(condition=models.Q(('is_invoice_address', True)), fields=(
+                'company',), name='unique_invoice_address_per_company', violation_error_message='Company already has an invoice address.'),
         ),
     ]

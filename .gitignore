@@ -7,7 +7,7 @@ __pycache__/
 # static and media files in root
 /static/
 /mediafiles/
-
+/testfiles/
 
 # C extensions
 *.so

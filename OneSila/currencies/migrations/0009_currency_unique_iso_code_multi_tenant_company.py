@@ -13,6 +13,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddConstraint(
             model_name='currency',
-            constraint=models.UniqueConstraint(fields=('iso_code', 'multi_tenant_company'), name='unique_iso_code_multi_tenant_company', violation_error_message='This currency already exists.'),
+            constraint=models.UniqueConstraint(fields=('iso_code', 'multi_tenant_company'),
+                                               name='unique_iso_code_multi_tenant_company', violation_error_message='This currency already exists.'),
         ),
     ]

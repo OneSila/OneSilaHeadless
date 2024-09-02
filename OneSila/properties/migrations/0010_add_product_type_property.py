@@ -2,6 +2,7 @@
 
 from django.db import migrations
 
+
 def add_product_type_property(apps, schema_editor):
     from django.utils.text import slugify
     from core.defaults import get_product_type_name
@@ -25,13 +26,13 @@ def add_product_type_property(apps, schema_editor):
             multi_tenant_company=multi_tenant_company
         )
 
-
         PropertyTranslation.objects.create(
             property=property_instance,
             language=language,
             name=name,
             multi_tenant_company=multi_tenant_company
         )
+
 
 class Migration(migrations.Migration):
 

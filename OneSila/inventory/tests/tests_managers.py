@@ -1,11 +1,128 @@
-from core.tests import TestCase
+from core.tests import TestCase, TestCaseDemoDataMixin
 from inventory.models import InventoryLocation, Inventory
 from products.models import SimpleProduct, SupplierProduct, BundleProduct, \
     DropshipProduct, ManufacturableProduct, BundleVariation
 from .tests_models import InventoryTestCaseMixin
+from orders.tests.tests_factories.mixins import CreateTestOrderMixin
+from products.demo_data import SIMPLE_BLACK_FABRIC_PRODUCT_SKU, SIMPLE_PEN_SKU
+from shipments.flows import prepare_shipments_flow, pre_approve_shipping_flow
+
+
+class TestInventoryNumbersTestCase(TestCaseDemoDataMixin, CreateTestOrderMixin, InventoryTestCaseMixin, TestCase):
+    def pack_and_dispatch_all_items_in_order(self, order):
+        from shipments.models import Package, PackageItem
+
+        for shipment in order.shipment_set.all():
+            package = Package.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                type=Package.BOX,
+                shipment=shipment)
+
+            for item in shipment.shipmentitemtoship_set.all():
+                physical_inventory = item.product.inventory.filter_physical().filter(quantity__gte=1)
+
+                pre_physical = item.product.inventory.physical()
+
+                package_item = package.packageitem_set.create(
+                    multi_tenant_company=self.multi_tenant_company,
+                    product=item.product,
+                    inventory=physical_inventory.first(),
+                    quantity=item.quantity)
+
+                post_physical = item.product.inventory.physical()
+
+                self.assertFalse(post_physical == pre_physical)
+                self.assertTrue(post_physical < pre_physical)
+
+            package.set_status_dispatched()
+
+    def test_inventory_number(self):
+        # We start with a simple product with one supplier product and 10 items on stock
+        # 1) We sell 1 - but leave the order on draft.
+        #   So we should have 10 physically on stock, 0 reserved and 10 salable.
+        # 2) When we change the status and mark it as processing, it should adjust the items to
+        #   So we should have 10 physically on stock, 1 reserved and 9 salable.
+        # 3) Ship the items, we still expect all the same items to be in the state before
+        #   shipping
+        # 4) Time for packing.  Pack and ship the items.
+        #   items should be removed from physical and reserved stock
+
+        simple = SimpleProduct.objects.get(multi_tenant_company=self.multi_tenant_company,
+            sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU)
+
+        pre_order_physical = simple.inventory.physical()
+        pre_order_reserved = simple.inventory.reserved()
+        pre_order_salable = simple.inventory.salable()
+
+        order_qty = 1
+
+        order = self.create_test_order('test_inventory_number', simple, order_qty)
+
+        self.assertEqual(simple.inventory.physical(), pre_order_physical)
+        self.assertEqual(simple.inventory.salable(), pre_order_salable)
+        self.assertEqual(simple.inventory.reserved(), pre_order_reserved)
+
+        # No need to take more action, the automated flows should just ship
+        # these items without further action.
+        order.set_status_pending_processing()
+        self.assertEqual(order.status, order.SHIPPED)
+        self.pack_and_dispatch_all_items_in_order(order)
+
+        self.assertEqual(simple.inventory.physical(), pre_order_physical - order_qty)
+        self.assertEqual(simple.inventory.reserved(), pre_order_reserved)
+        self.assertEqual(simple.inventory.salable(), pre_order_salable - order_qty)
+
+    def test_oversold_inventory_number(self):
+        # We start with a simple product with one supplier product and 10 items on stock
+        # 1) We sell 1 - but leave the order on draft.
+        #   So we should have 10 physically on stock, 0 reserved and 10 salable.
+        # 2) When we change the status and mark it as processing, it should adjust the items to
+        #   So we should have 10 physically on stock, 1 reserved and 9 salable.
+
+        simple = SimpleProduct.objects.get(multi_tenant_company=self.multi_tenant_company,
+            sku=SIMPLE_BLACK_FABRIC_PRODUCT_SKU)
+        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
+        supplier.base_products.add(simple)
+
+        physical = simple.inventory.physical()
+        reserved = simple.inventory.reserved()
+        salable = simple.inventory.salable()
+
+        order_qty = 100
+
+        order = self.create_test_order('test_oversold_inventory_number', simple, order_qty)
+
+        self.assertEqual(simple.inventory.physical(), physical)
+        self.assertEqual(simple.inventory.salable(), salable)
+        self.assertEqual(simple.inventory.reserved(), reserved)
+
+        order.set_status_pending_processing()
+        self.assertEqual(order.status, order.PENDING_SHIPPING_APPROVAL)
+
+        self.assertEqual(simple.inventory.physical(), physical)
+        self.assertEqual(simple.inventory.reserved(), reserved + order_qty)
+        self.assertEqual(simple.inventory.salable(), 0)
+        self.assertEqual(simple.inventory.await_inventory(), reserved + order_qty - physical)
 
 
 class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
+    def test_salable(self):
+        simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
+        supplier.base_products.add(simple)
+
+        qty = 321
+        Inventory.objects.create(inventorylocation=self.inventory_location,
+            quantity=qty,
+            multi_tenant_company=self.multi_tenant_company,
+            product=supplier)
+
+        simple.inventory.\
+            order_by_least().\
+            order_by_relevant_shippinglocation(self.inventory_location.shipping_address.country).\
+            filter_internal().\
+            filter_by_shippingaddress(self.inventory_location.shipping_address)
+
     def test_salable(self):
         simple = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         supplier = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
@@ -137,6 +254,8 @@ class InventoryQuerySetPhysicalTestCase(InventoryTestCaseMixin, TestCase):
 
         physical = bundle.inventory.physical()
         self.assertEqual(physical, min(qty_one / bundle_qty, qty_two / bundle_qty))
+
+        bundle.inventory.filter_physical()
 
     def test_physical_nested_bundles_with_bundle(self):
         bundle = BundleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)

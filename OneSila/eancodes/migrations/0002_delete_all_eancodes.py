@@ -2,9 +2,12 @@
 
 from django.db import migrations
 
+
 def delete_all_eancodes(apps, schema_editor):
     EanCode = apps.get_model('eancodes', 'EanCode')
     EanCode.objects.all().delete()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [

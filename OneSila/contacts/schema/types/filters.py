@@ -26,12 +26,14 @@ class SupplierFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     name: auto
     exclude_demo_data: Optional[bool]
 
+
 @filter(Customer)
 class CustomerFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     search: str | None
     id: auto
     name: auto
     exclude_demo_data: Optional[bool]
+
 
 @filter(Person)
 class PersonFilter(SearchFilterMixin):

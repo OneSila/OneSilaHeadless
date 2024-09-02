@@ -9,6 +9,7 @@ def inspector_creation_flow(product):
     factory = InspectorCreateOrUpdateFactory(product)
     factory.run()
 
+
 def resync_inspector_flow(inspector, run_async=True):
     """
     Flow to resync all blocks for the given inspector.

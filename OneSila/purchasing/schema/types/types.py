@@ -4,6 +4,7 @@ from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixi
 
 from typing import List
 
+from core.schema.multi_tenant.types.types import MultiTenantUserType, MinimalMultiTenantUserType
 from currencies.schema.types.types import CurrencyType
 from products.schema.types.types import SupplierProductType
 from purchasing.models import PurchaseOrder, PurchaseOrderItem
@@ -16,6 +17,7 @@ class PurchaseOrderType(relay.Node, GetQuerysetMultiTenantMixin):
     supplier: CompanyType
     currency: CurrencyType
     invoice_address: InvoiceAddressType
+    internal_contact: MinimalMultiTenantUserType
     shipping_address: ShippingAddressType
     purchaseorderitem_set: List[Annotated['PurchaseOrderItemType', lazy("purchasing.schema.types.types")]]
 
@@ -34,7 +36,7 @@ class PurchaseOrderType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(PurchaseOrderItem, filters=PurchaseOrderItemFilter, order=PurchaseOrderItemOrder, pagination=True, fields="__all__")
 class PurchaseOrderItemType(relay.Node, GetQuerysetMultiTenantMixin):
     purchase_order: PurchaseOrderType
-    item: SupplierProductType
+    product: SupplierProductType
 
     @field()
     def price_with_currency(self) -> str | None:

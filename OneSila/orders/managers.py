@@ -3,6 +3,7 @@ from core.managers import MultiTenantQuerySet, MultiTenantManager
 from core.models import Sum, F, FloatField, Count
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
+from products.models import Product
 
 from datetime import timedelta
 
@@ -18,17 +19,11 @@ class OrderQuerySet(MultiTenantQuerySet):
     def unprocessed(self):
         return self.filter(status__in=self.model.UNPROCESSED)
 
-    def in_production(self):
-        return self.filter(status__in=self.model.IN_PRODUCTION)
-
     def exclude_cancelled(self):
         return self.exclude(status=self.model.CANCELLED)
 
-    def held(self):
-        return self.filter(status__in=self.model.HELD)
-
-    def refunded(self):
-        return self.filter(status=self.model.REFUNDED)
+    def hold(self):
+        return self.filter(status__in=self.model.HOLD)
 
     def annotate_order_value(self):
         return self.annotate(order_value=Sum(F('orderitem__quantity') * F('orderitem__price'), output_field=FloatField()))
@@ -45,41 +40,8 @@ class OrderManager(MultiTenantManager):
     def exclude_cancelled(self):
         return self.get_queryset().exclude_cancelled()
 
-    def in_production(self):
-        return self.get_queryset().in_production()
-
-    def held(self):
-        return self.get_queryset().held()
-
-    def refunded(self):
-        return self.get_queryset().refunded()
-
-
-class OrderReportQuerySet(MultiTenantQuerySet):
-    def returns_per_month(self, year):
-        return self.filter(created_at__year=year).filter(status=self.model.REFUNDED)\
-            .annotate(month=TruncMonth('created_at'))\
-            .values('month')\
-            .annotate(c=Count('id'))\
-            .values('month', 'c')
-
-    def completed_per_month(self, year):
-        return self.filter(created_at__year=year).filter(status=self.model.DONE)\
-            .annotate(month=TruncMonth('created_at'))\
-            .values('month')\
-            .annotate(c=Count('id'))\
-            .values('month', 'c')
-
-
-class OrderReportManager(MultiTenantManager):
-    def get_queryset(self):
-        return OrderReportQuerySet(self.model, using=self._db)
-
-    def returns_per_month(self, year):
-        return self.get_queryset().returns_per_month(year)
-
-    def completed_per_month(self, year):
-        return self.get_queryset().completed_per_month(year)
+    def hold(self):
+        return self.get_queryset().hold()
 
 
 # ########## #
@@ -87,6 +49,9 @@ class OrderReportManager(MultiTenantManager):
 # ########## #
 
 class OrderItemQuerySet(MultiTenantQuerySet):
+    def exclude_dropshipping(self):
+        return self.exclude(product__type=Product.DROPSHIP)
+
     def total_value(self):
         '''
         is the sum of all price * quantity
@@ -115,6 +80,9 @@ class OrderItemQuerySet(MultiTenantQuerySet):
 class OrderItemManager(MultiTenantManager):
     def get_queryset(self):
         return OrderItemQuerySet(self.model, using=self._db)  # Important!
+
+    def exclude_dropshipping(self):
+        return self.get_queryset().exclude_dropshipping()
 
     def total_value(self):
         return self.get_queryset().total_value()

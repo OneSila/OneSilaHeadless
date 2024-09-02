@@ -1,13 +1,15 @@
 from django.urls import path
 from .views import OrderListView, OrderDetailViev, OrderUpdateView, OrderDeleteView, \
     OrderItemListView, OrderItemDetailViev, OrderItemUpdateView, OrderItemDeleteView, \
-    OrderNoteListView, OrderNoteDetailViev, OrderNoteUpdateView, OrderNoteDeleteView
+    OrderNoteListView, OrderNoteDetailViev, OrderNoteUpdateView, OrderNoteDeleteView, \
+    OrderConfirmationFileViev
 
 app_name = 'orders'
 
 urlpatterns = [
     path('orders/', OrderListView.as_view(), name='orders_list'),
     path('orders/<str:pk>/', OrderDetailViev.as_view(), name='order_detail'),
+    path('orders/<str:pk>/confirmation/', OrderConfirmationFileViev.as_view(), name='order_confirmation'),
     path('orders/<str:pk>/update/', OrderUpdateView.as_view(), name='order_update'),
     path('orders/<str:pk>/delete/', OrderDeleteView.as_view(), name='order_delete'),
     path('order-items/', OrderItemListView.as_view(), name='order_items_list'),
