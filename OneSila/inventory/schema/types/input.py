@@ -3,8 +3,6 @@ from core.schema.core.types.input import NodeInput, input, partial
 from strawberry.relay import GlobalID
 
 from inventory.models import Inventory, InventoryLocation, InventoryMovement
-from purchasing.schema.types.input import PurchaseOrderPartialInput
-from shipments.schema.types.input import PackagePartialInput
 
 
 INVENTORY_MOVEMENT_EXCLUDES = ['mf_content_type', 'mf_object_id', 'mt_content_type', 'mt_object_id', 'movement_from', 'movement_to']

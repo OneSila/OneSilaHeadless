@@ -10,6 +10,7 @@ from .filters import InventoryFilter, InventoryLocationFilter
 from .ordering import InventoryOrder, InventoryLocationOrder
 from purchasing.schema.types.types import PurchaseOrderType
 from shipments.schema.types.types import PackageType
+from order_returns.schema.types.types import OrderReturnType
 
 
 @type(InventoryLocation, filters=InventoryLocationFilter, order=InventoryLocationOrder, pagination=True, fields="__all__")
@@ -36,5 +37,5 @@ class InventoryMovementType(relay.Node, GetQuerysetMultiTenantMixin):
         return self.movement_to
 
     @field()
-    def movement_from(self, info) -> PurchaseOrderType | InventoryType:
+    def movement_from(self, info) -> PurchaseOrderType | InventoryType | OrderReturnType:
         return self.movement_from

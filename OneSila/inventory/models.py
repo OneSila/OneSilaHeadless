@@ -4,10 +4,10 @@ from core import models
 from .managers import InventoryManager, InventoryLocationManager
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 
 from purchasing.models import PurchaseOrder
-# FIXME: Add once returns are merged into the main branch.
-# from order_returns import OrderReturn
+from order_returns.models import OrderReturn
 from orders.models import Order
 from shipments.models import Package
 
@@ -32,6 +32,9 @@ class Inventory(models.Model):
         verbose_name_plural = "inventories"
 
     def reduce_quantity(self, quantity):
+        if quantity > self.quantity:
+            raise ValidationError(f"Cannot reduce inventory with {quantity}. Available quantity {self.quantity}.")
+
         self.quantity -= quantity
         self.save()
 
@@ -83,8 +86,7 @@ class InventoryMovement(models.Model):
     MOVEMENT_FROM_MODELS = [
         PurchaseOrder,
         Inventory,
-        # FIXME: Add once returns are merged into the main branch.
-        # OrderReturn
+        OrderReturn
     ]
     MOVEMENT_TO_MODELS = [Inventory, Package]
 

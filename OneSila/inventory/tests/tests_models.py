@@ -1,6 +1,7 @@
 from contacts.models import Supplier, ShippingAddress
 from core.tests import TestCase, TestCaseDemoDataMixin
 from django.db import IntegrityError
+from django.core.exceptions import ValidationError
 from inventory.models import Inventory, InventoryLocation, InventoryMovement
 from products.models import SupplierProduct, ConfigurableProduct, Product, \
     SimpleProduct, BundleProduct, DropshipProduct, ManufacturableProduct
@@ -23,6 +24,18 @@ class InventoryTestCaseMixin:
 
 
 class InventoryTestCase(TestCaseDemoDataMixin, InventoryTestCaseMixin, TestCase):
+    def test_inventory_reduce_too_much(self):
+        prod = ManufacturableProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company)
+        quantity = 10
+        inv = Inventory.objects.create(product=prod,
+                inventorylocation=self.inventory_location,
+                multi_tenant_company=self.multi_tenant_company,
+                quantity=quantity)
+
+        with self.assertRaises(ValidationError):
+            inv.reduce_quantity(quantity + 1)
+
     def test_inventory_to_inventory_not_identical(self):
         prod = ManufacturableProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company)
