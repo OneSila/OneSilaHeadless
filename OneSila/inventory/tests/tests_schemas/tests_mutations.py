@@ -20,6 +20,9 @@ class InventoryMutationTestCase(TestCaseWithDemoData, TransactionTestCaseMixin, 
         inv_bis = Inventory.objects.create(multi_tenant_company=self.multi_tenant_company,
             quantity=10, inventorylocation=loc_bis, product=supplier_prod)
 
+        self.assertTrue(inv is not None)
+        self.assertTrue(inv_bis is not None)
+
         supplier_prod_id = self.to_global_id(supplier_prod)
         inv_id = self.to_global_id(inv)
         inv_bis_id = self.to_global_id(inv_bis)
@@ -27,10 +30,10 @@ class InventoryMutationTestCase(TestCaseWithDemoData, TransactionTestCaseMixin, 
         resp = self.strawberry_test_client(
             query=INVENTORY_MOVEMENT_CREATE,
             variables={'data': {
-                'product': {'id': supplier_prod_id},
+                'product': {'id': supplier_prod_id},  # GlobalID
                 'quantity': 5,
-                'movementTo': {'id': inv_id},
-                'movementFrom': {'id': inv_bis_id},
+                'movementToId': inv_id,
+                'movementFromId': inv_bis_id,
             }
             }
         )
