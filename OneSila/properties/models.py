@@ -6,8 +6,6 @@ from translations.models import TranslationFieldsMixin, TranslatedModelMixin
 from builtins import property as django_property  # in this file we will use property as django property because we have fields named property
 from django.db.models import Q
 from django.core.exceptions import ValidationError
-from django.utils.text import slugify
-
 
 class Property(TranslatedModelMixin, models.Model):
     """https://github.com/TweaveTech/django-classifier/blob/master/classifier/models.py"""

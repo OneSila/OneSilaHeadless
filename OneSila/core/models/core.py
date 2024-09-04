@@ -25,6 +25,9 @@ class OnlySaveOnChangeMixin(DirtyFieldsMixin, OldModel):
     def is_dirty_field(self, field):
         return field in self.get_dirty_fields().keys()
 
+    def is_any_field_dirty(self, fields: list) -> bool:
+        return any(self.is_dirty_field(field) for field in fields)
+
     class Meta:
         abstract = True
 

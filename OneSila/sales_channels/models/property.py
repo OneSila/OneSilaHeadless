@@ -25,6 +25,8 @@ class RemotePropertySelectValue(PolymorphicModel, RemoteObjectMixin, models.Mode
     local_instance = models.ForeignKey('peropeties.PropertySelectValue',
                                               on_delete=models.CASCADE,
                                               help_text="The local PropertySelectValue associated with this remote value.")
+    remote_property = models.ForeignKey(RemoteProperty, on_delete=models.CASCADE, help_text="The remote property associated with this remote value.")
+
 
     class Meta:
         unique_together = ('sales_channel', 'property_select_value')

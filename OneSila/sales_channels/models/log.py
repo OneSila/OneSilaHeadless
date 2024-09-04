@@ -29,14 +29,6 @@ class RemoteLog(models.Model):
         (STATUS_FAILED, 'Failed'),
     ]
 
-    # identifier = ... factory class name ClassName:methodName
-    # is_useer error
-    # try:
-    #     someting()
-    # except self.sales_channel._user_errors as e:
-    #     self.model.add_user_error(e)
-    # except Exception as e:
-    #     self.model.add_admin_error(e)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
@@ -47,6 +39,8 @@ class RemoteLog(models.Model):
     payload = models.JSONField(null=True, blank=True, help_text="The API call payload associated with this log.")
     response = models.TextField(null=True, blank=True, help_text="The API response or additional information.")
     error_traceback = models.TextField(null=True, blank=True, help_text="Detailed error traceback if the action failed.")
+    user_error = models.BooleanField(default=False)  # Boolean field to indicate if the error is user-facing
+    identifier = models.CharField(max_length=255, null=True, blank=True)  # Field to store a unique identifier for the log entry
     keep = models.BooleanField(default=False, help_text="Whether to keep this log permanently.")
 
     class Meta:

@@ -1,8 +1,15 @@
+from django.core.exceptions import ValidationError
+
 from core import models
 from polymorphic.models import PolymorphicModel
 from django.conf import settings
 from core.helpers import get_languages
+from core.huey import DEFAULT_PRIORITY
 from sales_channels.models.mixins import RemoteObjectMixin
+from django.utils.timezone import now
+
+import logging
+logger = logging.getLogger(__name__)
 
 class SalesChannel(PolymorphicModel, models.Model):
     """
@@ -131,3 +138,108 @@ class RemoteLanguage(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     def __str__(self):
         return f"Remote language {self.local_instance} (Remote code: {self.remote_code}) on {self.sales_channel.hostname}"
+
+class RemoteTaskQueue(models.Model):
+    PENDING = 'PENDING'
+    PROCESSING = 'PROCESSING'
+    PROCESSED = 'PROCESSED'
+    FAILED = 'FAILED'  # New status
+    STATUS_CHOICES = [
+        (PENDING, 'Pending'),
+        (PROCESSING, 'Processing'),
+        (PROCESSED, 'Processed'),
+        (FAILED, 'Failed'),  # New status choice
+    ]
+
+    sales_channel = models.ForeignKey(SalesChannel, on_delete=models.CASCADE)
+    task_name = models.CharField(max_length=255)
+    task_args = models.JSONField()
+    task_kwargs = models.JSONField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=PENDING)
+    sent_to_queue_at = models.DateTimeField(default=now)
+    retry = models.IntegerField(default=0)
+    error_message = models.TextField(null=True, blank=True)
+    error_traceback = models.TextField(null=True, blank=True)
+    number_of_remote_requests = models.IntegerField(default=1) # how many remote requests does this task do?
+    priority = models.IntegerField(default=DEFAULT_PRIORITY)
+
+    @classmethod
+    def get_pending_tasks(cls, sales_channel):
+        # Sum the number of remote requests for currently processing tasks
+        processing_requests = cls.objects.filter(
+            sales_channel=sales_channel,
+            status=cls.PROCESSING
+        ).aggregate(total=models.Sum('number_of_remote_requests'))['total'] or 0
+
+        # Calculate the number of requests that can still be processed
+        remaining_requests = sales_channel.requests_per_minute - processing_requests
+
+        if remaining_requests > 0:
+            # Get pending tasks, ordered by priority (high first) then by sent_to_queue_at
+            pending_tasks = cls.objects.filter(
+                sales_channel=sales_channel,
+                status=cls.PENDING
+            ).order_by('-priority', 'sent_to_queue_at')
+
+            # Select tasks until the sum of their remote requests fits the remaining capacity
+            selected_tasks = []
+            total_requests = 0
+
+            for task in pending_tasks:
+                task_requests = task.number_of_remote_requests
+                if total_requests + task_requests <= remaining_requests:
+                    task.status = cls.PROCESSING
+                    selected_tasks.append(task)
+                    total_requests += task_requests
+                else:
+                    break
+
+            if selected_tasks:
+                cls.objects.bulk_update(selected_tasks, ['status'])
+            return selected_tasks
+
+        return []
+
+    def mark_as_processed(self):
+        self.status = self.PROCESSED
+        self.save()
+
+    def mark_as_failed(self):
+        self.retry += 1
+        if self.retry < 3:
+            self.status = self.PENDING
+            self.sent_to_queue_at = now()  # Move to the back of the queue
+        else:
+            self.status = self.FAILED
+        self.save()
+
+    def dispatch(self):
+        if self.status != self.PROCESSING:
+            raise ValidationError("Cannot dispatch not proccessing tasks.")
+
+        task_func = globals().get(self.task_name)
+        if task_func:
+            logger.info(f"Dispatching task '{self.task_name}' for SalesChannel '{self.sales_channel.name}'.")
+            # Pass task_queue_item_id, sales_channel_id, and relevant args to the task
+            task_func(
+                self.id,
+                *self.task_args,
+                **self.task_kwargs
+            )
+        else:
+            logger.error(f"Task '{self.task_name}' not found.")
+
+    def retry(self, retry_now=False):
+        self.retry = 0
+
+        if retry_now:
+            self.status = self.PROCESSING
+        else:
+            self.status = self.PENDING
+
+
+        self.sent_to_queue_at = now()
+        self.save()
+
+        if retry_now:
+            self.dispatch()

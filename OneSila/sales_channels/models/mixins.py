@@ -1,5 +1,7 @@
 from core import models
 from django.contrib.contenttypes.models import ContentType
+import json
+from datetime import datetime
 
 class RemoteObjectMixin(models.Model):
     """
@@ -18,11 +20,12 @@ class RemoteObjectMixin(models.Model):
     # this should be overriden in the save we should make a qs on the logs to all the different identifier of the latest versions
     # they all need to be success for this to be true
     outdated = models.BooleanField(default=False, help_text="Indicates if the remote product is outdated due to an error.")
+    outdated_since = models.DateTimeField(null=True, blank=True, help_text="Timestamp indicating when the object became outdated.")
 
     class Meta:
         abstract = True
 
-    def add_log(self, action, response, payload, *args, **kwargs):
+    def add_log(self, action, response, payload, identifier,  **kwargs):
         from .log import RemoteLog
 
         """
@@ -33,25 +36,55 @@ class RemoteObjectMixin(models.Model):
             status=RemoteLog.STATUS_SUCCESS,
             response=response,
             payload=payload,
-            *args, **kwargs
+            identifier=identifier,
+           **kwargs
         )
 
-    def add_error(self, action, response, payload, error_traceback, is_timeout=False, *args, **kwargs):
+    def add_error(self, action, response, payload, error_traceback, identifier, user_error=False, **kwargs):
         from .log import RemoteLog
         """
         Method to add an error log entry.
         """
-        status = RemoteLog.STATUS_TIMEOUT if is_timeout else RemoteLog.STATUS_FAILED
         self.create_log_entry(
             action=action,
-            status=status,
+            status=RemoteLog.STATUS_FAILED,
             response=response,
             payload=payload,
             error_traceback=error_traceback,
-            *args, **kwargs
+            identifier=identifier,
+            user_error=user_error,
+            **kwargs
         )
 
-    def create_log_entry(self, action, status, response, payload, error_traceback=None, *args, **kwargs):
+    def add_user_error(self, action, response, payload, error_traceback, identifier, **kwargs):
+        """
+        Method to add a user-facing error log entry.
+        """
+        self.add_error(
+            action=action,
+            response=response,
+            payload=payload,
+            error_traceback=error_traceback,
+            identifier=identifier,
+            user_error=True,
+            **kwargs
+        )
+
+    def add_admin_error(self, action, response, payload, error_traceback, identifier, **kwargs):
+        """
+        Method to add an admin-facing error log entry.
+        """
+        self.add_error(
+            action=action,
+            response=response,
+            payload=payload,
+            error_traceback=error_traceback,
+            identifier=identifier,
+            user_error=False,
+            **kwargs
+        )
+
+    def create_log_entry(self, action, status, response, payload, error_traceback=None, identifier=None, user_error=False, **kwargs):
         from .log import RemoteLog
         """
         Method to create a log entry.
@@ -66,5 +99,70 @@ class RemoteObjectMixin(models.Model):
             status=status,
             response=response,
             payload=payload,
-            error_traceback=error_traceback
+            error_traceback=error_traceback,
+            identifier=identifier,
+            user_error=user_error,
+            **kwargs
         )
+
+    @property
+    def payload(self):
+        """
+        Property to get the payload of the last log entry.
+        """
+        from .log import RemoteLog
+        last_log = RemoteLog.objects.filter(
+            content_type=ContentType.objects.get_for_model(self),
+            object_id=self.pk,
+            content_object=self,
+            sales_channel=self.sales_channel
+        ).order_by('-created_at').first()
+        return last_log.payload if last_log else {}
+
+    def need_update(self, new_payload):
+        """
+        Compares the current payload with a new one to determine if an update is needed.
+        """
+        current_payload = self.payload
+        return json.dumps(current_payload, sort_keys=True) != json.dumps(new_payload, sort_keys=True)
+
+    @property
+    def errors(self):
+        """
+        Property to retrieve the latest errors based on unique identifiers.
+        Only includes errors that are the latest occurrence of their identifier.
+        """
+        from .log import RemoteLog
+        # Fetch the latest logs for each identifier
+        latest_logs = RemoteLog.objects.filter(
+            content_type=ContentType.objects.get_for_model(self),
+            object_id=self.pk,
+            content_object=self
+        ).order_by('identifier', '-created_at').distinct('identifier')
+
+        # Return only logs with a FAILED status
+        return latest_logs.filter(status=RemoteLog.STATUS_FAILED)
+
+    def mark_outdated(self, save=True):
+        """
+        Marks the object as outdated due to an error and sets the outdated_since timestamp.
+        """
+        self.outdated = True
+        self.outdated_since = datetime.now()
+        if save:
+            self.save()
+
+    def save(self, *args, **kwargs):
+        """
+        Overrides save method to check for errors and mark as outdated if necessary.
+        """
+        # Check if there are any errors
+        if self.errors.exists():
+            self.mark_outdated(save=False)  # Mark as outdated without saving immediately
+        else:
+            # Reset outdated status if no errors are found
+            self.outdated = False
+            self.outdated_since = None
+
+        # Call the original save method
+        super().save(*args, **kwargs)

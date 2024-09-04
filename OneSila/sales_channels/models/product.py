@@ -8,13 +8,10 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
     Polymorphic model representing the remote mirror of a Product.
     """
 
-    product = models.ForeignKey('products.Product', on_delete=models.CASCADE, db_index=True, help_text="The local Product instance associated with this remote product.")
+    local_instance = models.ForeignKey('products.Product', on_delete=models.CASCADE, db_index=True, help_text="The local Product instance associated with this remote product.")
     remote_sku = models.CharField(max_length=255, help_text="The SKU of the product in the remote system.")
     is_variation = models.BooleanField(default=False, help_text="Indicates if this product is a variation.")
     remote_parent_product = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, help_text="The remote parent product for variations.")
-    payload = models.JSONField(help_text="The JSON payload representing this product in the remote system.")
-
-
 
     # user wants last error
     # admin wants all the errors
@@ -26,36 +23,8 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Remote Products'
 
     def __str__(self):
-        return f"{self.product.name} (SKU: {self.remote_sku})"
+        return f"{self.local_instance.name} (SKU: {self.remote_sku})"
 
-    def need_update(self, new_payload):
-        import json
-        """
-        Compares the current payload with a new one to determine if an update is needed.
-        """
-        return json.dumps(self.payload, sort_keys=True) != json.dumps(new_payload, sort_keys=True)
-
-    def mark_outdated(self, save=True):
-        """
-        Marks the assign as outdated due to an error and sets the outdated_since timestamp.
-        """
-        self.outdated = True
-        self.outdated_since = models.DateTimeField(auto_now=True)
-        if save:
-            self.save()
-
-    def get_related_error_logs(self):
-        """
-        Retrieves all related error logs through the associated RemoteProduct and filters by outdated_since.
-        """
-        if not self.outdated_since:
-            return None
-
-        # @TODO: Extend that to also use errors from stock, price,e product properties error and so on
-        return self.remotelog_set.filter(
-            status=RemoteLog.STATUS_FAILED,
-            created_at__gte=self.outdated_since
-        )
 
 class RemoteInventory(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
@@ -71,7 +40,7 @@ class RemoteInventory(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Remote Inventories'
 
     def __str__(self):
-        return f"Inventory for {self.remote_product.product.name} - Quantity: {self.quantity}"
+        return f"Inventory for {self.remote_product.local_instance.name} - Quantity: {self.quantity}"
 
 class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
@@ -88,7 +57,7 @@ class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Remote Prices'
 
     def __str__(self):
-        return f"Price for {self.remote_product.product.name} - {self.price}"
+        return f"Price for {self.remote_product.local_instance.name} - {self.price}"
 
 class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
@@ -103,7 +72,7 @@ class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Remote Product Contents'
 
     def __str__(self):
-        return f"Content sync status for {self.remote_product.product.name}"
+        return f"Content sync status for {self.remote_product.local_instance.name}"
 
 class RemoteImage(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
