@@ -117,7 +117,8 @@ class PurchaseOrderItem(models.Model):
     """
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE)
     product = models.ForeignKey(SupplierProduct, on_delete=models.PROTECT)
-    quantity = models.IntegerField()
+    quantity = models.IntegerField(default=0)
+    quantity_received = models.IntegerField(default=0)
     unit_price = models.FloatField(null=True)
     orderitem = models.ForeignKey('orders.OrderItem', null=True, blank=True,
         on_delete=models.CASCADE)
@@ -129,6 +130,10 @@ class PurchaseOrderItem(models.Model):
 
     def currency(self):
         return self.purchase_order.currency
+
+    def add_quantity_received(self, quantity):
+        self.quantity_received += quantity
+        self.save()
 
     def subtotal_string(self):
         return f"{self.currency().symbol} {self.subtotal()}"

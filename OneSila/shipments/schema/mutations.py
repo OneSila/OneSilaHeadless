@@ -20,8 +20,10 @@ class ShipmentsMutation:
     delete_package: PackageType = delete()
     delete_packages: List[PackageType] = delete()
 
-    create_packageitem: PackageItemType = create(PackageItemInput)
-    create_packageitems: List[PackageItemType] = create(PackageItemInput)
-    update_packageitem: PackageItemType = update(PackageItemPartialInput)
-    delete_packageitem: PackageItemType = delete()
-    delete_packageitems: List[PackageItemType] = delete()
+    # # Package items are disabled, we dont create them directly from the frontend.
+    # # Inventory movements will take care of the create.
+    # create_packageitem: PackageItemType = create(PackageItemInput)
+    # create_packageitems: List[PackageItemType] = create(PackageItemInput)
+    # update_packageitem: PackageItemType = update(PackageItemPartialInput)
+    # delete_packageitem: PackageItemType = delete()
+    # delete_packageitems: List[PackageItemType] = delete()

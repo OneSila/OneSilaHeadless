@@ -14,11 +14,16 @@ class PurchaseOrderPartialInput(NodeInput):
     pass
 
 
-@input(PurchaseOrderItem, fields="__all__")
+# We cannot set quantity_recieved directly.  You
+# MUST use an InventoryMovement from the PurchaseOrder to an Inventory
+@input(PurchaseOrderItem, exclude=["quantity_recieved"])
 class PurchaseOrderItemInput:
     pass
 
+# We cannot set quantity_recieved directly.  You
+# MUST use an InventoryMovement from the PurchaseOrder to an Inventory
 
-@partial(PurchaseOrderItem, fields="__all__")
+
+@partial(PurchaseOrderItem, exclude=["quantity_recieved"])
 class PurchaseOrderItemPartialInput(NodeInput):
     pass

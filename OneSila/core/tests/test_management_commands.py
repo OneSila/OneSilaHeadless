@@ -11,3 +11,6 @@ class UrlManagementCommandsTestCase(TestCase):
 
     def test_list_urls(self):
         os.system('./manage.py list_urls >/dev/null 2>&1')
+
+    def test_generate_schema(self):
+        os.system('./manage.py generate_schema all --dryrun  >/dev/null 2>&1')
