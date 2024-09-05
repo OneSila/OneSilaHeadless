@@ -23,3 +23,9 @@ delete_remote_property_select_value = ModelSignal(use_caching=True)
 create_remote_product_property = ModelSignal(use_caching=True)
 update_remote_product_property = ModelSignal(use_caching=True)
 delete_remote_product_property = ModelSignal(use_caching=True)
+
+
+update_remote_inventory = ModelSignal(use_caching=True)
+
+
+update_remote_price = ModelSignal(use_caching=True)

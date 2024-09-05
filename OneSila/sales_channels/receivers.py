@@ -1,10 +1,11 @@
 from django.db.models.signals import post_delete, pre_delete
 from core.signals import post_create, post_update
+from inventory.models import Inventory
 from .signals import (
     create_remote_property,
     update_remote_property,
     delete_remote_property, create_remote_property_select_value, update_remote_property_select_value, delete_remote_property_select_value,
-    create_remote_product_property, update_remote_product_property, delete_remote_product_property,
+    create_remote_product_property, update_remote_product_property, delete_remote_product_property, update_remote_inventory,
 )
 from django.dispatch import receiver
 from properties.models import Property, PropertyTranslation, PropertySelectValueTranslation, PropertySelectValue, ProductProperty, \
@@ -166,3 +167,16 @@ def sales_channels__product_property_text_translation__post_update_receiver(send
 def sales_channels__product_property_text_translation__pre_delete_receiver(sender, instance: ProductPropertyTextTranslation, **kwargs):
     if instance.product_property.property.is_public_information:
         update_remote_product_property.send(sender=instance.product_property.__class__, instance=instance.product_property)
+
+
+# ------------------------------------------------------------- SEND SIGNALS FOR INVENTORY
+
+@receiver(post_create, sender='inventory.Inventory')
+@receiver(post_update, sender='inventory.Inventory')
+@receiver(post_delete, sender='inventory.Inventory')
+def handle_inventory_changes(sender, instance: Inventory, **kwargs):
+    """
+    Handles post-create, post-update, and post-delete events for the Inventory model.
+    - Sends an update signal for the associated product's inventory.
+    """
+    update_remote_inventory.send(sender=instance.product.__class__, instance=instance.product)

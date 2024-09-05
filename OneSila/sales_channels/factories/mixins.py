@@ -216,6 +216,7 @@ class RemoteInstanceUpdateFactory:
 
     # Configurable Create Factory for recreating instances if needed
     create_factory_class = None  # Should be overridden in subclasses with the specific Create Factory
+    create_if_not_exists = False  # Configurable parameter to create the instance if not found
 
     def __init__(self, local_instance, sales_channel):
         self.local_instance = local_instance  # Instance of the local model
@@ -250,15 +251,20 @@ class RemoteInstanceUpdateFactory:
             )
 
             if not self.remote_instance.successfully_created:
+                self.remote_instance.delete()
                 # Attempt to "repair" by recreating the remote instance
-                self.recreate_remote_instance()
+                self.create_remote_instance()
                 # Abort the update after re-creation attempt
                 self.successfully_updated = False
 
         except self.remote_model_class.DoesNotExist:
-            raise ValueError("Remote instance does not exist and cannot be updated.")
+            if self.create_if_not_exists:
+                self.create_remote_instance()
+                self.successfully_updated = False
+            else:
+                raise ValueError(f"Remote instance for value {self.local_instance} does not exist on website {self.sales_channel} and cannot be updated.")
 
-    def recreate_remote_instance(self):
+    def create_remote_instance(self):
         """
         Attempts to recreate the remote instance using the specified Create Factory.
         """

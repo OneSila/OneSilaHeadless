@@ -7,6 +7,7 @@ class RemotePropertyCreateFactory(RemoteInstanceCreateFactory):
 
 class RemotePropertyUpdateFactory(RemoteInstanceUpdateFactory):
     local_model_class = Property
+    create_if_not_exists = True
 
 class RemotePropertyDeleteFactory(RemoteInstanceDeleteFactory):
     local_model_class = Property
@@ -25,7 +26,7 @@ class RemotePropertySelectValueCreateFactory(RemotePropertyEnsureMixin, RemoteIn
 
 class RemotePropertySelectValueUpdateFactory(RemoteInstanceUpdateFactory):
     local_model_class = PropertySelectValue
-
+    create_if_not_exists = True
 
 class RemotePropertySelectValueDeleteFactory(RemoteInstanceDeleteFactory):
     local_model_class = PropertySelectValue
@@ -93,6 +94,7 @@ class RemoteProductPropertyCreateFactory(RemotePropertyEnsureMixin, RemoteInstan
 
 class RemoteProductPropertyUpdateFactory(RemoteInstanceUpdateFactory):
     local_model_class = ProductProperty
+    create_if_not_exists = True
 
 class RemoteProductPropertyDeleteFactory(RemoteInstanceDeleteFactory):
     local_model_class = ProductProperty
