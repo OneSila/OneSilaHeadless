@@ -1,11 +1,17 @@
 from django.db.models.signals import post_delete, pre_delete
 from core.signals import post_create, post_update
 from inventory.models import Inventory
+from media.models import Media
+from sales_prices.models import SalesPriceListItem
+from sales_prices.signals import price_changed
+from .models.sales_channels import SalesChannelViewAssign
 from .signals import (
     create_remote_property,
     update_remote_property,
     delete_remote_property, create_remote_property_select_value, update_remote_property_select_value, delete_remote_property_select_value,
-    create_remote_product_property, update_remote_product_property, delete_remote_product_property, update_remote_inventory,
+    create_remote_product_property, update_remote_product_property, delete_remote_product_property, update_remote_inventory, update_remote_price,
+    update_remote_product_content, remove_remote_product_variation, add_remote_product_variation, create_remote_image_association,
+    update_remote_image_association, delete_remote_image_association, delete_remote_image,
 )
 from django.dispatch import receiver
 from properties.models import Property, PropertyTranslation, PropertySelectValueTranslation, PropertySelectValue, ProductProperty, \
@@ -174,9 +180,153 @@ def sales_channels__product_property_text_translation__pre_delete_receiver(sende
 @receiver(post_create, sender='inventory.Inventory')
 @receiver(post_update, sender='inventory.Inventory')
 @receiver(post_delete, sender='inventory.Inventory')
-def handle_inventory_changes(sender, instance: Inventory, **kwargs):
+def sales_channels__inventory__update(sender, instance: Inventory, **kwargs):
     """
     Handles post-create, post-update, and post-delete events for the Inventory model.
     - Sends an update signal for the associated product's inventory.
     """
     update_remote_inventory.send(sender=instance.product.__class__, instance=instance.product)
+
+# ------------------------------------------------------------- SEND SIGNALS FOR PRICES
+
+@receiver(post_create, sender='prices.SalesChannelIntegrationPricelist')
+def sales_channels__sales_channel_integration_pricelist__post_create_receiver(sender, instance, **kwargs):
+    """
+    Trigger a price change signal for all products using the price list when a new price list is added to a sales channel.
+    """
+    sales_channel = instance.sales_channel
+    assigns = SalesChannelViewAssign.objects.filter(sales_channel_view__sales_channel=sales_channel)
+    for assign in assigns:
+        update_remote_price.send(sender=assign.product.__class__, instance=assign.product)
+
+@receiver(post_delete, sender='prices.SalesChannelIntegrationPricelist')
+def sales_channels__sales_channel_integration_pricelist__post_delete_receiver(sender, instance, **kwargs):
+    """
+    Trigger a price change signal for all products using the price list when a price list is removed from a sales channel.
+    """
+    sales_channel = instance.sales_channel
+    assigns = SalesChannelViewAssign.objects.filter(sales_channel_view__sales_channel=sales_channel)
+    for assign in assigns:
+        update_remote_price.send(sender=assign.product.__class__, instance=assign.product)
+
+
+@receiver(post_update, sender='prices.SalesPriceList')
+def sales_channels__sales_price_list__post_update_receiver(sender, instance, **kwargs):
+    """
+    Trigger a price change signal for all products using the price list when the price list's dates are updated.
+    """
+    if instance.is_any_field_dirty(['start_date', 'end_date']):
+        price_list_items = SalesPriceListItem.objects.filter(salespricelist=instance)
+        for item in price_list_items:
+            update_remote_price.send(sender=item.product.__class__, instance=item.product)
+
+
+@receiver(post_delete, sender='prices.SalesPriceList')
+def sales_channels__sales_price_list__pre_delete_receiver(sender, instance, **kwargs):
+    """
+    Trigger a price change signal for all products using the price list when a price list is deleted.
+    """
+    price_list_items = SalesPriceListItem.objects.filter(salespricelist=instance)
+    for item in price_list_items:
+        update_remote_price.send(sender=item.product.__class__, instance=item.product)
+
+
+@receiver(post_create, sender='prices.SalesPriceListItem')
+@receiver(post_update, sender='prices.SalesPriceListItem')
+@receiver(post_delete, sender='prices.SalesPriceListItem')
+def sales_channels__sales_price_list_item__post_create_receiver(sender, instance, **kwargs):
+    update_remote_price.send(sender=instance.product.__class__, instance=instance.product)
+
+
+@receiver(post_update, sender='prices.SalesPrice')
+def sales_channels__sales_price__post_update_receiver(sender, instance, **kwargs):
+    """
+    Trigger a price change signal when the product price or RRP is updated.
+    """
+    update_remote_price.send(sender=instance.product.__class__, instance=instance.product)
+
+@receiver(price_changed, sender='products.Product')
+def sales_channels__price_changed__receiver(sender, instance, **kwargs):
+    """
+    Handle the price_changed signal to check trigger the update_remote_price signal if so.
+    """
+    update_remote_price.send(sender=instance.__class__, instance=instance)
+
+# ------------------------------------------------------------- SEND SIGNALS FOR PRODUCT CONTENT
+
+@receiver(post_create, sender='products.ProductTranslation')
+@receiver(post_update, sender='products.ProductTranslation')
+@receiver(post_delete, sender='products.ProductTranslation')
+def sales_channels__product_translation__post_create_update_delete_receiver(sender, instance, **kwargs):
+    """
+    Trigger the update_remote_product_content signal for the associated product
+    whenever a ProductTranslation is created, updated, or deleted.
+    """
+    update_remote_product_content.send(sender=instance.product.__class__, instance=instance.product)
+
+# ------------------------------------------------------------- SEND SIGNALS FOR VARIATIONS
+
+@receiver(post_create, sender='yourapp.ConfigurableVariation')
+def sales_channels__configurable_variation__post_create_receiver(sender, instance, **kwargs):
+    """
+    Handle post-create events for the ConfigurableVariation model.
+    Sends a signal to add the variation to the remote product.
+    """
+
+    add_remote_product_variation.send(
+        sender=instance.__class__,
+        parent_product=instance.parent,
+        variation_product=instance.variation
+    )
+
+@receiver(post_delete, sender='yourapp.ConfigurableVariation')
+def sales_channels__configurable_variation__post_delete_receiver(sender, instance, **kwargs):
+    """
+    Handle post-delete events for the ConfigurableVariation model.
+    Sends a signal to remove the variation from the remote product.
+    """
+
+    remove_remote_product_variation.send(
+        sender=instance.__class__,
+        parent_product=instance.parent,
+        variation_product=instance.variation
+    )
+
+# ------------------------------------------------------------- SEND SIGNALS FOR IMAGES
+
+@receiver(post_create, sender='media.MediaProductThrough')
+def sales_channels__media_product_through__post_create_receiver(sender, instance, **kwargs):
+    """
+    Handles the creation of MediaProductThrough instances.
+    Sends a create_remote_image_association signal if the media type is IMAGE.
+    """
+    if instance.media.type == Media.IMAGE:
+        create_remote_image_association.send(sender=instance.__class__, instance=instance)
+
+@receiver(post_update, sender='media.MediaProductThrough')
+def sales_channels__media_product_through__post_update_receiver(sender, instance, **kwargs):
+    """
+    Handles the update of MediaProductThrough instances.
+    Sends an update_remote_image_association signal if the sort_order or is_main_image fields are changed
+    and the media type is IMAGE.
+    """
+    if instance.media.type == Media.IMAGE and instance.is_any_field_dirty(['sort_order', 'is_main_image']):
+        update_remote_image_association.send(sender=instance.__class__, instance=instance)
+
+@receiver(post_delete, sender='media.MediaProductThrough')
+def sales_channels__media_product_through__post_delete_receiver(sender, instance, **kwargs):
+    """
+    Handles the deletion of MediaProductThrough instances.
+    Sends a delete_remote_image_association signal if the media type is IMAGE.
+    """
+    if instance.media.type == Media.IMAGE:
+        delete_remote_image_association.send(sender=instance.__class__, instance=instance)
+        
+@receiver(post_delete, sender='media.Media')
+def sales_channels__media__post_delete_receiver(sender, instance, **kwargs):
+    """
+    Handles the deletion of Media instances.
+    Sends a delete_remote_image signal if the media type is IMAGE.
+    """
+    if instance.type == Media.IMAGE:
+        delete_remote_image.send(sender=instance.__class__, instance=instance)

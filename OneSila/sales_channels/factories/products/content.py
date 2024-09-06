@@ -1,13 +1,12 @@
-from inventory.models import Inventory
-from ..mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
+from products.models import Product
+from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
 
-
-class RemoteInventoryUpdateFactory(RemoteInstanceUpdateFactory, ProductAssignmentMixin):
-    local_model_class = Inventory
+class RemoteProductContentUpdateFactory(RemoteInstanceUpdateFactory, ProductAssignmentMixin):
+    local_model_class = Product
 
     def __init__(self, local_instance, sales_channel):
         super().__init__(local_instance, sales_channel)
-        self.remote_product = self.get_remote_product(local_instance.product)
+        self.remote_product = self.get_remote_product(local_instance)
         self.remote_instance = None
 
 
@@ -28,10 +27,6 @@ class RemoteInventoryUpdateFactory(RemoteInstanceUpdateFactory, ProductAssignmen
                 remote_product=self.remote_product
             )
         except self.remote_model_class.DoesNotExist:
-            return False
-
-        # Check if the quantity matches the salable quantity
-        if self.remote_instance.quantity == self.local_instance.salable():
             return False
 
         return True

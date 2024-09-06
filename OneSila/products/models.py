@@ -267,6 +267,58 @@ class Product(TranslatedModelMixin, models.Model):
 
         return Product.objects.filter(id__in=unique_variations_ids)
 
+    def get_price_for_sales_channel(self, sales_channel):
+        from datetime import date
+        from sales_prices.models import SalesPrice, SalesPriceListItem
+        from sales_channels.models.sales_channels import SalesChannelIntegrationPricelist
+
+        today = date.today()
+
+        # Step 1: Check for Periodic Pricelist
+        periodic_pricelist = SalesChannelIntegrationPricelist.objects.filter(
+            sales_channel=sales_channel,
+            price_list__start_date__lte=today,
+            price_list__end_date__gte=today
+        ).first()
+
+        if periodic_pricelist:
+            # Check for a price list item for this product
+            price_item = SalesPriceListItem.objects.filter(
+                salespricelist=periodic_pricelist.price_list,
+                product=self
+            ).annotate_prices().first()
+
+            if price_item:
+                return price_item.price, price_item.discount
+
+        # Step 2: Check for Non-Periodic Pricelist
+        non_periodic_pricelist = SalesChannelIntegrationPricelist.objects.filter(
+            sales_channel=sales_channel,
+            price_list__start_date__isnull=True,
+            price_list__end_date__isnull=True
+        ).first()
+
+        if non_periodic_pricelist:
+            price_item = SalesPriceListItem.objects.filter(
+                salespricelist=non_periodic_pricelist.price_list,
+                product=self
+            ).annotate_prices().first()
+
+            if price_item:
+                return price_item.price, price_item.discount
+
+        # Step 3: Use Default Product Price
+        sales_price = SalesPrice.objects.filter(product=self).first()
+
+        if sales_price:
+            if sales_price.rrp:
+                return sales_price.rrp, sales_price.price
+            else:
+                return sales_price.price, None
+
+        # Fallback if no price information is available
+        return None, None
+
     def _generate_sku(self, save=False):
         self.sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
 

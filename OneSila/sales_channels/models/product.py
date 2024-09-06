@@ -42,6 +42,7 @@ class RemoteInventory(PolymorphicModel, RemoteObjectMixin, models.Model):
     def __str__(self):
         return f"Inventory for {self.remote_product.local_instance.name} - Quantity: {self.quantity}"
 
+
 class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the remote mirror of a product's price.
@@ -59,6 +60,7 @@ class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
     def __str__(self):
         return f"Price for {self.remote_product.local_instance.name} - {self.price}"
 
+
 class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the synchronization state of a product's content with a remote system.
@@ -73,6 +75,7 @@ class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     def __str__(self):
         return f"Content sync status for {self.remote_product.local_instance.name}"
+
 
 class RemoteImage(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
@@ -93,9 +96,9 @@ class RemoteImageProductAssociation(PolymorphicModel, RemoteObjectMixin, models.
     """
     Polymorphic model representing the association of a remote image with a remote product.
     """
-    local_instance = models.ForeignKey('MediaProductThrough', on_delete=models.CASCADE, help_text="The local MediaProductThrough instance associated with this remote association.")
+    local_instance = models.ForeignKey('media.MediaProductThrough', on_delete=models.CASCADE, help_text="The local MediaProductThrough instance associated with this remote association.")
     remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.CASCADE, help_text="The remote product associated with this image assignment.")
-    remote_image = models.ForeignKey('sales_channels.RemoteImage', on_delete=models.CASCADE, help_text="The remote image being assigned to the remote product.")
+    remote_image = models.ForeignKey(RemoteImage, on_delete=models.CASCADE, null=True, blank=True, help_text="The remote image being assigned to the remote product. Optional for direct links.")
 
     class Meta:
         unique_together = ('remote_product', 'remote_image')

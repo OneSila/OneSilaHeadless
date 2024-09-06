@@ -1,10 +1,14 @@
 from huey import crontab
-from huey.contrib.djhuey import db_periodic_task, db_task
+from huey.contrib.djhuey import db_periodic_task, db_task, periodic_task
+from datetime import date, timedelta
 
 from .models import SalesPrice
 from currencies.helpers import currency_convert
 
 import logging
+
+from .signals import price_changed
+
 logger = logging.getLogger(__name__)
 
 
@@ -54,3 +58,22 @@ def sales_price_list__salespricelistitem__update_prices_task(salespricelist):
 def salespricelistitem__update_prices_task(salespricelistitem):
     from sales_prices.flows import salespricelistitem__update_prices_flow
     salespricelistitem__update_prices_flow(salespricelistitem)
+
+@db_periodic_task(crontab(hour=2, minute=0))
+def salespricelistitem__check_price_changed_periodic_task():
+    from .models import SalesPriceList
+    """
+    Periodic task to check for promotions starting or ending.
+    """
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+
+    ending_promotions = SalesPriceList.objects.filter(end_date=yesterday)
+    for salespricelist in ending_promotions:
+        for item in salespricelist.salespricelistitem_set.all().iterator():
+            price_changed.send(sender=item.product.__class__, instance=item.product)
+
+    starting_promotions = SalesPriceList.objects.filter(start_date=today)
+    for salespricelist in starting_promotions:
+        for item in salespricelist.salespricelistitem_set.all().iterator():
+            price_changed.send(sender=item.product.__class__, instance=item.product)

@@ -44,7 +44,6 @@ class SalesChannelIntegrationPricelist(models.Model):
     def __str__(self):
         return f"{self.sales_channel} - {self.price_list}"
 
-
 class SalesChannelView(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Model representing a specific view of a sales channel

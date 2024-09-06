@@ -1,5 +1,5 @@
 from properties.models import Property, PropertySelectValue, ProductProperty
-from ..mixins import RemoteInstanceCreateFactory, RemoteInstanceDeleteFactory, RemoteInstanceUpdateFactory, RemotePropertyEnsureMixin
+from ..mixins import RemoteInstanceCreateFactory, RemoteInstanceDeleteFactory, RemoteInstanceUpdateFactory, RemotePropertyEnsureMixin, ProductAssignmentMixin
 
 
 class RemotePropertyCreateFactory(RemoteInstanceCreateFactory):
@@ -32,7 +32,7 @@ class RemotePropertySelectValueDeleteFactory(RemoteInstanceDeleteFactory):
     local_model_class = PropertySelectValue
 
 
-class RemoteProductPropertyCreateFactory(RemotePropertyEnsureMixin, RemoteInstanceCreateFactory):
+class RemoteProductPropertyCreateFactory(RemotePropertyEnsureMixin, RemoteInstanceCreateFactory, ProductAssignmentMixin):
     local_model_class = ProductProperty
 
     def __init__(self, local_instance, sales_channel, remote_property_factory, remote_product_factory, remote_property_select_value_factory):
@@ -40,27 +40,18 @@ class RemoteProductPropertyCreateFactory(RemotePropertyEnsureMixin, RemoteInstan
         self.remote_product_factory = remote_product_factory
         self.remote_property_select_value_factory = remote_property_select_value_factory
         self.local_property = local_instance.property
-        self.remote_product = self.get_remote_product(local_instance, sales_channel)
+        self.remote_product = self.get_remote_product(local_instance.product)
         super().__init__(local_instance, sales_channel)
 
-    def get_remote_product(self, local_instance, sales_channel):
-        """
-        Retrieves the RemoteProduct associated with the local Product.
-        If not found, returns None which will stop the factory process.
-        """
-        try:
-            return self.remote_product_factory.remote_model_class.objects.get(
-                local_instance=local_instance.product,
-                sales_channel=sales_channel
-            )
-        except self.remote_product_factory.remote_model_class.DoesNotExist:
-            return None
 
     def preflight_check(self):
         """
         Checks that the RemoteProduct exists before proceeding.
         """
         if not self.remote_product:
+            return False
+
+        if not self.assigned_to_website():
             return False
 
         return True

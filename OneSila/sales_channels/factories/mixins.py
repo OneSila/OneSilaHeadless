@@ -1,4 +1,7 @@
 import requests
+
+from ..models.product import RemoteProduct
+from ..models.sales_channels import SalesChannelViewAssign
 from ..signals import remote_instance_pre_create, remote_instance_post_create, remote_instance_post_update, remote_instance_pre_update, \
     remote_instance_pre_delete, remote_instance_post_delete
 from ..models.log import RemoteLog
@@ -399,7 +402,7 @@ class RemoteInstanceUpdateFactory:
         self.preflight_process()
         self.get_remote_instance()
 
-        # Abort if the instance was re-created
+        # Abort if the instance was created / re-created
         if not self.successfully_updated:
             return
 
@@ -520,6 +523,63 @@ class RemoteInstanceDeleteFactory:
         """
         self.delete()
 
+
+class ProductAssignmentMixin:
+    """
+    Mixin to assist with retrieving RemoteProduct instances and checking their
+    assignment status to websites (sales channels).
+    """
+
+    def get_remote_product(self, product):
+        """
+        Retrieves the RemoteProduct associated with the given product.
+
+        Args:
+            product: The local Product instance to find the corresponding RemoteProduct.
+            sales_channel: The sales channel for which the RemoteProduct should be retrieved.
+
+        Returns:
+            The RemoteProduct instance if found, otherwise None.
+        """
+        try:
+            return RemoteProduct.objects.get(
+                local_instance=product,
+                sales_channel=self.sales_channel
+            )
+        except RemoteProduct.DoesNotExist:
+            return None
+
+    def assigned_to_website(self):
+        """
+        Checks whether the RemoteProduct and its associated SalesChannelViewAssign exist.
+
+        This method verifies:
+        - If the remote product itself is assigned to a website.
+        - If the remote product is a variation, checks if its parent product is assigned to a website.
+
+        Returns:
+            bool: True if the remote product or its parent is assigned to a website, False otherwise.
+        """
+        # Ensure that remote_product is set for the instance using this mixin
+        if not hasattr(self, 'remote_product') or not self.remote_product:
+            return False
+
+        # Check for SalesChannelViewAssign associated with the remote product
+        assign_exists = SalesChannelViewAssign.objects.filter(
+            product=self.remote_product.local_instance,
+            remote_product=self.remote_product,
+            sales_channel=self.sales_channel
+        ).exists()
+
+        # If the product is a variation, also check the parent product's assign
+        if not assign_exists and self.remote_product.is_variation and self.remote_product.remote_parent_product:
+            assign_exists = SalesChannelViewAssign.objects.filter(
+                product=self.remote_product.remote_parent_product.local_instance,
+                remote_product=self.remote_product.remote_parent_product,
+                sales_channel=self.sales_channel
+            ).exists()
+
+        return assign_exists
 
 class RemotePropertyEnsureMixin:
     def preflight_process(self):
