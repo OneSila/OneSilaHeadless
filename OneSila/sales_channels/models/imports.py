@@ -1,7 +1,7 @@
 from core import models
 from polymorphic.models import PolymorphicModel
 from sales_channels.models.sales_channels import SalesChannel
-from .product import (
+from .products import (
     RemoteProduct,
     RemoteImage,
 )

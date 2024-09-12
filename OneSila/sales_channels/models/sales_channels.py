@@ -9,6 +9,7 @@ from sales_channels.models.mixins import RemoteObjectMixin
 from django.utils.timezone import now
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 class SalesChannel(PolymorphicModel, models.Model):
@@ -18,6 +19,8 @@ class SalesChannel(PolymorphicModel, models.Model):
 
     hostname = models.URLField()
     active = models.BooleanField(default=True)
+    verify_ssl = models.BooleanField(default=True)
+    requests_per_minute = models.IntegerField(default=60)
 
     class Meta:
         unique_together = ('multi_tenant_company', 'hostname')
@@ -33,7 +36,7 @@ class SalesChannelIntegrationPricelist(models.Model):
     """
 
     sales_channel = models.ForeignKey(SalesChannel, on_delete=models.CASCADE)
-    price_list = models.ForeignKey('prices.PriceList', on_delete=models.PROTECT)
+    price_list = models.ForeignKey('sales_prices.SalesPriceList', on_delete=models.PROTECT)
     # @TODO: Add save override validation
 
     class Meta:
@@ -152,8 +155,8 @@ class RemoteTaskQueue(models.Model):
 
     sales_channel = models.ForeignKey(SalesChannel, on_delete=models.CASCADE)
     task_name = models.CharField(max_length=255)
-    task_args = models.JSONField()
-    task_kwargs = models.JSONField()
+    task_args = models.JSONField(null=True, blank=True)
+    task_kwargs = models.JSONField(null=True, blank=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=PENDING)
     sent_to_queue_at = models.DateTimeField(default=now)
     retry = models.IntegerField(default=0)
@@ -161,6 +164,14 @@ class RemoteTaskQueue(models.Model):
     error_traceback = models.TextField(null=True, blank=True)
     number_of_remote_requests = models.IntegerField(default=1) # how many remote requests does this task do?
     priority = models.IntegerField(default=DEFAULT_PRIORITY)
+
+    @property
+    def name(self):
+        """Extracts the simplified task name from the task path."""
+        return self.task_name.split('.')[-1]
+
+    def __str__(self):
+        return f"{self.name} > {self.sales_channel.hostname}"
 
     @classmethod
     def get_pending_tasks(cls, sales_channel):
@@ -186,6 +197,13 @@ class RemoteTaskQueue(models.Model):
 
             for task in pending_tasks:
                 task_requests = task.number_of_remote_requests
+
+                # if a task is bigger than the limit just add it. It will keep the queue full until is finished but at least will be processed
+                if task_requests > sales_channel.requests_per_minute:
+                    task.status = cls.PROCESSING
+                    selected_tasks.append(task)
+                    break
+
                 if total_requests + task_requests <= remaining_requests:
                     task.status = cls.PROCESSING
                     selected_tasks.append(task)
@@ -203,24 +221,30 @@ class RemoteTaskQueue(models.Model):
         self.status = self.PROCESSED
         self.save()
 
-    def mark_as_failed(self):
+    def mark_as_failed(self, error_message=None, error_traceback=None):
         self.retry += 1
         if self.retry < 3:
             self.status = self.PENDING
             self.sent_to_queue_at = now()  # Move to the back of the queue
         else:
             self.status = self.FAILED
+            self.error_message = error_message
+            self.error_traceback = error_traceback
+
         self.save()
 
     def dispatch(self):
+        from sales_channels.helpers import resolve_function
+
         if self.status != self.PROCESSING:
             raise ValidationError("Cannot dispatch not proccessing tasks.")
 
-        task_func = globals().get(self.task_name)
+        task_func = resolve_function(self.task_name)
+
         if task_func:
-            logger.info(f"Dispatching task '{self.task_name}' for SalesChannel '{self.sales_channel.name}'.")
+            logger.info(f"Dispatching task '{self.task_name}' for SalesChannel '{self.sales_channel.hostname}'.")
             # Pass task_queue_item_id, sales_channel_id, and relevant args to the task
-            task_func(
+            return task_func(
                 self.id,
                 *self.task_args,
                 **self.task_kwargs
@@ -228,15 +252,10 @@ class RemoteTaskQueue(models.Model):
         else:
             logger.error(f"Task '{self.task_name}' not found.")
 
-    def retry(self, retry_now=False):
+    def retry_task(self, retry_now=False):
         self.retry = 0
 
-        if retry_now:
-            self.status = self.PROCESSING
-        else:
-            self.status = self.PENDING
-
-
+        self.status = self.PROCESSING if retry_now else self.PENDING
         self.sent_to_queue_at = now()
         self.save()
 

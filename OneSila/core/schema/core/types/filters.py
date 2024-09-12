@@ -1,6 +1,7 @@
 from typing import Optional
 
 from strawberry_django.filters import filter as strawberry_filter
+from strawberry_django import filter_field
 from strawberry import UNSET
 from strawberry import LazyType as lazy
 from core.managers import QuerySet

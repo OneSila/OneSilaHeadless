@@ -47,4 +47,4 @@ django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absol
 starlette
 
 git+https://github.com/jazzband/django-polymorphic.git@v4.0.0a#egg=django-polymorphic
-git+ssh://git@github.com/OneSila/OneSilaMagento2Api.git@v1.0.0#egg=OneSilaMagento2Api
+git+ssh://git@github.com/OneSila/OneSilaMagento2Api.git@v1.0.02

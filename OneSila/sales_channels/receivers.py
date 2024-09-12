@@ -11,12 +11,12 @@ from .signals import (
     delete_remote_property, create_remote_property_select_value, update_remote_property_select_value, delete_remote_property_select_value,
     create_remote_product_property, update_remote_product_property, delete_remote_product_property, update_remote_inventory, update_remote_price,
     update_remote_product_content, remove_remote_product_variation, add_remote_product_variation, create_remote_image_association,
-    update_remote_image_association, delete_remote_image_association, delete_remote_image,
+    update_remote_image_association, delete_remote_image_association, delete_remote_image, sales_channel_created, remote_product_deleted,
+    sales_view_assign_updated, remote_product_created,
 )
 from django.dispatch import receiver
 from properties.models import Property, PropertyTranslation, PropertySelectValueTranslation, PropertySelectValue, ProductProperty, \
     ProductPropertyTextTranslation
-
 
 # ------------------------------------------------------------- SEND SIGNALS FOR PROPERTIES
 
@@ -53,7 +53,6 @@ def sales_channels__property__pre_delete_receiver(sender, instance: Property, **
         delete_remote_property.send(sender=instance.__class__, instance=instance)
 
 
-# Receiver for PropertyTranslation model
 @receiver(post_create, sender='properties.PropertyTranslation')
 def sales_channels__property_translation__post_create_receiver(sender, instance: PropertyTranslation, **kwargs):
     """
@@ -62,7 +61,7 @@ def sales_channels__property_translation__post_create_receiver(sender, instance:
     """
     translation_count = PropertyTranslation.objects.filter(property=instance.property).count()
 
-    if translation_count == 1:
+    if translation_count == 1 and instance.property.is_public_information:
         # Send create signal only if this is the first translation
         create_remote_property.send(sender=instance.property.__class__, instance=instance.property)
 
@@ -80,8 +79,10 @@ def sales_channels__property_translation__post_delete_receiver(sender, instance:
     """
     Handles post-delete events for the PropertyTranslation model to send update signals.
     """
-    update_remote_property.send(sender=instance.property.__class__, instance=instance.property)
+    translation_count = PropertyTranslation.objects.filter(property=instance.property).count()
 
+    if translation_count > 0:
+        update_remote_property.send(sender=instance.property.__class__, instance=instance.property)
 
 # ------------------------------------------------------------- SEND SIGNALS FOR PROPERTIES SELECT VALUE
 
@@ -144,32 +145,32 @@ def sales_channels__property_select_value__pre_delete_receiver(sender, instance:
 
 # ------------------------------------------------------------- SEND SIGNALS FOR PRODUCT PROPERTIES VALUES
 
-@receiver(post_create, sender='attributes.ProductProperty')
+@receiver(post_create, sender='properties.ProductProperty')
 def sales_channels__product_property__post_create_receiver(sender, instance: ProductProperty, **kwargs):
     if instance.property.is_public_information:
         create_remote_product_property.send(sender=instance.__class__, instance=instance)
 
-@receiver(post_update, sender='attributes.ProductProperty')
+@receiver(post_update, sender='properties.ProductProperty')
 def sales_channels__product_property__post_update_receiver(sender, instance: ProductProperty, **kwargs):
     if instance.property.is_public_information:
         update_remote_product_property.send(sender=instance.__class__, instance=instance)
 
-@receiver(pre_delete, sender='attributes.ProductProperty')
+@receiver(pre_delete, sender='properties.ProductProperty')
 def sales_channels__product_property__pre_delete_receiver(sender, instance: ProductProperty, **kwargs):
     if instance.property.is_public_information:
         delete_remote_product_property.send(sender=instance.__class__, instance=instance)
 
-@receiver(post_create, sender='attributes.ProductPropertyTextTranslation')
+@receiver(post_create, sender='properties.ProductPropertyTextTranslation')
 def sales_channels__product_property_text_translation__post_create_receiver(sender, instance: ProductPropertyTextTranslation, **kwargs):
     if instance.product_property.property.is_public_information:
         create_remote_product_property.send(sender=instance.product_property.__class__, instance=instance.product_property)
 
-@receiver(post_update, sender='attributes.ProductPropertyTextTranslation')
+@receiver(post_update, sender='properties.ProductPropertyTextTranslation')
 def sales_channels__product_property_text_translation__post_update_receiver(sender, instance: ProductPropertyTextTranslation, **kwargs):
     if instance.product_property.property.is_public_information:
         update_remote_product_property.send(sender=instance.product_property.__class__, instance=instance.product_property)
 
-@receiver(pre_delete, sender='attributes.ProductPropertyTextTranslation')
+@receiver(pre_delete, sender='properties.ProductPropertyTextTranslation')
 def sales_channels__product_property_text_translation__pre_delete_receiver(sender, instance: ProductPropertyTextTranslation, **kwargs):
     if instance.product_property.property.is_public_information:
         update_remote_product_property.send(sender=instance.product_property.__class__, instance=instance.product_property)
@@ -189,7 +190,7 @@ def sales_channels__inventory__update(sender, instance: Inventory, **kwargs):
 
 # ------------------------------------------------------------- SEND SIGNALS FOR PRICES
 
-@receiver(post_create, sender='prices.SalesChannelIntegrationPricelist')
+@receiver(post_create, sender='sales_channels.SalesChannelIntegrationPricelist')
 def sales_channels__sales_channel_integration_pricelist__post_create_receiver(sender, instance, **kwargs):
     """
     Trigger a price change signal for all products using the price list when a new price list is added to a sales channel.
@@ -199,7 +200,7 @@ def sales_channels__sales_channel_integration_pricelist__post_create_receiver(se
     for assign in assigns:
         update_remote_price.send(sender=assign.product.__class__, instance=assign.product)
 
-@receiver(post_delete, sender='prices.SalesChannelIntegrationPricelist')
+@receiver(post_delete, sender='sales_channels.SalesChannelIntegrationPricelist')
 def sales_channels__sales_channel_integration_pricelist__post_delete_receiver(sender, instance, **kwargs):
     """
     Trigger a price change signal for all products using the price list when a price list is removed from a sales channel.
@@ -210,7 +211,7 @@ def sales_channels__sales_channel_integration_pricelist__post_delete_receiver(se
         update_remote_price.send(sender=assign.product.__class__, instance=assign.product)
 
 
-@receiver(post_update, sender='prices.SalesPriceList')
+@receiver(post_update, sender='sales_prices.SalesPriceList')
 def sales_channels__sales_price_list__post_update_receiver(sender, instance, **kwargs):
     """
     Trigger a price change signal for all products using the price list when the price list's dates are updated.
@@ -221,7 +222,7 @@ def sales_channels__sales_price_list__post_update_receiver(sender, instance, **k
             update_remote_price.send(sender=item.product.__class__, instance=item.product)
 
 
-@receiver(post_delete, sender='prices.SalesPriceList')
+@receiver(post_delete, sender='sales_prices.SalesPriceList')
 def sales_channels__sales_price_list__pre_delete_receiver(sender, instance, **kwargs):
     """
     Trigger a price change signal for all products using the price list when a price list is deleted.
@@ -231,14 +232,14 @@ def sales_channels__sales_price_list__pre_delete_receiver(sender, instance, **kw
         update_remote_price.send(sender=item.product.__class__, instance=item.product)
 
 
-@receiver(post_create, sender='prices.SalesPriceListItem')
-@receiver(post_update, sender='prices.SalesPriceListItem')
-@receiver(post_delete, sender='prices.SalesPriceListItem')
+@receiver(post_create, sender='sales_prices.SalesPriceListItem')
+@receiver(post_update, sender='sales_prices.SalesPriceListItem')
+@receiver(post_delete, sender='sales_prices.SalesPriceListItem')
 def sales_channels__sales_price_list_item__post_create_receiver(sender, instance, **kwargs):
     update_remote_price.send(sender=instance.product.__class__, instance=instance.product)
 
 
-@receiver(post_update, sender='prices.SalesPrice')
+@receiver(post_update, sender='sales_prices.SalesPrice')
 def sales_channels__sales_price__post_update_receiver(sender, instance, **kwargs):
     """
     Trigger a price change signal when the product price or RRP is updated.
@@ -266,7 +267,7 @@ def sales_channels__product_translation__post_create_update_delete_receiver(send
 
 # ------------------------------------------------------------- SEND SIGNALS FOR VARIATIONS
 
-@receiver(post_create, sender='yourapp.ConfigurableVariation')
+@receiver(post_create, sender='products.ConfigurableVariation')
 def sales_channels__configurable_variation__post_create_receiver(sender, instance, **kwargs):
     """
     Handle post-create events for the ConfigurableVariation model.
@@ -279,7 +280,7 @@ def sales_channels__configurable_variation__post_create_receiver(sender, instanc
         variation_product=instance.variation
     )
 
-@receiver(post_delete, sender='yourapp.ConfigurableVariation')
+@receiver(post_delete, sender='products.ConfigurableVariation')
 def sales_channels__configurable_variation__post_delete_receiver(sender, instance, **kwargs):
     """
     Handle post-delete events for the ConfigurableVariation model.
@@ -330,3 +331,58 @@ def sales_channels__media__post_delete_receiver(sender, instance, **kwargs):
     """
     if instance.type == Media.IMAGE:
         delete_remote_image.send(sender=instance.__class__, instance=instance)
+
+# ------------------------------------------------------------- SEND SIGNALS FOR SALES CHANNEL
+
+
+@receiver(post_create, sender='sales_channels.SalesChannel')
+def sales_channels__sales_channel__post_create_receiver(sender, instance, **kwargs):
+    """
+    Handles the creation of SalesChannel instances.
+    Sends the sales_channel_created signal when a new SalesChannel is created.
+    """
+    sales_channel_created.send(sender=instance.__class__, instance=instance)
+
+
+# ------------------------------------------------------------- SEND SIGNALS FOR PRODUCT AND SALES CHANNEL ASSIGN
+
+@receiver(post_create, sender=SalesChannelViewAssign)
+def sales_channel_view_assign__post_create_receiver(sender, instance, **kwargs):
+    """
+    Handles the creation of SalesChannelViewAssign instances.
+    - Sends remote_product_created if it's the first assignment for the product on the sales_channel.
+    - Sends sales_view_assign_updated for any other creation.
+    """
+    # Count the number of assignments related to the same product and sales channel
+    product_assign_count = SalesChannelViewAssign.objects.filter(
+        product=instance.product,
+        sales_channel=instance.sales_channel
+    ).count()
+
+    if product_assign_count == 1:
+        # First assignment for this sales_channel, send remote_product_created signal
+        remote_product_created.send(sender=instance.__class__, instance=instance.remote_product)
+    else:
+        # Otherwise, send sales_view_assign_updated signal
+        sales_view_assign_updated.send(sender=instance.__class__, instance=instance)
+
+
+@receiver(post_delete, sender=SalesChannelViewAssign)
+def sales_channel_view_assign__post_delete_receiver(sender, instance, **kwargs):
+    """
+    Handles the deletion of SalesChannelViewAssign instances.
+    - Sends remote_product_deleted if it's the last assignment for the product on the sales_channel.
+    - Sends sales_view_assign_updated for any other deletion.
+    """
+    # Count the number of assignments related to the same product and sales channel
+    product_assign_count = SalesChannelViewAssign.objects.filter(
+        product=instance.product,
+        sales_channel=instance.sales_channel
+    ).count()
+
+    if product_assign_count == 0:
+        # Last assignment removed for this sales_channel, send remote_product_deleted signal
+        remote_product_deleted.send(sender=instance.__class__, instance=instance.remote_product)
+    else:
+        # Otherwise, send sales_view_assign_updated signal
+        sales_view_assign_updated.send(sender=instance.__class__, instance=instance)

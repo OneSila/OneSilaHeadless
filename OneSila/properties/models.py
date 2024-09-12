@@ -61,8 +61,8 @@ class Property(TranslatedModelMixin, models.Model):
         return self._get_translated_value(field_name='name', related_name='propertytranslation_set')
 
     def delete(self, *args, **kwargs):
-        # if self.is_product_type:
-        #     raise ValidationError(_("Product type cannot be deleted."))
+        if self.is_product_type:
+            raise ValidationError(_("Product type cannot be deleted."))
         super().delete(*args, **kwargs)
 
     def save(self, *args, **kwargs):

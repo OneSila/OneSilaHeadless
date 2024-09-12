@@ -1,3 +1,5 @@
+import json
+
 from django.conf import settings
 from django.http import HttpResponse
 import os
@@ -86,3 +88,42 @@ def dynamic_file_httpresponse(files, zip_filename):
         return single_file_httpresponse(filedata, filename)
     else:
         return multiple_files_to_zip_httpresponse(files, zip_filename)
+
+
+def get_nested_attr(instance, attr_path):
+    """
+    Retrieves the value of a nested attribute from an instance.
+
+    :param instance: The object to retrieve the attribute from.
+    :param attr_path: A string representing the path to the attribute, using '__' to denote nesting.
+    :return: The value of the nested attribute, or None if any part of the path is not found.
+    """
+    try:
+        for attr in attr_path.split('__'):
+            instance = getattr(instance, attr, None)
+            if instance is None:
+                return None
+        return instance
+    except AttributeError:
+        return None
+
+def clean_json_data(data):
+    """
+    Recursively cleans the data to remove or transform non-serializable objects.
+    """
+    if isinstance(data, dict):
+        return {k: clean_json_data(v) for k, v in data.items() if is_json_serializable(v)}
+    elif isinstance(data, list):
+        return [clean_json_data(item) for item in data]
+    else:
+        return data if is_json_serializable(data) else str(data)
+
+def is_json_serializable(value):
+    """
+    Checks if a value is JSON-serializable.
+    """
+    try:
+        json.dumps(value)
+        return True
+    except (TypeError, OverflowError):
+        return False

@@ -1,5 +1,5 @@
 from sales_channels.factories.mixins import RemoteInstanceUpdateFactory
-from sales_channels.models.product import RemoteProduct
+from sales_channels.models.products import RemoteProduct
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 
 

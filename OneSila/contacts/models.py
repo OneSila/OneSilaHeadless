@@ -63,7 +63,7 @@ class Company(models.Model):
 
     class Meta:
         search_terms = ['name']
-        unique_together = ("name", "multi_tenant_company")
+        unique_together = ("name", "email", "multi_tenant_company")
         verbose_name_plural = _("companies")
 
 
@@ -202,15 +202,6 @@ class Address(models.Model):
     class Meta:
         search_terms = ['person__email', 'company__name', 'address1', 'city']
         verbose_name_plural = 'addresses'
-
-        constraints = [
-            UniqueConstraint(
-                fields=['company'],
-                condition=models.Q(is_invoice_address=True),
-                name='unique_invoice_address_per_company',
-                violation_error_message=_("Company already has an invoice address.")
-            )
-        ]
 
 
 class ShippingAddress(Address):

@@ -59,9 +59,6 @@ class Order(models.SetStatusMixin, models.Model):
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=DRAFT)
     reason_for_sale = models.CharField(max_length=10, choices=REASON_CHOICES, default=SALE)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
     objects = OrderManager()
 
     @property

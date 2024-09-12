@@ -22,8 +22,45 @@ class RemoteObjectMixin(models.Model):
     outdated = models.BooleanField(default=False, help_text="Indicates if the remote product is outdated due to an error.")
     outdated_since = models.DateTimeField(null=True, blank=True, help_text="Timestamp indicating when the object became outdated.")
 
+
     class Meta:
         abstract = True
+
+    @property
+    def safe_str(self):
+        return f'To be deleted {self.remote_id}'
+
+
+    @property
+    def errors(self):
+        """
+        Retrieve the latest errors based on unique identifiers.
+        Only includes errors that are the latest occurrence of their identifier.
+        """
+        from .log import RemoteLog
+        content_type = ContentType.objects.get_for_model(self)
+        # Fetch the latest logs for each identifier
+        latest_logs = RemoteLog.objects.filter(
+            content_type=content_type,
+            object_id=self.pk,
+            status=RemoteLog.STATUS_FAILED
+        ).order_by('identifier', '-created_at').distinct('identifier')
+
+        # Return only logs with a FAILED status
+        return latest_logs.filter(status=RemoteLog.STATUS_FAILED)
+
+    @property
+    def payload(self):
+        """
+        Get the payload of the last log entry.
+        """
+        from .log import RemoteLog
+        content_type = ContentType.objects.get_for_model(self)
+        last_log = RemoteLog.objects.filter(
+            content_type=content_type,
+            object_id=self.pk
+        ).order_by('-created_at').first()
+        return last_log.payload if last_log else {}
 
     def add_log(self, action, response, payload, identifier,  **kwargs):
         from .log import RemoteLog
@@ -94,7 +131,6 @@ class RemoteObjectMixin(models.Model):
             object_id=self.pk,
             content_object=self,
             sales_channel=self.sales_channel,
-            multi_tenant_company=self.multi_tenant_company,  # Include the multi_tenant_company field
             action=action,
             status=status,
             response=response,
@@ -102,22 +138,10 @@ class RemoteObjectMixin(models.Model):
             error_traceback=error_traceback,
             identifier=identifier,
             user_error=user_error,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            related_object_str=str(self),
             **kwargs
         )
-
-    @property
-    def payload(self):
-        """
-        Property to get the payload of the last log entry.
-        """
-        from .log import RemoteLog
-        last_log = RemoteLog.objects.filter(
-            content_type=ContentType.objects.get_for_model(self),
-            object_id=self.pk,
-            content_object=self,
-            sales_channel=self.sales_channel
-        ).order_by('-created_at').first()
-        return last_log.payload if last_log else {}
 
     def need_update(self, new_payload):
         """
@@ -125,23 +149,6 @@ class RemoteObjectMixin(models.Model):
         """
         current_payload = self.payload
         return json.dumps(current_payload, sort_keys=True) != json.dumps(new_payload, sort_keys=True)
-
-    @property
-    def errors(self):
-        """
-        Property to retrieve the latest errors based on unique identifiers.
-        Only includes errors that are the latest occurrence of their identifier.
-        """
-        from .log import RemoteLog
-        # Fetch the latest logs for each identifier
-        latest_logs = RemoteLog.objects.filter(
-            content_type=ContentType.objects.get_for_model(self),
-            object_id=self.pk,
-            content_object=self
-        ).order_by('identifier', '-created_at').distinct('identifier')
-
-        # Return only logs with a FAILED status
-        return latest_logs.filter(status=RemoteLog.STATUS_FAILED)
 
     def mark_outdated(self, save=True):
         """

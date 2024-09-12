@@ -15,3 +15,8 @@ CUSTOMER_LANGUAGE_DICT = {
     'Dutch': 'NL',
     'Nederlands': 'NL',
 }
+
+LANGUAGE_TO_CUSTOMER_CONVERTOR = {
+    'nl': 'NL',
+    'en': 'EN'
+}

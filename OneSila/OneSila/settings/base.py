@@ -52,6 +52,8 @@ INSTALLED_LOCAL_APPS = [
     'media',
     'notifications',
     'inventory',
+    'sales_channels',
+    'sales_channels.integrations.magento2',
     'sales_prices',
     'properties',
     'orders',
@@ -226,7 +228,7 @@ HUEY = {
     'name': 'hueyonesilaheadless',  # Use db name for huey.
     'results': True,  # Store return values of tasks.
     'store_none': False,  # If a task returns None, do not save to results.
-    'immediate': True,  # If DEBUG=True, run synchronously.
+    'immediate': False,  # If DEBUG=True, run synchronously.
     'utc': True,  # Use UTC for all times internally.
     'blocking': True,  # Perform blocking pop rather than poll Redis.
     'connection': {

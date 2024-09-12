@@ -29,8 +29,8 @@ class RemoteLog(models.Model):
         (STATUS_FAILED, 'Failed'),
     ]
 
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
+    content_type = models.ForeignKey(ContentType, blank=True, null=True, on_delete=models.SET_NULL)
+    object_id = models.PositiveIntegerField(blank=True, null=True)
     content_object = GenericForeignKey('content_type', 'object_id')
 
     sales_channel = models.ForeignKey('SalesChannel', on_delete=models.PROTECT)
@@ -42,6 +42,7 @@ class RemoteLog(models.Model):
     user_error = models.BooleanField(default=False)  # Boolean field to indicate if the error is user-facing
     identifier = models.CharField(max_length=255, null=True, blank=True)  # Field to store a unique identifier for the log entry
     keep = models.BooleanField(default=False, help_text="Whether to keep this log permanently.")
+    related_object_str = models.CharField(max_length=556, null=True, blank=True, help_text="String representation of the related object.")
 
     class Meta:
         verbose_name = 'Remote Log'

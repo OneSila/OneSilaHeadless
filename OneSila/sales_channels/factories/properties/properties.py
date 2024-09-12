@@ -18,7 +18,7 @@ class RemotePropertySelectValueCreateFactory(RemotePropertyEnsureMixin, RemoteIn
     def __init__(self, local_instance, sales_channel, remote_property_factory):
         self.remote_property_factory = remote_property_factory
         self.local_property = local_instance.property
-        super().__init__(local_instance, sales_channel)
+        super().__init__(local_instance=local_instance, sales_channel=sales_channel)
 
     def customize_remote_instance_data(self):
         self.remote_instance_data['remote_property'] = self.remote_property

@@ -35,3 +35,12 @@ update_remote_image_association = ModelSignal(use_caching=True)
 delete_remote_image_association = ModelSignal(use_caching=True)
 
 delete_remote_image = ModelSignal(use_caching=True)
+
+refresh_website_pull_models = ModelSignal(use_caching=True)
+sales_channel_created = ModelSignal(use_caching=True)
+
+remote_product_created = ModelSignal(use_caching=True)
+remote_product_updated = ModelSignal(use_caching=True)
+remote_product_deleted = ModelSignal(use_caching=True)
+sales_view_assign_updated = ModelSignal(use_caching=True)
+
