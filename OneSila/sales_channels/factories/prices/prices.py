@@ -5,8 +5,10 @@ from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, Product
 class RemotePriceUpdateFactory(RemoteInstanceUpdateFactory, ProductAssignmentMixin):
     local_model_class = Product
 
-    def __init__(self, local_instance, sales_channel):
-        super().__init__(local_instance, sales_channel)
+    def __init__(self, sales_channel, local_instance, api=None):
+        super().__init__(sales_channel, local_instance, api=api)
+        self.discounted_price = None
+        self.full_price = None
         self.remote_product = self.get_remote_product(local_instance)
         self.remote_instance = None
 
@@ -43,3 +45,6 @@ class RemotePriceUpdateFactory(RemoteInstanceUpdateFactory, ProductAssignmentMix
         Override to prevent fetching in the default way since it is already set in preflight_check.
         """
         pass
+
+    def needs_update(self):
+        return True # the actual check is done in preflight_check

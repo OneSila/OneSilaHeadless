@@ -2,8 +2,10 @@ from django.db.models.signals import post_delete, pre_delete
 from core.signals import post_create, post_update
 from inventory.models import Inventory
 from media.models import Media
+from properties.signals import product_properties_rule_configurator_updated
 from sales_prices.models import SalesPriceListItem
 from sales_prices.signals import price_changed
+from .integrations.magento2.models import MagentoSalesChannelViewAssign
 from .models.sales_channels import SalesChannelViewAssign
 from .signals import (
     create_remote_property,
@@ -11,8 +13,8 @@ from .signals import (
     delete_remote_property, create_remote_property_select_value, update_remote_property_select_value, delete_remote_property_select_value,
     create_remote_product_property, update_remote_product_property, delete_remote_product_property, update_remote_inventory, update_remote_price,
     update_remote_product_content, remove_remote_product_variation, add_remote_product_variation, create_remote_image_association,
-    update_remote_image_association, delete_remote_image_association, delete_remote_image, sales_channel_created, remote_product_deleted,
-    sales_view_assign_updated, remote_product_created,
+    update_remote_image_association, delete_remote_image_association, delete_remote_image, sales_channel_created, delete_remote_product,
+    sales_view_assign_updated, create_remote_product, update_remote_product, sync_remote_product,
 )
 from django.dispatch import receiver
 from properties.models import Property, PropertyTranslation, PropertySelectValueTranslation, PropertySelectValue, ProductProperty, \
@@ -152,8 +154,12 @@ def sales_channels__product_property__post_create_receiver(sender, instance: Pro
 
 @receiver(post_update, sender='properties.ProductProperty')
 def sales_channels__product_property__post_update_receiver(sender, instance: ProductProperty, **kwargs):
+    from .tasks import update_configurators_for_product_property_db_task
+
     if instance.property.is_public_information:
         update_remote_product_property.send(sender=instance.__class__, instance=instance)
+
+        update_configurators_for_product_property_db_task(instance.product, instance.property)
 
 @receiver(pre_delete, sender='properties.ProductProperty')
 def sales_channels__product_property__pre_delete_receiver(sender, instance: ProductProperty, **kwargs):
@@ -273,6 +279,7 @@ def sales_channels__configurable_variation__post_create_receiver(sender, instanc
     Handle post-create events for the ConfigurableVariation model.
     Sends a signal to add the variation to the remote product.
     """
+    from .tasks import update_configurators_for_parent_product_db_task
 
     add_remote_product_variation.send(
         sender=instance.__class__,
@@ -280,18 +287,24 @@ def sales_channels__configurable_variation__post_create_receiver(sender, instanc
         variation_product=instance.variation
     )
 
+    update_configurators_for_parent_product_db_task(instance.parent)
+
 @receiver(post_delete, sender='products.ConfigurableVariation')
 def sales_channels__configurable_variation__post_delete_receiver(sender, instance, **kwargs):
     """
     Handle post-delete events for the ConfigurableVariation model.
     Sends a signal to remove the variation from the remote product.
     """
+    from .tasks import update_configurators_for_parent_product_db_task
 
     remove_remote_product_variation.send(
         sender=instance.__class__,
         parent_product=instance.parent,
         variation_product=instance.variation
     )
+
+    update_configurators_for_parent_product_db_task(instance.parent)
+
 
 # ------------------------------------------------------------- SEND SIGNALS FOR IMAGES
 
@@ -346,11 +359,12 @@ def sales_channels__sales_channel__post_create_receiver(sender, instance, **kwar
 
 # ------------------------------------------------------------- SEND SIGNALS FOR PRODUCT AND SALES CHANNEL ASSIGN
 
-@receiver(post_create, sender=SalesChannelViewAssign)
+@receiver(post_create, sender='sales_channels.SalesChannelViewAssign')
+@receiver(post_create, sender='magento2.MagentoSalesChannelViewAssign') # @TODO: Fix so this if polymorphic we will send signal for parent
 def sales_channel_view_assign__post_create_receiver(sender, instance, **kwargs):
     """
     Handles the creation of SalesChannelViewAssign instances.
-    - Sends remote_product_created if it's the first assignment for the product on the sales_channel.
+    - Sends create_remote_product if it's the first assignment for the product on the sales_channel.
     - Sends sales_view_assign_updated for any other creation.
     """
     # Count the number of assignments related to the same product and sales channel
@@ -360,18 +374,19 @@ def sales_channel_view_assign__post_create_receiver(sender, instance, **kwargs):
     ).count()
 
     if product_assign_count == 1:
-        # First assignment for this sales_channel, send remote_product_created signal
-        remote_product_created.send(sender=instance.__class__, instance=instance.remote_product)
+        print('----------------------------------------------------------------- ? 1')
+        create_remote_product.send(sender=instance.product.__class__, instance=instance.product)
     else:
         # Otherwise, send sales_view_assign_updated signal
-        sales_view_assign_updated.send(sender=instance.__class__, instance=instance)
+        sales_view_assign_updated.send(sender=instance.product.__class__, instance=instance.product)
 
 
-@receiver(post_delete, sender=SalesChannelViewAssign)
+@receiver(post_delete, sender='sales_channels.SalesChannelViewAssign')
+@receiver(post_delete, sender='magento2.MagentoSalesChannelViewAssign')
 def sales_channel_view_assign__post_delete_receiver(sender, instance, **kwargs):
     """
     Handles the deletion of SalesChannelViewAssign instances.
-    - Sends remote_product_deleted if it's the last assignment for the product on the sales_channel.
+    - Sends delete_remote_product if it's the last assignment for the product on the sales_channel.
     - Sends sales_view_assign_updated for any other deletion.
     """
     # Count the number of assignments related to the same product and sales channel
@@ -381,8 +396,39 @@ def sales_channel_view_assign__post_delete_receiver(sender, instance, **kwargs):
     ).count()
 
     if product_assign_count == 0:
-        # Last assignment removed for this sales_channel, send remote_product_deleted signal
-        remote_product_deleted.send(sender=instance.__class__, instance=instance.remote_product)
+        # Last assignment removed for this sales_channel, send delete_remote_product signal
+        delete_remote_product.send(sender=instance.product.__class__, instance=instance.product)
     else:
         # Otherwise, send sales_view_assign_updated signal
         sales_view_assign_updated.send(sender=instance.__class__, instance=instance)
+
+@receiver(post_update, sender='products.Product')
+@receiver(post_update, sender='products.SimpleProduct')
+@receiver(post_update, sender='products.ConfigurableProduct')
+@receiver(post_update, sender='products.ManufacturableProduct')
+@receiver(post_update, sender='products.BundleProduct')
+@receiver(post_update, sender='products.DropshipProduct')
+def sales_channels__product__post_update_receiver(sender, instance, **kwargs):
+    """
+    Handle post-update events for the product models.
+    Sends update_remote_product signal if any of the fields 'active', 'for_sale', or 'allow_backorder' are dirty.
+    """
+    # Check if any of the specified fields have changed
+    if instance.is_any_field_dirty(['active', 'for_sale', 'allow_backorder']):
+        # Send update_remote_product signal
+        update_remote_product.send(sender=instance.__class__, instance=instance)
+
+@receiver(post_update, sender='products.Inspector')
+def sales_channels__inspector__post_update_receiver(sender, instance, **kwargs):
+    """
+    Handle post-update events for the Inspector model.
+    Sends sync_remote_product signal if 'has_missing_information' changes to False.
+    """
+    if instance.is_dirty_field('has_missing_information') and not instance.has_missing_information:
+        sync_remote_product.send(sender=instance.product.__class__, instance=instance.product)
+        
+@receiver(product_properties_rule_configurator_updated, sender='properties.ProductPropertiesRule')
+def sales_channels__configurator_rule_changed_receiver(sender, instance, **kwargs):
+    from .tasks import update_configurators_for_rule_db_task
+    
+    update_configurators_for_rule_db_task(instance)

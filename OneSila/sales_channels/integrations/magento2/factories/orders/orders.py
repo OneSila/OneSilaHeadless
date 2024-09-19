@@ -38,10 +38,27 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
     def fetch_remote_instances(self):
         """
         Fetch remote instances using the Magento API's `all_in_memory` method, 
-        which retrieves all relevant orders since the specified number of hours ago.
+        which retrieves all relevant orders since the specified number of hours ago,
+        with a fallback to the `sync_orders_after` date if it is more recent.
         """
-        since_date = (datetime.now() - timedelta(hours=self.since_hours_ago)).strftime('%Y-%m-%d %H:%M:%S')
-        self.remote_instances = self.api.orders.since(since_date).all_in_memory()
+        # Calculate since_date from since_hours_ago
+        calculated_since_date = datetime.now() - timedelta(hours=self.since_hours_ago)
+
+        # Use sync_orders_after as a fallback if it is more recent than calculated_since_date
+        if self.sales_channel.sync_orders_after and self.sales_channel.sync_orders_after > calculated_since_date:
+            since_date = self.sales_channel.sync_orders_after
+        else:
+            since_date = calculated_since_date
+
+        # Convert since_date to the required string format
+        since_date_str = since_date.strftime('%Y-%m-%d %H:%M:%S')
+
+        # Fetch remote instances using the since_date
+        self.remote_instances = self.api.orders.\
+            since(since_date_str).\
+            add_criteria('status', MagentoApiOrder.STATUS_PROCESSING).\
+            all_in_memory()
+
 
     def process_remote_instance(self, remote_data: MagentoApiOrder, remote_instance_mirror: MagentoOrder, created: bool):
         """
@@ -452,8 +469,9 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
         """
         Changes the status of the local order after processing.
         """
-        if remote_data.status == MagentoApiOrder.STATUS_PENDING:
-            remote_data.update_status(MagentoApiOrder.STATUS_PROCESSING)
+        pass
+        # if remote_data.status == MagentoApiOrder.STATUS_PENDING:
+        #     remote_data.update_status(MagentoApiOrder.STATUS_PROCESSING)
 
 class MagentoChangeRemoteOrderStatus(GetMagentoAPIMixin, ChangeRemoteOrderStatus):
 

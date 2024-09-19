@@ -6,7 +6,7 @@ from properties.signals import product_properties_rule_created, product_properti
 from sales_channels.integrations.magento2.flows.default import run_generic_magento_task_flow, run_delete_generic_magento_task_flow
 from sales_channels.integrations.magento2.models import MagentoProperty
 from sales_channels.signals import create_remote_property, update_remote_property, delete_remote_property, create_remote_property_select_value, \
-    update_remote_property_select_value, delete_remote_property_select_value, refresh_website_pull_models, sales_channel_created
+    update_remote_property_select_value, delete_remote_property_select_value, refresh_website_pull_models, sales_channel_created, create_remote_product
 
 
 @receiver(create_remote_property, sender='properties.Property')
@@ -171,10 +171,20 @@ def sales_channels__magento__order_status__update(sender, instance, **kwargs):
     Handles the status update signals for orders specifically for Magento integration.
     """
     from .tasks import update_magento_order_status_db_task
-
-
     task_kwargs = {
         'order_id': instance.id,
     }
 
     run_generic_magento_task_flow(update_magento_order_status_db_task, **task_kwargs)
+
+
+@receiver(create_remote_product, sender='products.Product')
+def sales_channels__magento__product__create(sender, instance, **kwargs):
+    """
+    Handles the create signal for properties specifically for Magento integration.
+    Runs the MagentoPropertyCreateFactory using the run_generic_magento_task function.
+    """
+    from .tasks import create_magento_product_db_task
+
+    task_kwargs = {'product_id': instance.id}
+    run_generic_magento_task_flow(create_magento_product_db_task, **task_kwargs)

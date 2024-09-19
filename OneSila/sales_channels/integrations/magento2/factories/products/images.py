@@ -1,102 +1,90 @@
-# from media.models import MediaProductThrough, Media
-# from sales_channels.factories.mixins import RemoteInstanceCreateFactory, ProductAssignmentMixin, RemoteInstanceUpdateFactory, RemoteInstanceDeleteFactory
-#
-#
-# class RemoteMediaProductThroughCreateFactory(RemoteInstanceCreateFactory, ProductAssignmentMixin):
-#     local_model_class = MediaProductThrough
-#     has_remote_media_instance = False
-#
-#     def __init__(self, local_instance, sales_channel):
-#         super().__init__(local_instance, sales_channel)
-#         self.remote_product = self.get_remote_product(local_instance.product)
-#
-#     def preflight_check(self):
-#         """
-#         Checks for the presence of remote product and assignment to a website.
-#         """
-#         if not self.remote_product:
-#             return False
-#
-#         if not self.assigned_to_website():
-#             return False
-#
-#         return True
-#
-#     def preflight_process(self):
-#         """
-#         Optional process to create remote image instance if applicable.
-#         """
-#         if self.has_remote_media_instance:
-#             self.create_remote_image()
-#
-#     def create_remote_image(self):
-#         """
-#         Placeholder method to create remote image, should be overridden in the third layer.
-#         """
-#         pass
-#
-#     def customize_remote_instance_data(self):
-#         """
-#         Customizes remote instance data to include remote image if applicable.
-#         """
-#         if self.has_remote_media_instance:
-#             self.remote_instance_data['remote_image'] = self.remote_image
-#         return self.remote_instance_data
-#
-# class RemoteMediaProductThroughUpdateFactory(RemoteInstanceUpdateFactory, ProductAssignmentMixin):
-#     local_model_class = MediaProductThrough
-#
-#     def __init__(self, local_instance, sales_channel):
-#         super().__init__(local_instance, sales_channel)
-#         self.remote_product = self.get_remote_product(local_instance.product)
-#
-#     def preflight_check(self):
-#         """
-#         Checks for the presence of remote product and assignment to a website.
-#         """
-#         if not self.remote_product:
-#             return False
-#
-#         if not self.assigned_to_website():
-#             return False
-#
-#         return True
-#
-# class RemoteMediaProductThroughDeleteFactory(RemoteInstanceDeleteFactory, ProductAssignmentMixin):
-#     local_model_class = MediaProductThrough
-#
-#     def __init__(self, local_instance, sales_channel):
-#         super().__init__(local_instance, sales_channel)
-#         self.remote_product = self.get_remote_product(local_instance.product)
-#
-#     def preflight_check(self):
-#         """
-#         Checks for the presence of remote product and assignment to a website.
-#         """
-#         if not self.remote_product:
-#             return False
-#
-#         if not self.assigned_to_website():
-#             return False
-#
-#         return True
-#
-#
-# class RemoteImageDeleteFactory(RemoteInstanceDeleteFactory):
-#     local_model_class = Media
-#     has_remote_media_instance = False
-#     delete_media_assign_factory = None
-#
-#     def run(self):
-#         """
-#         Custom run method for handling deletions with or without a remote media instance.
-#         """
-#         if self.has_remote_media_instance:
-#             # Normal delete operation
-#             super().run()
-#         else:
-#             # Custom behavior for deleting all associated media assignments
-#             media_product_throughs = MediaProductThrough.objects.filter(media=self.local_instance)
-#             for media_product_through in media_product_throughs:
-#                 delete_factory = self.delete_media_assign_factory(media_product_through, self.sales_channel)
-#                 delete_factory.run()
+from magento.models import MediaEntry
+
+from sales_channels.factories.products.images import RemoteMediaProductThroughCreateFactory, RemoteMediaProductThroughUpdateFactory, \
+    RemoteMediaProductThroughDeleteFactory, RemoteImageDeleteFactory
+from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin
+from sales_channels.integrations.magento2.models import MagentoImageProductAssociation
+
+class GetMagentoImageTypesMixin:
+    def get_image_types(self):
+        types = ["image", "small_image"]
+
+        if self.local_instance.is_main_image:
+            types.append("thumbnail")
+
+        return types
+
+class MagentoMediaProductThroughCreateFactory(GetMagentoAPIMixin, RemoteMediaProductThroughCreateFactory, GetMagentoImageTypesMixin):
+    remote_model_class = MagentoImageProductAssociation
+    remote_id_map = 'id'
+    field_mapping = {
+        'sort_order': 'position',
+        'media__image__name': 'label',
+        'media__image_web_url': 'image_url'
+    }
+    api_package_name = 'product_media_entries'
+    api_method_name = 'create'
+
+    def preflight_process(self):
+        super().preflight_process()
+        self.magento_product = self.api.products.by_sku(self.remote_product.remote_sku)
+        self.api.media_entries_product = self.magento_product
+
+    def customize_remote_instance_data(self):
+        self.remote_instance_data['remote_product'] = self.remote_product
+        return self.remote_instance_data
+
+    def customize_payload(self):
+        self.payload['disabled'] = False
+        self.payload['media_type'] = "image"
+        self.payload['types'] = self.get_image_types()
+
+        self.payload = {'data': self.payload}
+        return self.payload
+
+    def serialize_response(self, response):
+        return response.to_dict()
+
+class MagentoMediaProductThroughUpdateFactory(GetMagentoAPIMixin, RemoteMediaProductThroughUpdateFactory, GetMagentoImageTypesMixin):
+    remote_model_class = MagentoImageProductAssociation
+    field_mapping = {
+        'sort_order': 'position',
+        'media__image__name': 'label',
+    }
+
+
+    def additional_update_check(self):
+        self.magento_product = self.api.products.by_sku(self.remote_product.remote_sku)
+        self.api.media_entries_product = self.magento_product
+        self.magento_instance: MediaEntry = self.api.product_media_entries.by_id(self.remote_instance.remote_id)
+        self.types = self.get_image_types()
+
+        if self.magento_instance.position != self.local_instance.sort_order or self.magento_instance.types != self.types:
+            return True
+
+        return False
+
+    def update_remote(self):
+        self.magento_instance.position = self.local_instance.sort_order
+        self.magento_instance.types = self.types
+        self.magento_instance.save()
+
+    def serialize_response(self, response):
+        return self.magento_instance.to_dict()
+
+class MagentoMediaProductThroughDeleteFactory(GetMagentoAPIMixin, RemoteMediaProductThroughDeleteFactory):
+    remote_model_class = MagentoImageProductAssociation
+    delete_remote_instance = True
+
+    def delete_remote(self):
+        magento_product = self.api.products.by_sku(self.remote_product.remote_sku)
+        self.api.media_entries_product = magento_product
+        magento_instance: MediaEntry = self.api.product_media_entries.by_id(self.remote_instance.remote_id)
+        return magento_instance.delete()
+
+    def serialize_response(self, response):
+        return response
+
+class MagentoImageDeleteFactory(RemoteImageDeleteFactory):
+    has_remote_media_instance = False
+    delete_media_assign_factory = MagentoMediaProductThroughDeleteFactory

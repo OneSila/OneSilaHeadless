@@ -1,38 +1,45 @@
-# from products.models import Product
-# from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
-#
-# class RemoteProductContentUpdateFactory(RemoteInstanceUpdateFactory, ProductAssignmentMixin):
-#     local_model_class = Product
-#
-#     def __init__(self, local_instance, sales_channel):
-#         super().__init__(local_instance, sales_channel)
-#         self.remote_product = self.get_remote_product(local_instance)
-#         self.remote_instance = None
-#
-#
-#     def preflight_check(self):
-#         """
-#         Checks that the RemoteProduct and associated SalesChannelViewAssign exist before proceeding.
-#         Also sets the remote_instance if conditions are met.
-#         """
-#         if not self.remote_product:
-#             return False
-#
-#         if not self.assigned_to_website():
-#             return False
-#
-#         # Set the remote_instance for the factory based on existing data
-#         try:
-#             self.remote_instance = self.remote_model_class.objects.get(
-#                 remote_product=self.remote_product
-#             )
-#         except self.remote_model_class.DoesNotExist:
-#             return False
-#
-#         return True
-#
-#     def get_remote_instance(self):
-#         """
-#         Override to prevent fetching in the default way since it is already set in preflight_check.
-#         """
-#         pass
+from magento.models import Product
+
+from products.models import ProductTranslation
+from sales_channels.factories.products.content import RemoteProductContentUpdateFactory
+from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin
+from sales_channels.integrations.magento2.models import MagentoProductContent
+from sales_channels.models.sales_channels import RemoteLanguage
+
+
+class MagentoProductContentUpdateFactory(GetMagentoAPIMixin, RemoteProductContentUpdateFactory):
+    remote_model_class = MagentoProductContent
+
+    def preflight_check(self):
+        if not self.sales_channel.sync_contents:
+            return False
+
+        return self.preflight_check()
+
+    def update_remote(self):
+        self.magento_product: Product = self.api.products.by_sku(self.remote_product.remote_sku)
+        self.response_data = {}
+
+        remote_languages = {rl.local_instance: rl.remote_code for rl in RemoteLanguage.objects.filter(
+            sales_channel=self.sales_channel
+        )}
+
+        translations = ProductTranslation.objects.filter(product=self.local_instance)
+        for translation in translations:
+            language_code = translation.language
+            remote_code = remote_languages.get(language_code, None)
+
+            if not remote_code:
+                continue
+
+            content = {}
+            content["name"] = translation.name
+            content["short_description"] = translation.short_description
+            content["description"] = translation.description
+            content["url_key"] = translation.url_key
+
+            self.response_data["remote_code"] = content
+
+            for key, value in content.items():
+                setattr(self.magento_product, key, value)
+                self.magento_product.save(scope=remote_code)

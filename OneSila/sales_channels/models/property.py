@@ -47,6 +47,7 @@ class RemoteProductProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
     local_instance = models.ForeignKey('properties.ProductProperty', on_delete=models.SET_NULL, null=True, help_text="The local ProductProperty instance associated with this remote property.")
     remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.CASCADE, help_text="The remote product associated with this property.")
     remote_property = models.ForeignKey('sales_channels.RemoteProperty', on_delete=models.CASCADE, help_text="The remote property associated with this product property.")
+    remote_value = models.TextField(null=True, blank=True,  help_text="The value of this property in the remote system, stored as a string.")
 
     class Meta:
         unique_together = ('remote_product', 'local_instance')
@@ -54,4 +55,18 @@ class RemoteProductProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Remote Product Properties'
 
     def __str__(self):
-        return f"{self.remote_product} {self.remote_property.property.internal_name} > {self.local_instance.get_value()}"
+        return f"{self.remote_product} {self.local_instance.property.internal_name} > {self.local_instance.get_value()}"
+
+    def needs_update(self, new_remote_value):
+        """
+        Checks if the remote value differs from the new value that is intended to be updated.
+        Converts both values to string for comparison to handle various data types uniformly.
+
+        :param new_remote_value: The new value intended to be set in the remote system.
+        :return: Boolean indicating whether an update is needed.
+        """
+        # Convert new_remote_value to string for comparison
+        new_value_str = str(new_remote_value)
+
+        # Compare the new value with the current remote_value
+        return new_value_str != self.remote_value

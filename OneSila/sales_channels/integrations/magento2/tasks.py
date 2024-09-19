@@ -1,5 +1,6 @@
 from huey.contrib.djhuey import db_task
 from core.huey import HIGH_PRIORITY, LOW_PRIORITY, MEDIUM_PRIORITY, CRUCIAL_PRIORITY
+from products.models import Product
 from properties.models import Property, PropertySelectValue, ProductPropertiesRule
 from sales_channels.decorators import remote_task
 from sales_channels.factories.remote_task import BaseRemoteTask
@@ -66,7 +67,7 @@ def delete_magento_property_db_task(task_queue_item_id, sales_channel_id, remote
     def actual_task():
         sales_channel = MagentoSalesChannel.objects.get(id=sales_channel_id)
 
-        factory_kwargs = {'remote_instance_id': remote_instance_id, 'sales_channel': sales_channel}
+        factory_kwargs = {'remote_instance': remote_instance_id, 'sales_channel': sales_channel}
         factory = MagentoPropertyDeleteFactory(**factory_kwargs)
         factory.run()
 
@@ -116,7 +117,7 @@ def delete_magento_property_select_value_task(task_queue_item_id, sales_channel_
     def actual_task():
         sales_channel = MagentoSalesChannel.objects.get(id=sales_channel_id)
 
-        factory_kwargs = {'remote_instance_id': remote_instance_id, 'sales_channel': sales_channel}
+        factory_kwargs = {'remote_instance': remote_instance_id, 'sales_channel': sales_channel}
         factory = MagentoPropertySelectValueDeleteFactory(**factory_kwargs)
         factory.run()
 
@@ -203,7 +204,7 @@ def delete_magento_attribute_set_task(task_queue_item_id, sales_channel_id, remo
     def actual_task():
         sales_channel = MagentoSalesChannel.objects.get(id=sales_channel_id)
 
-        factory_kwargs = {'remote_instance_id': remote_instance_id, 'sales_channel': sales_channel}
+        factory_kwargs = {'remote_instance': remote_instance_id, 'sales_channel': sales_channel}
         factory = MagentoAttributeSetDeleteFactory(**factory_kwargs)
         factory.run()
 
@@ -224,6 +225,24 @@ def update_magento_order_status_db_task(task_queue_item_id, sales_channel_id, or
             factory_class=MagentoChangeRemoteOrderStatus,
             local_instance_id=order_id,
             local_instance_class=Order
+        )
+
+    task.execute(actual_task)
+
+
+@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
+@db_task()
+def create_magento_product_db_task(task_queue_item_id, sales_channel_id, product_id):
+    from .factories.products import MagentoProductCreateFactory
+
+    task = BaseRemoteTask(task_queue_item_id)
+
+    def actual_task():
+        run_generic_factory(
+            sales_channel_id=sales_channel_id,
+            factory_class=MagentoProductCreateFactory,
+            local_instance_id=product_id,
+            local_instance_class=Product
         )
 
     task.execute(actual_task)

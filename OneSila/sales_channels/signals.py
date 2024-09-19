@@ -22,9 +22,7 @@ update_remote_product_property = ModelSignal(use_caching=True)
 delete_remote_product_property = ModelSignal(use_caching=True)
 
 update_remote_inventory = ModelSignal(use_caching=True)
-
 update_remote_price = ModelSignal(use_caching=True)
-
 update_remote_product_content = ModelSignal(use_caching=True)
 
 add_remote_product_variation = ModelSignal(use_caching=True)
@@ -39,8 +37,10 @@ delete_remote_image = ModelSignal(use_caching=True)
 refresh_website_pull_models = ModelSignal(use_caching=True)
 sales_channel_created = ModelSignal(use_caching=True)
 
-remote_product_created = ModelSignal(use_caching=True)
-remote_product_updated = ModelSignal(use_caching=True)
-remote_product_deleted = ModelSignal(use_caching=True)
+create_remote_product = ModelSignal(use_caching=True)
+update_remote_product = ModelSignal(use_caching=True) # this
+sync_remote_product = ModelSignal(use_caching=True)  # this
+delete_remote_product = ModelSignal(use_caching=True)
+
 sales_view_assign_updated = ModelSignal(use_caching=True)
 

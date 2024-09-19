@@ -13,7 +13,7 @@ def run_generic_magento_task_flow(task_func, number_of_remote_requests=None, **k
     :param kwargs: Additional keyword arguments to pass to the task.
     """
     for sales_channel in MagentoSalesChannel.objects.filter(active=True):
-        # Add the sales_channel_id to kwargs
+
         task_kwargs = {
             'sales_channel_id': sales_channel.id,
             **kwargs
@@ -41,10 +41,9 @@ def run_delete_generic_magento_task_flow(task_func, remote_class, **kwargs):
         try:
             remote_instance = remote_class.objects.get(local_instance_id=local_instance_id, sales_channel=sales_channel)
 
-            # Add the sales_channel_id to kwargs
             task_kwargs = {
                 'sales_channel_id': sales_channel.id,
-                'remote_instance_id': remote_instance.id
+                'remote_instance': remote_instance.id
             }
 
             add_task_to_queue(

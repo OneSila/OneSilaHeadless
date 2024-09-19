@@ -1,11 +1,11 @@
 from itertools import product
 
-from sales_channels.factories.products.assigns import MagentoSalesChannelViewAssignUpdateFactory
+from sales_channels.factories.products.assigns import RemoteSalesChannelViewAssignUpdateFactory
 from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin
 from sales_channels.integrations.magento2.models import MagentoSalesChannelViewAssign
 
 
-class MagentoSalesChannelAssignUpdateFactory(GetMagentoAPIMixin, MagentoSalesChannelViewAssignUpdateFactory):
+class RemoteSalesChannelAssignUpdateFactory(GetMagentoAPIMixin, RemoteSalesChannelViewAssignUpdateFactory):
     remote_model_class = MagentoSalesChannelViewAssign
 
     def update_remote(self):
@@ -22,3 +22,6 @@ class MagentoSalesChannelAssignUpdateFactory(GetMagentoAPIMixin, MagentoSalesCha
 
     def serialize_response(self, response):
         return self.magento_instance.to_dict()
+
+    def needs_update(self):
+        return True

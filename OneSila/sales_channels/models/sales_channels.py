@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-
+from django.utils.translation import gettext_lazy as _
 from core import models
 from polymorphic.models import PolymorphicModel
 from django.conf import settings
@@ -21,6 +21,9 @@ class SalesChannel(PolymorphicModel, models.Model):
     active = models.BooleanField(default=True)
     verify_ssl = models.BooleanField(default=True)
     requests_per_minute = models.IntegerField(default=60)
+    use_configurable_name = models.BooleanField(default=False,verbose_name=_('Always use Configurable name over child'))
+    sync_contents = models.BooleanField(default=False, verbose_name=_('Sync Contents'))
+    sync_orders_after = models.DateTimeField(null=True, blank=True, verbose_name=_('Sync Orders After Date'))
 
     class Meta:
         unique_together = ('multi_tenant_company', 'hostname')
@@ -68,25 +71,9 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Model representing the assignment of a product to a specific sales channel view.
     """
-
-    STATUS_DRAFT = 'DRAFT'
-    STATUS_PENDING = 'PENDING'
-    STATUS_TODO = 'TODO'
-    STATUS_DONE = 'DONE'
-    STATUS_FAILED = 'FAILED'
-
-    STATUS_CHOICES = [
-        (STATUS_DRAFT, 'Draft'),
-        (STATUS_PENDING, 'Pending'),
-        (STATUS_TODO, 'To Do'),
-        (STATUS_DONE, 'Done'),
-        (STATUS_FAILED, 'Failed'),
-    ]
-
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE, db_index=True)
     sales_channel_view = models.ForeignKey('SalesChannelView', on_delete=models.CASCADE, db_index=True)
     remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.SET_NULL, null=True, blank=True, help_text="The remote product associated with this assign.")
-    status = models.CharField(max_length=25, choices=STATUS_CHOICES, default=STATUS_DRAFT)
     needs_resync = models.BooleanField(default=False, help_text="Indicates if a resync is needed.")
 
     class Meta:
@@ -98,25 +85,18 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     def __str__(self):
         return f"{self.product} @ {self.sales_channel_view}"
 
-    def set_pending(self, save=True):
-        self.set_status(self.STATUS_PENDING, save)
+    def create_clean(self):
+        # Prevent assignment if the product is not for sale
+        if not self.product.for_sale:
+            raise ValidationError(f"Cannot assign product '{self.product}' to sales channel view because it is not marked for sale.")
 
-    def set_todo(self, save=True):
-        self.set_status(self.STATUS_TODO, save)
+        if self.product.inspector.has_missing_information:
+            raise ValidationError(f"Cannot assign product '{self.product}' to sales channel view because it is having missing informations..")
 
-    def set_done(self, save=True):
-        self.set_status(self.STATUS_DONE, save)
-
-    def set_failed(self, save=True):
-        self.set_status(self.STATUS_FAILED, save)
-
-    def set_status(self, status, save=True):
-        """
-        Generic method to set the status of the assignment.
-        """
-        self.status = status
-        if save:
-            self.save()
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            self.create_clean()
+        super().save(*args, **kwargs)
 
 class RemoteLanguage(PolymorphicModel, RemoteObjectMixin, models.Model):
     """

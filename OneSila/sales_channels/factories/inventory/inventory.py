@@ -5,8 +5,9 @@ from ..mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
 class RemoteInventoryUpdateFactory(RemoteInstanceUpdateFactory, ProductAssignmentMixin):
     local_model_class = Inventory
 
-    def __init__(self, local_instance, sales_channel):
-        super().__init__(local_instance, sales_channel)
+    def __init__(self, sales_channel, local_instance, api=None):
+        super().__init__(sales_channel, local_instance, api=api)
+        self.stock = None
         self.remote_product = self.get_remote_product(local_instance.product)
         self.remote_instance = None
 
@@ -30,8 +31,10 @@ class RemoteInventoryUpdateFactory(RemoteInstanceUpdateFactory, ProductAssignmen
         except self.remote_model_class.DoesNotExist:
             return False
 
+        self.stock = self.local_instance.salable()
+
         # Check if the quantity matches the salable quantity
-        if self.remote_instance.quantity == self.local_instance.salable():
+        if self.remote_instance.quantity == self.stock:
             return False
 
         return True
@@ -41,3 +44,6 @@ class RemoteInventoryUpdateFactory(RemoteInstanceUpdateFactory, ProductAssignmen
         Override to prevent fetching in the default way since it is already set in preflight_check.
         """
         pass
+
+    def needs_update(self):
+        return True # the actual check is done in preflight_check

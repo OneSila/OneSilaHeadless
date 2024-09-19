@@ -2,7 +2,7 @@ from products.models import Product
 from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
 
 
-class MagentoSalesChannelViewAssignUpdateFactory(RemoteInstanceUpdateFactory):
+class RemoteSalesChannelViewAssignUpdateFactory(RemoteInstanceUpdateFactory):
     local_model_class = Product
 
     def needs_update(self):

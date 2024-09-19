@@ -1,4 +1,4 @@
-from core.helpers import get_nested_attr
+from core.helpers import get_nested_attr, clean_json_data
 from ..models.products import RemoteProduct
 from ..models.sales_channels import SalesChannelViewAssign
 from ..signals import remote_instance_pre_create, remote_instance_post_create, remote_instance_post_update, remote_instance_pre_update, \
@@ -7,6 +7,7 @@ from ..models.log import RemoteLog
 import traceback
 import inspect
 import logging
+
 logger = logging.getLogger(__name__)
 
 class RemoteInstanceOperationMixin:
@@ -65,6 +66,7 @@ class RemoteInstanceOperationMixin:
         """
         tb = traceback.format_exc()
         error_message = str(exception)
+        payload = clean_json_data(payload)
 
         if isinstance(exception, self.sales_channel._meta.user_exceptions):
             self.remote_instance.add_user_error(
@@ -265,12 +267,20 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
     create_factory_class = None  # Should be overridden in subclasses with the specific Create Factory
     create_if_not_exists = False  # Configurable parameter to create the instance if not found
 
-    def __init__(self, sales_channel, local_instance=None, api=None):
+    def __init__(self, sales_channel, local_instance=None, api=None, remote_instance=None):
         self.local_instance = local_instance  # Instance of the local model
         self.sales_channel = sales_channel  # Sales channel associated with the sync
         self.successfully_updated = True  # Tracks if update was successful
         self.payload = {}  # Will hold the payload data
         self.api = api if api is not None else self.get_api()
+
+        # we can give both the remote_instance as an id (from tasks) or the real instance
+        if isinstance(remote_instance, self.remote_model_class):
+            self.remote_instance = remote_instance
+            self.remote_instance_id = remote_instance.id
+        else:
+            self.remote_instance = None
+            self.remote_instance_id = remote_instance
 
     def preflight_check(self):
         """
@@ -292,10 +302,15 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
         Attempt to recover if the instance was not created successfully.
         """
         try:
-            self.remote_instance = self.remote_model_class.objects.get(
-                local_instance=self.local_instance,
-                sales_channel=self.sales_channel
-            )
+
+            if self.remote_instance is None:
+                if self.remote_instance_id is not None:
+                    self.remote_instance  = self.remote_model_class.objects.get(id=self.remote_instance_id)
+                else:
+                    self.remote_instance = self.remote_model_class.objects.get(
+                        local_instance=self.local_instance,
+                        sales_channel=self.sales_channel)
+
             logger.debug(f"Fetched remote instance: {self.remote_instance}")
 
             if not self.remote_instance.successfully_created:
@@ -444,13 +459,18 @@ class RemoteInstanceDeleteFactory(RemoteInstanceOperationMixin):
     api_package_name = None  # The package name (e.g., 'properties')
     api_method_name = 'delete'  # The method name for delete (e.g., 'delete')
 
-    def __init__(self, sales_channel, local_instance=None, api=None, remote_instance_id=None):
+    def __init__(self, sales_channel, local_instance=None, api=None, remote_instance=None):
         self.local_instance = local_instance
         self.sales_channel = sales_channel
         self.api = api if api is not None else self.get_api()
-        self.remote_instance_id = remote_instance_id
-        self.remote_instance = self.get_remote_instance()
         self.payload = {}
+
+        if isinstance(remote_instance, self.remote_model_class):
+            self.remote_instance = remote_instance
+            self.remote_instance_id = remote_instance.id
+        else:
+            self.remote_instance_id = remote_instance
+            self.remote_instance = self.get_remote_instance()
 
     def get_remote_instance(self):
         """
@@ -460,13 +480,17 @@ class RemoteInstanceDeleteFactory(RemoteInstanceOperationMixin):
         Raises an error if the remote instance is not found.
         """
         try:
-            if self.remote_instance_id is not None:
-                instance = self.remote_model_class.objects.get(id=self.remote_instance_id)
+            if self.remote_instance is None:
+                if self.remote_instance_id is not None:
+                    instance = self.remote_model_class.objects.get(id=self.remote_instance_id)
+                else:
+                    instance = self.remote_model_class.objects.get(
+                        local_instance=self.local_instance,
+                        sales_channel=self.sales_channel
+                    )
             else:
-                instance = self.remote_model_class.objects.get(
-                    local_instance=self.local_instance,
-                    sales_channel=self.sales_channel
-                )
+                instance = self.remote_instance
+
             logger.debug(f"Fetched remote instance: {instance}")
             return instance
         except self.remote_model_class.DoesNotExist:

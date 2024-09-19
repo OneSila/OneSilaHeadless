@@ -7,7 +7,7 @@ from properties.models import Property, PropertyTranslation, PropertySelectValue
 
 import logging
 
-from properties.signals import product_properties_rule_rename
+from properties.signals import product_properties_rule_rename, product_properties_rule_created
 
 logger = logging.getLogger(__name__)
 
@@ -38,3 +38,16 @@ def properties__property_select_value_translation__rename_rule(sender, instance,
             product_properties_rule_rename.send(sender=rule.__class__, instance=rule)
         except ProductPropertiesRule.DoesNotExist:
             pass
+
+@receiver(post_create, sender=PropertySelectValue)
+def properties__property_select_value__create_rule(sender, instance, **kwargs):
+    """
+    Custom signal to create ProductPropertiesRule automatically if the property is a product_type
+    after a PropertySelectValue is created.
+    """
+    if instance.property.is_product_type:
+        rule = ProductPropertiesRule.objects.create(
+            product_type=instance,
+            multi_tenant_company=instance.multi_tenant_company
+        )
+        product_properties_rule_created.send(sender=rule.__class__, instance=rule)

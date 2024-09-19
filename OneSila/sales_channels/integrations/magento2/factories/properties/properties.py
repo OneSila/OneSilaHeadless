@@ -1,15 +1,17 @@
 from django.utils.text import slugify
 from magento.models import AttributeSet
 
-from sales_channels.factories.mixins import RemoteInstanceCreateFactory, RemoteInstanceUpdateFactory
+from sales_channels.factories.mixins import RemoteInstanceCreateFactory, RemoteInstanceUpdateFactory, RemoteInstanceDeleteFactory
 from sales_channels.factories.properties.properties import RemotePropertyCreateFactory, RemotePropertyDeleteFactory, RemotePropertySelectValueCreateFactory, \
-    RemotePropertySelectValueUpdateFactory, RemotePropertySelectValueDeleteFactory, RemotePropertyUpdateFactory
+    RemotePropertySelectValueUpdateFactory, RemotePropertySelectValueDeleteFactory, RemotePropertyUpdateFactory, RemoteProductPropertyCreateFactory, \
+    RemoteProductPropertyDeleteFactory, RemoteProductPropertyUpdateFactory
 from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin
 from sales_channels.integrations.magento2.models import MagentoProperty, MagentoPropertySelectValue
-from properties.models import Property
-from magento.models.product import ProductAttribute
+from properties.models import Property, ProductPropertyTextTranslation
+from magento.models.product import ProductAttribute, Product
 
-from sales_channels.integrations.magento2.models.property import MagentoAttributeSet, MagentoAttributeSetAttribute
+from sales_channels.integrations.magento2.models.property import MagentoAttributeSet, MagentoAttributeSetAttribute, MagentoProductProperty
+from sales_channels.models.sales_channels import RemoteLanguage
 
 
 class MagentoPropertyCreateFactory(GetMagentoAPIMixin, RemotePropertyCreateFactory):
@@ -55,15 +57,17 @@ class MagentoPropertyCreateFactory(GetMagentoAPIMixin, RemotePropertyCreateFacto
     def modify_remote_instance(self, response_data):
         self.remote_instance.attribute_code = response_data.get('data').get('attribute_code')
 
+
 class MagentoPropertyUpdateFactory(GetMagentoAPIMixin, RemotePropertyUpdateFactory):
     remote_model_class = MagentoProperty
+    create_factory_class = MagentoPropertyCreateFactory
     field_mapping = {
         'add_to_filters': 'is_filterable',
         'name': 'default_frontend_label'
     }
 
     def update_remote(self):
-        self.magento_instance =self.api.product_attributes.by_code(self.remote_instance.attribute_code)
+        self.magento_instance = self.api.product_attributes.by_code(self.remote_instance.attribute_code)
         for key, value in self.payload.items():
             setattr(self.magento_instance, key, value)
 
@@ -73,20 +77,22 @@ class MagentoPropertyUpdateFactory(GetMagentoAPIMixin, RemotePropertyUpdateFacto
         self.magento_instance.refresh()
         return self.magento_instance.to_dict()
 
+
 class MagentoPropertyDeleteFactory(GetMagentoAPIMixin, RemotePropertyDeleteFactory):
     remote_model_class = MagentoProperty
     delete_remote_instance = True
 
     def delete_remote(self):
-        magento_instance =self.api.product_attributes.by_code(self.remote_instance.attribute_code)
+        magento_instance = self.api.product_attributes.by_code(self.remote_instance.attribute_code)
         return magento_instance.delete()
 
     def serialize_response(self, response):
-        return response # is True or False
+        return response  # is True or False
 
 
 class MagentoPropertySelectValueCreateFactory(GetMagentoAPIMixin, RemotePropertySelectValueCreateFactory):
     remote_model_class = MagentoPropertySelectValue
+    remote_property_factory = MagentoPropertyCreateFactory
     remote_id_map = 'data__value'
     field_mapping = {
         'value': 'label'
@@ -94,9 +100,6 @@ class MagentoPropertySelectValueCreateFactory(GetMagentoAPIMixin, RemoteProperty
 
     api_package_name = 'product_attribute_options'
     api_method_name = 'create'
-
-    def __init__(self, sales_channel, local_instance):
-        super().__init__(sales_channel=sales_channel, local_instance=local_instance, remote_property_factory=MagentoPropertyCreateFactory)
 
     def preflight_check(self):
         return not self.local_instance.property.is_product_type
@@ -162,16 +165,150 @@ class MagentoPropertySelectValueDeleteFactory(GetMagentoAPIMixin, RemoteProperty
         return response
 
 
-# class MagentoProductPropertyCreateFactory(MagentoPropertyEnsureMixin, MagentoInstanceCreateFactory, ProductAssignmentMixin):
-#     local_model_class = ProductProperty
-# 
-# class MagentoProductPropertyUpdateFactory(MagentoInstanceUpdateFactory):
-#     local_model_class = ProductProperty
-#     create_if_not_exists = True
-# 
-# class MagentoProductPropertyDeleteFactory(MagentoInstanceDeleteFactory):
-#     local_model_class = ProductProperty
+class RemoteValueMixin:
+    def get_remote_value(self):
+        # Get the local property type and value
+        property_type = self.local_property.type
+        value = self.local_instance.get_value()
 
+        # Handle direct value types (int, float, boolean)
+        if property_type in [Property.TYPES.INT, Property.TYPES.FLOAT, Property.TYPES.BOOLEAN]:
+            return self.get_direct_value(value)
+
+        # Handle SELECT and MULTISELECT types
+        elif property_type == Property.TYPES.SELECT:
+            return self.get_select_value(multiple=False)
+        elif property_type == Property.TYPES.MULTISELECT:
+            return self.get_select_value(multiple=True)
+
+        elif property_type in [Property.TYPES.TEXT, Property.TYPES.DESCRIPTION]:
+            return self.get_translated_values()
+
+        # Handle DATE and DATETIME types with formatting
+        elif property_type == Property.TYPES.DATE:
+            return self.format_date(value)
+        elif property_type == Property.TYPES.DATETIME:
+            return self.format_datetime(value)
+
+        # Default case if type is not recognized
+        return None
+
+    def get_direct_value(self, value):
+        """Handles direct value types: int, float, boolean."""
+        return value
+
+    def get_select_value(self, multiple):
+        """Handles select and multiselect values."""
+        if multiple:
+            return self.remote_select_values
+        else:
+            # For single select
+            return self.remote_select_values[0]
+
+    def get_translated_values(self):
+        """Retrieves translations and returns them as a dict or a single value."""
+        # Retrieve all translations for the current property
+        translations = ProductPropertyTextTranslation.objects.filter(product_property=self.local_instance)
+        translation_count = translations.count()
+
+        # Map local language to remote language code using RemoteLanguage model
+        remote_languages = {rl.local_instance: rl.remote_code for rl in RemoteLanguage.objects.filter(
+            sales_channel=self.sales_channel
+        )}
+
+        if self.get_value_only:
+            # If get_value_only is True, return the value for the multi_tenant_company language
+            multi_tenant_language = self.sales_channel.multi_tenant_company.language
+            remote_code = remote_languages.get(multi_tenant_language)
+
+            # Check if a translation exists for the multi_tenant_language
+            default_translation = translations.filter(language=multi_tenant_language).first()
+
+            if default_translation and remote_code:
+                return default_translation.value_text if self.local_property.type == Property.TYPES.TEXT else default_translation.value_description
+
+            # If the translation is not available or remote_code does not exist, return the first available translation
+            first_translation = translations.first()
+            return first_translation.value_text if first_translation and self.local_property.type == Property.TYPES.TEXT else first_translation.value_description
+
+        # If only one translation exists, return it directly
+        if translation_count == 1:
+            translation = translations.first()
+            return translation.value_text if self.local_property.type == Property.TYPES.TEXT else translation.value_description
+
+        # Multiple translations: return them as a dictionary {remote_code: remote_value}
+        translated_values = {}
+        for translation in translations:
+            language_code = translation.language
+            remote_code = remote_languages.get(language_code)
+
+            # Skip if no corresponding remote code found
+            if not remote_code:
+                continue
+
+            # Choose the correct value type based on the property type
+            remote_value = translation.value_text if self.local_property.type == Property.TYPES.TEXT else translation.value_description
+            translated_values[remote_code] = remote_value
+
+        return translated_values
+
+    def format_date(self, date_value):
+        """Formats date values to include time as '00:00:00' in Magento compatible format."""
+        if date_value:
+            # Formatting date to include time as 00:00:00
+            return date_value.strftime('%d-%m-%Y 00:00:00')
+
+    def format_datetime(self, datetime_value):
+        """Formats datetime values to Magento compatible string format."""
+        if datetime_value:
+            return datetime_value.strftime('%d-%m-%Y %H:%M:%S')
+
+
+class MagentoProductPropertyCreateFactory(GetMagentoAPIMixin, RemoteProductPropertyCreateFactory, RemoteValueMixin):
+    remote_model_class = MagentoProductProperty
+    remote_property_factory = MagentoPropertyCreateFactory
+    remote_property_select_value_factory = MagentoPropertySelectValueCreateFactory
+
+    def create_remote(self):
+        self.remote_value = self.get_remote_value()
+        if self.get_value_only:
+            return  # if we ony get the value we don't need to cotninue
+
+        self.magento_product: Product = self.api.products.by_sku(self.remote_product.remote_sku)
+        if isinstance(self.remote_value, dict):
+            for remote_code, value in self.remote_value.items():
+                self.magento_product.update_custom_attributes({self.remote_property.attribute_code: value}, scope=remote_code)
+        else:
+            self.magento_product.update_custom_attributes({self.remote_property.attribute_code: self.remote_value})
+
+    def serialize_response(self, response):
+        return {self.remote_property.attribute_code: self.remote_value}
+
+
+class MagentoProductPropertyUpdateFactory(GetMagentoAPIMixin, RemoteValueMixin, RemoteProductPropertyUpdateFactory):
+    remote_model_class = MagentoProductProperty
+    create_factory_class = MagentoProductPropertyCreateFactory
+
+    def update_remote(self):
+        self.magento_product: Product = self.api.products.by_sku(self.remote_product.remote_sku)
+        if isinstance(self.remote_value, dict):
+            for remote_code, value in self.remote_value.items():
+                self.magento_product.update_custom_attributes({self.remote_property.attribute_code: value}, scope=remote_code)
+        else:
+            self.magento_product.update_custom_attributes({self.remote_property.attribute_code: self.remote_value})
+
+    def serialize_response(self, response):
+        return {self.remote_property.attribute_code: self.remote_value}
+
+class MagentoProductPropertyDeleteFactory(GetMagentoAPIMixin, RemoteProductPropertyDeleteFactory):
+    remote_model_class = MagentoProductProperty
+
+    def delete_remote(self):
+        self.magento_product: Product = self.api.products.by_sku(self.remote_instance.remote_product.remote_sku)
+        self.magento_product.update_custom_attributes({self.remote_instance.remote_property.attribute_code: None})
+
+    def serialize_response(self, response):
+        return True
 
 class EnsureMagentoAttributeSetAttributesMixin:
 
@@ -280,12 +417,11 @@ class MagentoAttributeSetCreateFactory(GetMagentoAPIMixin, RemoteInstanceCreateF
     api_package_name = 'product_attribute_set'
     api_method_name = 'create'
 
-
     def customize_payload(self):
         """
         Customizes the payload to include the correct data format required by Magento's API.
         """
-        self.payload['skeleton_id'] = 4 # @TODO: FIND A BETTER WAY TO DO THIS
+        self.payload['skeleton_id'] = 4  # @TODO: FIND A BETTER WAY TO DO THIS
         self.payload = {'data': self.payload}
         return self.payload
 
@@ -310,10 +446,10 @@ class MagentoAttributeSetUpdateFactory(GetMagentoAPIMixin, RemoteInstanceUpdateF
     remote_model_class = MagentoAttributeSet
     field_mapping = {
         'product_type__value': 'attribute_set_name'
-        }
+    }
 
-    def __init__(self, sales_channel, local_instance, update_name_only=False):
-        super().__init__(sales_channel, local_instance)
+    def __init__(self, sales_channel, local_instance, update_name_only=False, api=None, remote_instance=None):
+        super().__init__(sales_channel, local_instance, api=api, remote_instance=remote_instance)
         self.update_name_only = update_name_only
 
     def update_remote(self):
@@ -324,7 +460,7 @@ class MagentoAttributeSetUpdateFactory(GetMagentoAPIMixin, RemoteInstanceUpdateF
         self.attribute_set_magento_instance.save()
 
     def needs_update(self):
-        return True # we don't need to compare the payloads since this is sent by us when something actually changes
+        return True  # we don't need to compare the payloads since this is sent by us when something actually changes
 
     def serialize_response(self, response):
         return self.attribute_set_magento_instance.to_dict()
@@ -346,18 +482,19 @@ class MagentoAttributeSetUpdateFactory(GetMagentoAPIMixin, RemoteInstanceUpdateF
 
     def post_update_process(self):
         if self.update_name_only:
-            return 
+            return
 
         existing_ids = self.create_existing_attributes(self.remote_instance, self.attribute_set_magento_instance)
         self.remove_unnecessary_attributes(existing_ids)
 
-class MagentoAttributeSetDeleteFactory(GetMagentoAPIMixin, RemotePropertyDeleteFactory):
+
+class MagentoAttributeSetDeleteFactory(GetMagentoAPIMixin, RemoteInstanceDeleteFactory):
     remote_model_class = MagentoAttributeSet
     delete_remote_instance = True
 
     def delete_remote(self):
-        magento_instance =self.api.product_attribute_set.by_id(self.remote_instance.remote_id)
+        magento_instance = self.api.product_attribute_set.by_id(self.remote_instance.remote_id)
         return magento_instance.delete()
 
     def serialize_response(self, response):
-        return response # is True or False
+        return response  # is True or False

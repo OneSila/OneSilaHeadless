@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import MagentoSalesChannel, MagentoProperty, MagentoPropertySelectValue, MagentoSalesChannelView, MagentoOrder, MagentoCustomer, MagentoOrderItem, \
-    MagentoProduct
+    MagentoProduct, MagentoSalesChannelViewAssign, MagentoProductProperty
 from .models.property import MagentoAttributeSet, MagentoAttributeSetAttribute
 from .models.sales_channels import MagentoRemoteLanguage
 from .models.taxes import MagentoCurrency
@@ -8,7 +8,7 @@ from .models.taxes import MagentoCurrency
 
 @admin.register(MagentoSalesChannel)
 class MagentoSalesChannelAdmin(admin.ModelAdmin):
-    list_display = ('hostname', 'authentication_method', 'active', 'always_use_configurable_name', 'sync_contents')
+    list_display = ('hostname', 'authentication_method', 'active')
     list_filter = ('active', 'authentication_method')
     search_fields = ('hostname', 'host_api_username')
     ordering = ('hostname',)
@@ -31,8 +31,16 @@ class MagentoPropertyAdmin(admin.ModelAdmin):
 class MagentoPropertySelectValueAdmin(admin.ModelAdmin):
     pass
 
+@admin.register(MagentoProductProperty)
+class MagentoProductPropertyAdmin(admin.ModelAdmin):
+    pass
+
 @admin.register(MagentoSalesChannelView)
 class MagentoSalesChannelViewAdmin(admin.ModelAdmin):
+    pass
+
+@admin.register(MagentoSalesChannelViewAssign)
+class MagentoSalesChannelViewAssignAdmin(admin.ModelAdmin):
     pass
 
 @admin.register(MagentoRemoteLanguage)

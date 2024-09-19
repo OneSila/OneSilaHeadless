@@ -72,6 +72,25 @@ class Product(TranslatedModelMixin, models.Model):
     def name(self):
         return self._get_translated_value(field_name='name', related_name='translations', fallback='sku')
 
+    @property
+    def ean_code(self):
+        from eancodes.models import EanCode
+        """
+        Returns the EAN code for the product instance.
+        - If the product has a direct EAN code, return it.
+        - If the product is a variation and inherits an EAN code, return the inherited code.
+        - Return None if no EAN code is associated.
+        """
+        direct_ean = EanCode.objects.filter(product=self, already_used=False).first()
+        if direct_ean:
+            return direct_ean.ean_code
+
+        inherited_ean = EanCode.objects.filter(inherit_to=self, already_used=False).first()
+        if inherited_ean:
+            return inherited_ean.ean_code
+
+        return None
+
     def __str__(self):
         return f"{self.name} <{self.sku}>"
 
@@ -193,26 +212,36 @@ class Product(TranslatedModelMixin, models.Model):
         except ObjectDoesNotExist:
             return None
 
-    def get_configurator_properties(self):
+    def get_configurator_properties(self, product_rule=None):
         from properties.models import ProductPropertiesRuleItem
 
-        product_rule = self.get_product_rule()
         return ProductPropertiesRuleItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-            rule=product_rule,
+            property__is_public_information=True,
+            rule=product_rule or self.get_product_rule(),
             type__in=[
                 ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
                 ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
             ]
         ).select_related('property')
 
-    def get_required_properties(self):
+    def get_optional_in_configurator_properties(self, product_rule=None):
         from properties.models import ProductPropertiesRuleItem
 
-        product_rule = self.get_product_rule()
         return ProductPropertiesRuleItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-            rule=product_rule,
+            property__is_public_information=True,
+            rule=product_rule or self.get_product_rule(),
+            type=ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
+        ).select_related('property')
+
+    def get_required_properties(self, product_rule=None):
+        from properties.models import ProductPropertiesRuleItem
+
+        return ProductPropertiesRuleItem.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            property__is_public_information=True,
+            rule=product_rule or self.get_product_rule(),
             type__in=[
                 ProductPropertiesRuleItem.REQUIRED,
                 ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
@@ -220,23 +249,23 @@ class Product(TranslatedModelMixin, models.Model):
             ]
         ).select_related('property')
 
-    def get_optional_properties(self):
+    def get_optional_properties(self, product_rule=None):
         from properties.models import ProductPropertiesRuleItem
 
-        product_rule = self.get_product_rule()
         return ProductPropertiesRuleItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-            rule=product_rule,
+            property__is_public_information=True,
+            rule=product_rule or self.get_product_rule(),
             type=ProductPropertiesRuleItem.OPTIONAL
         ).select_related('property')
 
-    def get_required_and_optional_properties(self):
+    def get_required_and_optional_properties(self, product_rule=None):
         from properties.models import ProductPropertiesRuleItem
 
-        product_rule = self.get_product_rule()
         return ProductPropertiesRuleItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-            rule=product_rule,
+            property__is_public_information=True,
+            rule=product_rule or self.get_product_rule(),
         ).select_related('property')
 
     def get_unique_configurable_variations(self):
@@ -318,6 +347,30 @@ class Product(TranslatedModelMixin, models.Model):
 
         # Fallback if no price information is available
         return None, None
+
+    def get_configurable_variations(self, active_only=True, for_sale=True):
+        """
+        Returns the variations (child products) of this configurable product.
+
+        :param active_only: If True, returns only active variations.
+        :return: QuerySet of variation products.
+        """
+        # Ensure that this product is a configurable product
+        if self.type != self.CONFIGURABLE:
+            return Product.objects.none()
+
+        variations = Product.objects.filter(
+            configurablevariation_through_variations__parent=self
+        )
+
+        # Apply the active filter directly in the query if needed
+        if active_only:
+            variations = variations.filter(active=True)
+
+        if for_sale:
+            variations = variations.filter(for_sale=True)
+
+        return variations
 
     def _generate_sku(self, save=False):
         self.sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)

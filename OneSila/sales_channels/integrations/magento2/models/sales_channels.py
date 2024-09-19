@@ -4,7 +4,6 @@ from sales_channels.models.sales_channels import (
     SalesChannelViewAssign,
     RemoteLanguage
 )
-from django.utils.translation import gettext_lazy as _
 from core import models
 
 class MagentoSalesChannel(SalesChannel):
@@ -21,11 +20,6 @@ class MagentoSalesChannel(SalesChannel):
     host_api_username = models.CharField(max_length=256, blank=True, null=True)
     host_api_key = models.CharField(max_length=256)
     authentication_method = models.CharField(max_length=3, choices=AUTH_METHOD_CHOICES)
-    always_use_configurable_name = models.BooleanField(
-        default=False,
-        verbose_name=_('Always use Configurable name over child')
-    )
-    sync_contents = models.BooleanField(default=False, verbose_name=_('Sync Contents'))
 
     class Meta:
         verbose_name = 'Magento Sales Channel'

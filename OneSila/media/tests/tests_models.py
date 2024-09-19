@@ -9,7 +9,7 @@ import os
 class MediaTestCase(TestCase):
     def test_image_web_url_none(self):
         image = baker.make(Media, image=None)
-        url = image.image_web_url()
+        url = image.image_web_url
         self.assertTrue(url is None)
 
     def test_image_web_url(self):
@@ -21,7 +21,7 @@ class MediaTestCase(TestCase):
             image.image.save(fname, File(f))
             image.full_clean()
             image.save()
-            url = image.image_web_url()
+            url = image.image_web_url
 
             # Cached images are converted to jpg, no matter what the source.
             self.assertTrue(url.endswith('.jpg'))
