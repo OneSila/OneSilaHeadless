@@ -58,6 +58,8 @@ class RemoteMediaProductThroughUpdateFactory(RemoteInstanceUpdateFactory, Produc
     def __init__(self, sales_channel, local_instance, api=None, skip_checks=False, remote_product=None, remote_instance=None):
         super().__init__(sales_channel, local_instance, api=api, remote_instance=remote_instance)
         self.remote_product = remote_product or self.get_remote_product(local_instance.product)
+        print('--------------------------------------- REMOTE PRODUCT')
+        print(self.remote_product)
 
         if skip_checks and self.remote_product is None:
             raise ValueError("Factory has skip checks enabled without providing the remote product.")
@@ -71,11 +73,20 @@ class RemoteMediaProductThroughUpdateFactory(RemoteInstanceUpdateFactory, Produc
         if self.skip_checks:
             return True
 
+        print('----------------------------------- 1')
+
         if not self.remote_product:
             return False
 
+        print('----------------------------------- 2')
+
+
         if not self.assigned_to_website():
+            print('------------------------------------------------------ NOT ASSIGNED')
             return False
+
+        print('----------------------------------- 3')
+
 
         return True
 

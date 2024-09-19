@@ -10,7 +10,7 @@ from sales_channels.integrations.magento2.models import MagentoProperty, Magento
 from properties.models import Property, ProductPropertyTextTranslation
 from magento.models.product import ProductAttribute, Product
 
-from sales_channels.integrations.magento2.models.property import MagentoAttributeSet, MagentoAttributeSetAttribute, MagentoProductProperty
+from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet, MagentoAttributeSetAttribute, MagentoProductProperty
 from sales_channels.models.sales_channels import RemoteLanguage
 
 
@@ -283,7 +283,6 @@ class MagentoProductPropertyCreateFactory(GetMagentoAPIMixin, RemoteProductPrope
 
     def serialize_response(self, response):
         return {self.remote_property.attribute_code: self.remote_value}
-
 
 class MagentoProductPropertyUpdateFactory(GetMagentoAPIMixin, RemoteValueMixin, RemoteProductPropertyUpdateFactory):
     remote_model_class = MagentoProductProperty

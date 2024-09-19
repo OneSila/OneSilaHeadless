@@ -6,15 +6,15 @@ from properties.signals import product_properties_rule_created, product_properti
 from sales_channels.integrations.magento2.flows.default import run_generic_magento_task_flow, run_delete_generic_magento_task_flow
 from sales_channels.integrations.magento2.models import MagentoProperty
 from sales_channels.signals import create_remote_property, update_remote_property, delete_remote_property, create_remote_property_select_value, \
-    update_remote_property_select_value, delete_remote_property_select_value, refresh_website_pull_models, sales_channel_created, create_remote_product
+    update_remote_property_select_value, delete_remote_property_select_value, refresh_website_pull_models, sales_channel_created, create_remote_product, \
+    create_remote_product_property, update_remote_product_property, delete_remote_product_property, update_remote_inventory, update_remote_price, \
+    update_remote_product_content, add_remote_product_variation, remove_remote_product_variation, create_remote_image_association, \
+    update_remote_image_association, delete_remote_image_association, delete_remote_image, update_remote_product, sync_remote_product, \
+    sales_view_assign_updated, delete_remote_product
 
 
 @receiver(create_remote_property, sender='properties.Property')
 def sales_channels__magento__property__create(sender, instance, **kwargs):
-    """
-    Handles the create signal for properties specifically for Magento integration.
-    Runs the MagentoPropertyCreateFactory using the run_generic_magento_task function.
-    """
     from .tasks import create_magento_property_db_task
 
     task_kwargs = {'property_id': instance.id}
@@ -22,9 +22,6 @@ def sales_channels__magento__property__create(sender, instance, **kwargs):
 
 @receiver(update_remote_property, sender='properties.Property')
 def sales_channels__magento__property__update(sender, instance, **kwargs):
-    """
-    Handles the update signal for properties specifically for Magento integration.
-    """
     from .tasks import update_magento_property_db_task
 
     task_kwargs = {'property_id': instance.id}
@@ -33,9 +30,6 @@ def sales_channels__magento__property__update(sender, instance, **kwargs):
 
 @receiver(delete_remote_property, sender='properties.Property')
 def sales_channels__magento__property__delete(sender, instance, **kwargs):
-    """
-    Handles the delete signal for properties specifically for Magento integration.
-    """
     from .tasks import delete_magento_property_db_task
 
     task_kwargs = {'local_instance_id': instance.id}
@@ -44,9 +38,6 @@ def sales_channels__magento__property__delete(sender, instance, **kwargs):
 
 @receiver(create_remote_property_select_value, sender='properties.PropertySelectValue')
 def sales_channels__magento__property_select_value__create(sender, instance, **kwargs):
-    """
-    Handles the create signal for PropertySelectValue specifically for Magento integration.
-    """
     from .tasks import create_magento_property_select_value_task
 
     task_kwargs = {'property_select_value_id': instance.id}
@@ -55,9 +46,6 @@ def sales_channels__magento__property_select_value__create(sender, instance, **k
 
 @receiver(update_remote_property_select_value, sender='properties.PropertySelectValue')
 def sales_channels__magento__property_select_value__update(sender, instance, **kwargs):
-    """
-    Handles the update signal for PropertySelectValue specifically for Magento integration.
-    """
     from .tasks import update_magento_property_select_value_task
 
 
@@ -67,9 +55,6 @@ def sales_channels__magento__property_select_value__update(sender, instance, **k
 
 @receiver(delete_remote_property_select_value, sender='properties.PropertySelectValue')
 def sales_channels__magento__property_select_value__delete(sender, instance, **kwargs):
-    """
-    Handles the delete signal for PropertySelectValue specifically for Magento integration.
-    """
     from .tasks import delete_magento_property_select_value_task
     from .models import MagentoPropertySelectValue
 
@@ -83,10 +68,6 @@ def sales_channels__magento__property_select_value__delete(sender, instance, **k
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
 @receiver(sales_channel_created, sender='sales_channels.SalesChannel')
 def sales_channels__magento__handle_pull_magento_sales_chjannel_views(sender, instance, **kwargs):
-    """
-    Handles the refresh_website_pull_models and sales_channel_created signals for Magento integration.
-    Enqueues a task to pull Magento sales channel views for the sales channel.
-    """
     from sales_channels.tasks import add_task_to_queue
     from sales_channels.helpers import get_import_path
     from .tasks import pull_magento_sales_channel_views_task, pull_magento_languages_task
@@ -106,10 +87,6 @@ def sales_channels__magento__handle_pull_magento_sales_chjannel_views(sender, in
 
 @receiver(product_properties_rule_created, sender='properties.ProductPropertiesRule')
 def sales_channels__magento__attribute_set__create(sender, instance, **kwargs):
-    """
-    Handles the create signal for ProductPropertiesRule specifically for Magento integration.
-    Runs the MagentoAttributeSetCreateFactory using the run_generic_magento_task_flow function.
-    """
     from .tasks import create_magento_attribute_set_task
 
     task_kwargs = {'rule_id': instance.id}
@@ -117,10 +94,6 @@ def sales_channels__magento__attribute_set__create(sender, instance, **kwargs):
 
 @receiver(product_properties_rule_updated, sender='properties.ProductPropertiesRule')
 def sales_channels__magento__attribute_set__update(sender, instance, **kwargs):
-    """
-    Handles the update signal for ProductPropertiesRule specifically for Magento integration.
-    Runs the MagentoAttributeSetUpdateFactory using the run_generic_magento_task_flow function.
-    """
     from .tasks import update_magento_attribute_set_task
 
     task_kwargs = {'rule_id': instance.id}
@@ -128,10 +101,6 @@ def sales_channels__magento__attribute_set__update(sender, instance, **kwargs):
 
 @receiver(product_properties_rule_rename, sender='properties.ProductPropertiesRule')
 def sales_channels__magento__attribute_set__rename(sender, instance, **kwargs):
-    """
-    Handles the rename signal for ProductPropertiesRule specifically for Magento integration.
-    Runs the MagentoAttributeSetUpdateFactory with update_name_only=True using the run_generic_magento_task_flow function.
-    """
     from .tasks import update_magento_attribute_set_task
 
     task_kwargs = {
@@ -147,12 +116,8 @@ def sales_channels__magento__attribute_set__rename(sender, instance, **kwargs):
 
 @receiver(pre_delete, sender='properties.ProductPropertiesRule')
 def sales_channels__magento__attribute_set__delete(sender, instance, **kwargs):
-    """
-    Handles the delete signal for ProductPropertiesRule specifically for Magento integration.
-    Runs the MagentoAttributeSetDeleteFactory using the run_delete_generic_magento_task_flow function.
-    """
     from .tasks import delete_magento_attribute_set_task
-    from .models.property import MagentoAttributeSet
+    from .models.properties import MagentoAttributeSet
 
     task_kwargs = {'local_instance_id': instance.id}
     run_delete_generic_magento_task_flow(
@@ -167,9 +132,6 @@ def sales_channels__magento__attribute_set__delete(sender, instance, **kwargs):
 @receiver(hold, sender='orders.Order')
 @receiver(cancelled, sender='orders.Order')
 def sales_channels__magento__order_status__update(sender, instance, **kwargs):
-    """
-    Handles the status update signals for orders specifically for Magento integration.
-    """
     from .tasks import update_magento_order_status_db_task
     task_kwargs = {
         'order_id': instance.id,
@@ -180,11 +142,163 @@ def sales_channels__magento__order_status__update(sender, instance, **kwargs):
 
 @receiver(create_remote_product, sender='products.Product')
 def sales_channels__magento__product__create(sender, instance, **kwargs):
-    """
-    Handles the create signal for properties specifically for Magento integration.
-    Runs the MagentoPropertyCreateFactory using the run_generic_magento_task function.
-    """
     from .tasks import create_magento_product_db_task
+    from products.product_types import CONFIGURABLE
 
     task_kwargs = {'product_id': instance.id}
-    run_generic_magento_task_flow(create_magento_product_db_task, **task_kwargs)
+
+    if instance.type == CONFIGURABLE:
+        number_of_remote_requests = 1 + instance.get_variations().count()
+    else:
+        number_of_remote_requests = 1
+
+    run_generic_magento_task_flow(create_magento_product_db_task, number_of_remote_requests=number_of_remote_requests, **task_kwargs)
+
+@receiver(create_remote_product_property, sender='properties.ProductProperty')
+def sales_channels__magento__product_property__create(sender, instance, **kwargs):
+    from .tasks import create_magento_product_property_db_task
+
+    task_kwargs = {'product_property_id': instance.id}
+    run_generic_magento_task_flow(create_magento_product_property_db_task, **task_kwargs)
+
+@receiver(update_remote_product_property, sender='properties.ProductProperty')
+def sales_channels__magento__product_property__update(sender, instance, **kwargs):
+    from .tasks import update_magento_product_property_db_task
+
+    task_kwargs = {'product_property_id': instance.id}
+    run_generic_magento_task_flow(update_magento_product_property_db_task, **task_kwargs)
+
+@receiver(delete_remote_product_property, sender='properties.ProductProperty')
+def sales_channels__magento__product_property__delete(sender, instance, **kwargs):
+    from .tasks import delete_magento_product_property_db_task
+    from .models import MagentoProductProperty
+
+    task_kwargs = {'local_instance_id': instance.id}
+    run_delete_generic_magento_task_flow(
+        task_func=delete_magento_product_property_db_task,
+        remote_class=MagentoProductProperty,
+        **task_kwargs
+    )
+
+@receiver(update_remote_inventory, sender='inventory.Inventory')
+def sales_channels__magento__inventory__update(sender, instance, **kwargs):
+    from .tasks import update_magento_inventory_db_task
+
+    task_kwargs = {'inventory_id': instance.id}
+    run_generic_magento_task_flow(update_magento_inventory_db_task, **task_kwargs)
+
+@receiver(update_remote_price, sender='products.Product')
+def sales_channels__magento__price__update(sender, instance, **kwargs):
+    from .tasks import update_magento_price_db_task
+
+    task_kwargs = {'product_id': instance.id}
+    run_generic_magento_task_flow(update_magento_price_db_task, **task_kwargs)
+
+
+@receiver(update_remote_product_content, sender='products.Product')
+def sales_channels__magento__product_content__update(sender, instance, **kwargs):
+    from .tasks import update_magento_product_content_db_task
+
+    task_kwargs = {'product_id': instance.id}
+    run_generic_magento_task_flow(update_magento_product_content_db_task, **task_kwargs)
+
+
+@receiver(add_remote_product_variation, sender='products.ConfigurableVariation')
+def sales_channels__magento__product_variation__add(sender, parent_product, variation_product, **kwargs):
+    from .tasks import add_magento_product_variation_db_task
+
+    task_kwargs = {
+        'parent_product_id': parent_product.id,
+        'variation_product_id': variation_product.id
+    }
+    run_generic_magento_task_flow(add_magento_product_variation_db_task, **task_kwargs)
+
+@receiver(remove_remote_product_variation, sender='products.ConfigurableVariation')
+def sales_channels__magento__product_variation__remove(sender, parent_product, variation_product, **kwargs):
+    """
+    Handles the removal of product variations in Magento.
+    """
+    from .tasks import remove_magento_product_variation_db_task
+
+    task_kwargs = {
+        'parent_product_id': parent_product.id,
+        'variation_product_id': variation_product.id
+    }
+    run_generic_magento_task_flow(remove_magento_product_variation_db_task, **task_kwargs)
+
+@receiver(create_remote_image_association, sender='media.MediaProductThrough')
+def sales_channels__magento__media_product_through__create(sender, instance, **kwargs):
+    from .tasks import create_magento_image_association_db_task
+
+    task_kwargs = {'media_product_through_id': instance.id}
+    run_generic_magento_task_flow(create_magento_image_association_db_task, **task_kwargs)
+
+
+@receiver(update_remote_image_association, sender='media.MediaProductThrough')
+def sales_channels__magento__media_product_through__update(sender, instance, **kwargs):
+    from .tasks import update_magento_image_association_db_task
+
+    task_kwargs = {'media_product_through_id': instance.id}
+    run_generic_magento_task_flow(update_magento_image_association_db_task, **task_kwargs)
+
+
+@receiver(delete_remote_image_association, sender='media.MediaProductThrough')
+def sales_channels__magento__media_product_through__delete(sender, instance, **kwargs):
+    from .tasks import delete_magento_image_association_db_task
+    from .models import MagentoImageProductAssociation
+
+    task_kwargs = {'local_instance_id': instance.id}
+    run_delete_generic_magento_task_flow(
+        task_func=delete_magento_image_association_db_task,
+        remote_class=MagentoImageProductAssociation,
+        **task_kwargs
+    )
+
+
+@receiver(delete_remote_image, sender='media.Media')
+def sales_channels__magento__image__delete(sender, instance, **kwargs):
+    from .tasks import delete_magento_image_db_task
+
+    task_kwargs = {'image_id': instance.id}
+    run_generic_magento_task_flow(delete_magento_image_db_task, **task_kwargs)
+
+@receiver(update_remote_product, sender='products.Product')
+def sales_channels__magento__product__update(sender, instance, **kwargs):
+    from .tasks import update_magento_product_db_task
+
+    task_kwargs = {'product_id': instance.id}
+    run_generic_magento_task_flow(update_magento_product_db_task, **task_kwargs)
+
+
+@receiver(sync_remote_product, sender='products.Product')
+def sales_channels__magento__product__sync(sender, instance, **kwargs):
+    from .tasks import sync_magento_product_db_task
+    from products.product_types import CONFIGURABLE
+
+    if instance.type == CONFIGURABLE:
+        number_of_remote_requests = 1 + instance.get_variations().count()
+    else:
+        number_of_remote_requests = 1
+
+    task_kwargs = {'product_id': instance.id}
+    run_generic_magento_task_flow(sync_magento_product_db_task, number_of_remote_requests=number_of_remote_requests, **task_kwargs)
+
+
+@receiver(sales_view_assign_updated, sender='products.Product')
+def sales_channels__magento__assign__update(sender, instance, **kwargs):
+    from .tasks import update_magento_sales_view_assign_db_task
+
+    task_kwargs = {'assign_id': instance.id}
+    run_generic_magento_task_flow(update_magento_sales_view_assign_db_task, **task_kwargs)
+
+@receiver(delete_remote_product, sender='products.Product')
+def sales_channels__magento__product__delete(sender, instance, **kwargs):
+    from .tasks import delete_magento_product_db_task
+    from .models.products import MagentoProduct
+
+    task_kwargs = {'local_instance_id': instance.id}
+    run_delete_generic_magento_task_flow(
+        task_func=delete_magento_product_db_task,
+        remote_class=MagentoProduct,
+        **task_kwargs
+    )

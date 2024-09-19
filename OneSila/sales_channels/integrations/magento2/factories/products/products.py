@@ -9,7 +9,7 @@ from sales_channels.integrations.magento2.factories.properties.properties import
     MagentoProductPropertyDeleteFactory
 from sales_channels.integrations.magento2.models import MagentoProduct, MagentoInventory, MagentoPrice, MagentoProductContent, MagentoSalesChannelViewAssign, \
     MagentoProductProperty
-from sales_channels.integrations.magento2.models.property import MagentoAttributeSet
+from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet
 from magento.models import Product as MagentoApiProduct
 
 logger = logging.getLogger(__name__)

@@ -1,7 +1,7 @@
 from django.db.models import UniqueConstraint
 
 from sales_channels.models.mixins import RemoteObjectMixin
-from sales_channels.models.property import (
+from sales_channels.models.properties import (
     RemoteProperty,
     RemotePropertySelectValue,
     RemoteProductProperty

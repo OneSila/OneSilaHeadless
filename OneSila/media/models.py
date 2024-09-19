@@ -161,5 +161,14 @@ class MediaProductThrough(models.Model):
 
             # If this image is marked as the main image, ensure no other image for this product is marked as main
             if self.is_main_image:
-                MediaProductThrough.objects.filter(product=self.product, media__type=Media.IMAGE, is_main_image=True).exclude(pk=self.pk).update(
-                    is_main_image=False)
+                # Get all other instances marked as main image for the same product
+                other_main_images = MediaProductThrough.objects.filter(
+                    product=self.product,
+                    media__type=Media.IMAGE,
+                    is_main_image=True
+                ).exclude(pk=self.pk)
+
+                # Iterate through each instance and set is_main_image to False, saving individually to trigger post_save
+                for other in other_main_images:
+                    other.is_main_image = False
+                    other.save()

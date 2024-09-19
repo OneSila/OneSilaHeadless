@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import MagentoSalesChannel, MagentoProperty, MagentoPropertySelectValue, MagentoSalesChannelView, MagentoOrder, MagentoCustomer, MagentoOrderItem, \
     MagentoProduct, MagentoSalesChannelViewAssign, MagentoProductProperty
-from .models.property import MagentoAttributeSet, MagentoAttributeSetAttribute
+from .models.properties import MagentoAttributeSet, MagentoAttributeSetAttribute
 from .models.sales_channels import MagentoRemoteLanguage
 from .models.taxes import MagentoCurrency
 

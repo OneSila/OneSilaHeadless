@@ -1,9 +1,11 @@
 from magento.models import Product, ConfigurableProduct
 from sales_channels.factories.products.variations import RemoteProductVariationAddFactory
 from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin
+from sales_channels.integrations.magento2.factories.products import MagentoProductCreateFactory
 
 
 class MagentoProductVariationAddFactory(GetMagentoAPIMixin, RemoteProductVariationAddFactory):
+    create_factory_class = MagentoProductCreateFactory
 
     def update_remote(self):
         self.magento_parent_product: Product = self.api.products.by_sku(self.remote_parent_product.remote_sku)

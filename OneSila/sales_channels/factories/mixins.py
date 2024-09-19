@@ -3,7 +3,7 @@ from ..models.products import RemoteProduct
 from ..models.sales_channels import SalesChannelViewAssign
 from ..signals import remote_instance_pre_create, remote_instance_post_create, remote_instance_post_update, remote_instance_pre_update, \
     remote_instance_pre_delete, remote_instance_post_delete
-from ..models.log import RemoteLog
+from ..models.logs import RemoteLog
 import traceback
 import inspect
 import logging
@@ -480,7 +480,7 @@ class RemoteInstanceDeleteFactory(RemoteInstanceOperationMixin):
         Raises an error if the remote instance is not found.
         """
         try:
-            if self.remote_instance is None:
+            if not hasattr(self, 'remote_instance') or self.remote_instance is None:
                 if self.remote_instance_id is not None:
                     instance = self.remote_model_class.objects.get(id=self.remote_instance_id)
                 else:
@@ -601,6 +601,7 @@ class ProductAssignmentMixin:
         """
         # Ensure that remote_product is set for the instance using this mixin
         if not hasattr(self, 'remote_product') or not self.remote_product:
+            print('-------------------------------------------------------- HERE!')
             return False
 
         # Check for SalesChannelViewAssign associated with the remote product
@@ -609,6 +610,8 @@ class ProductAssignmentMixin:
             remote_product=self.remote_product,
             sales_channel=self.sales_channel
         ).exists()
+        print(SalesChannelViewAssign.objects.all())
+        print(f'-------------------------------------------------------- HERE 2! {assign_exists}')
 
         # If the product is a variation, also check the parent product's assign
         if not assign_exists and self.remote_product.is_variation and self.remote_product.remote_parent_product:

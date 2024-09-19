@@ -37,7 +37,7 @@ class RemoteObjectMixin(models.Model):
         Retrieve the latest errors based on unique identifiers.
         Only includes errors that are the latest occurrence of their identifier.
         """
-        from .log import RemoteLog
+        from .logs import RemoteLog
         content_type = ContentType.objects.get_for_model(self)
         # Fetch the latest logs for each identifier
         latest_logs = RemoteLog.objects.filter(
@@ -54,7 +54,7 @@ class RemoteObjectMixin(models.Model):
         """
         Get the payload of the last log entry.
         """
-        from .log import RemoteLog
+        from .logs import RemoteLog
         content_type = ContentType.objects.get_for_model(self)
         last_log = RemoteLog.objects.filter(
             content_type=content_type,
@@ -63,7 +63,7 @@ class RemoteObjectMixin(models.Model):
         return last_log.payload if last_log else {}
 
     def add_log(self, action, response, payload, identifier,  **kwargs):
-        from .log import RemoteLog
+        from .logs import RemoteLog
 
         """
         Method to add a successful log entry.
@@ -78,7 +78,7 @@ class RemoteObjectMixin(models.Model):
         )
 
     def add_error(self, action, response, payload, error_traceback, identifier, user_error=False, **kwargs):
-        from .log import RemoteLog
+        from .logs import RemoteLog
         """
         Method to add an error log entry.
         """
@@ -122,7 +122,7 @@ class RemoteObjectMixin(models.Model):
         )
 
     def create_log_entry(self, action, status, response, payload, error_traceback=None, identifier=None, user_error=False, **kwargs):
-        from .log import RemoteLog
+        from .logs import RemoteLog
         """
         Method to create a log entry.
         """

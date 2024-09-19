@@ -360,7 +360,6 @@ def sales_channels__sales_channel__post_create_receiver(sender, instance, **kwar
 # ------------------------------------------------------------- SEND SIGNALS FOR PRODUCT AND SALES CHANNEL ASSIGN
 
 @receiver(post_create, sender='sales_channels.SalesChannelViewAssign')
-@receiver(post_create, sender='magento2.MagentoSalesChannelViewAssign') # @TODO: Fix so this if polymorphic we will send signal for parent
 def sales_channel_view_assign__post_create_receiver(sender, instance, **kwargs):
     """
     Handles the creation of SalesChannelViewAssign instances.
@@ -374,7 +373,6 @@ def sales_channel_view_assign__post_create_receiver(sender, instance, **kwargs):
     ).count()
 
     if product_assign_count == 1:
-        print('----------------------------------------------------------------- ? 1')
         create_remote_product.send(sender=instance.product.__class__, instance=instance.product)
     else:
         # Otherwise, send sales_view_assign_updated signal
@@ -382,7 +380,6 @@ def sales_channel_view_assign__post_create_receiver(sender, instance, **kwargs):
 
 
 @receiver(post_delete, sender='sales_channels.SalesChannelViewAssign')
-@receiver(post_delete, sender='magento2.MagentoSalesChannelViewAssign')
 def sales_channel_view_assign__post_delete_receiver(sender, instance, **kwargs):
     """
     Handles the deletion of SalesChannelViewAssign instances.
@@ -418,7 +415,20 @@ def sales_channels__product__post_update_receiver(sender, instance, **kwargs):
         # Send update_remote_product signal
         update_remote_product.send(sender=instance.__class__, instance=instance)
 
-@receiver(post_update, sender='products.Inspector')
+@receiver(pre_delete, sender='products.Product')
+@receiver(pre_delete, sender='products.SimpleProduct')
+@receiver(pre_delete, sender='products.ConfigurableProduct')
+@receiver(pre_delete, sender='products.ManufacturableProduct')
+@receiver(pre_delete, sender='products.BundleProduct')
+@receiver(pre_delete, sender='products.DropshipProduct')
+def sales_channels__product__pre_delete_receiver(sender, instance, **kwargs):
+    """
+    Handle pre-delete events for the product models.
+    Sends delete_remote_product signal before the product is deleted.
+    """
+    delete_remote_product.send(sender=instance.__class__, instance=instance)
+
+@receiver(post_update, sender='products_inspector.Inspector')
 def sales_channels__inspector__post_update_receiver(sender, instance, **kwargs):
     """
     Handle post-update events for the Inspector model.

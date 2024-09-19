@@ -59,8 +59,14 @@ class MagentoMediaProductThroughUpdateFactory(GetMagentoAPIMixin, RemoteMediaPro
         self.magento_instance: MediaEntry = self.api.product_media_entries.by_id(self.remote_instance.remote_id)
         self.types = self.get_image_types()
 
+        print('------------------------------ TYPES')
+        print(self.types)
+        print(self.magento_instance.types)
+
         if self.magento_instance.position != self.local_instance.sort_order or self.magento_instance.types != self.types:
             return True
+
+        print('------------------------------------ NO UPDATE NEEDED')
 
         return False
 

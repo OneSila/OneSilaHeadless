@@ -5,7 +5,7 @@ from .products import (
     RemoteProduct,
     RemoteImage,
 )
-from .property import RemoteProperty, RemotePropertySelectValue
+from .properties import RemoteProperty, RemotePropertySelectValue
 from .taxes import RemoteVat, RemoteCurrency
 
 class ImportProcess(PolymorphicModel, models.Model):
