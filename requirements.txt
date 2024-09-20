@@ -36,8 +36,8 @@ tblib
 # To find the right version, go to the strawberry-graphql-django repo and inpect the peotry.lock file
 # strawberry-graphql==0.219.1
 # strawberry-graphql-django==0.32.1
-strawberry-graphql==0.237.3
-strawberry-graphql-django==0.47.1
+strawberry-graphql==0.219.1
+strawberry-graphql-django==0.32.1
 
 django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absolute_url.git@master
 
@@ -45,3 +45,6 @@ django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absol
 # in channels issue https://github.com/django/channels/issues/1247
 # Docs for middleware: https://www.starlette.io/middleware/#corsmiddleware
 starlette
+
+git+https://github.com/jazzband/django-polymorphic.git@v4.0.0a#egg=django-polymorphic
+git+ssh://git@github.com/OneSila/OneSilaMagento2Api.git@v1.0.05

@@ -52,11 +52,11 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
 
     @field(description="Gets the URL of the first MediaProductThrough Image with the lowest sort order")
     def thumbnail_url(self, info) -> str | None:
-        media_relation = self.mediaproductthrough_set.filter(media__type=Media.IMAGE).order_by('sort_order')
+        media_relation = self.mediaproductthrough_set.filter(media__type=Media.IMAGE, is_main_image=True)
 
         first_media = media_relation.first()
         if first_media and first_media.media.image:
-            return first_media.media.image_web_url()
+            return first_media.media.image_web_url
 
         return None
 

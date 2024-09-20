@@ -93,11 +93,13 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
 
     def update_rule(self, rule, items):
         from .models import ProductPropertiesRuleItem
-        from .signals import product_properties_rule_updated
+        from .signals import product_properties_rule_updated, product_properties_rule_configurator_updated
         from strawberry_django.mutations.types import ParsedObject
 
         with transaction.atomic():
             final_ids = []
+            configurator_changed = False
+            configurator_types = [ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR, ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR]
 
             for item in items:
                 item_id = item.get('id')
@@ -115,6 +117,8 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
                         type=item.get('type'),
                         sort_order=item.get('sort_order', 0)
                     )
+                    if item.get('type') in configurator_types:
+                        configurator_changed = True
                 else:
                     if isinstance(item_id, ParsedObject):
                         rule_item = item_id.pk
@@ -122,6 +126,9 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
                         rule_item = item_id
                     else:
                         rule_item = ProductPropertiesRuleItem.objects.get(id=item_id)
+
+                    if rule_item.type != item.get('type') and item.get('type') in configurator_types:
+                        configurator_changed = True
 
                     rule_item.type = item.get('type')
                     rule_item.sort_order = item.get('sort_order', 0)
@@ -134,6 +141,9 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
 
             # Send the update signal
             product_properties_rule_updated.send(sender=rule.__class__, instance=rule)
+
+            if configurator_changed:
+                product_properties_rule_configurator_updated.send(sender=rule.__class__, instance=rule)
 
             return rule
 

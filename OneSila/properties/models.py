@@ -6,8 +6,6 @@ from translations.models import TranslationFieldsMixin, TranslatedModelMixin
 from builtins import property as django_property  # in this file we will use property as django property because we have fields named property
 from django.db.models import Q
 from django.core.exceptions import ValidationError
-from django.utils.text import slugify
-
 
 class Property(TranslatedModelMixin, models.Model):
     """https://github.com/TweaveTech/django-classifier/blob/master/classifier/models.py"""
@@ -63,8 +61,8 @@ class Property(TranslatedModelMixin, models.Model):
         return self._get_translated_value(field_name='name', related_name='propertytranslation_set')
 
     def delete(self, *args, **kwargs):
-        # if self.is_product_type:
-        #     raise ValidationError(_("Product type cannot be deleted."))
+        if self.is_product_type:
+            raise ValidationError(_("Product type cannot be deleted."))
         super().delete(*args, **kwargs)
 
     def save(self, *args, **kwargs):
