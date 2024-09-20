@@ -5,7 +5,6 @@ from media.models import Media
 from properties.signals import product_properties_rule_configurator_updated
 from sales_prices.models import SalesPriceListItem
 from sales_prices.signals import price_changed
-from .integrations.magento2.models import MagentoSalesChannelViewAssign
 from .models.sales_channels import SalesChannelViewAssign
 from .signals import (
     create_remote_property,
@@ -327,7 +326,7 @@ def sales_channels__media_product_through__post_update_receiver(sender, instance
     if instance.media.type == Media.IMAGE and instance.is_any_field_dirty(['sort_order', 'is_main_image']):
         update_remote_image_association.send(sender=instance.__class__, instance=instance)
 
-@receiver(post_delete, sender='media.MediaProductThrough')
+@receiver(pre_delete, sender='media.MediaProductThrough')
 def sales_channels__media_product_through__post_delete_receiver(sender, instance, **kwargs):
     """
     Handles the deletion of MediaProductThrough instances.

@@ -2,7 +2,7 @@ from inventory.models import Inventory
 from ..mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
 
 
-class RemoteInventoryUpdateFactory(RemoteInstanceUpdateFactory, ProductAssignmentMixin):
+class RemoteInventoryUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = Inventory
 
     def __init__(self, sales_channel, local_instance, api=None):

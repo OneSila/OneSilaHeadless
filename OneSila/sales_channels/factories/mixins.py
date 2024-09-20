@@ -91,6 +91,36 @@ class RemoteInstanceOperationMixin:
         """
         return self.payload
 
+    def _determine_remote_product(self, kwargs):
+        """
+        Determines the remote product based on the following logic:
+        1. Check if 'remote_product' is in kwargs.
+           - If not, return None.
+        2. If 'remote_product' is in kwargs and is None, try to get it from remote_instance.
+        3. If 'remote_product' is in kwargs and is not None, return it.
+        4. If 'remote_product' is None in kwargs and remote_instance doesn't have it, use get_remote_product.
+        """
+        if 'remote_product' not in kwargs:
+            return None
+
+        remote_product = kwargs.get('remote_product')
+
+        if remote_product is None:
+            # Check if remote_instance has a remote_product attribute
+            if self.remote_instance and isinstance(self.remote_instance, self.remote_model_class) and hasattr(self.remote_instance, 'remote_product'):
+                return self.remote_instance.remote_product
+            else:
+                # Fallback to using the get_remote_product method
+                return self.get_remote_product(self.local_instance.product if self.local_instance else None)
+
+        return remote_product
+
+    def get_remote_product(self, product):
+        """
+        Placeholder method to be implemented in subclasses if specific behavior is required.
+        """
+        raise NotImplementedError("Subclasses should implement this method to get the remote product.")
+
 class RemoteInstanceCreateFactory(RemoteInstanceOperationMixin):
     local_model_class = None  # The Sila Model
     remote_model_class = None  # The Mirror Model
@@ -267,7 +297,7 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
     create_factory_class = None  # Should be overridden in subclasses with the specific Create Factory
     create_if_not_exists = False  # Configurable parameter to create the instance if not found
 
-    def __init__(self, sales_channel, local_instance=None, api=None, remote_instance=None):
+    def __init__(self, sales_channel, local_instance=None, api=None, remote_instance=None, **kwargs):
         self.local_instance = local_instance  # Instance of the local model
         self.sales_channel = sales_channel  # Sales channel associated with the sync
         self.successfully_updated = True  # Tracks if update was successful
@@ -281,6 +311,9 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
         else:
             self.remote_instance = None
             self.remote_instance_id = remote_instance
+            self.get_remote_instance()
+
+        self.remote_product = self._determine_remote_product(kwargs)
 
     def preflight_check(self):
         """
@@ -299,34 +332,37 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
     def get_remote_instance(self):
         """
         Retrieve the remote instance based on the local instance and sales channel.
-        Attempt to recover if the instance was not created successfully.
+        Does not handle creation or deletion logic.
         """
         try:
-
             if self.remote_instance is None:
                 if self.remote_instance_id is not None:
-                    self.remote_instance  = self.remote_model_class.objects.get(id=self.remote_instance_id)
+                    self.remote_instance = self.remote_model_class.objects.get(id=self.remote_instance_id)
                 else:
                     self.remote_instance = self.remote_model_class.objects.get(
                         local_instance=self.local_instance,
-                        sales_channel=self.sales_channel)
-
+                        sales_channel=self.sales_channel
+                    )
             logger.debug(f"Fetched remote instance: {self.remote_instance}")
-
-            if not self.remote_instance.successfully_created:
-                logger.debug(f"Remote instance not found, attempting to create for {self.local_instance}")
-                self.remote_instance.delete()
-                # Attempt to "repair" by recreating the remote instance
-                self.create_remote_instance()
-                # Abort the update after re-creation attempt
-                self.successfully_updated = False
-
         except self.remote_model_class.DoesNotExist:
+            self.remote_instance = None
+
+    def handle_remote_instance_creation(self):
+        """
+        Handles the logic for recreating a remote instance if it wasn't created successfully.
+        This method should be called after preflight processes, where the instance might need to be created.
+        """
+        if self.remote_instance is None:
             if self.create_if_not_exists:
                 self.create_remote_instance()
                 self.successfully_updated = False
             else:
                 raise ValueError(f"Remote instance for value {self.local_instance} does not exist on website {self.sales_channel} and cannot be updated.")
+        elif not self.remote_instance.successfully_created:
+            logger.debug(f"Remote instance not found, attempting to create for {self.local_instance}")
+            self.remote_instance.delete()
+            self.create_remote_instance()
+            self.successfully_updated = False
 
     def create_remote_instance(self):
         """
@@ -338,11 +374,7 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
         create_factory = self.create_factory_class(self.local_instance, self.sales_channel)
         create_factory.run()
 
-        # Refresh the remote instance after attempted creation
-        self.remote_instance = self.remote_model_class.objects.get(
-            local_instance=self.local_instance,
-            sales_channel=self.sales_channel
-        )
+        self.remote_instance = create_factory.remote_instance
 
     def build_payload(self):
         """
@@ -436,7 +468,9 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
             return
 
         self.preflight_process()
-        self.get_remote_instance()
+
+        # Handle instance creation logic after preflight processes
+        self.handle_remote_instance_creation()
 
         # Abort if the instance was created / re-created
         if not self.successfully_updated:
@@ -459,7 +493,7 @@ class RemoteInstanceDeleteFactory(RemoteInstanceOperationMixin):
     api_package_name = None  # The package name (e.g., 'properties')
     api_method_name = 'delete'  # The method name for delete (e.g., 'delete')
 
-    def __init__(self, sales_channel, local_instance=None, api=None, remote_instance=None):
+    def __init__(self, sales_channel, local_instance=None, api=None, remote_instance=None, **kwargs):
         self.local_instance = local_instance
         self.sales_channel = sales_channel
         self.api = api if api is not None else self.get_api()
@@ -471,6 +505,8 @@ class RemoteInstanceDeleteFactory(RemoteInstanceOperationMixin):
         else:
             self.remote_instance_id = remote_instance
             self.remote_instance = self.get_remote_instance()
+
+        self.remote_product = self._determine_remote_product(kwargs)
 
     def get_remote_instance(self):
         """
@@ -610,8 +646,6 @@ class ProductAssignmentMixin:
             remote_product=self.remote_product,
             sales_channel=self.sales_channel
         ).exists()
-        print(SalesChannelViewAssign.objects.all())
-        print(f'-------------------------------------------------------- HERE 2! {assign_exists}')
 
         # If the product is a variation, also check the parent product's assign
         if not assign_exists and self.remote_product.is_variation and self.remote_product.remote_parent_product:

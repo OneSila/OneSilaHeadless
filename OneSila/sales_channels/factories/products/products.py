@@ -6,13 +6,12 @@ import logging
 
 from sales_channels.models import RemoteLog, SalesChannel, RemoteImageProductAssociation
 from sales_channels.models.products import RemoteProductConfigurator
-from sales_channels.models.sales_channels import RemoteLanguage
+from sales_channels.models.sales_channels import RemoteLanguage, SalesChannelViewAssign
 
 logger = logging.getLogger(__name__)
 
 class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
     remote_model_class = None  # This should be set in subclasses
-    remote_assign_class = None
 
     remote_image_assign_create_factory = None
     remote_image_assign_update_factory = None
@@ -48,7 +47,7 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
 
 
     def set_local_assigns(self):
-        to_assign = self.remote_assign_class.objects.filter(product=self.local_instance, sales_channel=self.sales_channel, remote_product__isnull=True)
+        to_assign = SalesChannelViewAssign.objects.filter(product=self.local_instance, sales_channel=self.sales_channel, remote_product__isnull=True)
         for assign in to_assign:
             assign.remote_product = self.remote_instance
             assign.save()
@@ -367,6 +366,12 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
     def set_price(self):
         """Sets the price for the product or variation in the payload."""
         self.price, self.discount = self.local_instance.get_price_for_sales_channel(self.sales_channel)
+
+        # Convert price and discount to float if they are not None
+        if self.price is not None:
+            self.price = float(self.price)
+        if self.discount is not None:
+            self.discount = float(self.discount)
 
         if self.is_variation:
             self.set_variation_price()

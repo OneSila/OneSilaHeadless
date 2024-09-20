@@ -1,9 +1,10 @@
 from django.contrib import admin
 from .models import MagentoSalesChannel, MagentoProperty, MagentoPropertySelectValue, MagentoSalesChannelView, MagentoOrder, MagentoCustomer, MagentoOrderItem, \
-    MagentoProduct, MagentoSalesChannelViewAssign, MagentoProductProperty
+    MagentoProduct, MagentoProductProperty, MagentoImageProductAssociation
 from .models.properties import MagentoAttributeSet, MagentoAttributeSetAttribute
 from .models.sales_channels import MagentoRemoteLanguage
 from .models.taxes import MagentoCurrency
+from ...models import SalesChannelViewAssign
 
 
 @admin.register(MagentoSalesChannel)
@@ -39,8 +40,8 @@ class MagentoProductPropertyAdmin(admin.ModelAdmin):
 class MagentoSalesChannelViewAdmin(admin.ModelAdmin):
     pass
 
-@admin.register(MagentoSalesChannelViewAssign)
-class MagentoSalesChannelViewAssignAdmin(admin.ModelAdmin):
+@admin.register(SalesChannelViewAssign)
+class SalesChannelViewAssignAdmin(admin.ModelAdmin):
     pass
 
 @admin.register(MagentoRemoteLanguage)
@@ -73,4 +74,8 @@ class MagentoCustomerAdmin(admin.ModelAdmin):
 
 @admin.register(MagentoProduct)
 class MagentoProductAdmin(admin.ModelAdmin):
+    pass
+
+@admin.register(MagentoImageProductAssociation)
+class MagentoImageProductAssociationAdmin(admin.ModelAdmin):
     pass

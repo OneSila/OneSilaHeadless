@@ -140,6 +140,10 @@ class MediaProductThrough(models.Model):
     def __str__(self):
         return '{} > {}'.format(self.product, self.media)
 
+    @property
+    def sales_channels_sort_order(self):
+        return self.sort_order + 1 # because for some integration 0 can be a position
+
     class Meta:
         ordering = ('sort_order',)
 

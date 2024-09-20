@@ -1,7 +1,7 @@
 from products.models import Product
 from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
 
-class RemoteProductContentUpdateFactory(RemoteInstanceUpdateFactory, ProductAssignmentMixin):
+class RemoteProductContentUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = Product
 
     def __init__(self, sales_channel, local_instance, api=None, skip_checks=False, remote_product=None, remote_instance=None):

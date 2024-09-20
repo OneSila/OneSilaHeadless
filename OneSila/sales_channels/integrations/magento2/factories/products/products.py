@@ -7,17 +7,17 @@ from sales_channels.integrations.magento2.factories.products.images import Magen
     MagentoMediaProductThroughDeleteFactory
 from sales_channels.integrations.magento2.factories.properties.properties import MagentoProductPropertyCreateFactory, MagentoProductPropertyUpdateFactory, \
     MagentoProductPropertyDeleteFactory
-from sales_channels.integrations.magento2.models import MagentoProduct, MagentoInventory, MagentoPrice, MagentoProductContent, MagentoSalesChannelViewAssign, \
+from sales_channels.integrations.magento2.models import MagentoProduct, MagentoInventory, MagentoPrice, MagentoProductContent, \
     MagentoProductProperty
 from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet
 from magento.models import Product as MagentoApiProduct
+
+from sales_channels.models import SalesChannelViewAssign
 
 logger = logging.getLogger(__name__)
 
 class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
     remote_model_class = MagentoProduct
-    remote_assign_class = MagentoSalesChannelViewAssign
-
     remote_product_property_class = MagentoProductProperty
     remote_product_property_create_factory = MagentoProductPropertyCreateFactory
     remote_product_property_update_factory = MagentoProductPropertyUpdateFactory
@@ -83,7 +83,6 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
 
         return custom_attributes
 
-
     def set_visibility(self):
         if self.is_variation:
             self.set_variation_visibility()
@@ -100,7 +99,7 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
             self.set_variation_assigns()
         else:
             self.assigns = list(
-                map(int, MagentoSalesChannelViewAssign.objects.filter(
+                map(int, SalesChannelViewAssign.objects.filter(
                     sales_channel=self.sales_channel,
                     product=self.local_instance
                 ).values_list('sales_channel_view__remote_id', flat=True))
@@ -110,7 +109,7 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
 
     def set_variation_assigns(self):
         self.assigns = list(
-            map(int, MagentoSalesChannelViewAssign.objects.filter(
+            map(int, SalesChannelViewAssign.objects.filter(
                 sales_channel=self.sales_channel,
                 product=self.parent_local_instance
             ).values_list('sales_channel_view__remote_id', flat=True))

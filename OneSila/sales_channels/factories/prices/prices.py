@@ -2,7 +2,7 @@ from products.models import Product
 from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
 
 
-class RemotePriceUpdateFactory(RemoteInstanceUpdateFactory, ProductAssignmentMixin):
+class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = Product
 
     def __init__(self, sales_channel, local_instance, api=None):
@@ -31,8 +31,13 @@ class RemotePriceUpdateFactory(RemoteInstanceUpdateFactory, ProductAssignmentMix
         except self.remote_model_class.DoesNotExist:
             return False
 
-        # Check if the current price matches the correct price
         self.full_price, self.discounted_price = self.local_instance.get_price_for_sales_channel(self.sales_channel)
+
+        # Convert price and discount to float if they are not None
+        if self.full_price is not None:
+            self.full_price = float(self.full_price)
+        if self.discounted_price is not None:
+            self.discounted_price = float(self.discounted_price)
 
         # If the remote instance already has the correct price, no update is needed
         if self.remote_instance.price == self.full_price and self.remote_instance.discount_price == self.discounted_price:

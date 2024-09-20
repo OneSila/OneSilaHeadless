@@ -7,10 +7,10 @@ from sales_channels.integrations.magento2.models import MagentoImageProductAssoc
 
 class GetMagentoImageTypesMixin:
     def get_image_types(self):
-        types = ["image", "small_image"]
+        types = []
 
         if self.local_instance.is_main_image:
-            types.append("thumbnail")
+            types = ["thumbnail", "image", "small_image"]
 
         return types
 
@@ -18,7 +18,7 @@ class MagentoMediaProductThroughCreateFactory(GetMagentoAPIMixin, RemoteMediaPro
     remote_model_class = MagentoImageProductAssociation
     remote_id_map = 'id'
     field_mapping = {
-        'sort_order': 'position',
+        'sales_channels_sort_order': 'position',
         'media__image__name': 'label',
         'media__image_web_url': 'image_url'
     }
@@ -48,7 +48,7 @@ class MagentoMediaProductThroughCreateFactory(GetMagentoAPIMixin, RemoteMediaPro
 class MagentoMediaProductThroughUpdateFactory(GetMagentoAPIMixin, RemoteMediaProductThroughUpdateFactory, GetMagentoImageTypesMixin):
     remote_model_class = MagentoImageProductAssociation
     field_mapping = {
-        'sort_order': 'position',
+        'sales_channels_sort_order': 'position',
         'media__image__name': 'label',
     }
 
@@ -59,19 +59,14 @@ class MagentoMediaProductThroughUpdateFactory(GetMagentoAPIMixin, RemoteMediaPro
         self.magento_instance: MediaEntry = self.api.product_media_entries.by_id(self.remote_instance.remote_id)
         self.types = self.get_image_types()
 
-        print('------------------------------ TYPES')
-        print(self.types)
-        print(self.magento_instance.types)
 
-        if self.magento_instance.position != self.local_instance.sort_order or self.magento_instance.types != self.types:
+        if self.magento_instance.position != self.local_instance.sales_channels_sort_order or self.magento_instance.types != self.types:
             return True
-
-        print('------------------------------------ NO UPDATE NEEDED')
 
         return False
 
     def update_remote(self):
-        self.magento_instance.position = self.local_instance.sort_order
+        self.magento_instance.position = self.local_instance.sales_channels_sort_order
         self.magento_instance.types = self.types
         self.magento_instance.save()
 

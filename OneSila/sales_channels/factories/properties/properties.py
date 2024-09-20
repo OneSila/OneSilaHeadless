@@ -32,7 +32,7 @@ class RemotePropertySelectValueDeleteFactory(RemoteInstanceDeleteFactory):
     local_model_class = PropertySelectValue
 
 
-class RemoteProductPropertyCreateFactory(RemotePropertyEnsureMixin, RemoteInstanceCreateFactory, ProductAssignmentMixin):
+class RemoteProductPropertyCreateFactory(ProductAssignmentMixin, RemotePropertyEnsureMixin, RemoteInstanceCreateFactory):
     local_model_class = ProductProperty
     remote_property_factory = None
     remote_property_select_value_factory = None

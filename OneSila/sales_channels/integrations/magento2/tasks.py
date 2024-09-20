@@ -452,6 +452,7 @@ def delete_magento_image_association_db_task(task_queue_item_id, sales_channel_i
 
     def actual_task():
         sales_channel = MagentoSalesChannel.objects.get(id=sales_channel_id)
+        print('--------------------------------------------------------------- 2?')
 
         factory_kwargs = {
             'remote_instance': remote_instance,

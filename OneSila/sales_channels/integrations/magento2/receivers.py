@@ -247,6 +247,7 @@ def sales_channels__magento__media_product_through__delete(sender, instance, **k
     from .tasks import delete_magento_image_association_db_task
     from .models import MagentoImageProductAssociation
 
+    print('--------------------------------------------------------------- 1?')
     task_kwargs = {'local_instance_id': instance.id}
     run_delete_generic_magento_task_flow(
         task_func=delete_magento_image_association_db_task,

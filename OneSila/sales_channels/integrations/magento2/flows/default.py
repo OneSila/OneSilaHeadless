@@ -37,6 +37,7 @@ def run_delete_generic_magento_task_flow(task_func, remote_class, **kwargs):
     """
     local_instance_id = kwargs.get('local_instance_id', None)
 
+    print('-------------------------------------------- 2??')
     for sales_channel in MagentoSalesChannel.objects.filter(active=True):
         try:
             remote_instance = remote_class.objects.get(local_instance_id=local_instance_id, sales_channel=sales_channel)
@@ -52,4 +53,6 @@ def run_delete_generic_magento_task_flow(task_func, remote_class, **kwargs):
                 task_kwargs=task_kwargs,
             )
         except remote_class.DoesNotExist:
+            print('-------------------------------------------- AICI!')
+
             pass

@@ -233,7 +233,9 @@ class RemoteImageProductAssociation(PolymorphicModel, RemoteObjectMixin, models.
         verbose_name_plural = 'Remote Image Product Associations'
 
     def __str__(self):
-        return f"{self.remote_image} associated with {self.local_instance.product.name}"
+        local_product_name = self.local_instance.product.name if self.local_instance and self.local_instance.product else "No Local Product"
+        remote_image_desc = str(self.remote_image) if self.remote_image else "No Remote Image"
+        return f"{remote_image_desc} associated with {local_product_name}"
 
 
 class RemoteCategory(PolymorphicModel, RemoteObjectMixin, models.Model):
