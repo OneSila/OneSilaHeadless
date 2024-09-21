@@ -34,7 +34,7 @@ class MagentoSalesChannelView(SalesChannelView):
     """
     Magento-specific Sales Channel View.
     """
-    code = models.CharField(max_length=50, unique=True, help_text="Unique code for the sales channel view.")
+    code = models.CharField(max_length=50, help_text="Unique code for the sales channel view.")
 
 
 class MagentoRemoteLanguage(RemoteLanguage):
