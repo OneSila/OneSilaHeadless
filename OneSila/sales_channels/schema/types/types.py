@@ -1,4 +1,4 @@
-from core.schema.core.types.types import type, relay, List, Annotated, lazy
+from core.schema.core.types.types import type, relay, field
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from products.schema.types.types import ProductType
 
@@ -142,3 +142,6 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
     remote_product: RemoteProductType
     product: ProductType
 
+    @field()
+    def remote_url(self, info) -> str | None:
+        return self.remote_url

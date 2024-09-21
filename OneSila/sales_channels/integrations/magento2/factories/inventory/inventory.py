@@ -1,11 +1,12 @@
 from magento.models import Product
 from inventory.models import Inventory
 from sales_channels.factories.inventory.inventory import RemoteInventoryUpdateFactory
+from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin
 from sales_channels.integrations.magento2.models import MagentoInventory
 
 
-class MagentoInventoryUpdateFactory(RemoteInventoryUpdateFactory):
-    local_model_class = Inventory
+class MagentoInventoryUpdateFactory(GetMagentoAPIMixin, RemoteInventoryUpdateFactory):
+    local_model_class = Product
     remote_model_class = MagentoInventory
 
     def update_remote(self):

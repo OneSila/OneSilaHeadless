@@ -5,11 +5,10 @@ from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, Product
 class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = Product
 
-    def __init__(self, sales_channel, local_instance, api=None):
-        super().__init__(sales_channel, local_instance, api=api)
+    def __init__(self, sales_channel, local_instance, api=None, remote_product=None):
+        super().__init__(sales_channel, local_instance, api=api, remote_product=remote_product)
         self.discounted_price = None
         self.full_price = None
-        self.remote_product = self.get_remote_product(local_instance)
         self.remote_instance = None
 
     def preflight_check(self):

@@ -36,7 +36,7 @@ class RemoteInventory(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
 
     remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='inventory', on_delete=models.CASCADE, help_text="The remote product associated with this inventory.")
-    quantity = models.IntegerField(help_text="The quantity of the product available in the remote system.")
+    quantity = models.IntegerField(help_text="The quantity of the product available in the remote system.", null=True, blank=True)
 
     class Meta:
         unique_together = ('remote_product',)
@@ -53,7 +53,7 @@ class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
 
     remote_product = models.OneToOneField('sales_channels.RemoteProduct',related_name='price', on_delete=models.CASCADE, help_text="The remote product associated with this price.")
-    price = models.DecimalField(max_digits=10, decimal_places=2, help_text="The price of the product in the remote system.")
+    price = models.DecimalField(max_digits=10, decimal_places=2, help_text="The price of the product in the remote system.", null=True, blank=True,) # null for configurable products
     discount_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="The discounted price of the product in the remote system, if any.")
 
     class Meta:

@@ -1,14 +1,15 @@
 from inventory.models import Inventory
+from products.models import Product
 from ..mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
 
 
 class RemoteInventoryUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
-    local_model_class = Inventory
+    local_model_class = Product
+    local_product_map = 'local_instance'
 
-    def __init__(self, sales_channel, local_instance, api=None):
-        super().__init__(sales_channel, local_instance, api=api)
+    def __init__(self, sales_channel, local_instance, api=None, remote_product=None):
+        super().__init__(sales_channel, local_instance, api=api, remote_product=remote_product)
         self.stock = None
-        self.remote_product = self.get_remote_product(local_instance.product)
         self.remote_instance = None
 
 
@@ -31,7 +32,7 @@ class RemoteInventoryUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateF
         except self.remote_model_class.DoesNotExist:
             return False
 
-        self.stock = self.local_instance.salable()
+        self.stock = self.local_instance.inventory.salable()
 
         # Check if the quantity matches the salable quantity
         if self.remote_instance.quantity == self.stock:

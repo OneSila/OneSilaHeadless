@@ -38,6 +38,8 @@ class RemoteProductPropertyCreateFactory(ProductAssignmentMixin, RemotePropertyE
     remote_property_select_value_factory = None
 
     def __init__(self, sales_channel, local_instance, api=None, skip_checks=False, remote_product=None, get_value_only=False):
+        super().__init__(sales_channel, local_instance, api=api)
+
         self.local_property = local_instance.property
         # instead of creating the it we just receive the value for it so we can add it in bulk on product create
         self.get_value_only = get_value_only
@@ -50,7 +52,6 @@ class RemoteProductPropertyCreateFactory(ProductAssignmentMixin, RemotePropertyE
             raise ValueError("Factory has skip checks enabled without providing the remote product.")
 
         self.skip_checks = skip_checks
-        super().__init__(sales_channel, local_instance, api=api)
 
 
     def preflight_check(self):
@@ -71,30 +72,7 @@ class RemoteProductPropertyCreateFactory(ProductAssignmentMixin, RemotePropertyE
 
     def preflight_process(self):
         super().preflight_process()
-
-        self.remote_select_values = []
-        # For select or multi-select properties, ensure RemotePropertySelectValue exists
-        if self.local_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
-            select_values = self.local_instance.value_select.all() if self.local_property.type == Property.TYPES.MULTISELECT else [self.local_instance.value_select]
-
-            for value in select_values:
-                try:
-                    remote_select_value = self.remote_property_select_value_factory.remote_model_class.objects.get(
-                        local_instance=value,
-                        sales_channel=self.sales_channel
-                    )
-                except self.remote_property_select_value_factory.remote_model_class.DoesNotExist:
-                    # Create the remote select value if it doesn't exist
-                    select_value_create_factory = self.remote_property_select_value_factory(
-                        local_instance=value,
-                        sales_channel=self.sales_channel,
-                        remote_property_factory=self.remote_property_factory
-                    )
-                    select_value_create_factory.run()
-                    remote_select_value = select_value_create_factory.remote_instance
-
-                self.remote_select_values.append(remote_select_value.remote_id)
-
+        self.get_select_values()
 
     def set_remote_id(self, response_data):
         self.remote_instance.remote_value = str(self.remote_value)
@@ -104,19 +82,24 @@ class RemoteProductPropertyCreateFactory(ProductAssignmentMixin, RemotePropertyE
         self.remote_instance_data['remote_property'] = self.remote_property
         return self.remote_instance_data
 
-class RemoteProductPropertyUpdateFactory(RemoteInstanceUpdateFactory):
+class RemoteProductPropertyUpdateFactory(RemotePropertyEnsureMixin, RemoteInstanceUpdateFactory):
     local_model_class = ProductProperty
     create_if_not_exists = True
 
-    def __init__(self, sales_channel, local_instance, api=None, get_value_only=False):
+    def __init__(self, sales_channel, local_instance, api=None, get_value_only=False, remote_instance=None, skip_checks=False, remote_product=None):
+        super().__init__(sales_channel, local_instance, api=api, remote_instance=remote_instance, remote_product=remote_product)
         self.remote_value = None
         self.remote_property = None
-        self.remote_product = None
         self.local_property = local_instance.property
         # instead of creating the it we just receive the value for it so we can add it in bulk on product create
         self.get_value_only = get_value_only
-        super().__init__(sales_channel, local_instance, api=api)
 
+        if skip_checks and self.remote_product is None:
+            raise ValueError("Factory has skip checks enabled without providing the remote product.")
+
+    def preflight_process(self):
+        super().preflight_process()
+        self.get_select_values()
 
     def get_remote_value(self):
         raise NotImplementedError("Subclasses must implement get_remote_value")

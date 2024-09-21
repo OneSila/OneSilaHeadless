@@ -3,16 +3,16 @@ from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, Product
 
 class RemoteProductContentUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = Product
+    local_product_map = 'local_instance'
 
     def __init__(self, sales_channel, local_instance, api=None, skip_checks=False, remote_product=None, remote_instance=None):
-        self.remote_product = remote_product or self.get_remote_product(local_instance.product)
-        self.remote_instance = remote_instance
+        super().__init__(sales_channel, local_instance, api=api, remote_product=remote_product)
 
+        self.remote_instance = remote_instance
         if skip_checks and (self.remote_product is None or self.remote_instance is None):
             raise ValueError("Factory has skip checks enabled without providing the remote product.")
 
         self.skip_checks = skip_checks
-        super().__init__(sales_channel, local_instance, api=api)
 
 
     def preflight_check(self):

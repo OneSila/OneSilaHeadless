@@ -85,6 +85,10 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     def __str__(self):
         return f"{self.product} @ {self.sales_channel_view}"
 
+    @property
+    def remote_url(self):
+        return f"{self.sales_channel_view.url}{self.product.url_key}.html"
+
     def create_clean(self):
         # Prevent assignment if the product is not for sale
         if not self.product.for_sale:

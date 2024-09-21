@@ -292,9 +292,8 @@ def delete_magento_product_property_db_task(task_queue_item_id, sales_channel_id
 
 @remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def update_magento_inventory_db_task(task_queue_item_id, sales_channel_id, inventory_id):
+def update_magento_inventory_db_task(task_queue_item_id, sales_channel_id, product_id):
     from .factories.inventory import MagentoInventoryUpdateFactory
-    from inventory.models import Inventory
 
     task = BaseRemoteTask(task_queue_item_id)
 
@@ -302,8 +301,8 @@ def update_magento_inventory_db_task(task_queue_item_id, sales_channel_id, inven
         run_generic_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoInventoryUpdateFactory,
-            local_instance_id=inventory_id,
-            local_instance_class=Inventory
+            local_instance_id=product_id,
+            local_instance_class=Product
         )
 
     task.execute(actual_task)
@@ -452,7 +451,6 @@ def delete_magento_image_association_db_task(task_queue_item_id, sales_channel_i
 
     def actual_task():
         sales_channel = MagentoSalesChannel.objects.get(id=sales_channel_id)
-        print('--------------------------------------------------------------- 2?')
 
         factory_kwargs = {
             'remote_instance': remote_instance,

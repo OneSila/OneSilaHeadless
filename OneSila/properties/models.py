@@ -140,7 +140,12 @@ class ProductProperty(TranslatedModelMixin, models.Model):
         """
         Converts the various values and returns you the right type/value for the given property.
         """
-        return getattr(self, 'get_value_{}'.format(self.property.type.lower()))()
+        type = self.property.type
+
+        if type == Property.TYPES.MULTISELECT:
+            type = 'multi_select'
+
+        return getattr(self, 'get_value_{}'.format(type.lower()))()
 
     def get_value_int(self):
         return self.value_int

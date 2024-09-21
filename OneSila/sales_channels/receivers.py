@@ -116,14 +116,25 @@ def sales_channels__property_select_value_translation__post_update_receiver(send
     if instance.propertyselectvalue.property.is_public_information:
         update_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__, instance=instance.propertyselectvalue)
 
+
 @receiver(pre_delete, sender='properties.PropertySelectValueTranslation')
 def sales_channels__property_select_value_translation__pre_delete_receiver(sender, instance: PropertySelectValueTranslation, **kwargs):
     """
     Handles pre-delete events for the PropertySelectValueTranslation model.
     - Sends an update signal on translation deletion if the property is public information.
+    - If there's only one translation, no update signal is sent as the PropertySelectValue will be deleted.
     """
-    if instance.propertyselectvalue.property.is_public_information:
-        update_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__, instance=instance.propertyselectvalue)
+    property_instance = instance.propertyselectvalue.property
+
+    # Check if the property is marked as public information
+    if property_instance.is_public_information:
+        # Count the translations for the current PropertySelectValue
+        translation_count = PropertySelectValueTranslation.objects.filter(propertyselectvalue=instance.propertyselectvalue).count()
+
+        # Only send an update signal if there are more than one translations
+        if translation_count > 1:
+            update_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__, instance=instance.propertyselectvalue)
+
 
 @receiver(post_update, sender='properties.PropertySelectValue')
 def sales_channels__property_select_value__post_update_receiver(sender, instance: PropertySelectValue, **kwargs):
@@ -191,7 +202,13 @@ def sales_channels__inventory__update(sender, instance: Inventory, **kwargs):
     Handles post-create, post-update, and post-delete events for the Inventory model.
     - Sends an update signal for the associated product's inventory.
     """
-    update_remote_inventory.send(sender=instance.product.__class__, instance=instance.product)
+    from products.product_types import SUPPLIER
+
+    if instance.product.type == SUPPLIER:
+        for product in instance.product.base_products.all().iterator():
+            update_remote_inventory.send(sender=product.__class__, instance=product)
+    else:
+        update_remote_inventory.send(sender=instance.product.__class__, instance=instance.product)
 
 # ------------------------------------------------------------- SEND SIGNALS FOR PRICES
 

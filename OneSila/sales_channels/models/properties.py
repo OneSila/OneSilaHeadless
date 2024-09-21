@@ -38,7 +38,10 @@ class RemotePropertySelectValue(PolymorphicModel, RemoteObjectMixin, models.Mode
         verbose_name_plural = 'Remote Property Select Values'
 
     def __str__(self):
-        return f"Remote value for {self.local_instance.value} on {self.sales_channel.hostname}"
+        local_value = self.local_instance.value if self.local_instance else "N/A"
+        sales_channel = self.sales_channel.hostname if hasattr(self, 'sales_channel') and self.sales_channel else "N/A"
+        return f"Remote value for {local_value} on {sales_channel}"
+
 
 class RemoteProductProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
@@ -55,7 +58,14 @@ class RemoteProductProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Remote Product Properties'
 
     def __str__(self):
-        return f"{self.remote_product} {self.local_instance.property.internal_name} > {self.local_instance.get_value()}"
+        if self.local_instance:
+            property_name = self.local_instance.property.internal_name
+            property_value = self.local_instance.get_value()
+        else:
+            property_name = "No Property"
+            property_value = "No Value"
+
+        return f"{self.remote_product} {property_name} > {property_value}"
 
     def needs_update(self, new_remote_value):
         """

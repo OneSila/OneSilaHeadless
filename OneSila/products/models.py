@@ -73,6 +73,10 @@ class Product(TranslatedModelMixin, models.Model):
         return self._get_translated_value(field_name='name', related_name='translations', fallback='sku')
 
     @property
+    def url_key(self):
+        return self._get_translated_value(field_name='url_key', related_name='translations')
+
+    @property
     def ean_code(self):
         from eancodes.models import EanCode
         """

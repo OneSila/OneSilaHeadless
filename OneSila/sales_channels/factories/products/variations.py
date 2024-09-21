@@ -20,7 +20,7 @@ class RemoteProductVariationAddFactory(RemoteInstanceUpdateFactory):
         if self.skip_checks and (self.remote_instance is None or self.remote_parent_product is None):
             raise ValueError("Factory have skip checks enabled without giving the remote instances.")
 
-        super().__init__(sales_channel, local_instance, api=api)
+        super().__init__(sales_channel, local_instance, api=api, remote_instance=remote_instance)
 
     def preflight_check(self):
         """

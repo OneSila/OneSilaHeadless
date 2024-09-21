@@ -58,7 +58,8 @@ class RemoteObjectMixin(models.Model):
         content_type = ContentType.objects.get_for_model(self)
         last_log = RemoteLog.objects.filter(
             content_type=content_type,
-            object_id=self.pk
+            object_id=self.pk,
+            status=RemoteLog.STATUS_SUCCESS
         ).order_by('-created_at').first()
         return last_log.payload if last_log else {}
 

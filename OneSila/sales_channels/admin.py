@@ -5,6 +5,9 @@ from django.utils.html import format_html
 from .models import RemoteTaskQueue, RemoteLog
 from django.utils.translation import gettext_lazy as _
 
+from .models.products import RemoteProductConfigurator
+
+
 @admin.action(description=_("Retry selected tasks"))
 def retry_task_action(modeladmin, request, queryset):
     for task in queryset:
@@ -83,3 +86,7 @@ class RemoteLogAdmin(admin.ModelAdmin):
             'fields': ('user_error', 'keep')
         }),
     )
+
+@admin.register(RemoteProductConfigurator)
+class RemoteProductConfiguratorAdmin(admin.ModelAdmin):
+    pass

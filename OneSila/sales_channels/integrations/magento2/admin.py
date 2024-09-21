@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import MagentoSalesChannel, MagentoProperty, MagentoPropertySelectValue, MagentoSalesChannelView, MagentoOrder, MagentoCustomer, MagentoOrderItem, \
-    MagentoProduct, MagentoProductProperty, MagentoImageProductAssociation
+    MagentoProduct, MagentoProductProperty, MagentoImageProductAssociation, MagentoProductContent
 from .models.properties import MagentoAttributeSet, MagentoAttributeSetAttribute
 from .models.sales_channels import MagentoRemoteLanguage
 from .models.taxes import MagentoCurrency
@@ -19,7 +19,7 @@ class MagentoSalesChannelAdmin(admin.ModelAdmin):
             'fields': ('hostname', 'active', 'verify_ssl', 'authentication_method', 'host_api_username', 'host_api_key', 'multi_tenant_company')
         }),
         ('Magento Settings', {
-            'fields': ('always_use_configurable_name', 'sync_contents')
+            'fields': ('use_configurable_name', 'sync_contents')
         }),
     )
 
@@ -74,6 +74,10 @@ class MagentoCustomerAdmin(admin.ModelAdmin):
 
 @admin.register(MagentoProduct)
 class MagentoProductAdmin(admin.ModelAdmin):
+    pass
+
+@admin.register(MagentoProductContent)
+class MagentoProductContentAdmin(admin.ModelAdmin):
     pass
 
 @admin.register(MagentoImageProductAssociation)

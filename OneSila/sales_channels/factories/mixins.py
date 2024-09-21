@@ -1,4 +1,5 @@
 from core.helpers import get_nested_attr, clean_json_data
+from properties.models import Property
 from ..models.products import RemoteProduct
 from ..models.sales_channels import SalesChannelViewAssign
 from ..signals import remote_instance_pre_create, remote_instance_post_create, remote_instance_post_update, remote_instance_pre_update, \
@@ -91,6 +92,29 @@ class RemoteInstanceOperationMixin:
         """
         return self.payload
 
+    def get_mapped_field(self, data, map_path, is_model=False):
+        """
+        Retrieves a nested field from a dictionary or model based on the map path.
+        Supports nested fields using '__' notation.
+
+        :param data: The data source, either a dictionary or model instance.
+        :param map_path: A string representing the field path, e.g., 'field1__field2'.
+        :param is_model: Boolean flag indicating whether the data source is a model.
+        :return: The retrieved value or None if not found.
+        """
+        fields = map_path.split('__')
+        result = data
+
+        for field in fields:
+            if is_model:
+                result = getattr(result, field, None)
+            else:
+                result = result.get(field, None)
+            if result is None:
+                break
+
+        return result
+
     def _determine_remote_product(self, kwargs):
         """
         Determines the remote product based on the following logic:
@@ -106,12 +130,10 @@ class RemoteInstanceOperationMixin:
         remote_product = kwargs.get('remote_product')
 
         if remote_product is None:
-            # Check if remote_instance has a remote_product attribute
             if self.remote_instance and isinstance(self.remote_instance, self.remote_model_class) and hasattr(self.remote_instance, 'remote_product'):
                 return self.remote_instance.remote_product
             else:
-                # Fallback to using the get_remote_product method
-                return self.get_remote_product(self.local_instance.product if self.local_instance else None)
+                return self.get_remote_product(self.get_mapped_field(self, self.local_product_map, is_model=True))
 
         return remote_product
 
@@ -199,16 +221,8 @@ class RemoteInstanceCreateFactory(RemoteInstanceOperationMixin):
         """
         Sets the remote ID based on the response data using the mapping provided.
         """
-        id_path = self.remote_id_map.split('__')
-        remote_id = response_data
-
-        for path in id_path:
-            remote_id = remote_id.get(path, None)
-            if remote_id is None:
-                break
-
-        # Set the remote_id on the remote instance
-        self.remote_instance.remote_id = remote_id
+        # Retrieve remote_id using the get_mapped_field utility function
+        self.remote_instance.remote_id = self.get_mapped_field(response_data, self.remote_id_map)
 
     def create_remote(self):
         """
@@ -288,6 +302,7 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
     remote_model_class = None  # The Mirror Model
     field_mapping = {}  # Mapping of local fields to remote fields, should be overridden in subclasses
     updatable_fields = []  # Fields that are allowed to be updated
+    local_product_map = 'local_instance__product' # the way we go to the local product from the current instance (if possible)
 
     # Configurable API details
     api_package_name = None  # The package name (e.g., 'properties')
@@ -371,7 +386,7 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
         if not self.create_factory_class:
             raise ValueError("Create factory class must be specified to recreate remote instances.")
 
-        create_factory = self.create_factory_class(self.local_instance, self.sales_channel)
+        create_factory = self.create_factory_class(self.sales_channel, self.local_instance)
         create_factory.run()
 
         self.remote_instance = create_factory.remote_instance
@@ -476,6 +491,7 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
         if not self.successfully_updated:
             return
 
+
         self.build_payload()
         self.customize_payload()
 
@@ -487,6 +503,7 @@ class RemoteInstanceDeleteFactory(RemoteInstanceOperationMixin):
     local_model_class = None  # The Sila Model
     remote_model_class = None  # The Mirror Model
     delete_field_mapping = {}  # Default mapping for deletion payload
+    local_product_map = 'local_instance__product' # the way we go to the local product from the current instance (if possible)
     delete_remote_instance = True
 
     # Configurable API details
@@ -585,6 +602,7 @@ class RemoteInstanceDeleteFactory(RemoteInstanceOperationMixin):
             remote_instance_post_delete.send(sender=self.remote_instance.__class__, instance=self.remote_instance)
 
     def delete_remote_instance_process(self):
+
         if self.delete_remote_instance:
             logger.debug(f"Deleting remote instance: {self.remote_instance}")
             self.remote_instance.delete()
@@ -637,7 +655,6 @@ class ProductAssignmentMixin:
         """
         # Ensure that remote_product is set for the instance using this mixin
         if not hasattr(self, 'remote_product') or not self.remote_product:
-            print('-------------------------------------------------------- HERE!')
             return False
 
         # Check for SalesChannelViewAssign associated with the remote product
@@ -679,6 +696,28 @@ class RemotePropertyEnsureMixin:
 
             self.remote_property = property_create_factory.remote_instance
 
+    def get_select_values(self):
+        self.remote_select_values = []
+        # For select or multi-select properties, ensure RemotePropertySelectValue exists
+        if self.local_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
+            select_values = self.local_instance.value_multi_select.all() if self.local_property.type == Property.TYPES.MULTISELECT else [self.local_instance.value_select]
+
+            for value in select_values:
+                try:
+                    remote_select_value = self.remote_property_select_value_factory.remote_model_class.objects.get(
+                        local_instance=value,
+                        sales_channel=self.sales_channel
+                    )
+                except self.remote_property_select_value_factory.remote_model_class.DoesNotExist:
+                    # Create the remote select value if it doesn't exist
+                    select_value_create_factory = self.remote_property_select_value_factory(
+                        local_instance=value,
+                        sales_channel=self.sales_channel,
+                    )
+                    select_value_create_factory.run()
+                    remote_select_value = select_value_create_factory.remote_instance
+
+                self.remote_select_values.append(remote_select_value.remote_id)
 
 class PullRemoteInstanceMixin(RemoteInstanceOperationMixin):
     remote_model_class = None  # The Mirror Model (e.g., RemoteOrder)

@@ -148,7 +148,7 @@ def sales_channels__magento__product__create(sender, instance, **kwargs):
     task_kwargs = {'product_id': instance.id}
 
     if instance.type == CONFIGURABLE:
-        number_of_remote_requests = 1 + instance.get_variations().count()
+        number_of_remote_requests = 1 + instance.get_configurable_variations().count()
     else:
         number_of_remote_requests = 1
 
@@ -180,11 +180,11 @@ def sales_channels__magento__product_property__delete(sender, instance, **kwargs
         **task_kwargs
     )
 
-@receiver(update_remote_inventory, sender='inventory.Inventory')
+@receiver(update_remote_inventory, sender='products.Product')
 def sales_channels__magento__inventory__update(sender, instance, **kwargs):
     from .tasks import update_magento_inventory_db_task
 
-    task_kwargs = {'inventory_id': instance.id}
+    task_kwargs = {'product_id': instance.id}
     run_generic_magento_task_flow(update_magento_inventory_db_task, **task_kwargs)
 
 @receiver(update_remote_price, sender='products.Product')
@@ -247,7 +247,6 @@ def sales_channels__magento__media_product_through__delete(sender, instance, **k
     from .tasks import delete_magento_image_association_db_task
     from .models import MagentoImageProductAssociation
 
-    print('--------------------------------------------------------------- 1?')
     task_kwargs = {'local_instance_id': instance.id}
     run_delete_generic_magento_task_flow(
         task_func=delete_magento_image_association_db_task,
@@ -277,7 +276,7 @@ def sales_channels__magento__product__sync(sender, instance, **kwargs):
     from products.product_types import CONFIGURABLE
 
     if instance.type == CONFIGURABLE:
-        number_of_remote_requests = 1 + instance.get_variations().count()
+        number_of_remote_requests = 1 + instance.get_configurable_variations().count()
     else:
         number_of_remote_requests = 1
 

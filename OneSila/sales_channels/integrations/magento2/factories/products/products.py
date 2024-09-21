@@ -1,7 +1,6 @@
 import logging
 from sales_channels.factories.products.products import RemoteProductSyncFactory, RemoteProductCreateFactory, RemoteProductDeleteFactory, \
     RemoteProductUpdateFactory
-from sales_channels.factories.products.variations import RemoteProductVariationAddFactory
 from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin
 from sales_channels.integrations.magento2.factories.products.images import MagentoMediaProductThroughCreateFactory, MagentoMediaProductThroughUpdateFactory, \
     MagentoMediaProductThroughDeleteFactory
@@ -17,6 +16,8 @@ from sales_channels.models import SalesChannelViewAssign
 logger = logging.getLogger(__name__)
 
 class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
+    from sales_channels.integrations.magento2.factories.products.variations import MagentoProductVariationAddFactory
+
     remote_model_class = MagentoProduct
     remote_product_property_class = MagentoProductProperty
     remote_product_property_create_factory = MagentoProductPropertyCreateFactory
@@ -38,12 +39,18 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
         from sales_channels.integrations.magento2.factories.products import MagentoProductDeleteFactory
         return MagentoProductDeleteFactory
 
+    def get_add_variation_factory(self):
+        # Move import inside the method
+        from sales_channels.integrations.magento2.factories.products import MagentoProductVariationAddFactory
+        return MagentoProductVariationAddFactory
+
+
     # Use the getter methods within the class where needed
     sync_product_factory = property(get_sync_product_factory)
     create_product_factory = property(get_create_product_factory)
     delete_product_factory = property(get_delete_product_factory)
 
-    add_variation_factory = RemoteProductVariationAddFactory
+    add_variation_factory = property(get_add_variation_factory)
 
     field_mapping = {
         'name': 'name',
@@ -76,8 +83,6 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
 
     def get_unpacked_product_properties(self):
         custom_attributes = {}
-        print('----------------------------------------- 1')
-        print(self.remote_product_properties)
         for remote_product_property in self.remote_product_properties:
             custom_attributes[remote_product_property.remote_property.attribute_code] = remote_product_property.remote_value
 
@@ -145,11 +150,12 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
 
     def perform_remote_action(self):
         self.magento_product: MagentoApiProduct = self.api.products.by_sku(self.remote_instance.remote_sku)
-        for key, value in self.payload:
+
+        for key, value in self.payload.items():
             if value != getattr(self.magento_product, key):
                 setattr(self.magento_product, key, value)
 
-        self.magento_product.save()
+        self.magento_product.save(scope='all')
         self.magento_product.update_custom_attributes(self.get_unpacked_product_properties())
 
     def process_content_translation(self, short_description, description, url_key, remote_language):
@@ -169,7 +175,6 @@ class MagentoProductCreateFactory(RemoteProductCreateFactory, MagentoProductSync
 
     def customize_payload(self):
         super().customize_payload()
-        print('----------------------------------------------------------------- CUSTOMIZE PAYLOAD')
         extra_data = {'custom_attributes': self.get_unpacked_product_properties()}
         self.payload = {'data': self.payload, 'extra_data': extra_data}
 

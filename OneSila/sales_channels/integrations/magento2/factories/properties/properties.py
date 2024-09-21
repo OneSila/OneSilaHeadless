@@ -126,6 +126,7 @@ class MagentoPropertySelectValueCreateFactory(GetMagentoAPIMixin, RemoteProperty
 class MagentoPropertySelectValueUpdateFactory(GetMagentoAPIMixin, RemotePropertySelectValueUpdateFactory):
     remote_model_class = MagentoPropertySelectValue
     create_factory_class = MagentoPropertySelectValueCreateFactory
+
     field_mapping = {
         'value': 'label'
     }
@@ -200,7 +201,7 @@ class RemoteValueMixin:
     def get_select_value(self, multiple):
         """Handles select and multiselect values."""
         if multiple:
-            return self.remote_select_values
+            return ','.join(self.remote_select_values)
         else:
             # For single select
             return self.remote_select_values[0]
@@ -287,6 +288,8 @@ class MagentoProductPropertyCreateFactory(GetMagentoAPIMixin, RemoteProductPrope
 class MagentoProductPropertyUpdateFactory(GetMagentoAPIMixin, RemoteValueMixin, RemoteProductPropertyUpdateFactory):
     remote_model_class = MagentoProductProperty
     create_factory_class = MagentoProductPropertyCreateFactory
+    remote_property_factory = MagentoPropertyCreateFactory
+    remote_property_select_value_factory = MagentoPropertySelectValueCreateFactory
 
     def update_remote(self):
         self.magento_product: Product = self.api.products.by_sku(self.remote_product.remote_sku)
@@ -301,6 +304,7 @@ class MagentoProductPropertyUpdateFactory(GetMagentoAPIMixin, RemoteValueMixin, 
 
 class MagentoProductPropertyDeleteFactory(GetMagentoAPIMixin, RemoteProductPropertyDeleteFactory):
     remote_model_class = MagentoProductProperty
+    delete_remote_instance = True
 
     def delete_remote(self):
         self.magento_product: Product = self.api.products.by_sku(self.remote_instance.remote_product.remote_sku)

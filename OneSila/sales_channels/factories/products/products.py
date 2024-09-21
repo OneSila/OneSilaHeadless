@@ -36,11 +36,14 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
     REMOTE_TYPE_SIMPLE = None
     REMOTE_TYPE_CONFIGURABLE = None
 
-    def __init__(self, sales_channel: SalesChannel, local_instance: Product, api=None, parent_local_instance=None):
+    def __init__(self, sales_channel: SalesChannel, local_instance: Product,
+                 api=None, remote_instance=None, parent_local_instance=None, parent_remote_instance=None):
         self.local_instance = local_instance  # Instance of the Product model
         self.sales_channel = sales_channel   # Sales channel associated with the sync
         self.api = api if api is not None else self.get_api()  # Fetch the API client if not provided
         self.parent_local_instance = parent_local_instance  # Optional: parent product instance for variations
+        self.parent_remote_instance = parent_remote_instance  # Optional: If it comes from a  create factory of configurable it will save some queries
+        self.remote_instance = remote_instance  # Optional: If it comes from a sync factory of configurable it will save some queries
         self.is_variation = parent_local_instance is not None  # Determine if this is a variation
         self.payload = {}
         self.remote_product_properties = []
@@ -71,9 +74,21 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
         Attempts to retrieve the remote product instance. If not found, it should
         be created by subclasses implementing the creation logic.
         """
+        if self.remote_instance is not None:
+            return
+
+        remote_parent_product = None
+        if self.is_variation:
+
+            if self.parent_remote_instance is not None:
+                remote_parent_product = self.parent_remote_instance
+            else:
+                remote_parent_product = self.remote_model_class.objects.get(local_instance=self.parent_local_instance, sales_channel=self.sales_channel)
+
         self.remote_instance = self.remote_model_class.objects.get(
             local_instance=self.local_instance,
-            remote_parent_product=self.parent_local_instance.remote_product if self.parent_local_instance else None,
+            remote_parent_product=remote_parent_product,
+            is_variation=self.is_variation,
             sales_channel=self.sales_channel
         )
 
@@ -109,8 +124,6 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
             remote_property_id = self.process_single_property(product_property)
             existing_remote_property_ids.append(remote_property_id)
 
-        print('------------------------------------------------------- ????')
-        print(self.remote_product_properties)
         # Delete any remote properties that no longer exist locally
         self.delete_non_existing_remote_product_property(existing_remote_property_ids)
 
@@ -144,6 +157,7 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
             # If the remote property needs an update, modify the remote instance and its value
             if remote_property.needs_update(update_factory.remote_value):
                 remote_property.remote_value = update_factory.remote_value
+                remote_property.save()
                 self.remote_product_properties.append(remote_property)
                 return remote_property.id
 
@@ -247,16 +261,16 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
         """Sets the visibility for variations, allowing for overrides."""
         pass
 
-    def set_status(self):
+    def set_active(self):
         """Sets the status for the product or variation in the payload."""
-        self.status = self.local_instance.active and self.local_instance.for_sale
+        self.active = self.local_instance.active and self.local_instance.for_sale
 
         if self.is_variation:
-            self.set_variation_status()
+            self.set_variation_active()
 
-        self.add_field_in_payload('status', self.status)
+        self.add_field_in_payload('active', self.active)
 
-    def set_variation_status(self):
+    def set_variation_active(self):
         """Sets the status for variations, allowing for overrides."""
         pass
 
@@ -275,6 +289,9 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
 
     def set_content(self):
         """Sets the content fields for the product or variation in the payload."""
+        # Set URL key
+        self.set_url_key()
+
         if not self.sales_channel.sync_contents:
             return
 
@@ -283,9 +300,6 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
 
         # Set full description
         self.set_description()
-
-        # Set URL key
-        self.set_url_key()
 
     def set_short_description(self):
         """Sets the short description for the product or variation in the payload."""
@@ -317,8 +331,7 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
 
     def set_url_key(self):
         """Sets the URL key for the product or variation in the payload."""
-        self.url_key = self.local_instance._get_translated_value(
-            field_name='url_key', related_name='translations')
+        self.url_key = self.local_instance._get_translated_value(field_name='url_key', related_name='translations')
 
         if self.is_variation:
             self.set_variation_url_key()
@@ -327,7 +340,7 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
 
     def set_variation_url_key(self):
         """Sets the URL key for variations, allowing for overrides."""
-        pass
+        self.url_key = f"{self.url_key}-{self.sku}"
 
     def set_variation_content(self):
         """Sets the content for variations, allowing for overrides."""
@@ -549,15 +562,11 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
 
             existing_remote_images_ids.append(remote_image.id)
 
-        print('------------------------------------EXISTING IMAGES')
-        print(existing_remote_images_ids)
         remote_images_to_delete = RemoteImageProductAssociation.objects.filter(
             remote_product=self.remote_instance,
             sales_channel=self.sales_channel
         ).exclude(id__in=existing_remote_images_ids)
 
-        print('------------------------------ TO DEL')
-        print(remote_images_to_delete)
         for remote_image in remote_images_to_delete:
             self.delete_image_assignment(remote_image.local_instance, remote_image)
 
@@ -668,7 +677,7 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
             local_instance=variation,
             api=self.api,
             parent_local_instance=self.local_instance,
-            remote_instance=remote_variation
+            remote_instance=remote_variation,
         )
         factory.run()
 
@@ -802,9 +811,17 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
         """
         Creates a new RemoteProduct instance instead of retrieving an existing one.
         """
+        remote_parent_product = None
+        if self.is_variation:
+
+            if self.parent_remote_instance is not None:
+                remote_parent_product = self.parent_remote_instance
+            else:
+                remote_parent_product = self.remote_model_class.objects.get(local_instance=self.parent_local_instance, sales_channel=self.sales_channel)
+
         self.remote_instance = self.remote_model_class.objects.create(
             local_instance=self.local_instance,
-            remote_parent_product=self.parent_local_instance.remote_instance if self.parent_local_instance else None,
+            remote_parent_product=remote_parent_product,
             sales_channel=self.sales_channel,
             is_variation=self.is_variation,
             remote_sku=self.local_instance.sku  # Assuming SKU is directly from the local instance
@@ -879,8 +896,6 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
         if not api_method:
             raise ValueError(f"API method '{self.api_method_name}' not found in the API package '{self.api_package_name}'.")
 
-        print('----------------------------------------------------------------')
-        print(self.payload)
         # Call the API method with the payload
         return api_method(**self.payload)
 
