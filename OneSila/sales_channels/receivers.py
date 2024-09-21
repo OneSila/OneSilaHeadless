@@ -444,14 +444,14 @@ def sales_channels__product__pre_delete_receiver(sender, instance, **kwargs):
     """
     delete_remote_product.send(sender=instance.__class__, instance=instance)
 
-@receiver(post_update, sender='products_inspector.Inspector')
-def sales_channels__inspector__post_update_receiver(sender, instance, **kwargs):
-    """
-    Handle post-update events for the Inspector model.
-    Sends sync_remote_product signal if 'has_missing_information' changes to False.
-    """
-    if instance.is_dirty_field('has_missing_information') and not instance.has_missing_information:
-        sync_remote_product.send(sender=instance.product.__class__, instance=instance.product)
+# @receiver(post_update, sender='products_inspector.Inspector')
+# def sales_channels__inspector__post_update_receiver(sender, instance, **kwargs):
+#     """
+#     Handle post-update events for the Inspector model.
+#     Sends sync_remote_product signal if 'has_missing_information' changes to False.
+#     """
+#     if instance.is_dirty_field('has_missing_information') and not instance.has_missing_information:
+#         sync_remote_product.send(sender=instance.product.__class__, instance=instance.product)
         
 @receiver(product_properties_rule_configurator_updated, sender='properties.ProductPropertiesRule')
 def sales_channels__configurator_rule_changed_receiver(sender, instance, **kwargs):
