@@ -89,7 +89,7 @@ class MagentoAttributeSetAttribute(RemoteObjectMixin, models.Model):
     )
     remote_property = models.ForeignKey(
         MagentoProperty,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         help_text="The MagentoProperty associated with this attribute set attribute."
     )
 
