@@ -30,7 +30,6 @@ INSTALLED_APPS = [
     'daphne',
     'django.contrib.staticfiles',
     'strawberry_django',
-    'django_admin_row_actions'
 ]
 
 INSTALLED_LOCAL_APPS = [
