@@ -67,6 +67,8 @@ def sales_channels__magento__property_select_value__delete(sender, instance, **k
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
 @receiver(sales_channel_created, sender='sales_channels.SalesChannel')
+@receiver(refresh_website_pull_models, sender='magento2.MagentoSalesChannel')
+@receiver(sales_channel_created, sender='magento2.MagentoSalesChannel')
 def sales_channels__magento__handle_pull_magento_sales_chjannel_views(sender, instance, **kwargs):
     from sales_channels.tasks import add_task_to_queue
     from sales_channels.helpers import get_import_path

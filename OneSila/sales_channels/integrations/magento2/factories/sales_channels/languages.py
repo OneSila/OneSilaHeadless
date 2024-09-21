@@ -76,7 +76,7 @@ class MagentoRemoteLanguagePullFactory(GetMagentoAPIMixin, PullRemoteInstanceMix
                     identifier
                 )
 
-    def process_remote_instance(self, remote_data, remote_instance_mirror):
+    def process_remote_instance(self, remote_data, remote_instance_mirror, created):
         """
         Process each instance and set additional fields or relationships as needed.
         """
