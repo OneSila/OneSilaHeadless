@@ -3,7 +3,7 @@ from sales_channels.tasks import add_task_to_queue
 from sales_channels.helpers import get_import_path
 
 
-def run_generic_magento_task_flow(task_func, number_of_remote_requests=None, **kwargs):
+def run_generic_magento_task_flow(task_func, number_of_remote_requests=None, sales_channels_filter_kwargs=None, **kwargs):
     """
     Queues the specified task for each active Magento sales channel,
     passing additional kwargs as needed.
@@ -12,7 +12,13 @@ def run_generic_magento_task_flow(task_func, number_of_remote_requests=None, **k
     :param number_of_remote_requests: Manually giving the number of requests by the task
     :param kwargs: Additional keyword arguments to pass to the task.
     """
-    for sales_channel in MagentoSalesChannel.objects.filter(active=True):
+    if sales_channels_filter_kwargs is None:
+        sales_channels_filter_kwargs = {'active': True}
+    else:
+        if 'active' not in sales_channels_filter_kwargs:
+            sales_channels_filter_kwargs['active'] = True
+
+    for sales_channel in MagentoSalesChannel.objects.filter(**sales_channels_filter_kwargs):
 
         task_kwargs = {
             'sales_channel_id': sales_channel.id,
@@ -26,7 +32,7 @@ def run_generic_magento_task_flow(task_func, number_of_remote_requests=None, **k
             number_of_remote_requests=number_of_remote_requests
         )
 
-def run_delete_generic_magento_task_flow(task_func, remote_class, **kwargs):
+def run_delete_generic_magento_task_flow(task_func, remote_class, sales_channels_filter_kwargs=None, **kwargs):
     """
     Queues the specified task for each active Magento sales channel,
     passing additional kwargs as needed.
@@ -37,7 +43,13 @@ def run_delete_generic_magento_task_flow(task_func, remote_class, **kwargs):
     """
     local_instance_id = kwargs.get('local_instance_id', None)
 
-    for sales_channel in MagentoSalesChannel.objects.filter(active=True):
+    if sales_channels_filter_kwargs is None:
+        sales_channels_filter_kwargs = {'active': True}
+    else:
+        if 'active' not in sales_channels_filter_kwargs:
+            sales_channels_filter_kwargs['active'] = True
+
+    for sales_channel in MagentoSalesChannel.objects.filter(**sales_channels_filter_kwargs):
         try:
             remote_instance = remote_class.objects.get(local_instance_id=local_instance_id, sales_channel=sales_channel)
 

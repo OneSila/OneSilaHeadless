@@ -74,7 +74,7 @@ def sales_channels__magento__handle_pull_magento_sales_chjannel_views(sender, in
     from sales_channels.helpers import get_import_path
     from .tasks import pull_magento_sales_channel_views_task, pull_magento_languages_task
 
-    task_kwargs = {'sales_channel_id': instance.id}
+    task_kwargs = {'id': instance.id}
     add_task_to_queue(
         sales_channel_id=instance.id,
         task_func_path=get_import_path(pull_magento_sales_channel_views_task),
@@ -141,20 +141,6 @@ def sales_channels__magento__order_status__update(sender, instance, **kwargs):
 
     run_generic_magento_task_flow(update_magento_order_status_db_task, **task_kwargs)
 
-
-@receiver(create_remote_product, sender='products.Product')
-def sales_channels__magento__product__create(sender, instance, **kwargs):
-    from .tasks import create_magento_product_db_task
-    from products.product_types import CONFIGURABLE
-
-    task_kwargs = {'product_id': instance.id}
-
-    if instance.type == CONFIGURABLE:
-        number_of_remote_requests = 1 + instance.get_configurable_variations().count()
-    else:
-        number_of_remote_requests = 1
-
-    run_generic_magento_task_flow(create_magento_product_db_task, number_of_remote_requests=number_of_remote_requests, **task_kwargs)
 
 @receiver(create_remote_product_property, sender='properties.ProductProperty')
 def sales_channels__magento__product_property__create(sender, instance, **kwargs):
@@ -293,8 +279,43 @@ def sales_channels__magento__assign__update(sender, instance, **kwargs):
     task_kwargs = {'assign_id': instance.id}
     run_generic_magento_task_flow(update_magento_sales_view_assign_db_task, **task_kwargs)
 
+@receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
+def sales_channels__magento__product__create(sender, instance, **kwargs):
+    from .tasks import create_magento_product_db_task
+    from products.product_types import CONFIGURABLE
+    product = instance.product
+    sales_channel = instance.sales_channel
+
+    if instance.type == CONFIGURABLE:
+        number_of_remote_requests = 1 + product.get_configurable_variations().count()
+    else:
+        number_of_remote_requests = 1
+
+    task_kwargs = {'product_id': product.id}
+    run_generic_magento_task_flow(
+        task_func=create_magento_product_db_task,
+        number_of_remote_requests=number_of_remote_requests,
+        sales_channels_filter_kwargs={'id': sales_channel.id},
+        **task_kwargs)
+
+@receiver(delete_remote_product, sender='sales_channels.SalesChannelViewAssign')
+def sales_channels__magento__product__delete_from_assign(sender, instance, **kwargs):
+    from .tasks import delete_magento_product_db_task
+    from .models.products import MagentoProduct
+    product = instance.product
+    sales_channel = instance.sales_channel
+
+    task_kwargs = {'local_instance_id': product.id}
+    run_delete_generic_magento_task_flow(
+        task_func=delete_magento_product_db_task,
+        remote_class=MagentoProduct,
+        sales_channels_filter_kwargs={'id': sales_channel.id},
+        **task_kwargs
+    )
+
+
 @receiver(delete_remote_product, sender='products.Product')
-def sales_channels__magento__product__delete(sender, instance, **kwargs):
+def sales_channels__magento__product__delete_from_product(sender, instance, **kwargs):
     from .tasks import delete_magento_product_db_task
     from .models.products import MagentoProduct
 

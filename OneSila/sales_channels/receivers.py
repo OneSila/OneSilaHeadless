@@ -365,6 +365,7 @@ def sales_channels__media__post_delete_receiver(sender, instance, **kwargs):
 
 
 @receiver(post_create, sender='sales_channels.SalesChannel')
+@receiver(post_create, sender='magento2.MagentoSalesChannel')
 def sales_channels__sales_channel__post_create_receiver(sender, instance, **kwargs):
     """
     Handles the creation of SalesChannel instances.
@@ -389,7 +390,7 @@ def sales_channel_view_assign__post_create_receiver(sender, instance, **kwargs):
     ).count()
 
     if product_assign_count == 1:
-        create_remote_product.send(sender=instance.product.__class__, instance=instance.product)
+        create_remote_product.send(sender=instance.__class__, instance=instance)
     else:
         # Otherwise, send sales_view_assign_updated signal
         sales_view_assign_updated.send(sender=instance.product.__class__, instance=instance.product)
@@ -410,7 +411,7 @@ def sales_channel_view_assign__post_delete_receiver(sender, instance, **kwargs):
 
     if product_assign_count == 0:
         # Last assignment removed for this sales_channel, send delete_remote_product signal
-        delete_remote_product.send(sender=instance.product.__class__, instance=instance.product)
+        delete_remote_product.send(sender=instance.__class__, instance=instance)
     else:
         # Otherwise, send sales_view_assign_updated signal
         sales_view_assign_updated.send(sender=instance.__class__, instance=instance)
