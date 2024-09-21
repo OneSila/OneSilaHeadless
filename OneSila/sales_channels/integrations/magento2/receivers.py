@@ -286,7 +286,7 @@ def sales_channels__magento__product__create(sender, instance, **kwargs):
     product = instance.product
     sales_channel = instance.sales_channel
 
-    if instance.type == CONFIGURABLE:
+    if product.type == CONFIGURABLE:
         number_of_remote_requests = 1 + product.get_configurable_variations().count()
     else:
         number_of_remote_requests = 1
