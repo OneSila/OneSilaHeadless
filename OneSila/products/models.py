@@ -344,9 +344,14 @@ class Product(TranslatedModelMixin, models.Model):
         sales_price = SalesPrice.objects.filter(product=self).first()
 
         if sales_price:
-            if sales_price.rrp:
+            # Handle Case 1: Both RRP and price are available (and not None)
+            if sales_price.rrp is not None and sales_price.price is not None:
                 return sales_price.rrp, sales_price.price
-            else:
+            # Handle Case 2: Only RRP is available (price is None)
+            elif sales_price.rrp is not None and sales_price.price is None:
+                return sales_price.rrp, None
+            # Handle Case 3: Only price is available (rrp is None)
+            elif sales_price.price is not None and sales_price.rrp is None:
                 return sales_price.price, None
 
         # Fallback if no price information is available
