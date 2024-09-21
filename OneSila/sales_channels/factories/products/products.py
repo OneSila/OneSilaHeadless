@@ -295,6 +295,7 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
         if not self.sales_channel.sync_contents:
             return
 
+        print('---------------------------------- SET CONTENT')
         # Set short description
         self.set_short_description()
 
@@ -898,6 +899,8 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
             raise ValueError(f"API method '{self.api_method_name}' not found in the API package '{self.api_package_name}'.")
 
         # Call the API method with the payload
+        print('-------------------------')
+        print(self.payload)
         return api_method(**self.payload)
 
     def perform_remote_action(self):

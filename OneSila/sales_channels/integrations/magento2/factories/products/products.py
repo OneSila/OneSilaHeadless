@@ -63,7 +63,10 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
         'content': 'content',
         'assigns': 'views',
         'price': 'price',
-        'discount': 'special_price'
+        'discount': 'special_price',
+        'url_key': 'url_key',
+        'description': 'description',
+        'short_description': 'short_description',
     }
 
     # Remote product types, to be set in specific layer implementations
@@ -159,7 +162,10 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
         self.magento_product.update_custom_attributes(self.get_unpacked_product_properties())
 
     def process_content_translation(self, short_description, description, url_key, remote_language):
-        print('-------------------------------- PASS CONTENT TRANSLATION') # @TODO: Fix this
+        self.magento_product.short_description = short_description
+        self.magento_product.description = description
+        self.magento_product.url_key = url_key
+        self.magento_product.save(scope=remote_language.sales_channel_view.code)
 
 class MagentoProductUpdateFactory(RemoteProductUpdateFactory, MagentoProductSyncFactory):
     pass
@@ -179,6 +185,7 @@ class MagentoProductCreateFactory(RemoteProductCreateFactory, MagentoProductSync
         self.payload = {'data': self.payload, 'extra_data': extra_data}
 
     def serialize_response(self, response):
+        self.magento_product = response
         return response.to_dict()
 
 class MagentoProductDeleteFactory(GetMagentoAPIMixin, RemoteProductDeleteFactory):

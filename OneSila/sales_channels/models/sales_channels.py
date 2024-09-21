@@ -22,7 +22,7 @@ class SalesChannel(PolymorphicModel, models.Model):
     verify_ssl = models.BooleanField(default=True)
     requests_per_minute = models.IntegerField(default=60)
     use_configurable_name = models.BooleanField(default=False,verbose_name=_('Always use Configurable name over child'))
-    sync_contents = models.BooleanField(default=False, verbose_name=_('Sync Contents'))
+    sync_contents = models.BooleanField(default=True, verbose_name=_('Sync Contents'))
     sync_orders_after = models.DateTimeField(null=True, blank=True, verbose_name=_('Sync Orders After Date'))
 
     class Meta:
