@@ -819,12 +819,13 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
             else:
                 remote_parent_product = self.remote_model_class.objects.get(local_instance=self.parent_local_instance, sales_channel=self.sales_channel)
 
-        self.remote_instance = self.remote_model_class.objects.create(
+        self.remote_instance, _ = self.remote_model_class.objects.get_or_create(
             local_instance=self.local_instance,
             remote_parent_product=remote_parent_product,
             sales_channel=self.sales_channel,
             is_variation=self.is_variation,
-            remote_sku=self.local_instance.sku  # Assuming SKU is directly from the local instance
+            remote_sku=self.local_instance.sku,
+            remote_id=None
         )
         logger.debug(f"Created RemoteProduct: {self.remote_instance}")
 

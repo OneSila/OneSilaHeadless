@@ -4,6 +4,7 @@ from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, Product
 
 class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = Product
+    local_product_map = 'local_instance'
 
     def __init__(self, sales_channel, local_instance, api=None, remote_product=None):
         super().__init__(sales_channel, local_instance, api=api, remote_product=remote_product)

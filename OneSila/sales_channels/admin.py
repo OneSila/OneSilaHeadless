@@ -1,7 +1,9 @@
 from django.contrib import admin
-from django.urls import reverse
+from django.urls import path, reverse
 from django.utils.html import format_html
-
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404
+from django.contrib import messages
 from .models import RemoteTaskQueue, RemoteLog
 from django.utils.translation import gettext_lazy as _
 
@@ -41,13 +43,38 @@ class RemoteTaskQueueAdmin(admin.ModelAdmin):
     sent_to_queue_at_display.short_description = 'Sent to Queue At'
 
     def retry_button(self, obj):
+        # Generate a URL for the custom admin action using the correct view name
+        retry_url = reverse('admin:sales_channels_remotetaskqueue_retry', args=[obj.id])
         return format_html(
             '<a class="button" href="{}">Retry Task</a>',
-            reverse('sales_channels:retry_remote_task', args=[obj.id])
+            retry_url
         )
 
     retry_button.short_description = 'Retry Task'
     retry_button.allow_tags = True
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                'retry-task/<int:task_id>/',
+                self.admin_site.admin_view(self.retry_task),
+                name='sales_channels_remotetaskqueue_retry'
+            ),
+        ]
+        return custom_urls + urls
+
+    def retry_task(self, request, task_id):
+        """
+        Custom admin view to retry a specific task.
+        """
+        task = get_object_or_404(RemoteTaskQueue, id=task_id)
+        try:
+            task.retry_task(retry_now=True)
+            self.message_user(request, f"Task {task.task_name} has been retried successfully.")
+        except Exception as e:
+            self.message_user(request, f"Failed to retry task {task.task_name}: {e}", level=messages.ERROR)
+        return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
 
     readonly_fields = [
         'sales_channel', 'task_name', 'task_args', 'task_kwargs',

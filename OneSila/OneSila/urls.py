@@ -38,7 +38,7 @@ urlpatterns = [
     path('shipments/', include('shipments.urls')),
     path('taxes/', include('taxes.urls')),
     path('units/', include('units.urls')),
-    path('admin/sales_channels/', include('sales_channels.urls')), # @TODO: fix a better way that the admin/ thing
+    path('sales_channels/', include('sales_channels.urls')),
     path('graphql/',
         AsyncGraphQLView.as_view(
             schema=schema,
