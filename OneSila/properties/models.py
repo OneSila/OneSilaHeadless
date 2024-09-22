@@ -119,7 +119,11 @@ class PropertySelectValueTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         translated_field = 'propertyselectvalue'
         search_terms = ['value']
-        unique_together = ("value", "language", "multi_tenant_company")  # added language as well because some words translates the same in different languages
+        # added language as well because some words translates the same in different languages
+        # the issue with that is that we also kinda need to do propertyselectvalue__property but this is not possible because we can have the same translation
+        # on the value but for different properties
+        # @TODO: Improve this to aldo contain the property
+        # unique_together = ("value", "language", "multi_tenant_company")
 
 
 class ProductProperty(TranslatedModelMixin, models.Model):

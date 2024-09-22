@@ -12,7 +12,7 @@ class RemoteObjectMixin(models.Model):
     """
 
     remote_id = models.CharField(max_length=255, null=True, blank=True, help_text="ID of the object in the remote system")
-    sales_channel = models.ForeignKey('sales_channels.SalesChannel', on_delete=models.PROTECT, db_index=True)
+    sales_channel = models.ForeignKey('sales_channels.SalesChannel', on_delete=models.CASCADE, db_index=True)
     # if a mirror model was created but it fails next time we update it we will try update method because mirror model was created
     # to avoid that we have this field
     successfully_created = models.BooleanField(default=True, help_text="Indicates if the object was successfully created in the remote system.")

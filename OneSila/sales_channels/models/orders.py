@@ -92,4 +92,5 @@ class RemoteCustomer(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Remote Customers'
 
     def __str__(self):
-        return f"Remote customer for {self.local_instance.name} on {self.sales_channel.hostname}"
+        name = self.local_instance.name if self.local_instance is not None else "N/A"
+        return f"Remote customer for {name} on {self.sales_channel.hostname}"

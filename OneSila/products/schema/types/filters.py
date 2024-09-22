@@ -8,8 +8,6 @@ from products.models import Product, BundleProduct, ConfigurableProduct, \
     SimpleProduct, ProductTranslation, ConfigurableVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, \
     SupplierPrices
 from taxes.schema.types.filters import VatRateFilter
-from units.schema.types.filters import UnitFilter
-
 
 @filter(Product)
 class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
@@ -19,6 +17,7 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     type: auto
     for_sale: auto
     vat_rate: Optional[VatRateFilter]
+    inspector: Optional[lazy['InspectorFilter', "products_inspector.schema.types.filters"]]
     exclude_demo_data: Optional[bool]
 
 

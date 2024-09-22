@@ -470,8 +470,6 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
         Changes the status of the local order after processing.
         """
         pass
-        # if remote_data.status == MagentoApiOrder.STATUS_PENDING:
-        #     remote_data.update_status(MagentoApiOrder.STATUS_PROCESSING)
 
 class MagentoChangeRemoteOrderStatus(GetMagentoAPIMixin, ChangeRemoteOrderStatus):
 

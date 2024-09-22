@@ -218,7 +218,7 @@ def sales_channels__sales_channel_integration_pricelist__post_create_receiver(se
     Trigger a price change signal for all products using the price list when a new price list is added to a sales channel.
     """
     sales_channel = instance.sales_channel
-    assigns = SalesChannelViewAssign.objects.filter(sales_channel_view__sales_channel=sales_channel)
+    assigns = SalesChannelViewAssign.objects.filter(sales_channel=sales_channel, sales_channel__active=True)
     for assign in assigns:
         update_remote_price.send(sender=assign.product.__class__, instance=assign.product)
 
@@ -228,7 +228,7 @@ def sales_channels__sales_channel_integration_pricelist__post_delete_receiver(se
     Trigger a price change signal for all products using the price list when a price list is removed from a sales channel.
     """
     sales_channel = instance.sales_channel
-    assigns = SalesChannelViewAssign.objects.filter(sales_channel_view__sales_channel=sales_channel)
+    assigns = SalesChannelViewAssign.objects.filter(sales_channel=sales_channel, sales_channel__active=True)
     for assign in assigns:
         update_remote_price.send(sender=assign.product.__class__, instance=assign.product)
 
@@ -386,7 +386,8 @@ def sales_channel_view_assign__post_create_receiver(sender, instance, **kwargs):
     # Count the number of assignments related to the same product and sales channel
     product_assign_count = SalesChannelViewAssign.objects.filter(
         product=instance.product,
-        sales_channel=instance.sales_channel
+        sales_channel=instance.sales_channel,
+        sales_channel__active=True
     ).count()
 
     if product_assign_count == 1:
@@ -406,7 +407,8 @@ def sales_channel_view_assign__post_delete_receiver(sender, instance, **kwargs):
     # Count the number of assignments related to the same product and sales channel
     product_assign_count = SalesChannelViewAssign.objects.filter(
         product=instance.product,
-        sales_channel=instance.sales_channel
+        sales_channel=instance.sales_channel,
+        sales_channel__active=True
     ).count()
 
     if product_assign_count == 0:

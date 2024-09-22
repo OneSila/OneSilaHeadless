@@ -137,7 +137,7 @@ class RemoteTaskQueue(models.Model):
         (FAILED, 'Failed'),  # New status choice
     ]
 
-    sales_channel = models.ForeignKey(SalesChannel, on_delete=models.CASCADE)
+    sales_channel = models.ForeignKey(SalesChannel, null=True, blank=True, on_delete=models.SET_NULL)
     task_name = models.CharField(max_length=255)
     task_args = models.JSONField(null=True, blank=True)
     task_kwargs = models.JSONField(null=True, blank=True)
@@ -155,7 +155,8 @@ class RemoteTaskQueue(models.Model):
         return self.task_name.split('.')[-1]
 
     def __str__(self):
-        return f"{self.name} > {self.sales_channel.hostname}"
+        hostname = self.sales_channel.hostname if self.sales_channel else "N/A"
+        return f"{self.name} > {hostname}"
 
     @classmethod
     def get_pending_tasks(cls, sales_channel):

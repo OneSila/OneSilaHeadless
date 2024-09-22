@@ -74,7 +74,7 @@ def sales_channels__magento__handle_pull_magento_sales_chjannel_views(sender, in
     from sales_channels.helpers import get_import_path
     from .tasks import pull_magento_sales_channel_views_task, pull_magento_languages_task
 
-    task_kwargs = {'id': instance.id}
+    task_kwargs = {'sales_channel_id': instance.id}
     add_task_to_queue(
         sales_channel_id=instance.id,
         task_func_path=get_import_path(pull_magento_sales_channel_views_task),

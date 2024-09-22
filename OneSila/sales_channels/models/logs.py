@@ -33,7 +33,7 @@ class RemoteLog(models.Model):
     object_id = models.PositiveIntegerField(blank=True, null=True)
     content_object = GenericForeignKey('content_type', 'object_id')
 
-    sales_channel = models.ForeignKey('SalesChannel', on_delete=models.PROTECT)
+    sales_channel = models.ForeignKey('SalesChannel', blank=True, null=True, on_delete=models.SET_NULL)
     action = models.CharField(max_length=32, choices=ACTION_CHOICES)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES)
     payload = models.JSONField(null=True, blank=True, help_text="The API call payload associated with this log.")
