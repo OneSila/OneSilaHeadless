@@ -211,7 +211,7 @@ class RemoteImage(PolymorphicModel, RemoteObjectMixin, models.Model):
     local_instance = models.ForeignKey('media.Media', on_delete=models.SET_NULL, null=True, help_text="The local media instance associated with this remote image.")
 
     class Meta:
-        unique_together = ('local_instance',)
+        unique_together = ('local_instance', 'sales_channel',)
         verbose_name = 'Remote Image'
         verbose_name_plural = 'Remote Images'
 
@@ -228,7 +228,7 @@ class RemoteImageProductAssociation(PolymorphicModel, RemoteObjectMixin, models.
     remote_image = models.ForeignKey(RemoteImage, on_delete=models.CASCADE, null=True, blank=True, help_text="The remote image being assigned to the remote product. Optional for direct links.")
 
     class Meta:
-        unique_together = ('remote_product', 'remote_image')
+        unique_together = ('local_instance', 'sales_channel',)
         verbose_name = 'Remote Image Product Association'
         verbose_name_plural = 'Remote Image Product Associations'
 
