@@ -1,9 +1,14 @@
-from django.contrib import admin
 from django.urls import path, reverse
 from django.utils.html import format_html
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.contrib import messages
+import json
+from django.contrib import admin
+from pygments import highlight
+from pygments.lexers import JsonLexer
+from pygments.formatters import HtmlFormatter
+from django.utils.safestring import mark_safe
 from .models import RemoteTaskQueue, RemoteLog
 from django.utils.translation import gettext_lazy as _
 
@@ -19,7 +24,6 @@ def retry_task_action(modeladmin, request, queryset):
 class RemoteTaskQueueAdmin(admin.ModelAdmin):
     list_display = ['__str__', 'status', 'priority', 'sent_to_queue_at_display']
     list_filter = ['status', 'sales_channel', 'task_name']
-
     actions = [retry_task_action]
     search_fields = ['task_name', 'sales_channel__hostname']
 
@@ -34,7 +38,7 @@ class RemoteTaskQueueAdmin(admin.ModelAdmin):
             'fields': ('task_args', 'task_kwargs', 'number_of_remote_requests')
         }),
         ('Error Details', {
-            'fields': ('error_message', 'error_traceback')
+            'fields': ('error_message', 'error_traceback', 'history')
         }),
     )
 
@@ -76,11 +80,23 @@ class RemoteTaskQueueAdmin(admin.ModelAdmin):
             self.message_user(request, f"Failed to retry task {task.task_name}: {e}", level=messages.ERROR)
         return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
 
+    def history(self, instance):
+        response = json.dumps(instance.error_history, sort_keys=True, indent=2)
+        formatter = HtmlFormatter(style='colorful')
+        response = highlight(response, JsonLexer(), formatter)
+
+        response = response.replace('\\n', '<br/>').replace('\"', '').replace('\"', '')
+        style = "<style>" + formatter.get_style_defs() + "</style><br>"
+
+        return mark_safe(style + response)
+    history.short_description = 'Error History'
+
     readonly_fields = [
         'sales_channel', 'task_name', 'task_args', 'task_kwargs',
         'sent_to_queue_at', 'retry', 'error_message',
-        'error_traceback', 'number_of_remote_requests', 'retry_button'
+        'error_traceback', 'number_of_remote_requests', 'retry_button', 'history'
     ]
+
 
     def get_readonly_fields(self, request, obj=None):
 

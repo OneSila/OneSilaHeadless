@@ -7,7 +7,7 @@ class RemoteInventoryUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateF
     local_model_class = Product
     local_product_map = 'local_instance'
 
-    def __init__(self, sales_channel, local_instance, api=None, remote_product=None):
+    def __init__(self, sales_channel, local_instance, remote_product, api=None):
         super().__init__(sales_channel, local_instance, api=api, remote_product=remote_product)
         self.stock = None
         self.remote_instance = None

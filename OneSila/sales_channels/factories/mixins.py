@@ -24,6 +24,10 @@ class RemoteInstanceOperationMixin:
         """
         raise NotImplementedError("Subclasses must implement the get_api method to return the API client.")
 
+    def set_api(self):
+        if not hasattr(self, 'api') or self.api is None:
+            self.api = self.get_api()
+
     def serialize_response(self, response):
         """
         Serializes the response from the remote API.
@@ -159,7 +163,7 @@ class RemoteInstanceCreateFactory(RemoteInstanceOperationMixin):
         self.successfully_created = True  # Tracks if creation was successful
         self.payload = {}  # Will hold the payload data
         self.remote_instance_data = {}  # Will hold data for initializing the remote instance
-        self.api = api if api is not None else self.get_api()
+        self.api = api
 
     def preflight_check(self):
         """
@@ -288,6 +292,7 @@ class RemoteInstanceCreateFactory(RemoteInstanceOperationMixin):
         if not self.preflight_check():
             return
 
+        self.set_api()
         self.preflight_process()
         self.build_payload()
         self.customize_payload()
@@ -313,11 +318,14 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
     create_if_not_exists = False  # Configurable parameter to create the instance if not found
 
     def __init__(self, sales_channel, local_instance=None, api=None, remote_instance=None, **kwargs):
+        print('------------------------------------------------------------------------------- 3?')
         self.local_instance = local_instance  # Instance of the local model
         self.sales_channel = sales_channel  # Sales channel associated with the sync
         self.successfully_updated = True  # Tracks if update was successful
         self.payload = {}  # Will hold the payload data
-        self.api = api if api is not None else self.get_api()
+        self.api = api
+
+        print('------------------------------------------------------------------------------- 4?')
 
         # we can give both the remote_instance as an id (from tasks) or the real instance
         if isinstance(remote_instance, self.remote_model_class):
@@ -329,6 +337,8 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
             self.get_remote_instance()
 
         self.remote_product = self._determine_remote_product(kwargs)
+
+        print('------------------------------------------------------------------------------- 5?')
 
     def preflight_check(self):
         """
@@ -479,9 +489,12 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
             logger.debug(f"Finished update process with success status: {self.successfully_updated}")
 
     def run(self):
+        print('--- 1???')
         if not self.preflight_check():
             return
 
+        print('--- 2???')
+        self.set_api()
         self.preflight_process()
 
         # Handle instance creation logic after preflight processes
@@ -607,41 +620,21 @@ class RemoteInstanceDeleteFactory(RemoteInstanceOperationMixin):
             logger.debug(f"Deleting remote instance: {self.remote_instance}")
             self.remote_instance.delete()
 
+    def preflight_process(self):
+        pass
+
     def run(self):
         """
         Orchestrates the deletion steps without containing business logic.
         """
         self.build_delete_payload()
         self.customize_payload()
+        self.preflight_process()
         self.delete()
         self.delete_remote_instance_process()
 
 
 class ProductAssignmentMixin:
-    """
-    Mixin to assist with retrieving RemoteProduct instances and checking their
-    assignment status to websites (sales channels).
-    """
-
-    def get_remote_product(self, product):
-        """
-        Retrieves the RemoteProduct associated with the given product.
-
-        Args:
-            product: The local Product instance to find the corresponding RemoteProduct.
-            sales_channel: The sales channel for which the RemoteProduct should be retrieved.
-
-        Returns:
-            The RemoteProduct instance if found, otherwise None.
-        """
-        try:
-            return RemoteProduct.objects.get(
-                local_instance=product,
-                sales_channel=self.sales_channel
-            )
-        except RemoteProduct.DoesNotExist:
-            return None
-
     def assigned_to_website(self):
         """
         Checks whether the RemoteProduct and its associated SalesChannelViewAssign exist.

@@ -5,7 +5,7 @@ class RemoteProductContentUpdateFactory(ProductAssignmentMixin, RemoteInstanceUp
     local_model_class = Product
     local_product_map = 'local_instance'
 
-    def __init__(self, sales_channel, local_instance, api=None, skip_checks=False, remote_product=None, remote_instance=None):
+    def __init__(self, sales_channel, local_instance, remote_product, api=None, skip_checks=False, remote_instance=None):
         super().__init__(sales_channel, local_instance, api=api, remote_product=remote_product)
 
         self.remote_instance = remote_instance

@@ -16,8 +16,6 @@ from sales_channels.models import SalesChannelViewAssign
 logger = logging.getLogger(__name__)
 
 class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
-    from sales_channels.integrations.magento2.factories.products.variations import MagentoProductVariationAddFactory
-
     remote_model_class = MagentoProduct
     remote_product_property_class = MagentoProductProperty
     remote_product_property_create_factory = MagentoProductPropertyCreateFactory
@@ -51,6 +49,7 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
     delete_product_factory = property(get_delete_product_factory)
 
     add_variation_factory = property(get_add_variation_factory)
+    accepted_variation_already_exists_error = Exception # @TODO: Figure it out (or create on the wrapper) the real exception
 
     field_mapping = {
         'name': 'name',
@@ -73,16 +72,6 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
     REMOTE_TYPE_SIMPLE = MagentoApiProduct.PRODUCT_TYPE_SIMPLE
     REMOTE_TYPE_CONFIGURABLE = MagentoApiProduct.PRODUCT_TYPE_CONFIGURABLE
 
-    def get_sync_product_factory(self):
-        return MagentoProductSyncFactory
-
-    def get_create_product_factory(self):
-        from sales_channels.integrations.magento2.factories.products import MagentoProductCreateFactory
-        return MagentoProductCreateFactory
-
-    def get_delete_product_factory(self):
-        from sales_channels.integrations.magento2.factories.products import MagentoProductDeleteFactory
-        return MagentoProductDeleteFactory
 
     def get_unpacked_product_properties(self):
         custom_attributes = {}
@@ -179,6 +168,14 @@ class MagentoProductCreateFactory(RemoteProductCreateFactory, MagentoProductSync
     api_package_name = 'products'
     api_method_name = 'create'
 
+    def get_sync_product_factory(self):
+        return MagentoProductSyncFactory
+
+    sync_product_factory = property(get_sync_product_factory)
+
+    def get_saleschannel_remote_object(self, sku):
+        return self.api.products.by_sku(sku)
+
     def customize_payload(self):
         super().customize_payload()
         extra_data = {'custom_attributes': self.get_unpacked_product_properties()}
@@ -191,6 +188,12 @@ class MagentoProductCreateFactory(RemoteProductCreateFactory, MagentoProductSync
 class MagentoProductDeleteFactory(GetMagentoAPIMixin, RemoteProductDeleteFactory):
     remote_model_class = MagentoProduct
     delete_remote_instance = True
+
+    def get_delete_product_factory(self):
+        from sales_channels.integrations.magento2.factories.products import MagentoProductDeleteFactory
+        return MagentoProductDeleteFactory
+
+    remote_delete_factory = property(get_delete_product_factory)
 
     def delete_remote(self):
         magento_instance = self.api.products.by_sku(self.remote_instance.remote_sku)

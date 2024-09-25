@@ -128,7 +128,7 @@ class ChangeRemoteOrderStatus(RemoteInstanceOperationMixin):
 
     def __init__(self, sales_channel, local_instance, api=None):
         self.sales_channel = sales_channel
-        self.api = api if api is not None else self.get_api()
+        self.api = api
         self.payload = {}
         self.remote_instance = None
         self.remote_status = None
@@ -157,6 +157,7 @@ class ChangeRemoteOrderStatus(RemoteInstanceOperationMixin):
             logger.debug("Remote instance not found, skipping status update.")
             return
 
+        self.set_api()
         # Build the payload and update the remote instance
         self.build_payload()
         self.update()

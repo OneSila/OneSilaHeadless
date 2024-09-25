@@ -7,7 +7,7 @@ class RemoteSalesChannelAssignUpdateFactory(GetMagentoAPIMixin, RemoteSalesChann
     remote_model_class = SalesChannelViewAssign
 
     def update_remote(self):
-        self.magento_instance =self.api.products.by_sku(self.remote_instance.remote_sku)
+        self.magento_instance =self.api.products.by_sku(self.remote_instance.remote_product.remote_sku)
         view_ids = list(
             map(int, SalesChannelViewAssign.objects.filter(
                 sales_channel=self.sales_channel,

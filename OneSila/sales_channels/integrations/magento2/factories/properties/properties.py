@@ -173,8 +173,11 @@ class RemoteValueMixin:
         value = self.local_instance.get_value()
 
         # Handle direct value types (int, float, boolean)
-        if property_type in [Property.TYPES.INT, Property.TYPES.FLOAT, Property.TYPES.BOOLEAN]:
+        if property_type in [Property.TYPES.INT, Property.TYPES.FLOAT]:
             return self.get_direct_value(value)
+
+        if property_type == Property.TYPES.BOOLEAN:
+            return self.get_boolean_value(value)
 
         # Handle SELECT and MULTISELECT types
         elif property_type == Property.TYPES.SELECT:
@@ -197,6 +200,11 @@ class RemoteValueMixin:
     def get_direct_value(self, value):
         """Handles direct value types: int, float, boolean."""
         return value
+
+    def get_boolean_value(self, value: bool) -> int:
+        """Converts boolean values to 1 (True) or 0 (False) as required by Magento."""
+        print('-------------------------------------------- ?')
+        return 1 if value else 0
 
     def get_select_value(self, multiple):
         """Handles select and multiselect values."""
@@ -435,7 +443,7 @@ class MagentoAttributeSetCreateFactory(GetMagentoAPIMixin, RemoteInstanceCreateF
         self.attribute_set_magento_instance = self.api.product_attribute_set.by_id(self.remote_instance.remote_id)
 
     def set_group_id(self):
-        group = self.attribute_set_magento_instance.create_group('OneSila')
+        group = self.attribute_set_magento_instance.get_or_create_group_by_name('OneSila')
         self.remote_instance.group_remote_id = group.attribute_group_id
         self.remote_instance.save()
 

@@ -4,6 +4,7 @@ from huey import crontab
 from huey.contrib.djhuey import db_task, periodic_task
 from django.core.exceptions import ValidationError
 from core.huey import DEFAULT_PRIORITY
+from products.product_types import CONFIGURABLE
 from sales_channels.models.sales_channels import SalesChannel, RemoteTaskQueue
 from sales_channels.helpers import resolve_function
 import logging
@@ -69,9 +70,13 @@ def add_task_to_queue(
 
 @periodic_task(crontab(minute="*"))
 def sales_channels_process_remote_tasks_queue():
+    print('---------------------------------------------- ??')
+    print(SalesChannel.objects.filter(active=True))
     for sales_channel in SalesChannel.objects.filter(active=True):
         # Get the next batch of tasks that can be processed
         pending_tasks = RemoteTaskQueue.get_pending_tasks(sales_channel)
+        print('--------------------------------------------------------------')
+        print(pending_tasks)
 
         # Log the number of pending tasks found and the request limit
         logger.info(f"Found {len(pending_tasks)} tasks to process for SalesChannel '{sales_channel.hostname}' with a limit of {sales_channel.requests_per_minute} requests per minute.")
@@ -92,7 +97,7 @@ def update_configurators_for_rule_db_task(rule):
     from .models import RemoteProduct
 
     # Step 1: Filter products by the properties rule
-    products = Product.objects.filter_by_properties_rule(rule=rule)
+    products = Product.objects.filter(type=CONFIGURABLE).filter_by_properties_rule(rule=rule)
 
     # Step 2: Filter out products with missing information
     products_with_valid_info = products.filter(inspector__has_missing_information=False)
@@ -106,8 +111,11 @@ def update_configurators_for_rule_db_task(rule):
 
     # Step 4: Iterate through remote products and update configurators
     for remote_product in remote_products.iterator():
-        if remote_product.configurator:
-            remote_product.configurator.update_if_needed(rule=rule, send_sync_signal=True)
+        try:
+            if remote_product.configurator:
+                remote_product.configurator.update_if_needed(rule=rule, send_sync_signal=True)
+        except RemoteProduct.configurator.RelatedObjectDoesNotExist:
+            pass
 
 @db_task()
 def update_configurators_for_parent_product_db_task(parent_product):

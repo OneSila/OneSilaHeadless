@@ -146,6 +146,7 @@ class RemoteTaskQueue(models.Model):
     retry = models.IntegerField(default=0)
     error_message = models.TextField(null=True, blank=True)
     error_traceback = models.TextField(null=True, blank=True)
+    error_history = models.JSONField(default=dict, blank=True)
     number_of_remote_requests = models.IntegerField(default=1) # how many remote requests does this task do?
     priority = models.IntegerField(default=DEFAULT_PRIORITY)
 
@@ -169,12 +170,19 @@ class RemoteTaskQueue(models.Model):
         # Calculate the number of requests that can still be processed
         remaining_requests = sales_channel.requests_per_minute - processing_requests
 
+        print('-------------------------- 1')
+        print(processing_requests)
+        print(remaining_requests)
+
         if remaining_requests > 0:
             # Get pending tasks, ordered by priority (high first) then by sent_to_queue_at
             pending_tasks = cls.objects.filter(
                 sales_channel=sales_channel,
                 status=cls.PENDING
             ).order_by('-priority', 'sent_to_queue_at')
+
+            print('----------------------------------- 2')
+            print(pending_tasks)
 
             # Select tasks until the sum of their remote requests fits the remaining capacity
             selected_tasks = []
@@ -183,17 +191,23 @@ class RemoteTaskQueue(models.Model):
             for task in pending_tasks:
                 task_requests = task.number_of_remote_requests
 
+                print('----------------------------------- 3')
+                print(task_requests)
+
                 # if a task is bigger than the limit just add it. It will keep the queue full until is finished but at least will be processed
                 if task_requests > sales_channel.requests_per_minute:
+                    print('----------------------------------- 4')
                     task.status = cls.PROCESSING
                     selected_tasks.append(task)
                     break
 
                 if total_requests + task_requests <= remaining_requests:
+                    print('----------------------------------- 5')
                     task.status = cls.PROCESSING
                     selected_tasks.append(task)
                     total_requests += task_requests
                 else:
+                    print('----------------------------------- 6')
                     break
 
             if selected_tasks:
@@ -210,11 +224,22 @@ class RemoteTaskQueue(models.Model):
         self.retry += 1
         if self.retry < 3:
             self.status = self.PENDING
-            self.sent_to_queue_at = now()  # Move to the back of the queue
+            self.sent_to_queue_at = now()
         else:
             self.status = self.FAILED
-            self.error_message = error_message
-            self.error_traceback = error_traceback
+
+        next_key = str(len(self.error_history))
+
+        error_entry = {
+            'retry': self.retry,
+            'message': error_message,
+            'traceback': error_traceback,
+            'timestamp': str(now()),
+        }
+        self.error_history[next_key] = error_entry
+
+        self.error_message = error_message
+        self.error_traceback = error_traceback
 
         self.save()
 

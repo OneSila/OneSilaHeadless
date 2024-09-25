@@ -6,7 +6,7 @@ class RemoteMediaProductThroughCreateFactory(ProductAssignmentMixin, RemoteInsta
     local_model_class = MediaProductThrough
     has_remote_media_instance = False
 
-    def __init__(self, sales_channel, local_instance, api=None, skip_checks=False, remote_product=None):
+    def __init__(self, sales_channel, local_instance, remote_product, api=None, skip_checks=False):
         super().__init__(sales_channel, local_instance, api=api)
         self.remote_product = remote_product or self.get_remote_product(local_instance.product)
 
@@ -55,7 +55,7 @@ class RemoteMediaProductThroughCreateFactory(ProductAssignmentMixin, RemoteInsta
 class RemoteMediaProductThroughUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = MediaProductThrough
 
-    def __init__(self, sales_channel, local_instance, api=None, skip_checks=False, remote_product=None, remote_instance=None):
+    def __init__(self, sales_channel, local_instance, remote_product, api=None, skip_checks=False, remote_instance=None):
         super().__init__(sales_channel, local_instance, api=api, remote_instance=remote_instance, remote_product=remote_product)
 
         if skip_checks and self.remote_product is None:
@@ -81,7 +81,7 @@ class RemoteMediaProductThroughUpdateFactory(ProductAssignmentMixin, RemoteInsta
 class RemoteMediaProductThroughDeleteFactory(ProductAssignmentMixin, RemoteInstanceDeleteFactory):
     local_model_class = MediaProductThrough
 
-    def __init__(self, sales_channel, local_instance=None, api=None, skip_checks=False, remote_product=None, remote_instance=None):
+    def __init__(self, sales_channel, remote_product, local_instance=None, api=None, skip_checks=False, remote_instance=None):
         super().__init__(sales_channel, local_instance, api=api, remote_instance=remote_instance, remote_product=remote_product)
 
         if skip_checks and self.remote_product is None:

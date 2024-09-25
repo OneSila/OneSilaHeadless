@@ -37,15 +37,14 @@ class RemoteProductPropertyCreateFactory(ProductAssignmentMixin, RemotePropertyE
     remote_property_factory = None
     remote_property_select_value_factory = None
 
-    def __init__(self, sales_channel, local_instance, api=None, skip_checks=False, remote_product=None, get_value_only=False):
+    def __init__(self, sales_channel, local_instance, remote_product, api=None, skip_checks=False, get_value_only=False):
         super().__init__(sales_channel, local_instance, api=api)
 
         self.local_property = local_instance.property
         # instead of creating the it we just receive the value for it so we can add it in bulk on product create
         self.get_value_only = get_value_only
         self.remote_value = None
-        # Assign the remote_product based on the provided parameter or fetch it if None
-        self.remote_product = remote_product or self.get_remote_product(local_instance.product)
+        self.remote_product = remote_product
 
         # Ensure remote_product is not None if skip_checks is True
         if skip_checks and self.remote_product is None:
@@ -82,11 +81,11 @@ class RemoteProductPropertyCreateFactory(ProductAssignmentMixin, RemotePropertyE
         self.remote_instance_data['remote_property'] = self.remote_property
         return self.remote_instance_data
 
-class RemoteProductPropertyUpdateFactory(RemotePropertyEnsureMixin, RemoteInstanceUpdateFactory):
+class RemoteProductPropertyUpdateFactory(RemotePropertyEnsureMixin, ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = ProductProperty
     create_if_not_exists = True
 
-    def __init__(self, sales_channel, local_instance, api=None, get_value_only=False, remote_instance=None, skip_checks=False, remote_product=None):
+    def __init__(self, sales_channel, local_instance, remote_product, api=None, get_value_only=False, remote_instance=None, skip_checks=False):
         super().__init__(sales_channel, local_instance, api=api, remote_instance=remote_instance, remote_product=remote_product)
         self.remote_value = None
         self.remote_property = None
@@ -111,6 +110,10 @@ class RemoteProductPropertyUpdateFactory(RemotePropertyEnsureMixin, RemoteInstan
 
         self.remote_value = self.get_remote_value()
 
+        print('------------------------------')
+        print(self.remote_value)
+        print(type(self.remote_value))
+
         # we got the value we stop de process so everything is resolved
         if self.get_value_only:
             return False
@@ -123,3 +126,6 @@ class RemoteProductPropertyUpdateFactory(RemotePropertyEnsureMixin, RemoteInstan
 
 class RemoteProductPropertyDeleteFactory(RemoteInstanceDeleteFactory):
     local_model_class = ProductProperty
+
+    def __init__(self, sales_channel, local_instance, remote_product, api=None,remote_instance=None):
+        super().__init__(sales_channel, local_instance, api=api, remote_instance=remote_instance, remote_product=remote_product)

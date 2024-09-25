@@ -1,5 +1,5 @@
 from django.db.models.signals import post_delete, pre_delete
-from core.signals import post_create, post_update
+from core.signals import post_create, post_update, mutation_update
 from inventory.models import Inventory
 from media.models import Media
 from properties.signals import product_properties_rule_configurator_updated
@@ -167,6 +167,15 @@ def sales_channels__product_property__post_update_receiver(sender, instance: Pro
     from .tasks import update_configurators_for_product_property_db_task
 
     if instance.property.is_public_information:
+        update_remote_product_property.send(sender=instance.__class__, instance=instance)
+
+        update_configurators_for_product_property_db_task(instance.product, instance.property)
+
+@receiver(mutation_update, sender='properties.ProductProperty')
+def sales_channels__product_property__post_update_multiselect_receiver(sender, instance: ProductProperty, **kwargs):
+    from .tasks import update_configurators_for_product_property_db_task
+
+    if instance.property.is_public_information and instance.property.type == Property.TYPES.MULTISELECT:
         update_remote_product_property.send(sender=instance.__class__, instance=instance)
 
         update_configurators_for_product_property_db_task(instance.product, instance.property)
@@ -447,14 +456,14 @@ def sales_channels__product__pre_delete_receiver(sender, instance, **kwargs):
     """
     delete_remote_product.send(sender=instance.__class__, instance=instance)
 
-# @receiver(post_update, sender='products_inspector.Inspector')
-# def sales_channels__inspector__post_update_receiver(sender, instance, **kwargs):
-#     """
-#     Handle post-update events for the Inspector model.
-#     Sends sync_remote_product signal if 'has_missing_information' changes to False.
-#     """
-#     if instance.is_dirty_field('has_missing_information') and not instance.has_missing_information:
-#         sync_remote_product.send(sender=instance.product.__class__, instance=instance.product)
+@receiver(post_update, sender='products_inspector.Inspector')
+def sales_channels__inspector__post_update_receiver(sender, instance, **kwargs):
+    """
+    Handle post-update events for the Inspector model.
+    Sends sync_remote_product signal if 'has_missing_information' changes to False.
+    """
+    if instance.is_dirty_field('has_missing_information') and not instance.has_missing_information:
+        sync_remote_product.send(sender=instance.product.__class__, instance=instance.product)
         
 @receiver(product_properties_rule_configurator_updated, sender='properties.ProductPropertiesRule')
 def sales_channels__configurator_rule_changed_receiver(sender, instance, **kwargs):

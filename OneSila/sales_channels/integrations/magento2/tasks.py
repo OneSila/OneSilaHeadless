@@ -5,8 +5,9 @@ from properties.models import Property, PropertySelectValue, ProductPropertiesRu
 from sales_channels.decorators import remote_task
 from sales_channels.factories.remote_task import BaseRemoteTask
 from sales_channels.integrations.magento2.factories.properties.properties import MagentoPropertyUpdateFactory
-from sales_channels.integrations.magento2.helpers import run_generic_magento_factory
-from sales_channels.integrations.magento2.models import MagentoSalesChannel
+from sales_channels.integrations.magento2.helpers import run_generic_magento_factory, run_remote_product_dependent_magento_factory
+from sales_channels.integrations.magento2.models import MagentoSalesChannel, MagentoProduct
+from sales_channels.models import SalesChannel
 
 
 # !IMPORTANT: @remote_task needs to be above in order to work
@@ -236,18 +237,19 @@ def create_magento_product_db_task(task_queue_item_id, sales_channel_id, product
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def create_magento_product_property_db_task(task_queue_item_id, sales_channel_id, product_property_id):
+def create_magento_product_property_db_task(task_queue_item_id, sales_channel_id, product_property_id, remote_product_id):
     from .factories.properties import MagentoProductPropertyCreateFactory
     from properties.models import ProductProperty
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
-        run_generic_magento_factory(
+        run_remote_product_dependent_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoProductPropertyCreateFactory,
             local_instance_id=product_property_id,
-            local_instance_class=ProductProperty
+            local_instance_class=ProductProperty,
+            remote_product_id=remote_product_id
         )
 
     task.execute(actual_task)
@@ -255,25 +257,26 @@ def create_magento_product_property_db_task(task_queue_item_id, sales_channel_id
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def update_magento_product_property_db_task(task_queue_item_id, sales_channel_id, product_property_id):
+def update_magento_product_property_db_task(task_queue_item_id, sales_channel_id, product_property_id, remote_product_id):
     from .factories.properties import MagentoProductPropertyUpdateFactory
     from properties.models import ProductProperty
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
-        run_generic_magento_factory(
+        run_remote_product_dependent_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoProductPropertyUpdateFactory,
             local_instance_id=product_property_id,
-            local_instance_class=ProductProperty
+            local_instance_class=ProductProperty,
+            remote_product_id=remote_product_id
         )
 
     task.execute(actual_task)
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=2)
 @db_task()
-def delete_magento_product_property_db_task(task_queue_item_id, sales_channel_id, remote_instance):
+def delete_magento_product_property_db_task(task_queue_item_id, sales_channel_id, remote_instance, remote_product_id):
     from .factories.properties import MagentoProductPropertyDeleteFactory
 
     task = BaseRemoteTask(task_queue_item_id)
@@ -283,7 +286,8 @@ def delete_magento_product_property_db_task(task_queue_item_id, sales_channel_id
 
         factory_kwargs = {
             'remote_instance': remote_instance,
-            'sales_channel': sales_channel
+            'sales_channel': sales_channel,
+            'remote_product': MagentoProduct.objects.get(id=remote_product_id)
         }
         factory = MagentoProductPropertyDeleteFactory(**factory_kwargs)
         factory.run()
@@ -292,34 +296,36 @@ def delete_magento_product_property_db_task(task_queue_item_id, sales_channel_id
 
 @remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def update_magento_inventory_db_task(task_queue_item_id, sales_channel_id, product_id):
+def update_magento_inventory_db_task(task_queue_item_id, sales_channel_id, product_id, remote_product_id):
     from .factories.inventory import MagentoInventoryUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
-        run_generic_magento_factory(
+        run_remote_product_dependent_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoInventoryUpdateFactory,
             local_instance_id=product_id,
-            local_instance_class=Product
+            local_instance_class=Product,
+            remote_product_id=remote_product_id
         )
 
     task.execute(actual_task)
 
 @remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def update_magento_price_db_task(task_queue_item_id, sales_channel_id, product_id):
+def update_magento_price_db_task(task_queue_item_id, sales_channel_id, product_id, remote_product_id):
     from .factories.prices import MagentoPriceUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
-        run_generic_magento_factory(
+        run_remote_product_dependent_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoPriceUpdateFactory,
             local_instance_id=product_id,
-            local_instance_class=Product
+            local_instance_class=Product,
+            remote_product_id=remote_product_id
         )
 
     task.execute(actual_task)
@@ -327,23 +333,24 @@ def update_magento_price_db_task(task_queue_item_id, sales_channel_id, product_i
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def update_magento_product_content_db_task(task_queue_item_id, sales_channel_id, product_id):
+def update_magento_product_content_db_task(task_queue_item_id, sales_channel_id, product_id, remote_product_id):
     from .factories.products import MagentoProductContentUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
-        run_generic_magento_factory(
+        run_remote_product_dependent_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoProductContentUpdateFactory,
             local_instance_id=product_id,
-            local_instance_class=Product
+            local_instance_class=Product,
+            remote_product_id=remote_product_id
         )
 
     task.execute(actual_task)
 
 
-@remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
+@remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=2)
 @db_task()
 def add_magento_product_variation_db_task(task_queue_item_id, sales_channel_id, parent_product_id, variation_product_id):
     from .factories.products import MagentoProductVariationAddFactory
@@ -405,18 +412,19 @@ def remove_magento_product_variation_db_task(task_queue_item_id, sales_channel_i
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def create_magento_image_association_db_task(task_queue_item_id, sales_channel_id, media_product_through_id):
+def create_magento_image_association_db_task(task_queue_item_id, sales_channel_id, media_product_through_id, remote_product_id):
     from .factories.products import MagentoMediaProductThroughCreateFactory
     from media.models import MediaProductThrough
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
-        run_generic_magento_factory(
+        run_remote_product_dependent_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoMediaProductThroughCreateFactory,
             local_instance_id=media_product_through_id,
-            local_instance_class=MediaProductThrough
+            local_instance_class=MediaProductThrough,
+            remote_product_id=remote_product_id
         )
 
     task.execute(actual_task)
@@ -424,18 +432,19 @@ def create_magento_image_association_db_task(task_queue_item_id, sales_channel_i
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def update_magento_image_association_db_task(task_queue_item_id, sales_channel_id, media_product_through_id):
+def update_magento_image_association_db_task(task_queue_item_id, sales_channel_id, media_product_through_id, remote_product_id):
     from .factories.products import MagentoMediaProductThroughUpdateFactory
     from media.models import MediaProductThrough
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
-        run_generic_magento_factory(
+        run_remote_product_dependent_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoMediaProductThroughUpdateFactory,
             local_instance_id=media_product_through_id,
-            local_instance_class=MediaProductThrough
+            local_instance_class=MediaProductThrough,
+            remote_product_id=remote_product_id
         )
 
     task.execute(actual_task)
@@ -443,7 +452,7 @@ def update_magento_image_association_db_task(task_queue_item_id, sales_channel_i
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=2)
 @db_task()
-def delete_magento_image_association_db_task(task_queue_item_id, sales_channel_id, remote_instance):
+def delete_magento_image_association_db_task(task_queue_item_id, sales_channel_id, remote_instance, remote_product_id):
     from .factories.products import MagentoMediaProductThroughDeleteFactory
     from sales_channels.integrations.magento2.models import MagentoSalesChannel
 
@@ -454,7 +463,8 @@ def delete_magento_image_association_db_task(task_queue_item_id, sales_channel_i
 
         factory_kwargs = {
             'remote_instance': remote_instance,
-            'sales_channel': sales_channel
+            'sales_channel': sales_channel,
+            'remote_product': MagentoProduct.objects.get(id=remote_product_id)
         }
         factory = MagentoMediaProductThroughDeleteFactory(**factory_kwargs)
         factory.run()
@@ -481,36 +491,37 @@ def delete_magento_image_db_task(task_queue_item_id, sales_channel_id, image_id)
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def update_magento_product_db_task(task_queue_item_id, sales_channel_id, product_id):
+def update_magento_product_db_task(task_queue_item_id, sales_channel_id, product_id, remote_product_id):
     from .factories.products import MagentoProductUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
-        run_generic_magento_factory(
-            sales_channel_id=sales_channel_id,
-            factory_class=MagentoProductUpdateFactory,
-            local_instance_id=product_id,
-            local_instance_class=Product
+        factory = MagentoProductUpdateFactory(
+            sales_channel=SalesChannel.objects.get(id=sales_channel_id),
+            local_instance=Product.objects.get(id=product_id),
+            remote_instance=MagentoProduct.objects.get(id=remote_product_id)
         )
+        factory.run()
 
     task.execute(actual_task)
 
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def sync_magento_product_db_task(task_queue_item_id, sales_channel_id, product_id):
+def sync_magento_product_db_task(task_queue_item_id, sales_channel_id, product_id, remote_product_id):
     from .factories.products import MagentoProductSyncFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
-        run_generic_magento_factory(
-            sales_channel_id=sales_channel_id,
-            factory_class=MagentoProductSyncFactory,
-            local_instance_id=product_id,
-            local_instance_class=Product
+        factory = MagentoProductSyncFactory(
+            sales_channel=SalesChannel.objects.get(id=sales_channel_id),
+            local_instance=Product.objects.get(id=product_id),
+            remote_instance=MagentoProduct.objects.get(id=remote_product_id)
         )
+        factory.run()
+
 
     task.execute(actual_task)
 

@@ -10,7 +10,7 @@ class RemoteVat(PolymorphicModel, RemoteObjectMixin, models.Model):
     local_instance = models.ForeignKey('taxes.VatRate', on_delete=models.SET_NULL, null=True, help_text="The local VAT rate instance associated with this remote VAT.")
 
     class Meta:
-        unique_together = ('local_instance',)
+        unique_together = ('local_instance', 'sales_channel')
         verbose_name = 'Remote VAT'
         verbose_name_plural = 'Remote VATs'
 

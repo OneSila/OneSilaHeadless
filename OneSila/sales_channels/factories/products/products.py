@@ -5,7 +5,7 @@ from sales_channels.factories.mixins import RemoteInstanceOperationMixin, Remote
 import logging
 
 from sales_channels.models import RemoteLog, SalesChannel, RemoteImageProductAssociation
-from sales_channels.models.products import RemoteProductConfigurator
+from sales_channels.models.products import RemoteProductConfigurator, RemoteProduct
 from sales_channels.models.sales_channels import RemoteLanguage, SalesChannelViewAssign
 
 logger = logging.getLogger(__name__)
@@ -26,6 +26,7 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
     create_product_factory = None
     delete_product_factory = None
     add_variation_factory = None
+    accepted_variation_already_exists_error = None
 
     field_mapping = {}  # Mapping of local fields to remote fields, should be overridden in subclasses
 
@@ -37,12 +38,12 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
     REMOTE_TYPE_CONFIGURABLE = None
 
     def __init__(self, sales_channel: SalesChannel, local_instance: Product,
-                 api=None, remote_instance=None, parent_local_instance=None, parent_remote_instance=None):
+                 api=None, remote_instance=None, parent_local_instance=None, remote_parent_product=None):
         self.local_instance = local_instance  # Instance of the Product model
         self.sales_channel = sales_channel   # Sales channel associated with the sync
-        self.api = api if api is not None else self.get_api()  # Fetch the API client if not provided
+        self.api = api
         self.parent_local_instance = parent_local_instance  # Optional: parent product instance for variations
-        self.parent_remote_instance = parent_remote_instance  # Optional: If it comes from a  create factory of configurable it will save some queries
+        self.remote_parent_product = remote_parent_product  # Optional: If it comes from a  create factory of configurable it will save some queries
         self.remote_instance = remote_instance  # Optional: If it comes from a sync factory of configurable it will save some queries
         self.is_variation = parent_local_instance is not None  # Determine if this is a variation
         self.payload = {}
@@ -56,6 +57,13 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
             assign.save()
 
     def preflight_check(self):
+        return True
+    
+    def should_continue_after_initialize(self):
+        """
+        Determines whether the process should continue.
+        Can be overridden in subclasses to control the flow.
+        """
         return True
 
     def add_field_in_payload(self, field_name, value):
@@ -80,8 +88,8 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
         remote_parent_product = None
         if self.is_variation:
 
-            if self.parent_remote_instance is not None:
-                remote_parent_product = self.parent_remote_instance
+            if self.remote_parent_product is not None:
+                remote_parent_product = self.remote_parent_product
             else:
                 remote_parent_product = self.remote_model_class.objects.get(local_instance=self.parent_local_instance, sales_channel=self.sales_channel)
 
@@ -147,6 +155,7 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
             update_factory = self.remote_product_property_update_factory(
                 local_instance=product_property,
                 sales_channel=self.sales_channel,
+                remote_product=self.remote_instance,
                 remote_instance=remote_property,
                 api=self.api,
                 get_value_only=True,
@@ -198,6 +207,7 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
                 local_instance=remote_property.local_instance,
                 sales_channel=self.sales_channel,
                 remote_instance=remote_property,
+                remote_product=self.remote_instance,
                 api=self.api
             )
             delete_factory.run()
@@ -295,7 +305,6 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
         if not self.sales_channel.sync_contents:
             return
 
-        print('---------------------------------- SET CONTENT')
         # Set short description
         self.set_short_description()
 
@@ -652,16 +661,14 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
                 remote_variation = self.remote_model_class.objects.get(
                     local_instance=variation,
                     sales_channel=self.sales_channel,
-                    remote_parent_product=self.remote_instance
+                    remote_parent_product=self.remote_instance,
+                    is_variation=True
                 )
                 # Update the existing remote variation
                 self.update_child(variation, remote_variation)
             except self.remote_model_class.DoesNotExist:
                 # Create a new remote variation
                 remote_variation = self.create_child(variation)
-
-            # Add the variation to the remote parent product if necessary
-            self.add_variation_to_parent(remote_variation)
 
             # Keep track of existing remote variation IDs
             existing_remote_variation_ids.append(remote_variation.id)
@@ -676,9 +683,10 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
         factory = self.sync_product_factory(
             sales_channel=self.sales_channel,
             local_instance=variation,
-            api=self.api,
             parent_local_instance=self.local_instance,
+            remote_parent_product=self.remote_instance,
             remote_instance=remote_variation,
+            api=self.api,
         )
         factory.run()
 
@@ -689,27 +697,31 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
         factory = self.create_product_factory(
             sales_channel=self.sales_channel,
             local_instance=variation,
+            parent_local_instance=self.local_instance,
+            remote_parent_product=self.remote_instance,
             api=self.api,
-            parent_local_instance=self.local_instance
         )
         factory.run()
         remote_variation = factory.remote_instance
         return remote_variation
 
-    def add_variation_to_parent(self, remote_variation):
+    def add_variation_to_parent(self):
         """
         Adds the remote variation to the remote parent product.
         """
-        factory = self.add_variation_factory(
-            sales_channel=self.sales_channel,
-            local_instance=remote_variation.local_instance,
-            parent_product=self.local_instance,
-            remote_instance=remote_variation,
-            remote_parent_product=self.remote_instance,
-            skip_checks=True,
-            api=self.api
-        )
-        factory.run()
+        try:
+            factory = self.add_variation_factory(
+                sales_channel=self.sales_channel,
+                local_instance=self.local_instance,
+                parent_product=self.local_instance,
+                remote_instance=self.remote_instance,
+                remote_parent_product=self.remote_parent_product,
+                skip_checks=True,
+                api=self.api
+            )
+            factory.run()
+        except self.accepted_variation_already_exists_error:
+            pass
 
     def delete_child(self, remote_variation):
         """
@@ -742,11 +754,17 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
             logger.debug(f"Preflight check failed for {self.sales_channel}.")
             return
 
+        self.set_api()
         log_identifier = self.get_identifier()
 
         self.set_type()
         try:
             self.initialize_remote_product()
+
+            if not self.should_continue_after_initialize():
+                logger.debug("Process stopped by should_continue_after_initialize() check.")
+                return
+
             self.set_local_assigns()
             self.set_rule() # we put this here since if is not present we will stop the process
             self.build_payload()
@@ -764,6 +782,9 @@ class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
                 self.get_variations()
                 self.set_remote_configurator()
                 self.create_or_update_children()
+
+            if self.is_variation:
+                self.add_variation_to_parent()
 
             self.final_process()
         except Exception as e:
@@ -807,50 +828,139 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
     remote_price_class = None
     remote_product_content_class = None
     remote_id_map = 'id'  # Default remote ID mapping to get the remote id from the response
+    sync_product_factory = None
 
     def initialize_remote_product(self):
         """
-        Creates a new RemoteProduct instance instead of retrieving an existing one.
+        Initializes the RemoteProduct instance.
+        Handles three cases:
+        1. Brand new product.
+        2. Product with failed creation (exists locally but not remotely).
+        3. Product already exists remotely but not locally.
+        4. Product that existed both locally and remotely,
         """
         remote_parent_product = None
+        remote_sku = self.local_instance.sku
         if self.is_variation:
-
-            if self.parent_remote_instance is not None:
-                remote_parent_product = self.parent_remote_instance
+            remote_sku = f"{self.parent_local_instance.sku}-{self.local_instance.sku}"
+            if self.remote_parent_product is not None:
+                remote_parent_product = self.remote_parent_product
             else:
-                remote_parent_product = self.remote_model_class.objects.get(local_instance=self.parent_local_instance, sales_channel=self.sales_channel)
+                remote_parent_product = self.remote_model_class.objects.get(
+                    local_instance=self.parent_local_instance,
+                    sales_channel=self.sales_channel
+                )
 
-        self.remote_instance, _ = self.remote_model_class.objects.get_or_create(
+        # Attempt to get or create the RemoteProduct instance without filtering on remote_id
+        self.remote_instance, created = self.remote_model_class.objects.get_or_create(
             local_instance=self.local_instance,
             remote_parent_product=remote_parent_product,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
             sales_channel=self.sales_channel,
             is_variation=self.is_variation,
-            remote_sku=self.local_instance.sku,
-            remote_id=None
+            remote_sku=remote_sku,
         )
-        logger.debug(f"Created RemoteProduct: {self.remote_instance}")
 
+        # If the remote_instance has a remote_id, it means it's already linked to a remote product
+        if self.remote_instance.remote_id:
+            logger.debug(f"RemoteProduct already exists with remote_id: {self.remote_instance.remote_id}")
+            self.switch_to_sync = True
+            return
+
+        # Try to fetch the remote product from the remote API
+        try:
+            response = self.get_saleschannel_remote_object(remote_sku)
+            remote_data = self.serialize_response(response)
+            if remote_data:
+                # Remote product exists but wasn't linked locally
+                self.remote_instance.remote_id = self.extract_remote_id(remote_data)
+                self.remote_instance.remote_sku = self.extract_remote_sku(remote_data)
+                self.remote_instance.save()
+                logger.debug(f"Linked existing remote product with remote_id: {self.remote_instance.remote_id}")
+                # Set flag to switch to sync
+                self.switch_to_sync = True
+            else:
+                # Remote product doesn't exist; proceed with creation
+                logger.debug(f"Proceeding with creation of new remote product for {self.local_instance.name}")
+        except Exception as e:
+            logger.error(f"Error fetching remote product: {e}")
+            # Decide whether to proceed with creation or handle the error differently
+            # For now, we'll proceed with creation
+            logger.debug(f"Proceeding with creation despite error fetching remote product for {self.local_instance.name}")
+
+    def should_continue(self):
+        """
+        Determines whether the process should continue.
+        If switch_to_sync is True, it will instantiate and run the sync factory,
+        then return False to stop the create process.
+        """
+        if self.switch_to_sync:
+            logger.debug("Switching to sync flow.")
+            self.run_sync_flow()
+            return False
+        return True
+
+    def run_sync_flow(self):
+        """
+        Runs the sync/update flow.
+        """
+        if self.sync_product_factory is None:
+            raise ValueError("sync_product_factory must be specified in the RemoteProductCreateFactory.")
+
+        sync_factory = self.sync_product_factory(
+            sales_channel=self.sales_channel,
+            local_instance=self.local_instance,
+            remote_instance=self.remote_instance,
+            parent_local_instance=self.parent_local_instance,
+            remote_parent_product=self.remote_parent_product,
+            api=self.api,
+        )
+        sync_factory.run()
+
+    def get_saleschannel_remote_object(self, remote_sku):
+        """
+        Attempts to fetch the remote product using the remote API.
+        Should be overridden in subclasses to provide integration-specific logic.
+        Returns the remote product data if found, otherwise None.
+        """
+        raise NotImplementedError("Subclasses must implement get_saleschannel_remote_object method.")
+
+    # Refactor set_remote_id to use extract_remote_id
     def set_remote_id(self, response_data):
         """
         Sets the remote ID based on the response data using the mapping provided.
         """
+        self.remote_instance.remote_id = self.extract_remote_id(response_data)
+
+    def extract_remote_id(self, remote_data):
+        """
+        Extracts the remote_id from the remote_data using the remote_id_map.
+        """
         id_path = self.remote_id_map.split('__')
-        remote_id = response_data
+        remote_id = remote_data
 
         for path in id_path:
-            remote_id = remote_id.get(path, None)
+            remote_id = remote_id.get(path)
             if remote_id is None:
                 break
 
-        # Set the remote_id on the remote instance
-        self.remote_instance.remote_id = remote_id
+        if remote_id is None:
+            raise ValueError("Could not extract remote_id from remote_data.")
+        return remote_id
+
+    def extract_remote_sku(self, remote_data):
+        """
+        Extracts the remote_sku from the remote_data.
+        Override this method if the remote_sku is stored differently in the remote_data.
+        """
+        return remote_data.get('sku', self.remote_instance.remote_sku)
 
     # for the next 3 methods we want to make sure we also create the related mirror models for price, stock, content
     def set_content(self):
         super().set_content()
 
         if self.remote_product_content_class:
-            self.remote_instance.content = self.remote_product_content_class.objects.create(
+            self.remote_instance.content, _ = self.remote_product_content_class.objects.get_or_create(
                 remote_product=self.remote_instance,
                 sales_channel=self.sales_channel,
                 multi_tenant_company=self.sales_channel.multi_tenant_company
@@ -862,7 +972,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
         super().set_stock()
 
         if self.remote_inventory_class:
-            self.remote_instance.inventory = self.remote_inventory_class.objects.create(
+            self.remote_instance.inventory, _ = self.remote_inventory_class.objects.get_or_create(
                 remote_product=self.remote_instance,
                 quantity=self.stock,
                 sales_channel=self.sales_channel,
@@ -874,7 +984,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
         super().set_price()
 
         if self.remote_price_class:
-            self.remote_instance.price = self.remote_price_class.objects.create(
+            self.remote_instance.price, _ = self.remote_price_class.objects.get_or_create(
                 remote_product=self.remote_instance,
                 price=self.price,
                 discount_price=self.discount_price if hasattr(self, 'discount_price') else None,
@@ -899,8 +1009,6 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
             raise ValueError(f"API method '{self.api_method_name}' not found in the API package '{self.api_package_name}'.")
 
         # Call the API method with the payload
-        print('-------------------------')
-        print(self.payload)
         return api_method(**self.payload)
 
     def perform_remote_action(self):
@@ -928,3 +1036,9 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
 
 class RemoteProductDeleteFactory(RemoteInstanceDeleteFactory):
     local_model_class = Product
+    remote_delete_factory = None
+
+    def preflight_process(self):
+        for remote_variation in RemoteProduct.objects.filter(remote_parent_product=self.remote_instance).iterator():
+            factory = self.remote_delete_factory(sales_channel=self.sales_channel, remote_instance=remote_variation, api=self.api)
+            factory.run()

@@ -228,7 +228,7 @@ class RemoteImageProductAssociation(PolymorphicModel, RemoteObjectMixin, models.
     remote_image = models.ForeignKey(RemoteImage, on_delete=models.CASCADE, null=True, blank=True, help_text="The remote image being assigned to the remote product. Optional for direct links.")
 
     class Meta:
-        unique_together = ('local_instance', 'sales_channel',)
+        unique_together = ('local_instance', 'sales_channel', 'remote_product',)
         verbose_name = 'Remote Image Product Association'
         verbose_name_plural = 'Remote Image Product Associations'
 
