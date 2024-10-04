@@ -28,7 +28,9 @@ class PurchaseOrder(models.Model):
         (DELIVERED, _("Delivered")),
     )
 
-    status = models.CharField(max_length=16, choices=PO_STATUS_CHOICES)
+    OPEN_STATUSES = [ORDERED, CONFIRMED, PENDING_DELIVERY]
+
+    status = models.CharField(max_length=16, choices=PO_STATUS_CHOICES, default=DRAFT)
     supplier = models.ForeignKey('contacts.Company', on_delete=models.PROTECT)
     order_reference = models.CharField(max_length=100, blank=True, null=True)
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)

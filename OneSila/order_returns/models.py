@@ -21,6 +21,8 @@ class OrderReturn(models.Model):
         (REFUNDED, _("Refunded")),
     )
 
+    OPEN_STATUSES = [ANNOUNCED]
+
     order = models.ForeignKey('orders.Order', on_delete=models.CASCADE)
     received_on = models.DateField()
     status = models.CharField(max_length=18, choices=STATUS_CHOICES, default=ANNOUNCED)

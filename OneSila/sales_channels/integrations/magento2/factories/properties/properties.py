@@ -203,7 +203,6 @@ class RemoteValueMixin:
 
     def get_boolean_value(self, value: bool) -> int:
         """Converts boolean values to 1 (True) or 0 (False) as required by Magento."""
-        print('-------------------------------------------- ?')
         return 1 if value else 0
 
     def get_select_value(self, multiple):

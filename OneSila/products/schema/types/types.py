@@ -76,6 +76,21 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
     def inventory_await_inventory(self, info) -> int | None:
         return self.inventory.await_inventory()
 
+    @field()
+    def inspector_status(self, info) -> int:
+        """
+        Status Codes:
+        0 - Green: No missing information and no missing optional information.
+        1 - Orange: No missing information but missing optional information.
+        2 - Red: Missing information (regardless of optional information).
+        """
+        if self.inspector.has_missing_information:
+            return 3  # Red
+        elif self.inspector.has_missing_optional_information:
+            return 2  # Orange
+        else:
+            return 1  # Green
+
 
 @type(ProductTranslation, filters=ProductTranslationFilter, order=ProductTranslationOrder, pagination=True, fields="__all__")
 class ProductTranslationType(relay.Node, GetQuerysetMultiTenantMixin):

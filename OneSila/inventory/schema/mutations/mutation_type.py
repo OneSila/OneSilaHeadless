@@ -22,8 +22,10 @@ class InventoryMutation:
     delete_inventory_location: InventoryLocationType = delete()
     delete_inventory_locations: List[InventoryLocationType] = delete()
 
+    # We can't update it because the quality needs to be changed and we don't support that on the moment.
+    # Same for delete. But for delete, we should consider creating some logic
     create_inventory_movement: InventoryMovementType = create_inventory_movement()
-    create_inventory_movements: List[InventoryMovementType] = create(InventoryMovementInput)
-    update_inventory_movement: InventoryMovementType = update_inventory_movement()
-    delete_inventory_movement: InventoryMovementType = delete()
-    delete_inventory_movements: List[InventoryMovementType] = delete()
+    # create_inventory_movements: List[InventoryMovementType] = create(InventoryMovementInput)
+    # update_inventory_movement: InventoryMovementType = update_inventory_movement()
+    # delete_inventory_movement: InventoryMovementType = delete()
+    # delete_inventory_movements: List[InventoryMovementType] = delete()

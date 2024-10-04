@@ -69,7 +69,8 @@ class RegisterUserFactory:
             first_name=self.first_name,
             last_name=self.last_name,
             language=self.language,
-            is_multi_tenant_company_owner=self.is_multi_tenant_company_owner
+            is_multi_tenant_company_owner=self.is_multi_tenant_company_owner,
+            invitation_accepted=self.invitation_accepted
         )
 
         try:

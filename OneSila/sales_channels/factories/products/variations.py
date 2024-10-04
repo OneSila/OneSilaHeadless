@@ -14,15 +14,12 @@ class RemoteProductVariationAddFactory(RemoteInstanceUpdateFactory):
         self.remote_instance = remote_instance
         self.remote_parent_product = remote_parent_product  # Will be set in the preflight_check
         self.skip_checks = skip_checks
-        print('------------------------------------------------------------------------------- 1?')
-        print(skip_checks)
 
         # in order to not get them on every add variation we can predefine this as the remote properties used in configurator
         self.configurator_properties = configurator_properties
         if self.skip_checks and (self.remote_instance is None or self.remote_parent_product is None):
             raise ValueError("Factory have skip checks enabled without giving the remote instances.")
 
-        print('------------------------------------------------------------------------------- 2?')
         super().__init__(sales_channel, local_instance, api=api, remote_instance=remote_instance, remote_product=remote_parent_product)
 
     def preflight_check(self):
@@ -30,11 +27,9 @@ class RemoteProductVariationAddFactory(RemoteInstanceUpdateFactory):
         Checks that the RemoteProduct, Remote Parent Product, and associated SalesChannelViewAssign exist before proceeding.
         Also sets the remote_instance if conditions are met.
         """
-        print('------------------------------------------------------------------------------- 2')
         if self.skip_checks:
             return True
 
-        print('------------------------------------------------------------------------------- 3')
         # Check for SalesChannelViewAssign associated with the remote parent product
         parent_assign_exists = SalesChannelViewAssign.objects.filter(
             product=self.parent_product,

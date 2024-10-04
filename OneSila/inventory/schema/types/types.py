@@ -6,7 +6,7 @@ from typing import List, Optional, Self
 from inventory.models import Inventory, InventoryLocation, InventoryMovement
 from products.schema.types.types import ProductType
 from contacts.schema.types.types import InventoryShippingAddressType
-from .filters import InventoryFilter, InventoryLocationFilter
+from .filters import InventoryFilter, InventoryLocationFilter, InventoryMovementFilter
 from .ordering import InventoryOrder, InventoryLocationOrder
 from purchasing.schema.types.types import PurchaseOrderType
 from shipments.schema.types.types import PackageType
@@ -28,9 +28,13 @@ class InventoryType(relay.Node, GetQuerysetMultiTenantMixin):
     inventorylocation: InventoryLocationType
 
 
-@type(InventoryMovement, pagination=True, fields="__all__")
+@type(InventoryMovement, pagination=True, filters=InventoryMovementFilter, fields="__all__")
 class InventoryMovementType(relay.Node, GetQuerysetMultiTenantMixin):
     product: ProductType
+
+    @field()
+    def name(self, info) -> str:
+        return self.name
 
     @field()
     def movement_to(self, info) -> PackageType | InventoryLocationType:

@@ -70,13 +70,9 @@ def add_task_to_queue(
 
 @periodic_task(crontab(minute="*"))
 def sales_channels_process_remote_tasks_queue():
-    print('---------------------------------------------- ??')
-    print(SalesChannel.objects.filter(active=True))
     for sales_channel in SalesChannel.objects.filter(active=True):
         # Get the next batch of tasks that can be processed
         pending_tasks = RemoteTaskQueue.get_pending_tasks(sales_channel)
-        print('--------------------------------------------------------------')
-        print(pending_tasks)
 
         # Log the number of pending tasks found and the request limit
         logger.info(f"Found {len(pending_tasks)} tasks to process for SalesChannel '{sales_channel.hostname}' with a limit of {sales_channel.requests_per_minute} requests per minute.")

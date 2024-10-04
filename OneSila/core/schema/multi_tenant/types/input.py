@@ -1,7 +1,7 @@
 from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser, \
     MultiTenantUserLoginToken
 from core.schema.core.types.types import auto
-from core.schema.core.types.input import input, partial, strawberry_input
+from core.schema.core.types.input import input, partial, strawberry_input, NodeInput
 
 
 @input(MultiTenantCompany)
@@ -48,7 +48,11 @@ class MultiTenantUserStatusInput:
 @partial(MultiTenantUser, fields=['username', 'is_multi_tenant_company_owner',
     'language', 'timezone', 'mobile_number', 'whatsapp_number', 'telegram_number',
     'avatar', 'is_active', 'first_name', 'last_name'])
-class MultiTenantUserPartialInput:
+class MeMultiTenantUserPartialInput:
+    pass
+
+@partial(MultiTenantUser, fields=['multi_tenant_company', 'id', 'first_name', 'last_name', 'email', 'is_active'])
+class MultiTenantUserPartialInput(NodeInput):
     pass
 
 
@@ -69,7 +73,7 @@ class MultiTenantLoginLinkInput:
 class MultiTenantUserLoginTokenInput:
     username: str
 
-
+1
 @strawberry_input
 class UpdateOnboardingStatusInput:
     onboarding_status: str

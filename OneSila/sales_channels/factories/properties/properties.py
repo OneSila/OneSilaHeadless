@@ -110,10 +110,6 @@ class RemoteProductPropertyUpdateFactory(RemotePropertyEnsureMixin, ProductAssig
 
         self.remote_value = self.get_remote_value()
 
-        print('------------------------------')
-        print(self.remote_value)
-        print(type(self.remote_value))
-
         # we got the value we stop de process so everything is resolved
         if self.get_value_only:
             return False

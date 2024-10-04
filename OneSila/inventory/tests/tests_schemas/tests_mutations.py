@@ -35,7 +35,7 @@ class InventoryMutationTestCase(TestCaseWithDemoData, TransactionTestCaseMixin, 
                 'quantity': 5,
                 'movementFromId': loc_id,
                 'movementToId': loc_bis_id,
-            }
+                }
             }
         )
         self.assertTrue(resp.errors is None)

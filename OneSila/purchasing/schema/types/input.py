@@ -1,6 +1,5 @@
 from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial
-
 from purchasing.models import PurchaseOrder, PurchaseOrderItem
 
 
@@ -22,8 +21,6 @@ class PurchaseOrderItemInput:
 
 # We cannot set quantity_recieved directly.  You
 # MUST use an InventoryMovement from the PurchaseOrder to an Inventory
-
-
 @partial(PurchaseOrderItem, exclude=["quantity_recieved"])
 class PurchaseOrderItemPartialInput(NodeInput):
     pass

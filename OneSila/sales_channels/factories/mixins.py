@@ -318,14 +318,11 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
     create_if_not_exists = False  # Configurable parameter to create the instance if not found
 
     def __init__(self, sales_channel, local_instance=None, api=None, remote_instance=None, **kwargs):
-        print('------------------------------------------------------------------------------- 3?')
         self.local_instance = local_instance  # Instance of the local model
         self.sales_channel = sales_channel  # Sales channel associated with the sync
         self.successfully_updated = True  # Tracks if update was successful
         self.payload = {}  # Will hold the payload data
         self.api = api
-
-        print('------------------------------------------------------------------------------- 4?')
 
         # we can give both the remote_instance as an id (from tasks) or the real instance
         if isinstance(remote_instance, self.remote_model_class):
@@ -337,8 +334,6 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
             self.get_remote_instance()
 
         self.remote_product = self._determine_remote_product(kwargs)
-
-        print('------------------------------------------------------------------------------- 5?')
 
     def preflight_check(self):
         """
@@ -489,11 +484,10 @@ class RemoteInstanceUpdateFactory(RemoteInstanceOperationMixin):
             logger.debug(f"Finished update process with success status: {self.successfully_updated}")
 
     def run(self):
-        print('--- 1???')
+
         if not self.preflight_check():
             return
 
-        print('--- 2???')
         self.set_api()
         self.preflight_process()
 

@@ -29,4 +29,4 @@ class PurchaseOrderItemFilter(SearchFilterMixin):
     search: str | None
     id: auto
     purchase_order: PurchaseOrderFilter | None
-    item: SupplierProductFilter | None
+    product: SupplierProductFilter | None

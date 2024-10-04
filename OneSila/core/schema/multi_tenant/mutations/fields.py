@@ -1,5 +1,5 @@
 from core.schema.multi_tenant.types.input import MultiTenantCompanyMyInput, \
-    MultiTenantCompanyPartialInput, MultiTenantUserPartialInput, \
+    MultiTenantCompanyPartialInput, MeMultiTenantUserPartialInput, \
     MultiTenantUserInput, MultiTenantInviteUserInput, MultiTenantUserAcceptInviteInput, \
     MultiTenantUserStatusInput, MultiTenantLoginLinkInput, \
     MultiTenantUserPasswordInput, MultiTenantUserAuthenticateTokenInput, UpdateOnboardingStatusInput
@@ -29,7 +29,7 @@ def update_my_multi_tenant_company():
 
 def update_me():
     extensions = [IsAuthenticated()]
-    return UpdateMeMutation(MultiTenantUserPartialInput, extensions=extensions)
+    return UpdateMeMutation(MeMultiTenantUserPartialInput, extensions=extensions)
 
 
 def update_my_password():

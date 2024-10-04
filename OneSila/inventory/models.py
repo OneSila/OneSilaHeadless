@@ -47,7 +47,7 @@ class Inventory(models.Model):
 
     def save(self, *args, **kwargs):
         if self.quantity < 0:
-            raise IntegrityError(f"Inventory cannot have a quantity < 0.")
+            raise IntegrityError(_("Inventory cannot have a quantity smaller than 0."))
 
         if not (self.product.is_supplier_product() or self.product.is_manufacturable()):
             raise IntegrityError(_("Inventory can only be attached to a SUPPLIER or MANUFACTURABLE PRODUCT. Not a {}".format(self.product.type)))
@@ -130,20 +130,43 @@ class InventoryMovement(models.Model):
     quantity = models.IntegerField()
     notes = models.TextField(null=True, blank=True)
 
+    @property
+    def name(self):
+        return f"{self.quantity} units of {self.product} from {self.movement_from} to {self.movement_to}"
+
     def __str__(self):
-        return f"{self.quantity} from {self.movement_from} to {self.movement_to}"
+        return self.name
 
     def save(self, *args, **kwargs):
-        if self.movement_from == self.movement_to:
-            raise IntegrityError(f"You cannot move from and to the same location. Ensure movement_to is different from movement_from.")
-
         mf_class = self.mf_content_type.model_class()
-        if not mf_class in self.MOVEMENT_FROM_MODELS:
-            raise IntegrityError(f"You can only receive inventory from {self.MOVEMENT_FROM_MODELS}, not {mf_class}")
+        if mf_class not in self.MOVEMENT_FROM_MODELS:
+            allowed_models = ', '.join([model.__name__ for model in self.MOVEMENT_FROM_MODELS])
+            raise ValidationError(
+                _("Invalid source type. You can only move inventory from: {}.".format(allowed_models))
+            )
 
+        # Validate movement_to model
         mt_class = self.mt_content_type.model_class()
-        if not mt_class in self.MOVEMENT_TO_MODELS:
-            raise IntegrityError(f"You can only receive inventory from {self.MOVEMENT_TO_MODELS} not {mt_class}")
+        if mt_class not in self.MOVEMENT_TO_MODELS:
+            allowed_models = ', '.join([model.__name__ for model in self.MOVEMENT_TO_MODELS])
+            raise ValidationError(
+                _("Invalid destination type. You can only move inventory to: {}.".format(allowed_models))
+            )
+
+        # Ensure movement_from and movement_to are not the same when both are InventoryLocations
+        if self.movement_from == self.movement_to:
+            raise ValidationError(_("You cannot move inventory from and to the same location."))
+
+        # Additional validation for precise InventoryLocations
+        if isinstance(self.movement_to, InventoryLocation) and self.movement_to.precise:
+            # Fetch all inventory entries at the destination location
+            existing_inventories = Inventory.objects.filter(inventorylocation=self.movement_to)
+
+            # Exclude inventories of the same product
+            other_product_inventories = existing_inventories.exclude(product=self.product)
+
+            if other_product_inventories.exists():
+                raise ValidationError(_("Cannot move this product into the selected location because it already contains a different product."))
 
         super().save(*args, **kwargs)
 

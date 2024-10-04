@@ -155,14 +155,12 @@ def run_delete_product_specific_generic_magento_task_flow(
     for sales_channel in sales_channels:
             for remote_product in RemoteProduct.objects.filter(local_instance=product, sales_channel=sales_channel).iterator():
                 try:
-                    remote_instance = remote_class.objects.get(local_instance_id=local_instance_id, sales_channel=sales_channel, remote_product_id=remote_product_id)
-
+                    remote_instance = remote_class.objects.get(local_instance_id=local_instance_id, sales_channel=sales_channel, remote_product_id=remote_product.id)
 
                     task_kwargs = {
                         'sales_channel_id': sales_channel.id,
                         'remote_instance_id': remote_instance.id,
                         'remote_product_id': remote_product.id
-                        **kwargs
                     }
 
                     add_task_to_queue(
@@ -170,6 +168,7 @@ def run_delete_product_specific_generic_magento_task_flow(
                         task_func_path=get_import_path(task_func),
                         task_kwargs=task_kwargs,
                         number_of_remote_requests=number_of_remote_requests,
+                        **kwargs
                     )
                 except remote_class.DoesNotExist:
                     # If the remote instance does not exist for this sales channel, skip
