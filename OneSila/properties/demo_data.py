@@ -70,7 +70,7 @@ def create_property_structure(multi_tenant_company):
         registry.create_demo_data_relation(translation)
 
         if value == 'Table':
-            product_properties_rule = ProductPropertiesRule.objects.create(
+            product_properties_rule, _ = ProductPropertiesRule.objects.get_or_create(
                 multi_tenant_company=multi_tenant_company,
                 product_type=prop_select_value
             )

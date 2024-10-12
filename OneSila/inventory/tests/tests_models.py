@@ -68,7 +68,7 @@ class InventoryTestCase(TestCaseDemoDataMixin, InventoryTestCaseMixin, TestCase)
                 quantity=quantity)
         inv_qty_ori = inv.quantity
 
-        with self.assertRaises(IntegrityError):
+        with self.assertRaises(ValidationError):
             InventoryMovement.objects.create(
                 multi_tenant_company=self.multi_tenant_company,
                 movement_from=inv,

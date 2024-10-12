@@ -80,8 +80,7 @@ class BundleQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
 
             collected_ids.update(new_ids)
 
-            # Recursively fetch components for each new variation
-            for variation in Product.objects.get(id__in=new_ids).iterator():
+            for variation in Product.objects.filter(id__in=new_ids).iterator():
                 if variation.is_bundle() or variation.is_manufacturable():
                     fetch_items_components(variation, collected_ids)
 

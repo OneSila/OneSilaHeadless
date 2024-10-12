@@ -13,9 +13,5 @@ class Migration(migrations.Migration):
         migrations.RemoveField(
             model_name='magentosaleschannel',
             name='always_use_configurable_name',
-        ),
-        migrations.RemoveField(
-            model_name='magentosaleschannel',
-            name='sync_contents',
-        ),
+        )
     ]

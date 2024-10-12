@@ -13,7 +13,7 @@ class InventoryMutationTestCase(TestCaseWithDemoData, TransactionTestCaseMixin, 
         supplier_prod = SupplierProduct.objects.filter(multi_tenant_company=self.multi_tenant_company).last()
 
         loc = InventoryLocation.objects.filter(multi_tenant_company=self.multi_tenant_company).first()
-        loc_bis = InventoryLocation.objects.filter(multi_tenant_company=self.multi_tenant_company).last()
+        loc_bis = InventoryLocation.objects.filter(multi_tenant_company=self.multi_tenant_company, precise=False).last()
 
         self.assertTrue(loc is not None)
         self.assertTrue(loc_bis is not None)
@@ -38,5 +38,6 @@ class InventoryMutationTestCase(TestCaseWithDemoData, TransactionTestCaseMixin, 
                 }
             }
         )
+
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)

@@ -158,8 +158,7 @@ class Migration(migrations.Migration):
                 ('host_api_username', models.CharField(blank=True, max_length=256, null=True)),
                 ('host_api_key', models.CharField(max_length=256)),
                 ('authentication_method', models.CharField(choices=[('TOK', 'Token Only'), ('PAS', 'Username / Password')], max_length=3)),
-                ('always_use_configurable_name', models.BooleanField(default=False, verbose_name='Always use Configurable name over child')),
-                ('sync_contents', models.BooleanField(default=False, verbose_name='Sync Contents')),
+                ('always_use_configurable_name', models.BooleanField(default=False, verbose_name='Always use Configurable name over child'))
             ],
             options={
                 'verbose_name': 'Magento Sales Channel',

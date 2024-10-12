@@ -832,7 +832,7 @@ class InspectorBlockMissingPropertiesTest(TestCase):
         )
 
         # Step 3: Create the ProductPropertiesRule for the product type
-        self.product_properties_rule = ProductPropertiesRule.objects.create(
+        self.product_properties_rule, _ = ProductPropertiesRule.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             product_type=self.product_type_value,
         )
@@ -844,7 +844,7 @@ class InspectorBlockMissingPropertiesTest(TestCase):
             internal_name="color"
         )
 
-        self.color_rule_item = ProductPropertiesRuleItem.objects.create(
+        self.color_rule_itemm, _ = ProductPropertiesRuleItem.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             rule=self.product_properties_rule,
             property=self.color_property,
@@ -858,7 +858,7 @@ class InspectorBlockMissingPropertiesTest(TestCase):
             internal_name="size"
         )
 
-        self.size_rule_item = ProductPropertiesRuleItem.objects.create(
+        self.size_rule_item, _ = ProductPropertiesRuleItem.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             rule=self.product_properties_rule,
             property=self.size_property,
@@ -1604,7 +1604,7 @@ class InspectorBlockNonConfigurableRuleTest(TestCase):
         )
 
         # Step 3: Create the first ProductPropertiesRule with REQUIRED color property
-        self.first_product_properties_rule = ProductPropertiesRule.objects.create(
+        self.first_product_properties_rule, _ = ProductPropertiesRule.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             product_type=self.product_type_value,
         )
@@ -1615,7 +1615,7 @@ class InspectorBlockNonConfigurableRuleTest(TestCase):
             internal_name="color"
         )
 
-        self.first_color_rule_item = ProductPropertiesRuleItem.objects.create(
+        self.first_color_rule_item, _ = ProductPropertiesRuleItem.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             rule=self.first_product_properties_rule,
             property=self.color_property,
@@ -1623,12 +1623,12 @@ class InspectorBlockNonConfigurableRuleTest(TestCase):
         )
 
         # Step 4: Create the second ProductPropertiesRule with REQUIRED_IN_CONFIGURATOR color property
-        self.second_product_properties_rule = ProductPropertiesRule.objects.create(
+        self.second_product_properties_rule, _ = ProductPropertiesRule.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             product_type=self.product_type_value_two,
         )
 
-        self.second_color_rule_item = ProductPropertiesRuleItem.objects.create(
+        self.second_color_rule_item, _ = ProductPropertiesRuleItem.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             rule=self.second_product_properties_rule,
             property=self.color_property,
@@ -1689,7 +1689,7 @@ class InspectorBlockDuplicateVariationsTest(TestCase):
         )
 
         # Step 3: Create the ProductPropertiesRule with REQUIRED_IN_CONFIGURATOR color property
-        self.product_properties_rule = ProductPropertiesRule.objects.create(
+        self.product_properties_rule, _ = ProductPropertiesRule.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             product_type=self.product_type_value,
         )
@@ -1700,7 +1700,7 @@ class InspectorBlockDuplicateVariationsTest(TestCase):
             internal_name="color"
         )
 
-        self.color_rule_item = ProductPropertiesRuleItem.objects.create(
+        self.color_rule_item, _ = ProductPropertiesRuleItem.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             rule=self.product_properties_rule,
             property=self.color_property,
