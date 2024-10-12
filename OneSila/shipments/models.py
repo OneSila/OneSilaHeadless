@@ -89,6 +89,7 @@ class ShipmentItemToShip(models.Model):
     quantity = models.IntegerField()
     shipment = models.ForeignKey(Shipment, on_delete=models.PROTECT)
     orderitem = models.ForeignKey('orders.OrderItem', on_delete=models.PROTECT)
+    inventorylocation = models.ForeignKey('inventory.InventoryLocation', on_delete=models.PROTECT)
 
 
 class Package(models.SetStatusMixin, models.Model):

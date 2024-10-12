@@ -1,9 +1,9 @@
-from core.documents.views import DocumentViev
+from core.documents.views import DocumentView
 from core.views import EmptyTemplateView
 from .models import Package, PackageItem, Shipment, ShipmentItem, ShipmentItemToShip
 
 
-class ShipmentPickingListFileViev(DocumentViev):
+class ShipmentPickingListFileView(DocumentView):
     model = Shipment
 
 

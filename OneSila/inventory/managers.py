@@ -45,7 +45,7 @@ class InventoryQuerySet(MultiTenantQuerySet):
 
     def determine_picking_locations(self, product, shipping_address, quantity) -> dict:
         """
-        Find the locations with the quantity untill you run out of quanity.
+        Find the locations with the quantity until you run out of quantity.
         Used for picking goods.
 
         Returns a dict

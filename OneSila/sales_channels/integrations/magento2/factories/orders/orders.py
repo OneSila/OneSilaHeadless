@@ -273,6 +273,7 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
         base_subtotal = remote_data.base_subtotal
         base_subtotal_incl_tax = remote_data.base_subtotal_incl_tax
         price_incl_vat = base_subtotal == base_subtotal_incl_tax
+        created_at_dt = datetime.strptime(remote_data.created_at, '%Y-%m-%d %H:%M:%S')
 
         # Extract order reference from remote data
         reference = remote_data.increment_id
@@ -301,6 +302,9 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
             status=self.MAGENTO_TO_LOCAL_STATUS_MAPPING.get(remote_data.status, Order.DRAFT),
             multi_tenant_company=self.multi_tenant_company,
         )
+
+        # we need to set the created_at like this to bypass theauto_now_add
+        Order.objects.filter(pk=local_order.pk).update(created_at=created_at_dt)
 
         return local_order
 

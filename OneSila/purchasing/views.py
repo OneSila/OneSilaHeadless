@@ -1,4 +1,4 @@
-from core.documents.views import DocumentViev
+from core.documents.views import DocumentView
 from core.views import EmptyTemplateView
 from .models import PurchaseOrder, PurchaseOrderItem
 
@@ -11,7 +11,7 @@ class PurchaseOrderDetailViev(EmptyTemplateView):
     pass
 
 
-class PurchaseOrderConfirmationFileViev(DocumentViev):
+class PurchaseOrderConfirmationFileView(DocumentView):
     model = PurchaseOrder
 
 

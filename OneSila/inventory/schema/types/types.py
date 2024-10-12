@@ -1,7 +1,6 @@
 from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, auto
-from core.models import Model
-
-from typing import List, Optional, Self
+import strawberry
+from typing import Optional
 
 from inventory.models import Inventory, InventoryLocation, InventoryMovement
 from products.schema.types.types import ProductType
@@ -43,3 +42,8 @@ class InventoryMovementType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def movement_from(self, info) -> PurchaseOrderType | InventoryLocationType | OrderReturnType:
         return self.movement_from
+
+@strawberry.type
+class PickingLocationType:
+    location: InventoryLocationType
+    quantity: int

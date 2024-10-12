@@ -163,6 +163,7 @@ class ShipmentForOrderItemFactory(ShipOrderSanityCheckMixin):
             multi_tenant_company=self.multi_tenant_company,
             product=product,
             quantity=quantity,
+            inventorylocation=inv.inventorylocation,
             orderitem=self.orderitem)
         self.shipmentitems.append(shipmentitem)
 

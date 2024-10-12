@@ -1,12 +1,7 @@
 from django.db.models import *
 from django.db.models import Model as OldModel
-from django.utils.translation import gettext_lazy as _
-from django.conf import settings
-
 from dirtyfields import DirtyFieldsMixin
-
-from core.validators import phone_regex
-from core.models.multi_tenant import MultiTenantCompany, MultiTenantAwareMixin
+from core.models.multi_tenant import MultiTenantAwareMixin
 
 import logging
 logger = logging.getLogger(__name__)

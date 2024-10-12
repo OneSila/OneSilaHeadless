@@ -50,7 +50,7 @@ def shipments__shipment__signals(sender, instance, **kwargs):
     elif instance.is_todo():
         signals.append(todo)
     elif instance.is_in_progress():
-        signals.in_progress()
+        signals.append(in_progress)
     elif instance.is_done():
         signals.append(done)
     elif instance.is_cancelled():

@@ -1,9 +1,9 @@
-from core.documents.views import DocumentViev
+from core.documents.views import DocumentView
 from core.views import EmptyTemplateView
 from .models import Order, OrderItem, OrderNote
 
 
-class OrderConfirmationFileViev(DocumentViev):
+class OrderConfirmationFileView(DocumentView):
     model = Order
 
 

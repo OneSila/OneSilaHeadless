@@ -5,7 +5,7 @@ from .views import PackageListView, PackageDetailViev, PackageUpdateView, \
     ShipmentDetailViev, ShipmentUpdateView, ShipmentDeleteView, ShipmentItemListView, \
     ShipmentItemDetailViev, ShipmentItemUpdateView, ShipmentItemDeleteView, \
     ShipmentItemToShipListView, ShipmentItemToShipDetailViev, \
-    ShipmentItemToShipUpdateView, ShipmentItemToShipDeleteView, ShipmentPickingListFileViev
+    ShipmentItemToShipUpdateView, ShipmentItemToShipDeleteView, ShipmentPickingListFileView
 
 app_name = 'shipments'
 
@@ -20,7 +20,7 @@ urlpatterns = [
     path('package-items/<str:pk>/delete/', PackageItemDeleteView.as_view(), name='package_item_delete'),
     path('shipments/', ShipmentListView.as_view(), name='shipments_list'),
     path('shipments/<str:pk>/', ShipmentDetailViev.as_view(), name='shipment_detail'),
-    path('shipments/<str:pk>/pickinglist/', ShipmentPickingListFileViev.as_view(), name='shipment_pickinglist'),
+    path('shipments/<str:pk>/pickinglist/', ShipmentPickingListFileView.as_view(), name='shipment_pickinglist'),
     path('shipments/<str:pk>/update/', ShipmentUpdateView.as_view(), name='shipment_update'),
     path('shipments/<str:pk>/delete/', ShipmentDeleteView.as_view(), name='shipment_delete'),
     path('shipment-items/', ShipmentItemListView.as_view(), name='shipment_items_list'),
