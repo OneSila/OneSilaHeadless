@@ -21,7 +21,10 @@ def fetch_and_determine_picking_locations(db_id):
         product, shipping_address, item.quantity
     )
 
-    return picking_locations
+    return [
+        PickingLocationType(location=location.inventorylocation, quantity=quantity)
+        for location, quantity in picking_locations.items()
+    ]
 
 
 async def get_picking_locations(info, item_to_ship_id: strawberry.ID) -> List[PickingLocationType]:
@@ -32,10 +35,7 @@ async def get_picking_locations(info, item_to_ship_id: strawberry.ID) -> List[Pi
     picking_locations = await fetch_and_determine_picking_locations(db_id)
 
     # Convert the dictionary of locations and quantities to PickingLocationType
-    return [
-        PickingLocationType(location=location.inventorylocation, quantity=quantity)
-        for location, quantity in picking_locations.items()
-    ]
+    return picking_locations
 
 
 
