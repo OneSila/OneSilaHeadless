@@ -800,6 +800,7 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory):
             logger.debug(f"Preflight check failed for {self.sales_channel}.")
             return
 
+        self.set_api()
         log_identifier = self.get_identifier()
 
         self.set_type()
