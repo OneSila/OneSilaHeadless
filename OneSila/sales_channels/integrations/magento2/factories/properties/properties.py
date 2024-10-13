@@ -454,6 +454,7 @@ class MagentoAttributeSetCreateFactory(GetMagentoAPIMixin, RemoteInstanceCreateF
 
 class MagentoAttributeSetUpdateFactory(GetMagentoAPIMixin, RemoteInstanceUpdateFactory, EnsureMagentoAttributeSetAttributesMixin):
     remote_model_class = MagentoAttributeSet
+    create_factory_class = MagentoAttributeSetCreateFactory
     field_mapping = {
         'product_type__value': 'attribute_set_name'
     }
