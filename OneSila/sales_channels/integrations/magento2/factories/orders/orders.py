@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from django.utils import timezone
 from magento.models import Order as MagentoApiOrder
 from contacts.languages import LANGUAGE_TO_CUSTOMER_CONVERTOR
 from contacts.models import Customer, ShippingAddress, InvoiceAddress, Address
@@ -42,11 +43,13 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
         with a fallback to the `sync_orders_after` date if it is more recent.
         """
         # Calculate since_date from since_hours_ago
-        calculated_since_date = datetime.now() - timedelta(hours=self.since_hours_ago)
+        calculated_since_date = timezone.now() - timedelta(hours=self.since_hours_ago)
+
+        sync_orders_after = self.sales_channel.sync_orders_after
 
         # Use sync_orders_after as a fallback if it is more recent than calculated_since_date
-        if self.sales_channel.sync_orders_after and self.sales_channel.sync_orders_after > calculated_since_date:
-            since_date = self.sales_channel.sync_orders_after
+        if sync_orders_after and sync_orders_after > calculated_since_date:
+            since_date = sync_orders_after
         else:
             since_date = calculated_since_date
 
