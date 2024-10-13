@@ -5,7 +5,7 @@ from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIM
 from sales_channels.integrations.magento2.factories.products.images import MagentoMediaProductThroughCreateFactory, MagentoMediaProductThroughUpdateFactory, \
     MagentoMediaProductThroughDeleteFactory
 from sales_channels.integrations.magento2.factories.properties.properties import MagentoProductPropertyCreateFactory, MagentoProductPropertyUpdateFactory, \
-    MagentoProductPropertyDeleteFactory
+    MagentoProductPropertyDeleteFactory, MagentoAttributeSetCreateFactory
 from sales_channels.integrations.magento2.models import MagentoProduct, MagentoInventory, MagentoPrice, MagentoProductContent, \
     MagentoProductProperty
 from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet
@@ -137,7 +137,15 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
 
 
     def customize_payload(self):
-        attribute_set = MagentoAttributeSet.objects.get(local_instance=self.rule, sales_channel=self.sales_channel)
+        try:
+            attribute_set = MagentoAttributeSet.objects.get(local_instance=self.rule, sales_channel=self.sales_channel)
+        except MagentoAttributeSet.DoesNotExist:
+            fac = MagentoAttributeSetCreateFactory(sales_channel=self.sales_channel, local_instance=self.rule)
+            fac.run()
+
+            attribute_set = fac.remote_instance
+
+
         self.payload['attribute_set_id'] = attribute_set.remote_id
 
     def perform_remote_action(self):
