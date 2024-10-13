@@ -470,10 +470,9 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
         return billing_address
 
     def change_status_after_process(self, remote_data, local_order):
-        """
-        Changes the status of the local order after processing.
-        """
-        pass
+        local_order.status = Order.PENDING_PROCESSING
+        local_order.save()
+
 
 class MagentoChangeRemoteOrderStatus(GetMagentoAPIMixin, ChangeRemoteOrderStatus):
 

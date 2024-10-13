@@ -38,7 +38,7 @@ class Currency(models.Model):
     objects = CurrencyManager()
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.multi_tenant_company})"
 
     def save(self, *args, **kwargs):
         has_changed_exchange_rate = False
