@@ -1,4 +1,5 @@
-from huey.contrib.djhuey import db_task
+from huey import crontab
+from huey.contrib.djhuey import db_task, periodic_task
 from core.huey import HIGH_PRIORITY, LOW_PRIORITY, MEDIUM_PRIORITY, CRUCIAL_PRIORITY
 from products.models import Product
 from properties.models import Property, PropertySelectValue, ProductPropertiesRule
@@ -559,3 +560,10 @@ def delete_magento_product_db_task(task_queue_item_id, sales_channel_id, remote_
         factory.run()
 
     task.execute(actual_task)
+
+
+@periodic_task(crontab(minute="*"))
+def magento_pull_remote_orders_db_task():
+    from .flows.puill_orders import pull_magento_orders_flow
+
+    pull_magento_orders_flow()

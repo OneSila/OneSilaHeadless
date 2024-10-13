@@ -81,6 +81,7 @@ def sales_channels_process_remote_tasks_queue():
         for task_queue_item in pending_tasks:
             task_queue_item.dispatch()
 
+
 @periodic_task(crontab(hour=0, minute=0))
 def clean_up_processed_tasks():
     deleted_count, _ = RemoteTaskQueue.objects.filter(status=RemoteTaskQueue.PROCESSED).delete()
