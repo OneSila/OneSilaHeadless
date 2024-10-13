@@ -19,7 +19,7 @@ class MagentoSalesChannelAdmin(admin.ModelAdmin):
             'fields': ('hostname', 'active', 'verify_ssl', 'authentication_method', 'host_api_username', 'host_api_key', 'multi_tenant_company')
         }),
         ('Magento Settings', {
-            'fields': ('use_configurable_name', 'sync_contents')
+            'fields': ('use_configurable_name', 'sync_contents', 'sync_orders_after', 'requests_per_minute')
         }),
     )
 
