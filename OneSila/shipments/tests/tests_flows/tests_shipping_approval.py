@@ -24,6 +24,8 @@ class InventoryChangeTriggerFlowTestCase(CreateTestOrderMixin, TestCaseDemoDataM
         supplier_product = product.supplier_products.last()
         order_qty = 15
         order = self.create_test_order('test_prepare_shipment', product, order_qty)
+        # We manually set the order to AWAIT INVENTORY to test the 2nd part of the flow.
+        # call it a shortcut.
         Order.objects.filter(id=order.id).update(status=order.AWAIT_INVENTORY)
         order.refresh_from_db()
         location = InventoryLocation.objects.get(multi_tenant_company=self.multi_tenant_company,
