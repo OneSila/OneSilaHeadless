@@ -2,9 +2,20 @@ from django.db.models import *
 from django.db.models import Model as OldModel
 from dirtyfields import DirtyFieldsMixin
 from core.models.multi_tenant import MultiTenantAwareMixin
+from strawberry.relay import to_base64
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+class GlobalIDMixin(OldModel):
+    @property
+    def global_id(self):
+        type_name = f"{self.__class__.__name__}Type"
+        return to_base64(type_name, self.id)
+
+    class Meta:
+        abstract = True
 
 
 class OnlySaveOnChangeMixin(DirtyFieldsMixin, OldModel):
@@ -35,7 +46,7 @@ class TimeStampMixin(OldModel):
         abstract = True
 
 
-class Model(OnlySaveOnChangeMixin, TimeStampMixin, MultiTenantAwareMixin, OldModel):
+class Model(GlobalIDMixin, OnlySaveOnChangeMixin, TimeStampMixin, MultiTenantAwareMixin, OldModel):
     class Meta:
         abstract = True
 
@@ -51,6 +62,6 @@ class SetStatusMixin(Model):
         abstract = True
 
 
-class SharedModel(TimeStampMixin, OldModel):
+class SharedModel(GlobalIDMixin, TimeStampMixin, OldModel):
     class Meta:
         abstract = True

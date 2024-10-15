@@ -46,6 +46,10 @@ class PurchaseOrder(models.Model):
         filename = f"{self.reference()}.pdf"
         return filename, printer.pdf
 
+    def print_url(self):
+        from django.urls import reverse_lazy
+        return reverse_lazy('purchasing:purchase_order_confirmation_file', kwargs={'pk': self.global_id})
+
     def is_draft(self):
         return self.status == self.DRAFT
 

@@ -23,17 +23,24 @@ class ShipmentType(relay.Node, GetQuerysetMultiTenantMixin):
     def reference(self) -> str | None:
         return self.reference
 
+    @field()
+    def print_url(self) -> str | None:
+        return self.print_url()
+
+
 @type(Package, filters=PackageFilter, order=PackageOrder, pagination=True, fields='__all__')
 class PackageType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     packageitem_set: List[Annotated['PackageItemType', lazy("shipments.schema.types.types")]]
     shipment: ShipmentType
 
+
 @type(PackageItem, filters=PackageItemFilter, order=PackageItemOrder, pagination=True, fields='__all__')
 class PackageItemType(relay.Node, GetQuerysetMultiTenantMixin):
     multi_tenant_company: MultiTenantCompanyType | None
     product: ProductType
     package: PackageType
+
 
 @type(ShipmentItem, filters=ShipmentItemFilter, order=ShipmentItemOrder, pagination=True, fields='__all__')
 class ShipmentItemType(relay.Node, GetQuerysetMultiTenantMixin):
