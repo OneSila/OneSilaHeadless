@@ -15,6 +15,7 @@ SIMPLE_BLACK_FABRIC_NAME = 'Black Fabric'
 SUPPLIER_BLACK_TIGER_FABRIC = '1911'
 
 DROPSHIP_PRODUCT_VISCONTI_SKU = 'DR-2029'
+DROPSHIP_PRODUCT_JAMES_SKU = 'DR-20292123'
 
 BUNDLE_PEN_AND_INK_SKU = "B-PAI-2"
 SIMPLE_PEN_SKU = 'S-P-1291'
@@ -22,6 +23,7 @@ SIMPLE_INK_SKU = 'S-I-391'
 SUPPLIER_PEN_SKU_ONE = 'SUPP-PA-191'
 SUPPLIER_PEN_SKU_TWO = 'SUPP-PA-192'
 SUPPLIER_INK_SKU = 'SUPP-I-291'
+SUPPLIER_JAMES_SKU = 'ADADF-ADFA223'
 
 SUPPLIER_VISCONTI_SKU_ONE = 'SUPP-PA-292'
 SUPPLIER_VISCONTI_SKU_TWO = 'SUPP-PA-293'
@@ -115,6 +117,17 @@ class DropshopProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin
                 },
                 'post_data': {
                     'name': "Fountain Pen Visconti",
+                },
+            },
+            {
+                'instance_data': {
+                    'sku': DROPSHIP_PRODUCT_JAMES_SKU,
+                    'active': True,
+                    'for_sale': True,
+                    'vat_rate': self.get_vat_rate(),
+                },
+                'post_data': {
+                    'name': "James Dean Cup",
                 },
             },
         ]
@@ -215,6 +228,22 @@ class SupplierProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin
                 'post_data': {
                     'name': 'Visconti Fountain pen black',
                     'base_products_skus': [DROPSHIP_PRODUCT_VISCONTI_SKU],
+                    'price_info': {
+                        'quantity': 3,
+                        'unit_price': 399,
+                        'unit': self.get_unit(UNIT_PIECE),
+                    }
+                },
+            },
+            {
+                'instance_data': {
+                    'sku': SUPPLIER_JAMES_SKU,
+                    'active': True,
+                    'supplier': self.get_supplier(PEN_SUPPLIER_NAME_ONE),
+                },
+                'post_data': {
+                    'name': 'James Dean Cup',
+                    'base_products_skus': [DROPSHIP_PRODUCT_JAMES_SKU],
                     'price_info': {
                         'quantity': 3,
                         'unit_price': 399,
