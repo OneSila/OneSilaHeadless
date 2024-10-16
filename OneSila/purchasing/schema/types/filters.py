@@ -28,5 +28,6 @@ class PurchaseOrderFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
 class PurchaseOrderItemFilter(SearchFilterMixin):
     search: str | None
     id: auto
+    quantity: auto
     purchase_order: PurchaseOrderFilter | None
     product: SupplierProductFilter | None

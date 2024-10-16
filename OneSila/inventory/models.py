@@ -1,4 +1,5 @@
 from django.db import IntegrityError
+from django.db.models import Sum
 from django.utils.translation import gettext_lazy as _
 from core import models
 from .managers import InventoryManager, InventoryLocationManager
@@ -137,6 +138,49 @@ class InventoryMovement(models.Model):
     def __str__(self):
         return self.name
 
+    def validate_quantity(self):
+        from order_returns.models import OrderReturnItem
+
+        if self.quantity <= 0:
+            raise ValidationError(_("Quantity must be greater than zero."))
+
+        mf_class = self.mf_content_type.model_class()
+
+        if mf_class == InventoryLocation:
+            inventory_location = self.movement_from
+
+            try:
+                inventory = Inventory.objects.get(inventorylocation=inventory_location, product=self.product)
+            except Inventory.DoesNotExist:
+                raise ValidationError(_("No inventory available for the product at the selected location."))
+
+            # Ensure the quantity to move does not exceed the available quantity in advance (it will break later if not)
+            if self.quantity > inventory.quantity:
+                raise ValidationError(_("Cannot move more than available quantity from this location. ""Maximum available quantity is %(max_quantity)s.")
+                                      % {'max_quantity': inventory.quantity})
+        elif mf_class == OrderReturn:
+
+            # @TODO: When we start working on returns check if that is correct
+            order_return = self.movement_from
+            ori_qs = OrderReturnItem.objects.filter(
+                orderreturn=order_return,
+                product=self.product
+            )
+            if not ori_qs.exists():
+                raise ValidationError(_("No Order Return Item found for this product in the selected Order Return."))
+
+            total_returned_quantity = ori_qs.aggregate(total=Sum('quantity'))['total'] or 0
+
+            # Calculate total quantity already moved from this OrderReturn and product
+            total_moved_quantity = InventoryMovement.objects.filter(
+                mf_content_type=self.mf_content_type,
+                mf_object_id=self.mf_object_id,
+                product=self.product
+            ).exclude(pk=self.pk).aggregate(total=Sum('quantity'))['total'] or 0
+
+            if (total_moved_quantity + self.quantity) > total_returned_quantity:
+                raise ValidationError(_("Cannot move more than the returned quantity from this Order Return."))
+
     def save(self, *args, **kwargs):
         mf_class = self.mf_content_type.model_class()
         if mf_class not in self.MOVEMENT_FROM_MODELS:
@@ -167,6 +211,8 @@ class InventoryMovement(models.Model):
 
             if other_product_inventories.exists():
                 raise ValidationError(_("Cannot move this product into the selected location because it already contains a different product."))
+
+        self.validate_quantity()
 
         super().save(*args, **kwargs)
 

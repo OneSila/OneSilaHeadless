@@ -14,7 +14,7 @@ class MultiTenantUserAdmin(BaseUserAdmin):
         (_('Profile info'), {'fields': ('language', 'avatar', 'mobile_number', 'whatsapp_number', 'telegram_number', 'timezone')}),
         (_('Permissions'), {
             'fields': (
-                'is_active', 'is_staff', 'is_superuser', 'invitation_accepted', 'is_multi_tenant_company_owner',
+                'is_active', 'is_staff', 'is_superuser', 'invitation_accepted', 'is_multi_tenant_company_owner', 'onboarding_status',
                 'groups', 'user_permissions'
             ),
         }),
