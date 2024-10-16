@@ -32,6 +32,10 @@ class PurchaseOrderType(relay.Node, GetQuerysetMultiTenantMixin):
         except Exception:
             return None
 
+    @field()
+    def print_url(self) -> str | None:
+        return self.print_url()
+
 
 @type(PurchaseOrderItem, filters=PurchaseOrderItemFilter, order=PurchaseOrderItemOrder, pagination=True, fields="__all__")
 class PurchaseOrderItemType(relay.Node, GetQuerysetMultiTenantMixin):

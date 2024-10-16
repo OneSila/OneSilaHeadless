@@ -25,6 +25,6 @@ class PickingListDocumentTestCase(CreateTestOrderMixin, TestCaseDemoDataMixin, T
 
         logger.debug(F"File generated: {filepath}")
 
-        url = reverse("shipments:shipment_pickinglist", kwargs={'pk': shipment.id})
+        url = shipment.print_url()
         resp = self.client.get(url)
         self.assertTrue(resp.status_code, 200)

@@ -50,6 +50,10 @@ class Shipment(models.SetStatusMixin, models.Model):
         filename = f"{self.reference}.pdf"
         return filename, printer.pdf
 
+    def print_url(self):
+        from django.urls import reverse_lazy
+        return reverse_lazy('shipments:shipment_pickinglist', kwargs={'pk': self.global_id})
+
     def set_status_todo(self):
         self.set_status(self.TODO)
 

@@ -16,6 +16,6 @@ class TestPrepareShipmentFactoryTestCase(TestCaseDemoDataMixin, TestCase):
         filepath = save_test_file(filename, pdf)
         logger.debug(f'Store test pdf here: {filepath}')
 
-        url = reverse('purchasing:purchase_order_confirmation_file', kwargs={'pk': po.id})
+        url = po.print_url()
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, 200)
