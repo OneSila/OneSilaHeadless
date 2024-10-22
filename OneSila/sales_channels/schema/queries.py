@@ -1,6 +1,5 @@
 from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, type, field
-from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteTaskQueue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
-from .types.types import ImportCurrencyType, ImportImageType, ImportProcessType, ImportProductType, ImportPropertyType, ImportPropertySelectValueType, ImportVatType, RemoteCategoryType, RemoteCurrencyType, RemoteCustomerType, RemoteImageType, RemoteImageProductAssociationType, RemoteInventoryType, RemoteLogType, RemoteOrderType, RemotePriceType, RemoteProductType, RemoteProductContentType, RemoteProductPropertyType, RemotePropertyType, RemotePropertySelectValueType, RemoteTaskQueueType, RemoteVatType, SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, SalesChannelViewAssignType
+from .types.types import ImportProcessType, RemoteLogType, RemoteProductType, SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, SalesChannelViewAssignType
 
 
 @type(name='Query')
@@ -13,9 +12,6 @@ class SalesChannelsQuery:
 
     remote_product: RemoteProductType = node()
     remote_products: ListConnectionWithTotalCount[RemoteProductType] = connection()
-
-    remote_task_queue: RemoteTaskQueueType = node()
-    remote_task_queues: ListConnectionWithTotalCount[RemoteTaskQueueType] = connection()
 
     sales_channel: SalesChannelType = node()
     sales_channels: ListConnectionWithTotalCount[SalesChannelType] = connection()

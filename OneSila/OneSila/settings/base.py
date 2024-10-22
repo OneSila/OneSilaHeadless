@@ -38,6 +38,8 @@ INSTALLED_LOCAL_APPS = [
     # so not alphabetic order, but order according to dependency.
     'core',
 
+    'accounting',
+    'accounting.integrations.quickbooks',
     'contacts',
     'currencies',
     'taxes',
@@ -51,6 +53,7 @@ INSTALLED_LOCAL_APPS = [
     'lead_times',
     'media',
     'notifications',
+    'integrations',
     'inventory',
     'sales_channels',
     'sales_channels.integrations.magento2',

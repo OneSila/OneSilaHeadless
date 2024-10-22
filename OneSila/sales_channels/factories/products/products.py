@@ -1,7 +1,7 @@
 from media.models import MediaProductThrough, Media
 from products.models import Product
 from properties.models import ProductProperty
-from sales_channels.factories.mixins import RemoteInstanceOperationMixin, RemoteInstanceDeleteFactory
+from sales_channels.factories.mixins import IntegrationInstanceOperationMixin, RemoteInstanceDeleteFactory
 import logging
 
 from sales_channels.models import RemoteLog, SalesChannel, RemoteImageProductAssociation
@@ -10,7 +10,7 @@ from sales_channels.models.sales_channels import RemoteLanguage, SalesChannelVie
 
 logger = logging.getLogger(__name__)
 
-class RemoteProductSyncFactory(RemoteInstanceOperationMixin):
+class RemoteProductSyncFactory(IntegrationInstanceOperationMixin):
     remote_model_class = None  # This should be set in subclasses
 
     remote_image_assign_create_factory = None

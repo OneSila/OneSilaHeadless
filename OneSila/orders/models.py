@@ -59,6 +59,9 @@ class Order(models.SetStatusMixin, models.Model):
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=DRAFT)
     reason_for_sale = models.CharField(max_length=10, choices=REASON_CHOICES, default=SALE)
 
+    internal_company = models.ForeignKey('contacts.Company', on_delete=models.PROTECT, related_name='vendor_orders')
+    source = models.ForeignKey('integrations.Integration', on_delete=models.PROTECT, null=True,  blank=True) # we can have manual orders
+
     objects = OrderManager()
 
     @property
@@ -184,12 +187,13 @@ class OrderItem(models.Model):
     def __str__(self):
         return '{} x {} : {}'.format(self.product.sku, self.quantity, self.order)
 
+    @property
     def subtotal(self):
         return round(self.quantity * self.price, 2)
 
     def subtotal_string(self):
         currency_symbol = self.order.currency.symbol
-        subtotal = self.subtotal()
+        subtotal = self.subtotal
         return f"{currency_symbol} {subtotal}"
 
     def qty_on_stock(self):

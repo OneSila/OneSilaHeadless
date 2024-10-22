@@ -1,7 +1,8 @@
+from integrations.models import Integration
 from orders.models import Order
-from sales_channels.factories.mixins import PullRemoteInstanceMixin, RemoteInstanceOperationMixin
+from sales_channels.factories.mixins import PullRemoteInstanceMixin, IntegrationInstanceOperationMixin
 from sales_channels.models import RemoteLog
-from sales_channels.signals import remote_instance_post_update, remote_instance_pre_update
+from integrations.signals import remote_instance_post_update, remote_instance_pre_update
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,16 @@ class RemoteOrderPullFactory(PullRemoteInstanceMixin):
     allow_create = True
     allow_update = False
     allow_delete = False
+
+
+    def get_order_default_fields(self):
+        """Retrieve the fields with the values common to create all the orders"""
+        return {
+            'multi_tenant_company': self.sales_channel.multi_tenant_company,
+            'source': self.sales_channel.integration_ptr,
+            'internal_company': self.sales_channel.internal_company,
+        }
+
 
     def get_or_create_local_customer(self, remote_data):
         """
@@ -111,10 +122,10 @@ class RemoteOrderPullFactory(PullRemoteInstanceMixin):
         raise NotImplementedError("Subclasses must implement change_status_after_process")
 
 
-class ChangeRemoteOrderStatus(RemoteInstanceOperationMixin):
+class ChangeRemoteOrderStatus(IntegrationInstanceOperationMixin):
     """
     Factory to change the status of a remote order based on the local order status.
-    Uses RemoteInstanceOperationMixin for shared operations.
+    Uses IntegrationInstanceOperationMixin for shared operations.
     """
     # Define remote status parameters at the class level
     REMOTE_TO_SHIP_STATUS = None  # To be set with the equivalent remote status for 'TO_SHIP'
@@ -218,7 +229,7 @@ class ChangeRemoteOrderStatus(RemoteInstanceOperationMixin):
         pass
 
 
-class SyncCancelledOrdersFactory(RemoteInstanceOperationMixin):
+class SyncCancelledOrdersFactory(IntegrationInstanceOperationMixin):
     """
     Factory to sync canceled orders from the remote system to the local system.
     """

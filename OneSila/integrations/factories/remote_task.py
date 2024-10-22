@@ -1,6 +1,6 @@
 import logging
 import traceback
-from sales_channels.models.sales_channels import RemoteTaskQueue
+from integrations.models import IntegrationTaskQueue
 
 logger = logging.getLogger(__name__)
 
@@ -11,12 +11,12 @@ class BaseRemoteTask:
 
     def get_task_queue_item(self):
         try:
-            return RemoteTaskQueue.objects.get(id=self.task_queue_item_id)
-        except RemoteTaskQueue.DoesNotExist:
-            error_message = f"RemoteTaskQueue item with ID {self.task_queue_item_id} does not exist."
+            return IntegrationTaskQueue.objects.get(id=self.task_queue_item_id)
+        except IntegrationTaskQueue.DoesNotExist:
+            error_message = f"IntegrationTaskQueue item with ID {self.task_queue_item_id} does not exist."
             logger.error(error_message)
             # Raise an exception to ensure this critical error is caught and handled
-            raise RemoteTaskQueue.DoesNotExist(error_message)
+            raise IntegrationTaskQueue.DoesNotExist(error_message)
 
     def execute(self, task_func, *args, **kwargs):
         """Executes the provided task function and handles success or failure."""
