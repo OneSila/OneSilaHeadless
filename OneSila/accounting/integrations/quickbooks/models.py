@@ -68,7 +68,10 @@ class QuickbooksCustomer(AccountingMirrorCustomer):
 
 
 class QuickbooksVat(AccountingMirrorVat):
-    """
-    QuickBooks-specific implementation of a AccountingMirrorVat.
-    """
-    pass
+    remote_name = models.CharField(max_length=255, null=True, blank=True, help_text="Name of the tax code in QuickBooks")
+    tax_rate_id = models.CharField(max_length=255, null=True, blank=True, help_text="ID of the TaxRate in QuickBooks")
+    tax_rate_name = models.CharField(max_length=255, null=True, blank=True, help_text="Name of the TaxRate in QuickBooks")
+    rate_value = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Rate percentage of the TaxRate")
+
+    def __str__(self):
+        return f"QuickbooksVat(remote_name={self.remote_name}, local_instance={self.local_instance})"

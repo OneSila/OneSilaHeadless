@@ -14,7 +14,7 @@ class VatRate(models.Model):
     rate = models.IntegerField(help_text=_("VAT rate in percent.  Eg 21 for 21%"))
 
     def __str__(self):
-        return f"{self.name} ({self.rate}%)"
+        return f"{self.name} ({self.rate}%) @ {self.multi_tenant_company}"
 
     class Meta:
         verbose_name = 'VAT Rate'

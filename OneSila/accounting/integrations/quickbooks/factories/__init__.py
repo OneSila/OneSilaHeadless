@@ -1,2 +1,3 @@
 from .mixins import GetQuickbooksAPIMixin, GetOrCreateQuickbooksCustomerMixin, GetCreateOrUpdateItemMixin
 from .account import QuickbooksAccountAuthorizationFactory
+from .vat import QuickbooksVatPullFactory
