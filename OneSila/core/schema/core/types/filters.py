@@ -1,54 +1,54 @@
 from typing import Optional
 
+from asgiref.sync import sync_to_async
+from channels.db import database_sync_to_async
+from django.db.models import Q
 from strawberry_django.filters import filter as strawberry_filter
-# from strawberry_django import filter_field
+from strawberry_django import filter_field as custom_filter
 from strawberry import UNSET
 from strawberry import LazyType as lazy
 from core.managers import QuerySet
 
 
-# class SearchFilterMixin:
-#     search: str | None
-
-#     # def filter_search(self, queryset) -> str | None:
-#     #     if self.search not in (None, UNSET):
-#     #         queryset = queryset.search(self.search)
-
-#     #     return queryset
-
-#     @filter_field()
-#     def search(self, queryset: QuerySet, value: str, prefix: str) -> tuple:
-#         # Docs: https://strawberry.rocks/docs/django/guide/filters
-#         # FIXME: New style filter Not working.....
-#         return queryset.search(value)
-
-
 class SearchFilterMixin:
-    search: str | None
 
-    def filter_search(self, queryset) -> str | None:
-        if self.search not in (None, UNSET):
-            queryset = queryset.search(self.search)
+    @custom_filter
+    def search(
+        self,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
 
-        return queryset
+        if value not in (None, UNSET):
+            queryset = queryset.search(value)
+
+        return queryset, Q()
 
 
 class ExcluideDemoDataFilterMixin:
-    exclude_demo_data: Optional[bool]
 
-    def filter_exclude_demo_data(self, queryset):
-        from django.contrib.contenttypes.models import ContentType
-        from core.models import DemoDataRelation
+    @custom_filter
+    def exclude_demo_data(
+        self,
+        queryset: QuerySet,
+        value: bool,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
 
-        if self.exclude_demo_data:
+        if value:
+            from django.contrib.contenttypes.models import ContentType
+            from core.models import DemoDataRelation
+
             supplier_content_type = ContentType.objects.get_for_model(queryset.model)
             queryset = queryset.exclude(
                 id__in=DemoDataRelation.objects.filter(
                     content_type=supplier_content_type
-                ).values('object_id')
+                ).values("object_id")
             )
 
-        return queryset
+        return queryset, Q()
+
 
 
 def filter(*args, lookups=True, **kwargs):

@@ -133,7 +133,6 @@ def generate_filters(app_name, models):
         filter_type = [
             f"@filter({model})",
             f"class {model}Filter(SearchFilterMixin):",
-            f"    search: str | None",
             "",
             "",
         ]

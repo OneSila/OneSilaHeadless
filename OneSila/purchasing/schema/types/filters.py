@@ -12,7 +12,6 @@ from contacts.schema.types.filters import SupplierFilter, InvoiceAddressFilter, 
 
 @filter(PurchaseOrder)
 class PurchaseOrderFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
-    search: str | None
     id: auto
     status: auto
     supplier: SupplierFilter | None
@@ -26,7 +25,6 @@ class PurchaseOrderFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
 
 @filter(PurchaseOrderItem)
 class PurchaseOrderItemFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     quantity: auto
     purchase_order: PurchaseOrderFilter | None

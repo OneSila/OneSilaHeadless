@@ -9,134 +9,131 @@ from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, Im
 
 @filter(ImportCurrency)
 class ImportCurrencyFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(ImportImage)
 class ImportImageFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(ImportProcess)
 class ImportProcessFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(ImportProduct)
 class ImportProductFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(ImportProperty)
 class ImportPropertyFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(ImportPropertySelectValue)
 class ImportPropertySelectValueFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(ImportVat)
 class ImportVatFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemoteCategory)
 class RemoteCategoryFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemoteCurrency)
 class RemoteCurrencyFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemoteCustomer)
 class RemoteCustomerFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemoteImage)
 class RemoteImageFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemoteImageProductAssociation)
 class RemoteImageProductAssociationFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemoteInventory)
 class RemoteInventoryFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemoteLog)
 class RemoteLogFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemoteOrder)
 class RemoteOrderFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemotePrice)
 class RemotePriceFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemoteProduct)
 class RemoteProductFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemoteProductContent)
 class RemoteProductContentFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemoteProductProperty)
 class RemoteProductPropertyFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemoteProperty)
 class RemotePropertyFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemotePropertySelectValue)
 class RemotePropertySelectValueFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(RemoteVat)
 class RemoteVatFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(SalesChannel)
 class SalesChannelFilter(SearchFilterMixin):
-    search: str | None
+    pass
 
 
 @filter(SalesChannelIntegrationPricelist)
 class SalesChannelIntegrationPricelistFilter(SearchFilterMixin):
-    search: str | None
     id: auto
 
 
 @filter(SalesChannelView)
 class SalesChannelViewFilter(SearchFilterMixin):
-    search: str | None
     id: auto
 
 
 @filter(SalesChannelViewAssign)
 class SalesChannelViewAssignFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     sales_channel_view: Optional[SalesChannelViewFilter]

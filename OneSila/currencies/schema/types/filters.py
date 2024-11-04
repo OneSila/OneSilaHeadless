@@ -6,7 +6,6 @@ from currencies.models import Currency
 
 @filter(Currency)
 class CurrencyFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     iso_code: auto
     is_default_currency: auto

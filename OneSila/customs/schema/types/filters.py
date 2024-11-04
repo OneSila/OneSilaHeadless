@@ -7,7 +7,6 @@ from products.schema.types.filters import ProductFilter
 
 @filter(HsCode)
 class HsCodeFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     code: auto
     name: auto

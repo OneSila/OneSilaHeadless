@@ -6,6 +6,5 @@ from units.models import Unit
 
 @filter(Unit)
 class UnitFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     name: auto

@@ -6,7 +6,6 @@ from taxes.models import VatRate
 
 @filter(VatRate)
 class VatRateFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     name: auto
     rate: auto

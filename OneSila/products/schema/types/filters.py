@@ -11,7 +11,6 @@ from taxes.schema.types.filters import VatRateFilter
 
 @filter(Product)
 class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
-    search: str | None
     id: auto
     sku: auto
     type: auto
@@ -23,7 +22,6 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
 
 @filter(BundleProduct)
 class BundleProductFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     sku: auto
     vat_rate: Optional[VatRateFilter]
@@ -31,7 +29,6 @@ class BundleProductFilter(SearchFilterMixin):
 
 @filter(ConfigurableProduct)
 class ConfigurableProductFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     sku: auto
     vat_rate: Optional[VatRateFilter]
@@ -39,7 +36,6 @@ class ConfigurableProductFilter(SearchFilterMixin):
 
 @filter(SimpleProduct)
 class SimpleProductFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     sku: auto
     vat_rate: Optional[VatRateFilter]
@@ -66,7 +62,6 @@ class BundleVariationFilter:
 
 @filter(ManufacturableProduct)
 class ManufacturableProductFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     sku: auto
     vat_rate: Optional[VatRateFilter]
@@ -74,7 +69,6 @@ class ManufacturableProductFilter(SearchFilterMixin):
 
 @filter(DropshipProduct)
 class DropshipProductFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     sku: auto
     vat_rate: Optional[VatRateFilter]
@@ -82,7 +76,6 @@ class DropshipProductFilter(SearchFilterMixin):
 
 @filter(SupplierProduct)
 class SupplierProductFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     sku: auto
     supplier: Optional[SupplierFilter]
@@ -97,5 +90,4 @@ class BillOfMaterialFilter:
 
 @filter(SupplierPrices)
 class SupplierPricesFilter(SearchFilterMixin):
-    search: str | None
     supplier_product: Optional[SupplierProductFilter]

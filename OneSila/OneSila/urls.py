@@ -43,7 +43,6 @@ urlpatterns = [
         AsyncGraphQLView.as_view(
             schema=schema,
             graphiql=settings.DEBUG,
-            subscriptions_enabled=True
         ),
         name='graphql',
     ),

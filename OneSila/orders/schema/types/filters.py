@@ -11,7 +11,6 @@ from products.schema.types.filters import ProductFilter
 
 @filter(Order)
 class OrderFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
-    search: str | None
     exclude_demo_data: Optional[bool]
     id: auto
     reference: auto
@@ -26,7 +25,6 @@ class OrderFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
 
 @filter(OrderItem)
 class OrderItemFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     order: OrderFilter | None
     product: ProductFilter | None
@@ -34,6 +32,5 @@ class OrderItemFilter(SearchFilterMixin):
 
 @filter(OrderNote)
 class OrderNoteFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     order: OrderFilter | None

@@ -21,3 +21,15 @@ query simpleProducts($search: String!) {
   }
 }
 """
+
+PRODUCT_EXCLUDE_DEMO_DATA = """
+query simpleProducts($excludeDemoData: Boolean!) {
+  simpleProducts(filters:{excludeDemoData:$excludeDemoData}) {
+    edges {
+      node {
+        id
+      }
+    }
+  }
+}
+"""

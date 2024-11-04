@@ -6,11 +6,10 @@ from order_returns.models import OrderReturn, OrderReturnItem
 
 @filter(OrderReturn)
 class OrderReturnFilter(SearchFilterMixin):
-    search: str | None
     status: auto
     received_on: auto
 
 
 @filter(OrderReturnItem)
 class OrderReturnItemFilter(SearchFilterMixin):
-    search: str | None
+    pass

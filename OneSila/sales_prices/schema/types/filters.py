@@ -10,7 +10,6 @@ from currencies.schema.types.filters import CurrencyFilter
 
 @filter(SalesPrice)
 class SalesPriceFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     product: ProductFilter | None
     currency: CurrencyFilter | None
@@ -18,7 +17,6 @@ class SalesPriceFilter(SearchFilterMixin):
 
 @filter(SalesPriceList)
 class SalesPriceListFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     name: auto
     currency: Optional[CurrencyFilter]
@@ -33,7 +31,6 @@ class SalesPriceListFilter(SearchFilterMixin):
 
 @filter(SalesPriceListItem)
 class SalesPriceListItemFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     salespricelist: SalesPriceListFilter | None
     product: ProductFilter | None

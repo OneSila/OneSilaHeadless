@@ -11,7 +11,6 @@ from products.schema.types.filters import ProductFilter
 
 @filter(Property)
 class PropertyFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     is_public_information: auto
     is_product_type: auto
@@ -20,7 +19,6 @@ class PropertyFilter(SearchFilterMixin):
 
 @filter(PropertySelectValue)
 class PropertySelectValueFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     property: Optional[PropertyFilter]
 
@@ -34,7 +32,6 @@ class PropertySelectValueTranslationFilter:
 
 @filter(ProductProperty)
 class ProductPropertyFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     product: Optional[ProductFilter]
     property: Optional[PropertyFilter]
@@ -63,7 +60,6 @@ class ProductPropertyTextTranslationFilter:
 class ProductPropertiesRuleFilter:
     id: auto
     product_type: Optional[PropertyFilter]
-    search: str | None
 
 
 @filter(ProductPropertiesRuleItem)

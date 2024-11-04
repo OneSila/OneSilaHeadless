@@ -7,19 +7,16 @@ from products.schema.types.filters import ProductFilter
 
 @filter(LeadTime)
 class LeadTimeFilter(SearchFilterMixin):
-    search: str | None
     id: auto
 
 
 @filter(LeadTimeForShippingAddress)
 class LeadTimeForShippingAddressFilter(SearchFilterMixin):
-    search: str | None
     leadtime: LeadTimeFilter | None
     shippingaddress: ShippingAddressFilter | None
 
 
 @filter(LeadTimeProductOutOfStock)
 class LeadTimeProductOutOfStockFilter(SearchFilterMixin):
-    search: str | None
     leadtime_outofstock: LeadTimeFilter | None
     product: ProductFilter | None

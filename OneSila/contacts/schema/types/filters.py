@@ -8,7 +8,6 @@ from contacts.models import Company, Address, Person, Supplier, \
 
 @filter(Company)
 class CompanyFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     name: auto
     language: auto
@@ -21,7 +20,6 @@ class CompanyFilter(SearchFilterMixin):
 
 @filter(Supplier)
 class SupplierFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
-    search: str | None
     id: auto
     name: auto
     exclude_demo_data: Optional[bool]
@@ -29,7 +27,6 @@ class SupplierFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
 
 @filter(Customer)
 class CustomerFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
-    search: str | None
     id: auto
     name: auto
     exclude_demo_data: Optional[bool]
@@ -38,7 +35,6 @@ class CustomerFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
 @filter(Person)
 class PersonFilter(SearchFilterMixin):
     id: auto
-    search: str | None
     active: auto
     first_name: auto
     last_name: auto
@@ -49,7 +45,6 @@ class PersonFilter(SearchFilterMixin):
 @filter(Address)
 class AddressFilter(SearchFilterMixin):
     id: auto
-    search: str | None
     company: CompanyFilter | None
     is_invoice_address: auto
     is_shipping_address: auto
@@ -58,19 +53,16 @@ class AddressFilter(SearchFilterMixin):
 @filter(InvoiceAddress)
 class InvoiceAddressFilter(SearchFilterMixin):
     id: auto
-    search: str | None
     company: CompanyFilter | None
 
 
 @filter(ShippingAddress)
 class ShippingAddressFilter(SearchFilterMixin):
     id: auto
-    search: str | None
     company: CompanyFilter | None
 
 
 @filter(InventoryShippingAddress)
 class InventoryShippingAddressFilter(SearchFilterMixin):
     id: auto
-    search: str | None
     company: CompanyFilter | None
