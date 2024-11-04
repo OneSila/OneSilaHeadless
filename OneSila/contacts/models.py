@@ -191,6 +191,7 @@ class Address(models.Model):
         if self.address2:
             address_parts.append(self.address2)
         if self.address3:
+
             address_parts.append(self.address3)
 
         address_parts.extend([self.city, self.postcode, self.get_country_display()])
