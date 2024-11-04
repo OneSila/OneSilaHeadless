@@ -70,7 +70,7 @@ class DocumentCreateFactoryMixin:
             cnt = Invoice.objects.filter(sales_order__internal_company=self.internal_company).count() + 1
         else:
             prefix = 'CRN'
-            cnt = CreditNote.objects.filter(order_return__sales_order__internal_company=self.internal_company).count() + 1
+            cnt = CreditNote.objects.filter(order_return__order__internal_company=self.internal_company).count() + 1
 
         return f"{prefix}-{str(cnt).zfill(7)}"
 

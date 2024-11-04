@@ -6,8 +6,8 @@ from integrations.models import IntegrationObjectMixin
 class DocumentBase(models.Model):
     # 1. Document Identification
     document_number = models.CharField(max_length=100)
-    order_number = models.CharField(max_length=100)
     document_date = models.DateField()
+    order_number = models.CharField(max_length=100, blank=True, null=True)
 
     # 2. Parties Involved (preserved fields)
     # Vendor Details
