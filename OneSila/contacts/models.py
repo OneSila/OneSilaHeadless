@@ -108,8 +108,6 @@ class InternalCompany(Company):
     Your own invoicing addresses, used for purchasing and selling
     """
 
-    # TODO: When a new 'MultiTenantCompany' is created and completed. This model should be created
-    # with that information as well.
     objects = InternalCompanyManager()
     proxy_filter_fields = {'is_internal_company': True}
 

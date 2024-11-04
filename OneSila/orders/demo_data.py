@@ -1,7 +1,7 @@
 from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator, \
     PrivateStructuredDataGenerator
 from currencies.models import Currency
-from contacts.models import Customer
+from contacts.models import Customer, InternalCompany
 from orders.models import Order, OrderItem
 from contacts.models import Customer, InvoiceAddress, ShippingAddress
 from products.models import Product
@@ -30,6 +30,16 @@ class SalesOrderGenerator(PrivateStructuredDataGenerator):
     def get_currency(self, customer_name):
         return self.get_customer(customer_name).get_currency()
 
+    def get_internal_company(self):
+        try:
+            internal_company = InternalCompany.objects.get(multi_tenant_company=self.multi_tenant_company)
+        except InternalCompany.DoesNotExist:
+            internal_company = InternalCompany.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                name='Internal Company')
+
+        return internal_company
+
     def get_structure(self):
         return [
             {
@@ -40,6 +50,7 @@ class SalesOrderGenerator(PrivateStructuredDataGenerator):
                     'invoice_address': InvoiceAddress.objects.get(company=self.get_customer(CUSTOMER_B2B), multi_tenant_company=self.multi_tenant_company),
                     'shipping_address': ShippingAddress.objects.get(company=self.get_customer(CUSTOMER_B2B), multi_tenant_company=self.multi_tenant_company),
                     'created_at': self.get_created_at(),
+                    'internal_company': self.get_internal_company(),
                 },
                 'post_data': {
                     'orderitem_set': [

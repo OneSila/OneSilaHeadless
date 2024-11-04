@@ -1,7 +1,7 @@
 from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial, List
 
-from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteTaskQueue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
+from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
 
 
 @input(ImportCurrency, fields="__all__")
@@ -191,15 +191,6 @@ class RemotePropertySelectValueInput:
 
 @partial(RemotePropertySelectValue, fields="__all__")
 class RemotePropertySelectValuePartialInput(NodeInput):
-    pass
-
-@input(RemoteTaskQueue, fields="__all__")
-class RemoteTaskQueueInput:
-    pass
-
-
-@partial(RemoteTaskQueue, fields="__all__")
-class RemoteTaskQueuePartialInput(NodeInput):
     pass
 
 @input(RemoteVat, fields="__all__")

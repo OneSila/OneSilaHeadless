@@ -2,9 +2,9 @@ from core.schema.core.types.types import type, relay, field
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from products.schema.types.types import ProductType
 
-from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteTaskQueue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
-from .filters import ImportCurrencyFilter, ImportImageFilter, ImportProcessFilter, ImportProductFilter, ImportPropertyFilter, ImportPropertySelectValueFilter, ImportVatFilter, RemoteCategoryFilter, RemoteCurrencyFilter, RemoteCustomerFilter, RemoteImageFilter, RemoteImageProductAssociationFilter, RemoteInventoryFilter, RemoteLogFilter, RemoteOrderFilter, RemotePriceFilter, RemoteProductFilter, RemoteProductContentFilter, RemoteProductPropertyFilter, RemotePropertyFilter, RemotePropertySelectValueFilter, RemoteTaskQueueFilter, RemoteVatFilter, SalesChannelFilter, SalesChannelIntegrationPricelistFilter, SalesChannelViewFilter, SalesChannelViewAssignFilter
-from .ordering import ImportCurrencyOrder, ImportImageOrder, ImportProcessOrder, ImportProductOrder, ImportPropertyOrder, ImportPropertySelectValueOrder, ImportVatOrder, RemoteCategoryOrder, RemoteCurrencyOrder, RemoteCustomerOrder, RemoteImageOrder, RemoteImageProductAssociationOrder, RemoteInventoryOrder, RemoteLogOrder, RemoteOrderOrder, RemotePriceOrder, RemoteProductOrder, RemoteProductContentOrder, RemoteProductPropertyOrder, RemotePropertyOrder, RemotePropertySelectValueOrder, RemoteTaskQueueOrder, RemoteVatOrder, SalesChannelOrder, SalesChannelIntegrationPricelistOrder, SalesChannelViewOrder, SalesChannelViewAssignOrder
+from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
+from .filters import ImportCurrencyFilter, ImportImageFilter, ImportProcessFilter, ImportProductFilter, ImportPropertyFilter, ImportPropertySelectValueFilter, ImportVatFilter, RemoteCategoryFilter, RemoteCurrencyFilter, RemoteCustomerFilter, RemoteImageFilter, RemoteImageProductAssociationFilter, RemoteInventoryFilter, RemoteLogFilter, RemoteOrderFilter, RemotePriceFilter, RemoteProductFilter, RemoteProductContentFilter, RemoteProductPropertyFilter, RemotePropertyFilter, RemotePropertySelectValueFilter, RemoteVatFilter, SalesChannelFilter, SalesChannelIntegrationPricelistFilter, SalesChannelViewFilter, SalesChannelViewAssignFilter
+from .ordering import ImportCurrencyOrder, ImportImageOrder, ImportProcessOrder, ImportProductOrder, ImportPropertyOrder, ImportPropertySelectValueOrder, ImportVatOrder, RemoteCategoryOrder, RemoteCurrencyOrder, RemoteCustomerOrder, RemoteImageOrder, RemoteImageProductAssociationOrder, RemoteInventoryOrder, RemoteLogOrder, RemoteOrderOrder, RemotePriceOrder, RemoteProductOrder, RemoteProductContentOrder, RemoteProductPropertyOrder, RemotePropertyOrder, RemotePropertySelectValueOrder, RemoteVatOrder, SalesChannelOrder, SalesChannelIntegrationPricelistOrder, SalesChannelViewOrder, SalesChannelViewAssignOrder
 
 @type(SalesChannel, filters=SalesChannelFilter, order=SalesChannelOrder, pagination=True, fields='__all__')
 class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
@@ -112,11 +112,6 @@ class RemotePropertyType(relay.Node, GetQuerysetMultiTenantMixin):
 
 @type(RemotePropertySelectValue, filters=RemotePropertySelectValueFilter, order=RemotePropertySelectValueOrder, pagination=True, fields='__all__')
 class RemotePropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
-    sales_channel: SalesChannelType
-
-
-@type(RemoteTaskQueue, filters=RemoteTaskQueueFilter, order=RemoteTaskQueueOrder, pagination=True, fields='__all__')
-class RemoteTaskQueueType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
 
 

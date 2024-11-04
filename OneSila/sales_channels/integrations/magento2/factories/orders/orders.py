@@ -295,6 +295,7 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
 
         # Create the order if not found
         local_order = Order.objects.create(
+            **self.get_order_default_fields(),
             reference=reference,
             customer=local_customer,
             invoice_address=invoice_address,
@@ -303,7 +304,6 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
             price_incl_vat=price_incl_vat,
             reason_for_sale=Order.SALE,
             status=self.MAGENTO_TO_LOCAL_STATUS_MAPPING.get(remote_data.status, Order.DRAFT),
-            multi_tenant_company=self.multi_tenant_company,
         )
 
         # we need to set the created_at like this to bypass theauto_now_add

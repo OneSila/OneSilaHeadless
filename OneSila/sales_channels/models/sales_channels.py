@@ -5,6 +5,7 @@ from polymorphic.models import PolymorphicModel
 from django.conf import settings
 from core.helpers import get_languages
 from core.huey import DEFAULT_PRIORITY
+from integrations.models import Integration
 from sales_channels.models.mixins import RemoteObjectMixin
 from django.utils.timezone import now
 
@@ -12,26 +13,21 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class SalesChannel(PolymorphicModel, models.Model):
+class SalesChannel(Integration, models.Model):
     """
     Polymorphic model representing a sales channel, such as a website or marketplace.
     """
 
-    hostname = models.URLField()
-    active = models.BooleanField(default=True)
-    verify_ssl = models.BooleanField(default=True)
-    requests_per_minute = models.IntegerField(default=60)
     use_configurable_name = models.BooleanField(default=False,verbose_name=_('Always use Configurable name over child'))
     sync_contents = models.BooleanField(default=True, verbose_name=_('Sync Contents'))
     sync_orders_after = models.DateTimeField(null=True, blank=True, verbose_name=_('Sync Orders After Date'))
 
     class Meta:
-        unique_together = ('multi_tenant_company', 'hostname')
         verbose_name = 'Sales Channel'
         verbose_name_plural = 'Sales Channels'
 
     def __str__(self):
-        return self.hostname
+        return f"{self.hostname } @ {self.multi_tenant_company}"
 
 class SalesChannelIntegrationPricelist(models.Model):
     """
@@ -124,137 +120,3 @@ class RemoteLanguage(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     def __str__(self):
         return f"Remote language {self.local_instance} (Remote code: {self.remote_code}) on {self.sales_channel.hostname}"
-
-class RemoteTaskQueue(models.Model):
-    PENDING = 'PENDING'
-    PROCESSING = 'PROCESSING'
-    PROCESSED = 'PROCESSED'
-    FAILED = 'FAILED'  # New status
-    STATUS_CHOICES = [
-        (PENDING, 'Pending'),
-        (PROCESSING, 'Processing'),
-        (PROCESSED, 'Processed'),
-        (FAILED, 'Failed'),  # New status choice
-    ]
-
-    sales_channel = models.ForeignKey(SalesChannel, null=True, blank=True, on_delete=models.SET_NULL)
-    task_name = models.CharField(max_length=255)
-    task_args = models.JSONField(null=True, blank=True)
-    task_kwargs = models.JSONField(null=True, blank=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=PENDING)
-    sent_to_queue_at = models.DateTimeField(default=now)
-    retry = models.IntegerField(default=0)
-    error_message = models.TextField(null=True, blank=True)
-    error_traceback = models.TextField(null=True, blank=True)
-    error_history = models.JSONField(default=dict, blank=True)
-    number_of_remote_requests = models.IntegerField(default=1) # how many remote requests does this task do?
-    priority = models.IntegerField(default=DEFAULT_PRIORITY)
-
-    @property
-    def name(self):
-        """Extracts the simplified task name from the task path."""
-        return self.task_name.split('.')[-1]
-
-    def __str__(self):
-        hostname = self.sales_channel.hostname if self.sales_channel else "N/A"
-        return f"{self.name} > {hostname}"
-
-    @classmethod
-    def get_pending_tasks(cls, sales_channel):
-        # Sum the number of remote requests for currently processing tasks
-        processing_requests = cls.objects.filter(
-            sales_channel=sales_channel,
-            status=cls.PROCESSING
-        ).aggregate(total=models.Sum('number_of_remote_requests'))['total'] or 0
-
-        # Calculate the number of requests that can still be processed
-        remaining_requests = sales_channel.requests_per_minute - processing_requests
-
-        if remaining_requests > 0:
-            # Get pending tasks, ordered by priority (high first) then by sent_to_queue_at
-            pending_tasks = cls.objects.filter(
-                sales_channel=sales_channel,
-                status=cls.PENDING
-            ).order_by('-priority', 'sent_to_queue_at')
-
-            # Select tasks until the sum of their remote requests fits the remaining capacity
-            selected_tasks = []
-            total_requests = 0
-
-            for task in pending_tasks:
-                task_requests = task.number_of_remote_requests
-
-                # if a task is bigger than the limit just add it. It will keep the queue full until is finished but at least will be processed
-                if task_requests > sales_channel.requests_per_minute:
-                    task.status = cls.PROCESSING
-                    selected_tasks.append(task)
-                    break
-
-                if total_requests + task_requests <= remaining_requests:
-                    task.status = cls.PROCESSING
-                    selected_tasks.append(task)
-                    total_requests += task_requests
-                else:
-                    break
-
-            if selected_tasks:
-                cls.objects.bulk_update(selected_tasks, ['status'])
-            return selected_tasks
-
-        return []
-
-    def mark_as_processed(self):
-        self.status = self.PROCESSED
-        self.save()
-
-    def mark_as_failed(self, error_message=None, error_traceback=None):
-        self.retry += 1
-        if self.retry < 3:
-            self.status = self.PENDING
-            self.sent_to_queue_at = now()
-        else:
-            self.status = self.FAILED
-
-        next_key = str(len(self.error_history))
-
-        error_entry = {
-            'retry': self.retry,
-            'message': error_message,
-            'traceback': error_traceback,
-            'timestamp': str(now()),
-        }
-        self.error_history[next_key] = error_entry
-
-        self.error_message = error_message
-        self.error_traceback = error_traceback
-
-        self.save()
-
-    def dispatch(self):
-        from sales_channels.helpers import resolve_function
-
-        if self.status != self.PROCESSING:
-            raise ValidationError("Cannot dispatch not proccessing tasks.")
-
-        task_func = resolve_function(self.task_name)
-
-        if task_func:
-            logger.info(f"Dispatching task '{self.task_name}' for SalesChannel '{self.sales_channel.hostname}'.")
-            # Pass task_queue_item_id, sales_channel_id, and relevant args to the task
-            return task_func(
-                self.id,
-                *self.task_args,
-                **self.task_kwargs
-            )
-        else:
-            logger.error(f"Task '{self.task_name}' not found.")
-
-    def retry_task(self, retry_now=False):
-        self.retry = 0
-
-        self.status = self.PROCESSING if retry_now else self.PENDING
-        self.sent_to_queue_at = now()
-        self.save()
-
-        if retry_now:
-            self.dispatch()

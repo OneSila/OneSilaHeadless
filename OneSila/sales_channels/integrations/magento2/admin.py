@@ -1,4 +1,6 @@
 from django.contrib import admin
+from polymorphic.admin import PolymorphicChildModelAdmin
+
 from .models import MagentoSalesChannel, MagentoProperty, MagentoPropertySelectValue, MagentoSalesChannelView, MagentoOrder, MagentoCustomer, MagentoOrderItem, \
     MagentoProduct, MagentoProductProperty, MagentoImageProductAssociation, MagentoProductContent
 from .models.properties import MagentoAttributeSet, MagentoAttributeSetAttribute
@@ -6,9 +8,9 @@ from .models.sales_channels import MagentoRemoteLanguage
 from .models.taxes import MagentoCurrency
 from ...models import SalesChannelViewAssign
 
-
 @admin.register(MagentoSalesChannel)
-class MagentoSalesChannelAdmin(admin.ModelAdmin):
+class MagentoSalesChannelAdmin(PolymorphicChildModelAdmin):
+    base_model = MagentoSalesChannel
     list_display = ('hostname', 'authentication_method', 'active')
     list_filter = ('active', 'authentication_method')
     search_fields = ('hostname', 'host_api_username')

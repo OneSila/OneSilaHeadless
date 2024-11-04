@@ -7,4 +7,4 @@ class Magento2Config(AppConfig):
     label = 'magento2'
 
     def ready(self):
-            from . import receivers
+        from . import receivers

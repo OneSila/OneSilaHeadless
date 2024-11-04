@@ -12,9 +12,7 @@ class PrintOrder(OneSilaBaseDocument):
         self.invoicing_address = order.invoice_address
         # FIXME: This should be dynamic from the order itself, but there is no
         # support as of yet.
-        self.seller = InternalCompany.objects.\
-            filter(multi_tenant_company=self.multi_tenant_company).\
-            first()
+        self.seller = order.internal_company
         self.seller_address = InvoiceAddress.objects.\
             get(
                 company=self.seller,

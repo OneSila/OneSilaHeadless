@@ -1,10 +1,10 @@
 from huey import crontab
 from huey.contrib.djhuey import db_task, periodic_task
-from core.huey import HIGH_PRIORITY, LOW_PRIORITY, MEDIUM_PRIORITY, CRUCIAL_PRIORITY
+from core.huey import HIGH_PRIORITY, LOW_PRIORITY, MEDIUM_PRIORITY
 from products.models import Product
 from properties.models import Property, PropertySelectValue, ProductPropertiesRule
 from sales_channels.decorators import remote_task
-from sales_channels.factories.remote_task import BaseRemoteTask
+from integrations.factories.remote_task import BaseRemoteTask
 from sales_channels.integrations.magento2.factories.properties.properties import MagentoPropertyUpdateFactory
 from sales_channels.integrations.magento2.helpers import run_generic_magento_factory, run_remote_product_dependent_magento_factory
 from sales_channels.integrations.magento2.models import MagentoSalesChannel, MagentoProduct

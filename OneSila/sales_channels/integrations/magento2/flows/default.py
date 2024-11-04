@@ -1,7 +1,7 @@
 from sales_channels.integrations.magento2.models import MagentoSalesChannel
 from sales_channels.models import RemoteProduct
-from sales_channels.tasks import add_task_to_queue
-from sales_channels.helpers import get_import_path
+from integrations.tasks import add_task_to_queue
+from integrations.helpers import get_import_path
 
 
 def run_generic_magento_task_flow(task_func, multi_tenant_company, number_of_remote_requests=None, sales_channels_filter_kwargs=None, **kwargs):
@@ -28,7 +28,7 @@ def run_generic_magento_task_flow(task_func, multi_tenant_company, number_of_rem
         }
 
         add_task_to_queue(
-            sales_channel_id=sales_channel.id,
+            integration_id=sales_channel.id,
             task_func_path=get_import_path(task_func),
             task_kwargs=task_kwargs,
             number_of_remote_requests=number_of_remote_requests
@@ -75,7 +75,7 @@ def run_product_specific_magento_task_flow(
             }
 
             add_task_to_queue(
-                sales_channel_id=sales_channel.id,
+                integration_id=sales_channel.id,
                 task_func_path=get_import_path(task_func),
                 task_kwargs=task_kwargs,
                 number_of_remote_requests=number_of_remote_requests
@@ -109,7 +109,7 @@ def run_delete_generic_magento_task_flow(task_func, local_instance_id, remote_cl
             }
 
             add_task_to_queue(
-                sales_channel_id=sales_channel.id,
+                integration_id=sales_channel.id,
                 task_func_path=get_import_path(task_func),
                 task_kwargs=task_kwargs,
                 number_of_remote_requests=number_of_remote_requests
@@ -164,7 +164,7 @@ def run_delete_product_specific_generic_magento_task_flow(
                     }
 
                     add_task_to_queue(
-                        sales_channel_id=sales_channel.id,
+                        integration_id=sales_channel.id,
                         task_func_path=get_import_path(task_func),
                         task_kwargs=task_kwargs,
                         number_of_remote_requests=number_of_remote_requests,
