@@ -12,6 +12,7 @@ class LeadTimeFilter(SearchFilterMixin):
 
 @filter(LeadTimeForShippingAddress)
 class LeadTimeForShippingAddressFilter(SearchFilterMixin):
+    id: auto
     leadtime: LeadTimeFilter | None
     shippingaddress: ShippingAddressFilter | None
 
