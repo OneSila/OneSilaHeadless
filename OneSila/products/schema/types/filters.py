@@ -22,7 +22,6 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     for_sale: auto
     vat_rate: Optional[VatRateFilter]
     inspector: Optional[lazy['InspectorFilter', "products_inspector.schema.types.filters"]]
-    exclude_demo_data: Optional[bool]
 
     @custom_filter
     def inspector_not_succefully_code_error(

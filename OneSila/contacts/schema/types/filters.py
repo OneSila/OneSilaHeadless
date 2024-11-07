@@ -8,7 +8,6 @@ from contacts.models import Company, Address, Person, Supplier, \
 
 @filter(Company)
 class CompanyFilter(SearchFilterMixin):
-    search: str | None
     id: auto
     name: auto
     language: auto
@@ -23,15 +22,11 @@ class CompanyFilter(SearchFilterMixin):
 class SupplierFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     name: auto
-    exclude_demo_data: Optional[bool]
-
 
 @filter(Customer)
 class CustomerFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     name: auto
-    exclude_demo_data: Optional[bool]
-
 
 @filter(Person)
 class PersonFilter(SearchFilterMixin):

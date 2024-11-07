@@ -11,7 +11,6 @@ from products.schema.types.filters import ProductFilter
 
 @filter(Order)
 class OrderFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
-    exclude_demo_data: Optional[bool]
     id: auto
     reference: auto
     customer: CustomerFilter | None

@@ -9,8 +9,20 @@ from strawberry import UNSET
 from strawberry import LazyType as lazy
 from core.managers import QuerySet
 
+class AnnotationMergerMixin:
 
-class SearchFilterMixin:
+    # this will merge type annotations like
+    # search: Optional[str] from subclass to the main class so we don't need to declare it in every filter
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        annotations = {}
+        for base in reversed(cls.__bases__):
+            annotations.update(getattr(base, '__annotations__', {}))
+        annotations.update(cls.__annotations__)
+        cls.__annotations__ = annotations
+
+class SearchFilterMixin(AnnotationMergerMixin):
+    search: Optional[str]
 
     @custom_filter
     def search(
@@ -26,7 +38,8 @@ class SearchFilterMixin:
         return queryset, Q()
 
 
-class ExcluideDemoDataFilterMixin:
+class ExcluideDemoDataFilterMixin(AnnotationMergerMixin):
+    exclude_demo_data: Optional[bool]
 
     @custom_filter
     def exclude_demo_data(
@@ -48,7 +61,6 @@ class ExcluideDemoDataFilterMixin:
             )
 
         return queryset, Q()
-
 
 
 def filter(*args, lookups=True, **kwargs):

@@ -20,8 +20,6 @@ class PurchaseOrderFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     invoice_address: InvoiceAddressFilter | None
     shipping_address: ShippingAddressFilter | None
     purchaseorderitem: Optional[lazy['PurchaseOrderItemFilter', "purchasing.schema.types.filters"]]
-    exclude_demo_data: Optional[bool]
-
 
 @filter(PurchaseOrderItem)
 class PurchaseOrderItemFilter(SearchFilterMixin):

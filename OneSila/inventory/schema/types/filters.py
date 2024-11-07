@@ -10,7 +10,6 @@ from contacts.schema.types.filters import InventoryShippingAddressFilter
 
 @filter(InventoryLocation)
 class InventoryLocationFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
-    exclude_demo_data: Optional[bool]
     id: auto
     name: auto
     shippingaddress: Optional[InventoryShippingAddressFilter]
@@ -19,7 +18,6 @@ class InventoryLocationFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
 
 @filter(Inventory)
 class InventoryFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
-    exclude_demo_data: Optional[bool]
     id: auto
     quantity: auto
     inventorylocation: InventoryLocationFilter | None
