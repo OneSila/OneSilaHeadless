@@ -8,6 +8,7 @@ from contacts.models import Company, Address, Person, Supplier, \
 
 @filter(Company)
 class CompanyFilter(SearchFilterMixin):
+    search: str | None
     id: auto
     name: auto
     language: auto
