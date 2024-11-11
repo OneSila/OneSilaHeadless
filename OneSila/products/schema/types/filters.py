@@ -20,6 +20,7 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     sku: auto
     type: auto
     for_sale: auto
+    active: auto
     vat_rate: Optional[VatRateFilter]
     inspector: Optional[lazy['InspectorFilter', "products_inspector.schema.types.filters"]]
 
