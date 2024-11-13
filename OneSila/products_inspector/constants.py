@@ -148,11 +148,11 @@ missing_supplier_products_block = {
 
 missing_ean_code_block = {
     'error_code': MISSING_EAN_CODE_ERROR,
-    'simple_product_applicability': REQUIRED,
+    'simple_product_applicability': OPTIONAL,
     'configurable_product_applicability': NONE,
-    'manufacturable_product_applicability': REQUIRED,
-    'bundle_product_applicability': REQUIRED,
-    'dropship_product_applicability': REQUIRED,
+    'manufacturable_product_applicability': OPTIONAL,
+    'bundle_product_applicability': OPTIONAL,
+    'dropship_product_applicability': OPTIONAL,
     'supplier_product_applicability': NONE,
 }
 
