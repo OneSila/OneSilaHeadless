@@ -1,4 +1,4 @@
-from products.models import DropshipProduct, SupplierPrices
+from products.models import DropshipProduct, SupplierPrice
 from purchasing.models import PurchaseOrder
 from contacts.models import InternalCompany
 from core.exceptions import SanityCheckError
@@ -39,7 +39,7 @@ class BuyDropShippingProductsFactory:
             all_supplierproducts = orderitem.product.deflate_simple()
             # We can have multiple suppliers for a given purchased product.
             # For the qty needed, we'll just take the cheapest one.
-            supplierprice = SupplierPrices.objects.find_cheapest(all_supplierproducts, orderitem.quantity)
+            supplierprice = SupplierPrice.objects.find_cheapest(all_supplierproducts, orderitem.quantity)
 
             try:
                 supplierproduct = supplierprice.supplier_product

@@ -8,15 +8,15 @@ from typing import List, Optional
 
 from media.models import Media
 from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
-    ProductTranslation, ConfigurableVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrices
+    ProductTranslation, ConfigurableVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrice
 from taxes.schema.types.types import VatRateType
 from units.schema.types.types import UnitType
 from .filters import ProductFilter, BundleProductFilter, ConfigurableProductFilter, \
     SimpleProductFilter, ProductTranslationFilter, ConfigurableVariationFilter, BundleVariationFilter, BillOfMaterialFilter, SupplierProductFilter, \
-    DropshipProductFilter, ManufacturableProductFilter, SupplierPricesFilter
+    DropshipProductFilter, ManufacturableProductFilter, SupplierPriceFilter
 from .ordering import ProductOrder, BundleProductOrder, ConfigurableProductOrder, \
     SimpleProductOrder, ProductTranslationOrder, ConfigurableVariationOrder, BundleVariationOrder, BillOfMaterialOrder, SupplierProductOrder, \
-    DropshipProductOrder, ManufacturableProductOrder, SupplierPricesOrder
+    DropshipProductOrder, ManufacturableProductOrder, SupplierPriceOrder
 
 
 @type(Product, filters=ProductFilter, order=ProductOrder, pagination=True, fields="__all__")
@@ -175,7 +175,7 @@ class SupplierProductType(relay.Node, GetQuerysetMultiTenantMixin):
         return to_base64(ProductType, self.pk)
 
 
-@type(SupplierPrices, filters=SupplierPricesFilter, order=SupplierPricesOrder, pagination=True, fields="__all__")
-class SupplierPricesType(relay.Node, GetQuerysetMultiTenantMixin):
+@type(SupplierPrice, filters=SupplierPriceFilter, order=SupplierPriceOrder, pagination=True, fields="__all__")
+class SupplierPriceType(relay.Node, GetQuerysetMultiTenantMixin):
     supplier_product: SupplierProductType
     unit: UnitType

@@ -134,13 +134,13 @@ class MissingOptionalPropertiesInspectorBlockManager(InspectorBlockManager):
         return MissingOptionalPropertiesInspectorBlockQuerySet(self.model, using=self._db)
 
 
-class MissingSupplierPricesQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
+class MissingSupplierPriceQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
     pass
 
 
-class MissingSupplierPricesManager(InspectorBlockManager):
+class MissingSupplierPriceManager(InspectorBlockManager):
     def get_queryset(self):
-        return MissingSupplierPricesQuerySet(self.model, using=self._db)
+        return MissingSupplierPriceQuerySet(self.model, using=self._db)
 
 
 class MissingStockQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):

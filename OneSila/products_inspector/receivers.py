@@ -221,8 +221,8 @@ def products_inspector__inspector__trigger_block_product_properties_change(sende
 
 # MISSING_SUPPLIER_PRICES_ERROR  --------------------------------------------------
 
-@receiver(post_create, sender='products.SupplierPrices')
-@receiver(post_delete, sender='products.SupplierPrices')
+@receiver(post_create, sender='products.SupplierPrice')
+@receiver(post_delete, sender='products.SupplierPrice')
 def products_inspector__inspector__trigger_block_supplier_prices_change(sender, instance, **kwargs):
     inspector_block_refresh.send(
         sender=instance.supplier_product.inspector.__class__,

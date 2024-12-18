@@ -36,8 +36,8 @@ tblib
 # To find the right version, go to the strawberry-graphql-django repo and inpect the peotry.lock file
 # strawberry-graphql==0.219.1
 # strawberry-graphql-django==0.32.1
-strawberry-graphql==0.247.1
-strawberry-graphql-django==0.49.1
+strawberry-graphql==0.253.0
+strawberry-graphql-django==0.50.0
 
 django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absolute_url.git@master
 

@@ -1,5 +1,7 @@
 from functools import wraps
 
+from django.core.exceptions import PermissionDenied
+
 
 def multi_tenant_owner_protection():
     '''

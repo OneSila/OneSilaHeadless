@@ -1,6 +1,6 @@
 from core.demo_data import DemoDataLibrary, PrivateStructuredDataGenerator
 from products.models import ProductTranslation, Product, BundleProduct, SimpleProduct, SupplierProduct, \
-    SupplierPrices, BundleVariation, DropshipProduct
+    SupplierPrice, BundleVariation, DropshipProduct
 from products.product_types import MANUFACTURABLE, SIMPLE, BUNDLE, DROPSHIP
 from taxes.models import VatRate
 from units.models import Unit
@@ -267,7 +267,7 @@ class SupplierProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin
         for b in base_products:
             instance.base_products.add(b)
 
-        SupplierPrices.objects.get_or_create(multi_tenant_company=self.multi_tenant_company,
+        SupplierPrice.objects.get_or_create(multi_tenant_company=self.multi_tenant_company,
             supplier_product=instance,
             **price_info)
 

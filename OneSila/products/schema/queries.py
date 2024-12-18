@@ -3,7 +3,7 @@ from typing import List
 
 from .types.types import ProductType, BundleProductType, ConfigurableProductType, \
     SimpleProductType, ProductTranslationType, ConfigurableVariationType, \
-    BundleVariationType, ManufacturableProductType, DropshipProductType, SupplierProductType, BillOfMaterialType, SupplierPricesType
+    BundleVariationType, ManufacturableProductType, DropshipProductType, SupplierProductType, BillOfMaterialType, SupplierPriceType
 
 
 @type(name="Query")
@@ -41,5 +41,5 @@ class ProductsQuery:
     bill_of_material: BillOfMaterialType = node()
     bill_of_materials: ListConnectionWithTotalCount[BillOfMaterialType] = connection()
 
-    supplier_price: SupplierPricesType = node()
-    supplier_prices: ListConnectionWithTotalCount[SupplierPricesType] = connection()
+    supplier_price: SupplierPriceType = node()
+    supplier_prices: ListConnectionWithTotalCount[SupplierPriceType] = connection()

@@ -1,11 +1,12 @@
-from django.db import models
+from django.db import models, transaction
 from django.core.exceptions import PermissionDenied
 
 import strawberry_django
+from strawberry_django.mutations import resolvers
 from strawberry_django.permissions import IsAuthenticated
 
 from strawberry_django.mutations.fields import DjangoCreateMutation, \
-    DjangoUpdateMutation, DjangoDeleteMutation
+    DjangoUpdateMutation, DjangoDeleteMutation, get_pk
 from typing import TYPE_CHECKING, Any, Iterable, Union
 from strawberry.types import Info
 from strawberry import type, field
@@ -15,7 +16,63 @@ from .decorators import multi_tenant_owner_protection
 from .mixins import GetMultiTenantCompanyMixin, GetCurrentUserMixin
 from .extensions import default_extensions
 from ...signals import mutation_update, mutation_create
+from strawberry_django.permissions import get_with_perms
 
+class BulkDjangoDeleteMutation(DjangoDeleteMutation):
+    """
+    Enhanced Delete Mutation to support both single and bulk deletions.
+    """
+
+    @transaction.atomic
+    def resolver(
+        self,
+        source: Any,
+        info: Info | None,
+        args: list[Any],
+        kwargs: dict[str, Any],
+    ) -> Any:
+        assert info is not None
+
+        # Retrieve the deletion data
+        data = kwargs.get(self.argument_name)
+
+        # If bulk, ensure data is a list and process each item
+        if isinstance(data, list):
+            results = []
+            for item in data:
+                vdata = vars(item).copy()
+                pk = get_pk(vdata, key_attr=self.key_attr)
+
+                # Retrieve the instance
+                instance = get_with_perms(
+                    pk,
+                    info,
+                    required=True,
+                    model=self.django_model,
+                    key_attr=self.key_attr,
+                )
+
+                # Perform the delete operation
+                deleted_instance = self.delete(
+                    info, instance, resolvers.parse_input(info, vdata, key_attr=self.key_attr)
+                )
+                results.append(deleted_instance)
+
+            return results  # Return the list of deleted items
+
+        # Handle single deletion
+        vdata = vars(data).copy() if data is not None else {}
+        pk = get_pk(vdata, key_attr=self.key_attr)
+        instance = get_with_perms(
+            pk,
+            info,
+            required=True,
+            model=self.django_model,
+            key_attr=self.key_attr,
+        )
+        return self.delete(
+            info, instance, resolvers.parse_input(info, vdata, key_attr=self.key_attr)
+        )
 
 class CreateMutation(GetMultiTenantCompanyMixin, GetCurrentUserMixin, DjangoCreateMutation):
     """
@@ -48,7 +105,7 @@ class UpdateMutation(GetMultiTenantCompanyMixin, GetCurrentUserMixin, DjangoUpda
         return updated_instance
 
 
-class DeleteMutation(GetMultiTenantCompanyMixin, DjangoDeleteMutation):
+class DeleteMutation(GetMultiTenantCompanyMixin, BulkDjangoDeleteMutation):
     """
     You can only delete if the object is owned by the comnpany represented
     """
@@ -67,6 +124,8 @@ def update(input_type):
     return UpdateMutation(input_type, extensions=extensions)
 
 
-def delete():
+def delete(is_bulk = False):
+
+    input_type = List[strawberry_django.NodeInput] if is_bulk else strawberry_django.NodeInput
     extensions = default_extensions
-    return DeleteMutation(strawberry_django.NodeInput, extensions=extensions)
+    return DeleteMutation(input_type, extensions=extensions)

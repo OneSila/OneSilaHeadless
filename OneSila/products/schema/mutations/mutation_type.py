@@ -1,14 +1,14 @@
 from .fields import create_product, create_supplier_product
 from ..types.types import ProductType, BundleProductType, ConfigurableProductType, \
     SimpleProductType, ProductTranslationType, ConfigurableVariationType, \
-    BundleVariationType, ManufacturableProductType, DropshipProductType, SupplierProductType, BillOfMaterialType, SupplierPricesType
+    BundleVariationType, ManufacturableProductType, DropshipProductType, SupplierProductType, BillOfMaterialType, SupplierPriceType
 from ..types.input import ProductInput, BundleProductInput, ConfigurableProductInput, \
     SimpleProductInput, ProductTranslationInput, ConfigurableVariationInput, \
     BundleVariationInput, ProductPartialInput, ConfigurableProductPartialInput, \
     BundleProductPartialInput, SimpleProductPartialInput, \
     ProductTranslationPartialInput, ConfigurableVariationPartialInput, \
     BundleVariationPartialInput, ManufacturableProductInput, ManufacturableProductPartialInput, DropshipProductInput, DropshipProductPartialInput, \
-    SupplierProductInput, SupplierProductPartialInput, BillOfMaterialInput, BillOfMaterialPartialInput, SupplierPricesPartialInput, SupplierPricesInput
+    SupplierProductInput, SupplierProductPartialInput, BillOfMaterialInput, BillOfMaterialPartialInput, SupplierPricePartialInput, SupplierPriceInput
 from core.schema.core.mutations import create, update, delete, type, List
 
 
@@ -80,6 +80,6 @@ class ProductsMutation:
     delete_bill_of_material: BillOfMaterialType = delete()
     delete_bills_of_material: List[BillOfMaterialType] = delete()
 
-    create_supplier_price: SupplierPricesType = create(SupplierPricesInput)
-    update_supplier_price: SupplierPricesType = update(SupplierPricesPartialInput)
-    delete_supplier_price: SupplierPricesType = delete()
+    create_supplier_price: SupplierPriceType = create(SupplierPriceInput)
+    update_supplier_price: SupplierPriceType = update(SupplierPricePartialInput)
+    delete_supplier_price: SupplierPriceType = delete()

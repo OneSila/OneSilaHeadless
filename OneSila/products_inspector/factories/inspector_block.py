@@ -321,16 +321,16 @@ class MissingOptionalPropertiesInspectorBlockFactory(InspectorBlockFactory):
 
 
 @InspectorBlockFactoryRegistry.register(MISSING_SUPPLIER_PRICES_ERROR)
-class MissingSupplierPricesInspectorBlockFactory(InspectorBlockFactory):
+class MissingSupplierPriceInspectorBlockFactory(InspectorBlockFactory):
     def __init__(self, block, save_inspector=True):
         super().__init__(block, success_signal=inspector_missing_supplier_prices_success,
                          failure_signal=inspector_missing_supplier_prices_failed,
                          save_inspector=save_inspector)
 
     def _check(self):
-        from products.models import SupplierPrices
+        from products.models import SupplierPrice
 
-        if not SupplierPrices.objects.filter_multi_tenant(self.multi_tenant_company).filter(supplier_product=self.product).exists():
+        if not SupplierPrice.objects.filter_multi_tenant(self.multi_tenant_company).filter(supplier_product=self.product).exists():
             raise InspectorBlockFailed("Supplier product is missing required prices.")
 
 

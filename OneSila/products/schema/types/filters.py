@@ -10,7 +10,7 @@ from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDe
 from strawberry_django import filter_field as custom_filter
 from products.models import Product, BundleProduct, ConfigurableProduct, \
     SimpleProduct, ProductTranslation, ConfigurableVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, \
-    SupplierPrices
+    SupplierPrice
 from products_inspector.models import InspectorBlock
 from taxes.schema.types.filters import VatRateFilter
 
@@ -107,6 +107,6 @@ class BillOfMaterialFilter:
     parent: Optional[ProductFilter]
 
 
-@filter(SupplierPrices)
-class SupplierPricesFilter(SearchFilterMixin):
+@filter(SupplierPrice)
+class SupplierPriceFilter(SearchFilterMixin):
     supplier_product: Optional[SupplierProductFilter]

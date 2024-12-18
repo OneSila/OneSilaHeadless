@@ -5,7 +5,7 @@ from products_inspector.managers import InspectorBlockHasImagesManager, Inspecto
     MissingVariationInspectorBlockManager, MissingBundleItemsInspectorBlockManager, MissingBillOfMaterialsInspectorBlockManager, \
     MissingSupplierProductsInspectorBlockManager, InactiveBundleItemsInspectorBlockManager, MissingEanCodeInspectorBlockManager, \
     MissingProductTypeInspectorBlockManager, MissingRequiredPropertiesInspectorBlockManager, MissingOptionalPropertiesInspectorBlockManager, \
-    MissingSupplierPricesManager, MissingStockManager, MissingLeadTimeManager, MissingManualPriceListOverrideManager, VariationMismatchProductTypeManager, \
+    MissingSupplierPriceManager, MissingStockManager, MissingLeadTimeManager, MissingManualPriceListOverrideManager, VariationMismatchProductTypeManager, \
     ItemsMismatchProductTypeManager, BomMismatchProductTypeManager, ItemsMissingMandatoryInformationManager, VariationsMissingMandatoryInformationManager, \
     BomMissingMandatoryInformationManager, DuplicateVariationsManager, NonConfigurableRuleInspectorBlockManager
 
@@ -206,10 +206,10 @@ class MissingOptionalPropertiesInspectorBlock(InspectorBlock):
         verbose_name = _("Inspector Block Missing Optional Properties")
 
 
-class MissingSupplierPricesInspectorBlock(InspectorBlock):
+class MissingSupplierPriceInspectorBlock(InspectorBlock):
     from .constants import missing_supplier_prices_block
 
-    objects = MissingSupplierPricesManager()
+    objects = MissingSupplierPriceManager()
     proxy_filter_fields = missing_supplier_prices_block
 
     class Meta:

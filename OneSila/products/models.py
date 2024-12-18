@@ -589,7 +589,7 @@ class SupplierProduct(Product):
         super().save(*args, **kwargs)
 
 
-class SupplierPrices(models.Model):
+class SupplierPrice(models.Model):
     supplier_product = models.ForeignKey(SupplierProduct, on_delete=models.CASCADE, related_name='details')
 
     unit = models.ForeignKey('units.Unit', on_delete=models.PROTECT)

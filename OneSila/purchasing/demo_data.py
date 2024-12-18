@@ -5,7 +5,7 @@ from contacts.models import InvoiceAddress, ShippingAddress, Supplier, Company, 
 from currencies.models import Currency
 from units.models import Unit
 from .models import PurchaseOrder, PurchaseOrderItem
-from products.models import SupplierProduct, Product, ProductTranslation, SupplierPrices
+from products.models import SupplierProduct, Product, ProductTranslation, SupplierPrice
 from contacts.demo_data import FABRIC_SUPPLIER_NAME, INTERNAL_SHIPPING_STREET_ONE
 from products.demo_data import SUPPLIER_BLACK_TIGER_FABRIC
 
@@ -60,7 +60,7 @@ class PurchaseOrderGenerator(PrivateStructuredDataGenerator):
                         {
                             'product': self.get_supplier_product(SUPPLIER_BLACK_TIGER_FABRIC),
                             'quantity': 12,
-                            'unit_price': SupplierPrices.objects.get(supplier_product=self.get_supplier_product(SUPPLIER_BLACK_TIGER_FABRIC), quantity=1).unit_price,
+                            'unit_price': SupplierPrice.objects.get(supplier_product=self.get_supplier_product(SUPPLIER_BLACK_TIGER_FABRIC), quantity=1).unit_price,
                         }
                     ]
                 },

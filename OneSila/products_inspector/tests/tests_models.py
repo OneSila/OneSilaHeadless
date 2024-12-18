@@ -8,7 +8,7 @@ from eancodes.signals import ean_code_released_for_product
 from inventory.models import Inventory, InventoryLocation
 from lead_times.models import LeadTimeProductOutOfStock, LeadTime
 from products.models import ConfigurableProduct, SimpleProduct, BillOfMaterial, ManufacturableProduct, BundleVariation, BundleProduct, ConfigurableVariation, \
-    SupplierProduct, DropshipProduct, SupplierPrices
+    SupplierProduct, DropshipProduct, SupplierPrice
 from media.models import MediaProductThrough, Media
 from products_inspector.constants import *
 from products_inspector.models import Inspector
@@ -931,7 +931,7 @@ class InspectorBlockMissingPropertiesTest(TestCase):
         self.assertTrue(inspector_block.successfully_checked)
 
 
-class InspectorBlockMissingSupplierPricesTest(TestCase):
+class InspectorBlockMissingSupplierPriceTest(TestCase):
 
     def setUp(self):
         super().setUp()
@@ -958,7 +958,7 @@ class InspectorBlockMissingSupplierPricesTest(TestCase):
         self.assertFalse(inspector_block.successfully_checked)
 
         # Now, add a SupplierPrice for the supplier product
-        SupplierPrices.objects.create(
+        SupplierPrice.objects.create(
             supplier_product=self.supplier_product,
             unit=self.unit,
             quantity=10,
@@ -973,7 +973,7 @@ class InspectorBlockMissingSupplierPricesTest(TestCase):
 
     def test_inspector_block_on_supplier_price_deletion(self):
         # First, add a SupplierPrice so the inspector block is successfully checked
-        supplier_price = SupplierPrices.objects.create(
+        supplier_price = SupplierPrice.objects.create(
             supplier_product=self.supplier_product,
             unit=self.unit,
             quantity=10,

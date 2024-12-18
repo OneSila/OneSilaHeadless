@@ -1,7 +1,7 @@
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from core.schema.core.mutations import Info, Any
 from core.schema.core.mutations import type, CreateMutation
-from products.models import SupplierPrices
+from products.models import SupplierPrice
 from units.models import Unit
 from translations.schema.mutations import TranslatableCreateMutation
 
@@ -17,7 +17,7 @@ class CreateSupplierProductMutation(TranslatableCreateMutation):
         supplier_product = super().create(data=data, info=info)
 
         unit_obj = Unit.objects.get(pk=unit.pk.id)
-        SupplierPrices.objects.create(
+        SupplierPrice.objects.create(
             supplier_product=supplier_product,
             unit=unit_obj,
             quantity=quantity,

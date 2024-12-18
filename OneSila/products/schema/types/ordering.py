@@ -3,7 +3,7 @@ from core.schema.core.types.types import auto
 
 from products.models import Product, BundleProduct, ConfigurableProduct, \
     SimpleProduct, ProductTranslation, ConfigurableVariation, \
-    BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrices
+    BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrice
 
 
 @order(Product)
@@ -68,8 +68,8 @@ class BillOfMaterialOrder:
     id: auto
 
 
-@order(SupplierPrices)
-class SupplierPricesOrder:
+@order(SupplierPrice)
+class SupplierPriceOrder:
     id: auto
     quantity: auto
     unit_price: auto
