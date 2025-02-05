@@ -12,7 +12,7 @@ import os
 from django.conf import settings
 
 from django.core.asgi import get_asgi_application
-from strawberry_django.routers import AuthGraphQLProtocolTypeRouter
+from core.schema.routers import AuthGraphQLProtocolTypeRouter
 from starlette.middleware.cors import CORSMiddleware
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "OneSila.settings")
@@ -26,6 +26,7 @@ from .schema import schema  # NOQA
 application = AuthGraphQLProtocolTypeRouter(
     schema,
     django_application=django_application,
+    multipart_uploads_enabled=True
 )
 
 application = CORSMiddleware(

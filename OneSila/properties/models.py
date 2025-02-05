@@ -41,6 +41,7 @@ class Property(TranslatedModelMixin, models.Model):
     is_public_information = models.BooleanField(default=True)
     add_to_filters = models.BooleanField(default=True)
     is_product_type = models.BooleanField(default=False)
+    has_image = models.BooleanField(default=False)
 
     # advanced tab
     value_validator = models.CharField(
