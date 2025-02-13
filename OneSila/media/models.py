@@ -54,6 +54,7 @@ class Media(models.Model):
         id='mediapp:image:imagewebspec')
     onesila_thumbnail = ImageSpecField(source='image',
         id='mediapp:image:onesilathumbnail')
+    image_hash = models.CharField(_('image hash'), max_length=100, blank=True, null=True)
 
     file = models.FileField(_('File'),
         upload_to='files/', validators=[validate_file_extensions, no_dots_in_filename],
@@ -66,6 +67,16 @@ class Media(models.Model):
     objects = models.Manager()
     videos = VideoManager()
     images = ImageManager()
+
+    class Meta:
+        constraints = [
+            # Ensure that if image_hash is set then it is unique per multi_tenant_company.
+            models.UniqueConstraint(
+                fields=['multi_tenant_company', 'image_hash'],
+                name='unique_image_hash_per_tenant',
+                condition=models.Q(image_hash__isnull=False)
+            ),
+        ]
 
     @property
     def image_web_size(self):
@@ -146,6 +157,7 @@ class MediaProductThrough(models.Model):
 
     class Meta:
         ordering = ('sort_order',)
+        unique_together = ('product', 'media')
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

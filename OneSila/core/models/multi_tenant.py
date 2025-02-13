@@ -46,6 +46,22 @@ class MultiTenantCompany(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def full_address(self):
+        parts = []
+        if self.address1:
+            parts.append(self.address1)
+        if self.address2:
+            parts.append(self.address2)
+        # Combine postcode and city if available
+        location = " ".join(filter(None, [self.postcode, self.city]))
+        if location:
+            parts.append(location)
+        if self.country:
+            parts.append(self.get_country_display())
+
+        return ", ".join(parts)
+
     def language_detail(self):
         return LanguageType(**get_language_info(self.language))
 

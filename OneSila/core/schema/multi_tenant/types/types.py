@@ -43,6 +43,9 @@ class MultiTenantCompanyType(relay.Node):
     multitenantuser_set: List[MultiTenantUserType]
     language_detail: Annotated['LanguageType', lazy("core.schema.languages.types.types")]
 
+    @field()
+    def full_address(self, info) -> str:
+        return self.full_address
 
 @type(MultiTenantUserLoginToken, exclude=['token'])
 class MultiTenantUserLoginTokenType(relay.Node):

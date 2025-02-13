@@ -454,13 +454,13 @@ def products_inspector__inspector__trigger_block_duplicate_variations_check(send
 @receiver(product_properties_rule_created, sender='properties.ProductPropertiesRule')
 @receiver(product_properties_rule_updated, sender='properties.ProductPropertiesRule')
 def products_inspector__inspector__trigger_block_rule_changed(sender, instance, **kwargs):
-    from .tasks import trigger_rule_dependent_inspector_blocks
+    from .tasks import trigger_rule_dependent_inspector_blocks_task
 
-    trigger_rule_dependent_inspector_blocks(instance.id)
+    trigger_rule_dependent_inspector_blocks_task(instance.id)
 
 
 @receiver(post_delete, sender='properties.ProductPropertiesRule')
 def products_inspector__inspector__trigger_block_rule_deleted(sender, instance, **kwargs):
-    from .tasks import trigger_rule_dependent_inspector_blocks_delete
+    from .tasks import trigger_rule_dependent_inspector_blocks_delete_task
 
-    trigger_rule_dependent_inspector_blocks_delete(instance)
+    trigger_rule_dependent_inspector_blocks_delete_task(instance)

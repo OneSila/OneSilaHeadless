@@ -201,6 +201,7 @@ class ProductPropertiesRule(models.Model):
         on_delete=models.PROTECT,
         verbose_name=_('Product Type'),
     )
+    require_ean_code = models.BooleanField(default=False)
 
     objects = ProductPropertiesRuleManager()
 

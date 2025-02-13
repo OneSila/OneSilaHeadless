@@ -2,6 +2,7 @@ from typing import Optional
 
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin
+from media.schema.types.filters import ImageFilter
 
 from properties.models import Property, ProductProperty, \
     ProductProperty, PropertySelectValue, PropertyTranslation, ProductPropertyTextTranslation, PropertySelectValueTranslation, ProductPropertiesRule, \
@@ -21,6 +22,7 @@ class PropertyFilter(SearchFilterMixin):
 class PropertySelectValueFilter(SearchFilterMixin):
     id: auto
     property: Optional[PropertyFilter]
+    image: Optional[ImageFilter]
 
 
 @filter(PropertySelectValueTranslation)

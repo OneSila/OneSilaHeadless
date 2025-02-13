@@ -269,6 +269,10 @@ class MissingEanCodeInspectorBlockFactory(InspectorBlockFactory):
         if not self.product.for_sale:
             return  # No need to check further if the product is not for sale
 
+        rule = self.product.get_product_rule()
+        if rule is not None and not rule.require_ean_code:
+            return  # if the rule doesn't require ean code we just skip
+
         if not EanCode.objects.filter_multi_tenant(self.multi_tenant_company).filter(Q(product=self.product) | Q(inherit_to=self.product)).exists():
             raise InspectorBlockFailed("Product is missing an EAN code.")
 

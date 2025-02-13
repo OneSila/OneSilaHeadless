@@ -57,7 +57,7 @@ class PropertyManager(MultiTenantManager):
 
 
 class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
-    def create_rule(self, multi_tenant_company, product_type, items):
+    def create_rule(self, multi_tenant_company, product_type, require_ean_code, items):
         from .models import ProductPropertiesRuleItem
         from .signals import product_properties_rule_created
         from strawberry_django.mutations.types import ParsedObject
@@ -70,8 +70,12 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
         with transaction.atomic():
             rule, _ = self.get_or_create(
                 product_type=product_type,
-                multi_tenant_company=multi_tenant_company
+                multi_tenant_company=multi_tenant_company,
             )
+
+            if rule.require_ean_code != require_ean_code:
+                rule.require_ean_code = require_ean_code
+                rule.save()
 
             for item in items:
                 property_instance = item.get('property')
@@ -91,7 +95,7 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
 
             return rule
 
-    def update_rule(self, rule, items):
+    def update_rule_items(self, rule, items):
         from .models import ProductPropertiesRuleItem
         from .signals import product_properties_rule_updated, product_properties_rule_configurator_updated
         from strawberry_django.mutations.types import ParsedObject
@@ -152,8 +156,8 @@ class ProductPropertiesRuleManager(MultiTenantManager):
     def get_queryset(self):
         return ProductPropertiesRuleQuerySet(self.model, using=self._db)
 
-    def create_rule(self, multi_tenant_company, product_type, items):
-        return self.get_queryset().create_rule(multi_tenant_company, product_type, items)
+    def create_rule(self, multi_tenant_company, product_type, require_ean_code, items):
+        return self.get_queryset().create_rule(multi_tenant_company, product_type, require_ean_code, items)
 
-    def update_rule(self, rule, items):
-        return self.get_queryset().update_rule(rule, items)
+    def update_rule_items(self, rule, items):
+        return self.get_queryset().update_rule_items(rule, items)

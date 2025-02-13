@@ -13,11 +13,12 @@ class CompleteCreateProductPropertiesRule(CreateMutation):
             multi_tenant_company = self.get_multi_tenant_company(info, fail_silently=False)
             items = data.get("items")
             product_type = data.get("product_type")
+            require_ean_code = data.pop("require_ean_code", False)
 
             if items == UNSET:
                 items = []
 
-            rule = ProductPropertiesRule.objects.create_rule(multi_tenant_company, product_type, items)
+            rule = ProductPropertiesRule.objects.create_rule(multi_tenant_company, product_type, require_ean_code, items)
             return rule
 
 
@@ -25,9 +26,16 @@ class CompleteUpdateProductPropertiesRule(UpdateMutation, GetCurrentUserMixin):
     def update(self, info: Info, instance: ProductPropertiesRule, data: dict[str, Any]):
 
         with DjangoOptimizerExtension.disabled():
-            items = data.get("items")
+            items = data.pop("items", [])
+            require_ean_code = data.pop("require_ean_code", None)
+
+            if require_ean_code is not None:
+                if require_ean_code != instance.require_ean_code:
+                    instance.require_ean_code = require_ean_code
+                    instance.save()
+
             if items == UNSET:
                 items = []
 
-            rule = ProductPropertiesRule.objects.update_rule(instance, items)
+            rule = ProductPropertiesRule.objects.update_rule_items(instance, items)
             return rule

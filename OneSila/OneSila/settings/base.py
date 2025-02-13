@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'daphne',
     'django.contrib.staticfiles',
     'strawberry_django',
+    'django_cleanup.apps.CleanupConfig',
 ]
 
 INSTALLED_LOCAL_APPS = [

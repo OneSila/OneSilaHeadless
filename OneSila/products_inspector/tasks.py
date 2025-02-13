@@ -29,7 +29,7 @@ def resync_inspector_block_task(block_id):
 
 
 @db_task()
-def trigger_rule_dependent_inspector_blocks(rule_id):
+def trigger_rule_dependent_inspector_blocks_task(rule_id):
     from properties.models import ProductPropertiesRule
     from .flows.inspector_block import trigger_product_inspectors_for_rule_flow
     """
@@ -40,7 +40,7 @@ def trigger_rule_dependent_inspector_blocks(rule_id):
 
 
 @db_task()
-def trigger_rule_dependent_inspector_blocks_delete(rule):
+def trigger_rule_dependent_inspector_blocks_delete_task(rule):
     from .flows.inspector_block import trigger_product_inspectors_for_rule_flow
     """
     The difference between this one and the above one is that this one gives the rule from memory so we

@@ -96,12 +96,13 @@ def recursively_check_components(product, add_recursive_bom=True, add_recursive_
 
 def trigger_product_inspectors_for_rule_flow(rule):
     from products.models import Product
-    from ..constants import MISSING_REQUIRED_PROPERTIES_ERROR, MISSING_OPTIONAL_PROPERTIES_ERROR, DUPLICATE_VARIATIONS_ERROR
+    from ..constants import MISSING_REQUIRED_PROPERTIES_ERROR, MISSING_OPTIONAL_PROPERTIES_ERROR, DUPLICATE_VARIATIONS_ERROR, MISSING_EAN_CODE_ERROR
     from products_inspector.signals import inspector_block_refresh
 
     rule_dependent_blocks = [MISSING_REQUIRED_PROPERTIES_ERROR,
                             MISSING_OPTIONAL_PROPERTIES_ERROR,
-                            DUPLICATE_VARIATIONS_ERROR
+                            DUPLICATE_VARIATIONS_ERROR,
+                             MISSING_EAN_CODE_ERROR
                              ]
 
     for product in Product.objects.filter_by_properties_rule(rule=rule).iterator():
