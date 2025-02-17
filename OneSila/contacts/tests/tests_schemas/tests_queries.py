@@ -47,13 +47,14 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
     def test_company_list_filter_frontend_page(self):
         from .queries import COMPANY_LIST_FILTER_FRONTEND
-        query_filter = {"isInternalCompany": False}
+        query_filter = {"isInternalCompany": {"exact": False}}
         resp = self.strawberry_test_client(
             query=COMPANY_LIST_FILTER_FRONTEND,
             variables={
                 'filter': query_filter,
             }
         )
+
         self.assertTrue(resp.errors is None)
 
     def test_company(self):

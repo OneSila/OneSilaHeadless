@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import requests
 from django.core.files.base import ContentFile
 
@@ -14,6 +16,9 @@ from taxes.models import VatRate
 from units.models import Unit
 from contacts.models import Supplier
 from units.demo_data import UNIT_PIECE
+import os
+from django.core.files import File
+from django.conf import settings
 
 registry = DemoDataLibrary()
 
@@ -89,27 +94,27 @@ class ProductGetDataMixin:
                 )[0]
                 product_property.value_multi_select.add(value_instance)
 
-    def add_image(self, url, product):
-        """Downloads an image from a URL, saves it locally, and assigns it to a product."""
-        response = requests.get(url, stream=True)
-        if response.status_code == 200:
-            file_name = url.split("/")[-1]  # Extract file name from URL
-            image_content = ContentFile(response.content, name=file_name)
+    def add_image(self, filename, product):
+        image_path = os.path.join(Path(__file__).resolve(), 'products', 'demo_data_resources', filename)
 
-            image = Media.objects.create(
-                type=Media.IMAGE,
-                image=image_content,
-                owner=MultiTenantUser.objects.filter(multi_tenant_company=self.multi_tenant_company).first(),
-                multi_tenant_company=self.multi_tenant_company,
-            )
+        if os.path.exists(image_path):
+            with open(image_path, "rb") as img_file:
+                image_content = File(img_file, name=filename)
 
-            MediaProductThrough.objects.create(
-                product=product,
-                media=image,
-                sort_order=10,
-                is_main_image=True,
-                multi_tenant_company=self.multi_tenant_company,
-            )
+                image = Media.objects.create(
+                    type=Media.IMAGE,
+                    image=image_content,
+                    owner=MultiTenantUser.objects.filter(multi_tenant_company=self.multi_tenant_company).first(),
+                    multi_tenant_company=self.multi_tenant_company,
+                )
+
+                MediaProductThrough.objects.create(
+                    product=product,
+                    media=image,
+                    sort_order=10,
+                    is_main_image=True,
+                    multi_tenant_company=self.multi_tenant_company,
+                )
 
 
 class PostDataTranslationMixin:
@@ -144,7 +149,7 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                     'name': "Wooden Chair - Blue",
                     'color': "Blue",
                     'usage': ["Indoor", "Office"],
-                    'image_url': "https://images.squarespace-cdn.com/content/v1/54bf321fe4b042c4bf4e2f67/9eab74c9-7ffd-4e7c-85b1-796362486b52/blue+seat+logo+chair+only-01.png?format=1500w",
+                    'image_filename': "blue_chair.png",
                 },
             },
             {
@@ -158,7 +163,7 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                     'name': "Wooden Chair - Red",
                     'color': "Red",
                     'usage': ["Indoor", "Restaurant"],
-                    'image_url': "https://png.pngtree.com/png-clipart/20190920/original/pngtree-red-chair-furniture-illustration-png-image_4624169.jpg",
+                    'image_filename': "red_chair.jpg",
                 },
             },
             {
@@ -172,7 +177,7 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                     'name': "Wooden Chair - Green",
                     'color': "Green",
                     'usage': ["Garden", "Outdoor"],
-                    'image_url': "https://clipart-library.com/img1/1221331.jpg",
+                    'image_filename': "green_chair.jpg",
                 },
             },
             # Metal Chair
@@ -201,7 +206,7 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                     'name': "Glass Table",
                     'color': None,
                     'usage': ["Office", "Restaurant"],
-                    'image_url': "https://media.istockphoto.com/id/1254777704/vector/empty-glass-round-office-table-with-metal-stand-isolated-on-white-background-vector-template.jpg?s=612x612&w=0&k=20&c=zV85V-msjfYNXdmWKLdlGtwh0-isaW00qDoceH5SlQ4=",
+                    'image_filename': "glass_table.jpg",
                 },
             },
             # Queen Bed
@@ -216,7 +221,7 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                     'name': "Queen Size Bed",
                     'color': None,
                     'usage': ["Hotel"],
-                    'image_url': "https://media.istockphoto.com/id/1326913001/vector/double-size-bed-semi-flat-color-vector-object.jpg?s=612x612&w=0&k=20&c=atbKusfJrh8GXr8SL0mNsikKGfPRC3Rn5y5JeGERO_g=",
+                    'image_filename': "bed.jpg",
                 },
             },
         ]
@@ -249,8 +254,8 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
             self.assign_multi_select_property(instance, "Usage", usage_values)
 
         # Assign Image
-        if "image_url" in kwargs:
-            self.add_image(kwargs["image_url"], instance)
+        if "image_filename" in kwargs:
+            self.add_image(kwargs["image_filename"], instance)
 
 
 @registry.register_private_app
@@ -347,7 +352,7 @@ class ConfigurableProductDataGenerator(PostDataTranslationMixin, ProductGetDataM
                 },
                 'post_data': {
                     'name': "Customizable Wooden Chair",
-                    'image_url': "https://images.squarespace-cdn.com/content/v1/54bf321fe4b042c4bf4e2f67/9eab74c9-7ffd-4e7c-85b1-796362486b52/blue+seat+logo+chair+only-01.png?format=1500w",
+                    'image_filename': "blue_chair.png",
                 },
             }
         ]
@@ -371,8 +376,8 @@ class ConfigurableProductDataGenerator(PostDataTranslationMixin, ProductGetDataM
         for variation in variations:
             ConfigurableVariation.objects.create(parent=instance, variation=variation, multi_tenant_company=self.multi_tenant_company)
 
-        if "image_url" in kwargs:
-            self.add_image(kwargs["image_url"], instance)
+        if "image_filename" in kwargs:
+            self.add_image(kwargs["image_filename"], instance)
 
 
 @registry.register_private_app

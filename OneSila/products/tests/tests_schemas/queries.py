@@ -11,8 +11,8 @@ SIMPLE_PRODUCT_SKU_FILTER = """
 """
 
 PRODUCT_SEARCH = """
-query simpleProducts($search: String!) {
-  simpleProducts(filters:{search:$search}) {
+query products($search: String!) {
+  products(filters:{search:$search}) {
     edges {
       node {
         id
@@ -23,8 +23,8 @@ query simpleProducts($search: String!) {
 """
 
 PRODUCT_EXCLUDE_DEMO_DATA = """
-query simpleProducts($excludeDemoData: Boolean!) {
-  simpleProducts(filters:{excludeDemoData:$excludeDemoData}) {
+query products($excludeDemoData: Boolean!) {
+  products(filters:{excludeDemoData:$excludeDemoData}) {
     edges {
       node {
         id

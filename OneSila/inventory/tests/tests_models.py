@@ -5,7 +5,6 @@ from django.core.exceptions import ValidationError
 from inventory.models import Inventory, InventoryLocation, InventoryMovement
 from products.models import SupplierProduct, ConfigurableProduct, Product, \
     SimpleProduct, BundleProduct, DropshipProduct, ManufacturableProduct
-from products.demo_data import SIMPLE_BLACK_FABRIC_NAME
 
 
 class InventoryTestCaseMixin:
