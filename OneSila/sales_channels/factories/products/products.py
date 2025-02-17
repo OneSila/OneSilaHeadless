@@ -41,6 +41,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin):
                  api=None, remote_instance=None, parent_local_instance=None, remote_parent_product=None):
         self.local_instance = local_instance  # Instance of the Product model
         self.sales_channel = sales_channel   # Sales channel associated with the sync
+        self.integration = sales_channel # to make it work with other mixins
         self.api = api
         self.parent_local_instance = parent_local_instance  # Optional: parent product instance for variations
         self.remote_parent_product = remote_parent_product  # Optional: If it comes from a  create factory of configurable it will save some queries
