@@ -97,8 +97,6 @@ class ProductGetDataMixin:
     def add_image(self, filename, product):
         image_path = os.path.join(Path(__file__).resolve().parent, 'demo_data_resources', filename)
 
-        print(image_path)
-
         if os.path.exists(image_path):
             with open(image_path, "rb") as img_file:
                 image_content = File(img_file, name=filename)

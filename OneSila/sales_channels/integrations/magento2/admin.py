@@ -18,7 +18,7 @@ class MagentoSalesChannelAdmin(PolymorphicChildModelAdmin):
 
     fieldsets = (
         (None, {
-            'fields': ('hostname', 'active', 'verify_ssl', 'authentication_method', 'host_api_username', 'host_api_key', 'multi_tenant_company')
+            'fields': ('hostname', 'active', 'verify_ssl', 'authentication_method', 'host_api_username', 'host_api_key', 'multi_tenant_company', 'internal_company')
         }),
         ('Magento Settings', {
             'fields': ('use_configurable_name', 'sync_contents', 'sync_orders_after', 'requests_per_minute')
