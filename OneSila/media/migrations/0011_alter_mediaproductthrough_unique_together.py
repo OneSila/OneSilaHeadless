@@ -35,7 +35,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(remove_duplicate_media_entries),
+        migrations.RunPython(remove_duplicate_media_entries, atomic=False),
         migrations.AlterUniqueTogether(
             name='mediaproductthrough',
             unique_together={('product', 'media')},
