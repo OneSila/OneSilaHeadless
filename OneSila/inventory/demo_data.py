@@ -3,10 +3,9 @@ from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, P
     PublicDataGenerator
 from inventory.models import InventoryLocation, Inventory
 from products.models import SupplierProduct
-from products.demo_data import SUPPLIER_BLACK_TIGER_FABRIC, SUPPLIER_PEN_SKU_ONE, SUPPLIER_PEN_SKU_TWO, SUPPLIER_INK_SKU
+from products.demo_data import SUPPLIER_WOODEN_CHAIR_SKU, SUPPLIER_METAL_CHAIR_SKU, SUPPLIER_GLASS_TABLE_SKU, SUPPLIER_QUEEN_BED_SKU
 from contacts.demo_data import INTERNAL_SHIPPING_STREET_ONE, INTERNAL_SHIPPING_STREET_TWO
 registry = DemoDataLibrary()
-
 
 LOCATION_WAREHOUSE_A = "Warehouse A"
 LOCATION_WAREHOUSE_B = "Warehouse B"
@@ -84,7 +83,7 @@ class InventoryGenerator(PrivateStructuredDataGenerator):
                 'instance_data': {
                     "quantity": 1,
                     "inventorylocation": self.get_inventory_location(LOCATION_WAREHOUSE_A),
-                    "product": self.get_supplier_product(SUPPLIER_BLACK_TIGER_FABRIC),
+                    "product": self.get_supplier_product(SUPPLIER_WOODEN_CHAIR_SKU),
 
                 },
                 'post_data': {},
@@ -93,7 +92,7 @@ class InventoryGenerator(PrivateStructuredDataGenerator):
                 'instance_data': {
                     "quantity": 10,
                     "inventorylocation": self.get_inventory_location(LOCATION_B21AC),
-                    "product": self.get_supplier_product(SUPPLIER_BLACK_TIGER_FABRIC),
+                    "product": self.get_supplier_product(SUPPLIER_WOODEN_CHAIR_SKU),
 
                 },
                 'post_data': {},
@@ -102,7 +101,7 @@ class InventoryGenerator(PrivateStructuredDataGenerator):
                 'instance_data': {
                     "quantity": 1,
                     "inventorylocation": self.get_inventory_location(LOCATION_B21AD),
-                    "product": self.get_supplier_product(SUPPLIER_PEN_SKU_ONE),
+                    "product": self.get_supplier_product(SUPPLIER_METAL_CHAIR_SKU),
 
                 },
                 'post_data': {},
@@ -111,7 +110,7 @@ class InventoryGenerator(PrivateStructuredDataGenerator):
                 'instance_data': {
                     "quantity": 10,
                     "inventorylocation": self.get_inventory_location(LOCATION_B21AF),
-                    "product": self.get_supplier_product(SUPPLIER_PEN_SKU_TWO),
+                    "product": self.get_supplier_product(SUPPLIER_GLASS_TABLE_SKU),
 
                 },
                 'post_data': {},
@@ -120,7 +119,7 @@ class InventoryGenerator(PrivateStructuredDataGenerator):
                 'instance_data': {
                     "quantity": 2,
                     "inventorylocation": self.get_inventory_location(LOCATION_WAREHOUSE_A),
-                    "product": self.get_supplier_product(SUPPLIER_INK_SKU),
+                    "product": self.get_supplier_product(SUPPLIER_QUEEN_BED_SKU),
 
                 },
                 'post_data': {},
@@ -129,7 +128,7 @@ class InventoryGenerator(PrivateStructuredDataGenerator):
                 'instance_data': {
                     "quantity": 4,
                     "inventorylocation": self.get_inventory_location(LOCATION_WAREHOUSE_B),
-                    "product": self.get_supplier_product(SUPPLIER_INK_SKU),
+                    "product": self.get_supplier_product(SUPPLIER_QUEEN_BED_SKU),
 
                 },
                 'post_data': {},

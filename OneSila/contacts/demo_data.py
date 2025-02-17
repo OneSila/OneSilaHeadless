@@ -7,15 +7,16 @@ from contacts.models import Company, Person, Address, InternalShippingAddress, I
 registry = DemoDataLibrary()
 
 
-FABRIC_SUPPLIER_NAME = "Midlands Fabric Wholesales ltd"
-CUSTOMER_B2B = "Fashion Shop srl"
-
+CUSTOMER_B2B = "Luxury Home Interiors Ltd"
 
 INTERNAL_SHIPPING_STREET_ONE = "The Strand 23"
 INTERNAL_SHIPPING_STREET_TWO = "Jameson Street 201"
 
-PEN_SUPPLIER_NAME_ONE = "Sameson Co Pens"
-PEN_SUPPLIER_NAME_TWO = "Jane and Jamie Fine writing ltd"
+WOOD_SUPPLIER_ONE_NAME = "Timber & Co."
+WOOD_SUPPLIER_TWO_NAME = "Hardwood Masters"
+METAL_SUPPLIER_NAME = "SteelWorks Ltd."
+GLASS_SUPPLIER_NAME = "CrystalClear Glass"
+BED_SUPPLIER_NAME = "Dreamy Comfort Bedding"
 
 
 class CompanyGetDataMixin:
@@ -34,7 +35,7 @@ class CompanyDataGenerator(PrivateStructuredDataGenerator):
         return [
             {
                 'instance_data': {
-                    "name": FABRIC_SUPPLIER_NAME,
+                    "name": GLASS_SUPPLIER_NAME,
                     "email": "mfw@example.com",
                     "language": "GB",
                     "is_supplier": True,
@@ -52,7 +53,7 @@ class CompanyDataGenerator(PrivateStructuredDataGenerator):
             },
             {
                 'instance_data': {
-                    "name": PEN_SUPPLIER_NAME_ONE,
+                    "name": WOOD_SUPPLIER_ONE_NAME,
                     "email": fake.email(),
                     "language": "GB",
                     "is_supplier": True,
@@ -61,7 +62,25 @@ class CompanyDataGenerator(PrivateStructuredDataGenerator):
             },
             {
                 'instance_data': {
-                    "name": PEN_SUPPLIER_NAME_TWO,
+                    "name": WOOD_SUPPLIER_TWO_NAME,
+                    "email": fake.email(),
+                    "language": "GB",
+                    "is_supplier": True,
+                },
+                'post_data': {},
+            },
+            {
+                'instance_data': {
+                    "name": METAL_SUPPLIER_NAME,
+                    "email": fake.email(),
+                    "language": "GB",
+                    "is_supplier": True,
+                },
+                'post_data': {},
+            },
+            {
+                'instance_data': {
+                    "name": BED_SUPPLIER_NAME,
                     "email": fake.email(),
                     "language": "GB",
                     "is_supplier": True,
@@ -79,7 +98,7 @@ class PersonDataGenerator(CompanyGetDataMixin, PrivateStructuredDataGenerator):
         return [
             {
                 'instance_data': {
-                    "company": self.get_company(FABRIC_SUPPLIER_NAME),
+                    "company": self.get_company(GLASS_SUPPLIER_NAME),
                     "first_name": "Jenna",
                     "last_name": "Smith",
                     "email": fake.email(),
@@ -99,7 +118,7 @@ class PersonDataGenerator(CompanyGetDataMixin, PrivateStructuredDataGenerator):
             },
             {
                 'instance_data': {
-                    "company": self.get_company(PEN_SUPPLIER_NAME_ONE),
+                    "company": self.get_company(WOOD_SUPPLIER_ONE_NAME),
                     "first_name": "Tom",
                     "last_name": "Dickens",
                     "email": fake.email(),
@@ -109,7 +128,7 @@ class PersonDataGenerator(CompanyGetDataMixin, PrivateStructuredDataGenerator):
             },
             {
                 'instance_data': {
-                    "company": self.get_company(PEN_SUPPLIER_NAME_TWO),
+                    "company": self.get_company(WOOD_SUPPLIER_TWO_NAME),
                     "first_name": "Jamie",
                     "last_name": "James",
                     "email": fake.email(),
@@ -119,7 +138,7 @@ class PersonDataGenerator(CompanyGetDataMixin, PrivateStructuredDataGenerator):
             },
             {
                 'instance_data': {
-                    "company": self.get_company(PEN_SUPPLIER_NAME_TWO),
+                    "company": self.get_company(WOOD_SUPPLIER_TWO_NAME),
                     "first_name": "Jane",
                     "last_name": "James",
                     "email": fake.email(),
@@ -138,7 +157,7 @@ class AddressDataGenerator(CompanyGetDataMixin, PrivateStructuredDataGenerator):
         return [
             {
                 'instance_data': {
-                    "company": self.get_company(FABRIC_SUPPLIER_NAME),
+                    "company": self.get_company(GLASS_SUPPLIER_NAME),
                     "vat_number": fake.vat_number("GB"),
                     "address1": fake.street_address(),
                     "city": fake.city(),
@@ -146,7 +165,7 @@ class AddressDataGenerator(CompanyGetDataMixin, PrivateStructuredDataGenerator):
                     "country": "GB",
                     "is_shipping_address": True,
                     "is_invoice_address": True,
-                    "person": self.get_person(FABRIC_SUPPLIER_NAME),
+                    "person": self.get_person(GLASS_SUPPLIER_NAME),
                 },
                 'post_data': {},
             },
@@ -166,7 +185,7 @@ class AddressDataGenerator(CompanyGetDataMixin, PrivateStructuredDataGenerator):
             },
             {
                 'instance_data': {
-                    "company": self.get_company(PEN_SUPPLIER_NAME_ONE),
+                    "company": self.get_company(WOOD_SUPPLIER_ONE_NAME),
                     "vat_number": fake.vat_number("GB"),
                     "address1": fake.street_address(),
                     "city": fake.city(),
@@ -174,13 +193,13 @@ class AddressDataGenerator(CompanyGetDataMixin, PrivateStructuredDataGenerator):
                     "country": "GB",
                     "is_shipping_address": True,
                     "is_invoice_address": True,
-                    "person": self.get_person(PEN_SUPPLIER_NAME_ONE),
+                    "person": self.get_person(WOOD_SUPPLIER_ONE_NAME),
                 },
                 'post_data': {},
             },
             {
                 'instance_data': {
-                    "company": self.get_company(PEN_SUPPLIER_NAME_TWO),
+                    "company": self.get_company(WOOD_SUPPLIER_TWO_NAME),
                     "vat_number": fake.vat_number("GB"),
                     "address1": fake.street_address(),
                     "city": fake.city(),
@@ -188,7 +207,7 @@ class AddressDataGenerator(CompanyGetDataMixin, PrivateStructuredDataGenerator):
                     "country": "GB",
                     "is_shipping_address": True,
                     "is_invoice_address": True,
-                    "person": self.get_person(PEN_SUPPLIER_NAME_TWO),
+                    "person": self.get_person(WOOD_SUPPLIER_TWO_NAME),
                 },
                 'post_data': {},
             },

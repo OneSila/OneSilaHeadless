@@ -14,7 +14,7 @@ class CurrencyDefaultDataGenerator(PrivateStructuredDataGenerator):
         return [
             {
                 'instance_data': {
-                    "is_default_currency": True,
+                    "is_default_currency": False,
                     "iso_code": "GBP",
                     "comment": "Base Currency",
                     "name": "British Pound",

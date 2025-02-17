@@ -79,6 +79,7 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
             'priority': priority
         }
 
+
     def register_public_app(self, method):
         method_name = self.method_name(method)
 

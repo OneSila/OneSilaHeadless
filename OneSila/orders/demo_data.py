@@ -7,7 +7,7 @@ from contacts.models import Customer, InvoiceAddress, ShippingAddress
 from products.models import Product
 from django.utils import timezone
 from random import randint
-from products.demo_data import SIMPLE_BLACK_FABRIC_PRODUCT_SKU
+from products.demo_data import SIMPLE_CHAIR_WOOD_SKU
 from contacts.demo_data import CUSTOMER_B2B
 
 registry = DemoDataLibrary()
@@ -55,9 +55,9 @@ class SalesOrderGenerator(PrivateStructuredDataGenerator):
                 'post_data': {
                     'orderitem_set': [
                         {
-                            'product': self.get_product(SIMPLE_BLACK_FABRIC_PRODUCT_SKU),
+                            'product': self.get_product(SIMPLE_CHAIR_WOOD_SKU),
                             'quantity': 1,
-                            'price': self.get_product(SIMPLE_BLACK_FABRIC_PRODUCT_SKU).salesprice_set.get(currency=self.get_currency(CUSTOMER_B2B)).get_real_price(),
+                            'price': self.get_product(SIMPLE_CHAIR_WOOD_SKU).salesprice_set.get(currency=self.get_currency(CUSTOMER_B2B)).get_real_price(),
                         },
                     ]
 

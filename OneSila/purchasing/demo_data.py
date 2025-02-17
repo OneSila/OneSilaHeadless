@@ -6,8 +6,8 @@ from currencies.models import Currency
 from units.models import Unit
 from .models import PurchaseOrder, PurchaseOrderItem
 from products.models import SupplierProduct, Product, ProductTranslation, SupplierPrice
-from contacts.demo_data import FABRIC_SUPPLIER_NAME, INTERNAL_SHIPPING_STREET_ONE
-from products.demo_data import SUPPLIER_BLACK_TIGER_FABRIC
+from contacts.demo_data import GLASS_SUPPLIER_NAME, INTERNAL_SHIPPING_STREET_ONE
+from products.demo_data import SUPPLIER_WOODEN_CHAIR_SKU
 
 registry = DemoDataLibrary()
 
@@ -34,7 +34,7 @@ class PurchaseOrderGenerator(PrivateStructuredDataGenerator):
             address1=INTERNAL_SHIPPING_STREET_ONE)
 
     def get_supplier(self):
-        return Supplier.objects.get(name=FABRIC_SUPPLIER_NAME, multi_tenant_company=self.multi_tenant_company)
+        return Supplier.objects.get(name=GLASS_SUPPLIER_NAME, multi_tenant_company=self.multi_tenant_company)
 
     def get_currency(self):
         return self.get_supplier().get_currency()
@@ -44,27 +44,27 @@ class PurchaseOrderGenerator(PrivateStructuredDataGenerator):
 
     def get_structure(self):
         return [
-            {
-                'instance_data': {
-                    'supplier': self.get_supplier(),
-                    'currency': self.get_currency(),
-                    'order_reference': "SUP1038",
-                    'status': PurchaseOrder.ORDERED,
-                    'internal_contact': self.get_user(),
-                    'invoice_address': self.get_invoice_address(),
-                    'shipping_address': self.get_shipping_address(),
-                    'internal_contact': self.get_user(),
-                },
-                'post_data': {
-                    'purchaseorderitems': [
-                        {
-                            'product': self.get_supplier_product(SUPPLIER_BLACK_TIGER_FABRIC),
-                            'quantity': 12,
-                            'unit_price': SupplierPrice.objects.get(supplier_product=self.get_supplier_product(SUPPLIER_BLACK_TIGER_FABRIC), quantity=1).unit_price,
-                        }
-                    ]
-                },
-            },
+            # {
+            #     'instance_data': {
+            #         'supplier': self.get_supplier(),
+            #         'currency': self.get_currency(),
+            #         'order_reference': "SUP1038",
+            #         'status': PurchaseOrder.ORDERED,
+            #         'internal_contact': self.get_user(),
+            #         'invoice_address': self.get_invoice_address(),
+            #         'shipping_address': self.get_shipping_address(),
+            #         'internal_contact': self.get_user(),
+            #     },
+            #     'post_data': {
+            #         'purchaseorderitems': [
+            #             {
+            #                 'product': self.get_supplier_product(SUPPLIER_WOODEN_CHAIR_SKU),
+            #                 'quantity': 12,
+            #                 'unit_price': SupplierPrice.objects.get(supplier_product=self.get_supplier_product(SUPPLIER_WOODEN_CHAIR_SKU), quantity=1).unit_price,
+            #             }
+            #         ]
+            #     },
+            # },
         ]
 
     def post_data_generate(self, instance, **kwargs):
