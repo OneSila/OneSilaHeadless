@@ -95,7 +95,9 @@ class ProductGetDataMixin:
                 product_property.value_multi_select.add(value_instance)
 
     def add_image(self, filename, product):
-        image_path = os.path.join(Path(__file__).resolve(), 'products', 'demo_data_resources', filename)
+        image_path = os.path.join(Path(__file__).resolve().parent, 'demo_data_resources', filename)
+
+        print(image_path)
 
         if os.path.exists(image_path):
             with open(image_path, "rb") as img_file:
