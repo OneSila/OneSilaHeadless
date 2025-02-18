@@ -34,13 +34,14 @@ class GenerateEancodesMutation(CreateMutation):
 
 class AssignEanCodeMutation(CreateMutation, GetCurrentUserMixin):
     def create(self, data: dict[str, Any], *, info: Info):
+        multi_tenant_company = self.get_multi_tenant_company(info, fail_silently=False)
 
         prod = data.get("product", None)
         if prod is None:
             raise IntegrityError(_("Please provide a product"))
 
         product = prod.pk
-        to_assign = EanCode.objects.filter(internal=True, already_used=False, product__isnull=True, inherit_to__isnull=True).order_by('ean_code').first()
+        to_assign = EanCode.objects.filter_multi_tenant(multi_tenant_company=multi_tenant_company).filter(internal=True, already_used=False, product__isnull=True, inherit_to__isnull=True).order_by('ean_code').first()
         to_assign.product = product
         to_assign.save()
 
