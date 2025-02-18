@@ -76,5 +76,8 @@ class RemoteProductVariationAddFactory(RemoteInstanceUpdateFactory):
     def get_remote_instance(self):
         pass
 
+    def get_remote_product(self, product):
+        return self.remote_instance
+
     def needs_update(self):
         return True # the actual check is done in preflight_check
