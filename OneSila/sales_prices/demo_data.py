@@ -64,22 +64,37 @@ class SalesPriceGenerator(PrivateDataGenerator):
 
 
 @registry.register_private_app
-class SalesPriceListGenerator(PrivateDataGenerator):
+class SalesPriceListGenerator(PrivateStructuredDataGenerator):
     model = SalesPriceList
-    count = 1
 
-    field_mapper = {
-        'name': "30% Discount for dropshippers",
-        'discount_pcnt': 30,
-        'vat_included': True,
-        'auto_update_prices': True,
-        'auto_add_products': True,
-    }
+    def get_structure(self):
+        from datetime import date
 
-    def prep_baker_kwargs(self, seed):
-        kwargs = super().prep_baker_kwargs(seed)
-        multi_tenant_company = kwargs['multi_tenant_company']
-        currency = Currency.objects.filter(multi_tenant_company=multi_tenant_company).get(is_default_currency=True)
-        kwargs['currency'] = currency
+        current_year = date.today().year
 
-        return kwargs
+        return [
+            {
+                'instance_data': {
+                    'name': "30% Discount for Dropshippers",
+                    'discount_pcnt': 30,
+                    'vat_included': True,
+                    'auto_update_prices': True,
+                    'auto_add_products': True,
+                    'currency': Currency.objects.filter(multi_tenant_company=self.multi_tenant_company).get(is_default_currency=True)
+                },
+                'post_data': {},
+            },
+            {
+                'instance_data': {
+                    'name': "Summer Sales",
+                    'start_date': date(current_year, 6, 1),
+                    'end_date': date(current_year, 8, 31),
+                    'discount_pcnt': 20,
+                    'vat_included': True,
+                    'auto_update_prices': True,
+                    'auto_add_products': True,
+                    'currency': Currency.objects.filter(multi_tenant_company=self.multi_tenant_company).get(is_default_currency=True)
+                },
+                'post_data': {},
+            }
+        ]

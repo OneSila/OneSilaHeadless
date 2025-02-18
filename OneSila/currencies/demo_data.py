@@ -15,15 +15,22 @@ class CurrencyDefaultDataGenerator(PrivateStructuredDataGenerator):
             {
                 'instance_data': {
                     "is_default_currency": True,
+                },
+                'post_data': {
                     "iso_code": "GBP",
                     "comment": "Base Currency",
                     "name": "British Pound",
                     "symbol": "£",
                 },
-                'post_data': {},
             },
         ]
 
+
+    def post_data_generate(self, instance, **kwargs):
+        for k, v in kwargs.items():
+            setattr(instance, k, v)
+
+        instance.save()
 
 @registry.register_private_app
 class CurrencyNonDefaultDataGenerator(PrivateStructuredDataGenerator):
