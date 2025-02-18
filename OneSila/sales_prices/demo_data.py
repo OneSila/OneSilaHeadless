@@ -83,6 +83,7 @@ class SalesPriceListGenerator(PrivateStructuredDataGenerator):
                     'currency': Currency.objects.filter(multi_tenant_company=self.multi_tenant_company).get(is_default_currency=True)
                 },
                 'post_data': {},
+
             },
             {
                 'instance_data': {
