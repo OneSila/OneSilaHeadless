@@ -19,13 +19,10 @@ from inventory.schema import InventoryQuery, InventoryMutation, InventorySubscri
 from lead_times.schema import LeadTimesQuery, LeadTimesMutation, LeadTimesSubscription
 from media.schema import MediaQuery, MediaMutation, MediaSubscription
 from orders.schema import OrdersQuery, OrdersMutation, OrdersSubscription
-from order_returns.schema import OrderReturnsQuery, OrderReturnsMutation, OrderReturnsSubscription
 from products.schema import ProductsQuery, ProductsMutation, ProductsSubscription
 from products_inspector.schema import ProductsInspectorSubscription, ProductsInspectorMutation
 from properties.schema import PropertiesQuery, PropertiesMutation, PropertiesSubscription
-from purchasing.schema import PurchasingQuery, PurchasingMutation, PurchasingSubscription
 from sales_prices.schema import SalesPricesQuery, SalesPricesMutation, SalesPriceSubscription
-from shipments.schema import ShipmentsMutation, ShipmentsQuery, ShipmentsSubscription
 from sales_channels.schema import SalesChannelsQuery, SalesChannelsMutation, SalesChannelsSubscription
 from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
 from units.schema import UnitsQuery, UnitsMutation, UnitsSubscription
@@ -39,17 +36,16 @@ from translations.schema import TranslationsQuery
 @strawberry.type
 class Query(ContactsQuery, CurrenciesQuery, CustomsQuery, CountryQuery, EanCodesQuery,
         InventoryQuery, LanguageQuery, LeadTimesQuery, MediaQuery, MultiTenantQuery, OrdersQuery,
-        OrderReturnsQuery, ProductsQuery, PropertiesQuery, PurchasingQuery, SalesPricesQuery, SalesChannelsQuery,
-        ShipmentsQuery, TaxesQuery, TimeZoneQuery, UnitsQuery, TranslationsQuery):
+        ProductsQuery, PropertiesQuery, SalesPricesQuery, SalesChannelsQuery,
+        TaxesQuery, TimeZoneQuery, UnitsQuery, TranslationsQuery):
     pass
 
 
 @strawberry.type
 class Mutation(ContactsMutation, CurrenciesMutation, CustomsMutation, EanCodesMutation,
         InventoryMutation, LeadTimesMutation, MediaMutation, MultiTenantMutation,
-        OrdersMutation, OrderReturnsMutation, ProductsInspectorMutation, ProductsMutation,
-        PropertiesMutation, PurchasingMutation, SalesPricesMutation, SalesChannelsMutation, ShipmentsMutation,
-        TaxesMutation, UnitsMutation):
+        OrdersMutation, ProductsInspectorMutation, ProductsMutation, PropertiesMutation,
+        SalesPricesMutation, SalesChannelsMutation, TaxesMutation, UnitsMutation):
     pass
 
 
@@ -57,9 +53,9 @@ class Mutation(ContactsMutation, CurrenciesMutation, CustomsMutation, EanCodesMu
 class Subscription(ContactsSubscription, CurrenciesSubscription,
         CustomsSubscription, EanCodesSubscription, InventorySubscription,
         LeadTimesSubscription, MediaSubscription, MultiTenantSubscription,
-        OrdersSubscription, OrderReturnsSubscription, ProductsInspectorSubscription,
-        ProductsSubscription, PropertiesSubscription, PurchasingSubscription,
-        SalesPriceSubscription, SalesChannelsSubscription, ShipmentsSubscription, TaxSubscription, UnitsSubscription):
+        OrdersSubscription, ProductsInspectorSubscription,
+        ProductsSubscription, PropertiesSubscription, SalesPriceSubscription, SalesChannelsSubscription,
+        TaxSubscription, UnitsSubscription):
     pass
 
 #

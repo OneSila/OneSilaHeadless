@@ -2,29 +2,12 @@
 
 from django.db import migrations
 
-
-def delete_non_p_units(apps, schema_editor):
-    Unit = apps.get_model('units', 'Unit')
-    SupplierProduct = apps.get_model('purchasing', 'SupplierProduct')
-    PurchaseOrderItem = apps.get_model('purchasing', 'PurchaseOrderItem')
-
-    units_to_delete = Unit.objects.exclude(unit='p')
-
-    for unit in units_to_delete:
-        for supplier_product in SupplierProduct.objects.filter(unit=unit):
-            PurchaseOrderItem.objects.filter(item=supplier_product).delete()
-            supplier_product.delete()
-
-        unit.delete()
-
-
+# old custom migration related
 class Migration(migrations.Migration):
 
     dependencies = [
         ('units', '0001_initial'),
-        ('purchasing', '0001_initial'),
     ]
 
     operations = [
-        migrations.RunPython(delete_non_p_units),
     ]

@@ -2,15 +2,9 @@ from django.db import IntegrityError
 from django.db.models import Sum
 from django.utils.translation import gettext_lazy as _
 from core import models
-from .managers import InventoryManager, InventoryLocationManager
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-
-from purchasing.models import PurchaseOrder
-from order_returns.models import OrderReturn
-from orders.models import Order
-from shipments.models import Package
 
 from .signals import inventory_received, inventory_sent
 
@@ -27,11 +21,9 @@ class Inventory(models.Model):
     inventorylocation = models.ForeignKey('InventoryLocation', on_delete=models.PROTECT)
     quantity = models.IntegerField()
 
-    objects = InventoryManager()
-
     class Meta:
         backorder_item_count = 99999
-        search_terms = ['product__sku', 'inventorylocation__name', 'product__supplier__name']
+        search_terms = ['product__sku', 'inventorylocation__name']
         unique_together = ('product', 'inventorylocation')
         verbose_name_plural = "inventories"
 
@@ -50,9 +42,6 @@ class Inventory(models.Model):
         if self.quantity < 0:
             raise IntegrityError(_("Inventory cannot have a quantity smaller than 0."))
 
-        if not (self.product.is_supplier_product() or self.product.is_manufacturable()):
-            raise IntegrityError(_("Inventory can only be attached to a SUPPLIER or MANUFACTURABLE PRODUCT. Not a {}".format(self.product.type)))
-
         super().save(*args, **kwargs)
 
 
@@ -68,8 +57,6 @@ class InventoryLocation(models.Model):
     shippingaddress = models.ForeignKey('contacts.InventoryShippingAddress', on_delete=models.CASCADE)
 
     precise = models.BooleanField(default=False)
-
-    objects = InventoryLocationManager()
 
     def reduce_quantity(self, product, quantity):
         # Why no try / except / DoestNotExist?
@@ -111,11 +98,9 @@ class InventoryMovement(models.Model):
     Represents an inventory movement record, capable of dynamically referencing different types of sources and destinations.
     """
     MOVEMENT_FROM_MODELS = [
-        PurchaseOrder,
         InventoryLocation,
-        OrderReturn
     ]
-    MOVEMENT_TO_MODELS = [InventoryLocation, Package]
+    MOVEMENT_TO_MODELS = [InventoryLocation]
 
     # Source of inventory movement (e.g., from a warehouse, a purchase order or return)
     mf_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='inventory_movements_from')
@@ -139,7 +124,6 @@ class InventoryMovement(models.Model):
         return self.name
 
     def validate_quantity(self):
-        from order_returns.models import OrderReturnItem
 
         if self.quantity <= 0:
             raise ValidationError(_("Quantity must be greater than zero."))
@@ -158,28 +142,6 @@ class InventoryMovement(models.Model):
             if self.quantity > inventory.quantity:
                 raise ValidationError(_("Cannot move more than available quantity from this location. ""Maximum available quantity is %(max_quantity)s.")
                                       % {'max_quantity': inventory.quantity})
-        elif mf_class == OrderReturn:
-
-            # @TODO: When we start working on returns check if that is correct
-            order_return = self.movement_from
-            ori_qs = OrderReturnItem.objects.filter(
-                orderreturn=order_return,
-                product=self.product
-            )
-            if not ori_qs.exists():
-                raise ValidationError(_("No Order Return Item found for this product in the selected Order Return."))
-
-            total_returned_quantity = ori_qs.aggregate(total=Sum('quantity'))['total'] or 0
-
-            # Calculate total quantity already moved from this OrderReturn and product
-            total_moved_quantity = InventoryMovement.objects.filter(
-                mf_content_type=self.mf_content_type,
-                mf_object_id=self.mf_object_id,
-                product=self.product
-            ).exclude(pk=self.pk).aggregate(total=Sum('quantity'))['total'] or 0
-
-            if (total_moved_quantity + self.quantity) > total_returned_quantity:
-                raise ValidationError(_("Cannot move more than the returned quantity from this Order Return."))
 
     def save(self, *args, **kwargs):
         mf_class = self.mf_content_type.model_class()

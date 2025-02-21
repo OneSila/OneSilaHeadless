@@ -1,4 +1,4 @@
-from products.models import Product, ConfigurableVariation, BundleVariation, SupplierProduct
+from products.models import Product, ConfigurableVariation, BundleVariation
 from inventory.signals import inventory_change
 
 

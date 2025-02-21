@@ -39,8 +39,6 @@ INSTALLED_LOCAL_APPS = [
     # so not alphabetic order, but order according to dependency.
     'core',
 
-    'accounting',
-    'accounting.integrations.quickbooks',
     'contacts',
     'currencies',
     'taxes',
@@ -61,9 +59,6 @@ INSTALLED_LOCAL_APPS = [
     'sales_prices',
     'properties',
     'orders',
-    'purchasing',
-    'shipments',
-    'order_returns',
 
     'huey.contrib.djhuey',
 ]

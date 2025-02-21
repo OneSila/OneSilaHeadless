@@ -1,11 +1,7 @@
-from core.schema.core.mutations import type
 from core.schema.core.mutations import create, update, delete, type, List
-
-from .types.types import LeadTimeType, LeadTimeForShippingAddressType, \
-    LeadTimeProductOutOfStockType
+from .types.types import LeadTimeType, LeadTimeForShippingAddressType
 from .types.input import LeadTimeInput, LeadTimePartialInput, \
-    LeadTimeForShippingAddressInput, LeadTimeForShippingAddressPartialInput, \
-    LeadTimeProductOutOfStockInput, LeadTimeProductOutOfStockPartialInput
+    LeadTimeForShippingAddressInput, LeadTimeForShippingAddressPartialInput
 
 
 @type(name="Mutation")
@@ -21,7 +17,3 @@ class LeadTimesMutation:
     update_lead_time_for_shippingaddress: LeadTimeForShippingAddressType = update(LeadTimeForShippingAddressPartialInput)
     delete_lead_time_for_shippingaddress: LeadTimeForShippingAddressType = delete()
     delete_lead_times_for_shippingaddress: List[LeadTimeForShippingAddressType] = delete()
-
-    create_lead_time_product_out_of_stock: LeadTimeProductOutOfStockType = create(LeadTimeProductOutOfStockInput)
-    update_lead_time_product_out_of_stock: LeadTimeProductOutOfStockType = update(LeadTimeProductOutOfStockPartialInput)
-    delete_lead_time_product_out_of_stock: LeadTimeProductOutOfStockType = delete()

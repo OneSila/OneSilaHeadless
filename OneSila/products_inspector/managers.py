@@ -44,15 +44,6 @@ class InspectorBlockMissingPricesManager(InspectorBlockManager):
         return InspectorBlockMissingPricesQuerySet(self.model, using=self._db)
 
 
-class InactivePiecesInspectorBlockQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
-    pass
-
-
-class InactivePiecesInspectorBlockManager(InspectorBlockManager):
-    def get_queryset(self):
-        return InactivePiecesInspectorBlockQuerySet(self.model, using=self._db)
-
-
 class MissingVariationInspectorBlockQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
     pass
 
@@ -69,24 +60,6 @@ class MissingBundleItemsInspectorBlockQuerySet(QuerySetProxyModelMixin, Inspecto
 class MissingBundleItemsInspectorBlockManager(InspectorBlockManager):
     def get_queryset(self):
         return MissingBundleItemsInspectorBlockQuerySet(self.model, using=self._db)
-
-
-class MissingBillOfMaterialsInspectorBlockQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
-    pass
-
-
-class MissingBillOfMaterialsInspectorBlockManager(InspectorBlockManager):
-    def get_queryset(self):
-        return MissingBillOfMaterialsInspectorBlockQuerySet(self.model, using=self._db)
-
-
-class MissingSupplierProductsInspectorBlockQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
-    pass
-
-
-class MissingSupplierProductsInspectorBlockManager(InspectorBlockManager):
-    def get_queryset(self):
-        return MissingSupplierProductsInspectorBlockQuerySet(self.model, using=self._db)
 
 
 class InactiveBundleItemsInspectorBlockQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
@@ -134,15 +107,6 @@ class MissingOptionalPropertiesInspectorBlockManager(InspectorBlockManager):
         return MissingOptionalPropertiesInspectorBlockQuerySet(self.model, using=self._db)
 
 
-class MissingSupplierPriceQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
-    pass
-
-
-class MissingSupplierPriceManager(InspectorBlockManager):
-    def get_queryset(self):
-        return MissingSupplierPriceQuerySet(self.model, using=self._db)
-
-
 class MissingStockQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
     pass
 
@@ -150,15 +114,6 @@ class MissingStockQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
 class MissingStockManager(InspectorBlockManager):
     def get_queryset(self):
         return MissingStockQuerySet(self.model, using=self._db)
-
-
-class MissingLeadTimeQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
-    pass
-
-
-class MissingLeadTimeManager(InspectorBlockManager):
-    def get_queryset(self):
-        return MissingLeadTimeQuerySet(self.model, using=self._db)
 
 
 class MissingManualPriceListOverrideQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
@@ -188,15 +143,6 @@ class ItemsMismatchProductTypeManager(InspectorBlockManager):
         return ItemsMismatchProductTypeQuerySet(self.model, using=self._db)
 
 
-class BomMismatchProductTypeQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
-    pass
-
-
-class BomMismatchProductTypeManager(InspectorBlockManager):
-    def get_queryset(self):
-        return BomMismatchProductTypeQuerySet(self.model, using=self._db)
-
-
 class ItemsMissingMandatoryInformationQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
     pass
 
@@ -213,16 +159,6 @@ class VariationsMissingMandatoryInformationQuerySet(QuerySetProxyModelMixin, Ins
 class VariationsMissingMandatoryInformationManager(InspectorBlockManager):
     def get_queryset(self):
         return VariationsMissingMandatoryInformationQuerySet(self.model, using=self._db)
-
-
-class BomMissingMandatoryInformationQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
-    pass
-
-
-class BomMissingMandatoryInformationManager(InspectorBlockManager):
-    def get_queryset(self):
-        return BomMissingMandatoryInformationQuerySet(self.model, using=self._db)
-
 
 class DuplicateVariationsQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
     pass

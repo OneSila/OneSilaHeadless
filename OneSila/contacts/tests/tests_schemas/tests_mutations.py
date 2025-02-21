@@ -26,12 +26,8 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             variables={"name": company_name}
         )
 
-        self.assertTrue(resp.errors is None)
-        self.assertTrue(resp.data is not None)
-
-        resp_company_name = resp.data['createCompany']['name']
-
-        self.assertEqual(resp_company_name, company_name)
+        # this is readonly now so we can't use this mutation
+        self.assertFalse(resp.errors is None)
 
     def test_company_update(self):
         mutation = """
@@ -51,12 +47,8 @@ class CompanyQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             variables={"id": company_global_id, "name": company_name}
         )
 
-        self.assertTrue(resp.errors is None)
-        self.assertTrue(resp.data is not None)
-
-        resp_company_name = resp.data['updateCompany']['name']
-
-        self.assertEqual(resp_company_name, company_name)
+        # this is readonly now so we can't use this mutation
+        self.assertFalse(resp.errors is None)
 
 
 class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
@@ -76,12 +68,8 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             variables={"name": company_name}
         )
 
-        self.assertTrue(resp.errors is None)
-        self.assertTrue(resp.data is not None)
-
-        resp_company_name = resp.data['createSupplier']['name']
-
-        self.assertEqual(resp_company_name, company_name)
+        # this is readonly now so we can't use this mutation
+        self.assertFalse(resp.errors is None)
 
     def test_supplier_update(self):
         mutation = """
@@ -103,12 +91,8 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
 
         )
 
-        self.assertTrue(resp.errors is None)
-        self.assertTrue(resp.data is not None)
-
-        resp_company_name = resp.data['updateSupplier']['name']
-
-        self.assertEqual(resp_company_name, company_name)
+        # this is readonly now so we can't use this mutation
+        self.assertFalse(resp.errors is None)
 
     def test_company_to_supplier_update(self):
         mutation = """
@@ -132,9 +116,5 @@ class SupplierQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
             asserts_errors=False,
         )
 
-        self.assertTrue(resp.errors is None)
-        self.assertTrue(resp.data is not None)
-
-        resp_company_name = resp.data['updateSupplier']['name']
-
-        self.assertEqual(resp_company_name, company_name)
+        # this is readonly now so we can't use this mutation
+        self.assertFalse(resp.errors is None)

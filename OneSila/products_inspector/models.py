@@ -1,13 +1,13 @@
 from core import models
 from products.models import Product
 from django.utils.translation import gettext_lazy as _
-from products_inspector.managers import InspectorBlockHasImagesManager, InspectorBlockMissingPricesManager, InactivePiecesInspectorBlockManager, \
-    MissingVariationInspectorBlockManager, MissingBundleItemsInspectorBlockManager, MissingBillOfMaterialsInspectorBlockManager, \
-    MissingSupplierProductsInspectorBlockManager, InactiveBundleItemsInspectorBlockManager, MissingEanCodeInspectorBlockManager, \
+from products_inspector.managers import InspectorBlockHasImagesManager, InspectorBlockMissingPricesManager, \
+    MissingVariationInspectorBlockManager, MissingBundleItemsInspectorBlockManager, \
+    InactiveBundleItemsInspectorBlockManager, MissingEanCodeInspectorBlockManager, \
     MissingProductTypeInspectorBlockManager, MissingRequiredPropertiesInspectorBlockManager, MissingOptionalPropertiesInspectorBlockManager, \
-    MissingSupplierPriceManager, MissingStockManager, MissingLeadTimeManager, MissingManualPriceListOverrideManager, VariationMismatchProductTypeManager, \
-    ItemsMismatchProductTypeManager, BomMismatchProductTypeManager, ItemsMissingMandatoryInformationManager, VariationsMissingMandatoryInformationManager, \
-    BomMissingMandatoryInformationManager, DuplicateVariationsManager, NonConfigurableRuleInspectorBlockManager
+    MissingStockManager, MissingManualPriceListOverrideManager, VariationMismatchProductTypeManager, \
+    ItemsMismatchProductTypeManager, ItemsMissingMandatoryInformationManager, VariationsMissingMandatoryInformationManager, \
+    DuplicateVariationsManager, NonConfigurableRuleInspectorBlockManager
 
 
 class Inspector(models.Model):
@@ -56,7 +56,7 @@ class InspectorBlock(models.Model):
         ]
 
     def get_target_field_key(self):
-        from products.product_types import SIMPLE, BUNDLE, CONFIGURABLE, MANUFACTURABLE, DROPSHIP, SUPPLIER
+        from products.product_types import SIMPLE, BUNDLE, CONFIGURABLE
         """
         Determines the appropriate target field key based on the associated product's type.
         """
@@ -64,10 +64,8 @@ class InspectorBlock(models.Model):
             SIMPLE: 'simple_product_applicability',
             BUNDLE: 'bundle_product_applicability',
             CONFIGURABLE: 'configurable_product_applicability',
-            MANUFACTURABLE: 'manufacturable_product_applicability',
-            DROPSHIP: 'dropship_product_applicability',
-            SUPPLIER: 'supplier_product_applicability',
         }
+
         return product_type_map.get(self.inspector.product.type)
 
     def __str__(self):
@@ -94,17 +92,6 @@ class InspectorBlockMissingPrices(InspectorBlock):
     class Meta:
         proxy = True
         verbose_name = _("Inspector Block Missing Prices")
-
-
-class InspectorBlockInactivePieces(InspectorBlock):
-    from .constants import inactive_pieces_block
-
-    objects = InactivePiecesInspectorBlockManager()
-    proxy_filter_fields = inactive_pieces_block
-
-    class Meta:
-        proxy = True
-        verbose_name = _("Inspector Block Inactive Pieces")
 
 
 class InspectorBlockInactiveBundleItems(InspectorBlock):
@@ -138,28 +125,6 @@ class InspectorBlockMissingBundleItems(InspectorBlock):
     class Meta:
         proxy = True
         verbose_name = _("Inspector Block Missing Bundle Items")
-
-
-class InspectorBlockMissingBillOfMaterials(InspectorBlock):
-    from .constants import missing_bill_of_materials_block
-
-    objects = MissingBillOfMaterialsInspectorBlockManager()
-    proxy_filter_fields = missing_bill_of_materials_block
-
-    class Meta:
-        proxy = True
-        verbose_name = _("Inspector Block Missing Bill of Materials")
-
-
-class InspectorBlockMissingSupplierProducts(InspectorBlock):
-    from .constants import missing_supplier_products_block
-
-    objects = MissingSupplierProductsInspectorBlockManager()
-    proxy_filter_fields = missing_supplier_products_block
-
-    class Meta:
-        proxy = True
-        verbose_name = _("Inspector Block Missing Supplier Products")
 
 
 class MissingEanCodeInspectorBlock(InspectorBlock):
@@ -205,18 +170,6 @@ class MissingOptionalPropertiesInspectorBlock(InspectorBlock):
         proxy = True
         verbose_name = _("Inspector Block Missing Optional Properties")
 
-
-class MissingSupplierPriceInspectorBlock(InspectorBlock):
-    from .constants import missing_supplier_prices_block
-
-    objects = MissingSupplierPriceManager()
-    proxy_filter_fields = missing_supplier_prices_block
-
-    class Meta:
-        proxy = True
-        verbose_name = _("Inspector Block Missing Supplier Prices")
-
-
 class MissingStockInspectorBlock(InspectorBlock):
     from .constants import missing_stock_block
 
@@ -226,17 +179,6 @@ class MissingStockInspectorBlock(InspectorBlock):
     class Meta:
         proxy = True
         verbose_name = _("Inspector Block Missing Stock")
-
-
-class MissingLeadTimeInspectorBlock(InspectorBlock):
-    from .constants import missing_lead_time_block
-
-    objects = MissingLeadTimeManager()
-    proxy_filter_fields = missing_lead_time_block
-
-    class Meta:
-        proxy = True
-        verbose_name = _("Inspector Block Missing Lead Time")
 
 
 class MissingManualPriceListOverrideInspectorBlock(InspectorBlock):
@@ -272,17 +214,6 @@ class ItemsMismatchProductTypeInspectorBlock(InspectorBlock):
         verbose_name = _("Inspector Block Items Mismatch Product Type")
 
 
-class BomMismatchProductTypeInspectorBlock(InspectorBlock):
-    from .constants import bom_mismatch_product_type_block
-
-    objects = BomMismatchProductTypeManager()
-    proxy_filter_fields = bom_mismatch_product_type_block
-
-    class Meta:
-        proxy = True
-        verbose_name = _("Inspector Block BOM Mismatch Product Type")
-
-
 class ItemsMissingMandatoryInformationInspectorBlock(InspectorBlock):
     from .constants import items_missing_mandatory_information_block
 
@@ -303,17 +234,6 @@ class VariationsMissingMandatoryInformationInspectorBlock(InspectorBlock):
     class Meta:
         proxy = True
         verbose_name = _("Inspector Block Variations Missing Mandatory Information")
-
-
-class BomMissingMandatoryInformationInspectorBlock(InspectorBlock):
-    from .constants import bom_missing_mandatory_information_block
-
-    objects = BomMissingMandatoryInformationManager()
-    proxy_filter_fields = bom_missing_mandatory_information_block
-
-    class Meta:
-        proxy = True
-        verbose_name = _("Inspector Block BOM Missing Mandatory Information")
 
 
 class DuplicateVariationsInspectorBlock(InspectorBlock):

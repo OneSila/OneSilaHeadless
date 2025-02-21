@@ -2,7 +2,7 @@ from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, P
 from django.db.models import Q
 from eancodes.models import EanCode
 from products.models import Product
-from products.product_types import UMBRELLA, SIMPLE, BUNDLE, PRODUCT_TYPE_CHOICES, MANUFACTURABLE
+from products.product_types import SIMPLE, BUNDLE
 
 registry = DemoDataLibrary()
 
@@ -18,7 +18,7 @@ def generate_demo_eancodes(multi_tenant_company):
         if fake.boolean():
             product = Product.objects.\
                 filter(
-                    Q(type=SIMPLE) | Q(type=BUNDLE) | Q(type=MANUFACTURABLE),
+                    Q(type=SIMPLE) | Q(type=BUNDLE),
                     multi_tenant_company=multi_tenant_company,
                     eancode__isnull=True
                 ).\

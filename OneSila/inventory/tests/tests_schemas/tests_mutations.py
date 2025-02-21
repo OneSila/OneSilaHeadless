@@ -1,8 +1,6 @@
 from model_bakery import baker
 from core.tests import TestCaseWithDemoData, TestCase, TransactionTestCase
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
-
-from products.models import SupplierProduct
 from inventory.models import Inventory, InventoryLocation
 
 #

@@ -7,38 +7,26 @@ from django.db import IntegrityError, transaction
 from django.utils.translation import gettext_lazy as _
 from translations.models import TranslationFieldsMixin, TranslatedModelMixin
 from taxes.models import VatRate
-from .managers import ProductManager, ConfigurableManager, BundleManager, VariationManager, \
-    SupplierProductManager, ManufacturableManager, DropshipManager, SupplierPriceManager
+from .managers import ProductManager, ConfigurableManager, BundleManager, VariationManager
 import shortuuid
 from hashlib import shake_256
-from products.product_types import SUPPLIER
 
 import logging
 logger = logging.getLogger(__name__)
 
 
 class Product(TranslatedModelMixin, models.Model):
-    from products.product_types import CONFIGURABLE, BUNDLE, MANUFACTURABLE, DROPSHIP, SUPPLIER, SIMPLE, \
-        PRODUCT_TYPE_CHOICES, HAS_PRICES_TYPES
+    from products.product_types import CONFIGURABLE, BUNDLE, SIMPLE,  PRODUCT_TYPE_CHOICES, HAS_PRICES_TYPES
 
     # Mandatory
     sku = models.CharField(max_length=100, db_index=True, blank=True, null=True)
     active = models.BooleanField(default=True)
     type = models.CharField(max_length=15, choices=PRODUCT_TYPE_CHOICES)
 
-    # For Everything except supplier product
     vat_rate = models.ForeignKey(VatRate, on_delete=models.PROTECT, null=True, blank=True)
-    for_sale = models.BooleanField(default=True)
 
     # for simple and dropshipping products, meaning allow product to be sold even when no physical stock is present.
     allow_backorder = models.BooleanField(default=False)
-
-    # Supplier Product Fields
-    supplier = models.ForeignKey('contacts.Company', on_delete=models.CASCADE, null=True, blank=True)
-    base_products = models.ManyToManyField('self', symmetrical=False, related_name='supplier_products', blank=True)
-
-    # Manufacturer product fields
-    production_time = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     configurable_variations = models.ManyToManyField('self',
         through='ConfigurableVariation',
@@ -52,21 +40,10 @@ class Product(TranslatedModelMixin, models.Model):
         blank=True,
         related_name='bundles')
 
-    bom_variations = models.ManyToManyField(
-        'self',
-        through='BillOfMaterial',
-        symmetrical=False,
-        blank=True,
-        related_name='manufacturables'
-    )
-
     objects = ProductManager()
     variations = VariationManager()
     bundles = BundleManager()
     configurables = ConfigurableManager()
-    manufacturables = ManufacturableManager()
-    dropships = DropshipManager()
-    supplier_products = SupplierProductManager()
 
     @property
     def name(self):
@@ -124,30 +101,6 @@ class Product(TranslatedModelMixin, models.Model):
     def is_not_variations(self):
         return self.type != self.SIMPLE
 
-    def is_not_manufacturable(self):
-        return self.type != self.MANUFACTURABLE
-
-    def is_manufacturable(self):
-        return self.type == self.MANUFACTURABLE
-
-    def is_dropship(self):
-        return self.type == self.DROPSHIP
-
-    def is_supplier_product(self):
-        return self.type == self.SUPPLIER
-
-    def defalte_dropshipping(self, active_only=True):
-        return self.deflate_simple(active_only=active_only)
-
-    def deflate_simple(self, active_only=True):
-        """Return all of the supplier products for a given simple product"""
-        qs = self.supplier_products.all()
-
-        if active_only:
-            qs = qs.filter(active=True)
-
-        return qs
-
     def deflate_bundle(self):
         """Return all BundleVariation items"""
 
@@ -173,9 +126,6 @@ class Product(TranslatedModelMixin, models.Model):
         product_ids = set()
         product_ids.add(self.id)
 
-        for prod in self.base_products.all().iterator():
-            product_ids.add(prod.id)
-
         bundles = BundleVariation.objects.filter(variation_id__in=product_ids)
         for bv in bundles.iterator():
             product_ids.add(bv.parent.id)
@@ -197,12 +147,6 @@ class Product(TranslatedModelMixin, models.Model):
             return BundleProduct.objects.get(pk=self.pk)
         elif self.is_configurable():
             return ConfigurableProduct.objects.get(pk=self.pk)
-        elif self.is_manufacturable():
-            return ManufacturableProduct.objects.get(pk=self.pk)
-        elif self.is_dropship():
-            return DropshipProduct.objects.get(pk=self.pk)
-        elif self.is_supplier_product():
-            return SupplierProduct.objects.get(pk=self.pk)
         else:
             return self
 
@@ -357,7 +301,7 @@ class Product(TranslatedModelMixin, models.Model):
         # Fallback if no price information is available
         return None, None
 
-    def get_configurable_variations(self, active_only=True, for_sale=True):
+    def get_configurable_variations(self, active_only=True):
         """
         Returns the variations (child products) of this configurable product.
 
@@ -376,44 +320,20 @@ class Product(TranslatedModelMixin, models.Model):
         if active_only:
             variations = variations.filter(active=True)
 
-        if for_sale:
-            variations = variations.filter(for_sale=True)
-
         return variations
 
     def _generate_sku(self, save=False):
         self.sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
 
     def save(self, *args, **kwargs):
-        if not self.sku and self.type != SUPPLIER:
+        if not self.sku:
             self._generate_sku()
 
         super().save(*args, **kwargs)
 
     class Meta:
         search_terms = ['sku', 'translations__name']
-        constraints = [
-            models.CheckConstraint(
-                check=~Q(type=Value(SUPPLIER)) | Q(sku__isnull=False),
-                name='sku_required_for_supplier_product',
-                violation_error_message=_("Supplier products require an sku"),
-            ),
-            models.CheckConstraint(
-                check=~Q(type=Value(SUPPLIER)) | Q(supplier__isnull=False),
-                name='supplier_required_for_supplier_product',
-                violation_error_message=_("Supplier products require a Supplier"),
-            ),
-            models.UniqueConstraint(
-                fields=['sku', 'supplier', 'multi_tenant_company'],
-                name='unique_sku_with_supplier',
-                condition=Q(supplier__isnull=False)
-            ),
-            models.UniqueConstraint(
-                fields=['sku', 'multi_tenant_company'],
-                name='unique_sku_without_supplier',
-                condition=Q(supplier__isnull=True)
-            )
-        ]
+        unique_together = ('sku', 'multi_tenant_company')
 
 
 class BundleProduct(Product):
@@ -443,28 +363,6 @@ class SimpleProduct(Product):
 
     objects = VariationManager()
     proxy_filter_fields = {'type': SIMPLE}
-
-    class Meta:
-        proxy = True
-        search_terms = ['sku']
-
-
-class ManufacturableProduct(Product):
-    from products.product_types import MANUFACTURABLE
-
-    objects = ManufacturableManager()
-    proxy_filter_fields = {'type': MANUFACTURABLE}
-
-    class Meta:
-        proxy = True
-        search_terms = ['sku']
-
-
-class DropshipProduct(Product):
-    from products.product_types import DROPSHIP
-
-    objects = DropshipManager()
-    proxy_filter_fields = {'type': DROPSHIP}
 
     class Meta:
         proxy = True
@@ -512,27 +410,6 @@ class BundleVariation(models.Model):
         unique_together = ("parent", "variation")
 
 
-class BillOfMaterial(models.Model):
-    parent = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_through_parents")
-    variation = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bom_through_variations")
-    quantity = models.FloatField(default=1)
-
-    def __str__(self):
-        return f"{self.parent} x {self.quantity} {self.variation}"
-
-    def save(self, *args, **kwargs):
-        if self.parent.is_not_manufacturable():
-            raise IntegrityError(_("Product needs to be of type MANUFACTURABLE. Not %s" % self.parent.type))
-
-        if self.variation.type not in [Product.SIMPLE, Product.MANUFACTURABLE]:
-            raise IntegrityError(_("variation needs to a product of type BUNDLE or MANUFACTURABLE. Not %s" % (self.variation.type)))
-
-        super().save(*args, **kwargs)
-
-    class Meta:
-        unique_together = ("parent", "variation")
-
-
 class ProductTranslation(TranslationFieldsMixin, models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations")
 
@@ -545,14 +422,13 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
         return f"{self.product} <{self.language}>"
 
     def _get_default_url_key(self):
-        if self.product.type != Product.SUPPLIER:
-            new_url_key = slugify(self.name)
+        new_url_key = slugify(self.name)
 
-            if ProductTranslation.objects.filter(url_key=new_url_key, multi_tenant_company=self.multi_tenant_company).exists():
-                # sku is unique so this will solve everything
-                new_url_key += f'-{self.product.sku}-{self.language}'
+        if ProductTranslation.objects.filter(url_key=new_url_key, multi_tenant_company=self.multi_tenant_company).exists():
+            # sku is unique so this will solve everything
+            new_url_key += f'-{self.product.sku}-{self.language}'
 
-            return new_url_key
+        return new_url_key
 
         return None
 
@@ -568,35 +444,3 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
             ('product', 'language'),
             ('url_key', 'multi_tenant_company'),
         )
-
-
-class SupplierProduct(Product):
-    from products.product_types import SUPPLIER
-
-    objects = SupplierProductManager()
-    proxy_filter_fields = {'type': SUPPLIER}
-
-    class Meta:
-        proxy = True
-        search_terms = ['sku', 'supplier__name', 'translations__name']
-
-    def save(self, *args, **kwargs):
-        if self.id and not all(bp.type in [self.SIMPLE, self.DROPSHIP] for bp in self.base_products.all()):
-            raise IntegrityError(_("SupplierProduct can only be attached to SIMPLE or DROPSHIP products."))
-
-        self.for_sale = False
-
-        super().save(*args, **kwargs)
-
-
-class SupplierPrice(models.Model):
-    supplier_product = models.ForeignKey(SupplierProduct, on_delete=models.CASCADE, related_name='details')
-
-    unit = models.ForeignKey('units.Unit', on_delete=models.PROTECT)
-    quantity = models.IntegerField()
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
-
-    objects = SupplierPriceManager()
-
-    class Meta:
-        search_terms = ['supplier_product__product__sku', 'supplier_product__supplier__name']

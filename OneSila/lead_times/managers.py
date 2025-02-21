@@ -11,50 +11,6 @@ class LeadTimeQuerySet(MultiTenantQuerySet):
     def order_by_fastest(self):
         return self.order_by('unit', 'max_time', 'min_time')
 
-    def get_product_leadtime(self, product):
-        from .models import LeadTimeProductOutOfStock
-
-        if product.type == BUNDLE:
-            bundlevariations = BundleVariation.objects.filter(parent=product)
-            leadtime_ids = []
-            for bv in bundlevariations:
-                product = bv.variation
-                try:
-                    leadtime_ids.append(self.model.objects.get_product_leadtime(product).id)
-                except self.model.DoesNotExist:
-                    pass
-            leadtime = self.filter_slowest(leadtimes=leadtime_ids)
-        else:
-            # Items that are not bundles should return a physical location if there inventory.
-            # These locations have lead times.
-            inventory_qs = product.inventory.filter_physical()
-            leadtime = self.\
-                filter_leadtimes_for_inventory(inventory_qs).\
-                filter_fastest()
-
-            # If there is not leadtime detected, most likely there was no inventory
-            # present for that location. (that or there was no setting on the shipping address)
-            # So we start digging for out-of-stock inventory settings.
-            if not leadtime:
-                if product.type in HAS_DIRECT_INVENTORY_TYPES:
-                    try:
-                        leadtime_product = LeadTimeProductOutOfStock.objects.get(product=product)
-                        leadtime = leadtime_product.leadtime_outofstock
-                    except LeadTimeProductOutOfStock.DoesNotExist:
-                        pass
-                elif product.type in HAS_INDIRECT_INVENTORY_TYPES:
-                    supplier_products = product.supplier_products.all()
-                    leadtimes_outofstock_ids = LeadTimeProductOutOfStock.objects.\
-                        filter(product__in=supplier_products).\
-                        values('leadtime_outofstock')
-                    leadtimes = self.model.objects.filter(id__in=leadtimes_outofstock_ids, multi_tenant_company=product.multi_tenant_company)
-                    leadtime = leadtimes.filter_fastest()
-
-        if not leadtime:
-            raise self.model.DoesNotExist(f"No LeadTime found for Product.id {product.id}")
-
-        return leadtime
-
     def filter_leadtimes_for_inventory(self, inventory_qs):
         from .models import LeadTimeForShippingAddress
 
@@ -105,6 +61,3 @@ class LeadTimeManager(MultiTenantManager):
 
     def order_by_fastest(self):
         return self.get_queryset().order_by_fastest()
-
-    def get_product_leadtime(self, product):
-        return self.get_queryset().get_product_leadtime(product=product)

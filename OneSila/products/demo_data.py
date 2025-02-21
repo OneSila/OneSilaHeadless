@@ -1,24 +1,15 @@
 from pathlib import Path
 
-import requests
-from django.core.files.base import ContentFile
-
-from contacts.demo_data import BED_SUPPLIER_NAME, GLASS_SUPPLIER_NAME, METAL_SUPPLIER_NAME, WOOD_SUPPLIER_ONE_NAME
 from core.demo_data import DemoDataLibrary, PrivateStructuredDataGenerator, fake
-from core.managers.decorators import multi_tenant_company_required
 from core.models import MultiTenantCompany, MultiTenantUser
 from media.models import MediaProductThrough, Media
-from products.models import ProductTranslation, Product, BundleProduct, SimpleProduct, SupplierProduct, \
-    SupplierPrice, BundleVariation, DropshipProduct, ConfigurableProduct, ConfigurableVariation
+from products.models import (ProductTranslation, Product, BundleProduct, SimpleProduct,  BundleVariation
+, ConfigurableProduct, ConfigurableVariation)
 from properties.models import Property, PropertySelectValue, ProductProperty
-from products.product_types import CONFIGURABLE, SIMPLE, BUNDLE, DROPSHIP
 from taxes.models import VatRate
 from units.models import Unit
-from contacts.models import Supplier
-from units.demo_data import UNIT_PIECE
 import os
 from django.core.files import File
-from django.conf import settings
 
 registry = DemoDataLibrary()
 
@@ -44,9 +35,6 @@ SUPPLIER_QUEEN_BED_SKU = "SUPP-QUEEN-BED"
 class ProductGetDataMixin:
     def get_unit(self, unit):
         return Unit.objects.get(multi_tenant_company=self.multi_tenant_company, unit=unit)
-
-    def get_supplier(self, name):
-        return Supplier.objects.get(multi_tenant_company=self.multi_tenant_company, name=name)
 
     def get_vat_rate(self):
         return VatRate.objects.filter(multi_tenant_company=self.multi_tenant_company).last()
@@ -142,7 +130,6 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                 'instance_data': {
                     'sku': SIMPLE_CHAIR_WOOD_SKU,  # Default Blue
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {
@@ -156,7 +143,6 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                 'instance_data': {
                     'sku': SIMPLE_CHAIR_WOOD_RED_SKU,
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {
@@ -170,7 +156,6 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                 'instance_data': {
                     'sku': SIMPLE_CHAIR_WOOD_GREEN_SKU,
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {
@@ -185,7 +170,6 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                 'instance_data': {
                     'sku': SIMPLE_CHAIR_METAL_SKU,
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {
@@ -199,7 +183,6 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                 'instance_data': {
                     'sku': SIMPLE_TABLE_GLASS_SKU,
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {
@@ -214,7 +197,6 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                 'instance_data': {
                     'sku': SIMPLE_BED_QUEEN_SKU,
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {
@@ -259,85 +241,6 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
 
 
 @registry.register_private_app
-class SupplierProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, PrivateStructuredDataGenerator):
-    model = SupplierProduct
-
-    def get_structure(self):
-        return [
-            {
-                'instance_data': {
-                    'sku': SUPPLIER_WOODEN_CHAIR_SKU,
-                    'active': True,
-                    'supplier': self.get_supplier(WOOD_SUPPLIER_ONE_NAME),
-                },
-                'post_data': {
-                    'name': "Supplier - Wooden Chair",
-                    'base_products_skus': [SIMPLE_CHAIR_WOOD_SKU],
-                    'price_info': {
-                        'quantity': 10,
-                        'unit_price': 50.0,
-                        'unit': self.get_unit(UNIT_PIECE),
-                    }
-                },
-            },
-            {
-                'instance_data': {
-                    'sku': SUPPLIER_METAL_CHAIR_SKU,
-                    'active': True,
-                    'supplier': self.get_supplier(METAL_SUPPLIER_NAME),
-                },
-                'post_data': {
-                    'name': "Supplier - Metal Chair",
-                    'base_products_skus': [SIMPLE_CHAIR_METAL_SKU],
-                    'price_info': {
-                        'quantity': 8,
-                        'unit_price': 55.0,
-                        'unit': self.get_unit(UNIT_PIECE),
-                    }
-                },
-            },
-            {
-                'instance_data': {
-                    'sku': SUPPLIER_GLASS_TABLE_SKU,
-                    'active': True,
-                    'supplier': self.get_supplier(GLASS_SUPPLIER_NAME),
-                },
-                'post_data': {
-                    'name': "Supplier - Glass Table",
-                    'base_products_skus': [SIMPLE_TABLE_GLASS_SKU],
-                    'price_info': {
-                        'quantity': 5,
-                        'unit_price': 150.0,
-                        'unit': self.get_unit(UNIT_PIECE),
-                    }
-                },
-            },
-            {
-                'instance_data': {
-                    'sku': SUPPLIER_QUEEN_BED_SKU,
-                    'active': True,
-                    'supplier': self.get_supplier(BED_SUPPLIER_NAME),
-                },
-                'post_data': {
-                    'name': "Supplier - Queen Bed",
-                    'base_products_skus': [SIMPLE_BED_QUEEN_SKU],
-                    'price_info': {
-                        'quantity': 3,
-                        'unit_price': 400.0,
-                        'unit': self.get_unit(UNIT_PIECE),
-                    }
-                },
-            },
-        ]
-
-    def post_data_generate(self, instance, **kwargs):
-        super().post_data_generate(instance, **kwargs)
-
-        for sku in kwargs['base_products_skus']:
-            base_product = self.get_product(sku)
-            instance.base_products.add(base_product)
-
-@registry.register_private_app
 class ConfigurableProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, PrivateStructuredDataGenerator):
     model = ConfigurableProduct
 
@@ -347,7 +250,6 @@ class ConfigurableProductDataGenerator(PostDataTranslationMixin, ProductGetDataM
                 'instance_data': {
                     'sku': CONFIGURABLE_CHAIR_SKU,
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {
@@ -390,7 +292,6 @@ class BundleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                 'instance_data': {
                     'sku': BUNDLE_DINING_SET_SKU,
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {

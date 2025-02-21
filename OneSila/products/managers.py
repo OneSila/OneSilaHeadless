@@ -12,12 +12,6 @@ class ProductQuerySet(MultiTenantQuerySet):
     def filter_bundle(self):
         return self.filter(type=self.model.BUNDLE)
 
-    def filter_manufacturer(self):
-        return self.filter(type=self.model.MANUFACTURER)
-
-    def filter_dropship(self):
-        return self.filter(type=self.model.DROPSHIP)
-
     def filter_has_prices(self):
         return self.filter(type__in=self.model.HAS_PRICES_TYPES)
 
@@ -55,7 +49,7 @@ class VariationManager(ProductManager):
 
 class BundleQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
     def get_all_item_products(self, product):
-        from .models import Product, BundleVariation, BillOfMaterial
+        from .models import Product, BundleVariation
 
         """
         Recursively fetch all products that are part of the BOM of the given manufacturable product.
@@ -70,18 +64,13 @@ class BundleQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
             direct_components = BundleVariation.objects.filter(parent=product).values_list('variation_id', flat=True)
             new_ids = set(direct_components) - collected_ids
 
-            # Get direct BillOfMaterial components for manufacturable products
-            if product.is_manufacturable():
-                bom_components = BillOfMaterial.objects.filter(parent=product).values_list('variation_id', flat=True)
-                new_ids.update(set(bom_components) - collected_ids)
-
             if not new_ids:
                 return collected_ids
 
             collected_ids.update(new_ids)
 
             for variation in Product.objects.filter(id__in=new_ids).iterator():
-                if variation.is_bundle() or variation.is_manufacturable():
+                if variation.is_bundle():
                     fetch_items_components(variation, collected_ids)
 
             return collected_ids
@@ -99,83 +88,3 @@ class BundleManager(ProductManager):
 
     def get_all_item_products(self, product):
         return self.get_queryset().get_all_item_products(product)
-
-
-class ManufacturableQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
-    def get_all_bills_of_materials_products(self, product):
-        from .models import Product, BillOfMaterial
-        """
-        Recursively fetch all products that are part of the BOM of the given manufacturable product.
-        Returns a QuerySet of all BOM components.
-        """
-        def fetch_bom_components(product, collected_ids=None):
-            if collected_ids is None:
-                collected_ids = set()
-
-            # Get direct BOM components
-            direct_components = BillOfMaterial.objects.filter(parent=product).values_list('variation_id', flat=True)
-            new_ids = set(direct_components) - collected_ids
-
-            if not new_ids:
-                return collected_ids
-
-            collected_ids.update(new_ids)
-
-            # Recursively fetch BOM components for each new variation
-            for variation_id in new_ids:
-                variation = Product.objects.get(id=variation_id)
-                if variation.is_manufacturable():
-                    fetch_bom_components(variation, collected_ids)
-
-            return collected_ids
-
-        # Fetch all BOM components
-        all_bom_component_ids = fetch_bom_components(product)
-
-        # Return a QuerySet of all the BOM components
-        return Product.objects.filter(id__in=all_bom_component_ids)
-
-
-class ManufacturableManager(ProductManager):
-    def get_queryset(self):
-        return ManufacturableQuerySet(self.model, using=self._db)
-
-    def get_all_bills_of_materials_products(self, product):
-        return self.get_queryset().get_all_bills_of_materials_products(product)
-
-
-class DropshipQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
-    pass
-
-
-class DropshipManager(ProductManager):
-    def get_queryset(self):
-        return DropshipQuerySet(self.model, using=self._db)
-
-
-class SupplierProductQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
-    pass
-
-
-class SupplierProductManager(ProductManager):
-    def get_queryset(self):
-        return SupplierProductQuerySet(self.model, using=self._db)
-
-
-class SupplierPriceQuerySet(MultiTenantQuerySet):
-    def find_cheapest(self, supplierproducts, quantity):
-        return self.\
-            filter(
-                supplier_product__in=supplierproducts,
-                quantity__lte=quantity,
-            ).\
-            order_by('unit_price').\
-            first()
-
-
-class SupplierPriceManager(MultiTenantManager):
-    def get_queryset(self):
-        return SupplierPriceQuerySet(self.model, using=self._db)
-
-    def find_cheapest(self, supplierproducts, quantity):
-        return self.get_queryset().find_cheapest(supplierproducts, quantity)

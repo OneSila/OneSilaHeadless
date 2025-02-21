@@ -1,6 +1,6 @@
 from core import models
 from django.db import IntegrityError
-from products.models import Product, SupplierProduct
+from products.models import Product
 from django.utils.translation import gettext_lazy as _
 
 import logging
