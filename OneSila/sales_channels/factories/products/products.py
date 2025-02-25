@@ -222,8 +222,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin):
 
         if local_type == Product.CONFIGURABLE:
             self.remote_type = self.REMOTE_TYPE_CONFIGURABLE
-        elif local_type == Product.SUPPLIER:
-            raise ValueError("Supplier products are not supported for remote synchronization.")
         else:
             # All other types default to simple
             self.remote_type = self.REMOTE_TYPE_SIMPLE
