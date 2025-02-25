@@ -1,7 +1,7 @@
 from typing import Optional
 
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin
+from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin
 
 from media.models import Media, Image, Video, MediaProductThrough, File
 from products.schema.types.filters import ProductFilter
@@ -30,7 +30,7 @@ class VideoFilter(SearchFilterMixin):
 
 
 @filter(MediaProductThrough)
-class MediaProductThroughFilter:
+class MediaProductThroughFilter(ExcluideDemoDataFilterMixin):
     id: auto
     media: Optional[MediaFilter]
     product: Optional[ProductFilter]

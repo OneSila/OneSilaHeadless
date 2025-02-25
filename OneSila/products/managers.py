@@ -20,6 +20,10 @@ class ProductQuerySet(MultiTenantQuerySet):
         product_ids = ProductProperty.objects.filter(value_select=rule.product_type).values_list('product_id', flat=True)
         return self.filter_multi_tenant(multi_tenant_company=rule.multi_tenant_company).filter(id__in=product_ids)
 
+    def filter_by_product_type(self, product_type):
+        from properties.models import ProductProperty
+        product_ids = ProductProperty.objects.filter(value_select=product_type).values_list('product_id', flat=True)
+        return self.filter_multi_tenant(multi_tenant_company=product_type.multi_tenant_company).filter(id__in=product_ids)
 
 class ProductManager(MultiTenantManager):
     def get_queryset(self):
@@ -27,6 +31,9 @@ class ProductManager(MultiTenantManager):
 
     def filter_by_properties_rule(self, rule):
         return self.get_queryset().filter_by_properties_rule(rule)
+
+    def filter_by_product_type(self, product_type):
+        return self.get_queryset().filter_by_product_type(product_type)
 
 
 class ConfigurableQuerySet(QuerySetProxyModelMixin, ProductQuerySet):

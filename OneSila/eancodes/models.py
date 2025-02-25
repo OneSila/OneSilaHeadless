@@ -18,13 +18,6 @@ class EanCode(models.Model):
         blank=True,
     )
     ean_code = models.CharField(max_length=14, blank=True, null=True)
-    inherit_to = models.ForeignKey(
-        Product,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='inherited_ean_codes'
-    )
     internal = models.BooleanField(default=True, help_text='Generated from the prefix')
     already_used = models.BooleanField(default=False)
 
@@ -36,14 +29,9 @@ class EanCode(models.Model):
         if self.product:
             return self.product.name
 
-        if self.inherit_to:
-            return self.inherit_to.name
-
         return None
 
     def clean(self):
-        if not self.ean_code and not self.inherit_to:
-            raise IntegrityError("Either ean_code or inherit_to must be provided.")
         if self.product and self.product.is_configurable():
             raise IntegrityError("You cannot assign an ean_code to an CONFIGURABLE. It needs to be BUNDLE or SIMPLE")
 
@@ -52,7 +40,10 @@ class EanCode(models.Model):
         super().save(*args, **kwargs)
 
     class Meta:
-        unique_together = ('product', 'ean_code', 'inherit_to')
+        unique_together = (
+            ('product', 'ean_code'),
+            ('product', 'multi_tenant_company'), # a product can only have one ean code
+        )
         constraints = [
             models.UniqueConstraint(
                 fields=['multi_tenant_company', 'ean_code'],
@@ -65,8 +56,7 @@ class EanCode(models.Model):
             models.CheckConstraint(
                 check=(
                     models.Q(ean_code__isnull=False) |
-                    models.Q(product__isnull=False) |
-                    models.Q(inherit_to__isnull=False)
+                    models.Q(product__isnull=False)
                 ),
                 name='ean_code_or_product_to_not_null'
             )

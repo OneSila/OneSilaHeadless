@@ -1,7 +1,7 @@
 from typing import Optional
 
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin
+from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin
 from media.schema.types.filters import ImageFilter
 
 from properties.models import Property, ProductProperty, \
@@ -11,7 +11,7 @@ from products.schema.types.filters import ProductFilter
 
 
 @filter(Property)
-class PropertyFilter(SearchFilterMixin):
+class PropertyFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     is_public_information: auto
     is_product_type: auto
@@ -19,7 +19,7 @@ class PropertyFilter(SearchFilterMixin):
 
 
 @filter(PropertySelectValue)
-class PropertySelectValueFilter(SearchFilterMixin):
+class PropertySelectValueFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     property: Optional[PropertyFilter]
     image: Optional[ImageFilter]
@@ -33,7 +33,7 @@ class PropertySelectValueTranslationFilter:
 
 
 @filter(ProductProperty)
-class ProductPropertyFilter(SearchFilterMixin):
+class ProductPropertyFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     product: Optional[ProductFilter]
     property: Optional[PropertyFilter]
@@ -59,13 +59,13 @@ class ProductPropertyTextTranslationFilter:
 
 
 @filter(ProductPropertiesRule)
-class ProductPropertiesRuleFilter:
+class ProductPropertiesRuleFilter(ExcluideDemoDataFilterMixin):
     id: auto
     product_type: Optional[PropertyFilter]
 
 
 @filter(ProductPropertiesRuleItem)
-class ProductPropertiesRuleItemFilter:
+class ProductPropertiesRuleItemFilter(ExcluideDemoDataFilterMixin):
     id: auto
     rule: Optional[ProductPropertiesRuleFilter]
     property: Optional[PropertyFilter]

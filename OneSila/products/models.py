@@ -59,18 +59,11 @@ class Product(TranslatedModelMixin, models.Model):
         """
         Returns the EAN code for the product instance.
         - If the product has a direct EAN code, return it.
-        - If the product is a variation and inherits an EAN code, return the inherited code.
         - Return None if no EAN code is associated.
         """
-        direct_ean = EanCode.objects.filter(product=self, already_used=False).first()
-        if direct_ean:
-            return direct_ean.ean_code
+        ean = EanCode.objects.filter(product=self, already_used=False).first()
 
-        inherited_ean = EanCode.objects.filter(inherit_to=self, already_used=False).first()
-        if inherited_ean:
-            return inherited_ean.ean_code
-
-        return None
+        return ean.ean_code
 
     def __str__(self):
         return f"{self.name} <{self.sku}>"

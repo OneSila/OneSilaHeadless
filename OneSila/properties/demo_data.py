@@ -1,4 +1,4 @@
-from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator
+from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator, CreatePrivateDataRelationMixin
 from properties.models import Property, PropertyTranslation, PropertySelectValue, PropertySelectValueTranslation, ProductPropertiesRule, \
     ProductPropertiesRuleItem
 
@@ -26,6 +26,7 @@ def create_property_structure(multi_tenant_company):
             multi_tenant_company=multi_tenant_company,
             type=prop_data['type']
         )
+        CreatePrivateDataRelationMixin.create_demo_data_relation(property)
 
         translation = PropertyTranslation.objects.create(
             multi_tenant_company=multi_tenant_company,
@@ -33,6 +34,7 @@ def create_property_structure(multi_tenant_company):
             language='en',
             name=prop_data['name']
         )
+        CreatePrivateDataRelationMixin.create_demo_data_relation(translation)
 
         registry.create_demo_data_relation(translation)
         registry.create_demo_data_relation(property)
@@ -46,6 +48,7 @@ def create_property_structure(multi_tenant_company):
                     property=property,
                     multi_tenant_company=multi_tenant_company,
                 )
+                CreatePrivateDataRelationMixin.create_demo_data_relation(select_value)
                 registry.create_demo_data_relation(select_value)
 
                 translation = PropertySelectValueTranslation.objects.create(
@@ -54,6 +57,7 @@ def create_property_structure(multi_tenant_company):
                     language='en',
                     value=value
                 )
+                CreatePrivateDataRelationMixin.create_demo_data_relation(translation)
                 registry.create_demo_data_relation(translation)
 
     product_type_property = Property.objects.get(is_product_type=True, multi_tenant_company=multi_tenant_company)
@@ -65,6 +69,7 @@ def create_property_structure(multi_tenant_company):
             multi_tenant_company=multi_tenant_company,
         )
 
+        CreatePrivateDataRelationMixin.create_demo_data_relation(prop_select_value)
         registry.create_demo_data_relation(prop_select_value)
 
         translation = PropertySelectValueTranslation.objects.create(
@@ -73,14 +78,18 @@ def create_property_structure(multi_tenant_company):
             language='en',
             value=value
         )
+
+        CreatePrivateDataRelationMixin.create_demo_data_relation(translation)
         registry.create_demo_data_relation(translation)
 
         # Create Product Properties Rule
-        product_properties_rule, _ = ProductPropertiesRule.objects.get_or_create(
+        product_properties_rule, created = ProductPropertiesRule.objects.get_or_create(
             multi_tenant_company=multi_tenant_company,
             product_type=prop_select_value
         )
         registry.create_demo_data_relation(product_properties_rule)
+        if created:
+            CreatePrivateDataRelationMixin.create_demo_data_relation(product_properties_rule)
 
         # Assign properties based on type
         property_assignments = {
@@ -110,6 +119,8 @@ def create_property_structure(multi_tenant_company):
                 property=prop,
                 type=rule_type
             )
+
+            CreatePrivateDataRelationMixin.create_demo_data_relation(rule_item)
             registry.create_demo_data_relation(rule_item)
 
 create_property_structure.priority = 100

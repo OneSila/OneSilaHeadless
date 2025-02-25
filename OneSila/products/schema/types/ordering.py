@@ -9,6 +9,8 @@ from products.models import Product, BundleProduct, ConfigurableProduct, \
 class ProductOrder:
     id: auto
     sku: auto
+    created_at: auto
+    updated_at: auto
 
 
 @order(BundleProduct)

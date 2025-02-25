@@ -1,5 +1,7 @@
 from core.demo_data import DemoDataLibrary, baker, fake, PrivateDataGenerator, PublicDataGenerator
 from django.db.models import Q
+
+from core.models import DemoDataRelation
 from eancodes.models import EanCode
 from products.models import Product
 from products.product_types import SIMPLE, BUNDLE
@@ -12,19 +14,25 @@ def generate_demo_eancodes(multi_tenant_company):
     from eancodes.flows import GenerateEancodesFlow
     f = GenerateEancodesFlow(multi_tenant_company=multi_tenant_company, prefix='99999999991')
     f.flow()
-    for instance in f.ean_codes:
-        registry.create_demo_data_relation(instance)
 
-        if fake.boolean():
-            product = Product.objects.\
-                filter(
-                    Q(type=SIMPLE) | Q(type=BUNDLE),
-                    multi_tenant_company=multi_tenant_company,
-                    eancode__isnull=True
-                ).\
-                first()
+    for instance in f.ean_codes:
+
+        product = Product.objects.filter(
+            type=SIMPLE,
+            multi_tenant_company=multi_tenant_company,
+            eancode__isnull=True,
+            id__in=DemoDataRelation.objects.filter(multi_tenant_company=multi_tenant_company)
+                                           .values_list('object_id', flat=True)  # Ensures product is demo data
+        ).first()
+
+        # we don't want to have ean codes that we can still assign to make the onboarding work
+        if product:
             instance.product = product
+            instance.already_used = True
             instance.save()
+            registry.create_demo_data_relation(instance)
+        else:
+            instance.delete()
 
 
 # class EanCodeGenerator(PrivateDataGenerator):

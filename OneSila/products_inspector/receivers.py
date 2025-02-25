@@ -124,21 +124,11 @@ def products_inspector__inspector__trigger_block_ean_product_change(sender, inst
         product = instance.product
         inspector_block_refresh.send(sender=product.inspector.__class__, instance=product.inspector, error_code=MISSING_EAN_CODE_ERROR, run_async=False)
 
-    if instance.inherit_to is not None:
-        inherit_to = instance.inherit_to
-        inspector_block_refresh.send(sender=inherit_to.inspector.__class__, instance=inherit_to.inspector, error_code=MISSING_EAN_CODE_ERROR, run_async=False)
-
-
 @receiver(post_delete, sender='eancodes.EanCode')
 def products_inspector__inspector__trigger_block_ean_product_change_on_delete(sender, instance, **kwargs):
     if instance.product is not None:
         product = instance.product
         inspector_block_refresh.send(sender=product.inspector.__class__, instance=product.inspector, error_code=MISSING_EAN_CODE_ERROR, run_async=False)
-
-    if instance.inherit_to is not None:
-        inherit_to = instance.inherit_to
-        inspector_block_refresh.send(sender=inherit_to.inspector.__class__, instance=inherit_to.inspector, error_code=MISSING_EAN_CODE_ERROR, run_async=False)
-
 
 # MISSING_PRODUCT_TYPE_ERROR  ------------------------------------------------------
 # MISSING_REQUIRED_PROPERTIES_ERROR  -----------------------------------------------

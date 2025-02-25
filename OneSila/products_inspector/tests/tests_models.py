@@ -317,10 +317,7 @@ class InspectorBlockMissingEanCodeTest(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             active=True,
         )
-        self.inherit_to_product = SimpleProduct.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            active=True,
-        )
+
         self.ean_code = "1234567890123"
 
 
@@ -342,23 +339,6 @@ class InspectorBlockMissingEanCodeTest(TestCase):
         # Step 3: Check the inspector block's successfully_checked field - it should be True
         self.assertTrue(inspector_block.successfully_checked)
 
-    def test_inspector_block_for_ean_code_creation_with_inherit_to_product(self):
-        # Step 1: Create an EAN code associated with the inherited product
-        EanCode.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            inherit_to=self.inherit_to_product,
-            ean_code=self.ean_code
-        )
-
-        # Manually trigger the create mutation signal
-        mutation_create.send(sender=self.inherit_to_product.__class__, instance=self.inherit_to_product)
-
-        # Step 2: Refresh the inspector block from the database
-        inspector_block = self.inherit_to_product.inspector.blocks.get(error_code=MISSING_EAN_CODE_ERROR)
-        inspector_block.refresh_from_db()
-
-        # Step 3: Check the inspector block's successfully_checked field - it should be True
-        self.assertTrue(inspector_block.successfully_checked)
 
     def test_inspector_block_for_ean_code_update_with_product(self):
         # Step 1: Create an EAN code associated with the product
@@ -377,28 +357,6 @@ class InspectorBlockMissingEanCodeTest(TestCase):
 
         # Step 2: Refresh the inspector block from the database
         inspector_block = self.product.inspector.blocks.get(error_code=MISSING_EAN_CODE_ERROR)
-        inspector_block.refresh_from_db()
-
-        # Step 3: Check the inspector block's successfully_checked field - it should be True
-        self.assertTrue(inspector_block.successfully_checked)
-
-    def test_inspector_block_for_ean_code_update_with_inherit_to_product(self):
-        # Step 1: Create an EAN code associated with the inherited product
-        ean_code_instance = EanCode.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            inherit_to=self.inherit_to_product,
-            ean_code=self.ean_code
-        )
-
-        # Update the EAN code
-        ean_code_instance.ean_code = "9876543210987"
-        ean_code_instance.save()
-
-        # Manually trigger the update mutation signal
-        mutation_update.send(sender=ean_code_instance.__class__, instance=ean_code_instance)
-
-        # Step 2: Refresh the inspector block from the database
-        inspector_block = self.inherit_to_product.inspector.blocks.get(error_code=MISSING_EAN_CODE_ERROR)
         inspector_block.refresh_from_db()
 
         # Step 3: Check the inspector block's successfully_checked field - it should be True

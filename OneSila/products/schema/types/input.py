@@ -13,7 +13,7 @@ class ProductInput:
 
 @partial(Product, fields="__all__")
 class ProductPartialInput(NodeInput):
-    base_products: Optional[List[Annotated['ProductPartialInput', lazy("products.schema.types.input")]]]
+    pass
 
 
 @input(BundleProduct, fields="__all__")
