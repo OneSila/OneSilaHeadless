@@ -39,7 +39,6 @@ def trigger_rule_dependent_inspector_blocks_task(rule_id):
     trigger_product_inspectors_for_rule_flow(rule)
 
 
-@db_task()
 def trigger_rule_dependent_inspector_blocks_delete_task(rule):
     from .flows.inspector_block import trigger_product_inspectors_for_rule_flow
     """

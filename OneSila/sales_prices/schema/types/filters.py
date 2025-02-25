@@ -1,7 +1,7 @@
 from typing import Optional, Tuple
 from contacts.schema.types.filters import CustomerFilter
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin, lazy
+from core.schema.core.types.filters import filter, SearchFilterMixin, lazy, ExcluideDemoDataFilterMixin
 
 from sales_prices.models import SalesPrice, SalesPriceList, SalesPriceListItem
 from products.schema.types.filters import ProductFilter
@@ -18,7 +18,7 @@ class SalesPriceFilter(SearchFilterMixin):
 
 
 @filter(SalesPriceList)
-class SalesPriceListFilter(SearchFilterMixin):
+class SalesPriceListFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     name: auto
     currency: Optional[CurrencyFilter]

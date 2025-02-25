@@ -3,12 +3,12 @@ from django.db.models import Q
 from media.models import MediaProductThrough
 from .inspector import InspectorCreateOrUpdateFactory, SaveInspectorMixin
 from ..exceptions import InspectorBlockFailed
-from products_inspector.constants import HAS_IMAGES_ERROR, MISSING_PRICES_ERROR, NONE, INACTIVE_BILL_OF_MATERIALS_ERROR, MISSING_VARIATION_ERROR, \
-    MISSING_BUNDLE_ITEMS_ERROR, MISSING_BILL_OF_MATERIALS_ERROR, MISSING_SUPPLIER_PRODUCTS_ERROR, INACTIVE_BUNDLE_ITEMS_ERROR, MISSING_EAN_CODE_ERROR, \
-    MISSING_PRODUCT_TYPE_ERROR, MISSING_REQUIRED_PROPERTIES_ERROR, MISSING_OPTIONAL_PROPERTIES_ERROR, MISSING_SUPPLIER_PRICES_ERROR, MISSING_STOCK_ERROR, \
-    MISSING_LEAD_TIME_ERROR, MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, ITEMS_MISMATCH_PRODUCT_TYPE_ERROR, \
-    BOM_MISMATCH_PRODUCT_TYPE_ERROR, ITEMS_MISSING_MANDATORY_INFORMATION_ERROR, VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR, \
-    BOM_MISSING_MANDATORY_INFORMATION_ERROR, DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR
+from products_inspector.constants import HAS_IMAGES_ERROR, MISSING_PRICES_ERROR, NONE, MISSING_VARIATION_ERROR, \
+    MISSING_BUNDLE_ITEMS_ERROR, INACTIVE_BUNDLE_ITEMS_ERROR, MISSING_EAN_CODE_ERROR, \
+    MISSING_PRODUCT_TYPE_ERROR, MISSING_REQUIRED_PROPERTIES_ERROR, MISSING_OPTIONAL_PROPERTIES_ERROR, MISSING_STOCK_ERROR, \
+    MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, ITEMS_MISMATCH_PRODUCT_TYPE_ERROR, \
+    ITEMS_MISSING_MANDATORY_INFORMATION_ERROR, VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR, \
+    DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR
 from products_inspector.models import InspectorBlock
 from products_inspector.signals import *
 from ..constants import blocks
@@ -179,22 +179,9 @@ class MissingPricesInspectorBlockFactory(InspectorBlockFactory):
     def _check(self):
         from sales_prices.models import SalesPrice
 
-        if self.product.for_sale and self.product.active:
+        if self.product.active:
             if SalesPrice.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product).count() == 0:
                 raise InspectorBlockFailed("Product is missing default price.")
-
-
-@InspectorBlockFactoryRegistry.register(INACTIVE_BILL_OF_MATERIALS_ERROR)
-class InactivePiecesInspectorBlockFactory(InspectorBlockFactory):
-    def __init__(self, block, save_inspector=True):
-        super().__init__(block, success_signal=inspector_inactive_pieces_success, failure_signal=inspector_inactive_pieces_failed,
-                         save_inspector=save_inspector)
-
-    def _check(self):
-        from products.models import ManufacturableProduct
-        if ManufacturableProduct.objects.get_all_bills_of_materials_products(self.product).filter_multi_tenant(self.multi_tenant_company).filter(
-                active=False).exists():
-            raise InspectorBlockFailed(f"Product has inactive bill of materials components.")
 
 
 @InspectorBlockFactoryRegistry.register(INACTIVE_BUNDLE_ITEMS_ERROR)
@@ -231,31 +218,7 @@ class MissingBundleItemsInspectorBlockFactory(InspectorBlockFactory):
         from products.models import BundleVariation
         if not BundleVariation.objects.filter_multi_tenant(self.multi_tenant_company).filter(parent=self.product).exists():
             raise InspectorBlockFailed(f"Bundle Product have no items")
-
-
-@InspectorBlockFactoryRegistry.register(MISSING_BILL_OF_MATERIALS_ERROR)
-class MissingBillOfMaterialsInspectorBlockFactory(InspectorBlockFactory):
-    def __init__(self, block, save_inspector=True):
-        super().__init__(block, success_signal=inspector_missing_bill_of_materials_success, failure_signal=inspector_missing_bill_of_materials_failed,
-                         save_inspector=save_inspector)
-
-    def _check(self):
-        from products.models import BillOfMaterial
-        if not BillOfMaterial.objects.filter_multi_tenant(self.multi_tenant_company).filter(parent=self.product).exists():
-            raise InspectorBlockFailed(f"Bundle Product have no items")
-
-
-@InspectorBlockFactoryRegistry.register(MISSING_SUPPLIER_PRODUCTS_ERROR)
-class MissingSupplierProductsInspectorBlockFactory(InspectorBlockFactory):
-    def __init__(self, block, save_inspector=True):
-        super().__init__(block, success_signal=inspector_missing_supplier_products_success, failure_signal=inspector_missing_supplier_products_failed,
-                         save_inspector=save_inspector)
-
-    def _check(self):
-        if not self.product.supplier_products.exists():
-            raise InspectorBlockFailed("Product is missing supplier products.")
-
-
+8
 @InspectorBlockFactoryRegistry.register(MISSING_EAN_CODE_ERROR)
 class MissingEanCodeInspectorBlockFactory(InspectorBlockFactory):
     def __init__(self, block, save_inspector=True):
@@ -265,15 +228,11 @@ class MissingEanCodeInspectorBlockFactory(InspectorBlockFactory):
     def _check(self):
         from eancodes.models import EanCode
 
-        # Ensure the product is for sale
-        if not self.product.for_sale:
-            return  # No need to check further if the product is not for sale
-
         rule = self.product.get_product_rule()
         if rule is not None and not rule.require_ean_code:
             return  # if the rule doesn't require ean code we just skip
 
-        if not EanCode.objects.filter_multi_tenant(self.multi_tenant_company).filter(Q(product=self.product) | Q(inherit_to=self.product)).exists():
+        if not EanCode.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product).exists():
             raise InspectorBlockFailed("Product is missing an EAN code.")
 
 
@@ -324,20 +283,6 @@ class MissingOptionalPropertiesInspectorBlockFactory(InspectorBlockFactory):
             raise InspectorBlockFailed(f"Product is missing optional propertes")
 
 
-@InspectorBlockFactoryRegistry.register(MISSING_SUPPLIER_PRICES_ERROR)
-class MissingSupplierPriceInspectorBlockFactory(InspectorBlockFactory):
-    def __init__(self, block, save_inspector=True):
-        super().__init__(block, success_signal=inspector_missing_supplier_prices_success,
-                         failure_signal=inspector_missing_supplier_prices_failed,
-                         save_inspector=save_inspector)
-
-    def _check(self):
-        from products.models import SupplierPrice
-
-        if not SupplierPrice.objects.filter_multi_tenant(self.multi_tenant_company).filter(supplier_product=self.product).exists():
-            raise InspectorBlockFailed("Supplier product is missing required prices.")
-
-
 @InspectorBlockFactoryRegistry.register(MISSING_STOCK_ERROR)
 class MissingStockInspectorBlockFactory(InspectorBlockFactory):
     def __init__(self, block, save_inspector=True):
@@ -345,21 +290,8 @@ class MissingStockInspectorBlockFactory(InspectorBlockFactory):
                          save_inspector=save_inspector)
 
     def _check(self):
-        if self.product.active and self.product.for_sale and not self.product.allow_backorder and self.product.inventory.physical() == 0:
-            raise InspectorBlockFailed("Missing stock and not allow backorder")
-
-
-@InspectorBlockFactoryRegistry.register(MISSING_LEAD_TIME_ERROR)
-class MissingLeadTimeInspectorBlockFactory(InspectorBlockFactory):
-    def __init__(self, block, save_inspector=True):
-        super().__init__(block, success_signal=inspector_missing_lead_time_success, failure_signal=inspector_missing_lead_time_failed,
-                         save_inspector=save_inspector)
-
-    def _check(self):
-        from lead_times.models import LeadTimeProductOutOfStock
-
-        if not LeadTimeProductOutOfStock.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product).exists():
-            raise InspectorBlockFailed("Lead time out of stock is missing")
+        # @TODO THIS NEEDS REFACTOR AFTER WE HAVE INVETORY IN A SIMPLE FORM
+        pass
 
 
 @InspectorBlockFactoryRegistry.register(MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR)
@@ -445,40 +377,6 @@ class ItemsMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
                 raise InspectorBlockFailed("Items products type mismatch")
 
 
-@InspectorBlockFactoryRegistry.register(BOM_MISMATCH_PRODUCT_TYPE_ERROR)
-class BomMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
-    def __init__(self, block, save_inspector=True):
-        super().__init__(block, success_signal=inspector_bom_mismatch_product_type_success, failure_signal=inspector_bom_mismatch_product_type_failed,
-                         save_inspector=save_inspector)
-
-    def _check(self):
-        from properties.models import ProductProperty
-        from products.models import BillOfMaterial
-
-        product_type_value_id = ProductProperty.objects.filter(
-            multi_tenant_company=self.multi_tenant_company,
-            product=self.product,
-            property__is_product_type=True
-        ).values_list('value_select', flat=True).first()
-
-        bom_ids = BillOfMaterial.objects.filter_multi_tenant(self.multi_tenant_company). \
-            filter(parent=self.product).values_list('variation_id', flat=True)
-
-        bom_product_type_value = ProductProperty.objects.filter(multi_tenant_company=self.multi_tenant_company,
-                                                                product_id__in=bom_ids,
-                                                                property__is_product_type=True).\
-            values_list('value_select', flat=True).distinct()
-
-        if bom_product_type_value.count() == 0 or product_type_value_id is None:
-            return
-
-        if bom_product_type_value.count() != 1:
-            raise InspectorBlockFailed("Bills of materials products type mismatch")
-        else:
-            if bom_product_type_value.first() != product_type_value_id:
-                raise InspectorBlockFailed("Bills of materials products type mismatch")
-
-
 @InspectorBlockFactoryRegistry.register(ITEMS_MISSING_MANDATORY_INFORMATION_ERROR)
 class ItemsMissingMandatoryInformationInspectorBlockFactory(InspectorBlockFactory):
     def __init__(self, block, save_inspector=True):
@@ -511,23 +409,6 @@ class VariationsMissingMandatoryInformationInspectorBlockFactory(InspectorBlockF
 
         if Inspector.objects.filter_multi_tenant(self.multi_tenant_company).filter(product_id__in=variation_ids, has_missing_information=True).exists():
             raise InspectorBlockFailed("Variations has missing information")
-
-
-@InspectorBlockFactoryRegistry.register(BOM_MISSING_MANDATORY_INFORMATION_ERROR)
-class BomMissingMandatoryInformationInspectorBlockFactory(InspectorBlockFactory):
-    def __init__(self, block, save_inspector=True):
-        super().__init__(block, success_signal=inspector_bom_missing_mandatory_information_success, failure_signal=inspector_bom_missing_mandatory_information_failed,
-                         save_inspector=save_inspector)
-
-    def _check(self):
-        from products.models import BillOfMaterial
-        from ..models import Inspector
-
-        bom_ids = BillOfMaterial.objects.filter_multi_tenant(self.multi_tenant_company). \
-            filter(parent=self.product).values_list('variation_id', flat=True)
-
-        if Inspector.objects.filter_multi_tenant(self.multi_tenant_company).filter(product_id__in=bom_ids, has_missing_information=True).exists():
-            raise InspectorBlockFailed("Bill of materials has missing information")
 
 
 @InspectorBlockFactoryRegistry.register(DUPLICATE_VARIATIONS_ERROR)

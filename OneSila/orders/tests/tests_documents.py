@@ -1,6 +1,5 @@
 from django.urls import reverse
 from core.tests import TestCaseDemoDataMixin, TestCase
-from shipments.flows import prepare_shipments_flow
 from orders.tests.tests_factories.mixins import CreateTestOrderMixin
 from products.models import Product
 from products.demo_data import SIMPLE_CHAIR_WOOD_SKU

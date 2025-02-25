@@ -49,15 +49,6 @@ def recursively_check_components(product, add_recursive_bom=True, add_recursive_
                 run_async=run_async
             )
 
-    def add_recursive_bom_check(prod):
-        from products.models import BillOfMaterial
-
-        bill_of_materials = BillOfMaterial.objects.filter(variation=prod).iterator()
-        for bill_of_material in bill_of_materials:
-            parent_product = bill_of_material.parent
-            refresh_inspector(parent_product)
-            recursively_check_variations(parent_product)
-
     def add_recursive_bundle_check(prod):
         from products.models import BundleVariation
 
@@ -77,9 +68,6 @@ def recursively_check_components(product, add_recursive_bom=True, add_recursive_
             recursively_check_variations(parent_product)
 
     def recursively_check_variations(prod):
-        if add_recursive_bom:
-            add_recursive_bom_check(prod)
-
         if add_recursive_bundle:
             add_recursive_bundle_check(prod)
 

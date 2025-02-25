@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class SalesPriceCreateForCurrencyFactoryTestCase(TestCase):
     def test_new_currency_created_for_company(self):
-        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company, for_sale=True, active=True)
+        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company, active=True)
         currency_default, _ = Currency.objects.get_or_create(is_default_currency=True, multi_tenant_company=self.multi_tenant_company, **currencies['GB'])
         salesprice_create_for_currency_flow(currency_default)
 
@@ -32,7 +32,7 @@ class SalesPriceUpdateCreateFactoryTestCase(TestCase):
         """
         The tasks should create and update all the other prices.
         """
-        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company, for_sale=True, active=True)
+        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company, active=True)
         currency = Currency.objects.create(is_default_currency=True, multi_tenant_company=self.multi_tenant_company, **currencies['BE'])
         other_currency = Currency.objects.create(
             is_default_currency=False,
@@ -87,7 +87,7 @@ class SalesPriceUpdateCreateFactoryTestCase(TestCase):
         """
         The tasks should create and update all the other prices.
         """
-        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company, for_sale=True, active=True)
+        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company, active=True)
         currency = Currency.objects.create(is_default_currency=True, multi_tenant_company=self.multi_tenant_company, **currencies['BE'])
         other_currency = Currency.objects.create(
             is_default_currency=False,

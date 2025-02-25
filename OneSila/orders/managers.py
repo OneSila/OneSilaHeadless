@@ -49,8 +49,6 @@ class OrderManager(MultiTenantManager):
 # ########## #
 
 class OrderItemQuerySet(MultiTenantQuerySet):
-    def exclude_dropshipping(self):
-        return self.exclude(product__type=Product.DROPSHIP)
 
     def total_value(self):
         '''
@@ -80,9 +78,6 @@ class OrderItemQuerySet(MultiTenantQuerySet):
 class OrderItemManager(MultiTenantManager):
     def get_queryset(self):
         return OrderItemQuerySet(self.model, using=self._db)  # Important!
-
-    def exclude_dropshipping(self):
-        return self.get_queryset().exclude_dropshipping()
 
     def total_value(self):
         return self.get_queryset().total_value()

@@ -2,7 +2,7 @@ from django.db import transaction
 from django.db.models import Q
 from products_inspector.constants import blocks, REQUIRED, OPTIONAL, NONE
 from products_inspector.models import Inspector, InspectorBlock
-from products.product_types import SIMPLE, BUNDLE, CONFIGURABLE, MANUFACTURABLE, DROPSHIP, SUPPLIER
+from products.product_types import SIMPLE, BUNDLE, CONFIGURABLE
 import logging
 
 from products_inspector.signals import inspector_missing_info_detected, inspector_missing_info_resolved, inspector_missing_optional_info_detected, \
@@ -17,9 +17,6 @@ class SaveInspectorMixin:
             'simple_product_applicability',
             'bundle_product_applicability',
             'configurable_product_applicability',
-            'manufacturable_product_applicability',
-            'dropship_product_applicability',
-            'supplier_product_applicability',
         ]
 
         # Construct the Q object for required fields
@@ -157,9 +154,6 @@ class InspectorCreateOrUpdateFactory(SaveInspectorMixin):
             SIMPLE: 'simple_product_applicability',
             BUNDLE: 'bundle_product_applicability',
             CONFIGURABLE: 'configurable_product_applicability',
-            MANUFACTURABLE: 'manufacturable_product_applicability',
-            DROPSHIP: 'dropship_product_applicability',
-            SUPPLIER: 'supplier_product_applicability',
         }
         return product_type_map.get(self.product.type)
 

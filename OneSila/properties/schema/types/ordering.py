@@ -9,12 +9,12 @@ from properties.models import Property, PropertySelectValue, \
 class PropertyOrder:
     id: auto
     type: auto
-
+    created_at: auto
 
 @order(PropertySelectValue)
 class PropertySelectValueOrder:
     id: auto
-
+    created_at: auto
 
 @order(PropertySelectValueTranslation)
 class PropertySelectValueTranslationOrder:
@@ -27,6 +27,7 @@ class ProductPropertyOrder:
     id: auto
     value_select: auto
     value_multi_select: auto
+    created_at: auto
 
 
 @order(PropertyTranslation)
@@ -43,8 +44,9 @@ class ProductPropertyTextTranslationOrder:
 class ProductPropertiesRuleOrder:
     id: auto
     product_type: auto
-
+    created_at: auto
 
 @order(ProductPropertiesRuleItem)
 class ProductPropertiesRuleItemOrder:
     sort_order: auto
+    created_at: auto

@@ -4,7 +4,7 @@ from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin, lazy
 
 from inventory.models import Inventory, InventoryLocation, InventoryMovement
-from products.schema.types.filters import SupplierProductFilter, ProductFilter
+from products.schema.types.filters import ProductFilter
 from contacts.schema.types.filters import InventoryShippingAddressFilter
 
 
@@ -21,7 +21,6 @@ class InventoryFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     quantity: auto
     inventorylocation: InventoryLocationFilter | None
-    product: SupplierProductFilter | None
 
 @filter(InventoryMovement)
 class InventoryMovementFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):

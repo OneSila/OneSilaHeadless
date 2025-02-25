@@ -3,14 +3,12 @@ from typing import Optional
 from django.db.models import Q
 from strawberry import UNSET
 
-from contacts.schema.types.filters import SupplierFilter
 from core.managers import QuerySet
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin, lazy
 from strawberry_django import filter_field as custom_filter
 from products.models import Product, BundleProduct, ConfigurableProduct, \
-    SimpleProduct, ProductTranslation, ConfigurableVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, \
-    SupplierPrice
+    SimpleProduct, ProductTranslation, ConfigurableVariation, BundleVariation
 from products_inspector.models import InspectorBlock
 from taxes.schema.types.filters import VatRateFilter
 
@@ -19,7 +17,6 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     sku: auto
     type: auto
-    for_sale: auto
     active: auto
     vat_rate: Optional[VatRateFilter]
     inspector: Optional[lazy['InspectorFilter', "products_inspector.schema.types.filters"]]
@@ -77,36 +74,3 @@ class ConfigurableVariationFilter:
 class BundleVariationFilter:
     id: auto
     parent: Optional[ProductFilter]
-
-
-@filter(ManufacturableProduct)
-class ManufacturableProductFilter(SearchFilterMixin):
-    id: auto
-    sku: auto
-    vat_rate: Optional[VatRateFilter]
-
-
-@filter(DropshipProduct)
-class DropshipProductFilter(SearchFilterMixin):
-    id: auto
-    sku: auto
-    vat_rate: Optional[VatRateFilter]
-
-
-@filter(SupplierProduct)
-class SupplierProductFilter(SearchFilterMixin):
-    id: auto
-    sku: auto
-    supplier: Optional[SupplierFilter]
-    base_products: Optional[lazy['ProductFilter', "products.schema.types.filters"]]
-
-
-@filter(BillOfMaterial)
-class BillOfMaterialFilter:
-    id: auto
-    parent: Optional[ProductFilter]
-
-
-@filter(SupplierPrice)
-class SupplierPriceFilter(SearchFilterMixin):
-    supplier_product: Optional[SupplierProductFilter]

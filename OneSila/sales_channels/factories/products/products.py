@@ -274,7 +274,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin):
 
     def set_active(self):
         """Sets the status for the product or variation in the payload."""
-        self.active = self.local_instance.active and self.local_instance.for_sale
+        self.active = self.local_instance.active
 
         if self.is_variation:
             self.set_variation_active()

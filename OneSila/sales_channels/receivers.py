@@ -203,21 +203,21 @@ def sales_channels__product_property_text_translation__pre_delete_receiver(sende
 
 # ------------------------------------------------------------- SEND SIGNALS FOR INVENTORY
 
-@receiver(post_create, sender='inventory.Inventory')
-@receiver(post_update, sender='inventory.Inventory')
-@receiver(post_delete, sender='inventory.Inventory')
-def sales_channels__inventory__update(sender, instance: Inventory, **kwargs):
-    """
-    Handles post-create, post-update, and post-delete events for the Inventory model.
-    - Sends an update signal for the associated product's inventory.
-    """
-    from products.product_types import SUPPLIER
-
-    if instance.product.type == SUPPLIER:
-        for product in instance.product.base_products.all().iterator():
-            update_remote_inventory.send(sender=product.__class__, instance=product)
-    else:
-        update_remote_inventory.send(sender=instance.product.__class__, instance=instance.product)
+# @receiver(post_create, sender='inventory.Inventory')
+# @receiver(post_update, sender='inventory.Inventory')
+# @receiver(post_delete, sender='inventory.Inventory')
+# def sales_channels__inventory__update(sender, instance: Inventory, **kwargs):
+#     """
+#     Handles post-create, post-update, and post-delete events for the Inventory model.
+#     - Sends an update signal for the associated product's inventory.
+#     """
+#     from products.product_types import SUPPLIER
+#
+#     if instance.product.type == SUPPLIER:
+#         for product in instance.product.base_products.all().iterator():
+#             update_remote_inventory.send(sender=product.__class__, instance=product)
+#     else:
+#         update_remote_inventory.send(sender=instance.product.__class__, instance=instance.product)
 
 # ------------------------------------------------------------- SEND SIGNALS FOR PRICES
 
@@ -430,25 +430,21 @@ def sales_channel_view_assign__post_delete_receiver(sender, instance, **kwargs):
 @receiver(post_update, sender='products.Product')
 @receiver(post_update, sender='products.SimpleProduct')
 @receiver(post_update, sender='products.ConfigurableProduct')
-@receiver(post_update, sender='products.ManufacturableProduct')
 @receiver(post_update, sender='products.BundleProduct')
-@receiver(post_update, sender='products.DropshipProduct')
 def sales_channels__product__post_update_receiver(sender, instance, **kwargs):
     """
     Handle post-update events for the product models.
-    Sends update_remote_product signal if any of the fields 'active', 'for_sale', or 'allow_backorder' are dirty.
+    Sends update_remote_product signal if any of the fields 'active' or 'allow_backorder' are dirty.
     """
     # Check if any of the specified fields have changed
-    if instance.is_any_field_dirty(['active', 'for_sale', 'allow_backorder']):
+    if instance.is_any_field_dirty(['active', 'allow_backorder']):
         # Send update_remote_product signal
         update_remote_product.send(sender=instance.__class__, instance=instance)
 
 @receiver(pre_delete, sender='products.Product')
 @receiver(pre_delete, sender='products.SimpleProduct')
 @receiver(pre_delete, sender='products.ConfigurableProduct')
-@receiver(pre_delete, sender='products.ManufacturableProduct')
 @receiver(pre_delete, sender='products.BundleProduct')
-@receiver(pre_delete, sender='products.DropshipProduct')
 def sales_channels__product__pre_delete_receiver(sender, instance, **kwargs):
     """
     Handle pre-delete events for the product models.

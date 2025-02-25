@@ -3,10 +3,10 @@ from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixi
 
 from typing import List
 
-from lead_times.models import LeadTime, LeadTimeForShippingAddress, LeadTimeProductOutOfStock
+from lead_times.models import LeadTime, LeadTimeForShippingAddress
 from products.schema.types.types import ProductType
-from .filters import LeadTimeFilter, LeadTimeForShippingAddressFilter, LeadTimeProductOutOfStockFilter
-from .ordering import LeadTimeOrder, LeadTimeForShippingAddressOrder, LeadTimeProductOutOfStockOrder
+from .filters import LeadTimeFilter, LeadTimeForShippingAddressFilter
+from .ordering import LeadTimeOrder, LeadTimeForShippingAddressOrder
 from contacts.schema.types.types import ShippingAddressType
 
 
@@ -22,12 +22,6 @@ class LeadTimeType(relay.Node, GetQuerysetMultiTenantMixin):
 class LeadTimeForShippingAddressType(relay.Node, GetQuerysetMultiTenantMixin):
     leadtime: LeadTimeType
     shippingaddress: ShippingAddressType
-
-
-@type(LeadTimeProductOutOfStock, filters=LeadTimeProductOutOfStockFilter, order=LeadTimeProductOutOfStockOrder, pagination=True, fields="__all__")
-class LeadTimeProductOutOfStockType(relay.Node, GetQuerysetMultiTenantMixin):
-    product: ProductType
-    leadtime_outofstock: LeadTimeType
 
 
 @strawberry_type

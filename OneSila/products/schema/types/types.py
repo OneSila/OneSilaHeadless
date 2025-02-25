@@ -8,24 +8,18 @@ from typing import List, Optional
 
 from media.models import Media
 from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
-    ProductTranslation, ConfigurableVariation, BundleVariation, BillOfMaterial, SupplierProduct, DropshipProduct, ManufacturableProduct, SupplierPrice
+    ProductTranslation, ConfigurableVariation, BundleVariation
 from taxes.schema.types.types import VatRateType
-from units.schema.types.types import UnitType
 from .filters import ProductFilter, BundleProductFilter, ConfigurableProductFilter, \
-    SimpleProductFilter, ProductTranslationFilter, ConfigurableVariationFilter, BundleVariationFilter, BillOfMaterialFilter, SupplierProductFilter, \
-    DropshipProductFilter, ManufacturableProductFilter, SupplierPriceFilter
+    SimpleProductFilter, ProductTranslationFilter, ConfigurableVariationFilter, BundleVariationFilter
 from .ordering import ProductOrder, BundleProductOrder, ConfigurableProductOrder, \
-    SimpleProductOrder, ProductTranslationOrder, ConfigurableVariationOrder, BundleVariationOrder, BillOfMaterialOrder, SupplierProductOrder, \
-    DropshipProductOrder, ManufacturableProductOrder, SupplierPriceOrder
+    SimpleProductOrder, ProductTranslationOrder, ConfigurableVariationOrder, BundleVariationOrder
 
 
 @type(Product, filters=ProductFilter, order=ProductOrder, pagination=True, fields="__all__")
 class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
     vat_rate: Optional[VatRateType]
     inspector: Optional[Annotated['InspectorType', lazy('products_inspector.schema.types.types')]]
-    base_products: List[Annotated['ProductType', lazy("products.schema.types.types")]]
-
-    supplier: Optional[CompanyType]
 
     @field()
     def proxy_id(self, info) -> str:
@@ -35,12 +29,6 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
             graphql_type = BundleProductType
         elif self.is_configurable():
             graphql_type = ConfigurableProductType
-        elif self.is_manufacturable():
-            graphql_type = ManufacturableProductType
-        elif self.is_dropship():
-            graphql_type = DropshipProductType
-        elif self.is_supplier_product():
-            graphql_type = SupplierProductType
         else:
             graphql_type = ProductType
 
@@ -59,22 +47,6 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
             return first_media.media.image_web_url
 
         return None
-
-    @field()
-    def inventory_physical(self, info) -> int | None:
-        return self.inventory.physical()
-
-    @field()
-    def inventory_salable(self, info) -> int | None:
-        return self.inventory.salable()
-
-    @field()
-    def inventory_reserved(self, info) -> int | None:
-        return self.inventory.reserved()
-
-    @field()
-    def inventory_await_inventory(self, info) -> int | None:
-        return self.inventory.await_inventory()
 
     @field()
     def inspector_status(self, info) -> int:
@@ -124,58 +96,3 @@ class ConfigurableVariationType(relay.Node, GetQuerysetMultiTenantMixin):
 class BundleVariationType(relay.Node, GetQuerysetMultiTenantMixin):
     parent: Optional[ProductType]
     variation: Optional[ProductType]
-
-
-@type(BillOfMaterial, filters=BillOfMaterialFilter, order=BillOfMaterialOrder, pagination=True, fields="__all__")
-class BillOfMaterialType(relay.Node, GetQuerysetMultiTenantMixin):
-    parent: Optional[ProductType]
-    variation: Optional[ProductType]
-
-
-@type(ManufacturableProduct, filters=ManufacturableProductFilter, order=ManufacturableProductOrder, pagination=True, fields="__all__")
-class ManufacturableProductType(relay.Node, GetQuerysetMultiTenantMixin):
-    production_time: Decimal
-
-    @field()
-    def name(self, info) -> str | None:
-        return self.name
-
-
-@type(DropshipProduct, filters=DropshipProductFilter, order=DropshipProductOrder, pagination=True, fields="__all__")
-class DropshipProductType(relay.Node, GetQuerysetMultiTenantMixin):
-    @field()
-    def name(self, info) -> str | None:
-        return self.name
-
-
-@type(SupplierProduct, filters=SupplierProductFilter, order=SupplierProductOrder, pagination=True, fields="__all__")
-class SupplierProductType(relay.Node, GetQuerysetMultiTenantMixin):
-    supplier: Optional[CompanyType]
-    base_products: List[Annotated['ProductType', lazy("products.schema.types.types")]]
-
-    @field()
-    def name(self, info) -> str | None:
-        return self.name
-
-    @field()
-    def quantity(self, info) -> int:
-        return self.details.first().quantity if self.details.exists() else None
-
-    @field()
-    def unit_price(self, info) -> float:
-        return self.details.first().unit_price if self.details.exists() else None
-
-    @field()
-    def unit(self, info) -> UnitType:
-        unit = self.details.first().unit if self.details.exists() else None
-        return unit
-
-    @field()
-    def proxy_id(self, info) -> str:
-        return to_base64(ProductType, self.pk)
-
-
-@type(SupplierPrice, filters=SupplierPriceFilter, order=SupplierPriceOrder, pagination=True, fields="__all__")
-class SupplierPriceType(relay.Node, GetQuerysetMultiTenantMixin):
-    supplier_product: SupplierProductType
-    unit: UnitType

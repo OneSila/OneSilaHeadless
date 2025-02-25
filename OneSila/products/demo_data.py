@@ -1,24 +1,15 @@
 from pathlib import Path
 
-import requests
-from django.core.files.base import ContentFile
-
-from contacts.demo_data import BED_SUPPLIER_NAME, GLASS_SUPPLIER_NAME, METAL_SUPPLIER_NAME, WOOD_SUPPLIER_ONE_NAME
-from core.demo_data import DemoDataLibrary, PrivateStructuredDataGenerator, fake
-from core.managers.decorators import multi_tenant_company_required
+from core.demo_data import DemoDataLibrary, PrivateStructuredDataGenerator, fake, CreatePrivateDataRelationMixin
 from core.models import MultiTenantCompany, MultiTenantUser
 from media.models import MediaProductThrough, Media
-from products.models import ProductTranslation, Product, BundleProduct, SimpleProduct, SupplierProduct, \
-    SupplierPrice, BundleVariation, DropshipProduct, ConfigurableProduct, ConfigurableVariation
+from products.models import (ProductTranslation, Product, BundleProduct, SimpleProduct,  BundleVariation
+, ConfigurableProduct, ConfigurableVariation)
 from properties.models import Property, PropertySelectValue, ProductProperty
-from products.product_types import CONFIGURABLE, SIMPLE, BUNDLE, DROPSHIP
 from taxes.models import VatRate
 from units.models import Unit
-from contacts.models import Supplier
-from units.demo_data import UNIT_PIECE
 import os
 from django.core.files import File
-from django.conf import settings
 
 registry = DemoDataLibrary()
 
@@ -41,12 +32,9 @@ SUPPLIER_GLASS_TABLE_SKU = "SUPP-GLASS-TABLE"
 SUPPLIER_QUEEN_BED_SKU = "SUPP-QUEEN-BED"
 
 
-class ProductGetDataMixin:
+class ProductGetDataMixin(CreatePrivateDataRelationMixin):
     def get_unit(self, unit):
         return Unit.objects.get(multi_tenant_company=self.multi_tenant_company, unit=unit)
-
-    def get_supplier(self, name):
-        return Supplier.objects.get(multi_tenant_company=self.multi_tenant_company, name=name)
 
     def get_vat_rate(self):
         return VatRate.objects.filter(multi_tenant_company=self.multi_tenant_company).last()
@@ -87,11 +75,15 @@ class ProductGetDataMixin:
             value_instance = PropertySelectValue.objects.filter(property=property_instance,
                                                                 propertyselectvaluetranslation__value=value).first()
             if value_instance:
-                product_property = ProductProperty.objects.get_or_create(
+                product_property, created = ProductProperty.objects.get_or_create(
                     product=product,
                     property=property_instance,
                     multi_tenant_company=self.multi_tenant_company
-                )[0]
+                )
+
+                if created:
+                    self.create_demo_data_relation(product_property)
+
                 product_property.value_multi_select.add(value_instance)
 
     def add_image(self, filename, product):
@@ -108,31 +100,35 @@ class ProductGetDataMixin:
                     multi_tenant_company=self.multi_tenant_company,
                 )
 
-                MediaProductThrough.objects.create(
+                media_relation = MediaProductThrough.objects.create(
                     product=product,
                     media=image,
                     sort_order=10,
                     is_main_image=True,
                     multi_tenant_company=self.multi_tenant_company,
                 )
+                self.create_demo_data_relation(image)
+                self.create_demo_data_relation(media_relation)
 
 
-class PostDataTranslationMixin:
+class PostDataTranslationMixin(CreatePrivateDataRelationMixin):
     def post_data_generate(self, instance, **kwargs):
         multi_tenant_company = instance.multi_tenant_company
         language = multi_tenant_company.language
         name = kwargs['name']
 
-        ProductTranslation.objects.create(
+        translation = ProductTranslation.objects.create(
             product=instance,
             language=language,
             name=name,
             multi_tenant_company=multi_tenant_company,
         )
 
+        self.create_demo_data_relation(translation)
+
 
 @registry.register_private_app
-class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, PrivateStructuredDataGenerator):
+class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, PrivateStructuredDataGenerator, CreatePrivateDataRelationMixin):
     model = SimpleProduct
 
     def get_structure(self):
@@ -142,7 +138,6 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                 'instance_data': {
                     'sku': SIMPLE_CHAIR_WOOD_SKU,  # Default Blue
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {
@@ -156,7 +151,6 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                 'instance_data': {
                     'sku': SIMPLE_CHAIR_WOOD_RED_SKU,
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {
@@ -170,7 +164,6 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                 'instance_data': {
                     'sku': SIMPLE_CHAIR_WOOD_GREEN_SKU,
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {
@@ -185,7 +178,6 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                 'instance_data': {
                     'sku': SIMPLE_CHAIR_METAL_SKU,
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {
@@ -199,7 +191,6 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                 'instance_data': {
                     'sku': SIMPLE_TABLE_GLASS_SKU,
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {
@@ -214,7 +205,6 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
                 'instance_data': {
                     'sku': SIMPLE_BED_QUEEN_SKU,
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {
@@ -231,9 +221,9 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
 
         # Assign Product Type
         product_type = self.get_product_type("Chair" if "CHAIR" in instance.sku else "Table" if "TABLE" in instance.sku else "Bed")
-        ProductProperty.objects.create(
-            product=instance, property=product_type.property, value_select=product_type, multi_tenant_company=self.multi_tenant_company
-        )
+        product_type_property = ProductProperty.objects.create(product=instance, property=product_type.property, value_select=product_type, multi_tenant_company=self.multi_tenant_company)
+
+        self.create_demo_data_relation(product_type_property)
 
         # Assign Required Properties
         properties = {
@@ -244,9 +234,8 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
 
         for prop_name, value in properties.items():
             if value:
-                ProductProperty.objects.create(
-                    product=instance, property=value.property, value_select=value, multi_tenant_company=self.multi_tenant_company
-                )
+                product_property = ProductProperty.objects.create(product=instance, property=value.property, value_select=value, multi_tenant_company=self.multi_tenant_company)
+                self.create_demo_data_relation(product_property)
 
         # Assign Usage (Multi-Select Property)
         usage_values = kwargs.get("usage")
@@ -259,86 +248,7 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
 
 
 @registry.register_private_app
-class SupplierProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, PrivateStructuredDataGenerator):
-    model = SupplierProduct
-
-    def get_structure(self):
-        return [
-            {
-                'instance_data': {
-                    'sku': SUPPLIER_WOODEN_CHAIR_SKU,
-                    'active': True,
-                    'supplier': self.get_supplier(WOOD_SUPPLIER_ONE_NAME),
-                },
-                'post_data': {
-                    'name': "Supplier - Wooden Chair",
-                    'base_products_skus': [SIMPLE_CHAIR_WOOD_SKU],
-                    'price_info': {
-                        'quantity': 10,
-                        'unit_price': 50.0,
-                        'unit': self.get_unit(UNIT_PIECE),
-                    }
-                },
-            },
-            {
-                'instance_data': {
-                    'sku': SUPPLIER_METAL_CHAIR_SKU,
-                    'active': True,
-                    'supplier': self.get_supplier(METAL_SUPPLIER_NAME),
-                },
-                'post_data': {
-                    'name': "Supplier - Metal Chair",
-                    'base_products_skus': [SIMPLE_CHAIR_METAL_SKU],
-                    'price_info': {
-                        'quantity': 8,
-                        'unit_price': 55.0,
-                        'unit': self.get_unit(UNIT_PIECE),
-                    }
-                },
-            },
-            {
-                'instance_data': {
-                    'sku': SUPPLIER_GLASS_TABLE_SKU,
-                    'active': True,
-                    'supplier': self.get_supplier(GLASS_SUPPLIER_NAME),
-                },
-                'post_data': {
-                    'name': "Supplier - Glass Table",
-                    'base_products_skus': [SIMPLE_TABLE_GLASS_SKU],
-                    'price_info': {
-                        'quantity': 5,
-                        'unit_price': 150.0,
-                        'unit': self.get_unit(UNIT_PIECE),
-                    }
-                },
-            },
-            {
-                'instance_data': {
-                    'sku': SUPPLIER_QUEEN_BED_SKU,
-                    'active': True,
-                    'supplier': self.get_supplier(BED_SUPPLIER_NAME),
-                },
-                'post_data': {
-                    'name': "Supplier - Queen Bed",
-                    'base_products_skus': [SIMPLE_BED_QUEEN_SKU],
-                    'price_info': {
-                        'quantity': 3,
-                        'unit_price': 400.0,
-                        'unit': self.get_unit(UNIT_PIECE),
-                    }
-                },
-            },
-        ]
-
-    def post_data_generate(self, instance, **kwargs):
-        super().post_data_generate(instance, **kwargs)
-
-        for sku in kwargs['base_products_skus']:
-            base_product = self.get_product(sku)
-            instance.base_products.add(base_product)
-
-@registry.register_private_app
-class ConfigurableProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, PrivateStructuredDataGenerator):
+class ConfigurableProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, PrivateStructuredDataGenerator, CreatePrivateDataRelationMixin):
     model = ConfigurableProduct
 
     def get_structure(self):
@@ -347,7 +257,6 @@ class ConfigurableProductDataGenerator(PostDataTranslationMixin, ProductGetDataM
                 'instance_data': {
                     'sku': CONFIGURABLE_CHAIR_SKU,
                     'active': True,
-                    'for_sale': True,
                     'vat_rate': self.get_vat_rate(),
                 },
                 'post_data': {
@@ -361,9 +270,10 @@ class ConfigurableProductDataGenerator(PostDataTranslationMixin, ProductGetDataM
         super().post_data_generate(instance, **kwargs)
 
         product_type = self.get_product_type("Chair")
-        ProductProperty.objects.create(product=instance, property=product_type.property,
+        product_type_property = ProductProperty.objects.create(product=instance, property=product_type.property,
                                        value_select=product_type, multi_tenant_company=self.multi_tenant_company)
 
+        self.create_demo_data_relation(product_type_property)
 
         # Get Wooden Chairs in different colors
         variations = [
@@ -374,35 +284,36 @@ class ConfigurableProductDataGenerator(PostDataTranslationMixin, ProductGetDataM
 
         # Assign variations to Configurable Product
         for variation in variations:
-            ConfigurableVariation.objects.create(parent=instance, variation=variation, multi_tenant_company=self.multi_tenant_company)
+            config_variation = ConfigurableVariation.objects.create(parent=instance, variation=variation, multi_tenant_company=self.multi_tenant_company)
+            self.create_demo_data_relation(config_variation)
 
         if "image_filename" in kwargs:
             self.add_image(kwargs["image_filename"], instance)
 
 
-@registry.register_private_app
-class BundleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, PrivateStructuredDataGenerator):
-    model = BundleProduct
-
-    def get_structure(self):
-        return [
-            {
-                'instance_data': {
-                    'sku': BUNDLE_DINING_SET_SKU,
-                    'active': True,
-                    'for_sale': True,
-                    'vat_rate': self.get_vat_rate(),
-                },
-                'post_data': {
-                    'name': "Dining Set (4 Chairs + 1 Table)",
-                    'variations': {SIMPLE_CHAIR_WOOD_SKU: 4, SIMPLE_TABLE_GLASS_SKU: 1}
-                },
-            }
-        ]
-
-    def post_data_generate(self, instance, **kwargs):
-        super().post_data_generate(instance, **kwargs)
-
-        for sku, qty in kwargs['variations'].items():
-            variation = self.get_product(sku)
-            BundleVariation.objects.create(parent=instance, variation=variation, quantity=qty, multi_tenant_company=self.multi_tenant_company)
+# @registry.register_private_app
+# class BundleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, PrivateStructuredDataGenerator, CreatePrivateDataRelationMixin):
+#     model = BundleProduct
+#
+#     def get_structure(self):
+#         return [
+#             {
+#                 'instance_data': {
+#                     'sku': BUNDLE_DINING_SET_SKU,
+#                     'active': True,
+#                     'vat_rate': self.get_vat_rate(),
+#                 },
+#                 'post_data': {
+#                     'name': "Dining Set (4 Chairs + 1 Table)",
+#                     'variations': {SIMPLE_CHAIR_WOOD_SKU: 4, SIMPLE_TABLE_GLASS_SKU: 1}
+#                 },
+#             }
+#         ]
+#
+#     def post_data_generate(self, instance, **kwargs):
+#         super().post_data_generate(instance, **kwargs)
+#
+#         for sku, qty in kwargs['variations'].items():
+#             variation = self.get_product(sku)
+#             bundle_variation = BundleVariation.objects.create(parent=instance, variation=variation, quantity=qty, multi_tenant_company=self.multi_tenant_company)
+#             self.create_demo_data_relation(bundle_variation)

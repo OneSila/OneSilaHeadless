@@ -1,12 +1,7 @@
-from core.tests import TestCase, TransactionTestCase, \
+from core.tests import TransactionTestCase, \
     TransactionTestCaseMixin, TestCaseDemoDataMixin
-from model_bakery import baker
-from OneSila.schema import schema
-from lead_times.models import LeadTime, LeadTimeForShippingAddress, \
-    LeadTimeProductOutOfStock
+from lead_times.models import LeadTime, LeadTimeForShippingAddress
 from contacts.models import ShippingAddress, Supplier
-from products.models import Product, SupplierProduct
-
 
 class LeadTimeQueriesTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def test_lead_time_create(self):
@@ -56,26 +51,4 @@ class LeadTimeForShippingAddressTestCase(TestCaseDemoDataMixin, TransactionTestC
         resp = self.strawberry_test_client(
             query=create_leadtime_for_shippingaddress,
             variables={'shippingid': shippingid, 'leadtimeid': leadtimeid})
-        self.assertTrue(resp.errors is None)
-
-
-class LeadTimeProductOutOfStockTestCase(LeadTimeForShippingAddressTestCase):
-    def setUp(self):
-        super().setUp()
-        self.supplier_product = SupplierProduct.objects.create(multi_tenant_company=self.multi_tenant_company, supplier=self.supplier, sku="SUP-123")
-
-    def test_lead_time_product_outofstock(self):
-        from .mutations import create_lead_time_product_outofstock
-        from lead_times.schema.types.types import LeadTimeProductOutOfStockType, LeadTimeType
-
-        productid = self.to_global_id(instance=self.supplier_product)
-        leadtimeid = self.to_global_id(instance=self.lead_time)
-
-        LeadTimeProductOutOfStock.objects.\
-            filter(product=self.supplier_product, multi_tenant_company=self.multi_tenant_company).\
-            delete()
-
-        resp = self.strawberry_test_client(
-            query=create_lead_time_product_outofstock,
-            variables={'productid': productid, 'leadtimeid': leadtimeid})
         self.assertTrue(resp.errors is None)

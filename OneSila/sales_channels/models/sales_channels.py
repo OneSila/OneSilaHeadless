@@ -86,9 +86,6 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
         return f"{self.sales_channel_view.url}{self.product.url_key}.html"
 
     def create_clean(self):
-        # Prevent assignment if the product is not for sale
-        if not self.product.for_sale:
-            raise ValidationError(f"Cannot assign product '{self.product}' to sales channel view because it is not marked for sale.")
 
         if self.product.inspector.has_missing_information:
             raise ValidationError(f"Cannot assign product '{self.product}' to sales channel view because it is having missing informations..")
