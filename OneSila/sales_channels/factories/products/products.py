@@ -971,6 +971,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
 
 
     def set_stock(self):
+        return # @TODO: Come back after we decide with inventory
         super().set_stock()
 
         if self.remote_inventory_class:
