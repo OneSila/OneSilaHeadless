@@ -113,6 +113,8 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
         )
 
     def set_stock(self):
+        return  # @TODO: Come back after we decide with inventory
+
         if self.remote_type == self.REMOTE_TYPE_CONFIGURABLE:
             self.stock = None
         else:

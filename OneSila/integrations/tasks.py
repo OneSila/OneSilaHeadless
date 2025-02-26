@@ -41,7 +41,7 @@ def sales_channels_process_remote_tasks_queue():
     fac.run()
 
 
-@periodic_task(crontab(hour=0, minute=0))
+@periodic_task(run_every=crontab(hour=2, minute=0, day='1,15'))
 def clean_up_processed_tasks():
     deleted_count, _ = IntegrationTaskQueue.objects.filter(status=IntegrationTaskQueue.PROCESSED).delete()
     logger.info(f"Cleaned up {deleted_count} processed tasks.")

@@ -285,6 +285,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin):
 
     def set_stock(self):
         """Sets the stock for the product or variation in the payload."""
+
+        return # @TODO: Come back after we decide with inventory
         self.stock = self.local_instance.inventory.salable()
 
         if self.is_variation:

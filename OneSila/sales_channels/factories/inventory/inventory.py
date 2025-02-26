@@ -18,6 +18,8 @@ class RemoteInventoryUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateF
         Checks that the RemoteProduct and associated SalesChannelViewAssign exist before proceeding.
         Also sets the remote_instance if conditions are met.
         """
+        return False # @TODO: Come back after we decide with inventory
+
         if not self.remote_product:
             return False
 
