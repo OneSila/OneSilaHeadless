@@ -15,13 +15,12 @@ class CurrencyDefaultDataGenerator(PrivateStructuredDataGenerator):
             {
                 'instance_data': {
                     "is_default_currency": True,
-                },
-                'post_data': {
                     "iso_code": "GBP",
                     "comment": "Base Currency",
                     "name": "British Pound",
                     "symbol": "£",
                 },
+                'post_data': {},
             },
         ]
 

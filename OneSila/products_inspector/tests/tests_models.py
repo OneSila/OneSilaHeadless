@@ -318,6 +318,39 @@ class InspectorBlockMissingEanCodeTest(TestCase):
             active=True,
         )
 
+        self.product_type, _ = Property.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            is_product_type=True
+        )
+
+        self.product_type_value = PropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.product_type,
+        )
+
+        self.product_type_value_translation = PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=self.product_type_value,
+            value='Chair',
+        )
+
+        self.product_properties_rule, _ = ProductPropertiesRule.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            product_type=self.product_type_value,
+        )
+
+        if not self.product_properties_rule.require_ean_code:
+            self.product_properties_rule.require_ean_code = True
+            self.product_properties_rule.save()
+
+        self.product_property = ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            property=self.product_type,
+            value_select=self.product_type_value
+        )
+
+
         self.ean_code = "1234567890123"
 
 
@@ -395,14 +428,14 @@ class InspectorBlockMissingProductTypeTest(TestCase):
             active=True,
         )
 
-        self.product_tye, _ = Property.objects.get_or_create(
+        self.product_type, _ = Property.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             is_product_type=True
         )
 
         self.product_type_value = PropertySelectValue.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            property=self.product_tye,
+            property=self.product_type,
         )
 
         self.product_type_value_translation = PropertySelectValueTranslation.objects.create(
@@ -414,7 +447,7 @@ class InspectorBlockMissingProductTypeTest(TestCase):
         self.product_property = ProductProperty.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,
-            property=self.product_tye,
+            property=self.product_type,
             value_select=self.product_type_value
         )
 
@@ -441,7 +474,7 @@ class InspectorBlockMissingProductTypeTest(TestCase):
         # Test updating the product type property
         new_value = PropertySelectValue.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            property=self.product_tye,
+            property=self.product_type,
         )
         self.product_property.value_select = new_value
         self.product_property.save()
