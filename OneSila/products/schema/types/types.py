@@ -63,6 +63,10 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
         else:
             return 1  # Green
 
+    @field()
+    def has_parents(self, info) -> bool:
+        return ConfigurableVariation.objects.filter(variation_id=self.id).exists()
+
 
 @type(ProductTranslation, filters=ProductTranslationFilter, order=ProductTranslationOrder, pagination=True, fields="__all__")
 class ProductTranslationType(relay.Node, GetQuerysetMultiTenantMixin):
