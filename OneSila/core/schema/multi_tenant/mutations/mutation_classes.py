@@ -8,7 +8,7 @@ from core.schema.core.mixins import GetCurrentUserMixin, GetMultiTenantCompanyMi
 from core.schema.core.mutations import DjangoUpdateMutation, DjangoCreateMutation, Info, models, Any
 from core.factories.multi_tenant import InviteUserFactory, AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory, RequestLoginTokenFactory, \
     RecoveryTokenFactory, ChangePasswordFactory
-from core.models.multi_tenant import MultiTenantUser
+from core.models.multi_tenant import MultiTenantUser, MultiTenantUserLoginToken
 from django.utils.translation import gettext_lazy as _
 
 from core.tasks import core__demo_data__create_task, core__demo_data__delete_task
@@ -27,7 +27,8 @@ class RequestLoginTokenMutation(CleanupDataMixin, DjangoCreateMutation):
     def create_token(self, *, user):
         fac = RequestLoginTokenFactory(user)
         fac.run()
-        return fac.token
+        
+        return MultiTenantUserLoginToken.objects.get(id=fac.token.id)
 
     def create(self, data: dict[str, Any], *, info: Info):
         with DjangoOptimizerExtension.disabled():
@@ -46,14 +47,15 @@ class InviteUserMutation(CleanupDataMixin, GetMultiTenantCompanyMixin, DjangoCre
                 multi_tenant_company=multi_tenant_company,
                 **data)
             fac.run()
-            return fac.user
+            return MultiTenantUser.objects.get(id=fac.user.id)
 
 
 class RecoveryTokenMutation(RequestLoginTokenMutation):
     def create_token(self, *, user):
         fac = RecoveryTokenFactory(user)
         fac.run()
-        return fac.token
+        
+        return MultiTenantUserLoginToken.objects.get(id=fac.token.id)
 
 
 class AcceptInvitationMutation(GetCurrentUserMixin, DjangoUpdateMutation):
@@ -63,13 +65,14 @@ class AcceptInvitationMutation(GetCurrentUserMixin, DjangoUpdateMutation):
         password = data['password']
 
         with DjangoOptimizerExtension.disabled():
+
             fac = AcceptUserInviteFactory(
                 user=user,
                 password=password,
                 language=language)
             fac.run()
 
-            return fac.user
+            return MultiTenantUser.objects.get(id=fac.user.id)
 
 
 class MyMultiTenantCompanyCreateMutation(GetCurrentUserMixin, DjangoCreateMutation):
@@ -133,7 +136,7 @@ class UpdateMyPasswordMutation(UpdateMeMutation):
             fac = ChangePasswordFactory(user=user, password=password)
             fac.run()
 
-            return fac.user
+            return MultiTenantUser.objects.get(id=fac.user.id)
 
 
 class DisableUserMutation(DjangoUpdateMutation):
@@ -142,7 +145,7 @@ class DisableUserMutation(DjangoUpdateMutation):
         with DjangoOptimizerExtension.disabled():
             fac = DisableUserFactory(user=instance)
             fac.run()
-            return fac.user
+            return MultiTenantUser.objects.get(id=fac.user.id)
 
 
 class EnableUserMutation(DjangoUpdateMutation):
