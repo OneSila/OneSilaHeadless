@@ -103,7 +103,6 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     ADD_COMPANY = 'ADD_COMPANY'  # - add owner company + create internal company + internal company address out of it
     ADD_CURRENCY = 'ADD_CURRENCY'  # - add default currency
     CONFIRM_VAT_RATE = 'CONFIRM_VAT_RATE'  # - edit / create VAT Rate
-    CREATE_INVENTORY_LOCATION = 'CREATE_INVENTORY_LOCATION'  # add inventory location (can be skipped)
     GENERATE_DEMO_DATA = 'GENERATE_DEMO_DATA'  # - Ask if want demo data
     DASHBOARD_CARDS_PRESENTATION = 'DASHBOARD_CARDS_PRESENTATION'  # Presentation of dashboard Tutorial Carads
     COMPLETE_DASHBOARD_CARDS = 'COMPLETE_DASHBOARD_CARDS'  # Dashboard cards still not completed
@@ -114,7 +113,6 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
         (ADD_COMPANY, _('Add Company')),
         (ADD_CURRENCY, _('Add Currency')),
         (CONFIRM_VAT_RATE, _('Confirm VAT Rate')),
-        (CREATE_INVENTORY_LOCATION, _('Create Inventory Location')),
         (DASHBOARD_CARDS_PRESENTATION, _('Dashboard Cards Presentation')),
         (COMPLETE_DASHBOARD_CARDS, _('Complete Dashboard Cards')),
         (DONE, _('Done')),
