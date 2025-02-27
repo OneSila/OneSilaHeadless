@@ -68,6 +68,7 @@ class ProductTranslationFilter:
 class ConfigurableVariationFilter:
     id: auto
     parent: Optional[ProductFilter]
+    variation: Optional[ProductFilter]
 
 
 @filter(BundleVariation)

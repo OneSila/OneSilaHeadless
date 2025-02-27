@@ -1,5 +1,7 @@
 import importlib
 
+from django.db import IntegrityError
+
 from core.exceptions import NotDemoDataGeneratorError
 from core.models import DemoDataRelation
 from django.core.exceptions import ValidationError
@@ -247,6 +249,7 @@ class PrivateDataGenerator(DemoDataGeneratorMixin, CreatePrivateDataRelationMixi
 
 class PrivateStructuredDataGenerator(PrivateDataGenerator):
     use_baker = False
+    skip_existing = False
 
     def get_structure(self):
         pass
@@ -269,11 +272,17 @@ class PrivateStructuredDataGenerator(PrivateDataGenerator):
             if not self.preflight_check(pre_kwargs):
                 continue
 
-            instance = self.create_instance(**pre_kwargs)
-            self.generated_instances.append(instance)
+            try:
+                instance = self.create_instance(**pre_kwargs)
 
-            post_kwargs = i['post_data']
-            self.post_data_generate(instance, **post_kwargs)
+                self.generated_instances.append(instance)
+
+                post_kwargs = i['post_data']
+                self.post_data_generate(instance, **post_kwargs)
+
+            except IntegrityError as e:
+                if not self.skip_existing:
+                    raise e
 
         logger.debug(f"Created {len(self.generated_instances)} for {self.__class__.__name__}")
 

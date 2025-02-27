@@ -36,6 +36,7 @@ class CurrencyDefaultDataGenerator(PrivateStructuredDataGenerator):
 @registry.register_private_app
 class CurrencyNonDefaultDataGenerator(PrivateStructuredDataGenerator):
     model = Currency
+    skip_existing = True
 
     def get_structure(self):
         return [
