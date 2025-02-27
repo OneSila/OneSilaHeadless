@@ -255,11 +255,19 @@ class PrivateStructuredDataGenerator(PrivateDataGenerator):
         if kwargs:
             raise Exception("You need to create a post_data_generate method to process the post_kwargs set on your configuration.")
 
+    def preflight_check(self, pre_kwargs):
+        # a method we can override to skip certain data
+        # ex we want to not create another default currency or to override the existing one
+        return True
+
     def generate(self):
         structure = self.get_structure()
         for i in structure:
             pre_kwargs = i['instance_data']
             pre_kwargs.setdefault('multi_tenant_company', self.multi_tenant_company)
+
+            if not self.preflight_check(pre_kwargs):
+                continue
 
             instance = self.create_instance(**pre_kwargs)
             self.generated_instances.append(instance)

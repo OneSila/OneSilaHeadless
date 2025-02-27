@@ -1,5 +1,6 @@
 from core.schema.core.types.ordering import order
 from core.schema.core.types.types import auto
+from currencies.schema.types.ordering import CurrencyOrder
 
 from sales_prices.models import SalesPrice, SalesPriceList, \
     SalesPriceListItem
@@ -8,6 +9,7 @@ from sales_prices.models import SalesPrice, SalesPriceList, \
 @order(SalesPrice)
 class SalesPriceOrder:
     id: auto
+    currency: CurrencyOrder | None
 
 
 @order(SalesPriceList)

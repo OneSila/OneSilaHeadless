@@ -221,6 +221,7 @@ def products_inspector__inspector__trigger_block_product_type_variations_mismatc
     product = instance.product
     error_codes_to_trigger = [VARIATION_MISMATCH_PRODUCT_TYPE_ERROR,
                               ITEMS_MISMATCH_PRODUCT_TYPE_ERROR,
+                              MISSING_EAN_CODE_ERROR,
                               DUPLICATE_VARIATIONS_ERROR,
                               NON_CONFIGURABLE_RULE_ERROR]
 
