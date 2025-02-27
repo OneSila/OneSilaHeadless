@@ -66,6 +66,15 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
         if isinstance(product_type, ParsedObject):
             product_type = product_type.pk
 
+        # we want to make sure we keep the sort order right but we start creating the REQUIRED_IN_CONFIGURATOR
+        # to avoid errors
+        items = sorted(items,
+            key=lambda item: (
+                0 if item.get('type') == ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR else 1,
+                item.get('sort_order', 0)
+            )
+        )
+
         # Step 1: Create the rule inside an atomic transaction
         with transaction.atomic():
             rule, _ = self.get_or_create(
@@ -99,6 +108,15 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
         from .models import ProductPropertiesRuleItem
         from .signals import product_properties_rule_updated, product_properties_rule_configurator_updated
         from strawberry_django.mutations.types import ParsedObject
+
+        # we want to make sure we keep the sort order right but we start creating the REQUIRED_IN_CONFIGURATOR
+        # to avoid errors
+        items = sorted(items,
+            key=lambda item: (
+                0 if item.get('type') == ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR else 1,
+                item.get('sort_order', 0)
+            )
+        )
 
         with transaction.atomic():
             final_ids = []

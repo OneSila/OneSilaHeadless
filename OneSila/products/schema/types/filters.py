@@ -22,7 +22,7 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     inspector: Optional[lazy['InspectorFilter', "products_inspector.schema.types.filters"]]
 
     @custom_filter
-    def inspector_not_succefully_code_error(
+    def inspector_not_successfully_code_error(
         self,
         queryset: QuerySet,
         value: str,

@@ -46,7 +46,7 @@ class GenerateEancodesFactory:
 
     def generate_eancodes(self):
         ean_code_instances = [EanCode(ean_code=ean_code, multi_tenant_company=self.multi_tenant_company) for ean_code in self.ean_codes]
-        self.ean_code_instances = EanCode.objects.bulk_create(ean_code_instances)
+        self.ean_code_instances = EanCode.objects.bulk_create(ean_code_instances, ignore_conflicts=True)
 
     def run(self):
         self.set_ean_codes()
