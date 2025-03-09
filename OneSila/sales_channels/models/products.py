@@ -26,8 +26,12 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name = 'Remote Product'
         verbose_name_plural = 'Remote Products'
 
+
     def __str__(self):
-        return f"{self.local_instance.name} (SKU: {self.remote_sku})"
+        local_name = self.local_instance.name if self.local_instance else "N/A"
+        remote_sku = self.remote_sku if self.remote_sku else "N/A"
+        sales_channel = self.sales_channel.hostname if hasattr(self, 'sales_channel') and self.sales_channel else "N/A"
+        return f"Remote product {local_name} (SKU: {remote_sku}) on {sales_channel}"
 
 
 class RemoteInventory(PolymorphicModel, RemoteObjectMixin, models.Model):
@@ -44,7 +48,7 @@ class RemoteInventory(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Remote Inventories'
 
     def __str__(self):
-        return f"Inventory for {self.remote_product.local_instance.name} - Quantity: {self.quantity}"
+        return f"Inventory for {self.remote_product} - Quantity: {self.quantity}"
 
 
 class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
@@ -62,7 +66,7 @@ class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Remote Prices'
 
     def __str__(self):
-        return f"Price for {self.remote_product.local_instance.name} - {self.price}"
+        return f"Price for {self.remote_product} - {self.price}"
 
 
 class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
@@ -78,7 +82,7 @@ class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Remote Product Contents'
 
     def __str__(self):
-        return f"Content sync status for {self.remote_product.local_instance.name}"
+        return f"Content sync status for {self.remote_product}"
 
 
 class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Model):
@@ -109,7 +113,7 @@ class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Mode
         verbose_name_plural = 'Remote Product Configurators'
 
     def __str__(self):
-        return f"Configurator for {self.remote_product.local_instance.name}"
+        return f"Configurator for {self.remote_product}"
 
     @classmethod
     def _get_all_remote_properties(cls, local_product, sales_channel, rule=None, variations=None):
@@ -248,3 +252,35 @@ class RemoteCategory(PolymorphicModel, RemoteObjectMixin, models.Model):
     class Meta:
         verbose_name = 'Remote Category'
         verbose_name_plural = 'Remote Categories'
+
+
+class RemoteEanCode(PolymorphicModel, RemoteObjectMixin, models.Model):
+    """
+    Remote mirror model for an EAN code.
+    Stores the EAN code value directly and associates it with a remote product on Magento.
+    """
+    ean_code = models.CharField(
+        max_length=14,
+        blank=True,
+        null=True,
+        help_text="The EAN code value."
+    )
+    remote_product = models.ForeignKey(
+        'sales_channels.RemoteProduct',
+        related_name='eancode',
+        on_delete=models.CASCADE,
+        help_text="The remote product associated with this EAN code."
+    )
+
+    class Meta:
+        unique_together = ('ean_code', 'remote_product')
+        verbose_name = 'Remote EAN Code'
+        verbose_name_plural = 'Remote EAN Codes'
+
+    def __str__(self):
+        sales_channel = (
+            self.remote_product.sales_channel.hostname
+            if hasattr(self.remote_product, 'sales_channel') and self.remote_product.sales_channel
+            else "N/A"
+        )
+        return f"Remote EAN Code {self.ean_code or 'N/A'} for {sales_channel}"

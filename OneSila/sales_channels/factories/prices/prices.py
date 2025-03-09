@@ -17,6 +17,9 @@ class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFacto
         Checks that the RemoteProduct and associated SalesChannelViewAssign exist before proceeding.
         Also sets the remote_instance if conditions are met.
         """
+        if not self.sales_channel.sync_prices:
+            return
+
         if not self.remote_product:
             return False
 

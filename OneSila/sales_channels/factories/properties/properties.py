@@ -16,7 +16,7 @@ class RemotePropertySelectValueCreateFactory(RemotePropertyEnsureMixin, RemoteIn
     local_model_class = PropertySelectValue
     remote_property_factory = None
 
-    def __init__(self, local_instance, sales_channel):
+    def __init__(self, sales_channel, local_instance):
         self.local_property = local_instance.property
         super().__init__(local_instance=local_instance, sales_channel=sales_channel)
 
@@ -123,5 +123,5 @@ class RemoteProductPropertyUpdateFactory(RemotePropertyEnsureMixin, ProductAssig
 class RemoteProductPropertyDeleteFactory(RemoteInstanceDeleteFactory):
     local_model_class = ProductProperty
 
-    def __init__(self, sales_channel, local_instance, remote_product, api=None,remote_instance=None):
+    def __init__(self, sales_channel, local_instance, remote_product, api=None, remote_instance=None):
         super().__init__(sales_channel, local_instance, api=api, remote_instance=remote_instance, remote_product=remote_product)

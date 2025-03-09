@@ -20,7 +20,14 @@ class SalesChannel(Integration, models.Model):
 
     use_configurable_name = models.BooleanField(default=False,verbose_name=_('Always use Configurable name over child'))
     sync_contents = models.BooleanField(default=True, verbose_name=_('Sync Contents'))
-    sync_orders_after = models.DateTimeField(null=True, blank=True, verbose_name=_('Sync Orders After Date'))
+    sync_ean_codes = models.BooleanField(
+        default=True,
+        verbose_name=_('Sync EAN Codes')
+    )
+    sync_prices = models.BooleanField(
+        default=True,
+        verbose_name=_('Sync Prices')
+    )
 
     class Meta:
         verbose_name = 'Sales Channel'

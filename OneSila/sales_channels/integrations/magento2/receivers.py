@@ -6,12 +6,17 @@ from properties.signals import product_properties_rule_created, product_properti
 from sales_channels.integrations.magento2.flows.default import run_generic_magento_task_flow, run_delete_generic_magento_task_flow, \
     run_product_specific_magento_task_flow, run_delete_product_specific_generic_magento_task_flow
 from sales_channels.integrations.magento2.models import MagentoProperty
-from sales_channels.signals import create_remote_property, update_remote_property, delete_remote_property, create_remote_property_select_value, \
-    update_remote_property_select_value, delete_remote_property_select_value, refresh_website_pull_models, sales_channel_created, create_remote_product, \
-    create_remote_product_property, update_remote_product_property, delete_remote_product_property, update_remote_inventory, update_remote_price, \
-    update_remote_product_content, add_remote_product_variation, remove_remote_product_variation, create_remote_image_association, \
-    update_remote_image_association, delete_remote_image_association, delete_remote_image, update_remote_product, sync_remote_product, \
-    sales_view_assign_updated, delete_remote_product
+from sales_channels.signals import create_remote_property, update_remote_property, delete_remote_property, \
+    create_remote_property_select_value, \
+    update_remote_property_select_value, delete_remote_property_select_value, refresh_website_pull_models, \
+    sales_channel_created, create_remote_product, \
+    create_remote_product_property, update_remote_product_property, delete_remote_product_property, \
+    update_remote_inventory, update_remote_price, \
+    update_remote_product_content, add_remote_product_variation, remove_remote_product_variation, \
+    create_remote_image_association, \
+    update_remote_image_association, delete_remote_image_association, delete_remote_image, update_remote_product, \
+    sync_remote_product, \
+    sales_view_assign_updated, delete_remote_product, update_remote_product_eancode
 
 
 @receiver(create_remote_property, sender='properties.Property')
@@ -134,19 +139,6 @@ def sales_channels__magento__attribute_set__delete(sender, instance, **kwargs):
     )
 
 
-@receiver(to_ship, sender='orders.Order')
-@receiver(shipped, sender='orders.Order')
-@receiver(hold, sender='orders.Order')
-@receiver(cancelled, sender='orders.Order')
-def sales_channels__magento__order_status__update(sender, instance, **kwargs):
-    from .tasks import update_magento_order_status_db_task
-    task_kwargs = {
-        'order_id': instance.id,
-    }
-
-    run_generic_magento_task_flow(update_magento_order_status_db_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
-
-
 @receiver(create_remote_product_property, sender='properties.ProductProperty')
 def sales_channels__magento__product_property__create(sender, instance, **kwargs):
     from .tasks import create_magento_product_property_db_task
@@ -210,6 +202,17 @@ def sales_channels__magento__product_content__update(sender, instance, **kwargs)
     task_kwargs = {'product_id': instance.id}
     run_product_specific_magento_task_flow(
         task_func=update_magento_product_content_db_task,
+        multi_tenant_company=instance.multi_tenant_company,
+        product=instance,
+        **task_kwargs)
+
+@receiver(update_remote_product_eancode, sender='products.Product')
+def sales_channels__magento__product_eancode__update(sender, instance, **kwargs):
+    from .tasks import update_magento_product_eancode_db_task
+
+    task_kwargs = {'product_id': instance.id}
+    run_product_specific_magento_task_flow(
+        task_func=update_magento_product_eancode_db_task,
         multi_tenant_company=instance.multi_tenant_company,
         product=instance,
         **task_kwargs)
@@ -341,6 +344,7 @@ def sales_channels__magento__product__create(sender, instance, **kwargs):
 def sales_channels__magento__product__delete_from_assign(sender, instance, **kwargs):
     from .tasks import delete_magento_product_db_task
     from .models.products import MagentoProduct
+
     product = instance.product
     sales_channel = instance.sales_channel
 
@@ -349,7 +353,8 @@ def sales_channels__magento__product__delete_from_assign(sender, instance, **kwa
         local_instance_id=product.id,
         remote_class=MagentoProduct,
         multi_tenant_company=product.multi_tenant_company,
-        sales_channels_filter_kwargs={'id': sales_channel.id}
+        sales_channels_filter_kwargs={'id': sales_channel.id},
+        is_variation=kwargs.get('is_variation', False)
     )
 
 
@@ -363,4 +368,5 @@ def sales_channels__magento__product__delete_from_product(sender, instance, **kw
         local_instance_id=instance.id,
         remote_class=MagentoProduct,
         multi_tenant_company=instance.multi_tenant_company,
+        is_multiple=True
     )

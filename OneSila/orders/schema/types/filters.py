@@ -13,12 +13,7 @@ from products.schema.types.filters import ProductFilter
 class OrderFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     reference: auto
-    customer: CustomerFilter | None
-    invoice_address: auto
-    shipping_address: auto
     currency: auto
-    status: auto
-    reason_for_sale: auto
     orderitem: Optional[lazy['OrderItemFilter', "orders.schema.types.filters"]]
 
 

@@ -1,13 +1,18 @@
 import logging
+
+from magento.exceptions import InstanceGetFailed
+
 from sales_channels.factories.products.products import RemoteProductSyncFactory, RemoteProductCreateFactory, RemoteProductDeleteFactory, \
     RemoteProductUpdateFactory
 from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin
+from sales_channels.integrations.magento2.factories.products.eancodes import MagentoEanCodeUpdateFactory
 from sales_channels.integrations.magento2.factories.products.images import MagentoMediaProductThroughCreateFactory, MagentoMediaProductThroughUpdateFactory, \
     MagentoMediaProductThroughDeleteFactory
 from sales_channels.integrations.magento2.factories.properties.properties import MagentoProductPropertyCreateFactory, MagentoProductPropertyUpdateFactory, \
     MagentoProductPropertyDeleteFactory, MagentoAttributeSetCreateFactory
 from sales_channels.integrations.magento2.models import MagentoProduct, MagentoInventory, MagentoPrice, MagentoProductContent, \
     MagentoProductProperty
+from sales_channels.integrations.magento2.models.products import MagentoEanCode
 from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet
 from magento.models import Product as MagentoApiProduct
 
@@ -26,6 +31,8 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
     remote_image_assign_update_factory = MagentoMediaProductThroughUpdateFactory
     remote_image_assign_delete_factory = MagentoMediaProductThroughDeleteFactory
 
+    remote_eancode_update_factory = MagentoEanCodeUpdateFactory
+
     def get_sync_product_factory(self):
         return MagentoProductSyncFactory
 
@@ -38,7 +45,6 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
         return MagentoProductDeleteFactory
 
     def get_add_variation_factory(self):
-        # Move import inside the method
         from sales_channels.integrations.magento2.factories.products import MagentoProductVariationAddFactory
         return MagentoProductVariationAddFactory
 
@@ -49,7 +55,6 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
     delete_product_factory = property(get_delete_product_factory)
 
     add_variation_factory = property(get_add_variation_factory)
-    accepted_variation_already_exists_error = Exception # @TODO: Figure it out (or create on the wrapper) the real exception
 
     field_mapping = {
         'name': 'name',
@@ -72,6 +77,9 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
     REMOTE_TYPE_SIMPLE = MagentoApiProduct.PRODUCT_TYPE_SIMPLE
     REMOTE_TYPE_CONFIGURABLE = MagentoApiProduct.PRODUCT_TYPE_CONFIGURABLE
 
+    def is_accepted_variation_error(self, error):
+        error_str = str(error)
+        return 'already attached' in error_str or 'have the same set of attribute values' in error_str
 
     def get_unpacked_product_properties(self):
         custom_attributes = {}
@@ -147,7 +155,6 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
 
             attribute_set = fac.remote_instance
 
-
         self.payload['attribute_set_id'] = attribute_set.remote_id
 
     def perform_remote_action(self):
@@ -173,6 +180,7 @@ class MagentoProductCreateFactory(RemoteProductCreateFactory, MagentoProductSync
     remote_inventory_class = MagentoInventory
     remote_price_class = MagentoPrice
     remote_product_content_class = MagentoProductContent
+    remote_product_eancode_class = MagentoEanCode
     remote_id_map = 'id'
 
     api_package_name = 'products'
@@ -206,7 +214,12 @@ class MagentoProductDeleteFactory(GetMagentoAPIMixin, RemoteProductDeleteFactory
     remote_delete_factory = property(get_delete_product_factory)
 
     def delete_remote(self):
-        magento_instance = self.api.products.by_sku(self.remote_instance.remote_sku)
+
+        try:
+            magento_instance = self.api.products.by_sku(self.remote_instance.remote_sku)
+        except InstanceGetFailed:
+            return True
+
         return magento_instance.delete()
 
     def serialize_response(self, response):

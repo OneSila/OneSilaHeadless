@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from polymorphic.models import PolymorphicModel
+from django.core.validators import MaxValueValidator, MinValueValidator
 from core import models
 import logging
 from django.utils.timezone import now
@@ -22,6 +23,11 @@ class Integration(PolymorphicModel, models.Model):
     verify_ssl = models.BooleanField(default=True)
     requests_per_minute = models.IntegerField(default=60)
     internal_company = models.ForeignKey('contacts.Company',on_delete=models.PROTECT)
+    max_retries = models.PositiveIntegerField(
+        default=3,
+        validators=[MinValueValidator(1), MaxValueValidator(20)],
+        help_text="Maximum number of task retries (between 1 and 20)"
+    )
 
     class Meta:
         unique_together = ('multi_tenant_company', 'hostname')
@@ -116,7 +122,7 @@ class IntegrationTaskQueue(models.Model):
 
     def mark_as_failed(self, error_message=None, error_traceback=None):
         self.retry += 1
-        if self.retry < 3:
+        if self.retry < self.integration.max_retries:
             self.status = self.PENDING
             self.sent_to_queue_at = now()
         else:

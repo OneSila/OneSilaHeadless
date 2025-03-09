@@ -1,5 +1,4 @@
 from core import models
-from django.utils.translation import gettext_lazy as _
 from currency_converter import CurrencyConverter, RateNotFoundError
 
 from .managers import OrderItemManager, OrderManager
@@ -7,59 +6,9 @@ from .documents import PrintOrder
 
 
 class Order(models.SetStatusMixin, models.Model):
-    DRAFT = 'DRAFT'
-    PENDING_PROCESSING = 'PENDING_PROCESSING'  # Set by scripts after draft. It means 'ready to do whatever you need to do before shipping'
-    PENDING_SHIPPING_APPROVAL = "PENDING_SHIPPING_APPROVAL"  # Choices should be: to-ship or await-inventory
-    TO_SHIP = "TO_SHIP"
-    AWAIT_INVENTORY = "AWAIT_INVENTORY"
-    SHIPPED = "SHIPPED"
-    CANCELLED = "CANCELLED"
-    HOLD = "HOLD"
-
-    UNPROCESSED = [PENDING_PROCESSING]
-    DONE_TYPES = [SHIPPED, CANCELLED, HOLD]
-    HELD = [HOLD, PENDING_SHIPPING_APPROVAL, AWAIT_INVENTORY]
-    RESERVE_STOCK_TYPES = [PENDING_PROCESSING, HOLD, PENDING_SHIPPING_APPROVAL, TO_SHIP, AWAIT_INVENTORY]
-
-    STATUS_CHOICES = (
-        (DRAFT, _('Draft')),
-        (PENDING_PROCESSING, _('Pending Processing')),
-        (PENDING_SHIPPING_APPROVAL, _('Pending Shipping Approval')),
-        (TO_SHIP, _('To Ship')),
-        (AWAIT_INVENTORY, _('Awaiting Inventory')),
-        (SHIPPED, _('Shipped')),
-        (CANCELLED, _('Cancelled')),
-        (HOLD, _('On Hold')),
-    )
-
-    SALE = 'SALE'
-    RETURNGOODS = 'RETURN'
-    DOCUMENTS = 'DOCUMENTS'
-    SAMPLE = 'SAMPLE'
-    GIFT = 'GIFT'
-
-    REASON_CHOICES = (
-        (SALE, _('Sale')),
-        # (RETURNGOODS, _('Return goods')),
-        (SAMPLE, _('Commercial Sample')),
-        (GIFT, _('Gift')),
-        # (DOCUMENTS, _('Documents'))
-    )
-
     reference = models.CharField(max_length=100, blank=True, null=True)
-    customer = models.ForeignKey('contacts.Company', on_delete=models.PROTECT)
-    invoice_address = models.ForeignKey('contacts.InvoiceAddress', on_delete=models.PROTECT,
-        related_name='invoiceaddress_set')
-    shipping_address = models.ForeignKey('contacts.ShippingAddress', on_delete=models.PROTECT,
-        related_name='shippingaddress_set')
-
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
     price_incl_vat = models.BooleanField(default=True)
-
-    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=DRAFT)
-    reason_for_sale = models.CharField(max_length=10, choices=REASON_CHOICES, default=SALE)
-
-    internal_company = models.ForeignKey('contacts.Company', on_delete=models.PROTECT, related_name='vendor_orders')
     source = models.ForeignKey('integrations.Integration', on_delete=models.PROTECT, null=True,  blank=True) # we can have manual orders
 
     objects = OrderManager()
@@ -165,14 +114,6 @@ class Order(models.SetStatusMixin, models.Model):
     class Meta:
         ordering = ('-created_at',)
         search_terms = ['reference', 'customer__name']
-
-    def save(self, *args, **kwargs):
-        # if we buy from someone it mean it become a customer if is not already
-        if not self.customer.is_customer:
-            self.customer.is_customer = True
-            self.customer.save()
-
-        super().save(*args, **kwargs)
 
 
 class OrderItem(models.Model):

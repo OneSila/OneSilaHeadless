@@ -5,6 +5,7 @@ from sales_channels.models.sales_channels import (
     RemoteLanguage
 )
 from core import models
+from django.utils.translation import gettext_lazy as _
 
 class MagentoSalesChannel(SalesChannel):
     """
@@ -20,6 +21,15 @@ class MagentoSalesChannel(SalesChannel):
     host_api_username = models.CharField(max_length=256, blank=True, null=True)
     host_api_key = models.CharField(max_length=256)
     authentication_method = models.CharField(max_length=3, choices=AUTH_METHOD_CHOICES)
+    attribute_set_skeleton_id = models.PositiveIntegerField(
+        default=4,
+        help_text=_("Default skeleton ID used for attribute set creation during initial import.")
+    )
+    ean_code_attribute = models.CharField(
+        max_length=64,
+        default="ean_code",
+        help_text=_("Magento attribute code for the EAN code.")
+    )
 
     class Meta:
         verbose_name = 'Magento Sales Channel'

@@ -1,10 +1,11 @@
-from core.helpers import get_nested_attr, clean_json_data
+from typing import Optional
 from integrations.factories.mixins import IntegrationInstanceOperationMixin, IntegrationInstanceCreateFactory, IntegrationInstanceUpdateFactory, \
     IntegrationInstanceDeleteFactory
 from properties.models import Property
 from ..models.sales_channels import SalesChannelViewAssign
 from ..models.logs import RemoteLog
 import logging
+from eancodes.models import EanCode
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,6 @@ class RemoteInstanceDeleteFactory(IntegrationInstanceDeleteFactory):
 
     def __init__(self, sales_channel, local_instance=None, api=None, remote_instance=None, **kwargs):
         super().__init__(integration=sales_channel, local_instance=local_instance, api=api, remote_instance=remote_instance, **kwargs)
-
 
 
 class ProductAssignmentMixin:
@@ -303,3 +303,8 @@ class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
         self.build_payload()
         self.fetch_remote_instances()
         self.process_remote_instances()
+
+class EanCodeValueMixin:
+    def get_ean_code_value(self) -> Optional[str]:
+        ean_obj = EanCode.objects.filter(product=self.local_instance).first()
+        return ean_obj.ean_code if ean_obj else None

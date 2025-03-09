@@ -35,3 +35,5 @@ sync_remote_product = ModelSignal(use_caching=True)
 delete_remote_product = ModelSignal(use_caching=True)
 
 sales_view_assign_updated = ModelSignal(use_caching=True)
+
+update_remote_product_eancode = ModelSignal(use_caching=True)
