@@ -8,11 +8,8 @@ class GenerateEancodesFlow:
         self.ean_codes = None
 
     def set_ean_codes(self):
-        ids = []
-        for ean in self.factory.ean_code_instances:
-            ids.append(ean.id)
-
-        self.ean_codes = EanCode.objects.filter(id__in=ids)
+        ean_values = [ean for ean in self.factory.ean_code_instances]
+        self.ean_codes = EanCode.objects.filter(ean_code__in=ean_values)
 
     def flow(self):
         self.factory.run()
