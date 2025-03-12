@@ -13,20 +13,18 @@ from core.schema.languages import LanguageQuery
 from core.schema.multi_tenant import MultiTenantQuery, MultiTenantMutation, MultiTenantSubscription
 from core.schema.timezones import TimeZoneQuery
 from currencies.schema import CurrenciesQuery, CurrenciesMutation, CurrenciesSubscription
-from customs.schema import CustomsQuery, CustomsMutation, CustomsSubscription
 from eancodes.schema import EanCodesQuery, EanCodesMutation, EanCodesSubscription
-from inventory.schema import InventoryQuery, InventoryMutation, InventorySubscription
-from lead_times.schema import LeadTimesQuery, LeadTimesMutation, LeadTimesSubscription
+from lead_times.schema import LeadTimesQuery
 from media.schema import MediaQuery, MediaMutation, MediaSubscription
-from orders.schema import OrdersQuery, OrdersMutation, OrdersSubscription
 from products.schema import ProductsQuery, ProductsMutation, ProductsSubscription
 from products_inspector.schema import ProductsInspectorSubscription, ProductsInspectorMutation
 from properties.schema import PropertiesQuery, PropertiesMutation, PropertiesSubscription
 from sales_prices.schema import SalesPricesQuery, SalesPricesMutation, SalesPriceSubscription
 from sales_channels.schema import SalesChannelsQuery, SalesChannelsMutation, SalesChannelsSubscription
+from sales_channels.integrations.magento2.schema import MagentoSalesChannelMutation
 from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
-from units.schema import UnitsQuery, UnitsMutation, UnitsSubscription
 from translations.schema import TranslationsQuery
+from integrations.schema import IntegrationsQuery
 
 
 #
@@ -34,28 +32,24 @@ from translations.schema import TranslationsQuery
 #
 
 @strawberry.type
-class Query(ContactsQuery, CurrenciesQuery, CustomsQuery, CountryQuery, EanCodesQuery,
-        InventoryQuery, LanguageQuery, LeadTimesQuery, MediaQuery, MultiTenantQuery, OrdersQuery,
+class Query(CurrenciesQuery, CountryQuery, EanCodesQuery, IntegrationsQuery,
+        LanguageQuery, LeadTimesQuery, MediaQuery, MultiTenantQuery,
         ProductsQuery, PropertiesQuery, SalesPricesQuery, SalesChannelsQuery,
-        TaxesQuery, TimeZoneQuery, UnitsQuery, TranslationsQuery):
+        TaxesQuery, TimeZoneQuery, TranslationsQuery):
     pass
 
 
 @strawberry.type
-class Mutation(ContactsMutation, CurrenciesMutation, CustomsMutation, EanCodesMutation,
-        InventoryMutation, LeadTimesMutation, MediaMutation, MultiTenantMutation,
-        OrdersMutation, ProductsInspectorMutation, ProductsMutation, PropertiesMutation,
-        SalesPricesMutation, SalesChannelsMutation, TaxesMutation, UnitsMutation):
+class Mutation(CurrenciesMutation, EanCodesMutation,MediaMutation, MultiTenantMutation,
+       ProductsInspectorMutation, ProductsMutation, PropertiesMutation,
+        SalesPricesMutation, SalesChannelsMutation, MagentoSalesChannelMutation, TaxesMutation):
     pass
 
 
 @strawberry.type
-class Subscription(ContactsSubscription, CurrenciesSubscription,
-        CustomsSubscription, EanCodesSubscription, InventorySubscription,
-        LeadTimesSubscription, MediaSubscription, MultiTenantSubscription,
-        OrdersSubscription, ProductsInspectorSubscription,
-        ProductsSubscription, PropertiesSubscription, SalesPriceSubscription, SalesChannelsSubscription,
-        TaxSubscription, UnitsSubscription):
+class Subscription(CurrenciesSubscription,EanCodesSubscription, MediaSubscription, MultiTenantSubscription,
+        ProductsInspectorSubscription, ProductsSubscription, PropertiesSubscription, SalesPriceSubscription,
+        SalesChannelsSubscription, TaxSubscription):
     pass
 
 #

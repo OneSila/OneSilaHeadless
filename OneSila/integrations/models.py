@@ -9,6 +9,7 @@ from django.contrib.contenttypes.models import ContentType
 from core.huey import DEFAULT_PRIORITY
 import json
 from datetime import datetime
+from django.utils.translation import gettext_lazy as _
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class Integration(PolymorphicModel, models.Model):
     active = models.BooleanField(default=True)
     verify_ssl = models.BooleanField(default=True)
     requests_per_minute = models.IntegerField(default=60)
-    internal_company = models.ForeignKey('contacts.Company',on_delete=models.PROTECT)
+    # internal_company = models.ForeignKey('contacts.Company',on_delete=models.PROTECT) this was for accounting
     max_retries = models.PositiveIntegerField(
         default=3,
         validators=[MinValueValidator(1), MaxValueValidator(20)],
@@ -33,6 +34,7 @@ class Integration(PolymorphicModel, models.Model):
         unique_together = ('multi_tenant_company', 'hostname')
         verbose_name = 'Integration'
         verbose_name_plural = 'Integrations'
+        search_terms = ['hostname']
 
 
     def __str__(self):
@@ -205,6 +207,7 @@ class IntegrationLog(PolymorphicModel, models.Model):
     content_object = GenericForeignKey('content_type', 'object_id')
 
     integration = models.ForeignKey(Integration, null=True, blank=True, on_delete=models.SET_NULL)
+    remote_product = models.ForeignKey('sales_channels.RemoteProduct',on_delete=models.SET_NULL, null=True, blank=True) # linked remote_product (if any) so we can filter on it
     action = models.CharField(max_length=32, choices=ACTION_CHOICES)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES)
     payload = models.JSONField(null=True, blank=True, help_text="The API call payload associated with this log.")
@@ -212,6 +215,7 @@ class IntegrationLog(PolymorphicModel, models.Model):
     error_traceback = models.TextField(null=True, blank=True, help_text="Detailed error traceback if the action failed.")
     user_error = models.BooleanField(default=False)  # Boolean field to indicate if the error is user-facing
     identifier = models.CharField(max_length=255, null=True, blank=True)  # Field to store a unique identifier for the log entry
+    fixing_identifier = models.CharField(max_length=255, null=True, blank=True, help_text=_("Identifier used by a later log to indicate this error has been fixed."))
     keep = models.BooleanField(default=False, help_text="Whether to keep this log permanently.")
     related_object_str = models.CharField(max_length=556, null=True, blank=True, help_text="String representation of the related object.")
 
@@ -223,7 +227,28 @@ class IntegrationLog(PolymorphicModel, models.Model):
     def __str__(self):
         return f"Log for {self.content_object} - Action: {self.action}, Status: {self.status}"
     
-    
+    @property
+    def frontend_name(self):
+        """
+        Returns a user-friendly name for the content_object:
+          - If the content_object is None, returns _('Deleted').
+          - If the content_object does not have a 'frontend_name' attribute, returns _('Unknown').
+          - Otherwise, returns the content_object.frontend_name.
+        """
+        if self.content_object is None:
+            return _("Deleted")
+        if not hasattr(self.content_object, 'frontend_name'):
+            return _("Unknown")
+        return self.content_object.frontend_name
+
+    @property
+    def frontend_error(self):
+        """
+        Returns the error response for user-facing logs:
+          - If the log is marked as a user_error, returns the response.
+          - Otherwise, returns None.
+        """
+        return self.response if self.user_error else None
 
 class IntegrationObjectMixin(models.Model):
     """
@@ -259,23 +284,37 @@ class IntegrationObjectMixin(models.Model):
     def safe_str(self):
         return f'To be deleted {self.remote_id}'
 
-
     @property
     def errors(self):
-        """
-        Retrieve the latest errors based on unique identifiers.
-        Only includes errors that are the latest occurrence of their identifier.
-        """
-        content_type = ContentType.objects.get_for_model(self)
-        # Fetch the latest logs for each identifier
-        latest_logs = IntegrationLog.objects.filter(
-            content_type=content_type,
-            object_id=self.pk,
-            status=IntegrationLog.STATUS_FAILED
-        ).order_by('identifier', '-created_at').distinct('identifier')
 
-        # Return only logs with a FAILED status
-        return latest_logs.filter(status=IntegrationLog.STATUS_FAILED)
+        if not self.pk:
+            return IntegrationLog.objects.none()
+
+        content_type = ContentType.objects.get_for_model(self)
+        latest_logs = IntegrationLog.objects.filter(content_type=content_type, object_id=self.pk).order_by('identifier', '-created_at').distinct('identifier')
+
+        error_ids = []
+        for log in latest_logs:
+
+            if log.status != IntegrationLog.STATUS_FAILED:
+                continue
+
+            if log.fixing_identifier:
+                fixed = IntegrationLog.objects.filter(content_type=content_type, object_id=self.pk,
+                                                      identifier=log.fixing_identifier,
+                                                      status=IntegrationLog.STATUS_SUCCESS,
+                                                      created_at__gt=log.created_at).exists()
+
+                if fixed:
+                    continue
+
+            error_ids.append(log.id)
+
+        return IntegrationLog.objects.filter(id__in=error_ids)
+
+    @property
+    def has_errors(self):
+        return self.errors.exists()
 
     @property
     def payload(self):
@@ -290,7 +329,7 @@ class IntegrationObjectMixin(models.Model):
         ).order_by('-created_at').first()
         return last_log.payload if last_log else {}
 
-    def add_log(self, action, response, payload, identifier,  **kwargs):
+    def add_log(self, action, response, payload, identifier, remote_product=None,  **kwargs):
         """
         Method to add a successful log entry.
         """
@@ -300,10 +339,11 @@ class IntegrationObjectMixin(models.Model):
             response=response,
             payload=payload,
             identifier=identifier,
+            remote_product=remote_product,
            **kwargs
         )
 
-    def add_error(self, action, response, payload, error_traceback, identifier, user_error=False, **kwargs):
+    def add_error(self, action, response, payload, error_traceback, identifier, user_error=False, remote_product=None, fixing_identifier=None, **kwargs):
         """
         Method to add an error log entry.
         """
@@ -315,10 +355,12 @@ class IntegrationObjectMixin(models.Model):
             error_traceback=error_traceback,
             identifier=identifier,
             user_error=user_error,
+            remote_product=remote_product,
+            fixing_identifier=fixing_identifier,
             **kwargs
         )
 
-    def add_user_error(self, action, response, payload, error_traceback, identifier, **kwargs):
+    def add_user_error(self, action, response, payload, error_traceback, identifier, remote_product=None, fixing_identifier=None, **kwargs):
         """
         Method to add a user-facing error log entry.
         """
@@ -329,10 +371,12 @@ class IntegrationObjectMixin(models.Model):
             error_traceback=error_traceback,
             identifier=identifier,
             user_error=True,
+            remote_product=remote_product,
+            fixing_identifier=fixing_identifier,
             **kwargs
         )
 
-    def add_admin_error(self, action, response, payload, error_traceback, identifier, **kwargs):
+    def add_admin_error(self, action, response, payload, error_traceback, identifier, remote_product=None, fixing_identifier=None, **kwargs):
         """
         Method to add an admin-facing error log entry.
         """
@@ -343,14 +387,19 @@ class IntegrationObjectMixin(models.Model):
             error_traceback=error_traceback,
             identifier=identifier,
             user_error=False,
+            remote_product=remote_product,
+            fixing_identifier=fixing_identifier,
             **kwargs
         )
 
-    def create_log_entry(self, action, status, response, payload, error_traceback=None, identifier=None, user_error=False, **kwargs):
+    def create_log_entry(self, action, status, response, payload, error_traceback=None, identifier=None, user_error=False, remote_product=None, fixing_identifier=None, **kwargs):
         """
         Method to create a log entry.
         """
-        IntegrationLog.objects.create(
+        from sales_channels.models import RemoteLog
+
+        # @TODO: the class here should be configurable but for now we will let the RemoteLog
+        RemoteLog.objects.create(
             content_type=ContentType.objects.get_for_model(self),
             object_id=self.pk,
             content_object=self,
@@ -361,9 +410,11 @@ class IntegrationObjectMixin(models.Model):
             payload=payload,
             error_traceback=error_traceback,
             identifier=identifier,
+            fixing_identifier=fixing_identifier,
             user_error=user_error,
             multi_tenant_company=self.integration.multi_tenant_company,
             related_object_str=str(self),
+            remote_product=remote_product,
             **kwargs
         )
 
@@ -388,7 +439,7 @@ class IntegrationObjectMixin(models.Model):
         Overrides save method to check for errors and mark as outdated if necessary.
         """
         # Check if there are any errors
-        if self.errors.exists():
+        if self.has_errors:
             self.mark_outdated(save=False)  # Mark as outdated without saving immediately
         else:
             # Reset outdated status if no errors are found

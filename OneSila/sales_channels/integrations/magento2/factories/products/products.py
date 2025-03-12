@@ -174,13 +174,14 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
         self.magento_product.save(scope=remote_language.sales_channel_view.code)
 
 class MagentoProductUpdateFactory(RemoteProductUpdateFactory, MagentoProductSyncFactory):
-    pass
+    fixing_identifier_class = MagentoProductSyncFactory
 
 class MagentoProductCreateFactory(RemoteProductCreateFactory, MagentoProductSyncFactory):
     remote_inventory_class = MagentoInventory
     remote_price_class = MagentoPrice
     remote_product_content_class = MagentoProductContent
     remote_product_eancode_class = MagentoEanCode
+    fixing_identifier_class = MagentoProductSyncFactory
     remote_id_map = 'id'
 
     api_package_name = 'products'

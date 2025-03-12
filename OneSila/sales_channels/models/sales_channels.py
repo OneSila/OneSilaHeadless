@@ -4,10 +4,8 @@ from core import models
 from polymorphic.models import PolymorphicModel
 from django.conf import settings
 from core.helpers import get_languages
-from core.huey import DEFAULT_PRIORITY
 from integrations.models import Integration
 from sales_channels.models.mixins import RemoteObjectMixin
-from django.utils.timezone import now
 
 import logging
 
@@ -20,14 +18,9 @@ class SalesChannel(Integration, models.Model):
 
     use_configurable_name = models.BooleanField(default=False,verbose_name=_('Always use Configurable name over child'))
     sync_contents = models.BooleanField(default=True, verbose_name=_('Sync Contents'))
-    sync_ean_codes = models.BooleanField(
-        default=True,
-        verbose_name=_('Sync EAN Codes')
-    )
-    sync_prices = models.BooleanField(
-        default=True,
-        verbose_name=_('Sync Prices')
-    )
+    sync_ean_codes = models.BooleanField(default=True, verbose_name=_('Sync EAN Codes'))
+    sync_prices = models.BooleanField(default=True, verbose_name=_('Sync Prices'))
+    first_import_complete = models.BooleanField(default=False, help_text="Set to True once the first import has been completed.")
 
     class Meta:
         verbose_name = 'Sales Channel'
@@ -36,7 +29,7 @@ class SalesChannel(Integration, models.Model):
     def __str__(self):
         return f"{self.hostname } @ {self.multi_tenant_company}"
 
-class SalesChannelIntegrationPricelist(models.Model):
+class SalesChannelIntegrationPricelist(models.Model): # @TODO: I don't think this is needed
     """
     Through model to handle the association between a SalesChannel and a PriceList.
     """

@@ -35,14 +35,22 @@ class IntegrationInstanceOperationMixin:
         """
         return response.json()
 
-    def get_identifier(self):
+    def get_identifiers(self, fixing_caller='run'):
         """
         Generates a log identifier to reflect the current class and calling method context.
         """
         frame = inspect.currentframe()
         caller = frame.f_back.f_code.co_name
         class_name = self.__class__.__name__
-        return f"{class_name}:{caller}"
+
+        fixing_class = getattr(self, 'fixing_identifier_class', None)
+        fixing_identifier = None
+        if fixing_caller and fixing_class:
+            fixing_identifier = f"{fixing_class.__name__}:{fixing_caller}"
+
+
+        return f"{class_name}:{caller}", fixing_identifier
+
 
     def log_action_for_instance(self, remote_instance, action, response_data, payload, identifier):
         if not remote_instance:
@@ -52,7 +60,8 @@ class IntegrationInstanceOperationMixin:
             action=action,
             response=response_data,
             payload=payload,
-            identifier=identifier
+            identifier=identifier,
+            remote_product=getattr(self, 'remote_product', None)
         )
 
     def log_action(self, action, response_data, payload, identifier):
@@ -63,10 +72,11 @@ class IntegrationInstanceOperationMixin:
             action=action,
             response=response_data,
             payload=payload,
-            identifier=identifier
+            identifier=identifier,
+            remote_product=getattr(self, 'remote_product', None)
         )
 
-    def log_error(self, exception, action, identifier, payload):
+    def log_error(self, exception, action, identifier, payload, fixing_identifier=None):
         """
         Logs errors for user exceptions or admin exceptions depending on the exception type.
         """
@@ -80,7 +90,9 @@ class IntegrationInstanceOperationMixin:
                 response=error_message,
                 payload=payload,
                 error_traceback=tb,
-                identifier=identifier
+                identifier=identifier,
+                remote_product=getattr(self, 'remote_product', None),
+                fixing_identifier=fixing_identifier
             )
         else:
             self.remote_instance.add_admin_error(
@@ -88,7 +100,9 @@ class IntegrationInstanceOperationMixin:
                 response=error_message,
                 payload=payload,
                 error_traceback=tb,
-                identifier=identifier
+                identifier=identifier,
+                remote_product=getattr(self, 'remote_product', None),
+                fixing_identifier=fixing_identifier
             )
 
     def customize_payload(self):
@@ -322,7 +336,7 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
         """
         Main method to orchestrate the creation process, including error handling and logging.
         """
-        log_identifier = self.get_identifier()
+        log_identifier, fixing_identifier = self.get_identifiers()
 
         try:
             logger.debug(f"Creating remote instance with payload: {self.payload}")
@@ -548,7 +562,7 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
         pass
 
     def update(self):
-        log_identifier = self.get_identifier()
+        log_identifier, _ = self.get_identifiers()
 
         # Send pre-update signal
         remote_instance_pre_update.send(sender=self.remote_instance.__class__, instance=self.remote_instance)
@@ -687,7 +701,7 @@ class IntegrationInstanceDeleteFactory(IntegrationInstanceOperationMixin):
         """
         Main method to orchestrate the deletion process, including error handling.
         """
-        log_identifier = self.get_identifier()
+        log_identifier, _ = self.get_identifiers()
         remote_instance_pre_delete.send(sender=self.remote_instance.__class__, instance=self.remote_instance)
 
         try:

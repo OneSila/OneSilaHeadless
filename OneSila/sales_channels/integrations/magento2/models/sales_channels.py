@@ -1,9 +1,9 @@
 from sales_channels.models.sales_channels import (
     SalesChannel,
     SalesChannelView,
-    SalesChannelViewAssign,
     RemoteLanguage
 )
+
 from core import models
 from django.utils.translation import gettext_lazy as _
 

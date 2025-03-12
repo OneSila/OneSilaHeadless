@@ -1,4 +1,6 @@
 from django.db.models.signals import post_delete, pre_delete
+
+from core.schema.core.subscriptions import refresh_subscription_receiver
 from core.signals import post_create, post_update, mutation_update
 from eancodes.signals import ean_code_released_for_product
 from inventory.models import Inventory
@@ -6,6 +8,8 @@ from media.models import Media
 from properties.signals import product_properties_rule_configurator_updated
 from sales_prices.models import SalesPriceListItem
 from sales_prices.signals import price_changed
+from .integrations.magento2.models import MagentoProduct
+from .models import ImportProcess
 from .models.sales_channels import SalesChannelViewAssign
 from .signals import (
     create_remote_property,
@@ -22,6 +26,31 @@ from .signals import (
 from django.dispatch import receiver
 from properties.models import Property, PropertyTranslation, PropertySelectValueTranslation, PropertySelectValue, ProductProperty, \
     ProductPropertyTextTranslation
+
+@receiver(post_create, sender=ImportProcess)
+def import_process_post_create_receiver(sender, instance: ImportProcess, created, **kwargs):
+
+    sales_channel = instance.sales_channel
+    if not sales_channel.first_import_complete:
+        sales_channel.first_import_complete = True
+        sales_channel.save(update_fields=['first_import_complete'])
+
+@receiver(post_update, sender=MagentoProduct)
+def syncing_current_percentage_real_time_sync__post_update_receiver(sender, instance, **kwargs):
+    """
+    Update real time syncing_current_percentage when is changed to the product.
+    """
+    if instance.is_dirty_field('syncing_current_percentage'):
+        refresh_subscription_receiver(instance.local_instance)
+
+
+@receiver(post_create, sender=SalesChannelViewAssign)
+@receiver(post_delete, sender=SalesChannelViewAssign)
+def sales_channels__assign__added_or_remove_receiver(sender, instance, **kwargs):
+    """
+    Update real time syncing_current_percentage when is changed to the product.
+    """
+    refresh_subscription_receiver(instance.product)
 
 # ------------------------------------------------------------- SEND SIGNALS FOR PROPERTIES
 

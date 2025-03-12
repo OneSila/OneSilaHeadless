@@ -3,9 +3,9 @@ from model_bakery.recipe import related
 from core import models
 from .mixins import RemoteObjectMixin
 from polymorphic.models import PolymorphicModel
-
+from django.core.validators import MinValueValidator, MaxValueValidator
 from ..signals import sync_remote_product
-
+from django.utils.translation import gettext_lazy as _
 
 class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
@@ -16,16 +16,63 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
     remote_sku = models.CharField(max_length=255, help_text="The SKU of the product in the remote system.")
     is_variation = models.BooleanField(default=False, help_text="Indicates if this product is a variation.")
     remote_parent_product = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, help_text="The remote parent product for variations.")
-
-    # user wants last error
-    # admin wants all the errors
-    # in frontend show only the user errors. If the errors are admin we show a generic message but still let them resync so it maybe fixed
+    syncing_current_percentage = models.PositiveSmallIntegerField(
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Current sync progress percentage (0-100)."
+    )
 
     class Meta:
         unique_together = (('sales_channel', 'local_instance', 'remote_parent_product'), ('sales_channel', 'remote_sku'),)
         verbose_name = 'Remote Product'
         verbose_name_plural = 'Remote Products'
 
+    def set_new_sync_percentage(self, new_percentage: int):
+        """
+        Sets a new sync progress percentage for the remote product.
+
+        :param new_percentage: An integer value between 0 and 100.
+        :raises ValueError: If new_percentage is not in the valid range.
+        """
+        if not (0 <= new_percentage <= 100):
+            raise ValueError("Sync percentage must be between 0 and 100.")
+        self.syncing_current_percentage = new_percentage
+        self.save(update_fields=['syncing_current_percentage'])
+
+    @property
+    def frontend_name(self):
+        return f"{self.local_instance.name} ({self.remote_sku})"
+
+    @property
+    def errors(self):
+        from integrations.models import IntegrationLog
+
+        if not self.pk:
+            return IntegrationLog.objects.none()
+
+        # Retrieve the latest logs grouped by identifier (using distinct on 'identifier')
+        latest_logs = IntegrationLog.objects.filter(remote_product=self).order_by('identifier', '-created_at').distinct('identifier')
+
+        # Now build a list of error IDs that should remain, i.e. where a more recent fix log is not present.
+        error_ids = []
+        for log in latest_logs:
+
+            if log.status != IntegrationLog.STATUS_FAILED:
+                continue
+
+            # If a fixing_identifier is set on this log, check if a later successful log with that fixing_identifier exists.
+            if log.fixing_identifier:
+                fixed = IntegrationLog.objects.filter(remote_product=self,
+                                                      identifier=log.fixing_identifier,
+                                                      status=IntegrationLog.STATUS_SUCCESS,
+                                                      created_at__gt=log.created_at).exists()
+
+                if fixed:
+                    continue
+
+            error_ids.append(log.id)
+
+        return IntegrationLog.objects.filter(id__in=error_ids)
 
     def __str__(self):
         local_name = self.local_instance.name if self.local_instance else "N/A"
@@ -68,6 +115,13 @@ class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
     def __str__(self):
         return f"Price for {self.remote_product} - {self.price}"
 
+    @property
+    def frontend_name(self):
+        if self.discount_price is not None:
+            return f"{self.price} - {self.discount_price}"
+
+        return f"{self.price}"
+
 
 class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
@@ -83,6 +137,10 @@ class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     def __str__(self):
         return f"Content sync status for {self.remote_product}"
+
+    @property
+    def frontend_name(self):
+        return (_(f"Content for {self.remote_product.local_instance.name}"))
 
 
 class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Model):
@@ -111,6 +169,10 @@ class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Mode
         unique_together = ('remote_product',)
         verbose_name = 'Remote Product Configurator'
         verbose_name_plural = 'Remote Product Configurators'
+
+    @property
+    def frontend_name(self):
+        return (_(f"Configurator for {self.remote_product.local_instance.name}"))
 
     def __str__(self):
         return f"Configurator for {self.remote_product}"
@@ -219,6 +281,10 @@ class RemoteImage(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name = 'Remote Image'
         verbose_name_plural = 'Remote Images'
 
+    @property
+    def frontend_name(self):
+        return (_(f"Image for {self.remote_product.local_instance.name}"))
+
     def __str__(self):
         return f"Remote image for {self.local_instance}"
 
@@ -235,6 +301,10 @@ class RemoteImageProductAssociation(PolymorphicModel, RemoteObjectMixin, models.
         unique_together = ('local_instance', 'sales_channel', 'remote_product',)
         verbose_name = 'Remote Image Product Association'
         verbose_name_plural = 'Remote Image Product Associations'
+
+    @property
+    def frontend_name(self):
+        return (_(f"Image for {self.remote_product.local_instance.name}"))
 
     def __str__(self):
         local_product_name = self.local_instance.product.name if self.local_instance and self.local_instance.product else "No Local Product"
@@ -276,6 +346,10 @@ class RemoteEanCode(PolymorphicModel, RemoteObjectMixin, models.Model):
         unique_together = ('ean_code', 'remote_product')
         verbose_name = 'Remote EAN Code'
         verbose_name_plural = 'Remote EAN Codes'
+
+    @property
+    def frontend_name(self):
+        return self.ean_code
 
     def __str__(self):
         sales_channel = (

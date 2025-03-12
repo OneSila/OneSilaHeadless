@@ -72,11 +72,6 @@ class RemoteInventoryFilter(SearchFilterMixin):
     pass
 
 
-@filter(RemoteLog)
-class RemoteLogFilter(SearchFilterMixin):
-    pass
-
-
 @filter(RemoteOrder)
 class RemoteOrderFilter(SearchFilterMixin):
     pass
@@ -89,7 +84,7 @@ class RemotePriceFilter(SearchFilterMixin):
 
 @filter(RemoteProduct)
 class RemoteProductFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteProductContent)
@@ -117,9 +112,16 @@ class RemoteVatFilter(SearchFilterMixin):
     pass
 
 
+@filter(RemoteLog)
+class RemoteLogFilter(SearchFilterMixin):
+    id: auto
+    remote_product: Optional[RemoteProductFilter]
+
+
+
 @filter(SalesChannel)
 class SalesChannelFilter(SearchFilterMixin):
-    pass
+    active: auto
 
 
 @filter(SalesChannelIntegrationPricelist)
@@ -130,6 +132,7 @@ class SalesChannelIntegrationPricelistFilter(SearchFilterMixin):
 @filter(SalesChannelView)
 class SalesChannelViewFilter(SearchFilterMixin):
     id: auto
+    active: auto
 
 
 @filter(SalesChannelViewAssign)

@@ -57,6 +57,10 @@ class RemoteProductProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name = 'Remote Product Property'
         verbose_name_plural = 'Remote Product Properties'
 
+    @property
+    def frontend_name(self):
+        return f"{self.local_instance.property.name} > {self.local_instance.get_value()}"
+
     def __str__(self):
         if self.local_instance:
             property_name = self.local_instance.property.internal_name

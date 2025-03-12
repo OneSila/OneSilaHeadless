@@ -35,6 +35,11 @@ def products_inspector__inspector_block__subscription__post_save(sender, instanc
     refresh_subscription_receiver(instance.inspector)
 
 
+@receiver(post_update, sender=Inspector)
+def products_inspector__inspector__subscription__post_save(sender, instance, **kwargs):
+    refresh_subscription_receiver(instance.product)
+
+
 @receiver(inspector_block_refresh, sender=Inspector)
 def products_inspector__inspector__inspector_sync_block_by_error_code(sender, instance, **kwargs):
     from .flows.inspector_block import inspector_sync_block_by_error_code_flow

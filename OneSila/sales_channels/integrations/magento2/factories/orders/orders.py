@@ -217,7 +217,7 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
             RemoteLog.ACTION_CREATE,
             raw_data,
             {},
-            self.get_identifier()
+            self.get_identifiers()[0]
         )
 
         return remote_order_item

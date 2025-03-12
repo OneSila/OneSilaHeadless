@@ -125,17 +125,17 @@ class RemoteTaskQueueAdmin(admin.ModelAdmin):
 @admin.register(IntegrationLog)
 class IntegrationLogAdmin(PolymorphicParentModelAdmin):
     base_model = IntegrationLog
-    child_models = (RemoteLog, )
+    child_models = (IntegrationLog, RemoteLog)
     list_display = ('related_object_str', 'integration', 'action', 'status', 'identifier', 'created_at')
     list_filter = ('status', 'action', 'integration', PolymorphicChildModelFilter)
     search_fields = ('content_object__name', 'identifier')
     ordering = ('-created_at',)
-    fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type', 'object_id', 'related_object_str', 'integration', 'action', 'status', 'identifier']
-    readonly_fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type', 'object_id', 'related_object_str', 'integration', 'action', 'status', 'identifier']
+    fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type', 'object_id', 'related_object_str', 'integration', 'remote_product', 'action', 'status', 'identifier']
+    readonly_fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type', 'object_id', 'related_object_str', 'integration', 'action', 'status', 'identifier', 'remote_product']
 
     base_fieldsets = (
         (None, {
-            'fields': ('related_object_str', 'content_type', 'object_id', 'content_object', 'integration', 'action', 'status', 'identifier', 'multi_tenant_company')
+            'fields': ('related_object_str', 'content_type', 'object_id', 'content_object', 'integration', 'remote_product', 'action', 'status', 'identifier', 'multi_tenant_company')
         }),
         ('Details', {
             'fields': ('payload', 'response', 'error_traceback')
