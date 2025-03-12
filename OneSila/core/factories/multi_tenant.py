@@ -233,7 +233,7 @@ class CreateInternalCompanyFromOwnerCompany:
 
         return map.get(language, 'EN')
 
-    def _create_internal_company(self):
+    def _create_internal_company_if_not_exists(self):
         if not InternalCompany.objects.filter(multi_tenant_company=self.multi_tenant_company).exists():
             internal_company_kwargs = {
                 'multi_tenant_company': self.multi_tenant_company,
@@ -243,6 +243,10 @@ class CreateInternalCompanyFromOwnerCompany:
                 'language': self._get_customer_language(),
             }
             self.internal_comapany, _ = InternalCompany.objects.get_or_create(**internal_company_kwargs)
+
+            return True
+
+        return False
 
     def _create_address(self):
         if not Address.objects.filter(multi_tenant_company=self.multi_tenant_company).exists():
@@ -261,5 +265,5 @@ class CreateInternalCompanyFromOwnerCompany:
             Address.objects.create(**address_kwargs)
 
     def run(self):
-        self._create_internal_company()
-        self._create_address()
+        if self._create_internal_company_if_not_exists():
+            self._create_address()

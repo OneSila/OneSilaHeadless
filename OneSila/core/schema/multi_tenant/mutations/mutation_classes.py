@@ -177,7 +177,7 @@ class UpdateOnboardingStatusMutation(GetCurrentUserMixin, DjangoUpdateMutation):
                 fac = CreateInternalCompanyFromOwnerCompany(user.multi_tenant_company)
                 fac.run()
 
-            return user
+            return MultiTenantUser.objects.get(id=user.id)
 
 
 class CreateDemoDataMutation(GetMultiTenantCompanyMixin, DjangoUpdateMutation):
