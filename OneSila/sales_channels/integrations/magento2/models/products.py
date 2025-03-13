@@ -4,7 +4,7 @@ from sales_channels.models.products import (
     RemotePrice,
     RemoteProductContent,
     RemoteImageProductAssociation,
-    RemoteCategory
+    RemoteCategory, RemoteEanCode
 )
 
 class MagentoProduct(RemoteProduct):
@@ -43,3 +43,13 @@ class MagentoCategory(RemoteCategory):
     Magento-specific model for remote categories, inheriting from the general RemoteCategory.
     """
     pass
+
+
+class MagentoEanCode(RemoteEanCode):
+    """
+    Magento-specific model for remote EAN codes.
+    You can add Magento‐specific fields here if needed.
+    """
+    class Meta:
+        verbose_name = 'Magento EAN Code'
+        verbose_name_plural = 'Magento EAN Codes'

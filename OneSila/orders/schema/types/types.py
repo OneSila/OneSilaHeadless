@@ -12,11 +12,6 @@ from .ordering import OrderOrder, OrderItemOrder, OrderNoteOrder
 
 @type(Order, filters=OrderFilter, order=OrderOrder, pagination=True, fields="__all__")
 class OrderType(relay.Node, GetQuerysetMultiTenantMixin):
-    #@TODO: When adding sales channel frontend add the source
-    customer: CompanyType
-    internal_company: CompanyType
-    invoice_address: InvoiceAddressType
-    shipping_address: ShippingAddressType
     currency: CurrencyType
     orderitem_set: List[Annotated['OrderItemType', lazy("orders.schema.types.types")]]
 

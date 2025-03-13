@@ -1,15 +1,17 @@
-from core.helpers import get_nested_attr, clean_json_data
+from typing import Optional
 from integrations.factories.mixins import IntegrationInstanceOperationMixin, IntegrationInstanceCreateFactory, IntegrationInstanceUpdateFactory, \
     IntegrationInstanceDeleteFactory
 from properties.models import Property
 from ..models.sales_channels import SalesChannelViewAssign
 from ..models.logs import RemoteLog
 import logging
+from eancodes.models import EanCode
 
 logger = logging.getLogger(__name__)
 
 class RemoteInstanceCreateFactory(IntegrationInstanceCreateFactory):
     integration_key = 'sales_channel'
+    fixing_identifier_class = None
 
     def __init__(self, sales_channel, local_instance=None, api=None):
         super().__init__(integration=sales_channel, local_instance=local_instance, api=api)
@@ -17,18 +19,17 @@ class RemoteInstanceCreateFactory(IntegrationInstanceCreateFactory):
 
 class RemoteInstanceUpdateFactory(IntegrationInstanceUpdateFactory):
     integration_key = 'sales_channel'
+    fixing_identifier_class = None
 
     def __init__(self, sales_channel, local_instance=None, api=None, remote_instance=None, **kwargs):
         super().__init__(integration=sales_channel, local_instance=local_instance, api=api, remote_instance=remote_instance, **kwargs)
-
-
 
 class RemoteInstanceDeleteFactory(IntegrationInstanceDeleteFactory):
     integration_key = 'sales_channel'
+    fixing_identifier_class = None
 
     def __init__(self, sales_channel, local_instance=None, api=None, remote_instance=None, **kwargs):
         super().__init__(integration=sales_channel, local_instance=local_instance, api=api, remote_instance=remote_instance, **kwargs)
-
 
 
 class ProductAssignmentMixin:
@@ -187,7 +188,7 @@ class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
                 logger.debug(f"Skipping processing for remote data: {remote_data}")
                 continue
 
-            identifier = self.get_identifier()
+            identifier = self.get_identifiers()
             remote_instance_mirror, created = self.get_or_create_remote_instance_mirror(remote_data)
             if created:
                 if self.allow_create:
@@ -287,7 +288,7 @@ class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
         """
         for remote_instance_mirror in self.remote_model_class.objects.filter(sales_channel=self.sales_channel):
             if int(remote_instance_mirror.remote_id) not in existing_remote_ids:
-                self.log_action_for_instance(remote_instance_mirror, RemoteLog.ACTION_DELETE, {}, {}, self.get_identifier())
+                self.log_action_for_instance(remote_instance_mirror, RemoteLog.ACTION_DELETE, {}, {}, self.get_identifiers()[0])
                 remote_instance_mirror.delete()
                 logger.debug(f"Deleted remote instance mirror: {remote_instance_mirror}")
 
@@ -303,3 +304,54 @@ class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
         self.build_payload()
         self.fetch_remote_instances()
         self.process_remote_instances()
+
+class EanCodeValueMixin:
+    def get_ean_code_value(self) -> Optional[str]:
+        ean_obj = EanCode.objects.filter(product=self.local_instance).first()
+        return ean_obj.ean_code if ean_obj else None
+
+
+class SyncProgressMixin:
+
+    def precalculate_progress_step_increment(self, total_steps_excluding_variations: int):
+        """
+        Calculate the progress increment value for the sync process.
+
+        This method determines the total number of steps by adding:
+          - The number of variation items (if any), and
+          - The additional steps provided via total_steps_excluding_variations.
+        It then divides 100 (the full progress percentage) by the total number of steps.
+        The calculated increment is saved in self.increment, and the sync progress is reset to 0.
+
+        :param total_steps_excluding_variations: The number of steps in the sync process that are not
+                                                 related to processing variations.
+        """
+        variations = getattr(self, 'variations', None)
+        variations_count = variations.count() if variations is not None else 0
+        total_steps = variations_count + total_steps_excluding_variations
+
+        if total_steps <= 0:
+            self.increment = 0
+        else:
+            self.increment = int(100 / total_steps)
+
+        self.current_progress = 0
+        self.remote_instance.set_new_sync_percentage(self.current_progress)
+
+    def update_progress(self):
+
+        if self.remote_instance is None:
+            return
+
+        self.current_progress = min(self.current_progress + self.increment, 99)
+        self.remote_instance.set_new_sync_percentage(self.current_progress)
+        logger.debug(f"Updated sync progress to {self.current_progress}%.")
+
+
+    def finalize_progress(self):
+
+        if self.remote_instance is None:
+            return
+
+        self.remote_instance.set_new_sync_percentage(100)
+

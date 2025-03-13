@@ -1,7 +1,7 @@
 from core import models
 from django.utils.translation import gettext_lazy as _
 
-from properties.managers import PropertyManager, ProductPropertiesRuleManager
+from properties.managers import PropertyManager, ProductPropertiesRuleManager, PropertySelectValueManager
 from translations.models import TranslationFieldsMixin, TranslatedModelMixin
 from builtins import property as django_property  # in this file we will use property as django property because we have fields named property
 from django.db.models import Q
@@ -19,6 +19,7 @@ class Property(TranslatedModelMixin, models.Model):
         DATETIME = 'DATETIME'
         SELECT = 'SELECT'
         MULTISELECT = 'MULTISELECT'
+        TRANSLATED = [TEXT, DESCRIPTION]
 
         ALL = (
             (INT, _('Integer')),
@@ -102,12 +103,25 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
     property = models.ForeignKey(Property, on_delete=models.PROTECT)
     image = models.ForeignKey('media.Image', null=True, blank=True, on_delete=models.CASCADE)
 
+
+    objects = PropertySelectValueManager()
+
     @django_property
     def value(self, language=None):
         return self._get_translated_value(field_name='value', related_name='propertyselectvaluetranslation_set', language=language)
 
     def __str__(self):
         return f"{self.value} <{self.property}>"
+
+    def delete(self, *args, **kwargs):
+        force = kwargs.pop('force_delete', False)
+        if self.property.is_product_type and not force:
+            raise ValidationError(
+                _("This property value is associated with a product type rule and cannot be removed directly. "
+                  "Please delete the product type rule to remove it.")
+            )
+
+        super().delete(*args, **kwargs)
 
     class Meta:
         search_terms = ['propertyselectvaluetranslation__value']
@@ -214,6 +228,14 @@ class ProductPropertiesRule(models.Model):
             raise ValidationError(_("Invalid product type."))
 
         super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+
+        if ProductProperty.objects.filter(value_select=self.product_type).exists():
+            raise ValidationError(
+                _("Cannot delete product type rule because there are products assigned to this rule.")
+            )
+        super().delete(*args, **kwargs)
 
     class Meta:
         verbose_name_plural = _("Product Properties Rules")

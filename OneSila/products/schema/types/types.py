@@ -20,6 +20,7 @@ from .ordering import ProductOrder, BundleProductOrder, ConfigurableProductOrder
 class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
     vat_rate: Optional[VatRateType]
     inspector: Optional[Annotated['InspectorType', lazy('products_inspector.schema.types.types')]]
+    saleschannelviewassign_set: List[Annotated['SalesChannelViewAssignType', lazy("sales_channels.schema.types.types")]]
 
     @field()
     def proxy_id(self, info) -> str:

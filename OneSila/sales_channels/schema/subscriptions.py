@@ -1,6 +1,8 @@
 from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
-from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
-from .types.types import ImportCurrencyType, ImportImageType, ImportProcessType, ImportProductType, ImportPropertyType, ImportPropertySelectValueType, ImportVatType, RemoteCategoryType, RemoteCurrencyType, RemoteCustomerType, RemoteImageType, RemoteImageProductAssociationType, RemoteInventoryType, RemoteLogType, RemoteOrderType, RemotePriceType, RemoteProductType, RemoteProductContentType, RemoteProductPropertyType, RemotePropertyType, RemotePropertySelectValueType, RemoteVatType, SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, SalesChannelViewAssignType
+from sales_channels.models import ImportProcess, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
+from .types.types import ImportProcessType, SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, SalesChannelViewAssignType
+from ..integrations.magento2.models import MagentoSalesChannel
+from ..integrations.magento2.schema.types.types import MagentoSalesChannelType
 
 
 @type(name='Subscription')
@@ -28,4 +30,9 @@ class SalesChannelsSubscription:
     @subscription
     async def sales_channel_view_assign(self, info: Info, pk: str) -> AsyncGenerator[SalesChannelViewAssignType, None]:
         async for i in model_subscriber(info=info, pk=pk, model=SalesChannelViewAssign):
+            yield i
+
+    @subscription
+    async def magento_channel(self, info: Info, pk: str) -> AsyncGenerator[MagentoSalesChannelType, None]:
+        async for i in model_subscriber(info=info, pk=pk, model=MagentoSalesChannel):
             yield i

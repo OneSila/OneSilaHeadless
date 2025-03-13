@@ -38,7 +38,7 @@ class PropertyQuerySet(MultiTenantQuerySet):
 
     def delete(self, *args, **kwargs):
         if self.filter(is_product_type=True).exists():
-            raise ValidationError(_("You cannot delete a Property with is_product_type=True."))
+            raise ValidationError(_("You cannot delete the product type property."))
         super().delete(*args, **kwargs)
 
 
@@ -55,6 +55,19 @@ class PropertyManager(MultiTenantManager):
     def create_product_type(self, multi_tenant_company):
         return self.get_queryset().create_product_type(multi_tenant_company)
 
+
+class PropertySelectValueQuerySet(MultiTenantQuerySet):
+    def delete(self, *args, **kwargs):
+        if self.filter(property__is_product_type=True).exists():
+            raise ValidationError(
+                _("One or more property values are associated with a product type rule and cannot be removed directly. "
+                  "Please delete the product type rule to remove them."))
+
+        return super().delete(*args, **kwargs)
+
+class PropertySelectValueManager(MultiTenantManager):
+    def get_queryset(self):
+        return PropertySelectValueQuerySet(self.model, using=self._db)
 
 class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
     def create_rule(self, multi_tenant_company, product_type, require_ean_code, items):
@@ -169,6 +182,18 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
 
             return rule
 
+    def delete(self, *args, **kwargs):
+        from properties.models import ProductProperty
+        product_type_ids = list(self.values_list('product_type_id', flat=True))
+
+        if ProductProperty.objects.filter(value_select_id__in=product_type_ids).exists():
+            raise ValidationError(
+                _("One or more product type rules are currently in use by some products. "
+                  "Please unassign all products from these rules before attempting deletion.")
+            )
+
+        return super().delete(*args, **kwargs)
+
 
 class ProductPropertiesRuleManager(MultiTenantManager):
     def get_queryset(self):
@@ -179,3 +204,6 @@ class ProductPropertiesRuleManager(MultiTenantManager):
 
     def update_rule_items(self, rule, items):
         return self.get_queryset().update_rule_items(rule, items)
+
+    def delete(self, *args, **kwargs):
+        return self.get_queryset().delete(*args, **kwargs)

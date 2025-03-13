@@ -82,13 +82,26 @@ def run_product_specific_magento_task_flow(
             )
 
 
-def run_delete_generic_magento_task_flow(task_func, local_instance_id, remote_class, multi_tenant_company, number_of_remote_requests=None, sales_channels_filter_kwargs=None, **kwargs):
+def run_delete_generic_magento_task_flow(
+        task_func,
+        local_instance_id,
+        remote_class,
+        multi_tenant_company,
+        number_of_remote_requests=None,
+        sales_channels_filter_kwargs=None,
+        is_variation=False,  # for products if a delete comes from a variation
+        is_multiple=False,   # if True, process multiple remote objects using filter()
+        **kwargs):
     """
     Queues the specified task for each active Magento sales channel,
     passing additional kwargs as needed.
 
     :param task_func: The task function to be queued.
     :param remote_class: Class of the remote object that needs to be deleted.
+    :param number_of_remote_requests: Number of remote requests to include with the task.
+    :param sales_channels_filter_kwargs: Additional filters for selecting Magento sales channels.
+    :param is_variation: Boolean flag for variations (if True, force is_variation to False when fetching).
+    :param is_multiple: If True, use .filter() to retrieve all matching remote instances and queue a task for each.
     :param kwargs: Additional keyword arguments to pass to the task.
     """
     if sales_channels_filter_kwargs is None:
@@ -96,26 +109,40 @@ def run_delete_generic_magento_task_flow(task_func, local_instance_id, remote_cl
     else:
         if 'active' not in sales_channels_filter_kwargs:
             sales_channels_filter_kwargs['active'] = True
-
         sales_channels_filter_kwargs['multi_tenant_company'] = multi_tenant_company
 
+    def queue_task(sales_channel, remote_instance):
+        task_kwargs = {
+            'sales_channel_id': sales_channel.id,
+            'remote_instance': remote_instance.id
+        }
+        add_task_to_queue(
+            integration_id=sales_channel.id,
+            task_func_path=get_import_path(task_func),
+            task_kwargs=task_kwargs,
+            number_of_remote_requests=number_of_remote_requests
+        )
+
     for sales_channel in MagentoSalesChannel.objects.filter(**sales_channels_filter_kwargs):
+        get_kwargs = {
+            "local_instance_id": local_instance_id,
+            "sales_channel": sales_channel
+        }
+        # For variations, force is_variation to False (as per your note)
+        if is_variation:
+            get_kwargs['is_variation'] = False
+
         try:
-            remote_instance = remote_class.objects.get(local_instance_id=local_instance_id, sales_channel=sales_channel)
-
-            task_kwargs = {
-                'sales_channel_id': sales_channel.id,
-                'remote_instance': remote_instance.id
-            }
-
-            add_task_to_queue(
-                integration_id=sales_channel.id,
-                task_func_path=get_import_path(task_func),
-                task_kwargs=task_kwargs,
-                number_of_remote_requests=number_of_remote_requests
-            )
+            if is_multiple:
+                remote_instances = remote_class.objects.filter(**get_kwargs)
+                for remote_instance in remote_instances:
+                    queue_task(sales_channel, remote_instance)
+            else:
+                remote_instance = remote_class.objects.get(**get_kwargs)
+                queue_task(sales_channel, remote_instance)
         except remote_class.DoesNotExist:
             pass
+
 
 
 

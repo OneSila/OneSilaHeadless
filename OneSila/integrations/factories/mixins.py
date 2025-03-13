@@ -1,5 +1,8 @@
 import traceback
 import inspect
+
+from django.db import IntegrityError
+
 from core.helpers import get_nested_attr, clean_json_data
 from ..signals import remote_instance_pre_create, remote_instance_post_create, remote_instance_post_update, remote_instance_pre_update, \
     remote_instance_pre_delete, remote_instance_post_delete
@@ -32,14 +35,22 @@ class IntegrationInstanceOperationMixin:
         """
         return response.json()
 
-    def get_identifier(self):
+    def get_identifiers(self, fixing_caller='run'):
         """
         Generates a log identifier to reflect the current class and calling method context.
         """
         frame = inspect.currentframe()
         caller = frame.f_back.f_code.co_name
         class_name = self.__class__.__name__
-        return f"{class_name}:{caller}"
+
+        fixing_class = getattr(self, 'fixing_identifier_class', None)
+        fixing_identifier = None
+        if fixing_caller and fixing_class:
+            fixing_identifier = f"{fixing_class.__name__}:{fixing_caller}"
+
+
+        return f"{class_name}:{caller}", fixing_identifier
+
 
     def log_action_for_instance(self, remote_instance, action, response_data, payload, identifier):
         if not remote_instance:
@@ -49,7 +60,8 @@ class IntegrationInstanceOperationMixin:
             action=action,
             response=response_data,
             payload=payload,
-            identifier=identifier
+            identifier=identifier,
+            remote_product=getattr(self, 'remote_product', None)
         )
 
     def log_action(self, action, response_data, payload, identifier):
@@ -60,10 +72,11 @@ class IntegrationInstanceOperationMixin:
             action=action,
             response=response_data,
             payload=payload,
-            identifier=identifier
+            identifier=identifier,
+            remote_product=getattr(self, 'remote_product', None)
         )
 
-    def log_error(self, exception, action, identifier, payload):
+    def log_error(self, exception, action, identifier, payload, fixing_identifier=None):
         """
         Logs errors for user exceptions or admin exceptions depending on the exception type.
         """
@@ -77,7 +90,9 @@ class IntegrationInstanceOperationMixin:
                 response=error_message,
                 payload=payload,
                 error_traceback=tb,
-                identifier=identifier
+                identifier=identifier,
+                remote_product=getattr(self, 'remote_product', None),
+                fixing_identifier=fixing_identifier
             )
         else:
             self.remote_instance.add_admin_error(
@@ -85,7 +100,9 @@ class IntegrationInstanceOperationMixin:
                 response=error_message,
                 payload=payload,
                 error_traceback=tb,
-                identifier=identifier
+                identifier=identifier,
+                remote_product=getattr(self, 'remote_product', None),
+                fixing_identifier=fixing_identifier
             )
 
     def customize_payload(self):
@@ -145,15 +162,31 @@ class IntegrationInstanceOperationMixin:
         """
         raise NotImplementedError("Subclasses should implement this method to get the remote product.")
 
+
+    def post_action_payload_modify(self):
+        """
+        A method where we can modify the payload after is used so it is saved with new data used to then be compared
+        in needs update
+        """
+        pass
+
 class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
     local_model_class = None  # The Sila Model
     remote_model_class = None  # The Mirror Model
     remote_id_map = 'id'  # Default remote ID mapping to get the remote id from the response
     field_mapping = {}  # Mapping of local fields to remote fields, should be overridden in subclasses
+    default_field_mapping = {}  # Mapping of default values on create
 
     # Configurable API details
     api_package_name = None  # The package name (e.g., 'properties')
     api_method_name = 'create'  # The method name (e.g., 'create')
+
+    # If something we try to create already exists on the remote server we del with the following configs
+    enable_fetch_and_update = False  # If True, check for duplicate remote instance, fetch it, and trigger an update flow
+    already_exists_exception = None  # Set to a custom exception type if applicable, or None
+    update_factory_class = None  # Update factory to use if remote already exists
+    update_if_not_exists = False  # Whether to trigger an update flow if the remote instance is already present
+
 
     def __init__(self, integration, local_instance=None, api=None):
         self.local_instance = local_instance  # Instance of the local model
@@ -189,6 +222,11 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
             # Use the helper function to handle nested field lookups
             self.payload[remote_field] = get_nested_attr(self.local_instance, local_field)
 
+        if hasattr(self, 'default_field_mapping') and self.default_field_mapping:
+            # Merge the default field mapping into the payload.
+            # Values in the payload (from field_mapping) will override those in default_field_mapping.
+            self.payload = {**self.default_field_mapping, **self.payload}
+
         return self.payload
 
     def build_remote_instance_data(self):
@@ -209,10 +247,19 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
         """
         Initialize the remote instance based on the remote instance data & save so we can add logs to it
         """
+        self.remote_instance_data['multi_tenant_company'] = self.integration.multi_tenant_company
         self.remote_instance = self.remote_model_class(**self.remote_instance_data)
-        self.remote_instance.multi_tenant_company = self.integration.multi_tenant_company
         remote_instance_pre_create.send(sender=self.remote_instance.__class__, instance=self.remote_instance)
-        self.remote_instance.save()
+
+        try:
+            self.remote_instance.save()
+        except IntegrityError:
+
+            if not self.enable_fetch_and_update:
+                raise
+
+            self.remote_instance = self.remote_model_class.objects.get(**self.remote_instance_data)
+
         logger.debug(f"Initialized remote instance: {self.remote_instance}")
 
     def modify_remote_instance(self, response_data):
@@ -253,20 +300,68 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
         """
         pass
 
+    def is_duplicate_error(self, error):
+        """
+        Override this method to implement custom logic to decide if the error indicates that
+        the remote object already exists (e.g., by checking the error message contents).
+        By default, return False.
+        """
+        return False
+
+    def fetch_existing_remote_data(self):
+        """
+        Override this method if enable_fetch_and_update is True.
+        It should fetch and return the remote API response corresponding to the existing remote object.
+        """
+        raise NotImplementedError("Subclasses must override fetch_existing_remote_data() if enable_fetch_and_update is True.")
+
+    def serialize_fetched_response(self, response):
+        """
+        Override this method to customize the serialization of a fetched remote response.
+        By default, returns the same as serialize_response().
+        """
+        return self.serialize_response(response)
+
+    def upload_flow(self):
+        """
+        Flow to trigger the update factory. This can be overrided
+        """
+        update_factory = self.update_factory_class(self.integration,
+                                                   self.local_instance,
+                                                   api=self.api,
+                                                   remote_instance=self.remote_instance)
+        update_factory.run()
+
     def create(self):
         """
         Main method to orchestrate the creation process, including error handling and logging.
         """
-        log_identifier = self.get_identifier()
+        log_identifier, fixing_identifier = self.get_identifiers()
 
         try:
             logger.debug(f"Creating remote instance with payload: {self.payload}")
+            require_update = False
 
-            # Attempt to create the remote instance
-            response = self.create_remote()
-            response_data = self.serialize_response(response)
+            try:
+                # Attempt to create the remote instance
+                response = self.create_remote()
+                response_data = self.serialize_response(response)
+            except Exception as e:
+                # First, if enable_fetch_and_update is enabled, check for duplicate error conditions
+                if self.enable_fetch_and_update and ((self.already_exists_exception and isinstance(e, self.already_exists_exception)) or self.is_duplicate_error(e)):
+                    logger.debug("Remote instance already exists; fetching existing remote data.")
+                    response = self.fetch_existing_remote_data()
+
+                    # Use a dedicated serialization method for fetched data
+                    response_data = self.serialize_fetched_response(response)
+                    require_update = True
+                else:
+                    raise e
+
             self.set_remote_id(response_data)
             self.modify_remote_instance(response_data)
+
+            self.post_action_payload_modify()
 
             # Log the successful creation
             self.log_action(IntegrationLog.ACTION_CREATE, response_data, self.payload, log_identifier)
@@ -286,6 +381,13 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
             self.remote_instance.successfully_created = self.successfully_created
             self.remote_instance.save()
             logger.debug(f"Finished create process with success status: {self.successfully_created}")
+
+
+        # After creation, if configured to trigger an update flow for an existing instance,
+        # do so only if successfully_created is True.
+        if self.enable_fetch_and_update and self.update_if_not_exists and self.update_factory_class and self.successfully_created and require_update:
+            logger.debug("Remote instance existed; triggering update flow.")
+            self.upload_flow()
 
     def run(self):
 
@@ -460,7 +562,7 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
         pass
 
     def update(self):
-        log_identifier = self.get_identifier()
+        log_identifier, _ = self.get_identifiers()
 
         # Send pre-update signal
         remote_instance_pre_update.send(sender=self.remote_instance.__class__, instance=self.remote_instance)
@@ -471,6 +573,8 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
             # Attempt to update the remote instance
             response = self.update_remote()
             response_data = self.serialize_response(response)
+
+            self.post_action_payload_modify()
 
             # Log the successful update
             self.log_action(IntegrationLog.ACTION_UPDATE, response_data, self.payload, log_identifier)
@@ -487,6 +591,7 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
 
         finally:
             logger.debug(f"Finished update process with success status: {self.successfully_updated}")
+            self.remote_instance.save()
 
     def run(self):
 
@@ -506,7 +611,6 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
 
         self.build_payload()
         self.customize_payload()
-
         if self.needs_update() and self.additional_update_check():
             self.update()
 
@@ -525,7 +629,7 @@ class IntegrationInstanceDeleteFactory(IntegrationInstanceOperationMixin):
     def __init__(self, integration, local_instance=None, api=None, remote_instance=None, **kwargs):
         self.local_instance = local_instance
         self.integration = integration
-        self.api = api if api is not None else self.get_api()
+        self.api = api
         self.payload = {}
 
         setattr(self, self.integration_key, self.integration.get_real_instance())
@@ -597,7 +701,7 @@ class IntegrationInstanceDeleteFactory(IntegrationInstanceOperationMixin):
         """
         Main method to orchestrate the deletion process, including error handling.
         """
-        log_identifier = self.get_identifier()
+        log_identifier, _ = self.get_identifiers()
         remote_instance_pre_delete.send(sender=self.remote_instance.__class__, instance=self.remote_instance)
 
         try:
@@ -630,6 +734,7 @@ class IntegrationInstanceDeleteFactory(IntegrationInstanceOperationMixin):
         """
         Orchestrates the deletion steps without containing business logic.
         """
+        self.set_api()
         self.build_delete_payload()
         self.customize_payload()
         self.preflight_process()

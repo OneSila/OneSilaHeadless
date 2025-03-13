@@ -11,7 +11,8 @@ class RemoteSalesChannelAssignUpdateFactory(GetMagentoAPIMixin, RemoteSalesChann
         view_ids = list(
             map(int, SalesChannelViewAssign.objects.filter(
                 sales_channel=self.sales_channel,
-                product=self.remote_instance.product
+                product=self.remote_instance.product,
+                sales_channel_view__active=True
             ).values_list('sales_channel_view__remote_id', flat=True))
         )
 

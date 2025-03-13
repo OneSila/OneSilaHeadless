@@ -67,7 +67,7 @@ class MagentoRemoteLanguagePullFactory(GetMagentoAPIMixin, PullRemoteInstanceMix
             )
 
             if created:
-                identifier = self.get_identifier()
+                identifier, _ = self.get_identifiers()
                 self.log_action_for_instance(
                     magento_currency,
                     RemoteLog.ACTION_CREATE,

@@ -17,9 +17,6 @@ registry = DemoDataLibrary()
 class SalesOrderGenerator(PrivateStructuredDataGenerator):
     model = Order
 
-    def get_customer(self, name):
-        return Customer.objects.get(name=name, multi_tenant_company=self.multi_tenant_company)
-
     def get_created_at(self):
         days_ago = randint(1, 50)
         return timezone.now() - timezone.timedelta(days=days_ago)
@@ -28,29 +25,15 @@ class SalesOrderGenerator(PrivateStructuredDataGenerator):
         return Product.objects.get(sku=sku, multi_tenant_company=self.multi_tenant_company)
 
     def get_currency(self, customer_name):
-        return self.get_customer(customer_name).get_currency()
-
-    def get_internal_company(self):
-        try:
-            internal_company = InternalCompany.objects.get(multi_tenant_company=self.multi_tenant_company)
-        except InternalCompany.DoesNotExist:
-            internal_company = InternalCompany.objects.create(
-                multi_tenant_company=self.multi_tenant_company,
-                name='Internal Company')
-
-        return internal_company
+        return Currency.objects.filter(multi_tenant_company=self.multi_tenant_company, is_default_currency=True).first()
 
     def get_structure(self):
         return [
             {
                 'instance_data': {
                     'reference': 'Demo Order AF192',
-                    'customer': self.get_customer(CUSTOMER_B2B),
                     'currency': self.get_currency(CUSTOMER_B2B),
-                    'invoice_address': InvoiceAddress.objects.get(company=self.get_customer(CUSTOMER_B2B), multi_tenant_company=self.multi_tenant_company),
-                    'shipping_address': ShippingAddress.objects.get(company=self.get_customer(CUSTOMER_B2B), multi_tenant_company=self.multi_tenant_company),
                     'created_at': self.get_created_at(),
-                    'internal_company': self.get_internal_company(),
                 },
                 'post_data': {
                     'orderitem_set': [
@@ -72,4 +55,3 @@ class SalesOrderGenerator(PrivateStructuredDataGenerator):
                 multi_tenant_company=self.multi_tenant_company,
                 **item
             )
-        instance.set_status_pending_processing()

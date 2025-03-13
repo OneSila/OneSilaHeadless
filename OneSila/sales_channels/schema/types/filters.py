@@ -5,6 +5,7 @@ from core.schema.core.types.filters import filter, SearchFilterMixin
 from products.schema.types.filters import ProductFilter
 
 from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
+from sales_channels.models.sales_channels import RemoteLanguage
 
 
 @filter(ImportCurrency)
@@ -14,11 +15,6 @@ class ImportCurrencyFilter(SearchFilterMixin):
 
 @filter(ImportImage)
 class ImportImageFilter(SearchFilterMixin):
-    pass
-
-
-@filter(ImportProcess)
-class ImportProcessFilter(SearchFilterMixin):
     pass
 
 
@@ -47,11 +43,6 @@ class RemoteCategoryFilter(SearchFilterMixin):
     pass
 
 
-@filter(RemoteCurrency)
-class RemoteCurrencyFilter(SearchFilterMixin):
-    pass
-
-
 @filter(RemoteCustomer)
 class RemoteCustomerFilter(SearchFilterMixin):
     pass
@@ -72,11 +63,6 @@ class RemoteInventoryFilter(SearchFilterMixin):
     pass
 
 
-@filter(RemoteLog)
-class RemoteLogFilter(SearchFilterMixin):
-    pass
-
-
 @filter(RemoteOrder)
 class RemoteOrderFilter(SearchFilterMixin):
     pass
@@ -89,7 +75,7 @@ class RemotePriceFilter(SearchFilterMixin):
 
 @filter(RemoteProduct)
 class RemoteProductFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteProductContent)
@@ -117,19 +103,43 @@ class RemoteVatFilter(SearchFilterMixin):
     pass
 
 
+@filter(RemoteLog)
+class RemoteLogFilter(SearchFilterMixin):
+    id: auto
+    remote_product: Optional[RemoteProductFilter]
+
+
+
 @filter(SalesChannel)
 class SalesChannelFilter(SearchFilterMixin):
-    pass
+    id: auto
+    active: auto
 
 
 @filter(SalesChannelIntegrationPricelist)
 class SalesChannelIntegrationPricelistFilter(SearchFilterMixin):
     id: auto
 
+@filter(RemoteCurrency)
+class RemoteCurrencyFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+
+@filter(ImportProcess)
+class ImportProcessFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
 
 @filter(SalesChannelView)
 class SalesChannelViewFilter(SearchFilterMixin):
     id: auto
+    active: auto
+    sales_channel: Optional[SalesChannelFilter]
+
+@filter(RemoteLanguage)
+class RemoteLanguageFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
 
 
 @filter(SalesChannelViewAssign)

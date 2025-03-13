@@ -30,10 +30,12 @@ class ImportProcess(PolymorphicModel, models.Model):
     ]
 
     STATUS_FAILED = 'failed'
+    STATUS_PROCESSING = 'processing'
     STATUS_SUCCESS = 'success'
 
     STATUS_CHOICES = [
         (STATUS_FAILED, 'Failed'),
+        (STATUS_PROCESSING, 'Processing'),
         (STATUS_SUCCESS, 'Success'),
     ]
 

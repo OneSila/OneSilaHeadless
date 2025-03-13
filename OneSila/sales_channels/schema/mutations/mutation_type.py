@@ -1,6 +1,11 @@
 from core.schema.core.mutations import create, update, delete, type, List, field
-from .types.types import ImportCurrencyType, ImportImageType, ImportProcessType, ImportProductType, ImportPropertyType, ImportPropertySelectValueType, ImportVatType, RemoteCategoryType, RemoteCurrencyType, RemoteCustomerType, RemoteImageType, RemoteImageProductAssociationType, RemoteInventoryType, RemoteLogType, RemoteOrderType, RemotePriceType, RemoteProductType, RemoteProductContentType, RemoteProductPropertyType, RemotePropertyType, RemotePropertySelectValueType, RemoteVatType, SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, SalesChannelViewAssignType
-from .types.input import ImportCurrencyInput, ImportCurrencyPartialInput, ImportImageInput, ImportImagePartialInput, ImportProcessInput, ImportProcessPartialInput, ImportProductInput, ImportProductPartialInput, ImportPropertyInput, ImportPropertyPartialInput, ImportPropertySelectValueInput, ImportPropertySelectValuePartialInput, ImportVatInput, ImportVatPartialInput, RemoteCategoryInput, RemoteCategoryPartialInput, RemoteCurrencyInput, RemoteCurrencyPartialInput, RemoteCustomerInput, RemoteCustomerPartialInput, RemoteImageInput, RemoteImagePartialInput, RemoteImageProductAssociationInput, RemoteImageProductAssociationPartialInput, RemoteInventoryInput, RemoteInventoryPartialInput, RemoteLogInput, RemoteLogPartialInput, RemoteOrderInput, RemoteOrderPartialInput, RemotePriceInput, RemotePricePartialInput, RemoteProductInput, RemoteProductPartialInput, RemoteProductContentInput, RemoteProductContentPartialInput, RemoteProductPropertyInput, RemoteProductPropertyPartialInput, RemotePropertyInput, RemotePropertyPartialInput, RemotePropertySelectValueInput, RemotePropertySelectValuePartialInput, RemoteVatInput, RemoteVatPartialInput, SalesChannelInput, SalesChannelPartialInput, SalesChannelIntegrationPricelistInput, SalesChannelIntegrationPricelistPartialInput, SalesChannelViewInput, SalesChannelViewPartialInput, SalesChannelViewAssignInput, SalesChannelViewAssignPartialInput
+from .fields import resync_sales_channel_assign
+from ..types.types import SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, \
+    SalesChannelViewAssignType, ImportProcessType, RemoteLanguageType, RemoteCurrencyType
+from ..types.input import ImportProcessInput, ImportProcessPartialInput, SalesChannelInput, SalesChannelPartialInput, \
+    SalesChannelIntegrationPricelistInput, SalesChannelIntegrationPricelistPartialInput, SalesChannelViewInput, \
+    SalesChannelViewPartialInput, SalesChannelViewAssignInput, SalesChannelViewAssignPartialInput, \
+    RemoteLanguagePartialInput, RemoteCurrencyPartialInput
 
 
 @type(name='Mutation')
@@ -24,8 +29,11 @@ class SalesChannelsMutation:
     delete_sales_channel_integration_pricelists: List[SalesChannelIntegrationPricelistType] = delete()
 
     update_sales_channel_view: SalesChannelViewType = update(SalesChannelViewPartialInput)
+    update_remote_language: RemoteLanguageType = update(RemoteLanguagePartialInput)
+    update_remote_currency: RemoteCurrencyType = update(RemoteCurrencyPartialInput)
 
     create_sales_channel_view_assign: SalesChannelViewAssignType = create(SalesChannelViewAssignInput)
+    resync_sales_channel_view_assign: SalesChannelViewAssignType = resync_sales_channel_assign()
     create_sales_channel_view_assigns: List[SalesChannelViewAssignType] = create(SalesChannelViewAssignInput)
     update_sales_channel_view_assign: SalesChannelViewAssignType = update(SalesChannelViewAssignPartialInput)
     delete_sales_channel_view_assign: SalesChannelViewAssignType = delete()
