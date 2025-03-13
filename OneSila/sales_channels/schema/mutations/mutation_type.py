@@ -1,8 +1,11 @@
 from core.schema.core.mutations import create, update, delete, type, List, field
 from .fields import resync_sales_channel_assign
 from ..types.types import SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, \
-    SalesChannelViewAssignType, ImportProcessType
-from ..types.input import ImportProcessInput, ImportProcessPartialInput, SalesChannelInput, SalesChannelPartialInput, SalesChannelIntegrationPricelistInput, SalesChannelIntegrationPricelistPartialInput, SalesChannelViewInput, SalesChannelViewPartialInput, SalesChannelViewAssignInput, SalesChannelViewAssignPartialInput
+    SalesChannelViewAssignType, ImportProcessType, RemoteLanguageType, RemoteCurrencyType
+from ..types.input import ImportProcessInput, ImportProcessPartialInput, SalesChannelInput, SalesChannelPartialInput, \
+    SalesChannelIntegrationPricelistInput, SalesChannelIntegrationPricelistPartialInput, SalesChannelViewInput, \
+    SalesChannelViewPartialInput, SalesChannelViewAssignInput, SalesChannelViewAssignPartialInput, \
+    RemoteLanguagePartialInput, RemoteCurrencyPartialInput
 
 
 @type(name='Mutation')
@@ -26,6 +29,8 @@ class SalesChannelsMutation:
     delete_sales_channel_integration_pricelists: List[SalesChannelIntegrationPricelistType] = delete()
 
     update_sales_channel_view: SalesChannelViewType = update(SalesChannelViewPartialInput)
+    update_remote_language: RemoteLanguageType = update(RemoteLanguagePartialInput)
+    update_remote_currency: RemoteCurrencyType = update(RemoteCurrencyPartialInput)
 
     create_sales_channel_view_assign: SalesChannelViewAssignType = create(SalesChannelViewAssignInput)
     resync_sales_channel_view_assign: SalesChannelViewAssignType = resync_sales_channel_assign()

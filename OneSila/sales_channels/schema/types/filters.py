@@ -5,6 +5,7 @@ from core.schema.core.types.filters import filter, SearchFilterMixin
 from products.schema.types.filters import ProductFilter
 
 from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
+from sales_channels.models.sales_channels import RemoteLanguage
 
 
 @filter(ImportCurrency)
@@ -14,11 +15,6 @@ class ImportCurrencyFilter(SearchFilterMixin):
 
 @filter(ImportImage)
 class ImportImageFilter(SearchFilterMixin):
-    pass
-
-
-@filter(ImportProcess)
-class ImportProcessFilter(SearchFilterMixin):
     pass
 
 
@@ -44,11 +40,6 @@ class ImportVatFilter(SearchFilterMixin):
 
 @filter(RemoteCategory)
 class RemoteCategoryFilter(SearchFilterMixin):
-    pass
-
-
-@filter(RemoteCurrency)
-class RemoteCurrencyFilter(SearchFilterMixin):
     pass
 
 
@@ -121,6 +112,7 @@ class RemoteLogFilter(SearchFilterMixin):
 
 @filter(SalesChannel)
 class SalesChannelFilter(SearchFilterMixin):
+    id: auto
     active: auto
 
 
@@ -128,11 +120,26 @@ class SalesChannelFilter(SearchFilterMixin):
 class SalesChannelIntegrationPricelistFilter(SearchFilterMixin):
     id: auto
 
+@filter(RemoteCurrency)
+class RemoteCurrencyFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+
+@filter(ImportProcess)
+class ImportProcessFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
 
 @filter(SalesChannelView)
 class SalesChannelViewFilter(SearchFilterMixin):
     id: auto
     active: auto
+    sales_channel: Optional[SalesChannelFilter]
+
+@filter(RemoteLanguage)
+class RemoteLanguageFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
 
 
 @filter(SalesChannelViewAssign)

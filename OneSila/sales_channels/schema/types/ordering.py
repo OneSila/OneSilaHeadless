@@ -2,6 +2,7 @@ from core.schema.core.types.ordering import order
 from core.schema.core.types.types import auto
 
 from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
+from sales_channels.models.sales_channels import RemoteLanguage
 
 
 @order(ImportCurrency)
@@ -128,6 +129,9 @@ class SalesChannelIntegrationPricelistOrder:
 class SalesChannelViewOrder:
     id: auto
 
+@order(RemoteLanguage)
+class RemoteLanguageOrder:
+    id: auto
 
 @order(SalesChannelViewAssign)
 class SalesChannelViewAssignOrder:

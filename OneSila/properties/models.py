@@ -120,6 +120,7 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
                 _("This property value is associated with a product type rule and cannot be removed directly. "
                   "Please delete the product type rule to remove it.")
             )
+
         super().delete(*args, **kwargs)
 
     class Meta:

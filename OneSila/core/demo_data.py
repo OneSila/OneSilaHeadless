@@ -152,6 +152,10 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
                 self.delete_traversed_content_object(protected_intance)
 
             self.delete_traversed_content_object(content_object)
+        except ValidationError as e:
+
+            if 'removed directly' in str(e):
+                pass # this is for select values that are deleted by deleting the rule
 
     def delete_demo_data(self, *, multi_tenant_company):
         # we reverse the sequence, to avoid dealing with protected instances.

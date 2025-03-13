@@ -1,5 +1,4 @@
-from core.schema.core.types.types import type, relay
-from core.schema.core.mixins import GetQuerysetMultiTenantMixin
+from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin
 from sales_channels.integrations.magento2.models import MagentoSalesChannel
 from sales_channels.integrations.magento2.schema.types.filters import MagentoSalesChannelFilter
 from sales_channels.integrations.magento2.schema.types.ordering import MagentoSalesChannelOrder

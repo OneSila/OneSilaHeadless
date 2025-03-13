@@ -49,8 +49,6 @@ class Order(models.SetStatusMixin, models.Model):
         pdf = printer.pdf
         return filename, pdf
 
-    def tax_rate(self):
-        return self.invoice_address.tax_rate
 
     def total_value_custom_currency(self, currency_symbol):
         '''return the total_value in the given currency'''
@@ -63,53 +61,6 @@ class Order(models.SetStatusMixin, models.Model):
         else:
             return self.total_value
 
-    def set_status_pending_processing(self):
-        self.set_status(self.PENDING_PROCESSING)
-
-    def set_status_pending_shipping_approval(self):
-        self.set_status(self.PENDING_SHIPPING_APPROVAL)
-
-    def set_status_draft(self):
-        self.set_status(self.DRAFT)
-
-    def set_status_done(self):
-        self.set_status(self.DONE)
-
-    def set_status_to_ship(self):
-        self.set_status(self.TO_SHIP)
-
-    def set_status_await_inventory(self):
-        self.set_status(self.AWAIT_INVENTORY)
-
-    def set_status_shipped(self):
-        self.set_status(self.SHIPPED)
-
-    def is_draft(self):
-        return self.status == self.DRAFT
-
-    def is_pending_processing(self):
-        return self.status == self.PENDING_PROCESSING
-
-    def is_pending_shipping_approval(self):
-        return self.status == self.PENDING_SHIPPING_APPROVAL
-
-    def is_done(self):
-        return self.status == self.DONE
-
-    def is_to_ship(self):
-        return self.status == self.TO_SHIP
-
-    def is_await_inventory(self):
-        return self.status == self.AWAIT_INVENTORY
-
-    def is_shipped(self):
-        return self.status == self.SHIPPED
-
-    def is_cancelled(self):
-        return self.status == self.CANCELLED
-
-    def is_hold(self):
-        return self.status == self.HOLD
 
     class Meta:
         ordering = ('-created_at',)
