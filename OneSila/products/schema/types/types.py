@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from strawberry.relay.utils import to_base64
 from contacts.schema.types.types import CompanyType
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, Annotated, lazy
+from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, Annotated, lazy, strawberry_type
 
 from typing import List, Optional
 
@@ -101,3 +101,8 @@ class ConfigurableVariationType(relay.Node, GetQuerysetMultiTenantMixin):
 class BundleVariationType(relay.Node, GetQuerysetMultiTenantMixin):
     parent: Optional[ProductType]
     variation: Optional[ProductType]
+
+@strawberry_type
+class AiContent:
+    content: str
+    points: str

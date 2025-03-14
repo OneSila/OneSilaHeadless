@@ -1,3 +1,4 @@
+
 from .base import *
 
 ALLOWED_HOSTS = ['myonesilaserver.com']
@@ -86,3 +87,8 @@ HUEY['immediate'] = DEBUG
 
 # This will make absolute path to work
 LOCAL_HOST = 'localhost:8080'
+
+# price per ai point
+AI_POINT_PRICE = 0
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+openai.api_key = OPENAI_API_KEY

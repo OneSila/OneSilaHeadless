@@ -15,6 +15,9 @@ class ProductInput:
 class ProductPartialInput(NodeInput):
     pass
 
+@partial(Product, fields="__all__")
+class ProductAiContentInput(NodeInput):
+    language: str
 
 @input(BundleProduct, fields="__all__")
 class BundleProductInput:

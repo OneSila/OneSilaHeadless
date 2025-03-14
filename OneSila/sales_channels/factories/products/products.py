@@ -123,9 +123,9 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         Retrieves and sets the required and optional properties for the product.
         Raises an exception if no properties are found, as properties are mandatory for the sync process.
         """
-        reule_properties_ids = self.local_instance.get_required_and_optional_properties(product_rule=self.rule).values_list('property_id', flat=True)
+        rule_properties_ids = self.local_instance.get_required_and_optional_properties(product_rule=self.rule).values_list('property_id', flat=True)
         self.product_properties = ProductProperty.objects.filter_multi_tenant(self.sales_channel.multi_tenant_company). \
-            filter(product=self.local_instance, property_id__in=reule_properties_ids)
+            filter(product=self.local_instance, property_id__in=rule_properties_ids)
 
     def process_product_properties(self):
         """

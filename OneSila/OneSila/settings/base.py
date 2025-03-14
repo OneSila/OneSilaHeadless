@@ -48,6 +48,7 @@ INSTALLED_LOCAL_APPS = [
     'translations',
 
     'customs',
+    'billing',
     'eancodes',
     'lead_times',
     'media',

@@ -43,6 +43,9 @@ class MultiTenantCompany(models.Model):
     vat_number = models.CharField(max_length=30, null=True, blank=True)
     website = models.URLField(blank=True, null=True)
 
+    ai_points = models.IntegerField(default=0, help_text="Points allocated for AI processes.")
+
+
     def __str__(self):
         return self.name
 
