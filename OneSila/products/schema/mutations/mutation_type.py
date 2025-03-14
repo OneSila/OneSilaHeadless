@@ -1,13 +1,17 @@
+import strawberry_django
+from strawberry.relay import from_base64
+
+from core.schema.core.extensions import default_extensions
 from .fields import create_product
 from ..types.types import ProductType, BundleProductType, ConfigurableProductType, \
     SimpleProductType, ProductTranslationType, ConfigurableVariationType, \
-    BundleVariationType
+    BundleVariationType, AiContent
 from ..types.input import ProductInput, BundleProductInput, ConfigurableProductInput, \
     SimpleProductInput, ProductTranslationInput, ConfigurableVariationInput, \
     BundleVariationInput, ProductPartialInput, ConfigurableProductPartialInput, \
     BundleProductPartialInput, SimpleProductPartialInput, \
     ProductTranslationPartialInput, ConfigurableVariationPartialInput, \
-    BundleVariationPartialInput
+    BundleVariationPartialInput, ProductAiContentInput
 from core.schema.core.mutations import create, update, delete, type, List
 
 
@@ -54,3 +58,16 @@ class ProductsMutation:
     update_bundle_variation: BundleVariationType = update(BundleVariationPartialInput)
     delete_bundle_variation: BundleVariationType = delete()
     delete_bundle_variations: List[BundleVariationType] = delete()
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def generate_product_ai_content(self, instance: ProductAiContentInput) -> AiContent:
+        from products.models import Product
+        from products.flows.generate_prompt import AIGenerateContentFlow
+
+        language = instance.language
+        product = Product.objects.get(id=instance.id.node_id)
+
+        content_generator = AIGenerateContentFlow(product=product, language=language)
+        content_generator.flow()
+
+        return AiContent(content=content_generator.generated_content, points=content_generator.used_points)
