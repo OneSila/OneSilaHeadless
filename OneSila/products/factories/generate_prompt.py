@@ -86,8 +86,6 @@ class CreateProductPromptFactory:
                 self.attribute_values[key] = [value]
 
     def get_images(self):
-        return
-
         for image_ass in MediaProductThrough.objects.filter(product=self.product, media__type=Media.IMAGE):
             self.images.append(image_ass.media.image_web_url)
 
