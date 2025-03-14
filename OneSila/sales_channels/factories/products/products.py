@@ -86,11 +86,13 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         Attempts to retrieve the remote product instance. If not found, it should
         be created by subclasses implementing the creation logic.
         """
-
         if self.is_variation and self.remote_parent_product is None:
             self.remote_parent_product = self.remote_model_class.objects.get(local_instance=self.parent_local_instance, sales_channel=self.sales_channel)
 
         if self.remote_instance is not None:
+            self.remote_parent_product = self.remote_instance.remote_parent_product
+            self.parent_local_instance = self.remote_parent_product.local_instance
+            self.is_variation = self.remote_instance.remote_parent_product is not None
             return
 
         try:

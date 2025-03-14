@@ -157,11 +157,14 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
 
         self.payload['attribute_set_id'] = attribute_set.remote_id
 
+        if self.remote_type == self.REMOTE_TYPE_CONFIGURABLE:
+            self.payload['manage_stock'] = False
+
     def perform_remote_action(self):
         self.magento_product: MagentoApiProduct = self.api.products.by_sku(self.remote_instance.remote_sku)
 
         for key, value in self.payload.items():
-            if value != getattr(self.magento_product, key):
+            if  value != getattr(self.magento_product, key):
                 setattr(self.magento_product, key, value)
 
         self.magento_product.save(scope='all')

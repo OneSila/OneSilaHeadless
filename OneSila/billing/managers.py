@@ -115,6 +115,8 @@ class AiPointContentGenerateProcessQuerySet(MultiTenantQuerySet):
             result=result_text,
             result_time=result_time,
             cost=total_cost,
+            input_tokens=prompt_tokens,
+            output_tokens=completion_tokens,
             multi_tenant_company=company,
         )
 

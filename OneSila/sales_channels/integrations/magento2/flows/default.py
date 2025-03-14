@@ -61,6 +61,7 @@ def run_product_specific_magento_task_flow(
     else:
         if 'active' not in sales_channels_filter_kwargs:
             sales_channels_filter_kwargs['active'] = True
+
         sales_channels_filter_kwargs['multi_tenant_company'] = multi_tenant_company
 
     # Iterate over each active sales channel
@@ -142,8 +143,6 @@ def run_delete_generic_magento_task_flow(
                 queue_task(sales_channel, remote_instance)
         except remote_class.DoesNotExist:
             pass
-
-
 
 
 def run_delete_product_specific_generic_magento_task_flow(

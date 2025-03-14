@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from media.models import MediaProductThrough, Media
 from products.models import ProductTranslation
 from properties.models import ProductProperty, Property
@@ -38,7 +40,7 @@ class CreateProductPromptFactory:
         self.rule = self.product.get_product_rule()
 
         if self.rule:
-            self.product_type_attribute = self.rule.product_type
+            self.product_type_attribute = self.rule.product_type.value
 
         return self.rule
 
@@ -86,6 +88,10 @@ class CreateProductPromptFactory:
                 self.attribute_values[key] = [value]
 
     def get_images(self):
+
+        if settings.DEBUG:
+            return
+
         for image_ass in MediaProductThrough.objects.filter(product=self.product, media__type=Media.IMAGE):
             self.images.append(image_ass.media.image_web_url)
 
@@ -129,7 +135,7 @@ class CreateProductPromptFactory:
             f"\nBased on the above information, create an engaging, clear, SEO-optimized, and user-friendly product description."
             f" The description should be well-structured, using appropriate HTML elements (headings, paragraphs, bullet lists)."
             f" Highlight unique features, benefits, and practical use-cases for potential buyers. Write the description in {self.language.upper()}"
-            f"Very important! I want it to be an HTML but this is a description inside of a bigger one so don't give me <body> only the content"
+            f"Very important! I want it to be an HTML but this is a description inside of a bigger HTML block so don't give me <body> but only the content"
         )
 
         self.prompt = "\n".join(parts)

@@ -22,6 +22,8 @@ class AiPointContentGenerateProcess(models.Model):
     prompt = models.TextField()
     result = models.TextField()
     result_time = models.FloatField()
+    input_tokens = models.FloatField(null=True, blank=True)
+    output_tokens = models.FloatField(null=True, blank=True)
     cost = models.DecimalField(max_digits=10, decimal_places=4)
 
     objects = AiPointContentGenerateProcessManager()

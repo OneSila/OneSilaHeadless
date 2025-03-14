@@ -69,7 +69,7 @@ class RemoteCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(RemoteCurrency, filters=RemoteCurrencyFilter, order=RemoteCurrencyOrder, pagination=True, fields='__all__')
 class RemoteCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
-    local_instance: CurrencyType
+    local_instance: Optional[CurrencyType]
 
 
 @type(RemoteCustomer, filters=RemoteCustomerFilter, order=RemoteCustomerOrder, pagination=True, fields='__all__')

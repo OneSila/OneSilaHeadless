@@ -48,7 +48,7 @@ class ProductsMutation:
     delete_product_translations: List[ProductTranslationType] = delete()
 
     create_configurable_variation: ConfigurableVariationType = create(ConfigurableVariationInput)
-    create_configurable_variations: List[ConfigurableVariationType] = create(ConfigurableVariationInput)
+    create_configurable_variations: List[ConfigurableVariationType] = create(List[ConfigurableVariationInput])
     update_configurable_variation: ConfigurableVariationType = update(ConfigurableVariationPartialInput)
     delete_configurable_variation: ConfigurableVariationType = delete()
     delete_configurable_variations: List[ConfigurableVariationType] = delete()
