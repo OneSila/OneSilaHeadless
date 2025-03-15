@@ -60,3 +60,14 @@ product = "macbook air 13 inch m3"
 llm = ProductResearchLLM(product)
 print(llm.generate_response())
 ```
+
+## Background removal
+
+Needs proper converstation how we can do this.  But the code (on demand model) via replicate.com can be used like:
+
+```
+from llm.factories.image_editin import CutBackgroundBirefnet
+
+f = CutBackgroundBirefnet(source_url, to_path)
+f.run()
+```

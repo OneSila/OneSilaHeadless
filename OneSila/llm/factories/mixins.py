@@ -1,5 +1,6 @@
 import openai
 from django.conf import settings
+import replicate
 
 from media.models import MediaProductThrough
 from products.models import ProductTranslation
@@ -61,6 +62,11 @@ class AskDalleMixin(OpenAIMixin):
     def generate_response(self):
         return self.ask_dalle()
         
+
+class ReplicateMixin:
+    def __init__(self):
+        client = replicate.Client(api_token=settings.REPLICATE_API_TOKEN)
+
 
 class ContentLLMMixin(AskGPTMixin):
     """
