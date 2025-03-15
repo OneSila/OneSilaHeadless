@@ -30,6 +30,8 @@ faker-commerce
 sentry-sdk[django]
 tblib
 django-cleanup
+python-telegram-bot
+spacy
 
 # version stuck to 0.32.1, filters need upgrading before increasing version number
 # also pin the stawberry-graphql version.  Pip doesnt seem to manage to install the right version
