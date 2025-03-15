@@ -49,9 +49,9 @@ EMAIL_FILE_PATH = '/tmp/app-messages'  # change this to a proper location
 CORS_ALLOWED_ORIGINS = [
     # Format example:
     # 'http://172.19.250.107:3000',
-    # Or to allow everything:
-    # '*',
-    # IMPORTANT! In frontend Apollo client we need to specify we accept * so just adding  "http://localhost:3000" will be simpler
+    # the right port will depend on the port the frontend is running.
+    # on a dev machine check npm run dev and add that here.
+    "http://localhost:5173",
 ]
 
 CORS_ALLOWED_HEADERS = [
