@@ -45,3 +45,18 @@ for i in to_translate:
 	llm = StringTranslationLLM(to_translate=i, from_language_code='en', to_language_code='nl')
 	print(f"**Original: \n{i}")
 	print(f"**Translated: \n{llm.generate_response()}")
+
+```
+## Product Reseaercher
+
+This is VERY EXPIRIMENTAL and needs significant improving.  Like A LOT
+
+```
+from llm.factories.product_research import ProductResearchLLM
+from django.conf import settings
+
+product = "macbook air 13 inch m3"
+
+llm = ProductResearchLLM(product)
+print(llm.generate_response())
+```
