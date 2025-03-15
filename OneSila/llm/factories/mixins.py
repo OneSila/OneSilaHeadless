@@ -32,6 +32,9 @@ class AskGPTMixin(OpenAIMixin):
         )
         return response.choices[0].message.content.strip()
 
+    def generate_response(self):
+        return self.ask_gpt()
+
 
 class AskDalleMixin(OpenAIMixin):
     model = 'dall-e-3'
@@ -55,6 +58,9 @@ class AskDalleMixin(OpenAIMixin):
         image_url = response.data[0].url
         return image_url
 
+    def generate_response(self):
+        return self.ask_dalle()
+        
 
 class ContentLLMMixin(AskGPTMixin):
     """
