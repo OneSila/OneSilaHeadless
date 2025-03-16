@@ -23,6 +23,44 @@ nlp = spacy.load("telegram_bot/en_core_web_sm_james_extend_model")
 # Store user context
 user_context = {}
 
+INTENTS = {
+    "greeting": [
+        "Hi", "Hello", "Hey", "Good morning", "Hi there", "What's up?", "Yo",
+        "Hello bot", "Hey assistant", "Hi friend", "Hello, how are you?", "Greetings!", "Howdy"
+    ],
+    "goodbye": [
+        "See you later", "Goodbye!", "Take care", "Bye!", "Later!", "See you soon",
+        "I'm off", "Catch you later", "Good night", "Farewell"
+    ],
+    "weather": [
+        "What's the weather like?", "Tell me the forecast", "Is it hot today?", "Will it rain?",
+        "How's the weather?", "Do I need an umbrella?", "What's the humidity?",
+        "Give me the weather update", "What's the temperature?", "Is it sunny outside?"
+    ],
+    "restart_huey": [
+        "Restart huey", "Restart the task queue", "Reset the workers", "Restart background jobs",
+        "Refresh huey", "Restart the worker process", "Restart task execution",
+        "Reboot the Huey process", "Restart Huey now", "Kill and restart the Huey service",
+        "Restart the job queue process", "Flush and restart Huey"
+    ]
+}
+
+def detect_intent(user_message):
+    """Detects user intent based on keyword matching and lemmatization."""
+    user_message = user_message.lower().strip()
+    doc = nlp(user_message)
+
+    for intent, phrases in INTENTS.items():
+        # Direct substring match (e.g., "hello" matches "Hello bot")
+        if any(phrase.lower() in user_message for phrase in phrases):
+            return intent
+
+        # Lemmatized word match (handles variations like "restarting huey" → "restart_huey")
+        if any(token.lemma_ in [phrase.lower() for phrase in phrases] for token in doc):
+            return intent
+
+    return None  # No match found
+
 def detect_intent_from_training_data(user_message):
     """Uses the trained spaCy model to predict user intent."""
     if not user_message or not isinstance(user_message, str):
@@ -63,7 +101,7 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text(f"Fetching the weather for {location}... Cold as snow!")
             return
 
-    intent = detect_intent_from_training_data(user_message)
+    intent = detect_intent(user_message)
 
     # Handle different intents
     if intent == "weather":
