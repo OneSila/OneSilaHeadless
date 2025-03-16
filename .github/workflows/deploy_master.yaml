@@ -33,3 +33,4 @@ jobs:
             sudo supervisorctl restart hypercornctl
             sudo chmod 777 /home/${{ secrets.MASTER_USERNAME }}/hypercorn.sock
             sudo supervisorctl restart huey
+            sudo supervisorctl restart telegram_bot
