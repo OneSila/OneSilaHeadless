@@ -1,3 +1,4 @@
-from django.shortcuts import render
+from core.views import EmptyTemplateView
 
-# Create your views here.
+# class SomeModelView(EmptyTemplateView):
+#    pass

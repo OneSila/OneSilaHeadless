@@ -11,6 +11,7 @@ from products.models import Product, BundleProduct, ConfigurableProduct, \
     SimpleProduct, ProductTranslation, ConfigurableVariation, BundleVariation
 from products_inspector.models import InspectorBlock
 from taxes.schema.types.filters import VatRateFilter
+from strawberry.relay import from_base64
 
 @filter(Product)
 class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
@@ -32,6 +33,15 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
         if value not in (None, UNSET):
             products_ids = InspectorBlock.objects.filter(successfully_checked=False, error_code=value).values_list('inspector__product_id', flat=True)
             queryset = queryset.filter(id__in=products_ids)
+
+        return queryset, Q()
+
+    @custom_filter
+    def value_select_id(self, queryset: QuerySet, value: str, prefix: str) -> tuple[QuerySet, Q]:
+
+        if value is not None:
+            _, id = from_base64(value)
+            queryset = queryset.filter(productproperty__value_select_id=id)
 
         return queryset, Q()
 

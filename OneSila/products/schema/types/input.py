@@ -1,8 +1,4 @@
-from decimal import Decimal
-from typing import List, Optional
 from core.schema.core.types.input import NodeInput, input, partial
-from core.schema.core.types.types import Annotated, lazy
-
 from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
     ProductTranslation, ConfigurableVariation, BundleVariation
 
@@ -14,10 +10,6 @@ class ProductInput:
 @partial(Product, fields="__all__")
 class ProductPartialInput(NodeInput):
     pass
-
-@partial(Product, fields="__all__")
-class ProductAiContentInput(NodeInput):
-    language: str
 
 @input(BundleProduct, fields="__all__")
 class BundleProductInput:
