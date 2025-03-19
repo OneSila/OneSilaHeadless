@@ -31,6 +31,7 @@ class PropertyTranslationType(relay.Node, GetQuerysetMultiTenantMixin):
 class PropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
     property: PropertyType
     image: Optional[ImageType]
+    productpropertiesrule_set: List[Annotated['ProductPropertiesRuleType', lazy("properties.schema.types.types")]]
 
     @field()
     def value(self, info) -> str | None:
