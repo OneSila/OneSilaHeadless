@@ -15,19 +15,23 @@ class AITranslateContentFlow:
         self.translated_content = ''
         self.used_points = 0
 
+    def _get_safe_translation(self, translation, attr):
+        """Helper method to safely get a translation attribute."""
+        return getattr(translation, attr, '') or ''
+
     def _set_product_translation(self):
         if self.product:
             translation = self.product.translations.exclude(language=self.to_language_code).first()
 
             if translation:
                 if self.content_type == ContentAiGenerateType.DESCRIPTION:
-                    self.to_translate = translation.description
+                    self.to_translate = self._get_safe_translation(translation, 'description')
 
                 if self.content_type == ContentAiGenerateType.SHORT_DESCRIPTION:
-                    self.to_translate = translation.short_description
+                    self.to_translate = self._get_safe_translation(translation, 'short_description')
 
                 if self.content_type == ContentAiGenerateType.NAME:
-                    self.to_translate = translation.name
+                    self.to_translate = self._get_safe_translation(translation, 'name')
 
                 self.from_language_code = translation.language
 
