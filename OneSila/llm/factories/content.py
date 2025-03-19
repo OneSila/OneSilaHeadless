@@ -197,6 +197,7 @@ class ShortDescriptionLLM(DescriptionGenLLM):
         - **Basic HTML (fully formatted, no plain text mixed in)**  
 
         ⚠️ **DO NOT mix flat text with HTML in the same response.**  
+        ⚠️ **DO NOT use markdown.**  
 
         ---
 
@@ -210,13 +211,14 @@ class ShortDescriptionLLM(DescriptionGenLLM):
             - __Underlined (`<u>`)__ for key highlights  
         - **Ensure compatibility with PIM integration** by maintaining a clean, structured output.  
         - **Do NOT include** `<html>`, `<head>`, or `<body>` tags.  
+        - **Do NOT include markdown.  
 
         ---
 
         ## **3. Flat Text Formatting Rules (if plain text is required)**  
         - **Write in complete sentences.**  
         - **Use bullet points or paragraph-based formatting, depending on the context.**  
-        - **DO NOT include any HTML tags** or special formatting.  
+        - **DO NOT include any HTML tags or markdown** or special formatting.  
 
         ---
 
