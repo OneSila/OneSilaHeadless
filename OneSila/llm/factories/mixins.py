@@ -210,12 +210,22 @@ class ContentLLMMixin(AskGPTMixin,  CalculateCostMixin, CreateTransactionMixin):
         self.description = self.translation.description
 
     def _set_images(self):
-
         if settings.DEBUG:
             self.images = []
             return
 
-        self.images = [i.media.image_web_url for i in MediaProductThrough.objects.filter(product=self.product)]
+        self.images = [i.media.image_web_url for i in MediaProductThrough.objects.filter(
+            type=MediaProductThrough.IMAGE,
+            product=self.product)]
+
+    def _set_documents(self):
+        if settings.DEBUG:
+            self.images = []
+            return
+
+        self.documents = [i.media.file_url() for i in MediaProductThrough.objects.filter(
+            type=MediaProductThrough.FILE,
+            product=self.product)]
 
     def _set_is_configurable(self):
         self.is_configurable = self.product.is_configurable()
@@ -261,6 +271,7 @@ class ContentLLMMixin(AskGPTMixin,  CalculateCostMixin, CreateTransactionMixin):
         self._set_product_rule()
         self._set_property_values()
         self._set_images()
+        self._set_documents()
 
         self.response = self.ask_gpt()
         self.calculate_cost(self.response)

@@ -144,6 +144,9 @@ class DescriptionGenLLM(ContentLLMMixin):
         
         ##Product Images##
         {self.images}
+
+        ##Product Documents##
+        {self.documents}
         """
 
         if self.short_description:
