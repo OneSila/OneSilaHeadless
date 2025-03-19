@@ -30,7 +30,10 @@ class LlmMutation:
         from llm.flows.translate_ai_content import AITranslateContentFlow
 
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        product = Product.objects.get(id=instance.product.id.node_id)
+
+        if instance.product:
+            product = Product.objects.get(id=instance.product.id.node_id)
+
         content_type = instance.product_content_type
 
         content_generator = AITranslateContentFlow(multi_tenant_company=multi_tenant_company,
