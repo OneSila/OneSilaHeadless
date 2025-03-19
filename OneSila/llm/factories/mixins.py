@@ -85,7 +85,7 @@ class CalculateCostMixin:
 
         self.input_tokens = usage.input_tokens
         self.output_tokens = usage.output_tokens
-        self.cached_tokens = usage.input_tokens_details.get('cached_tokens', 0)
+        self.cached_tokens = usage.input_tokens_details.cached_tokens
 
         cost_input = (Decimal(self.input_tokens) / Decimal(1e6)) * cost['input']
         cost_output = (Decimal(self.output_tokens) / Decimal(1e6)) * cost['output']
