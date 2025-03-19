@@ -91,7 +91,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         if self.remote_instance is not None:
             self.remote_parent_product = self.remote_instance.remote_parent_product
-            self.parent_local_instance = self.remote_parent_product.local_instance
+            self.parent_local_instance = self.remote_parent_product.local_instance if self.remote_parent_product is not None else None
             self.is_variation = self.remote_instance.remote_parent_product is not None
             return
 

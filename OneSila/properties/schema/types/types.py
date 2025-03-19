@@ -37,6 +37,11 @@ class PropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
         return self.value
 
     @field()
+    def full_value_name(self, info) -> str | None:
+        return f"{self.property.name} > {self.value}"
+
+
+    @field()
     def thumbnail_url(self, info) -> str | None:
         if self.image:
             return self.image.image_web_url

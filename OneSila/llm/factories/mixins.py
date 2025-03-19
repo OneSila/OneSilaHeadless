@@ -1,7 +1,14 @@
+import time
+from decimal import Decimal
+
 import openai
 from django.conf import settings
 import replicate
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 
+from billing.models import AiPointTransaction
+from llm.models import AiGenerateProcess, AiTranslationProcess
 from media.models import MediaProductThrough
 from products.models import ProductTranslation
 from properties.helpers import get_product_properties_dict
@@ -15,6 +22,82 @@ class OpenAIMixin:
         self.openai = openai.Client(api_key=settings.OPENAI_API_KEY)
 
 
+class CreateTransactionMixin:
+
+    def _create_transaction(self):
+        self.transaction = AiPointTransaction.objects.create(
+            points=self.points_cost,
+            transaction_type=AiPointTransaction.SUBTRACT,
+            multi_tenant_company=self.multi_tenant_company)
+        return self.transaction
+
+    def _create_ai_generate_process(self):
+        self.ai_process = AiGenerateProcess.objects.create(
+            product=self.product,
+            transaction=self.transaction,
+            prompt=self.prompt,
+            result=self.text_response,
+            result_time=self.result_time,
+            cost=self.total_cost,
+            input_tokens=self.input_tokens,
+            output_tokens=self.output_tokens,
+            cached_tokens=self.cached_tokens,
+            multi_tenant_company=self.multi_tenant_company)
+
+        return self.ai_process
+
+    def _create_ai_translate_process(self):
+        self.ai_process = AiTranslationProcess.objects.create(
+            to_translate=self.to_translate,
+            from_language_code=self.from_language_code,
+            to_language_code=self.to_language_code,
+            transaction=self.transaction,
+            result=self.text_response,
+            result_time=self.result_time,
+            cost=self.total_cost,
+            input_tokens=self.input_tokens,
+            output_tokens=self.output_tokens,
+            cached_tokens=self.cached_tokens,
+            multi_tenant_company=self.multi_tenant_company)
+
+        return self.ai_process
+
+
+class CalculateCostMixin:
+
+    # prices are USD per 1M tokens
+    COSTS = {
+        "gpt-4o": {
+            "input": Decimal("2.50"),
+            "output": Decimal("10.00"),
+            "cached": Decimal("1.25"),
+        },
+        "gpt-4o-mini": {
+            "input": Decimal("0.150"),
+            "output": Decimal("0.600"),
+            "cached": Decimal("0.075"),
+        }
+    }
+
+    def calculate_cost(self, response):
+        usage = response.usage
+        cost = self.COSTS.get(self.model, "gpt-4o-mini")
+
+        self.input_tokens = usage.input_tokens
+        self.output_tokens = usage.output_tokens
+        self.cached_tokens = usage.input_tokens_details.cached_tokens
+
+        cost_input = (Decimal(self.input_tokens) / Decimal(1e6)) * cost['input']
+        cost_output = (Decimal(self.output_tokens) / Decimal(1e6)) * cost['output']
+        cost_cached = (Decimal(self.cached_tokens) / Decimal(1e6)) * cost['cached']
+        self.total_cost = cost_input + cost_output + cost_cached
+
+        const_price = Decimal(getattr(settings, "AI_POINT_PRICE", "0.1"))
+        multiplier = Decimal(getattr(settings, "AI_POINT_MULTIPLIER", "10"))
+
+        self.points_cost = max(1, int(round(self.total_cost / const_price * multiplier)))
+
+
 class AskGPTMixin(OpenAIMixin):
     model = 'gpt-4o-mini'
     temperature = 0.7
@@ -22,19 +105,38 @@ class AskGPTMixin(OpenAIMixin):
 
     def ask_gpt(self):
         logger.debug(f"About to ask_gpt")
-        response = self.openai.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": self.prompt}
-            ],
+
+        if not hasattr(self, 'images'):
+            self.images = []
+
+        image_inputs = [{"type": "input_image", "image_url": url} for url in self.images]
+        start_time = time.time()
+        response = self.openai.responses.create(
+            model="gpt-4o-mini",
+            instructions=self.system_prompt,
             temperature=self.temperature,
-            max_tokens=self.max_tokens
+            max_output_tokens=self.max_tokens,
+            input=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": self.prompt},
+                        *image_inputs
+                    ]
+                }
+            ]
         )
-        return response.choices[0].message.content.strip()
+
+        end_time = time.time()
+        self.result_time = end_time - start_time
+
+        return response
+
+    def get_text_response(self, response):
+        return response.output_text.strip()
 
     def generate_response(self):
-        return self.ask_gpt()
+        return self.get_text_response(self.ask_gpt())
 
 
 class AskDalleMixin(OpenAIMixin):
@@ -68,15 +170,23 @@ class ReplicateMixin:
         client = replicate.Client(api_token=settings.REPLICATE_API_TOKEN)
 
 
-class ContentLLMMixin(AskGPTMixin):
+class ContentLLMMixin(AskGPTMixin,  CalculateCostMixin, CreateTransactionMixin):
     """
     The product should not be changed, only yield the html result at the end of the process.
     """
     model = "gpt-4o-mini"
 
+    def validate_generation(self):
+
+        if self.multi_tenant_company.ai_points < 0:
+            raise ValidationError(_("Insufficient AI points. Please purchase more."))
+
+        return True
+
     def __init__(self, product, language_code):
         super().__init__()
         self.product = product
+        self.multi_tenant_company = product.multi_tenant_company
         self.language_code = language_code
 
     def _set_translation(self):
@@ -84,6 +194,11 @@ class ContentLLMMixin(AskGPTMixin):
             product=self.product,
             language=self.language_code
         ).first()
+
+        # we can generate content for not existent translations
+        # ex we have the english product then we switch to Dutch and we want to generate the translation
+        if self.translation is None:
+            self.translation = ProductTranslation.objects.filter(product=self.product).first()
 
     def _set_product_name(self):
         self.product_name = self.translation.name
@@ -95,6 +210,11 @@ class ContentLLMMixin(AskGPTMixin):
         self.description = self.translation.description
 
     def _set_images(self):
+
+        if settings.DEBUG:
+            self.images = []
+            return
+
         self.images = [i.media.image_web_url for i in MediaProductThrough.objects.filter(product=self.product)]
 
     def _set_is_configurable(self):
@@ -132,6 +252,7 @@ class ContentLLMMixin(AskGPTMixin):
         raise Exception("Prompt not configured.")
 
     def generate_response(self):
+        self.validate_generation()
         self._set_translation()
         self._set_product_name()
         self._set_short_description()
@@ -140,5 +261,11 @@ class ContentLLMMixin(AskGPTMixin):
         self._set_product_rule()
         self._set_property_values()
         self._set_images()
+
         self.response = self.ask_gpt()
-        return self.response
+        self.calculate_cost(self.response)
+        self.text_response = self.get_text_response(self.response)
+        self._create_transaction()
+        self._create_ai_generate_process()
+
+        return self.text_response

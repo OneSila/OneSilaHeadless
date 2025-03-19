@@ -32,44 +32,44 @@ class DescriptionGenLLM(ContentLLMMixin):
             <h3>Size information</h5>
             <b>Small - 13.5" x 8.75" x 10.0"</b><br>
             Dogs under 10 lbs, eg:
-            <ul>
-                <li>Chihuahua</li>
-                <li>Yorkshire Terrier</li>
-                <li>Chinese Crested</li>
-            </ul>
+            <ol>
+                <li data-list="bullet">Chihuahua</li>
+                <li data-list="bullet">Yorkshire Terrier</li>
+                <li data-list="bullet">Chinese Crested</li>
+            </ol>
       
             <b>Medium - 15.75" x 10.0" x 11.25"</b><br>
             Dogs from 10 lbs to 20 lbs, eg:
-            <ul>
-                <li>Jack Russell</li>
-                <li>Bichon</li>
-                <li>Mini Dachshund</li>
-                <li>Pomeranian</li>
-                <li>Shi Tzu</li>
-            </ul>
+            <ol>
+                <li data-list="bullet">Jack Russell</li>
+                <li data-list="bullet">Bichon</li>
+                <li data-list="bullet">Mini Dachshund</li>
+                <li data-list="bullet">Pomeranian</li>
+                <li data-list="bullet">Shi Tzu</li>
+            </ol>
       
             <b>Large - 17.75" x 11.25" x 12.75"</b><br>
             Dogs like:
-            <ul>
-                <li>Corgi</li>
-                <li>Beagle</li>
-                <li>Cocker Spaniel</li>
-                <li>French Buldog</li>
-            </ul>
+            <ol>
+                <li data-list="bullet">Corgi</li>
+                <li data-list="bullet">Beagle</li>
+                <li data-list="bullet">Cocker Spaniel</li>
+                <li data-list="bullet">French Buldog</li>
+            </ol>
                 
 
             <h3>Additional Product Information</h3>
-            <ul>    
-                <li><b>Brand:</b> Suzy's</li>
-                <li><b>Product Type:</b> Dog Carrier</li>
-                <li><b>Adjustable straps:</b> True</li>
-                <li><b>Filling:</b> Hollow Fibre, Orthopedic</li>
-                <li><b>Orthopedic:</b> True</li>
-                <li><b>Product collection:</b> Rainy Bear</li>
-                <li><b>Maintenance Instructions:</b> Machine wash 30C, Do not tumble dry, No ironing</li>
-                <li><b>Made in:</b> UK</li>
-                <li><b>SKU:</b> 082-0145-GR</li>
-              </ul>
+            <ol>    
+                <li data-list="bullet"><b>Brand:</b> Suzy's</li>
+                <li data-list="bullet"><b>Product Type:</b> Dog Carrier</li>
+                <li data-list="bullet"><b>Adjustable straps:</b> True</li>
+                <li data-list="bullet"><b>Filling:</b> Hollow Fibre, Orthopedic</li>
+                <li data-list="bullet"><b>Orthopedic:</b> True</li>
+                <li data-list="bullet"><b>Product collection:</b> Rainy Bear</li>
+                <li data-list="bullet"><b>Maintenance Instructions:</b> Machine wash 30C, Do not tumble dry, No ironing</li>
+                <li data-list="bullet"><b>Made in:</b> UK</li>
+                <li data-list="bullet"><b>SKU:</b> 082-0145-GR</li>
+              </ol>
         """
 
     @property
@@ -98,7 +98,7 @@ class DescriptionGenLLM(ContentLLMMixin):
 
         - **Engaging Introduction** (first sentence should highlight key qualities without mentioning the product name).
         - **Key Features Section:** `<h3>`
-        - **Bullet Points for Features & Specs:** `<ul><li>`
+        - **Bullet Points for Features & Specs:** `<ol><li data-list="bullet">`
         - **Text Emphasis for Clarity:**
           - **Bold (`<b>`)** for critical details
           - *Italics (`<i>`)* for descriptive emphasis
@@ -171,12 +171,12 @@ class ShortDescriptionLLM(DescriptionGenLLM):
     @property
     def description_example_html(self):
         return """## Example 2
-        <ul>
-        <li>Are looking to keep your dog's <b>back straight</b></li>
-        <li>Want the carrier to be <b>machine-washable</b></li>
-        <li>Enjoy wearing bags <b>cross-body and on your shoulder</b></li>
-        <li>Expect a carrier to be <b>durable and long-lasting</b></li>
-        </ul>
+        <ol>
+        <li data-list="bullet">Are looking to keep your dog's <b>back straight</b></li>
+        <li data-list="bullet">Want the carrier to be <b>machine-washable</b></li>
+        <li data-list="bullet">Enjoy wearing bags <b>cross-body and on your shoulder</b></li>
+        <li data-list="bullet">Expect a carrier to be <b>durable and long-lasting</b></li>
+        </ol>
         """
 
     @property
@@ -204,7 +204,7 @@ class ShortDescriptionLLM(DescriptionGenLLM):
         ## **2. HTML Formatting Rules (if HTML is required)**  
         - **Use proper structure and clean formatting:**  
           - **Key Features Section:** `<h3>`  
-          - **Bullet Points for Features & Specs:** `<ul><li>`  
+          - **Bullet Points for Features & Specs:** `<ol><li data-list="bullet">`  
           - **Text Emphasis for Clarity:**  
             - **Bold (`<b>`)** for critical details  
             - *Italics (`<i>`)* for descriptive emphasis  
