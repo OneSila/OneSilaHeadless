@@ -25,6 +25,7 @@ from sales_channels.integrations.magento2.schema import MagentoSalesChannelMutat
 from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
 from translations.schema import TranslationsQuery
 from integrations.schema import IntegrationsQuery, IntegrationsMutation
+from llm.schema import LlmMutation
 
 
 #
@@ -41,8 +42,8 @@ class Query(CurrenciesQuery, CountryQuery, EanCodesQuery, IntegrationsQuery,
 
 @strawberry.type
 class Mutation(CurrenciesMutation, EanCodesMutation,MediaMutation, MultiTenantMutation,
-       ProductsInspectorMutation, ProductsMutation, PropertiesMutation, IntegrationsMutation,
-        SalesPricesMutation, SalesChannelsMutation, MagentoSalesChannelMutation, TaxesMutation):
+       ProductsInspectorMutation, ProductsMutation, PropertiesMutation, IntegrationsMutation, LlmMutation,
+       SalesPricesMutation, SalesChannelsMutation, MagentoSalesChannelMutation, TaxesMutation):
     pass
 
 

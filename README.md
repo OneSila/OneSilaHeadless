@@ -20,7 +20,13 @@ cp OneSila/settings/local_template.py OneSila/settings/local.py
 ```
 
 And create a postgres db + set the settings in your local.py setting file.
+Also add CORS settings to your local file.
 
+```
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # check the right port from your frontend npm run dev.
+]
+```
 
 Next, migrate your db:
 

@@ -51,6 +51,7 @@ INSTALLED_LOCAL_APPS = [
     'billing',
     'eancodes',
     'lead_times',
+    'llm',
     'media',
     'notifications',
     'integrations',

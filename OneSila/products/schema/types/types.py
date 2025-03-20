@@ -101,8 +101,3 @@ class ConfigurableVariationType(relay.Node, GetQuerysetMultiTenantMixin):
 class BundleVariationType(relay.Node, GetQuerysetMultiTenantMixin):
     parent: Optional[ProductType]
     variation: Optional[ProductType]
-
-@strawberry_type
-class AiContent:
-    content: str
-    points: str

@@ -30,13 +30,9 @@ faker-commerce
 sentry-sdk[django]
 tblib
 django-cleanup
+openai~=1.66.3
+replicate
 
-# version stuck to 0.32.1, filters need upgrading before increasing version number
-# also pin the stawberry-graphql version.  Pip doesnt seem to manage to install the right version
-# which causes instability on freshly deployed systems like the auto testing in github.
-# To find the right version, go to the strawberry-graphql-django repo and inpect the peotry.lock file
-# strawberry-graphql==0.219.1
-# strawberry-graphql-django==0.32.1
 strawberry-graphql==0.261.0
 strawberry-graphql-django==0.56.0
 
@@ -48,8 +44,4 @@ django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absol
 starlette
 
 git+https://github.com/jazzband/django-polymorphic.git@v4.0.0a#egg=django-polymorphic
-git+https://github.com/OneSila/OneSilaMagento2Api.git@v1.0.16
-
-# accounting integrations
-python-quickbooks
-openai>=0.27.0
+git+https://github.com/OneSila/OneSilaMagento2Api.git@v1.0.17

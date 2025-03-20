@@ -423,8 +423,6 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
 
         return new_url_key
 
-        return None
-
     def save(self, *args, **kwargs):
         if not self.url_key:
             self.url_key = self._get_default_url_key()
