@@ -1,72 +1,22 @@
 from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial, List
 
-from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
+from sales_channels.models import SalesChannelImport, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, \
+    RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, \
+    RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, \
+    SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
 from sales_channels.models.sales_channels import RemoteLanguage
 
 
-@input(ImportCurrency, fields="__all__")
-class ImportCurrencyInput:
+@input(SalesChannelImport, fields="__all__")
+class SalesChannelImportInput:
     pass
 
 
-@partial(ImportCurrency, fields="__all__")
-class ImportCurrencyPartialInput(NodeInput):
+@partial(SalesChannelImport, fields="__all__")
+class SalesChannelImportPartialInput(NodeInput):
     pass
 
-@input(ImportImage, fields="__all__")
-class ImportImageInput:
-    pass
-
-
-@partial(ImportImage, fields="__all__")
-class ImportImagePartialInput(NodeInput):
-    pass
-
-@input(ImportProcess, fields="__all__")
-class ImportProcessInput:
-    pass
-
-
-@partial(ImportProcess, fields="__all__")
-class ImportProcessPartialInput(NodeInput):
-    pass
-
-@input(ImportProduct, fields="__all__")
-class ImportProductInput:
-    pass
-
-
-@partial(ImportProduct, fields="__all__")
-class ImportProductPartialInput(NodeInput):
-    pass
-
-@input(ImportProperty, fields="__all__")
-class ImportPropertyInput:
-    pass
-
-
-@partial(ImportProperty, fields="__all__")
-class ImportPropertyPartialInput(NodeInput):
-    pass
-
-@input(ImportPropertySelectValue, fields="__all__")
-class ImportPropertySelectValueInput:
-    pass
-
-
-@partial(ImportPropertySelectValue, fields="__all__")
-class ImportPropertySelectValuePartialInput(NodeInput):
-    pass
-
-@input(ImportVat, fields="__all__")
-class ImportVatInput:
-    pass
-
-
-@partial(ImportVat, fields="__all__")
-class ImportVatPartialInput(NodeInput):
-    pass
 
 @input(RemoteCategory, fields="__all__")
 class RemoteCategoryInput:
@@ -77,6 +27,7 @@ class RemoteCategoryInput:
 class RemoteCategoryPartialInput(NodeInput):
     pass
 
+
 @input(RemoteCurrency, fields="__all__")
 class RemoteCurrencyInput:
     pass
@@ -85,6 +36,7 @@ class RemoteCurrencyInput:
 @partial(RemoteCurrency, fields="__all__")
 class RemoteCurrencyPartialInput(NodeInput):
     pass
+
 
 @input(RemoteCustomer, fields="__all__")
 class RemoteCustomerInput:
@@ -95,6 +47,7 @@ class RemoteCustomerInput:
 class RemoteCustomerPartialInput(NodeInput):
     pass
 
+
 @input(RemoteImage, fields="__all__")
 class RemoteImageInput:
     pass
@@ -103,6 +56,7 @@ class RemoteImageInput:
 @partial(RemoteImage, fields="__all__")
 class RemoteImagePartialInput(NodeInput):
     pass
+
 
 @input(RemoteImageProductAssociation, fields="__all__")
 class RemoteImageProductAssociationInput:
@@ -113,6 +67,7 @@ class RemoteImageProductAssociationInput:
 class RemoteImageProductAssociationPartialInput(NodeInput):
     pass
 
+
 @input(RemoteInventory, fields="__all__")
 class RemoteInventoryInput:
     pass
@@ -121,6 +76,7 @@ class RemoteInventoryInput:
 @partial(RemoteInventory, fields="__all__")
 class RemoteInventoryPartialInput(NodeInput):
     pass
+
 
 @input(RemoteLog, fields="__all__")
 class RemoteLogInput:
@@ -131,6 +87,7 @@ class RemoteLogInput:
 class RemoteLogPartialInput(NodeInput):
     pass
 
+
 @input(RemoteOrder, fields="__all__")
 class RemoteOrderInput:
     pass
@@ -140,21 +97,26 @@ class RemoteOrderInput:
 class RemoteOrderPartialInput(NodeInput):
     pass
 
+
 @partial(RemoteOrder, fields="__all__")
 class RemoteOrderPartialInput(NodeInput):
     pass
+
 
 @input(RemotePrice, fields="__all__")
 class RemotePriceInput:
     pass
 
+
 @input(RemoteProduct, fields="__all__")
 class RemoteProductInput:
     pass
 
+
 @partial(RemoteProduct, fields="__all__")
 class RemoteProductPartialInput(NodeInput):
     pass
+
 
 @input(RemoteProductContent, fields="__all__")
 class RemoteProductContentInput:
@@ -165,6 +127,7 @@ class RemoteProductContentInput:
 class RemoteProductContentPartialInput(NodeInput):
     pass
 
+
 @input(RemoteProductProperty, fields="__all__")
 class RemoteProductPropertyInput:
     pass
@@ -173,6 +136,7 @@ class RemoteProductPropertyInput:
 @partial(RemoteProductProperty, fields="__all__")
 class RemoteProductPropertyPartialInput(NodeInput):
     pass
+
 
 @input(RemoteProperty, fields="__all__")
 class RemotePropertyInput:
@@ -183,6 +147,7 @@ class RemotePropertyInput:
 class RemotePropertyPartialInput(NodeInput):
     pass
 
+
 @input(RemotePropertySelectValue, fields="__all__")
 class RemotePropertySelectValueInput:
     pass
@@ -191,6 +156,7 @@ class RemotePropertySelectValueInput:
 @partial(RemotePropertySelectValue, fields="__all__")
 class RemotePropertySelectValuePartialInput(NodeInput):
     pass
+
 
 @input(RemoteVat, fields="__all__")
 class RemoteVatInput:
@@ -201,6 +167,7 @@ class RemoteVatInput:
 class RemoteVatPartialInput(NodeInput):
     pass
 
+
 @input(SalesChannel, fields="__all__")
 class SalesChannelInput:
     pass
@@ -210,6 +177,7 @@ class SalesChannelInput:
 class SalesChannelPartialInput(NodeInput):
     pass
 
+
 @input(SalesChannelIntegrationPricelist, fields="__all__")
 class SalesChannelIntegrationPricelistInput:
     pass
@@ -218,6 +186,7 @@ class SalesChannelIntegrationPricelistInput:
 @partial(SalesChannelIntegrationPricelist, fields="__all__")
 class SalesChannelIntegrationPricelistPartialInput(NodeInput):
     pass
+
 
 @input(SalesChannelView, fields="__all__")
 class SalesChannelViewInput:

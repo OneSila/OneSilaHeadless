@@ -1,8 +1,8 @@
 from core.schema.core.mutations import create, update, delete, type, List, field
 from .fields import resync_sales_channel_assign
 from ..types.types import SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, \
-    SalesChannelViewAssignType, ImportProcessType, RemoteLanguageType, RemoteCurrencyType
-from ..types.input import ImportProcessInput, ImportProcessPartialInput, SalesChannelInput, SalesChannelPartialInput, \
+    SalesChannelViewAssignType, SalesChannelImportType, RemoteLanguageType, RemoteCurrencyType
+from ..types.input import SalesChannelImportInput, SalesChannelImportPartialInput, SalesChannelInput, SalesChannelPartialInput, \
     SalesChannelIntegrationPricelistInput, SalesChannelIntegrationPricelistPartialInput, SalesChannelViewInput, \
     SalesChannelViewPartialInput, SalesChannelViewAssignInput, SalesChannelViewAssignPartialInput, \
     RemoteLanguagePartialInput, RemoteCurrencyPartialInput
@@ -10,11 +10,11 @@ from ..types.input import ImportProcessInput, ImportProcessPartialInput, SalesCh
 
 @type(name='Mutation')
 class SalesChannelsMutation:
-    create_import_process: ImportProcessType = create(ImportProcessInput)
-    create_import_processes: List[ImportProcessType] = create(ImportProcessInput)
-    update_import_process: ImportProcessType = update(ImportProcessPartialInput)
-    delete_import_process: ImportProcessType = delete()
-    delete_import_processes: List[ImportProcessType] = delete()
+    create_import_process: SalesChannelImportType = create(SalesChannelImportInput)
+    create_import_processes: List[SalesChannelImportType] = create(SalesChannelImportInput)
+    update_import_process: SalesChannelImportType = update(SalesChannelImportPartialInput)
+    delete_import_process: SalesChannelImportType = delete()
+    delete_import_processes: List[SalesChannelImportType] = delete()
 
     create_sales_channel: SalesChannelType = create(SalesChannelInput)
     create_sales_channels: List[SalesChannelType] = create(SalesChannelInput)

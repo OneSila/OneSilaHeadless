@@ -1,5 +1,5 @@
 from core import models
-from sales_channels.models.imports import ImportableModel
+from imports_exports.models import ImportableModel
 
 
 class MagentoAttributeSetImport(ImportableModel):

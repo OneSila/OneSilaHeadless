@@ -1,5 +1,7 @@
 from core import models
 from polymorphic.models import PolymorphicModel
+
+from imports_exports.models import Import, ImportableModel
 from sales_channels.models.sales_channels import SalesChannel
 from .products import (
     RemoteProduct,
@@ -8,56 +10,15 @@ from .products import (
 from .properties import RemoteProperty, RemotePropertySelectValue
 from .taxes import RemoteVat, RemoteCurrency
 
-class ImportProcess(PolymorphicModel, models.Model):
+class SalesChannelImport(Import, models.Model):
     """
     Model representing an import process for various sales channel data.
     """
-
-    TYPE_PROPERTIES = 'properties'
-    TYPE_PROPERTY_VALUES = 'property_values'
-    TYPE_PRODUCTS = 'products'
-    TYPE_TAXES = 'taxes'
-    TYPE_CURRENCIES = 'currencies'
-    TYPE_IMAGES = 'images'
-
-    TYPE_CHOICES = [
-        (TYPE_PROPERTIES, 'Properties'),
-        (TYPE_PROPERTY_VALUES, 'Property Values'),
-        (TYPE_PRODUCTS, 'Products'),
-        (TYPE_TAXES, 'Taxes'),
-        (TYPE_CURRENCIES, 'Currencies'),
-        (TYPE_IMAGES, 'Images'),
-    ]
-
-    STATUS_FAILED = 'failed'
-    STATUS_PROCESSING = 'processing'
-    STATUS_SUCCESS = 'success'
-
-    STATUS_CHOICES = [
-        (STATUS_FAILED, 'Failed'),
-        (STATUS_PROCESSING, 'Processing'),
-        (STATUS_SUCCESS, 'Success'),
-    ]
-
     sales_channel = models.ForeignKey(SalesChannel, on_delete=models.CASCADE)
-    type = models.CharField(max_length=50, choices=TYPE_CHOICES)
-    percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0, help_text="Percentage of the import process completed.")
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_FAILED)
-    error_traceback = models.TextField(null=True, blank=True, help_text="Stores the error traceback if the import fails.")
 
     def __str__(self):
-        return f"ImportProcess {self.type} for {self.sales_channel} - {self.get_status_display()}"
+        return f"{self.sales_channel} - {self.get_status_display()}"
 
-class ImportableModel(PolymorphicModel, models.Model):
-    """
-    Abstract model for representing importable data with a reference to raw data and the import process.
-    """
-
-    raw_data = models.JSONField(help_text="The raw data being imported.")
-    import_process = models.ForeignKey(ImportProcess, on_delete=models.CASCADE)
-
-    class Meta:
-        abstract = True
 
 class ImportProperty(ImportableModel):
     """

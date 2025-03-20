@@ -9,7 +9,7 @@ from properties.signals import product_properties_rule_configurator_updated
 from sales_prices.models import SalesPriceListItem
 from sales_prices.signals import price_changed
 from .integrations.magento2.models import MagentoProduct
-from .models import ImportProcess
+# from .models import ImportProcess
 from .models.sales_channels import SalesChannelViewAssign
 from .signals import (
     create_remote_property,
@@ -27,13 +27,13 @@ from django.dispatch import receiver
 from properties.models import Property, PropertyTranslation, PropertySelectValueTranslation, PropertySelectValue, ProductProperty, \
     ProductPropertyTextTranslation
 
-@receiver(post_create, sender=ImportProcess)
-def import_process_post_create_receiver(sender, instance: ImportProcess, created, **kwargs):
-
-    sales_channel = instance.sales_channel
-    if not sales_channel.first_import_complete:
-        sales_channel.first_import_complete = True
-        sales_channel.save(update_fields=['first_import_complete'])
+# @receiver(post_create, sender=ImportProcess)
+# def import_process_post_create_receiver(sender, instance: ImportProcess, created, **kwargs):
+#
+#     sales_channel = instance.sales_channel
+#     if not sales_channel.first_import_complete:
+#         sales_channel.first_import_complete = True
+#         sales_channel.save(update_fields=['first_import_complete'])
 
 @receiver(post_update, sender=MagentoProduct)
 def syncing_current_percentage_real_time_sync__post_update_receiver(sender, instance, **kwargs):

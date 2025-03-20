@@ -5,15 +5,15 @@ from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from currencies.schema.types.types import CurrencyType
 from products.schema.types.types import ProductType
 
-from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
-from .filters import ImportCurrencyFilter, ImportImageFilter, ImportProcessFilter, ImportProductFilter, \
+from sales_channels.models import ImportCurrency, ImportImage, SalesChannelImport, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
+from .filters import ImportCurrencyFilter, ImportImageFilter, SalesChannelImportFilter, ImportProductFilter, \
     ImportPropertyFilter, ImportPropertySelectValueFilter, ImportVatFilter, RemoteCategoryFilter, RemoteCurrencyFilter, \
     RemoteCustomerFilter, RemoteImageFilter, RemoteImageProductAssociationFilter, RemoteInventoryFilter, \
     RemoteLogFilter, RemoteOrderFilter, RemotePriceFilter, RemoteProductFilter, RemoteProductContentFilter, \
     RemoteProductPropertyFilter, RemotePropertyFilter, RemotePropertySelectValueFilter, RemoteVatFilter, \
     SalesChannelFilter, SalesChannelIntegrationPricelistFilter, SalesChannelViewFilter, SalesChannelViewAssignFilter, \
     RemoteLanguageFilter
-from .ordering import ImportCurrencyOrder, ImportImageOrder, ImportProcessOrder, ImportProductOrder, \
+from .ordering import ImportCurrencyOrder, ImportImageOrder, SalesChannelImportOrder, ImportProductOrder, \
     ImportPropertyOrder, ImportPropertySelectValueOrder, ImportVatOrder, RemoteCategoryOrder, RemoteCurrencyOrder, \
     RemoteCustomerOrder, RemoteImageOrder, RemoteImageProductAssociationOrder, RemoteInventoryOrder, RemoteLogOrder, \
     RemoteOrderOrder, RemotePriceOrder, RemoteProductOrder, RemoteProductContentOrder, RemoteProductPropertyOrder, \
@@ -36,8 +36,8 @@ class ImportImageType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
 
 
-@type(ImportProcess, filters=ImportProcessFilter, order=ImportProcessOrder, pagination=True, fields='__all__')
-class ImportProcessType(relay.Node, GetQuerysetMultiTenantMixin):
+@type(SalesChannelImport, filters=SalesChannelImportFilter, order=SalesChannelImportOrder, pagination=True, fields='__all__')
+class SalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
 
 
