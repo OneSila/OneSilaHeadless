@@ -1,7 +1,7 @@
 from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field
 from strawberry_django.fields.types import DjangoImageType
 from strawberry.relay.utils import to_base64
-from typing import List
+from typing import List, Optional
 
 from media.models import Media, Image, Video, MediaProductThrough, File
 
@@ -19,7 +19,7 @@ class MediaType(relay.Node, GetQuerysetMultiTenantMixin):
     image_web_url: str | None
     file_url: str | None
     onesila_thumbnail_url: str | None
-    owner: MultiTenantUserType
+    owner: Optional[MultiTenantUserType]
 
     @field()
     def proxy_id(self, info) -> str:
@@ -41,17 +41,17 @@ class ImageType(relay.Node, GetQuerysetMultiTenantMixin):
     image_web_url: str | None
     image_url: str | None
     onesila_thumbnail_url: str | None
-    owner: MultiTenantUserType
+    owner: Optional[MultiTenantUserType]
 
 
 @type(Video, filters=VideoFilter, order=VideoOrder, pagination=True, fields="__all__")
 class VideoType(relay.Node, GetQuerysetMultiTenantMixin):
-    owner: MultiTenantUserType
+    owner: Optional[MultiTenantUserType]
 
 
 @type(File, filters=FileFilter, order=FileOrder, pagination=True, fields="__all__")
 class FileType(relay.Node, GetQuerysetMultiTenantMixin):
-    owner: MultiTenantUserType
+    owner: Optional[MultiTenantUserType]
     file_url: str | None
 
 

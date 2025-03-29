@@ -85,16 +85,6 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     def remote_url(self):
         return f"{self.sales_channel_view.url}{self.product.url_key}.html"
 
-    def create_clean(self):
-
-        if self.product.inspector.has_missing_information:
-            raise ValidationError(f"Cannot assign product '{self.product}' to sales channel view because it is having missing informations..")
-
-    def save(self, *args, **kwargs):
-        if not self.pk:
-            self.create_clean()
-        super().save(*args, **kwargs)
-
 class RemoteLanguage(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the remote mirror of a Language.

@@ -1,0 +1,705 @@
+import math
+from decimal import Decimal
+from typing import Optional
+
+from django.core.exceptions import ValidationError
+from magento.models import ProductAttribute, AttributeOption, AttributeSet
+from core.helpers import clean_json_data
+from currencies.models import Currency
+from imports_exports.factories.imports import ImportMixin
+from imports_exports.factories.products import ImportProductInstance
+from imports_exports.factories.properties import ImportPropertyInstance, ImportPropertySelectValueInstance, \
+    ImportProductPropertiesRuleInstance, ImportProductPropertiesRuleItemInstance
+from products.models import Product
+from properties.models import Property, PropertySelectValue, ProductPropertiesRuleItem, ProductPropertiesRule
+from sales_channels.integrations.magento2.constants import PROPERTY_FRONTEND_INPUT_MAP
+from sales_channels.integrations.magento2.factories.imports.properties import ImportMagentoProductPropertiesRuleInstance
+from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin
+from sales_channels.integrations.magento2.models import MagentoProperty, MagentoPropertySelectValue, \
+    MagentoAttributeSetImport, MagentoProduct, MagentoSalesChannelView
+from sales_channels.integrations.magento2.models.products import MagentoEanCode, MagentoPrice, MagentoProductContent, \
+    MagentoImageProductAssociation
+from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet, MagentoProductProperty
+from sales_channels.models import ImportProperty, ImportPropertySelectValue, ImportProduct, SalesChannelViewAssign
+from django.contrib.contenttypes.models import ContentType
+from magento.models import Product as MagentoApiProduct
+from magento.models import ConfigurableProduct as MagentoApiConfigurableProduct
+
+from sales_channels.models.products import RemoteProductConfigurator
+
+
+class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
+    import_properties = True
+    import_select_values = True
+    import_rules = True
+    import_products = True
+
+    def __init__(self, import_process, sales_channel, language=None):
+        super().__init__(import_process, language)
+
+        self.sales_channel = sales_channel
+        self.api = self.get_api()
+
+        self.remote_local_property_map = {}
+
+    def prepare_import_process(self):
+
+        # get properties
+        self.properties = ImportProperty.objects.filter(import_process=self.import_process)
+        self.select_values = []
+
+        # get select values
+        properties_to_import = []
+        for p in self.properties:
+            if p.raw_data['frontend_input'] in [ProductAttribute.SELECT, ProductAttribute.MULTISELECT]:
+                properties_to_import.append(p.raw_data['attribute_code'])
+
+        properties_string = ",".join(properties_to_import)
+        api_properties = self.api.product_attributes.add_criteria(
+            field="attribute_code",
+            value=properties_string,
+            condition="in").all_in_memory()
+
+        for property in api_properties:
+            for option in property.options:
+                self.select_values.append(option)
+
+        self.rules = self.api.product_attribute_set.all_in_memory()
+
+    def get_total_instances(self):
+        properties_cnt = self.properties.count()
+        return properties_cnt + len(self.select_values) + len(self.rules) + properties_cnt
+
+    def get_properties_data(self):
+        return self.properties
+
+    def get_structured_property_data(self, property_data: ImportProperty):
+        reversed_frontend_input_map = {
+            value: key
+            for key, value in PROPERTY_FRONTEND_INPUT_MAP.items()
+        }
+        reversed_frontend_input_map['weight'] = Property.TYPES.FLOAT
+
+        raw = property_data.raw_data
+        structured = {}
+
+        structured['internal_name'] = raw.get('attribute_code')
+        structured['name'] = raw.get('default_frontend_label')
+        structured['is_public_information'] = True
+        structured['add_to_filters'] = bool(int(raw.get('is_filterable', False)))
+
+        # Try to detect type from frontend_input
+        frontend_input = raw.get('frontend_input')
+        if frontend_input in reversed_frontend_input_map:
+            structured['type'] = reversed_frontend_input_map[frontend_input]
+
+        property_data.structured_data = structured
+        return property_data
+
+    def get_final_property_data_from_log(self, log_instance: ImportProperty):
+        return log_instance.structured_data
+
+    def update_property_import_instance(self, import_instance: ImportPropertyInstance):
+        import_instance.prepare_mirror_model_class(
+            mirror_model_class=MagentoProperty,
+            sales_channel=self.sales_channel,
+            mirror_model_map={
+                "attribute_code": "internal_name",
+                "local_instance": "*"
+            }
+        )
+
+    def update_property_log_instance(self, log_instance: ImportProperty, import_instance: ImportPropertyInstance):
+        mirror_property = import_instance.remote_instance
+
+        log_instance.successfully_imported = True
+        log_instance.content_type = ContentType.objects.get_for_model(import_instance.instance)
+        log_instance.object_id = import_instance.instance.pk
+
+        if mirror_property:
+            log_instance.remote_property = mirror_property
+
+        log_instance.save()
+
+        if mirror_property and not mirror_property.remote_id:
+            mirror_property.remote_id = log_instance.raw_data['attribute_id']
+            mirror_property.save()
+
+        self.remote_local_property_map[log_instance.raw_data['attribute_code']] = {
+            "local": import_instance.instance,
+            "remote": mirror_property
+        }
+
+    def get_select_values_data(self):
+        return self.select_values
+
+    def get_structured_select_value_data(self, value_data: AttributeOption):
+
+        structured_data = {
+            'value': value_data.label,
+        }
+
+        log_instance = ImportPropertySelectValue.objects.create(
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            raw_data=value_data.data,
+            import_process=self.import_process,
+            structured_data=structured_data
+        )
+
+        return log_instance
+
+    def get_final_select_value_data_from_log(self, log_instance: ImportPropertySelectValue):
+        return log_instance.structured_data
+
+    def get_select_value_property_instance(self, log_instance: ImportPropertySelectValue, value_data: AttributeOption):
+        property_map = self.remote_local_property_map.get(value_data.attribute.attribute_code, {})
+        return property_map.get('local', None)
+
+    def update_property_select_value_import_instance(self, import_instance: ImportPropertySelectValueInstance,
+                                                     value_data: AttributeOption):
+        property_map = self.remote_local_property_map.get(value_data.attribute.attribute_code, {})
+        remote_property = property_map.get('remote', None)
+
+        import_instance.prepare_mirror_model_class(
+            mirror_model_class=MagentoPropertySelectValue,
+            sales_channel=self.sales_channel,
+            mirror_model_map={
+                "local_instance": "*",
+            },
+            mirror_model_defaults={
+                "remote_property": remote_property
+            }
+        )
+
+    def update_select_value_log_instance(self, log_instance: ImportPropertySelectValue,
+                                         import_instance: ImportPropertySelectValueInstance):
+        mirror_property_select_value = import_instance.remote_instance
+
+        log_instance.successfully_imported = True
+        log_instance.content_type = ContentType.objects.get_for_model(import_instance.instance)
+        log_instance.object_id = import_instance.instance.pk
+
+        if mirror_property_select_value:
+            log_instance.remote_property_value = mirror_property_select_value
+
+        log_instance.save()
+
+        if mirror_property_select_value and not mirror_property_select_value.remote_id:
+            mirror_property_select_value.remote_id = log_instance.raw_data['value']
+            mirror_property_select_value.save()
+
+    def import_rules_process(self):
+        for rule_data in self.rules:
+            log_instance, items = self.get_structured_rule_data(rule_data)
+
+            structured_data = log_instance.structured_data.copy()
+            structured_data["items"] = items
+
+            import_instance = ImportMagentoProductPropertiesRuleInstance(
+                structured_data,
+                self.import_process,
+                sales_channel=self.sales_channel
+            )
+
+            import_instance.process()
+            self.update_percentage()
+            self.update_rule_log_instance(log_instance, import_instance, rule_data)
+
+    def build_items_data(self, rule_data):
+        structured_items = []
+        real_items = []
+
+        for magento_attribute in rule_data.get_attributes():
+            attr_code = magento_attribute.attribute_code
+            if attr_code in self.remote_local_property_map:
+                property_instance = self.remote_local_property_map[attr_code]["local"]
+
+                structured_items.append({
+                    "property": property_instance.internal_name
+                })
+
+                real_items.append({
+                    "property": property_instance
+                })
+
+        return structured_items, real_items
+
+    def get_structured_rule_data(self, rule_data: AttributeSet):
+        structured_items, real_items = self.build_items_data(rule_data)
+
+        structured_data = {
+            'value': rule_data.attribute_set_name,
+            'items': structured_items,
+        }
+
+        log_instance = MagentoAttributeSetImport.objects.create(
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            import_process=self.import_process,
+            raw_data=rule_data.data,
+            structured_data=structured_data
+        )
+
+        return log_instance, real_items
+
+    def update_rule_log_instance(self, log_instance: MagentoAttributeSetImport,
+                                 import_instance: ImportProductPropertiesRuleInstance, rule_data: AttributeSet):
+
+        mirror_rule_value = import_instance.remote_instance
+
+        log_instance.successfully_imported = True
+        log_instance.content_type = ContentType.objects.get_for_model(import_instance.instance)
+        log_instance.object_id = import_instance.instance.pk
+
+        if mirror_rule_value:
+            log_instance.remote_attribute_set = mirror_rule_value
+
+        log_instance.save()
+
+        if mirror_rule_value:
+            to_save = False
+            if not mirror_rule_value.remote_id:
+                mirror_rule_value.remote_id = rule_data.attribute_set_id
+                to_save = True
+
+            if not mirror_rule_value.group_remote_id:
+                group = rule_data.get_or_create_group_by_name('OneSila')
+                mirror_rule_value.group_remote_id = group.attribute_group_id
+                to_save = True
+
+            if to_save:
+                mirror_rule_value.save()
+
+
+    def get_product_translations(self, product: MagentoApiProduct):
+        # @TODO: THIS NEED TO BE MULTI LINGUAL
+        return [{
+            "name": product.name,
+            "short_description": product.short_description,
+            "description": product.description,
+            "url_key": product.url_key,
+        }]
+
+    def get_product_images(self, product: MagentoApiProduct):
+        images = []
+        image_id_map = {}
+
+        for index, image_entry in enumerate(product.media_gallery_entries):
+            image_data = {
+                "image_url": image_entry.link,
+                "sort_order": image_entry.position
+            }
+
+            if image_entry.is_thumbnail:
+                image_data['is_main_image'] = True
+
+            images.append(image_data)
+            image_id_map[str(index)] = image_entry.id
+
+        return images, image_id_map
+
+    def get_product_attributes(self, custom_attributes: dict):
+        attributes = []
+        mirror_map = {}
+        accepted_properties = self.remote_local_property_map.keys()
+
+        for attribute_code in accepted_properties:
+            if attribute_code in custom_attributes:
+                magento_value = custom_attributes[attribute_code]
+                value = magento_value
+                value_is_id = False
+                property = self.remote_local_property_map[attribute_code]["local"]
+                magento_property = self.remote_local_property_map[attribute_code]["remote"]
+
+                if property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
+                    value_is_id = True
+
+                    if property.type == Property.TYPES.SELECT:
+
+                        magento_select_value = MagentoPropertySelectValue.objects.get(
+                            sales_channel=self.sales_channel,
+                            multi_tenant_company=self.import_process.multi_tenant_company,
+                            remote_property=magento_property,
+                            remote_id=magento_value
+                        )
+                        value = magento_select_value.local_instance.id
+                    else:
+                        select_values_ids = magento_value.split(',')
+                        select_values = PropertySelectValue.objects.filter(
+                            remotepropertyselectvalue__sales_channel=self.sales_channel,
+                            remotepropertyselectvalue__remote_property=magento_property,
+                            remotepropertyselectvalue__remote_id__in=select_values_ids
+                        )
+                        value = select_values.values_list('id', flat=True)
+
+                attribute_data = {
+                    "value": value,
+                    "value_is_id": value_is_id,
+                    "property": property,
+                }
+                attributes.append(attribute_data)
+
+                mirror_map[property.id] = {
+                    "remote_property": magento_property,
+                    "remote_value": str(magento_value),
+                }
+
+        return attributes, mirror_map
+
+    def get_product_prices(self, product: MagentoApiProduct):
+        # @TODO: HOW WE GET VAT RATE FROM MAGENTO PRODUCT?
+        currency = Currency.objects.get(
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            is_default_currency=True
+        )
+        return [{
+            "price": product.special_price,
+            "rrp": product.price,
+            "currency": currency.iso_code,
+        }]
+
+    def get_product_variations(self, product: MagentoApiProduct, rule: ProductPropertiesRule):
+        variations = []
+        sku_to_id_map = {}
+
+        for child in product.get_children():
+            variation_data = self.get_product_data(child, rule, is_variation=True)
+            variations.append({
+                "variation_data": variation_data,
+            })
+            sku_to_id_map[variation_data['sku']] = {
+                "id": child.id,
+                "sku": child.sku,
+            }
+
+        return variations, sku_to_id_map
+
+    def sync_configurator_rule_items(self, product: MagentoApiProduct, rule):
+        configurable_prod = MagentoApiConfigurableProduct(product=product, client=self.api)
+
+        for option in configurable_prod.options:
+            property = Property.objects.filter(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                remoteproperty__sales_channel=self.sales_channel,
+                remoteproperty__remote_id=option['attribute_id']
+            ).first()
+
+            if property:
+                rule_item_import_instance = ImportProductPropertiesRuleItemInstance(
+                    data={"type": ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR},
+                    import_process=self.import_process,
+                    rule=rule,
+                    property=property,
+                )
+                rule_item_import_instance.process()
+
+    def get_product_ean_code(self, custom_attributes: dict) -> Optional[str]:
+        """
+        Returns the EAN code from custom_attributes if present and syncing is enabled.
+        """
+        if self.sales_channel.sync_ean_codes:
+            ean_code_key = self.sales_channel.ean_code_attribute
+            if ean_code_key in custom_attributes:
+                return custom_attributes[ean_code_key]
+        return None
+
+    def normalize_sku_for_variation(self, product: MagentoApiProduct, is_variation: bool) -> str:
+        """
+        If product is a variation and SKU starts with one of the configurable SKUs + '-', normalize it.
+        """
+        if is_variation:
+            for config_sku in self.configurable_skus:
+                prefix = f"{config_sku}-"
+                if product.sku.startswith(prefix):
+                    return product.sku[len(prefix):]
+        return product.sku
+
+    def get_product_data(self, product: MagentoApiProduct, rule: ProductPropertiesRule, is_variation: Optional[bool] = False):
+        type_map = {
+            MagentoApiProduct.PRODUCT_TYPE_SIMPLE: Product.SIMPLE,
+            MagentoApiProduct.PRODUCT_TYPE_CONFIGURABLE: Product.CONFIGURABLE,
+        }
+
+        product_type = type_map.get(product.type_id, Product.SIMPLE)
+        custom_attributes = product.custom_attributes
+
+        structured_data = {
+            "name": product.name,
+            "sku": self.normalize_sku_for_variation(product, is_variation),
+            "type": product_type,
+            "active": bool(product.status),
+            "allow_backorder": product.backorders,
+        }
+
+
+
+        ean_code = self.get_product_ean_code(custom_attributes)
+        if ean_code:
+            structured_data['ean_code'] = ean_code
+
+        structured_data['translations'] = self.get_product_translations(product)
+        structured_data['images'], structured_data['__image_index_to_remote_id'] = self.get_product_images(product)
+
+        if product_type == Product.SIMPLE:
+            structured_data['attributes'], structured_data['__mirror_product_properties_map'] = self.get_product_attributes(custom_attributes)
+            structured_data['prices'] = self.get_product_prices(product)
+        elif product_type == Product.CONFIGURABLE:
+            structured_data['variations'], structured_data['__variation_sku_to_id_map'] = self.get_product_variations(product, rule)
+            self.sync_configurator_rule_items(product, rule)
+
+        return structured_data
+
+    def create_log_instance(self, import_instance: ImportProductInstance, structured_data: dict):
+
+        log_instance = ImportProduct.objects.create(
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            import_process=self.import_process,
+            remote_product=import_instance.remote_instance,
+            raw_data=clean_json_data(import_instance.data),
+            structured_data=clean_json_data(structured_data),
+            successfully_imported=True
+        )
+
+        log_instance.content_type = ContentType.objects.get_for_model(import_instance.instance)
+        log_instance.object_id = import_instance.instance.pk
+
+    def handle_vat_rate(self, import_instance, product):
+        # @TODO: when we find out how to import the vat
+        pass
+
+    def handle_ean_code(self, import_instance: ImportProductInstance):
+
+        if hasattr(import_instance, 'ean_code'):
+            MagentoEanCode.objects.get_or_create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                remote_product=import_instance.remote_instance,
+                ean_code=import_instance.ean_code
+            )
+
+
+    def handle_attributes(self, import_instance: ImportProductInstance):
+        if hasattr(import_instance, 'attributes'):
+            product_properties = import_instance.product_property_instances
+            remote_product = import_instance.remote_instance
+            mirror_map = import_instance.data.get('__mirror_product_properties_map', {})
+
+            for product_property in product_properties:
+                mirror_data = mirror_map.get(product_property.property.id)
+
+                if not mirror_data:
+                    continue  # skip if we didn't get original remote context
+
+                remote_property = mirror_data["remote_property"]
+                remote_value = mirror_data["remote_value"]
+
+                remote_product_property, _ = MagentoProductProperty.objects.get_or_create(
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    local_instance=product_property,
+                    remote_product=remote_product,
+                    remote_property=remote_property,
+                )
+
+                if not remote_product_property.remote_value:
+                    remote_product_property.remote_value = remote_value
+                    remote_product_property.save()
+
+
+    def handle_prices(self, import_instance: ImportProductInstance):
+        if hasattr(import_instance, 'prices'):
+
+            full_price, discounted_price = import_instance.instance.get_price_for_sales_channel(self.sales_channel)
+
+            if full_price is not None:
+                full_price = Decimal(full_price)
+            if discounted_price is not None:
+                discounted_price = Decimal(discounted_price)
+
+            # @TODO: THIS SHOULD BE MULTICURRENCY
+            for price in import_instance.prices:
+                magento_price, _ = MagentoPrice.objects.get_or_create(
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    remote_product=import_instance.remote_instance,
+                )
+
+                magento_price.price = full_price
+                magento_price.discount_price = discounted_price
+                magento_price.save()
+
+
+    def handle_translations(self, import_instance: ImportProductInstance):
+        if hasattr(import_instance, 'translations'):
+            MagentoProductContent.objects.get_or_create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                remote_product=import_instance.remote_instance,
+            )
+
+    def handle_images(self, import_instance: ImportProductInstance):
+        if hasattr(import_instance, 'images'):
+            remote_id_map = import_instance.data.get('__image_index_to_remote_id', {})
+
+            index = 0
+            for image_ass in import_instance.images_associations_instances:
+                magento_image_association, _ = MagentoImageProductAssociation.objects.get_or_create(
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    local_instance=image_ass,
+                    remote_product=import_instance.remote_instance,
+                )
+
+                remote_id = remote_id_map.get(str(index))
+                if remote_id and not magento_image_association.remote_id:
+                    magento_image_association.remote_id = remote_id
+                    magento_image_association.save()
+
+                index+= 1
+
+    def handle_variations(self, import_instance: ImportProductInstance, rule: ProductPropertiesRule):
+        if hasattr(import_instance, 'variations'):
+            variation_id_map = import_instance.data.get('__variation_sku_to_id_map', {})
+            remote_product = import_instance.remote_instance
+            variations = import_instance.variations_products_instances
+
+            for product in variations:
+                info_map = variation_id_map.get(product.sku, {})
+                remote_sku = info_map.get('sku', None)
+                remote_id = info_map.get('id', None)
+
+                if remote_sku and remote_id:
+                    print('-----------------------------------------------------__REMOTE SKU')
+                    print(f"{product.sku}: {remote_sku}")
+
+                    magento_product, _ = MagentoProduct.objects.get_or_create(
+                        multi_tenant_company=self.import_process.multi_tenant_company,
+                        sales_channel=self.sales_channel,
+                        local_instance=product,
+                        remote_sku=remote_sku,
+                        is_variation=True
+                    )
+
+                    magento_product.remote_parent_product = remote_product
+                    magento_product.remote_id = remote_id
+                    magento_product.save()
+
+
+            if hasattr(remote_product, 'configurator'):
+                configurator = remote_product.configurator
+                configurator.update_if_needed(rule=rule, variations=variations, send_sync_signal=False)
+            else:
+                RemoteProductConfigurator.objects.create_from_remote_product(
+                    remote_product=import_instance.remote_instance,
+                    rule=rule,
+                    variations=variations,
+                )
+
+
+    def handle_sales_channels_views(self, import_instance: ImportProductInstance, product: MagentoApiProduct):
+        sales_channel_views = MagentoSalesChannelView.objects.filter(
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id__in=product.views
+        )
+
+        for sales_channel_view in sales_channel_views:
+            SalesChannelViewAssign.objects.get_or_create(
+                product=import_instance.instance,
+                sales_channel_view=sales_channel_view,
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                remote_product=import_instance.remote_instance,
+                sales_channel=self.sales_channel,
+            )
+
+
+    def update_remote_product(self, import_instance: ImportProductInstance, product: MagentoApiProduct, is_variation: bool):
+        remote_product = import_instance.remote_instance
+
+        if not remote_product.remote_id:
+            remote_product.remote_id = product.id
+
+        if remote_product.syncing_current_percentage != 100:
+            remote_product.syncing_current_percentage = 100
+
+        remote_product.save()
+
+    def get_product_rule(self, product: MagentoApiProduct):
+        magento_rule = MagentoAttributeSet.objects.get(
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id=product.attribute_set_id
+        )
+        return magento_rule.local_instance
+
+    def is_magento_variation(self, product: MagentoApiProduct) -> bool:
+        is_variation = product.visibility == MagentoApiProduct.VISIBILITY_NOT_VISIBLE and product.type_id == MagentoApiProduct.PRODUCT_TYPE_SIMPLE
+
+        if product.type_id == MagentoApiProduct.PRODUCT_TYPE_CONFIGURABLE:
+            self.configurable_skus.add(product.sku)
+
+        return is_variation
+
+
+    def import_products_process(self):
+        products_api = self.api.products
+        products_api.clear_pagination()
+        products_api.per_page = 200
+
+        # Fetch first page
+        product_batch = products_api.execute_search()
+        self.configurable_skus = set()
+
+        while True:
+            if not product_batch:
+                break
+
+            if not isinstance(product_batch, list):
+                product_batch = [product_batch]
+
+            batch_size = len(product_batch)
+            self.total_import_instances_cnt += batch_size
+            self.set_threshold_chunk()
+
+            for product in product_batch:
+
+                is_variation = self.is_magento_variation(product)
+                rule = self.get_product_rule(product)
+                structured_data = self.get_product_data(product, rule, is_variation=is_variation)
+                product_import_instance = ImportProductInstance(
+                    data=structured_data,
+                    import_process=self.import_process,
+                    rule=rule,
+                )
+
+                product_import_instance.prepare_mirror_model_class(
+                    mirror_model_class=MagentoProduct,
+                    sales_channel=self.sales_channel,
+                    mirror_model_map={
+                        "local_instance": "*",
+                    },
+                    mirror_model_defaults={
+                        "remote_sku": structured_data['sku'],
+                    }
+                )
+
+                product_import_instance.process()
+
+                self.update_remote_product(product_import_instance, product, is_variation)
+                self.create_log_instance(product_import_instance, structured_data)
+                self.handle_vat_rate(product_import_instance, product)
+                self.handle_ean_code(product_import_instance)
+                self.handle_attributes(product_import_instance)
+                self.handle_translations(product_import_instance)
+                self.handle_prices(product_import_instance)
+                self.handle_images(product_import_instance)
+                self.handle_variations(product_import_instance, rule)
+
+                if not is_variation:
+                    self.handle_sales_channels_views(product_import_instance, product)
+
+                self.update_percentage()
+
+            try:
+                product_batch = products_api.next()
+            except ValueError:
+                break

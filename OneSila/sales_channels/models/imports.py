@@ -25,7 +25,7 @@ class ImportProperty(ImportableModel):
     Model representing the import process for properties.
     """
 
-    remote_property = models.ForeignKey(RemoteProperty, on_delete=models.CASCADE)
+    remote_property = models.ForeignKey(RemoteProperty, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return f"ImportProperty for {self.remote_property}"
@@ -35,7 +35,7 @@ class ImportPropertySelectValue(ImportableModel):
     Model representing the import process for property select values.
     """
 
-    remote_property_value = models.ForeignKey(RemotePropertySelectValue, on_delete=models.CASCADE)
+    remote_property_value = models.ForeignKey(RemotePropertySelectValue, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return f"ImportPropertySelectValue for {self.remote_property_value}"
@@ -45,10 +45,11 @@ class ImportProduct(ImportableModel):
     Model representing the import process for products.
     """
 
-    remote_product = models.ForeignKey(RemoteProduct, on_delete=models.CASCADE)
+    remote_product = models.ForeignKey(RemoteProduct, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return f"ImportProduct for {self.remote_product}"
+
 
 class ImportVat(ImportableModel):
     """
@@ -60,6 +61,7 @@ class ImportVat(ImportableModel):
     def __str__(self):
         return f"ImportVat for {self.remote_vat}"
 
+
 class ImportCurrency(ImportableModel):
     """
     Model representing the import process for currencies.
@@ -69,6 +71,7 @@ class ImportCurrency(ImportableModel):
 
     def __str__(self):
         return f"ImportCurrency for {self.remote_currency}"
+
 
 class ImportImage(ImportableModel):
     """

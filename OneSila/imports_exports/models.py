@@ -26,7 +26,7 @@ class Import(PolymorphicModel, models.Model):
     status = models.CharField(
         max_length=10,
         choices=STATUS_CHOICES,
-        default=STATUS_FAILED
+        default=STATUS_PROCESSING
     )
     error_traceback = models.TextField(
         null=True,

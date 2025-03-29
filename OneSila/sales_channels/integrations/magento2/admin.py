@@ -3,7 +3,7 @@ from polymorphic.admin import PolymorphicChildModelAdmin
 
 from .models import MagentoSalesChannel, MagentoProperty, MagentoPropertySelectValue, MagentoSalesChannelView, MagentoOrder, MagentoOrderItem, \
     MagentoProduct, MagentoProductProperty, MagentoImageProductAssociation, MagentoProductContent
-from .models.products import MagentoEanCode
+from .models.products import MagentoEanCode, MagentoPrice
 from .models.properties import MagentoAttributeSet, MagentoAttributeSetAttribute
 from .models.sales_channels import MagentoRemoteLanguage
 from .models.taxes import MagentoCurrency
@@ -78,6 +78,11 @@ class MagentoProductAdmin(admin.ModelAdmin):
 @admin.register(MagentoProductContent)
 class MagentoProductContentAdmin(admin.ModelAdmin):
     pass
+
+@admin.register(MagentoPrice)
+class MagentoPriceAdmin(admin.ModelAdmin):
+    pass
+
 
 @admin.register(MagentoEanCode)
 class MagentoEanCodeAdmin(admin.ModelAdmin):

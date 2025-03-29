@@ -1,23 +1,47 @@
-import abc
-
+from datetime import datetime
+from types import SimpleNamespace
 from imports_exports.factories.mixins import ImportOperationMixin, AbstractImportInstance
 from llm.factories.property_type_detector import DetectPropertyTypeLLM
-from properties.models import Property, PropertyTranslation
+from properties.models import Property, PropertyTranslation, PropertySelectValue, PropertySelectValueTranslation, \
+    ProductPropertiesRule, ProductPropertiesRuleItem, ProductProperty, ProductPropertyTextTranslation
 
 
-class ImportUsingInternalName(ImportOperationMixin):
-    local_class = Property
-    local_translation_class = PropertyTranslation
+class PropertyImportUsingInternalName(ImportOperationMixin):
     get_identifiers = ['internal_name', 'type']
 
 
-class ImportUsingTranslationName(ImportOperationMixin):
-    local_class = Property
-    local_translation_class = PropertyTranslation
+class PropertyImportUsingTranslationName(ImportOperationMixin):
     get_using_translation = True
     translation_get_value = 'property'
-    get_identifiers = ['name', 'property__type']
+    get_identifiers = ['type']
+    get_translation_identifiers = ['name']
 
+
+class PropertySelectValueImport(ImportOperationMixin):
+    get_using_translation = True
+    allow_edit = False
+    translation_get_value = 'propertyselectvalue'
+    get_identifiers = ['property']
+    get_translation_identifiers = ['value', 'propertyselectvalue__property']
+
+
+class ProductPropertiesRuleImport(ImportOperationMixin):
+    get_identifiers = ['product_type']
+
+
+class ProductPropertiesRuleItemImport(ImportOperationMixin):
+    get_identifiers = ['rule', 'property']
+
+class ProductPropertyImport(ImportOperationMixin):
+    get_identifiers = ['product', 'property']
+
+class TranslatedProductPropertyImport(ImportOperationMixin):
+    get_using_translation = True
+    allow_edit = False
+    allow_translation_edit = True
+    translation_get_value = 'product_property'
+    get_translation_identifiers = ['product_property__product', 'product_property__property']
+    get_identifiers = ['product', 'property']
 
 class ImportPropertyInstance(AbstractImportInstance):
     """
@@ -62,92 +86,542 @@ class ImportPropertyInstance(AbstractImportInstance):
     """
     ALLOWED_TYPES = [choice[0] for choice in Property.TYPES.ALL]
 
-    def __init__(self, data: dict, multi_tenant_company=None):
-        super().__init__(data, multi_tenant_company)
+    def __init__(self, data: dict, import_process=None):
+        super().__init__(data, import_process)
 
-        # Set defaults for optional boolean fields
-        self.data.setdefault('is_public_information', True)
-        self.data.setdefault('add_to_filters', True)
-        self.data.setdefault('has_image', False)
+        # make sure we only use the needed values
+        self.set_field_if_exists('name')
+        self.set_field_if_exists('internal_name')
+        self.set_field_if_exists('type')
+        self.set_field_if_exists('is_public_information')
+        self.set_field_if_exists('add_to_filters')
+        self.set_field_if_exists('has_image')
 
         # First, validate required keys and boolean field types (ignoring 'type').
         self.validate()
 
         # If 'type' is missing or empty, detect it.
-        if not self.data.get('type'):
-            self.data['type'] = self.detect_type()
+        if not hasattr(self, 'type'):
+            self.detect_type()
 
         # Now validate that the property type is one of the allowed types.
         self.validate_type()
 
-    @abc.abstractmethod
+        # initiate the default import factory
+        self.factory_class = PropertyImportUsingTranslationName
+
+    @property
+    def local_class(self):
+        return Property
+
+    @property
+    def local_translation_class(self):
+        return PropertyTranslation
+
+    @property
+    def updatable_fields(self):
+        return ['is_public_information', 'add_to_filters', 'has_image']
+
     def detect_type(self):
         """
         Detects and returns the property type if not provided.
         Concrete implementations must override this method.
         """
         llm = DetectPropertyTypeLLM(self.data, self.multi_tenant_company)
-        self.data['type'] = llm.detect_type()
+        self.type = llm.detect_type()
 
     def validate(self):
         """
         Validates that at least one of 'internal_name' or 'name' is provided
-        and that the boolean fields have boolean values.
+        as an instance attribute and that the boolean fields in updatable_fields
+        have boolean values.
         """
-        if not (self.data.get('internal_name') or self.data.get('name')):
+        if not (hasattr(self, 'internal_name') or hasattr(self, 'name')):
             raise ValueError("Either 'internal_name' or 'name' must be provided.")
-        for key in ['is_public_information', 'add_to_filters', 'is_product_type', 'has_image']:
-            if not isinstance(self.data.get(key), bool):
-                raise ValueError(f"Field '{key}' must be a boolean value.")
+
+        for key in self.updatable_fields:
+            if hasattr(self, key):
+                value = getattr(self, key)
+                if not isinstance(value, bool):
+                    raise ValueError(f"Field '{key}' must be a boolean value.")
 
     def validate_type(self):
         """
-        Validates that the property type is one of the allowed types.
+        Validates that the property type (stored as an attribute 'type') is one of the allowed types.
         """
-        prop_type = self.data.get('type')
+        prop_type = getattr(self, 'type', None)
         if prop_type not in self.ALLOWED_TYPES:
             raise ValueError(
-                f"Invalid property type: {prop_type}. Allowed types are: {self.ALLOWED_TYPES}"
-            )
+                f"Invalid property type: {prop_type}. Allowed types are: {self.ALLOWED_TYPES}")
 
-    def process(self, import_instance):
-        """
-        Processes the validated import data.
 
-        This method chooses which factory to use based on the provided identifiers:
-          - If 'internal_name' is present in the data, use ImportUsingInternalName.
-          - Otherwise, use ImportUsingTranslationName.
-
-        :param import_instance: The import instance (e.g., a SaleChannelImport instance) is mandatory.
-
-        The method then passes the import instance and this instance (as structured data)
-        to the chosen factory, assigns optional mirror and sales channel configuration if provided,
-        calls run(), and finally stores the created/updated instance in self.instance.
-        """
+    def pre_process_logic(self):
         # Decide which factory to use based on the data.
-        if self.data.get('internal_name'):
-            factory_class = ImportUsingInternalName
+        if hasattr(self, 'internal_name'):
+            self.factory_class = PropertyImportUsingInternalName
         else:
-            factory_class = ImportUsingTranslationName
+            self.factory_class = PropertyImportUsingTranslationName
 
-        # Instantiate the factory, providing the mandatory import_instance.
-        fac = factory_class(import_instance, self)
+    def process_logic(self):
 
-        # Pass optional configurations if provided.
-        if self.mirror_model_class is not None:
-            fac.mirror_model_class = self.mirror_model_class
-        if self.mirror_model_map:
-            fac.mirror_model_map = self.mirror_model_map
-        if self.sales_channel_class is not None:
-            fac.sales_channel_class = self.sales_channel_class
-        if self.sales_channel_id is not None:
-            fac.sales_channel_id = self.sales_channel_id
-
-        # Run the factory to process the import.
+        # Instantiate the factory, providing the mandatory import_process.
+        fac = self.factory_class(self, self.import_process)
         fac.run()
 
         # Save the created/updated instance.
         self.instance = fac.instance
 
-    def process_additional(self):
+        if fac.created:
+            self.create_translation()
+
+
+    def create_translation(self):
+
+        name = None
+        if hasattr(self, 'name'):
+            name = self.name
+
+        if name is None and hasattr(self, 'internal_name'):
+            name = self.internal_name.replace('_', ' ').title()
+
+        self.translation = PropertyTranslation.objects.create(
+            multi_tenant_company=self.instance.multi_tenant_company,
+            language=self.language,
+            property=self.instance,
+            name=name,
+        )
+
+
+class ImportPropertySelectValueInstance(AbstractImportInstance):
+    """
+    Import instance for PropertySelectValue.
+
+    Expected data keys:
+      - value: The select value to be imported.
+      - property_data: (Optional) A dict for importing the Property if no property is provided.
+
+    Optionally, if the property already exists, the data may contain a 'property' key.
+    """
+
+    def __init__(self, data: dict, import_process=None, property=None):
+        super().__init__(data, import_process)
+        self.property = property
+
+        self.set_field_if_exists('value')
+        self.set_field_if_exists('property_data')
+
+        self.validate()
+        self._set_property_import_instance()
+
+    @property
+    def local_class(self):
+        return PropertySelectValue
+
+    @property
+    def local_translation_class(self):
+        return PropertySelectValueTranslation
+
+    def validate(self):
+        """
+        Validate that the 'value' key exists.
+        """
+        if not hasattr(self, 'value'):
+            raise ValueError("The 'value' field is required.")
+
+        if not getattr(self, 'property_data', None) and not self.property:
+            raise ValueError("Either a 'property' or 'property_data' must be provided.")
+
+
+    def _set_property_import_instance(self):
+        if not self.property:
+            self.property_import_instance = ImportPropertyInstance(self.property_data, self.import_process)
+
+    def pre_process_logic(self):
+
+        # If the property is not provided, run the property import.
+        if not self.property:
+            self.property_import_instance.process()
+            self.property = self.property_import_instance.instance
+
+        # we need this so our identifier propertyselectvalue__property will work
+        self.propertyselectvalue = SimpleNamespace(property=self.property)
+
+    def process_logic(self):
+        """
+        Processes the select value import.
+
+        - If a Property instance is already provided (via 'property'), use it.
+        - Otherwise, import the Property using 'property_data' via ImportPropertyInstance.
+        - Then, create or update the PropertySelectValue using the provided 'value'.
+        """
+        fac = PropertySelectValueImport(self, self.import_process)
+        fac.run()
+
+        # Save the created/updated instance.
+        self.instance = fac.instance
+
+        if fac.created:
+            self.create_translation()
+
+
+    def create_translation(self):
+
+        self.translation = PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.instance.multi_tenant_company,
+            language=self.language,
+            propertyselectvalue=self.instance,
+            value=self.value
+        )
+
+
+class ImportProductPropertiesRuleInstance(AbstractImportInstance):
+    """
+    Import instance for ProductPropertiesRule.
+
+    Expected data keys:
+      - value: The select value to be imported.
+      - require_ean_code: Optional boolean indicating whether an EAN code is required.
+      - items: Optional the data for
+
+    """
+    def __init__(self, data: dict, import_process=None, product_type=None):
+        super().__init__(data, import_process)
+
+        # an existing Property instance, if provided
+        self.product_type = product_type
+
+        # Set instance attributes only if they exist in the input data.
+        self.set_field_if_exists('value')
+        self.set_field_if_exists('require_ean_code')
+        self.set_field_if_exists('items')
+
+        # Validate required keys:
+        self.validate()
+
+        # we do this here because we will also validate the data on the ImportPropertySelectValueInstance
+        self._set_property_import_instance()
+
+    @property
+    def local_class(self):
+        return ProductPropertiesRule
+
+    @property
+    def updatable_fields(self):
+        return ['require_ean_code']
+
+    def validate(self):
+
+        if not hasattr(self, 'value'):
+            raise ValueError("The 'value' field is required.")
+
+        if hasattr(self, 'items') and not isinstance(self.items, list):
+            raise ValueError("The 'items' field must be a list.")
+
+
+    def _set_property_import_instance(self):
+
+        # If the property is not provided, run the property import.
+        if not self.product_type:
+            product_type_property = Property.objects.get(multi_tenant_company=self.multi_tenant_company,
+                                                         is_product_type=True)
+
+            self.property_select_value_import_instance = ImportPropertySelectValueInstance(data={"value": self.value},
+                                                                import_process=self.import_process,
+                                                                property=product_type_property)
+
+    def pre_process_logic(self):
+
+        # If the property is not provided, run the property import.
+        if not self.product_type:
+            self.property_select_value_import_instance.process()
+            self.product_type = self.property_select_value_import_instance.instance
+
+
+    def process_logic(self):
+        fac = ProductPropertiesRuleImport(self, self.import_process)
+        fac.run()
+
+        self.instance = fac.instance
+
+
+    def before_process_item_logic(self, item_import_instance):
         pass
+
+    def after_process_item_logic(self, instance, remote_instance):
+        pass
+
+
+    def post_process_logic(self):
+
+        if hasattr(self, 'items'):
+
+            for item_data in self.items:
+                item_import_instance = ImportProductPropertiesRuleItemInstance(data=item_data,
+                                                                               import_process=self.import_process,
+                                                                               rule=self.instance)
+                self.before_process_item_logic(item_import_instance)
+                item_import_instance.process()
+                self.after_process_item_logic(item_import_instance.instance, item_import_instance.remote_instance)
+
+
+class ImportProductPropertiesRuleItemInstance(AbstractImportInstance):
+    """
+    Import instance for ProductPropertiesRuleItem.
+
+    Expected data keys:
+      - type: The rule type (e.g., REQUIRED_IN_CONFIGURATOR, OPTIONAL_IN_CONFIGURATOR, REQUIRED, OPTIONAL).
+      - sort_order: (Optional) The sort order for the rule item.
+
+    Optionally, a 'rule' or a 'property' may be provided externally.
+    """
+    def __init__(self, data: dict, import_process=None, rule=None, property=None):
+        super().__init__(data, import_process)
+        self.rule = rule
+        self.property = property
+
+        # For 'type', default to ProductPropertiesRuleItem.OPTIONAL if not provided.
+        self.set_field_if_exists('type', default_value=ProductPropertiesRuleItem.OPTIONAL)
+        self.set_field_if_exists('sort_order')
+        self.set_field_if_exists('rule_data')
+        self.set_field_if_exists('property_data')
+
+        if self.property is None:
+            # we might want to add the property directly into data because most of the times the items will be created
+            # in bulk
+            self.set_field_if_exists('property')
+
+        self.validate()
+
+        # this will also do validation
+        self._set_import_instances()
+
+
+    @property
+    def local_class(self):
+        return ProductPropertiesRuleItem
+
+    @property
+    def updatable_fields(self):
+        return ['sort_order', 'type']
+
+    def validate(self):
+
+        allowed_types = [rule[0] for rule in ProductPropertiesRuleItem.RULE_TYPES]
+        if self.type not in allowed_types:
+            raise ValueError(f"Invalid rule type: {self.type}. Allowed types are: {allowed_types}")
+
+        if not (self.rule or (hasattr(self, 'rule_data') and self.rule_data)):
+            raise ValueError("Either a 'rule' or 'rule_data' must be provided.")
+
+        if not (self.property or (hasattr(self, 'property_data') and self.property_data)):
+            raise ValueError("Either a 'property' or 'property_data' must be provided.")
+
+    def _set_import_instances(self):
+
+        if not self.property:
+            self.property_import_instance = ImportPropertyInstance(self.property_data, self.import_process)
+
+        if not self.rule:
+            self.rule_import_instance = ImportProductPropertiesRuleInstance(self.rule_data, self.import_process)
+
+    def pre_process_logic(self):
+
+        # If the property is not provided, run the property import.
+        if not self.property:
+            self.property_import_instance.process()
+            self.property = self.property_import_instance.instance
+
+        if not self.rule:
+            self.rule_import_instance.process()
+            self.rule = self.rule_import_instance.instance
+
+
+    def process_logic(self):
+        fac = ProductPropertiesRuleItemImport(self, self.import_process,)
+        fac.run()
+
+        self.instance = fac.instance
+
+class GetSelectValueMixin:
+
+    def get_select_value(self, value, property=None):
+
+        if property is None:
+            property = self.property
+
+        property_value_import_instance = ImportPropertySelectValueInstance(data={"value": value},
+                                                                     import_process=self.import_process,
+                                                                     property=property)
+        property_value_import_instance.set_language(self.language)
+        property_value_import_instance.process()
+        return property_value_import_instance.instance
+
+
+class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin):
+    """
+    Import instance for PropertySelectValue.
+
+    Expected data keys:
+      - value: The select value to be imported.
+      - property_data: (Optional) A dict for importing the Property if no property is provided.
+     - product_data
+
+    Optionally, if the property already exists, the data may contain a 'property' key.
+    """
+
+    def __init__(self, data: dict, import_process=None, property=None, product=None):
+        super().__init__(data, import_process)
+        self.property = property
+        self.product = product
+
+        self.set_field_if_exists('value')
+        self.set_field_if_exists('value_is_id', default_value=False)
+        self.set_field_if_exists('property_data')
+        self.set_field_if_exists('product_data')
+
+        if self.property is None:
+            # we might want to add the property directly into data because most of the times the product properties
+            # will be created in bulk
+            self.set_field_if_exists('property')
+
+        self.validate()
+        self._set_property_import_instance()
+        self._set_product_import_instance()
+
+        self.factory_class = ProductPropertyImport
+
+
+    @property
+    def local_class(self):
+        return ProductProperty
+
+    @property
+    def local_translation_class(self):
+        return ProductPropertyTextTranslation
+
+    @property
+    def updatable_fields(self):
+        return ['value_boolean', 'value_int', 'value_float', 'value_date', 'value_datetime',
+                'value_select', 'value_multi_select', 'value_text', 'value_description']
+
+    def validate(self):
+        """
+        Validate that the 'value' key exists.
+        """
+        if not hasattr(self, 'value'):
+            raise ValueError("The 'value' field is required.")
+
+        if not getattr(self, 'property_data', None) and not self.property:
+            raise ValueError("Either a 'property' or 'property_data' must be provided.")
+
+        if not getattr(self, 'product_data', None) and not self.product:
+            raise ValueError("Either a 'property' or 'property_data' must be provided.")
+
+
+    def _set_property_import_instance(self):
+
+        if not self.property and hasattr(self, 'property_data'):
+            self.property_import_instance = ImportPropertyInstance(self.property_data, self.import_process)
+
+    def _set_product_import_instance(self):
+        from imports_exports.factories.products import ImportProductInstance
+
+        if not self.product and hasattr(self, 'product_data'):
+            self.product_import_instance = ImportProductInstance(self.product_data, self.import_process)
+
+    def pre_process_logic(self):
+
+        if not self.property:
+            self.property_import_instance.process()
+            self.property = self.property_import_instance.instance
+
+
+        if not self.product:
+            self.product_import_instance.process()
+            self.product = self.product_import_instance.instance
+
+        self.set_value()
+
+        # we set this in case is a translations
+        self.product_property = SimpleNamespace(property=self.property, product=self.product)
+        self.set_factory_class()
+
+
+    def set_factory_class(self):
+        if self.property.type  in Property.TYPES.TRANSLATED:
+            self.factory_class = TranslatedProductPropertyImport
+        else:
+            self.factory_class = ProductPropertyImport
+
+
+    def set_value(self):
+
+        if self.property.type == Property.TYPES.INT:
+            self.value_int = int(self.value)
+        elif self.property.type == Property.TYPES.FLOAT:
+            self.value_float = float(self.value)
+        elif self.property.type == Property.TYPES.BOOLEAN:
+            self.value_boolean = bool(self.value)
+        elif self.property.type  in [Property.TYPES.DATE, Property.TYPES.DATETIME]:
+
+            date_format = '%Y-%m-%d %H:%M:%S'
+            parsed_datetime = datetime.strptime(self.value, date_format)
+
+            if self.property.type == Property.TYPES.DATETIME:
+                self.value_datetime = parsed_datetime
+            else:
+                self.value_date = parsed_datetime.date()
+
+        elif self.property.type == Property.TYPES.TEXT:
+            self.value_text = self.value
+        elif self.property.type == Property.TYPES.DESCRIPTION:
+            self.value_description = self.value
+
+        elif self.property.type == Property.TYPES.SELECT:
+
+            if self.value_is_id:
+                self.value_select = PropertySelectValue.objects.get(id=self.value)
+            else:
+                self.value_select = self.get_select_value(self.value)
+
+        elif self.property.type == Property.TYPES.MULTISELECT:
+
+            if self.value_is_id:
+                ids = [int(x) for x in self.value]
+                self.value_multi_select = PropertySelectValue.objects.get(id__in=ids)
+            else:
+
+                if isinstance(self.value, str):
+                    values = [x.strip() for x in self.value.split(',') if x.strip()]
+                elif isinstance(self.value, list):
+                    values = self.value
+                else:
+                    values = []
+
+                ids = []
+                for value in values:
+                    ids.append(self.get_select_value(value).id)
+
+                self.value_multi_select = PropertySelectValue.objects.filter(id__in=ids)
+
+
+
+    def process_logic(self):
+        fac = self.factory_class(self, self.import_process)
+        fac.run()
+
+        self.instance = fac.instance
+
+        if fac.created and self.factory_class == TranslatedProductPropertyImport:
+            self.create_translation()
+
+
+    def create_translation(self):
+
+        self.translation = ProductPropertyTextTranslation.objects.create(
+            multi_tenant_company=self.instance.multi_tenant_company,
+            product_property=self.instance,
+            language=self.language,
+            value_text=getattr(self, 'value_text', None),
+            value_description=getattr(self, 'value_description', None)
+        )

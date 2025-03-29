@@ -150,7 +150,7 @@ class Product(TranslatedModelMixin, models.Model):
         try:
             product_type_value = self.productproperty_set.get(property__is_product_type=True)
             return ProductPropertiesRule.objects.get(product_type_id=product_type_value.value_select.id, multi_tenant_company=self.multi_tenant_company)
-        except ObjectDoesNotExist:
+        except (ObjectDoesNotExist, AttributeError):
             return None
 
     def get_configurator_properties(self, product_rule=None):

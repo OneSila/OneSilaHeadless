@@ -60,7 +60,8 @@ class Media(models.Model):
         upload_to='files/', validators=[validate_file_extensions, no_dots_in_filename],
         null=True, blank=True)
 
-    owner = models.ForeignKey(MultiTenantUser, on_delete=models.CASCADE)
+    # can be created by the system
+    owner = models.ForeignKey(MultiTenantUser, on_delete=models.CASCADE, blank=True, null=True)
 
     products = models.ManyToManyField('products.Product', through='MediaProductThrough')
 

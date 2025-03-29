@@ -31,8 +31,11 @@ class AiTranslationProcess(AbstractAiProcess):
 
 class AiImportProcess(AbstractAiProcess):
     PROPERTY_TYPE_DETECTOR = 'PROPERTY_TYPE_DETECTOR'
+    IMPORTABLE_PROPERTIES_DETECTOR = 'IMPORTABLE_PROPERTIES_DETECTOR'
+
     TYPE_CHOICES = (
         (PROPERTY_TYPE_DETECTOR, 'Property Type Detector'),
+        (IMPORTABLE_PROPERTIES_DETECTOR, 'Detects Importable Properties'),
     )
     type = models.CharField(
         max_length=50,

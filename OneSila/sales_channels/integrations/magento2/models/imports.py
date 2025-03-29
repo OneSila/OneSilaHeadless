@@ -10,7 +10,8 @@ class MagentoAttributeSetImport(ImportableModel):
     remote_attribute_set = models.ForeignKey(
         'magento2.MagentoAttributeSet',
         on_delete=models.CASCADE,
-        help_text="The remote attribute set associated with this import process."
+        help_text="The remote attribute set associated with this import process.",
+        null=True, blank=True
     )
 
     class Meta:
@@ -28,7 +29,8 @@ class MagentoAttributeSetAttributeImport(ImportableModel):
     remote_attribute = models.ForeignKey(
         'magento2.MagentoAttributeSetAttribute',
         on_delete=models.CASCADE,
-        help_text="The remote attribute associated with this import process."
+        help_text="The remote attribute associated with this import process.",
+        null=True, blank=True
     )
 
     class Meta:
