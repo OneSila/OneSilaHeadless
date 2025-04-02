@@ -39,6 +39,19 @@ class MagentoSalesChannel(SalesChannel):
     def __str__(self):
         return f"Magento Sales Channel: {self.hostname}"
 
+    def connect(self):
+        from sales_channels.integrations.magento2.factories.sales_channels.sales_channel import TryConnection
+
+        required_fields = {'hostname', 'host_api_username', 'host_api_key', 'authentication_method'}
+
+        if required_fields.intersection(self.get_dirty_fields().keys()):
+            try:
+                TryConnection(sales_channel=self)
+            except Exception:
+                raise Exception(
+                    _("Could not connect to the Magento server. Make sure all the details are correctly completed.")
+                )
+
 
 class MagentoSalesChannelView(SalesChannelView):
     """

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import AiGenerateProcess, AiTranslationProcess
+from .models import AiGenerateProcess, AiTranslationProcess, AiImportProcess
 
 
 @admin.register(AiGenerateProcess)
@@ -13,3 +13,9 @@ class AiTranslationProcessAdmin(admin.ModelAdmin):
     list_display = ('transaction', 'cost', 'result_time', 'from_language_code', 'to_language_code')
     list_filter = ('transaction__transaction_type', 'from_language_code', 'to_language_code')
     search_fields = ('translate_from', 'result')
+
+@admin.register(AiImportProcess)
+class AiImportProcessAdmin(admin.ModelAdmin):
+    list_display = ('transaction', 'get_type_display', 'cost', 'result_time')
+    list_filter = ('transaction__transaction_type', 'type')
+    search_fields = ('prompt', 'result')

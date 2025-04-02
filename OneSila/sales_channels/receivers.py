@@ -1,5 +1,6 @@
-from django.db.models.signals import post_delete, pre_delete
+from django.db.models.signals import post_delete, pre_delete, pre_save
 
+from core.decorators import trigger_signal_for_dirty_fields
 from core.schema.core.subscriptions import refresh_subscription_receiver
 from core.signals import post_create, post_update, mutation_update
 from eancodes.signals import ean_code_released_for_product
@@ -9,7 +10,8 @@ from properties.signals import product_properties_rule_configurator_updated
 from sales_prices.models import SalesPriceListItem
 from sales_prices.signals import price_changed
 from .integrations.magento2.models import MagentoProduct
-from .models import ImportProcess
+from .models import SalesChannelImport
+# from .models import ImportProcess
 from .models.sales_channels import SalesChannelViewAssign
 from .signals import (
     create_remote_property,
@@ -27,13 +29,43 @@ from django.dispatch import receiver
 from properties.models import Property, PropertyTranslation, PropertySelectValueTranslation, PropertySelectValue, ProductProperty, \
     ProductPropertyTextTranslation
 
-@receiver(post_create, sender=ImportProcess)
-def import_process_post_create_receiver(sender, instance: ImportProcess, created, **kwargs):
+@receiver(post_create, sender=SalesChannelImport)
+def import_process_post_create_receiver(sender, instance: SalesChannelImport, **kwargs):
 
     sales_channel = instance.sales_channel
     if not sales_channel.first_import_complete:
         sales_channel.first_import_complete = True
         sales_channel.save(update_fields=['first_import_complete'])
+
+@receiver(pre_save, sender=SalesChannelImport)
+def import_process_avoid_duplicate_pre_create_receiver(sender, instance: SalesChannelImport, **kwargs):
+    from django.utils.translation import gettext_lazy as _
+
+    sales_channel = instance.sales_channel
+    if sales_channel.is_importing and not instance.pk:
+        raise OverflowError(_("There is another import that is already happening. Please wait for it to finish first."))
+
+@receiver(post_update, sender=SalesChannelImport)
+@trigger_signal_for_dirty_fields('status')
+def import_process_post_update_receiver(sender, instance: SalesChannelImport, **kwargs):
+    from sales_channels.integrations.magento2.models import MagentoSalesChannel
+    from sales_channels.integrations.magento2.tasks import magento_import_db_task
+
+    sales_channel = instance.sales_channel.get_real_instance()
+    if instance.status == SalesChannelImport.STATUS_PENDING:
+
+        if isinstance(sales_channel, MagentoSalesChannel):
+            magento_import_db_task(import_process=instance, sales_channel=sales_channel)
+
+
+@receiver(post_update, sender=SalesChannelImport)
+def syncing_current_import_percentage_real_time_sync__post_update_receiver(sender, instance, **kwargs):
+    """
+    Update real time percentage when is changed to the sales channe.
+    """
+    if instance.is_dirty_field('percentage') or instance.is_dirty_field('status'):
+        refresh_subscription_receiver(instance.sales_channel)
+
 
 @receiver(post_update, sender=MagentoProduct)
 def syncing_current_percentage_real_time_sync__post_update_receiver(sender, instance, **kwargs):
@@ -469,6 +501,15 @@ def sales_channel_view_assign__post_delete_receiver(sender, instance, **kwargs):
     - Sends delete_remote_product if it's the last assignment for the product on the sales_channel.
     - Sends sales_view_assign_updated for any other deletion.
     """
+    from sales_channels.models import SalesChannel
+
+    # this is for CASCADE DELETE of sales chanel
+    try:
+        sales_channel = instance.sales_channel
+    except SalesChannel.DoesNotExist:
+        return
+
+
     # Count the number of assignments related to the same product and sales channel
     product_assign_count = SalesChannelViewAssign.objects.filter(
         product=instance.product,

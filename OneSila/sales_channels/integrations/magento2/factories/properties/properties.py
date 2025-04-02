@@ -5,10 +5,10 @@ from sales_channels.factories.mixins import RemoteInstanceCreateFactory, RemoteI
 from sales_channels.factories.properties.properties import RemotePropertyCreateFactory, RemotePropertyDeleteFactory, RemotePropertySelectValueCreateFactory, \
     RemotePropertySelectValueUpdateFactory, RemotePropertySelectValueDeleteFactory, RemotePropertyUpdateFactory, RemoteProductPropertyCreateFactory, \
     RemoteProductPropertyDeleteFactory, RemoteProductPropertyUpdateFactory
+from sales_channels.integrations.magento2.constants import PROPERTY_FRONTEND_INPUT_MAP
 from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin, \
     MagentoEntityNotFoundGeneralErrorMixin, EnsureMagentoAttributeSetAttributesMixin, RemoteValueMixin
 from sales_channels.integrations.magento2.models import MagentoProperty, MagentoPropertySelectValue
-from properties.models import Property
 from magento.models.product import ProductAttribute, Product
 from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet, MagentoAttributeSetAttribute, MagentoProductProperty
 
@@ -28,18 +28,6 @@ class MagentoPropertyCreateFactory(GetMagentoAPIMixin, MagentoEntityNotFoundGene
     api_package_name = 'product_attributes'
     api_method_name = 'create'
 
-    FRONTEND_INPUT_MAP = {
-        Property.TYPES.INT: ProductAttribute.TEXT,
-        Property.TYPES.FLOAT: ProductAttribute.TEXT,
-        Property.TYPES.TEXT: ProductAttribute.TEXT,
-        Property.TYPES.DESCRIPTION: ProductAttribute.TEXTAREA,
-        Property.TYPES.BOOLEAN: ProductAttribute.BOOLEAN,
-        Property.TYPES.DATE: ProductAttribute.DATE,
-        Property.TYPES.DATETIME: ProductAttribute.DATETIME,
-        Property.TYPES.SELECT: ProductAttribute.SELECT,
-        Property.TYPES.MULTISELECT: ProductAttribute.MULTISELECT
-    }
-
     def get_update_property_factory(self):
         from sales_channels.integrations.magento2.factories.properties import MagentoPropertyUpdateFactory
         return MagentoPropertyUpdateFactory
@@ -56,7 +44,7 @@ class MagentoPropertyCreateFactory(GetMagentoAPIMixin, MagentoEntityNotFoundGene
         Customizes the payload to include the correct 'frontend_input' mapping and wraps it under 'data'.
         """
         # Add 'frontend_input' mapping
-        self.payload['frontend_input'] = self.FRONTEND_INPUT_MAP.get(self.local_instance.type, ProductAttribute.TEXT)
+        self.payload['frontend_input'] = PROPERTY_FRONTEND_INPUT_MAP.get(self.local_instance.type, ProductAttribute.TEXT)
 
         # we need to set it like this because of some issue with the order of the signals
         self.payload['attribute_code'] = self.get_attribute_code()

@@ -1,4 +1,4 @@
-from .imports import ImportProperty, ImportImage, ImportVat, ImportProduct, ImportProcess, ImportCurrency, ImportPropertySelectValue
+from .imports import ImportProperty, ImportImage, ImportVat, ImportProduct, SalesChannelImport, ImportCurrency, ImportPropertySelectValue
 from .logs import RemoteLog
 from .orders import RemoteOrder, RemoteCustomer
 from .products import RemoteProduct, RemoteImage, RemoteProductContent, RemotePrice, RemoteInventory, RemoteCategory, RemoteImageProductAssociation

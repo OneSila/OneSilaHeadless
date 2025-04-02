@@ -21,7 +21,8 @@ from products_inspector.schema import ProductsInspectorSubscription, ProductsIns
 from properties.schema import PropertiesQuery, PropertiesMutation, PropertiesSubscription
 from sales_prices.schema import SalesPricesQuery, SalesPricesMutation, SalesPriceSubscription
 from sales_channels.schema import SalesChannelsQuery, SalesChannelsMutation, SalesChannelsSubscription
-from sales_channels.integrations.magento2.schema import MagentoSalesChannelMutation
+from sales_channels.integrations.magento2.schema import MagentoSalesChannelMutation, MagentoSalesChannelsQuery, \
+    MagentoSalesChannelsSubscription
 from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
 from translations.schema import TranslationsQuery
 from integrations.schema import IntegrationsQuery, IntegrationsMutation
@@ -34,7 +35,7 @@ from llm.schema import LlmMutation
 
 @strawberry.type
 class Query(CurrenciesQuery, CountryQuery, EanCodesQuery, IntegrationsQuery,
-        LanguageQuery, LeadTimesQuery, MediaQuery, MultiTenantQuery,
+        LanguageQuery, LeadTimesQuery, MediaQuery, MultiTenantQuery, MagentoSalesChannelsQuery,
         ProductsQuery, PropertiesQuery, SalesPricesQuery, SalesChannelsQuery,
         TaxesQuery, TimeZoneQuery, TranslationsQuery):
     pass
@@ -50,7 +51,7 @@ class Mutation(CurrenciesMutation, EanCodesMutation,MediaMutation, MultiTenantMu
 @strawberry.type
 class Subscription(CurrenciesSubscription,EanCodesSubscription, MediaSubscription, MultiTenantSubscription,
         ProductsInspectorSubscription, ProductsSubscription, PropertiesSubscription, SalesPriceSubscription,
-        SalesChannelsSubscription, TaxSubscription):
+        MagentoSalesChannelsSubscription, SalesChannelsSubscription, TaxSubscription):
     pass
 
 #

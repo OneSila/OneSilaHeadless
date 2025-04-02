@@ -2,7 +2,7 @@ from django.contrib import admin
 from polymorphic.admin import PolymorphicChildModelAdmin
 from pygments.lexers import JsonLexer
 
-from .models import SalesChannel, RemoteLog
+from .models import SalesChannel, RemoteLog, SalesChannelImport
 from .models.products import RemoteProductConfigurator
 
 
@@ -34,3 +34,7 @@ class RemoteLogAdmin(PolymorphicChildModelAdmin):
             'fields': ('user_error', 'keep')
         }),
     )
+
+@admin.register(SalesChannelImport)
+class SalesChannelImportAdmin(admin.ModelAdmin):
+    pass
