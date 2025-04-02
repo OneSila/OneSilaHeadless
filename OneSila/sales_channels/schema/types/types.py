@@ -1,8 +1,12 @@
-from typing import Optional
+from typing import Optional, List, Annotated
+
+from strawberry import lazy
+from strawberry.relay import to_base64
 
 from core.schema.core.types.types import type, relay, field
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from currencies.schema.types.types import CurrencyType
+from imports_exports.schema.queries import ImportType
 from products.schema.types.types import ProductType
 
 from sales_channels.models import ImportCurrency, ImportImage, SalesChannelImport, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
@@ -24,7 +28,8 @@ from ...models.sales_channels import RemoteLanguage
 
 @type(SalesChannel, filters=SalesChannelFilter, order=SalesChannelOrder, pagination=True, fields='__all__')
 class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
-    pass
+    saleschannelimport_set: List[Annotated['SalesChannelImportType', lazy("sales_channels.schema.types.types")]]
+
 
 @type(ImportCurrency, filters=ImportCurrencyFilter, order=ImportCurrencyOrder, pagination=True, fields='__all__')
 class ImportCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):
@@ -40,6 +45,10 @@ class ImportImageType(relay.Node, GetQuerysetMultiTenantMixin):
 class SalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
 
+    @field()
+    def import_id(self, info) -> str:
+        return to_base64(ImportType, self.pk)
+
 
 @type(ImportProduct, filters=ImportProductFilter, order=ImportProductOrder, pagination=True, fields='__all__')
 class ImportProductType(relay.Node, GetQuerysetMultiTenantMixin):
@@ -48,7 +57,7 @@ class ImportProductType(relay.Node, GetQuerysetMultiTenantMixin):
 
 @type(ImportProperty, filters=ImportPropertyFilter, order=ImportPropertyOrder, pagination=True, fields='__all__')
 class ImportPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
-    sales_channel: SalesChannelType
+    import_process: ImportType
 
 
 @type(ImportPropertySelectValue, filters=ImportPropertySelectValueFilter, order=ImportPropertySelectValueOrder, pagination=True, fields='__all__')

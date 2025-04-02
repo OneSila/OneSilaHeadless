@@ -2,14 +2,12 @@ from core.schema.core.queries import node, connection, ListConnectionWithTotalCo
 from integrations.schema.types.types import IntegrationType
 from .types.types import RemoteLogType, RemoteProductType, SalesChannelType, \
     SalesChannelIntegrationPricelistType, SalesChannelViewType, SalesChannelViewAssignType, RemoteLanguageType, \
-    RemoteCurrencyType
-from ..integrations.magento2.schema.types.types import MagentoSalesChannelType
-
+    RemoteCurrencyType, SalesChannelImportType
 
 @type(name='Query')
 class SalesChannelsQuery:
-    # import_process: ImportProcessType = node()
-    # import_processes: ListConnectionWithTotalCount[ImportProcessType] = connection()
+    sales_channel_import: SalesChannelImportType = node()
+    sales_channel_imports: ListConnectionWithTotalCount[SalesChannelImportType] = connection()
 
     remote_log: RemoteLogType = node()
     remote_logs: ListConnectionWithTotalCount[RemoteLogType] = connection()
@@ -34,8 +32,5 @@ class SalesChannelsQuery:
 
     sales_channel_view_assign: SalesChannelViewAssignType = node()
     sales_channel_view_assigns: ListConnectionWithTotalCount[SalesChannelViewAssignType] = connection()
-
-    magento_channel: MagentoSalesChannelType = node()
-    magento_channels: ListConnectionWithTotalCount[MagentoSalesChannelType] = connection()
 
     integration: IntegrationType = node()

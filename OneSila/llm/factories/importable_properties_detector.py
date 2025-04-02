@@ -42,13 +42,14 @@ class DetectRealProductAttributesLLM(AskGPTMixin, CalculateCostMixin, CreateTran
             - Media/image-only fields (e.g. Base Image, Gallery, Thumbnail)
             
             ### Output:
+            GIVE ONLY THE IMPORTED TRUE ONES!!!
             Return a **JSON array** like this:
             
             [
               {
-                "index": <index>,
+                "id": <id>,
                 "label": "<label>",
-                "imported": true | false
+                "imported": true | false 
               }
             ]
         """.strip()
@@ -61,6 +62,7 @@ class DetectRealProductAttributesLLM(AskGPTMixin, CalculateCostMixin, CreateTran
         for idx, attr in enumerate(self.attributes_data):
             processed = {
                 "index": idx,
+                "id": attr.get("id"),
                 "label": attr.get("label")
             }
             if "extra_info" in attr:

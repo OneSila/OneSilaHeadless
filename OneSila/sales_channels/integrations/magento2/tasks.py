@@ -544,9 +544,22 @@ def delete_magento_product_db_task(task_queue_item_id, sales_channel_id, remote_
 
     task.execute(actual_task)
 
+@db_task()
+def magento_import_db_task(import_process, sales_channel):
+    from sales_channels.integrations.magento2.factories.imports import MagentoImportProcessor
 
-# @periodic_task(crontab(minute="*"))
-# def magento_pull_remote_orders_db_task():
-#     from .flows.puill_orders import pull_magento_orders_flow
-#
-#     pull_magento_orders_flow()
+    fac = MagentoImportProcessor(import_process=import_process, sales_channel=sales_channel)
+    fac.run()
+
+@periodic_task(crontab(minute=0, hour=2))
+def magento_pull_remote_orders_db_task():
+    from .flows.puill_orders import pull_magento_orders_flow
+
+    pull_magento_orders_flow()
+
+
+@periodic_task(crontab(minute=0, hour=3))
+def cleanup_old_import_data():
+    from .flows.cleanup_import_logs import cleanup_import_logs_flow
+
+    cleanup_import_logs_flow()

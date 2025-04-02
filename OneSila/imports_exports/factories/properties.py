@@ -184,7 +184,7 @@ class ImportPropertyInstance(AbstractImportInstance):
         if name is None and hasattr(self, 'internal_name'):
             name = self.internal_name.replace('_', ' ').title()
 
-        self.translation = PropertyTranslation.objects.create(
+        self.translation, _ = PropertyTranslation.objects.get_or_create(
             multi_tenant_company=self.instance.multi_tenant_company,
             language=self.language,
             property=self.instance,
@@ -588,7 +588,7 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
 
             if self.value_is_id:
                 ids = [int(x) for x in self.value]
-                self.value_multi_select = PropertySelectValue.objects.get(id__in=ids)
+                self.value_multi_select = PropertySelectValue.objects.filter(id__in=ids)
             else:
 
                 if isinstance(self.value, str):

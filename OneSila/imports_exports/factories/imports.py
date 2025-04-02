@@ -29,7 +29,7 @@ class ImportMixin:
         self.set_threshold_chunk()
 
     def set_threshold_chunk(self):
-        self._threshold_chunk = max(1, math.floor(self.total_import_instances_cnt * 0.05))
+        self._threshold_chunk = max(1, math.floor(self.total_import_instances_cnt * 0.01))
 
     def update_percentage(self, to_add=1):
         self.total_imported_instances += to_add
@@ -54,13 +54,23 @@ class ImportMixin:
         self.import_process.percentage = 100
         self.import_process.save()
 
+        self.on_success()
+
 
     def mark_failure(self):
         self.import_process.status = Import.STATUS_FAILED
-        self.import_process.percentage = 0
+        self.import_process.percentage = 100
         self.import_process.error_traceback = traceback.format_exc()
         self.import_process.save()
 
+        self.on_fail()
+
+
+    def on_success(self):
+        pass
+
+    def on_fail(self):
+        pass
 
     def get_total_instances(self):
         raise NotImplementedError("'get_total_instances' needs to be implemented in the subclass!")
@@ -186,6 +196,9 @@ class ImportMixin:
         """
         pass
 
+    def process_completed(self):
+        pass
+
     def run(self):
         self.prepare_import_process()
         self.calculate_percentage()
@@ -208,4 +221,6 @@ class ImportMixin:
 
         except Exception as e:
             self.mark_failure()
-            raise
+
+        finally:
+            self.process_completed()

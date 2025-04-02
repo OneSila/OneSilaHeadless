@@ -20,7 +20,8 @@ from sales_channels.integrations.magento2.models import MagentoProperty, Magento
 from sales_channels.integrations.magento2.models.products import MagentoEanCode, MagentoPrice, MagentoProductContent, \
     MagentoImageProductAssociation
 from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet, MagentoProductProperty
-from sales_channels.models import ImportProperty, ImportPropertySelectValue, ImportProduct, SalesChannelViewAssign
+from sales_channels.models import ImportProperty, ImportPropertySelectValue, ImportProduct, SalesChannelViewAssign, \
+    SalesChannelImport
 from django.contrib.contenttypes.models import ContentType
 from magento.models import Product as MagentoApiProduct
 from magento.models import ConfigurableProduct as MagentoApiConfigurableProduct
@@ -38,11 +39,18 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         super().__init__(import_process, language)
 
         self.sales_channel = sales_channel
+        self.initial_sales_channel_status = sales_channel.active
         self.api = self.get_api()
 
         self.remote_local_property_map = {}
 
     def prepare_import_process(self):
+
+        # during the import this needs to stay false to prevent trying to create the mirror models because
+        # we create them manually
+        self.sales_channel.active = False
+        self.sales_channel.is_importing = True
+        self.sales_channel.save()
 
         # get properties
         self.properties = ImportProperty.objects.filter(import_process=self.import_process)
@@ -65,10 +73,11 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 self.select_values.append(option)
 
         self.rules = self.api.product_attribute_set.all_in_memory()
+        self.products_cnt = self.api.products.count()
 
     def get_total_instances(self):
         properties_cnt = self.properties.count()
-        return properties_cnt + len(self.select_values) + len(self.rules) + properties_cnt
+        return properties_cnt + len(self.select_values) + len(self.rules) + self.products_cnt
 
     def get_properties_data(self):
         return self.properties
@@ -351,11 +360,15 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
             multi_tenant_company=self.import_process.multi_tenant_company,
             is_default_currency=True
         )
-        return [{
-            "price": product.special_price,
-            "rrp": product.price,
-            "currency": currency.iso_code,
-        }]
+
+        try:
+            return [{
+                "price": product.special_price,
+                "rrp": product.price,
+                "currency": currency.iso_code,
+            }]
+        except:
+            return []
 
     def get_product_variations(self, product: MagentoApiProduct, rule: ProductPropertiesRule):
         variations = []
@@ -402,16 +415,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 return custom_attributes[ean_code_key]
         return None
 
-    def normalize_sku_for_variation(self, product: MagentoApiProduct, is_variation: bool) -> str:
-        """
-        If product is a variation and SKU starts with one of the configurable SKUs + '-', normalize it.
-        """
-        if is_variation:
-            for config_sku in self.configurable_skus:
-                prefix = f"{config_sku}-"
-                if product.sku.startswith(prefix):
-                    return product.sku[len(prefix):]
-        return product.sku
 
     def get_product_data(self, product: MagentoApiProduct, rule: ProductPropertiesRule, is_variation: Optional[bool] = False):
         type_map = {
@@ -424,13 +427,11 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
         structured_data = {
             "name": product.name,
-            "sku": self.normalize_sku_for_variation(product, is_variation),
+            "sku": product.sku,
             "type": product_type,
             "active": bool(product.status),
             "allow_backorder": product.backorders,
         }
-
-
 
         ean_code = self.get_product_ean_code(custom_attributes)
         if ean_code:
@@ -568,8 +569,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 remote_id = info_map.get('id', None)
 
                 if remote_sku and remote_id:
-                    print('-----------------------------------------------------__REMOTE SKU')
-                    print(f"{product.sku}: {remote_sku}")
 
                     magento_product, _ = MagentoProduct.objects.get_or_create(
                         multi_tenant_company=self.import_process.multi_tenant_company,
@@ -621,6 +620,9 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         if remote_product.syncing_current_percentage != 100:
             remote_product.syncing_current_percentage = 100
 
+        if remote_product.is_variation != is_variation:
+            remote_product.is_variation = is_variation
+
         remote_product.save()
 
     def get_product_rule(self, product: MagentoApiProduct):
@@ -656,10 +658,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
             if not isinstance(product_batch, list):
                 product_batch = [product_batch]
 
-            batch_size = len(product_batch)
-            self.total_import_instances_cnt += batch_size
-            self.set_threshold_chunk()
-
             for product in product_batch:
 
                 is_variation = self.is_magento_variation(product)
@@ -678,7 +676,7 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                         "local_instance": "*",
                     },
                     mirror_model_defaults={
-                        "remote_sku": structured_data['sku'],
+                        "remote_sku": product.sku,
                     }
                 )
 
@@ -703,3 +701,9 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 product_batch = products_api.next()
             except ValueError:
                 break
+
+
+    def process_completed(self):
+        self.sales_channel.active = self.initial_sales_channel_status
+        self.sales_channel.is_importing = False
+        self.sales_channel.save()

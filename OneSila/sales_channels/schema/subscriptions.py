@@ -3,8 +3,6 @@ from sales_channels.models import SalesChannelImport, SalesChannel, SalesChannel
     SalesChannelViewAssign
 from .types.types import SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, \
     SalesChannelViewAssignType, SalesChannelImportType
-from ..integrations.magento2.models import MagentoSalesChannel
-from ..integrations.magento2.schema.types.types import MagentoSalesChannelType
 
 
 @type(name='Subscription')
@@ -33,9 +31,4 @@ class SalesChannelsSubscription:
     @subscription
     async def sales_channel_view_assign(self, info: Info, pk: str) -> AsyncGenerator[SalesChannelViewAssignType, None]:
         async for i in model_subscriber(info=info, pk=pk, model=SalesChannelViewAssign):
-            yield i
-
-    @subscription
-    async def magento_channel(self, info: Info, pk: str) -> AsyncGenerator[MagentoSalesChannelType, None]:
-        async for i in model_subscriber(info=info, pk=pk, model=MagentoSalesChannel):
             yield i

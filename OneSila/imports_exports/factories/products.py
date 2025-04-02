@@ -553,5 +553,10 @@ class ImportSalesPriceInstance(AbstractImportInstance):
 
 
     def process_logic(self):
+
+        # we will skip the price if is 0 because we can't create price 0
+        if self.price == 0:
+            return
+
         fac = SalesPriceImport(self, self.import_process)
         fac.run()

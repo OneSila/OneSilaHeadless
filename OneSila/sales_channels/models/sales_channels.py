@@ -11,7 +11,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class SalesChannel(Integration, models.Model):
+class  SalesChannel(Integration, models.Model):
     """
     Polymorphic model representing a sales channel, such as a website or marketplace.
     """
@@ -21,10 +21,27 @@ class SalesChannel(Integration, models.Model):
     sync_ean_codes = models.BooleanField(default=True, verbose_name=_('Sync EAN Codes'))
     sync_prices = models.BooleanField(default=True, verbose_name=_('Sync Prices'))
     first_import_complete = models.BooleanField(default=False, help_text="Set to True once the first import has been completed.")
+    is_importing = models.BooleanField(default=False, help_text=_("True while an import process is running."))
 
     class Meta:
         verbose_name = 'Sales Channel'
         verbose_name_plural = 'Sales Channels'
+
+
+    def save(self, *args, **kwargs):
+
+        dirty_fields = self.get_dirty_fields().keys()
+        if 'active' in dirty_fields and self.active and 'is_importing' not in dirty_fields:
+            if self.is_importing:
+                raise Exception(
+                    _("Cannot set integration to active during an import. It will automatically be set to the previous status after the import is done.")
+                )
+
+        self.connect()
+        super().save(*args, **kwargs)
+
+    def connect(self):
+        raise NotImplementedError("This method must be implemented by child class")
 
     def __str__(self):
         return f"{self.hostname } @ {self.multi_tenant_company}"

@@ -9,11 +9,15 @@ class Import(PolymorphicModel, models.Model):
     Note: Removed the 'type' and 'sales_channel' fields.
     """
 
+    STATUS_NEW = 'new'
+    STATUS_PENDING = 'pending'
     STATUS_FAILED = 'failed'
     STATUS_PROCESSING = 'processing'
     STATUS_SUCCESS = 'success'
 
     STATUS_CHOICES = [
+        (STATUS_NEW, 'New'),
+        (STATUS_PENDING, 'Pending'),
         (STATUS_FAILED, 'Failed'),
         (STATUS_PROCESSING, 'Processing'),
         (STATUS_SUCCESS, 'Success'),
@@ -26,7 +30,7 @@ class Import(PolymorphicModel, models.Model):
     status = models.CharField(
         max_length=10,
         choices=STATUS_CHOICES,
-        default=STATUS_PROCESSING
+        default=STATUS_NEW
     )
     error_traceback = models.TextField(
         null=True,
@@ -36,6 +40,10 @@ class Import(PolymorphicModel, models.Model):
 
     def __str__(self):
         return f"ImportProcess - {self.get_status_display()} ({self.percentage}%)"
+
+
+    class Meta:
+        ordering = ['-created_at']
 
 
 class ImportableModel(PolymorphicModel, models.Model):
@@ -49,7 +57,9 @@ class ImportableModel(PolymorphicModel, models.Model):
         help_text="The raw data being imported."
     )
     structured_data = models.JSONField(
-        help_text="The structured data after processing the raw data."
+        help_text="The structured data after processing the raw data.",
+        null=True,
+        blank=True,
     )
     import_process = models.ForeignKey(
         Import,
