@@ -257,3 +257,6 @@ HUEY = {
         'health_check_interval': 1,
     },
 }
+
+ADMIN_ROUTE_SUFFIX = ""
+MAGENTO_LOG_DIR_PATH = '/var/log/OneSilaHeadless/magento'

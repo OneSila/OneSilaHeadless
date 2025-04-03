@@ -241,6 +241,7 @@ class ProductPropertiesRule(models.Model):
     class Meta:
         verbose_name_plural = _("Product Properties Rules")
         unique_together = ("product_type", "multi_tenant_company")
+        search_terms = ['product_type__propertyselectvaluetranslation__value']
 
 
 class ProductPropertiesRuleItem(models.Model):
