@@ -506,7 +506,7 @@ class ImportSalesPriceInstance(AbstractImportInstance):
 
         if hasattr(self, 'currency') and hasattr(self, 'public_currency'):
 
-            self.currency, _ = Currency.objects.get(
+            self.currency = Currency.objects.get(
                 multi_tenant_company=self.multi_tenant_company,
                 iso_code=self.public_currency.iso_code,
             )
