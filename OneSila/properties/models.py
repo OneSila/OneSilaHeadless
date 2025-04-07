@@ -96,8 +96,6 @@ class PropertyTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         translated_field = 'property'
         search_terms = ['name']
-        unique_together = ("name", "language", "multi_tenant_company")
-
 
 class PropertySelectValue(TranslatedModelMixin, models.Model):
     property = models.ForeignKey(Property, on_delete=models.PROTECT)
@@ -122,6 +120,7 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
             )
 
         super().delete(*args, **kwargs)
+
 
     class Meta:
         search_terms = ['propertyselectvaluetranslation__value']
@@ -240,6 +239,7 @@ class ProductPropertiesRule(models.Model):
     class Meta:
         verbose_name_plural = _("Product Properties Rules")
         unique_together = ("product_type", "multi_tenant_company")
+        search_terms = ['product_type__propertyselectvaluetranslation__value']
 
 
 class ProductPropertiesRuleItem(models.Model):

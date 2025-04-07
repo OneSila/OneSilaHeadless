@@ -57,7 +57,7 @@ class SalesPrice(models.Model):
         return min(prices)
 
     def __str__(self):
-        return '{} {}'.format(self.rrp, self.currency)
+        return '{} {}'.format(self.get_real_price(), self.currency)
 
     def clean(self):
         super().clean()

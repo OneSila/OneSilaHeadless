@@ -3,7 +3,7 @@ from polymorphic.admin import PolymorphicChildModelAdmin
 
 from .models import MagentoSalesChannel, MagentoProperty, MagentoPropertySelectValue, MagentoSalesChannelView, MagentoOrder, MagentoOrderItem, \
     MagentoProduct, MagentoProductProperty, MagentoImageProductAssociation, MagentoProductContent
-from .models.products import MagentoEanCode
+from .models.products import MagentoEanCode, MagentoPrice
 from .models.properties import MagentoAttributeSet, MagentoAttributeSetAttribute
 from .models.sales_channels import MagentoRemoteLanguage
 from .models.taxes import MagentoCurrency
@@ -19,7 +19,7 @@ class MagentoSalesChannelAdmin(PolymorphicChildModelAdmin):
 
     fieldsets = (
         (None, {
-            'fields': ('hostname', 'active', 'verify_ssl', 'authentication_method', 'host_api_username', 'host_api_key', 'multi_tenant_company')
+            'fields': ('hostname', 'active', 'verify_ssl', 'authentication_method', 'host_api_username', 'host_api_key', 'first_import_complete', 'multi_tenant_company')
         }),
         ('Magento Settings', {
             'fields': ('attribute_set_skeleton_id', 'use_configurable_name', 'sync_contents', 'sync_ean_codes', 'sync_prices', 'requests_per_minute', 'max_retries')
@@ -78,6 +78,11 @@ class MagentoProductAdmin(admin.ModelAdmin):
 @admin.register(MagentoProductContent)
 class MagentoProductContentAdmin(admin.ModelAdmin):
     pass
+
+@admin.register(MagentoPrice)
+class MagentoPriceAdmin(admin.ModelAdmin):
+    pass
+
 
 @admin.register(MagentoEanCode)
 class MagentoEanCodeAdmin(admin.ModelAdmin):

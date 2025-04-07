@@ -2,6 +2,7 @@ import logging
 
 from magento.exceptions import InstanceGetFailed
 
+from properties.models import ProductProperty, Property
 from sales_channels.factories.products.products import RemoteProductSyncFactory, RemoteProductCreateFactory, RemoteProductDeleteFactory, \
     RemoteProductUpdateFactory
 from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin
@@ -16,6 +17,7 @@ from sales_channels.integrations.magento2.models.products import MagentoEanCode
 from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet
 from magento.models import Product as MagentoApiProduct
 
+from sales_channels.integrations.magento2.models.sales_channels import MagentoRemoteLanguage
 from sales_channels.models import SalesChannelViewAssign
 
 logger = logging.getLogger(__name__)
@@ -170,11 +172,31 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
         self.magento_product.save(scope='all')
         self.magento_product.update_custom_attributes(self.get_unpacked_product_properties())
 
+    def get_remote_languages(self):
+        sales_views_ids = SalesChannelViewAssign.objects.filter(sales_channel=self.sales_channel,
+                                                                product=self.local_instance).values_list(
+            'sales_channel_view_id', flat=True)
+
+        return MagentoRemoteLanguage.objects.filter(
+            sales_channel=self.sales_channel,
+            sales_channel_view_id__in=sales_views_ids,
+            store_view_code__isnull=False,
+            local_instance__isnull=False
+        )
+
     def process_content_translation(self, short_description, description, url_key, remote_language):
         self.magento_product.short_description = short_description
         self.magento_product.description = description
         self.magento_product.url_key = url_key
-        self.magento_product.save(scope=remote_language.sales_channel_view.code)
+        self.magento_product.save(scope=remote_language.store_view_code)
+
+    def final_process(self):
+        translated_product_properties = ProductProperty.objects.filter(product=self.local_instance, property__is_public_information=True, property__type__in=Property.TYPES.TRANSLATED)
+
+        # whe we update custom properties we only do it on main scope. The translated ones needs to be updated one by one in all languages
+        for product_property in translated_product_properties:
+            fac = MagentoProductPropertyUpdateFactory(sales_channel=self.sales_channel, local_instance=product_property, remote_product=self.remote_instance, api=self.api, skip_checks=True)
+            fac.run()
 
 class MagentoProductUpdateFactory(RemoteProductUpdateFactory, MagentoProductSyncFactory):
     fixing_identifier_class = MagentoProductSyncFactory

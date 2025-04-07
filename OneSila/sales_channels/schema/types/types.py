@@ -1,19 +1,23 @@
-from typing import Optional
+from typing import Optional, List, Annotated
+
+from strawberry import lazy
+from strawberry.relay import to_base64
 
 from core.schema.core.types.types import type, relay, field
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from currencies.schema.types.types import CurrencyType
+from imports_exports.schema.queries import ImportType
 from products.schema.types.types import ProductType
 
-from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
-from .filters import ImportCurrencyFilter, ImportImageFilter, ImportProcessFilter, ImportProductFilter, \
+from sales_channels.models import ImportCurrency, ImportImage, SalesChannelImport, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
+from .filters import ImportCurrencyFilter, ImportImageFilter, SalesChannelImportFilter, ImportProductFilter, \
     ImportPropertyFilter, ImportPropertySelectValueFilter, ImportVatFilter, RemoteCategoryFilter, RemoteCurrencyFilter, \
     RemoteCustomerFilter, RemoteImageFilter, RemoteImageProductAssociationFilter, RemoteInventoryFilter, \
     RemoteLogFilter, RemoteOrderFilter, RemotePriceFilter, RemoteProductFilter, RemoteProductContentFilter, \
     RemoteProductPropertyFilter, RemotePropertyFilter, RemotePropertySelectValueFilter, RemoteVatFilter, \
     SalesChannelFilter, SalesChannelIntegrationPricelistFilter, SalesChannelViewFilter, SalesChannelViewAssignFilter, \
     RemoteLanguageFilter
-from .ordering import ImportCurrencyOrder, ImportImageOrder, ImportProcessOrder, ImportProductOrder, \
+from .ordering import ImportCurrencyOrder, ImportImageOrder, SalesChannelImportOrder, ImportProductOrder, \
     ImportPropertyOrder, ImportPropertySelectValueOrder, ImportVatOrder, RemoteCategoryOrder, RemoteCurrencyOrder, \
     RemoteCustomerOrder, RemoteImageOrder, RemoteImageProductAssociationOrder, RemoteInventoryOrder, RemoteLogOrder, \
     RemoteOrderOrder, RemotePriceOrder, RemoteProductOrder, RemoteProductContentOrder, RemoteProductPropertyOrder, \
@@ -24,7 +28,8 @@ from ...models.sales_channels import RemoteLanguage
 
 @type(SalesChannel, filters=SalesChannelFilter, order=SalesChannelOrder, pagination=True, fields='__all__')
 class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
-    pass
+    saleschannelimport_set: List[Annotated['SalesChannelImportType', lazy("sales_channels.schema.types.types")]]
+
 
 @type(ImportCurrency, filters=ImportCurrencyFilter, order=ImportCurrencyOrder, pagination=True, fields='__all__')
 class ImportCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):
@@ -36,9 +41,13 @@ class ImportImageType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
 
 
-@type(ImportProcess, filters=ImportProcessFilter, order=ImportProcessOrder, pagination=True, fields='__all__')
-class ImportProcessType(relay.Node, GetQuerysetMultiTenantMixin):
+@type(SalesChannelImport, filters=SalesChannelImportFilter, order=SalesChannelImportOrder, pagination=True, fields='__all__')
+class SalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
+
+    @field()
+    def import_id(self, info) -> str:
+        return to_base64(ImportType, self.pk)
 
 
 @type(ImportProduct, filters=ImportProductFilter, order=ImportProductOrder, pagination=True, fields='__all__')
@@ -48,7 +57,7 @@ class ImportProductType(relay.Node, GetQuerysetMultiTenantMixin):
 
 @type(ImportProperty, filters=ImportPropertyFilter, order=ImportPropertyOrder, pagination=True, fields='__all__')
 class ImportPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
-    sales_channel: SalesChannelType
+    import_process: ImportType
 
 
 @type(ImportPropertySelectValue, filters=ImportPropertySelectValueFilter, order=ImportPropertySelectValueOrder, pagination=True, fields='__all__')
@@ -70,6 +79,15 @@ class RemoteCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
 class RemoteCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
     local_instance: Optional[CurrencyType]
+
+    @field()
+    def name(self, info) -> str:
+        name = self.remote_code
+
+        if hasattr(self, 'store_view_code'):
+            name = f"{name} ({self.store_view_code})"
+
+        return name
 
 
 @type(RemoteCustomer, filters=RemoteCustomerFilter, order=RemoteCustomerOrder, pagination=True, fields='__all__')
@@ -139,6 +157,15 @@ class SalesChannelViewType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(RemoteLanguage, filters=RemoteLanguageFilter, order=RemoteLanguageOrder, pagination=True, fields='__all__')
 class RemoteLanguageType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
+
+    @field()
+    def name(self, info) -> str:
+        name = self.remote_code
+
+        if hasattr(self, 'store_view_code'):
+            name = f"{name} ({self.store_view_code})"
+
+        return name
 
 @type(RemoteLog, filters=RemoteLogFilter, order=RemoteLogOrder, pagination=True, fields='__all__')
 class RemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):

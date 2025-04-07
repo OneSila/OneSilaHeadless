@@ -41,7 +41,7 @@ def update_configurators_for_parent_product_db_task(parent_product):
 
     # Step 2: Iterate through remote products and update configurators
     for remote_product in remote_products.iterator():
-        if remote_product.configurator:
+        if hasattr(remote_product, 'configurator') and remote_product.configurator:
             remote_product.configurator.update_if_needed(send_sync_signal=True)
 
 @db_task()

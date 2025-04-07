@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from billing.models import AiPointTransaction
-from llm.models import AiGenerateProcess, AiTranslationProcess
+from llm.models import AiGenerateProcess, AiTranslationProcess, AiImportProcess
 from media.models import MediaProductThrough, Media
 from products.models import ProductTranslation
 from properties.helpers import get_product_properties_dict
@@ -49,6 +49,7 @@ class CreateTransactionMixin:
     def _create_ai_translate_process(self):
         self.ai_process = AiTranslationProcess.objects.create(
             to_translate=self.to_translate,
+            prompt=self.prompt,
             from_language_code=self.from_language_code,
             to_language_code=self.to_language_code,
             transaction=self.transaction,
@@ -62,6 +63,21 @@ class CreateTransactionMixin:
 
         return self.ai_process
 
+
+    def _create_ai_import_process(self):
+        self.ai_process = AiImportProcess.objects.create(
+            transaction=self.transaction,
+            prompt=self.prompt,
+            result=self.text_response,
+            result_time=self.result_time,
+            cost=self.total_cost,
+            input_tokens=self.input_tokens,
+            output_tokens=self.output_tokens,
+            cached_tokens=self.cached_tokens,
+            multi_tenant_company=self.multi_tenant_company,
+            type=self.import_type
+        )
+        return self.ai_process
 
 class CalculateCostMixin:
 

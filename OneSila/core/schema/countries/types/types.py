@@ -1,8 +1,4 @@
-from django.contrib.auth import get_user_model
-
-from core.schema.core.types.types import type, relay, auto, strawberry_type
-from core.schema.core.mixins import GetQuerysetMultiTenantMixin
-
+from core.schema.core.types.types import strawberry_type
 
 @strawberry_type
 class CountryType:

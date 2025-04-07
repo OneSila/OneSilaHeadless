@@ -91,5 +91,6 @@ LOCAL_HOST = 'localhost:8080'
 # price per ai point
 AI_POINT_PRICE = 0
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-openai.api_key = OPENAI_API_KEY
 REPLICATE_API_TOKEN=""
+
+ADMIN_ROUTE_SUFFIX = "_somethingSecure"

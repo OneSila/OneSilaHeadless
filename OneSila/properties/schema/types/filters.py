@@ -59,7 +59,7 @@ class ProductPropertyTextTranslationFilter:
 
 
 @filter(ProductPropertiesRule)
-class ProductPropertiesRuleFilter(ExcluideDemoDataFilterMixin):
+class ProductPropertiesRuleFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     product_type: Optional[PropertyFilter]
 

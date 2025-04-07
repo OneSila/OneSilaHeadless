@@ -4,7 +4,6 @@ from integrations.schema.types.filters import IntegrationFilter
 from integrations.schema.types.ordering import IntegrationOrder
 from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION
 from strawberry.relay.utils import to_base64
-
 from sales_channels.integrations.magento2.models import MagentoSalesChannel
 from sales_channels.integrations.magento2.schema.types.types import MagentoSalesChannelType
 from sales_channels.schema.types.types import SalesChannelType

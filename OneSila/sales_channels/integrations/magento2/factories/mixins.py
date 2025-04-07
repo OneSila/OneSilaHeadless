@@ -1,10 +1,11 @@
 from magento import get_api
-
+from collections import defaultdict
 from properties.models import Property, ProductPropertyTextTranslation
 from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet, MagentoAttributeSetAttribute, MagentoProperty
 from magento.models import AttributeSet
 
-from sales_channels.models.sales_channels import RemoteLanguage
+from sales_channels.integrations.magento2.models.sales_channels import MagentoRemoteLanguage
+from sales_channels.models.sales_channels import RemoteLanguage, SalesChannelViewAssign
 
 
 class GetMagentoAPIMixin:
@@ -23,12 +24,72 @@ class GetMagentoAPIMixin:
             strict_mode=True
         )
 
+
 class MagentoEntityNotFoundGeneralErrorMixin:
 
     def is_duplicate_error(self, error):
         return "already exists" in str(error)
 
-class RemoteValueMixin:
+
+class MagentoTranslationMixin:
+    def get_magento_languages(self, product=None, language=None):
+        """
+        Returns a grouped structure of remote languages by local language code.
+
+        If a product is provided, filters only the sales channel views assigned to it.
+        """
+        remote_language_qs = MagentoRemoteLanguage.objects.filter(
+            sales_channel=self.sales_channel,
+            store_view_code__isnull=False,
+            local_instance__isnull=False
+        )
+
+        if product:
+            sales_views_ids = SalesChannelViewAssign.objects.filter(
+                sales_channel=self.sales_channel,
+                product=product
+            ).values_list('sales_channel_view_id', flat=True)
+
+            remote_language_qs = remote_language_qs.filter(
+                sales_channel_view_id__in=sales_views_ids
+            )
+
+        if language:
+            remote_language_qs = remote_language_qs.filter(local_instance=language)
+
+        languages_by_local = defaultdict(list)
+        for rl in remote_language_qs:
+            languages_by_local[rl.local_instance].append(rl)
+
+        return languages_by_local
+
+    def get_frontend_labels(self, translations, value_field, language=None):
+        """
+        Prepares a list of frontend labels to be used in Magento API.
+
+        :param translations: Queryset of ProductTranslation
+        :param value_field: Field name from translation to use as label
+        :return: List of dicts with label and store_id
+        """
+        frontend_labels = []
+        remote_languages = self.get_magento_languages(language=language)
+
+        for translation in translations:
+            language_code = translation.language
+            magento_langs = remote_languages.get(language_code, [])
+
+            for magento_language in magento_langs:
+                label = getattr(translation, value_field, None)
+                if label:
+                    frontend_labels.append({
+                        'label': label,
+                        'store_id': magento_language.remote_id
+                    })
+
+        return frontend_labels
+
+
+class RemoteValueMixin(MagentoTranslationMixin):
     def get_remote_value(self):
         # Get the local property type and value
         property_type = self.local_property.type
@@ -107,17 +168,14 @@ class RemoteValueMixin:
 
         # Multiple translations: return them as a dictionary {remote_code: remote_value}
         translated_values = {}
+        language_to_remote_languages = self.get_magento_languages(product=self.local_instance.product, language=self.language)
         for translation in translations:
-            language_code = translation.language
-            remote_code = remote_languages.get(language_code)
-
-            # Skip if no corresponding remote code found
-            if not remote_code:
-                continue
-
-            # Choose the correct value type based on the property type
-            remote_value = translation.value_text if self.local_property.type == Property.TYPES.TEXT else translation.value_description
-            translated_values[remote_code] = remote_value
+            value = (
+                translation.value_text if self.local_property.type == Property.TYPES.TEXT
+                else translation.value_description
+            )
+            for lang in language_to_remote_languages.get(translation.language, []):
+                translated_values[lang.store_view_code] = value
 
         return translated_values
 

@@ -51,6 +51,7 @@ INSTALLED_LOCAL_APPS = [
     'billing',
     'eancodes',
     'lead_times',
+    'imports_exports',
     'llm',
     'media',
     'notifications',
@@ -256,3 +257,6 @@ HUEY = {
         'health_check_interval': 1,
     },
 }
+
+ADMIN_ROUTE_SUFFIX = ""
+MAGENTO_LOG_DIR_PATH = '/var/log/OneSilaHeadless/magento'

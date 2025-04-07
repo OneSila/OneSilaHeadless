@@ -11,7 +11,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class SalesChannel(Integration, models.Model):
+class  SalesChannel(Integration, models.Model):
     """
     Polymorphic model representing a sales channel, such as a website or marketplace.
     """
@@ -20,11 +20,29 @@ class SalesChannel(Integration, models.Model):
     sync_contents = models.BooleanField(default=True, verbose_name=_('Sync Contents'))
     sync_ean_codes = models.BooleanField(default=True, verbose_name=_('Sync EAN Codes'))
     sync_prices = models.BooleanField(default=True, verbose_name=_('Sync Prices'))
+    import_orders = models.BooleanField(default=True, verbose_name=_('Import Orders'))
     first_import_complete = models.BooleanField(default=False, help_text="Set to True once the first import has been completed.")
+    is_importing = models.BooleanField(default=False, help_text=_("True while an import process is running."))
 
     class Meta:
         verbose_name = 'Sales Channel'
         verbose_name_plural = 'Sales Channels'
+
+
+    def save(self, *args, **kwargs):
+
+        dirty_fields = self.get_dirty_fields().keys()
+        if 'active' in dirty_fields and self.active and 'is_importing' not in dirty_fields:
+            if self.is_importing:
+                raise Exception(
+                    _("Cannot set integration to active during an import. It will automatically be set to the previous status after the import is done.")
+                )
+
+        self.connect()
+        super().save(*args, **kwargs)
+
+    def connect(self):
+        raise NotImplementedError("This method must be implemented by child class")
 
     def __str__(self):
         return f"{self.hostname } @ {self.multi_tenant_company}"
@@ -85,16 +103,6 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     def remote_url(self):
         return f"{self.sales_channel_view.url}{self.product.url_key}.html"
 
-    def create_clean(self):
-
-        if self.product.inspector.has_missing_information:
-            raise ValidationError(f"Cannot assign product '{self.product}' to sales channel view because it is having missing informations..")
-
-    def save(self, *args, **kwargs):
-        if not self.pk:
-            self.create_clean()
-        super().save(*args, **kwargs)
-
 class RemoteLanguage(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the remote mirror of a Language.
@@ -108,10 +116,9 @@ class RemoteLanguage(PolymorphicModel, RemoteObjectMixin, models.Model):
         default=settings.LANGUAGE_CODE,
         help_text="The local language code associated with this remote language."
     )
-    remote_code = models.CharField(max_length=10, help_text="The language code in the remote system.")
+    remote_code = models.CharField(max_length=64, help_text="The language code in the remote system.")
 
     class Meta:
-        unique_together = ('sales_channel', 'local_instance')
         verbose_name = 'Remote Language'
         verbose_name_plural = 'Remote Languages'
 

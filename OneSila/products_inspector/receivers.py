@@ -143,6 +143,10 @@ def products_inspector__inspector__trigger_block_ean_product_change_on_delete(se
 @receiver(post_update, sender='properties.ProductProperty')
 @receiver(post_create, sender='properties.ProductProperty')
 def products_inspector__inspector__trigger_block_product_properties_change(sender, instance, **kwargs):
+
+    if not hasattr(instance.product, 'inspector'):
+        return
+
     inspector_block_refresh.send(sender=instance.product.inspector.__class__,
                                  instance=instance.product.inspector,
                                  error_code=MISSING_PRODUCT_TYPE_ERROR,
@@ -221,6 +225,9 @@ def products_inspector__inspector__trigger_block_product_type_variations_mismatc
     from products.models import ConfigurableVariation, BundleVariation
 
     if not instance.property.is_product_type:
+        return
+
+    if not hasattr(instance.product, 'inspector'):
         return
 
     product = instance.product

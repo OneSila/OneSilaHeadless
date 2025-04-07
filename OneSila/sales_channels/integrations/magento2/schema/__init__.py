@@ -1,1 +1,3 @@
 from .mutations import MagentoSalesChannelMutation
+from .queries import MagentoSalesChannelsQuery
+from .subscriptions import MagentoSalesChannelsSubscription

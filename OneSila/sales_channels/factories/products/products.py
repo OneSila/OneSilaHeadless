@@ -521,6 +521,12 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """
         pass
 
+    def get_remote_languages(self):
+        return  RemoteLanguage.objects.filter(
+            sales_channel=self.sales_channel,
+            local_instance__isnull=False
+        )
+
     def set_content_translations(self):
         """
         Sets the content translations for the product or variation in all supported languages.
@@ -528,9 +534,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         if not self.sales_channel.sync_contents:
             return
 
-        remote_languages = RemoteLanguage.objects.filter(sales_channel=self.sales_channel)
-
-        for remote_language in remote_languages:
+        for remote_language in self.get_remote_languages():
             # Fetch translations for each content field
             short_description = self.local_instance._get_translated_value(
                 field_name='short_description',
