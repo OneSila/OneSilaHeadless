@@ -506,11 +506,9 @@ class ImportSalesPriceInstance(AbstractImportInstance):
 
         if hasattr(self, 'currency') and hasattr(self, 'public_currency'):
 
-            self.currency, _ = Currency.objects.get_or_create(
+            self.currency, _ = Currency.objects.get(
                 multi_tenant_company=self.multi_tenant_company,
                 iso_code=self.public_currency.iso_code,
-                name=self.public_currency.name,
-                symbol=self.public_currency.symbol,
             )
 
             return
