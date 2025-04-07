@@ -15,17 +15,22 @@ from sales_channels.models import SalesChannel
 # !IMPORTANT: @remote_task needs to be above in order to work
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def create_magento_property_db_task(task_queue_item_id, sales_channel_id, property_id):
+def create_magento_property_db_task(task_queue_item_id, sales_channel_id, property_id, language=None):
     from .factories.properties.properties import MagentoPropertyCreateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
+        factory_kwargs = {}
+        if language:
+            factory_kwargs['language'] = language
+
         run_generic_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoPropertyCreateFactory,
             local_instance_id=property_id,
-            local_instance_class=Property
+            local_instance_class=Property,
+            factory_kwargs=factory_kwargs
         )
 
     task.execute(actual_task)
@@ -33,15 +38,20 @@ def create_magento_property_db_task(task_queue_item_id, sales_channel_id, proper
 
 @remote_task(number_of_remote_requests=3)
 @db_task()
-def update_magento_property_db_task(task_queue_item_id, sales_channel_id, property_id):
+def update_magento_property_db_task(task_queue_item_id, sales_channel_id, property_id, language=None):
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
+        factory_kwargs = {}
+        if language:
+            factory_kwargs['language'] = language
+
         run_generic_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoPropertyUpdateFactory,
             local_instance_id=property_id,
-            local_instance_class=Property
+            local_instance_class=Property,
+            factory_kwargs=factory_kwargs
         )
 
     task.execute(actual_task)
@@ -65,16 +75,21 @@ def delete_magento_property_db_task(task_queue_item_id, sales_channel_id, remote
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def create_magento_property_select_value_task(task_queue_item_id, sales_channel_id, property_select_value_id):
+def create_magento_property_select_value_task(task_queue_item_id, sales_channel_id, property_select_value_id, language=None):
     from .factories.properties.properties import MagentoPropertySelectValueCreateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
     def actual_task():
+        factory_kwargs = {}
+        if language:
+            factory_kwargs['language'] = language
+
         run_generic_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoPropertySelectValueCreateFactory,
             local_instance_id=property_select_value_id,
-            local_instance_class=PropertySelectValue
+            local_instance_class=PropertySelectValue,
+            factory_kwargs=factory_kwargs
         )
 
     task.execute(actual_task)
@@ -82,16 +97,21 @@ def create_magento_property_select_value_task(task_queue_item_id, sales_channel_
 
 @remote_task(number_of_remote_requests=3)
 @db_task()
-def update_magento_property_select_value_task(task_queue_item_id, sales_channel_id, property_select_value_id):
+def update_magento_property_select_value_task(task_queue_item_id, sales_channel_id, property_select_value_id, language=None):
     from .factories.properties.properties import MagentoPropertySelectValueUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
     def actual_task():
+        factory_kwargs = {}
+        if language:
+            factory_kwargs['language'] = language
+
         run_generic_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoPropertySelectValueUpdateFactory,
             local_instance_id=property_select_value_id,
-            local_instance_class=PropertySelectValue
+            local_instance_class=PropertySelectValue,
+            factory_kwargs=factory_kwargs
         )
 
     task.execute(actual_task)
@@ -220,18 +240,23 @@ def create_magento_product_db_task(task_queue_item_id, sales_channel_id, product
 
 @remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def create_magento_product_property_db_task(task_queue_item_id, sales_channel_id, product_property_id, remote_product_id):
+def create_magento_product_property_db_task(task_queue_item_id, sales_channel_id, product_property_id, remote_product_id, language=None):
     from .factories.properties import MagentoProductPropertyCreateFactory
     from properties.models import ProductProperty
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
+        factory_kwargs = {}
+        if language:
+            factory_kwargs['language'] = language
+
         run_remote_product_dependent_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoProductPropertyCreateFactory,
             local_instance_id=product_property_id,
             local_instance_class=ProductProperty,
-            remote_product_id=remote_product_id
+            remote_product_id=remote_product_id,
+            factory_kwargs=factory_kwargs
         )
 
     task.execute(actual_task)
@@ -239,19 +264,24 @@ def create_magento_product_property_db_task(task_queue_item_id, sales_channel_id
 
 @remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def update_magento_product_property_db_task(task_queue_item_id, sales_channel_id, product_property_id, remote_product_id):
+def update_magento_product_property_db_task(task_queue_item_id, sales_channel_id, product_property_id, remote_product_id, language=None):
     from .factories.properties import MagentoProductPropertyUpdateFactory
     from properties.models import ProductProperty
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
+        factory_kwargs = {}
+        if language:
+            factory_kwargs['language'] = language
+
         run_remote_product_dependent_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoProductPropertyUpdateFactory,
             local_instance_id=product_property_id,
             local_instance_class=ProductProperty,
-            remote_product_id=remote_product_id
+            remote_product_id=remote_product_id,
+            factory_kwargs=factory_kwargs
         )
 
     task.execute(actual_task)
@@ -298,18 +328,25 @@ def update_magento_price_db_task(task_queue_item_id, sales_channel_id, product_i
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def update_magento_product_content_db_task(task_queue_item_id, sales_channel_id, product_id, remote_product_id):
+def update_magento_product_content_db_task(task_queue_item_id, sales_channel_id, product_id, remote_product_id, language=None):
     from .factories.products import MagentoProductContentUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
+        factory_kwargs = None
+        if language:
+            factory_kwargs = {
+                'language': language,
+            }
+
         run_remote_product_dependent_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoProductContentUpdateFactory,
             local_instance_id=product_id,
             local_instance_class=Product,
-            remote_product_id=remote_product_id
+            remote_product_id=remote_product_id,
+            factory_kwargs=factory_kwargs
         )
 
     task.execute(actual_task)
@@ -512,17 +549,18 @@ def sync_magento_product_db_task(task_queue_item_id, sales_channel_id, product_i
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=2)
 @db_task()
-def update_magento_sales_view_assign_db_task(task_queue_item_id, sales_channel_id, assign_id):
+def update_magento_sales_view_assign_db_task(task_queue_item_id, sales_channel_id, product_id):
     from .factories.products import RemoteSalesChannelAssignUpdateFactory
     from sales_channels.models import SalesChannelViewAssign
 
     task = BaseRemoteTask(task_queue_item_id)
+    assign = SalesChannelViewAssign.objects.get(product_id=product_id, sales_channel_id=sales_channel_id)
 
     def actual_task():
         run_generic_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=RemoteSalesChannelAssignUpdateFactory,
-            local_instance_id=assign_id,
+            local_instance_id=assign.id,
             local_instance_class=SalesChannelViewAssign
         )
 

@@ -1,38 +1,39 @@
 from magento.models import Product
-
 from products.models import ProductTranslation
 from sales_channels.factories.products.content import RemoteProductContentUpdateFactory
-from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin
+from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin, MagentoTranslationMixin
 from sales_channels.integrations.magento2.models import MagentoProductContent
-from sales_channels.models.sales_channels import RemoteLanguage
 
 
-class MagentoProductContentUpdateFactory(GetMagentoAPIMixin, RemoteProductContentUpdateFactory):
+class MagentoProductContentUpdateFactory(GetMagentoAPIMixin, RemoteProductContentUpdateFactory, MagentoTranslationMixin):
     remote_model_class = MagentoProductContent
 
     def customize_payload(self):
         translations = ProductTranslation.objects.filter(product=self.local_instance)
 
-        remote_languages = {rl.local_instance: rl.sales_channel_view.code for rl in RemoteLanguage.objects.filter(
-            sales_channel=self.sales_channel
-        ) if rl.sales_channel_view is not None}
+        # Use the mixin to get a mapping of local language -> list of MagentoRemoteLanguage objects
+        remote_languages_map = self.get_magento_languages(
+            product=self.local_instance,
+            language=self.language
+        )
 
         for translation in translations:
             language_code = translation.language
-            remote_code = remote_languages.get(language_code, None)
+            magento_languages = remote_languages_map.get(language_code, [])
 
-            if not remote_code:
-                continue
+            for magento_lang in magento_languages:
+                remote_code = magento_lang.store_view_code
 
-            content = {}
-            content["name"] = translation.name
-            content["url_key"] = translation.url_key
+                content = {
+                    "name": translation.name,
+                    "url_key": translation.url_key
+                }
 
-            if self.sales_channel.sync_contents:
-                content["short_description"] = translation.short_description
-                content["description"] = translation.description
+                if self.sales_channel.sync_contents:
+                    content["short_description"] = translation.short_description
+                    content["description"] = translation.description
 
-            self.payload[remote_code] = content
+                self.payload[remote_code] = content
 
 
     def update_remote(self):
@@ -41,7 +42,9 @@ class MagentoProductContentUpdateFactory(GetMagentoAPIMixin, RemoteProductConten
         for remote_code, content in self.payload.items():
             for key, value in content.items():
                 setattr(self.magento_product, key, value)
-                self.magento_product.save(scope=remote_code)
+
+            self.magento_product.save(scope=remote_code)
+
 
     def serialize_response(self, response):
         return self.magento_product.to_dict()

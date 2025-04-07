@@ -20,6 +20,7 @@ class  SalesChannel(Integration, models.Model):
     sync_contents = models.BooleanField(default=True, verbose_name=_('Sync Contents'))
     sync_ean_codes = models.BooleanField(default=True, verbose_name=_('Sync EAN Codes'))
     sync_prices = models.BooleanField(default=True, verbose_name=_('Sync Prices'))
+    import_orders = models.BooleanField(default=True, verbose_name=_('Import Orders'))
     first_import_complete = models.BooleanField(default=False, help_text="Set to True once the first import has been completed.")
     is_importing = models.BooleanField(default=False, help_text=_("True while an import process is running."))
 
@@ -115,10 +116,9 @@ class RemoteLanguage(PolymorphicModel, RemoteObjectMixin, models.Model):
         default=settings.LANGUAGE_CODE,
         help_text="The local language code associated with this remote language."
     )
-    remote_code = models.CharField(max_length=10, help_text="The language code in the remote system.")
+    remote_code = models.CharField(max_length=64, help_text="The language code in the remote system.")
 
     class Meta:
-        unique_together = ('sales_channel', 'local_instance')
         verbose_name = 'Remote Language'
         verbose_name_plural = 'Remote Languages'
 

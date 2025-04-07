@@ -222,5 +222,7 @@ class ImportMixin:
         except Exception as e:
             self.mark_failure()
 
+            raise
+
         finally:
             self.process_completed()

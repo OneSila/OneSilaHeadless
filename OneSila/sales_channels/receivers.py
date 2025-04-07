@@ -125,11 +125,15 @@ def sales_channels__property_translation__post_create_receiver(sender, instance:
     Handles post-create events for the PropertyTranslation model.
     - Send create signal if it's the first translation.
     """
-    translation_count = PropertyTranslation.objects.filter(property=instance.property).count()
+    if not instance.property.is_public_information:
+        return
 
-    if translation_count == 1 and instance.property.is_public_information:
+    translation_count = PropertyTranslation.objects.filter(property=instance.property).count()
+    if translation_count == 1:
         # Send create signal only if this is the first translation
-        create_remote_property.send(sender=instance.property.__class__, instance=instance.property)
+        create_remote_property.send(sender=instance.property.__class__, instance=instance.property, language=instance.language)
+    else:
+        update_remote_property.send(sender=instance.property.__class__, instance=instance.property, language=instance.language)
 
 
 @receiver(post_update, sender='properties.PropertyTranslation')
@@ -137,7 +141,7 @@ def sales_channels__property_translation__post_update_receiver(sender, instance:
     """
     Handles post-update events for the PropertyTranslation model to send update signals.
     """
-    update_remote_property.send(sender=instance.property.__class__, instance=instance.property)
+    update_remote_property.send(sender=instance.property.__class__, instance=instance.property, language=instance.language)
 
 
 @receiver(post_delete, sender='properties.PropertyTranslation')
@@ -167,10 +171,10 @@ def sales_channels__property_select_value_translation__post_create_receiver(send
 
         if translation_count == 1:
             # Send create signal only if this is the first translation
-            create_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__, instance=instance.propertyselectvalue)
+            create_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__, instance=instance.propertyselectvalue, language=instance.language)
         else:
             # For additional translations, send an update signal
-            update_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__, instance=instance.propertyselectvalue)
+            update_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__, instance=instance.propertyselectvalue, language=instance.language)
 
 @receiver(post_update, sender='properties.PropertySelectValueTranslation')
 def sales_channels__property_select_value_translation__post_update_receiver(sender, instance: PropertySelectValueTranslation, **kwargs):
@@ -179,7 +183,7 @@ def sales_channels__property_select_value_translation__post_update_receiver(send
     - Sends an update signal on any translation update if the property is public information.
     """
     if instance.propertyselectvalue.property.is_public_information:
-        update_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__, instance=instance.propertyselectvalue)
+        update_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__, instance=instance.propertyselectvalue, language=instance.language)
 
 
 @receiver(pre_delete, sender='properties.PropertySelectValueTranslation')
@@ -273,13 +277,13 @@ def sales_channels__product_property__pre_delete_receiver(sender, instance: Prod
 def sales_channels__product_property_text_translation__post_create_receiver(sender, instance: ProductPropertyTextTranslation, **kwargs):
 
     if instance.product_property.property.is_public_information:
-        create_remote_product_property.send(sender=instance.product_property.__class__, instance=instance.product_property)
+        create_remote_product_property.send(sender=instance.product_property.__class__, instance=instance.product_property, language=instance.language)
 
 @receiver(post_update, sender='properties.ProductPropertyTextTranslation')
 def sales_channels__product_property_text_translation__post_update_receiver(sender, instance: ProductPropertyTextTranslation, **kwargs):
 
     if instance.product_property.property.is_public_information:
-        update_remote_product_property.send(sender=instance.product_property.__class__, instance=instance.product_property)
+        update_remote_product_property.send(sender=instance.product_property.__class__, instance=instance.product_property, language=instance.language)
 
 @receiver(post_delete, sender='properties.ProductPropertyTextTranslation')
 def sales_channels__product_property_text_translation__pre_delete_receiver(sender, instance: ProductPropertyTextTranslation, **kwargs):
@@ -376,8 +380,16 @@ def sales_channels__price_changed__receiver(sender, instance, **kwargs):
 
 @receiver(post_create, sender='products.ProductTranslation')
 @receiver(post_update, sender='products.ProductTranslation')
+def sales_channels__product_translation__post_create_update_receiver(sender, instance, **kwargs):
+    """
+    Trigger the update_remote_product_content signal for the associated product
+    whenever a ProductTranslation is created, updated, or deleted.
+    """
+    update_remote_product_content.send(sender=instance.product.__class__, instance=instance.product, language=instance.language)
+
+
 @receiver(post_delete, sender='products.ProductTranslation')
-def sales_channels__product_translation__post_create_update_delete_receiver(sender, instance, **kwargs):
+def sales_channels__product_translation__post_delete_receiver(sender, instance, **kwargs):
     """
     Trigger the update_remote_product_content signal for the associated product
     whenever a ProductTranslation is created, updated, or deleted.
@@ -486,6 +498,10 @@ def sales_channel_view_assign__post_create_receiver(sender, instance, **kwargs):
         sales_channel=instance.sales_channel,
         sales_channel__active=True
     ).count()
+
+    # during imports sales channels are not active this signal will be triggered but it should just be skipped
+    if product_assign_count == 0:
+        return
 
     if product_assign_count == 1:
         create_remote_product.send(sender=instance.__class__, instance=instance)

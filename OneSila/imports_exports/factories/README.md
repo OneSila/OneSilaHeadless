@@ -12,12 +12,13 @@ At least one of:
 
 ### ⚙️ Optional Fields
 
-| Field                  | Type    | Default | Description |
-|------------------------|---------|---------|-------------|
-| `type`                 | `str`   | auto    | One of the allowed types (see below). |
-| `is_public_information`| `bool`  | `True`  | Whether the property is visible to the customer. |
-| `add_to_filters`       | `bool`  | `True`  | Whether the property appears in filters. |
-| `has_image`            | `bool`  | `False` | Whether the property has images per value. |
+| Field                   | Type   | Default  | Description                                      |
+|-------------------------|--------|----------|--------------------------------------------------|
+| `type`                  | `str`  | auto     | One of the allowed types (see below).            |
+| `is_public_information` | `bool` | `True`   | Whether the property is visible to the customer. |
+| `add_to_filters`        | `bool` | `True`   | Whether the property appears in filters.         |
+| `has_image`             | `bool` | `False`  | Whether the property has images per value.      |
+| `translations`          | `list` | `[]`     | Language and name list to create translations.   |
 
 ### 🔄 Updatable Fields
 
@@ -99,9 +100,11 @@ And **one of**:
 
 ### ⚙️ Optional Fields
 
-| Field          | Type    | Description |
-|----------------|---------|-------------|
-| `property_data`| `dict`  | See [ImportPropertyInstance](#-importpropertyinstance) for full structure. |
+| Field          | Type   | Description |
+|----------------|--------|------------|
+| `property_data`| `dict` | See [ImportPropertyInstance](#-importpropertyinstance) for full structure. |
+| `translations` | `list` | Language and name list to create translations.   |
+
 
 ### ✅ Behavior
 
@@ -349,8 +352,10 @@ Handles setting a property on a product, with flexible value handling based on t
 
 ### ⚙️ Optional Fields
 | Field         | Type  | Default |
-|---------------|-------|---------|
+|---------------|-------|--------|
 | `value_is_id` | `bool`| `False` |
+| `translations` | `list` | []     |
+
 
 ### 🔄 Updatable Fields
 - `value_boolean`

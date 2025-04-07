@@ -33,10 +33,13 @@ class AbstractImportInstance(abc.ABC):
         self.sales_channel = None
         self.remote_instance = None
 
-        if self.multi_tenant_company:
-            self.language = self.multi_tenant_company.language
+        if 'language'in data:
+            self.language = data['language']
         else:
-            self.language = settings.LANGUAGE_CODE
+            if self.multi_tenant_company:
+                self.language = self.multi_tenant_company.language
+            else:
+                self.language = settings.LANGUAGE_CODE
 
 
     @property

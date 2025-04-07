@@ -70,3 +70,5 @@ class MagentoRemoteLanguage(RemoteLanguage):
         related_name='remote_languages',
         help_text="The sales channel view associated with this remote language."
     )
+    store_view_code = models.CharField(max_length=126, help_text="The language code store view (will be used as scope).")
+

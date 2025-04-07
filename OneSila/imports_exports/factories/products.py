@@ -21,7 +21,7 @@ class ProductImport(ImportOperationMixin):
 
 
 class ProductTranslationImport(ImportOperationMixin):
-    get_identifiers = ['product']
+    get_identifiers = ['product', 'language']
 
 
 class SalesPriceImport(ImportOperationMixin):
@@ -180,7 +180,7 @@ class ImportProductInstance(AbstractImportInstance):
 
     def _set_translations(self):
 
-        if not hasattr(self, 'translations') or not len(self.translations):
+        if not getattr(self, 'translations', []):
 
             self.translations = [{
                 'name': getattr(self, 'name', 'Unnamed'),
@@ -406,6 +406,7 @@ class ImportProductTranslationInstance(AbstractImportInstance):
         self.set_field_if_exists('short_description')
         self.set_field_if_exists('description')
         self.set_field_if_exists('url_key')
+        self.set_field_if_exists('language')
         self.set_field_if_exists('product_data')
 
         self.validate()

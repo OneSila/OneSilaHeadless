@@ -65,6 +65,11 @@ class ImportPropertyInstance(AbstractImportInstance):
            "is_public_information": True,
            "add_to_filters": True,
            "has_image": False
+           "translations": [
+            { "language": "en", "name": "Material" },
+            { "language": "nl", "name": "Materiaal" },
+            { "language": "fr", "name": "Matériau" }
+          ]
        }
 
     2. Minimal data with type provided:
@@ -96,6 +101,7 @@ class ImportPropertyInstance(AbstractImportInstance):
         self.set_field_if_exists('is_public_information')
         self.set_field_if_exists('add_to_filters')
         self.set_field_if_exists('has_image')
+        self.set_field_if_exists('translations')
 
         # First, validate required keys and boolean field types (ignoring 'type').
         self.validate()
@@ -171,7 +177,10 @@ class ImportPropertyInstance(AbstractImportInstance):
         # Save the created/updated instance.
         self.instance = fac.instance
 
-        if fac.created:
+        # Only create a default translation if:
+        # - the instance was just created
+        # - and no valid translations were passed
+        if fac.created and not (hasattr(self, 'translations') and len(self.translations) > 0):
             self.create_translation()
 
 
@@ -191,6 +200,30 @@ class ImportPropertyInstance(AbstractImportInstance):
             name=name,
         )
 
+    def post_process_logic(self):
+
+        if not hasattr(self, 'translations'):
+            return
+
+        for translation in self.translations:
+            language = translation.get('language', None)
+            name = translation.get('name', None)
+
+            if not language or not name:
+                continue
+
+            translation_object, created = PropertyTranslation.objects.get_or_create(
+                multi_tenant_company=self.instance.multi_tenant_company,
+                language=language,
+                property=self.instance
+            )
+
+            # Update name if changed
+            if translation_object.name != name:
+                translation_object.name = name
+                translation_object.save()
+
+
 
 class ImportPropertySelectValueInstance(AbstractImportInstance):
     """
@@ -199,6 +232,7 @@ class ImportPropertySelectValueInstance(AbstractImportInstance):
     Expected data keys:
       - value: The select value to be imported.
       - property_data: (Optional) A dict for importing the Property if no property is provided.
+      - translations: (Optional) A list of translations with 'language' and 'value' keys.
 
     Optionally, if the property already exists, the data may contain a 'property' key.
     """
@@ -209,6 +243,7 @@ class ImportPropertySelectValueInstance(AbstractImportInstance):
 
         self.set_field_if_exists('value')
         self.set_field_if_exists('property_data')
+        self.set_field_if_exists('translations')
 
         self.validate()
         self._set_property_import_instance()
@@ -260,7 +295,7 @@ class ImportPropertySelectValueInstance(AbstractImportInstance):
         # Save the created/updated instance.
         self.instance = fac.instance
 
-        if fac.created:
+        if fac.created and not (hasattr(self, 'translations') and len(self.translations) > 0):
             self.create_translation()
 
 
@@ -272,6 +307,32 @@ class ImportPropertySelectValueInstance(AbstractImportInstance):
             propertyselectvalue=self.instance,
             value=self.value
         )
+
+
+    def post_process_logic(self):
+        """
+        Handles additional translations after main instance is created.
+        """
+
+        if not hasattr(self, 'translations'):
+            return
+
+        for translation in self.translations:
+            language = translation.get('language')
+            value = translation.get('value')
+
+            if not language or not value:
+                continue
+
+            translation_object, _ = PropertySelectValueTranslation.objects.get_or_create(
+                multi_tenant_company=self.instance.multi_tenant_company,
+                language=language,
+                propertyselectvalue=self.instance
+            )
+
+            if translation_object.value != value:
+                translation_object.value = value
+                translation_object.save()
 
 
 class ImportProductPropertiesRuleInstance(AbstractImportInstance):
@@ -464,7 +525,8 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
     Expected data keys:
       - value: The select value to be imported.
       - property_data: (Optional) A dict for importing the Property if no property is provided.
-     - product_data
+      - product_data
+      - translations
 
     Optionally, if the property already exists, the data may contain a 'property' key.
     """
@@ -478,6 +540,7 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
         self.set_field_if_exists('value_is_id', default_value=False)
         self.set_field_if_exists('property_data')
         self.set_field_if_exists('product_data')
+        self.set_field_if_exists('translations')
 
         if self.property is None:
             # we might want to add the property directly into data because most of the times the product properties
@@ -612,7 +675,11 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
 
         self.instance = fac.instance
 
-        if fac.created and self.factory_class == TranslatedProductPropertyImport:
+        if (
+            fac.created and
+            self.factory_class == TranslatedProductPropertyImport and
+            not (hasattr(self, 'translations') and len(self.translations) > 0)
+        ):
             self.create_translation()
 
 
@@ -625,3 +692,30 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
             value_text=getattr(self, 'value_text', None),
             value_description=getattr(self, 'value_description', None)
         )
+
+
+    def post_process_logic(self):
+
+        if not hasattr(self, 'translations'):
+            return
+
+        if self.property.type not in Property.TYPES.TRANSLATED:
+            return
+
+        for translation in getattr(self, 'translations', []):
+            language = translation.get('language')
+            value = translation.get('value')
+
+            if not language or not value:
+                continue
+
+            value_field = 'value_text' if self.property.type == Property.TYPES.TEXT else 'value_description'
+            translation_obj, _ = ProductPropertyTextTranslation.objects.get_or_create(
+                multi_tenant_company=self.instance.multi_tenant_company,
+                product_property=self.instance,
+                language=language,
+            )
+
+            if getattr(translation_obj, value_field) != value:
+                setattr(translation_obj, value_field, value)
+                translation_obj.save()

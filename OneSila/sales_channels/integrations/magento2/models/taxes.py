@@ -12,3 +12,4 @@ class MagentoCurrency(RemoteCurrency):
         related_name='remote_currencies',
         help_text="The sales channel view associated with this remote currency."
     )
+    store_view_code = models.CharField(max_length=126, help_text="The language code store view (will be used as scope).")

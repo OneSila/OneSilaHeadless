@@ -1,7 +1,8 @@
 import math
+from collections import defaultdict
+from copy import deepcopy
 from decimal import Decimal
 from typing import Optional
-
 from django.core.exceptions import ValidationError
 from magento.models import ProductAttribute, AttributeOption, AttributeSet
 from core.helpers import clean_json_data
@@ -20,14 +21,16 @@ from sales_channels.integrations.magento2.models import MagentoProperty, Magento
 from sales_channels.integrations.magento2.models.products import MagentoEanCode, MagentoPrice, MagentoProductContent, \
     MagentoImageProductAssociation
 from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet, MagentoProductProperty
+from sales_channels.integrations.magento2.models.sales_channels import MagentoRemoteLanguage
 from sales_channels.models import ImportProperty, ImportPropertySelectValue, ImportProduct, SalesChannelViewAssign, \
     SalesChannelImport
 from django.contrib.contenttypes.models import ContentType
 from magento.models import Product as MagentoApiProduct
 from magento.models import ConfigurableProduct as MagentoApiConfigurableProduct
-
 from sales_channels.models.products import RemoteProductConfigurator
+import logging
 
+logger = logging.getLogger(__name__)
 
 class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
     import_properties = True
@@ -44,6 +47,7 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
         self.remote_local_property_map = {}
 
+
     def prepare_import_process(self):
 
         # during the import this needs to stay false to prevent trying to create the mirror models because
@@ -54,7 +58,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
         # get properties
         self.properties = ImportProperty.objects.filter(import_process=self.import_process)
-        self.select_values = []
 
         # get select values
         properties_to_import = []
@@ -68,12 +71,72 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
             value=properties_string,
             condition="in").all_in_memory()
 
-        for property in api_properties:
-            for option in property.options:
-                self.select_values.append(option)
 
         self.rules = self.api.product_attribute_set.all_in_memory()
         self.products_cnt = self.api.products.count()
+
+        magento_languages = MagentoRemoteLanguage.objects.filter(
+            sales_channel=self.sales_channel,
+            local_instance__isnull=False
+        )
+
+        self.magento_translation_id_map = {}
+        self.magento_translation_store_code_map = {}
+
+        seen_languages = set()
+        for magento_language in magento_languages:
+            if magento_language.local_instance in seen_languages:
+                continue
+
+            self.magento_translation_id_map[magento_language.remote_id] = magento_language.local_instance
+            self.magento_translation_store_code_map[magento_language.store_view_code] = magento_language.local_instance
+            seen_languages.add(magento_language.local_instance)
+
+        self.select_values = []
+        if len(self.magento_translation_store_code_map) == 1:
+            # Only one language configured → no need to handle per-language translations
+            for property in api_properties:
+                for option in property.options:
+                    self.select_values.append(option)
+        else:
+            for property in api_properties:
+                option_translation_map = defaultdict(dict)  # value_id => {lang: label}
+                option_objects = {}  # value_id => base option from scope='all'
+
+                # Fetch base options from scope='all'
+                try:
+                    base_options = property.get_options_with_scope(scope="all")
+                except Exception as e:
+                    logger.debug(f"Failed to fetch base options for property {property.attribute_code}: {e}")
+                    continue
+
+                for option in base_options:
+                    value_id = option.value
+                    if value_id == '':
+                        continue
+                    option_objects[value_id] = option  # store only base version
+
+                # Collect translations per store view
+                for store_code, local_lang in self.magento_translation_store_code_map.items():
+                    try:
+                        scoped_options = property.get_options_with_scope(scope=store_code)
+                    except Exception as e:
+                        logger.debug(f"Failed to fetch options for scope {store_code}: {e}")
+                        continue
+
+
+                    for option in scoped_options:
+                        value_id = option.value
+                        label = option.label
+                        if not label or value_id == '':
+                            continue
+
+                        option_translation_map[value_id][local_lang] = label
+
+                # Combine base with translations
+                for value_id, base_option in option_objects.items():
+                    base_option.translations = option_translation_map.get(value_id, {})
+                    self.select_values.append(base_option)
 
     def get_total_instances(self):
         properties_cnt = self.properties.count()
@@ -96,6 +159,19 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         structured['name'] = raw.get('default_frontend_label')
         structured['is_public_information'] = True
         structured['add_to_filters'] = bool(int(raw.get('is_filterable', False)))
+
+        translations = []
+        frontend_labels = raw.get('frontend_labels', [])
+        for frontend_label in frontend_labels:
+            language = self.magento_translation_id_map.get(str(frontend_label['store_id']))
+            translation_data = {
+                'name': frontend_label['label'],
+                'language': language
+            }
+            translations.append(translation_data)
+
+        if translations:
+            structured['translations'] = translations
 
         # Try to detect type from frontend_input
         frontend_input = raw.get('frontend_input')
@@ -147,6 +223,13 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         structured_data = {
             'value': value_data.label,
         }
+
+        if hasattr(value_data, 'translations'):
+            translations = []
+            for language, value in value_data.translations.items():
+                translations.append({'language': language, 'value': value})
+
+            structured_data['translations'] = translations
 
         log_instance = ImportPropertySelectValue.objects.create(
             multi_tenant_company=self.import_process.multi_tenant_company,
@@ -278,15 +361,48 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
             if to_save:
                 mirror_rule_value.save()
 
+    def get_product_translation_map(self, product: MagentoApiProduct) -> dict | None:
+        """
+        Returns a mapping of local language → scoped MagentoApiProduct
+        without mutating the original product.
+        """
 
-    def get_product_translations(self, product: MagentoApiProduct):
-        # @TODO: THIS NEED TO BE MULTI LINGUAL
-        return [{
-            "name": product.name,
-            "short_description": product.short_description,
-            "description": product.description,
-            "url_key": product.url_key,
-        }]
+        if len(self.magento_translation_store_code_map) == 1:
+            return None
+
+        translation_product_map = {}
+
+        for store_code, language in self.magento_translation_store_code_map.items():
+            try:
+                translated_product = deepcopy(product)
+                translated_product.refresh(scope=store_code)
+                translation_product_map[language] = translated_product
+            except Exception as e:
+                logger.debug(f"Failed to fetch translation for scope {store_code}: {e}")
+                continue
+
+        return translation_product_map
+
+    def get_product_translations(self, product: MagentoApiProduct, translation_product_map=None):
+        if translation_product_map is None:
+            return [{
+                "name": product.name,
+                "short_description": product.short_description,
+                "description": product.description,
+                "url_key": product.url_key,
+            }]
+        else:
+            translations = []
+            for language, scoped_product in translation_product_map.items():
+                translations.append({
+                    "language": language,
+                    "name": scoped_product.name,
+                    "short_description": scoped_product.short_description,
+                    "description": scoped_product.description,
+                    "url_key": scoped_product.url_key,
+                })
+
+            return translations
 
     def get_product_images(self, product: MagentoApiProduct):
         images = []
@@ -306,51 +422,72 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
         return images, image_id_map
 
-    def get_product_attributes(self, custom_attributes: dict):
+    def get_product_attributes(self, custom_attributes: dict, translation_product_map: Optional[dict] = None):
         attributes = []
         mirror_map = {}
         accepted_properties = self.remote_local_property_map.keys()
 
         for attribute_code in accepted_properties:
-            if attribute_code in custom_attributes:
-                magento_value = custom_attributes[attribute_code]
-                value = magento_value
-                value_is_id = False
-                property = self.remote_local_property_map[attribute_code]["local"]
-                magento_property = self.remote_local_property_map[attribute_code]["remote"]
 
-                if property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
-                    value_is_id = True
+            if attribute_code not in custom_attributes:
+                continue
 
-                    if property.type == Property.TYPES.SELECT:
+            magento_value = custom_attributes[attribute_code]
+            value = magento_value
+            value_is_id = False
+            property = self.remote_local_property_map[attribute_code]["local"]
+            magento_property = self.remote_local_property_map[attribute_code]["remote"]
 
-                        magento_select_value = MagentoPropertySelectValue.objects.get(
-                            sales_channel=self.sales_channel,
-                            multi_tenant_company=self.import_process.multi_tenant_company,
-                            remote_property=magento_property,
-                            remote_id=magento_value
-                        )
-                        value = magento_select_value.local_instance.id
-                    else:
-                        select_values_ids = magento_value.split(',')
-                        select_values = PropertySelectValue.objects.filter(
-                            remotepropertyselectvalue__sales_channel=self.sales_channel,
-                            remotepropertyselectvalue__remote_property=magento_property,
-                            remotepropertyselectvalue__remote_id__in=select_values_ids
-                        )
-                        value = select_values.values_list('id', flat=True)
+            translations = []
 
-                attribute_data = {
-                    "value": value,
-                    "value_is_id": value_is_id,
-                    "property": property,
-                }
-                attributes.append(attribute_data)
+            # Handle SELECT and MULTISELECT
+            if property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
+                value_is_id = True
 
-                mirror_map[property.id] = {
-                    "remote_property": magento_property,
-                    "remote_value": str(magento_value),
-                }
+                if property.type == Property.TYPES.SELECT:
+                    magento_select_value = MagentoPropertySelectValue.objects.get(
+                        sales_channel=self.sales_channel,
+                        multi_tenant_company=self.import_process.multi_tenant_company,
+                        remote_property=magento_property,
+                        remote_id=magento_value
+                    )
+                    value = magento_select_value.local_instance.id
+
+                else:  # MULTISELECT
+                    select_values_ids = magento_value.split(',')
+                    select_values = PropertySelectValue.objects.filter(
+                        remotepropertyselectvalue__sales_channel=self.sales_channel,
+                        remotepropertyselectvalue__remote_property=magento_property,
+                        remotepropertyselectvalue__remote_id__in=select_values_ids
+                    )
+                    value = select_values.values_list('id', flat=True)
+
+            # Handle TEXT / DESCRIPTION multilingual
+            elif property.type in [Property.TYPES.DESCRIPTION, Property.TYPES.TEXT] and translation_product_map:
+                for language, scoped_product in translation_product_map.items():
+                    # language-specific value for the attribute
+                    lang_value = scoped_product.custom_attributes.get(attribute_code)
+                    if lang_value:
+                        translations.append({
+                            "language": language,
+                            "value": lang_value,
+                        })
+
+            attribute_data = {
+                "value": value,
+                "value_is_id": value_is_id,
+                "property": property,
+            }
+
+            if len(translations):
+                attribute_data["translations"] = translations
+
+            attributes.append(attribute_data)
+
+            mirror_map[property.id] = {
+                "remote_property": magento_property,
+                "remote_value": str(magento_value),
+            }
 
         return attributes, mirror_map
 
@@ -375,7 +512,7 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         sku_to_id_map = {}
 
         for child in product.get_children():
-            variation_data = self.get_product_data(child, rule, is_variation=True)
+            variation_data = self.get_product_data(child, rule)
             variations.append({
                 "variation_data": variation_data,
             })
@@ -416,7 +553,7 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         return None
 
 
-    def get_product_data(self, product: MagentoApiProduct, rule: ProductPropertiesRule, is_variation: Optional[bool] = False):
+    def get_product_data(self, product: MagentoApiProduct, rule: ProductPropertiesRule):
         type_map = {
             MagentoApiProduct.PRODUCT_TYPE_SIMPLE: Product.SIMPLE,
             MagentoApiProduct.PRODUCT_TYPE_CONFIGURABLE: Product.CONFIGURABLE,
@@ -433,15 +570,16 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
             "allow_backorder": product.backorders,
         }
 
+        translation_map = self.get_product_translation_map(product)
         ean_code = self.get_product_ean_code(custom_attributes)
         if ean_code:
             structured_data['ean_code'] = ean_code
 
-        structured_data['translations'] = self.get_product_translations(product)
+        structured_data['translations'] = self.get_product_translations(product, translation_map)
         structured_data['images'], structured_data['__image_index_to_remote_id'] = self.get_product_images(product)
 
         if product_type == Product.SIMPLE:
-            structured_data['attributes'], structured_data['__mirror_product_properties_map'] = self.get_product_attributes(custom_attributes)
+            structured_data['attributes'], structured_data['__mirror_product_properties_map'] = self.get_product_attributes(custom_attributes, translation_map)
             structured_data['prices'] = self.get_product_prices(product)
         elif product_type == Product.CONFIGURABLE:
             structured_data['variations'], structured_data['__variation_sku_to_id_map'] = self.get_product_variations(product, rule)
@@ -643,6 +781,7 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
 
     def import_products_process(self):
+
         products_api = self.api.products
         products_api.clear_pagination()
         products_api.per_page = 200
@@ -662,7 +801,7 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
                 is_variation = self.is_magento_variation(product)
                 rule = self.get_product_rule(product)
-                structured_data = self.get_product_data(product, rule, is_variation=is_variation)
+                structured_data = self.get_product_data(product, rule)
                 product_import_instance = ImportProductInstance(
                     data=structured_data,
                     import_process=self.import_process,

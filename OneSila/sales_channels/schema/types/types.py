@@ -80,6 +80,15 @@ class RemoteCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
     local_instance: Optional[CurrencyType]
 
+    @field()
+    def name(self, info) -> str:
+        name = self.remote_code
+
+        if hasattr(self, 'store_view_code'):
+            name = f"{name} ({self.store_view_code})"
+
+        return name
+
 
 @type(RemoteCustomer, filters=RemoteCustomerFilter, order=RemoteCustomerOrder, pagination=True, fields='__all__')
 class RemoteCustomerType(relay.Node, GetQuerysetMultiTenantMixin):
@@ -148,6 +157,15 @@ class SalesChannelViewType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(RemoteLanguage, filters=RemoteLanguageFilter, order=RemoteLanguageOrder, pagination=True, fields='__all__')
 class RemoteLanguageType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
+
+    @field()
+    def name(self, info) -> str:
+        name = self.remote_code
+
+        if hasattr(self, 'store_view_code'):
+            name = f"{name} ({self.store_view_code})"
+
+        return name
 
 @type(RemoteLog, filters=RemoteLogFilter, order=RemoteLogOrder, pagination=True, fields='__all__')
 class RemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):

@@ -33,5 +33,8 @@ def currency_convert(round_prices_up_to, exchange_rate, price):
     if price is None:
         return None
 
+    if exchange_rate is None:
+        return None
+
     new_price = Decimal(price) * Decimal(exchange_rate)
     return roundup(new_price, round_prices_up_to)

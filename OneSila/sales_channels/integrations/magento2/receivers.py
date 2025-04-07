@@ -1,5 +1,6 @@
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
+from django.templatetags.i18n import language
 
 from orders.signals import to_ship, shipped, hold, cancelled
 from properties.signals import product_properties_rule_created, product_properties_rule_updated, product_properties_rule_rename
@@ -22,15 +23,17 @@ from sales_channels.signals import create_remote_property, update_remote_propert
 @receiver(create_remote_property, sender='properties.Property')
 def sales_channels__magento__property__create(sender, instance, **kwargs):
     from .tasks import create_magento_property_db_task
+    language = kwargs.get('language', None)
 
-    task_kwargs = {'property_id': instance.id}
+    task_kwargs = {'property_id': instance.id, 'language': language}
     run_generic_magento_task_flow(create_magento_property_db_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
 
 @receiver(update_remote_property, sender='properties.Property')
 def sales_channels__magento__property__update(sender, instance, **kwargs):
     from .tasks import update_magento_property_db_task
+    language = kwargs.get('language', None)
 
-    task_kwargs = {'property_id': instance.id}
+    task_kwargs = {'property_id': instance.id, 'language': language}
     run_generic_magento_task_flow(update_magento_property_db_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
 
 
@@ -48,17 +51,18 @@ def sales_channels__magento__property__delete(sender, instance, **kwargs):
 @receiver(create_remote_property_select_value, sender='properties.PropertySelectValue')
 def sales_channels__magento__property_select_value__create(sender, instance, **kwargs):
     from .tasks import create_magento_property_select_value_task
+    language = kwargs.get('language', None)
 
-    task_kwargs = {'property_select_value_id': instance.id}
+    task_kwargs = {'property_select_value_id': instance.id, 'language': language}
     run_generic_magento_task_flow(create_magento_property_select_value_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
 
 
 @receiver(update_remote_property_select_value, sender='properties.PropertySelectValue')
 def sales_channels__magento__property_select_value__update(sender, instance, **kwargs):
     from .tasks import update_magento_property_select_value_task
+    language = kwargs.get('language', None)
 
-
-    task_kwargs = {'property_select_value_id': instance.id}
+    task_kwargs = {'property_select_value_id': instance.id, 'language': language}
     run_generic_magento_task_flow(update_magento_property_select_value_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
 
 
@@ -142,8 +146,9 @@ def sales_channels__magento__attribute_set__delete(sender, instance, **kwargs):
 @receiver(create_remote_product_property, sender='properties.ProductProperty')
 def sales_channels__magento__product_property__create(sender, instance, **kwargs):
     from .tasks import create_magento_product_property_db_task
+    language = kwargs.get('language', None)
 
-    task_kwargs = {'product_property_id': instance.id}
+    task_kwargs = {'product_property_id': instance.id, 'language': language}
     run_product_specific_magento_task_flow(
         task_func=create_magento_product_property_db_task,
         multi_tenant_company=instance.multi_tenant_company,
@@ -153,8 +158,9 @@ def sales_channels__magento__product_property__create(sender, instance, **kwargs
 @receiver(update_remote_product_property, sender='properties.ProductProperty')
 def sales_channels__magento__product_property__update(sender, instance, **kwargs):
     from .tasks import update_magento_product_property_db_task
+    language = kwargs.get('language', None)
 
-    task_kwargs = {'product_property_id': instance.id}
+    task_kwargs = {'product_property_id': instance.id, 'language': language}
     run_product_specific_magento_task_flow(
         task_func=update_magento_product_property_db_task,
         multi_tenant_company=instance.multi_tenant_company,
@@ -198,8 +204,9 @@ def sales_channels__magento__price__update(sender, instance, **kwargs):
 @receiver(update_remote_product_content, sender='products.Product')
 def sales_channels__magento__product_content__update(sender, instance, **kwargs):
     from .tasks import update_magento_product_content_db_task
+    language = kwargs.get('language', None)
 
-    task_kwargs = {'product_id': instance.id}
+    task_kwargs = {'product_id': instance.id, 'language': language}
     run_product_specific_magento_task_flow(
         task_func=update_magento_product_content_db_task,
         multi_tenant_company=instance.multi_tenant_company,
@@ -317,7 +324,7 @@ def sales_channels__magento__product__sync(sender, instance, **kwargs):
 def sales_channels__magento__assign__update(sender, instance, **kwargs):
     from .tasks import update_magento_sales_view_assign_db_task
 
-    task_kwargs = {'assign_id': instance.id}
+    task_kwargs = {'product_id': instance.id}
     run_generic_magento_task_flow(update_magento_sales_view_assign_db_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
 
 @receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
