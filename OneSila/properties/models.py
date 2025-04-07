@@ -96,8 +96,6 @@ class PropertyTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         translated_field = 'property'
         search_terms = ['name']
-        unique_together = ("name", "language", "multi_tenant_company")
-
 
 class PropertySelectValue(TranslatedModelMixin, models.Model):
     property = models.ForeignKey(Property, on_delete=models.PROTECT)
