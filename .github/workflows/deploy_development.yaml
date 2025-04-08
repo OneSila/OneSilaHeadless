@@ -20,6 +20,7 @@ jobs:
           key: ${{ secrets.DEVELOPMENT_SECRET_KEY_SSH }}
           port: 22
           script: |
+            set -e
             source venv/bin/activate
             cd /home/${{ secrets.DEVELOPMENT_USERNAME }}/OneSilaHeadless/
             git config pull.rebase false
