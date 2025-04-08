@@ -786,8 +786,10 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.logger.debug("remote_eancode_update_factory is not defined; skipping EAN code assignment.")
             return None
 
-
-        ean_mirror = self.remote_eancode_update_factory.remote_model_class.objects.get(remote_product=self.remote_instance)
+        ean_mirror, _ = self.remote_eancode_update_factory.remote_model_class.objects.get_or_create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            remote_product=self.remote_instance)
 
         # Instantiate the factory with the fetched remote_instance.
         fac = self.remote_eancode_update_factory(

@@ -606,6 +606,7 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         pass
 
     def handle_ean_code(self, import_instance: ImportProductInstance):
+        # @TODO: FIX THIS
 
         if hasattr(import_instance, 'ean_code'):
             MagentoEanCode.objects.get_or_create(

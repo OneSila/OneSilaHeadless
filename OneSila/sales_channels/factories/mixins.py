@@ -75,13 +75,14 @@ class RemotePropertyEnsureMixin:
             # Attempt to get the associated RemoteProperty instance using self.local_property
             self.remote_property = self.remote_property_factory.remote_model_class.objects.get(
                 local_instance=self.local_property,
-                sales_channel=self.sales_channel
+                sales_channel=self.sales_channel,
             )
         except self.remote_property_factory.remote_model_class.DoesNotExist:
             # If the RemoteProperty does not exist, create it using the provided factory
             property_create_factory = self.remote_property_factory(
                 self.sales_channel,
                 self.local_property,
+                api=self.api
             )
             property_create_factory.run()
 
@@ -104,6 +105,7 @@ class RemotePropertyEnsureMixin:
                     select_value_create_factory = self.remote_property_select_value_factory(
                         local_instance=value,
                         sales_channel=self.sales_channel,
+                        api=self.api
                     )
                     select_value_create_factory.run()
                     remote_select_value = select_value_create_factory.remote_instance

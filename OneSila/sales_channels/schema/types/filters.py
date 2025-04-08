@@ -133,7 +133,6 @@ class SalesChannelImportFilter(SearchFilterMixin):
 @filter(SalesChannelView)
 class SalesChannelViewFilter(SearchFilterMixin):
     id: auto
-    active: auto
     sales_channel: Optional[SalesChannelFilter]
 
 @filter(RemoteLanguage)

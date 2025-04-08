@@ -550,18 +550,16 @@ def sync_magento_product_db_task(task_queue_item_id, sales_channel_id, product_i
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=2)
 @db_task()
 def update_magento_sales_view_assign_db_task(task_queue_item_id, sales_channel_id, product_id):
-    from .factories.products import RemoteSalesChannelAssignUpdateFactory
-    from sales_channels.models import SalesChannelViewAssign
+    from sales_channels.integrations.magento2.factories.products import MagentoSalesChannelViewAssignUpdateFactory
+    from products.models import Product
 
     task = BaseRemoteTask(task_queue_item_id)
-    assign = SalesChannelViewAssign.objects.get(product_id=product_id, sales_channel_id=sales_channel_id)
-
     def actual_task():
         run_generic_magento_factory(
             sales_channel_id=sales_channel_id,
-            factory_class=RemoteSalesChannelAssignUpdateFactory,
-            local_instance_id=assign.id,
-            local_instance_class=SalesChannelViewAssign
+            factory_class=MagentoSalesChannelViewAssignUpdateFactory,
+            local_instance_id=product_id,
+            local_instance_class=Product
         )
 
     task.execute(actual_task)

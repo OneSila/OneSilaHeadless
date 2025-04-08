@@ -5,17 +5,17 @@ from ..mixins import RemoteInstanceCreateFactory, RemoteInstanceDeleteFactory, R
 class RemotePropertyCreateFactory(RemoteInstanceCreateFactory):
     local_model_class = Property
 
-    def __init__(self, sales_channel, local_instance, language=None):
+    def __init__(self, sales_channel, local_instance, api=None, language=None):
         self.language = language
-        super().__init__(local_instance=local_instance, sales_channel=sales_channel)
+        super().__init__(local_instance=local_instance, sales_channel=sales_channel, api=api)
 
 class RemotePropertyUpdateFactory(RemoteInstanceUpdateFactory):
     local_model_class = Property
     create_if_not_exists = True
 
-    def __init__(self, sales_channel, local_instance, language=None):
+    def __init__(self, sales_channel, local_instance, api=None, remote_instance=None, language=None):
         self.language = language
-        super().__init__(local_instance=local_instance, sales_channel=sales_channel)
+        super().__init__(local_instance=local_instance, sales_channel=sales_channel, api=api, remote_instance=remote_instance)
 
 class RemotePropertyDeleteFactory(RemoteInstanceDeleteFactory):
     local_model_class = Property
@@ -24,10 +24,10 @@ class RemotePropertySelectValueCreateFactory(RemotePropertyEnsureMixin, RemoteIn
     local_model_class = PropertySelectValue
     remote_property_factory = None
 
-    def __init__(self, sales_channel, local_instance, language=None):
+    def __init__(self, sales_channel, local_instance, api=None, language=None):
         self.local_property = local_instance.property
         self.language = language
-        super().__init__(local_instance=local_instance, sales_channel=sales_channel)
+        super().__init__(local_instance=local_instance, sales_channel=sales_channel, api=api)
 
     def customize_remote_instance_data(self):
         self.remote_instance_data['remote_property'] = self.remote_property
@@ -37,9 +37,9 @@ class RemotePropertySelectValueUpdateFactory(RemoteInstanceUpdateFactory):
     local_model_class = PropertySelectValue
     create_if_not_exists = True
 
-    def __init__(self, sales_channel, local_instance, language=None):
+    def __init__(self, sales_channel, local_instance, api=None, remote_instance=None, language=None):
         self.language = language
-        super().__init__(local_instance=local_instance, sales_channel=sales_channel)
+        super().__init__(local_instance=local_instance, sales_channel=sales_channel, api=api, remote_instance=remote_instance)
 
 class RemotePropertySelectValueDeleteFactory(RemoteInstanceDeleteFactory):
     local_model_class = PropertySelectValue
@@ -127,12 +127,17 @@ class RemoteProductPropertyUpdateFactory(RemotePropertyEnsureMixin, ProductAssig
 
         # we got the value we stop de process so everything is resolved
         if self.get_value_only:
+            self.remote_instance.remote_value = str(self.remote_value)
+            self.remote_instance.save()
             return False
 
         return self.remote_instance.needs_update(self.remote_value)
 
     def needs_update(self):
         return True
+
+    def post_update_process(self):
+        self.remote_instance.remote_value = str(self.remote_value)
 
 
 class RemoteProductPropertyDeleteFactory(RemoteInstanceDeleteFactory):

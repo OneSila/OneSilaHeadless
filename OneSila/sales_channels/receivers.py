@@ -29,13 +29,19 @@ from django.dispatch import receiver
 from properties.models import Property, PropertyTranslation, PropertySelectValueTranslation, PropertySelectValue, ProductProperty, \
     ProductPropertyTextTranslation
 
-@receiver(post_create, sender=SalesChannelImport)
+@receiver(post_update, sender=SalesChannelImport)
 def import_process_post_create_receiver(sender, instance: SalesChannelImport, **kwargs):
 
     sales_channel = instance.sales_channel
     if not sales_channel.first_import_complete:
-        sales_channel.first_import_complete = True
-        sales_channel.save(update_fields=['first_import_complete'])
+        completed_imports_exists = SalesChannelImport.objects.filter(
+            sales_channel=sales_channel,
+            status=SalesChannelImport.STATUS_SUCCESS
+        ).exists()
+
+        if not sales_channel.first_import_complete and completed_imports_exists:
+            sales_channel.first_import_complete = True
+            sales_channel.save(update_fields=['first_import_complete'])
 
 @receiver(pre_save, sender=SalesChannelImport)
 def import_process_avoid_duplicate_pre_create_receiver(sender, instance: SalesChannelImport, **kwargs):
@@ -77,6 +83,7 @@ def syncing_current_percentage_real_time_sync__post_update_receiver(sender, inst
 
 
 @receiver(post_create, sender=SalesChannelViewAssign)
+@receiver(post_update, sender=SalesChannelViewAssign)
 @receiver(post_delete, sender=SalesChannelViewAssign)
 def sales_channels__assign__added_or_remove_receiver(sender, instance, **kwargs):
     """
@@ -507,7 +514,7 @@ def sales_channel_view_assign__post_create_receiver(sender, instance, **kwargs):
         create_remote_product.send(sender=instance.__class__, instance=instance)
     else:
         # Otherwise, send sales_view_assign_updated signal
-        sales_view_assign_updated.send(sender=instance.product.__class__, instance=instance.product)
+        sales_view_assign_updated.send(sender=instance.product.__class__, instance=instance.product, sales_channel=instance.sales_channel)
 
 
 @receiver(post_delete, sender='sales_channels.SalesChannelViewAssign')
@@ -518,7 +525,7 @@ def sales_channel_view_assign__post_delete_receiver(sender, instance, **kwargs):
     - Sends sales_view_assign_updated for any other deletion.
     """
     from sales_channels.models import SalesChannel
-
+    from products.models import ConfigurableVariation
     # this is for CASCADE DELETE of sales chanel
     try:
         sales_channel = instance.sales_channel
@@ -533,15 +540,13 @@ def sales_channel_view_assign__post_delete_receiver(sender, instance, **kwargs):
         sales_channel__active=True
     ).count()
 
+    is_variation = ConfigurableVariation.objects.filter(variation=instance.product).exists()
     if product_assign_count == 0:
-        from products.models import ConfigurableVariation
-        is_variation = ConfigurableVariation.objects.filter(variation=instance.product).exists()
-
         # Last assignment removed for this sales_channel, send delete_remote_product signal
         delete_remote_product.send(sender=instance.__class__, instance=instance, is_variation=is_variation)
     else:
         # Otherwise, send sales_view_assign_updated signal
-        sales_view_assign_updated.send(sender=instance.__class__, instance=instance)
+        sales_view_assign_updated.send(sender=instance.product.__class__, instance=instance.product, sales_channel=instance.sales_channel)
 
 @receiver(post_update, sender='products.Product')
 @receiver(post_update, sender='products.SimpleProduct')
