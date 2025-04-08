@@ -166,8 +166,8 @@ class ImportProductInstance(AbstractImportInstance):
                         item_data = {
                             'property_data': attribute['property_data'],
                             'type': ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if name in required_names else ProductPropertiesRuleItem.OPTIONAL
-
                         }
+
                         items.append(item_data)
 
 

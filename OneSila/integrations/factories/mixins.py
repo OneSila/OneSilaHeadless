@@ -608,7 +608,6 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
         if not self.successfully_updated:
             return
 
-
         self.build_payload()
         self.customize_payload()
         if self.needs_update() and self.additional_update_check():

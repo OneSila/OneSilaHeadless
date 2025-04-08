@@ -149,7 +149,21 @@ class ProcessIntegrationTasksFactory:
     def dispatch_tasks(self, integration, pending_tasks):
         """
         Dispatch the pending tasks for the current integration.
+        If the integration is inactive, mark tasks as skipped.
         """
+        if not integration.active:
+
+            for task in pending_tasks:
+                task.status = IntegrationTaskQueue.SKIPPED
+
+            IntegrationTaskQueue.objects.bulk_update(pending_tasks, ['status'])
+            logger.info(
+                f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
+                f"Integration '{integration.hostname}' is inactive — skipped {len(pending_tasks)} task(s)."
+            )
+            return
+
+        # If active, continue with normal dispatch
         for task_queue_item in pending_tasks:
             task_queue_item.dispatch()
             logger.info(

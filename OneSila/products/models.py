@@ -62,8 +62,10 @@ class Product(TranslatedModelMixin, models.Model):
         - Return None if no EAN code is associated.
         """
         ean = EanCode.objects.filter(product=self, already_used=False).first()
+        if ean:
+            return ean.ean_code
 
-        return ean.ean_code
+        return None
 
     def __str__(self):
         return f"{self.name} <{self.sku}>"

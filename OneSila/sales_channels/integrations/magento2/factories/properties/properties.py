@@ -242,6 +242,8 @@ class MagentoProductPropertyCreateFactory(GetMagentoAPIMixin, RemoteProductPrope
 
         self.remote_value = self.get_remote_value()
         if self.get_value_only:
+            self.remote_instance.remote_value = str(self.remote_value)
+            self.remote_instance.save()
             return  # if we ony get the value we don't need to cotninue
 
         self.magento_product: Product = self.api.products.by_sku(self.remote_product.remote_sku)

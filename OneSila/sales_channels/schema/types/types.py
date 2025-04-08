@@ -154,6 +154,11 @@ class SalesChannelIntegrationPricelistType(relay.Node, GetQuerysetMultiTenantMix
 class SalesChannelViewType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
 
+    @field()
+    def active(self, info) -> bool:
+        return self.sales_channel.active
+
+
 @type(RemoteLanguage, filters=RemoteLanguageFilter, order=RemoteLanguageOrder, pagination=True, fields='__all__')
 class RemoteLanguageType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType

@@ -44,12 +44,15 @@ class IntegrationTaskQueue(models.Model):
     PENDING = 'PENDING'
     PROCESSING = 'PROCESSING'
     PROCESSED = 'PROCESSED'
-    FAILED = 'FAILED'  # New status
+    FAILED = 'FAILED'
+    SKIPPED = 'SKIPPED'
+
     STATUS_CHOICES = [
         (PENDING, 'Pending'),
         (PROCESSING, 'Processing'),
         (PROCESSED, 'Processed'),
-        (FAILED, 'Failed'),  # New status choice
+        (FAILED, 'Failed'),
+        (SKIPPED, 'Skipped'),
     ]
 
     integration = models.ForeignKey(Integration, null=True, blank=True, on_delete=models.SET_NULL)

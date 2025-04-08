@@ -2,5 +2,5 @@ from .products import MagentoProductSyncFactory, MagentoProductCreateFactory, Ma
 from .variations import MagentoProductVariationAddFactory
 from .content import MagentoProductContentUpdateFactory
 from .eancodes import MagentoEanCodeUpdateFactory
-from .assigns import RemoteSalesChannelAssignUpdateFactory
+from .assigns import MagentoSalesChannelViewAssignUpdateFactory
 from .images import MagentoImageDeleteFactory, MagentoMediaProductThroughCreateFactory, MagentoMediaProductThroughUpdateFactory, MagentoMediaProductThroughDeleteFactory

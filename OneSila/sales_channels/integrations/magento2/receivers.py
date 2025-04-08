@@ -319,13 +319,36 @@ def sales_channels__magento__product__sync(sender, instance, **kwargs):
         number_of_remote_requests=number_of_remote_requests,
         **task_kwargs)
 
+@receiver(sync_remote_product, sender='sales_channels.RemoteProduct')
+@receiver(sync_remote_product, sender='magento2.MagentoProduct')
+def sales_channels__magento__product__sync(sender, instance, **kwargs):
+    from .tasks import sync_magento_product_db_task
+    from products.product_types import CONFIGURABLE
+    product = instance.local_instance
+
+    if product.type == CONFIGURABLE:
+        number_of_remote_requests = 1 + product.get_configurable_variations().count()
+    else:
+        number_of_remote_requests = 1
+
+    task_kwargs = {'product_id': product.id, 'remote_product_id': instance.id}
+    run_generic_magento_task_flow(
+        task_func=sync_magento_product_db_task,
+        sales_channels_filter_kwargs={'id': instance.sales_channel.id},
+        multi_tenant_company=instance.multi_tenant_company,
+        number_of_remote_requests=number_of_remote_requests,
+        **task_kwargs)
 
 @receiver(sales_view_assign_updated, sender='products.Product')
 def sales_channels__magento__assign__update(sender, instance, **kwargs):
     from .tasks import update_magento_sales_view_assign_db_task
+    sales_channel = kwargs.get('sales_channel')
 
     task_kwargs = {'product_id': instance.id}
-    run_generic_magento_task_flow(update_magento_sales_view_assign_db_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
+    run_generic_magento_task_flow(update_magento_sales_view_assign_db_task,
+                                  multi_tenant_company=instance.multi_tenant_company,
+                                  sales_channels_filter_kwargs={'id': sales_channel.id},
+                                  **task_kwargs)
 
 @receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
 def sales_channels__magento__product__create(sender, instance, **kwargs):
