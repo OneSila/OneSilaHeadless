@@ -147,6 +147,7 @@ LANGUAGE_CODE = 'en'
 LANGUAGES = (
     ('nl', _('Nederlands')),
     ('en', _('English')),
+    ('fr', _('French')),
     # ('en-gb', _('English GB')),
 )
 
