@@ -62,6 +62,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
     def set_local_assigns(self):
         to_assign = SalesChannelViewAssign.objects.filter(product=self.local_instance, sales_channel=self.sales_channel, remote_product__isnull=True)
+        logger.info(f"Detected products assigns: {to_assign}")
+        logger.info(f"Remote product {self.remote_instance}")
         for assign in to_assign:
             assign.remote_product = self.remote_instance
             assign.save()
