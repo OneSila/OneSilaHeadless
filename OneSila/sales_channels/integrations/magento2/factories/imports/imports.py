@@ -513,6 +513,10 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
         for child in product.get_children():
             variation_data = self.get_product_data(child, rule)
+
+            if not variation_data:
+                continue
+
             variations.append({
                 "variation_data": variation_data,
             })
@@ -559,7 +563,11 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
             MagentoApiProduct.PRODUCT_TYPE_CONFIGURABLE: Product.CONFIGURABLE,
         }
 
-        product_type = type_map.get(product.type_id, Product.SIMPLE)
+        product_type = type_map.get(product.type_id, None)
+
+        if product_type is None:
+            return False
+
         custom_attributes = product.custom_attributes
 
         structured_data = {
@@ -606,15 +614,17 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         pass
 
     def handle_ean_code(self, import_instance: ImportProductInstance):
-        # @TODO: FIX THIS
 
-        if hasattr(import_instance, 'ean_code'):
-            MagentoEanCode.objects.get_or_create(
+        magento_ean_code, _ = MagentoEanCode.objects.get_or_create(
                 multi_tenant_company=self.import_process.multi_tenant_company,
                 sales_channel=self.sales_channel,
                 remote_product=import_instance.remote_instance,
-                ean_code=import_instance.ean_code
             )
+
+        if hasattr(import_instance, 'ean_code'):
+            if magento_ean_code.ean_code != import_instance.ean_code:
+                magento_ean_code.ean_code = import_instance.ean_code
+                magento_ean_code.save()
 
 
     def handle_attributes(self, import_instance: ImportProductInstance):
@@ -803,6 +813,10 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 is_variation = self.is_magento_variation(product)
                 rule = self.get_product_rule(product)
                 structured_data = self.get_product_data(product, rule)
+
+                if not structured_data:
+                    continue
+
                 product_import_instance = ImportProductInstance(
                     data=structured_data,
                     import_process=self.import_process,

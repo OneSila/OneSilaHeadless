@@ -45,33 +45,25 @@ def update_configurators_for_parent_product_db_task(parent_product):
             remote_product.configurator.update_if_needed(send_sync_signal=True)
 
 @db_task()
-def update_configurators_for_product_property_db_task(product, property):
+def update_configurators_for_product_property_db_task(parent_product_id, property_id):
     from sales_channels.models import RemoteProduct
     from products.models import Product
+    from properties.models import Property
 
-    # Step 1: Get all parent product IDs where this product is a variation
-    parent_product_ids = product.configurablevariation_through_variations.values_list('parent_id', flat=True)
+    parent_product = Product.objects.get(id=parent_product_id)
+    property = Property.objects.get(id=property_id)
 
-    # Step 2: Retrieve all parent products in a single query
-    parent_products = Product.objects.filter(id__in=parent_product_ids)
+    product_rule = parent_product.get_product_rule()
+    optional_properties = parent_product.get_optional_in_configurator_properties(product_rule)
 
-    # Step 3: Iterate through each parent product and check if we need to update the configurator
-    for parent_product in parent_products:
-        # Get the product rule for the parent product
-        product_rule = parent_product.get_product_rule()
+    if property not in optional_properties.values_list('property', flat=True):
+        return  # safety exit
 
-        # Check if the property is optional in the configurator
-        optional_properties_in_configurator = parent_product.get_optional_in_configurator_properties(product_rule)
-        if property not in optional_properties_in_configurator.values_list('property', flat=True):
-            continue  # Skip if the property is not optional in configurator
+    remote_products = RemoteProduct.objects.filter(
+        local_instance=parent_product,
+        multi_tenant_company=parent_product.multi_tenant_company
+    )
 
-        # Step 4: Retrieve remote products for the parent product
-        remote_products = RemoteProduct.objects.filter(
-            local_instance=parent_product,
-            multi_tenant_company=parent_product.multi_tenant_company
-        )
-
-        # Step 5: Iterate through remote products and update configurators
-        for remote_product in remote_products.iterator():
-            if remote_product.configurator:
-                remote_product.configurator.update_if_needed(rule=product_rule, send_sync_signal=True)
+    for remote_product in remote_products.iterator():
+        if remote_product.configurator:
+            remote_product.configurator.update_if_needed(rule=product_rule, send_sync_signal=True)

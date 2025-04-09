@@ -83,21 +83,14 @@ def sales_channels__magento__property_select_value__delete(sender, instance, **k
 @receiver(refresh_website_pull_models, sender='magento2.MagentoSalesChannel')
 @receiver(sales_channel_created, sender='magento2.MagentoSalesChannel')
 def sales_channels__magento__handle_pull_magento_sales_chjannel_views(sender, instance, **kwargs):
-    from integrations.tasks import add_task_to_queue
-    from integrations.helpers import get_import_path
-    from .tasks import pull_magento_sales_channel_views_task, pull_magento_languages_task
+    from sales_channels.integrations.magento2.factories.sales_channels.views import MagentoSalesChannelViewPullFactory
+    from sales_channels.integrations.magento2.factories.sales_channels.languages import MagentoRemoteLanguagePullFactory
 
-    task_kwargs = {'sales_channel_id': instance.id}
-    add_task_to_queue(
-        integration_id=instance.id,
-        task_func_path=get_import_path(pull_magento_sales_channel_views_task),
-        task_kwargs=task_kwargs,
-    )
-    add_task_to_queue(
-        integration_id=instance.id,
-        task_func_path=get_import_path(pull_magento_languages_task),
-        task_kwargs=task_kwargs,
-    )
+    views_factory = MagentoSalesChannelViewPullFactory(sales_channel=instance)
+    views_factory.run()
+
+    languages_factory = MagentoRemoteLanguagePullFactory(sales_channel=instance)
+    languages_factory.run()
 
 
 @receiver(product_properties_rule_created, sender='properties.ProductPropertiesRule')

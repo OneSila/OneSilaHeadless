@@ -246,7 +246,7 @@ def sales_channels__product_property__post_create_receiver(sender, instance: Pro
 
 @receiver(post_update, sender='properties.ProductProperty')
 def sales_channels__product_property__post_update_receiver(sender, instance: ProductProperty, **kwargs):
-    from .tasks import update_configurators_for_product_property_db_task
+    from sales_channels.flows.update_configurator import update_configurator_if_needed_flow
 
     if instance.property.is_product_type:
         sync_remote_product.send(sender=instance.product.__class__, instance=instance.product)
@@ -255,11 +255,11 @@ def sales_channels__product_property__post_update_receiver(sender, instance: Pro
     if instance.property.is_public_information:
         update_remote_product_property.send(sender=instance.__class__, instance=instance)
 
-        update_configurators_for_product_property_db_task(instance.product, instance.property)
+        update_configurator_if_needed_flow(instance.product, instance.property)
 
 @receiver(mutation_update, sender='properties.ProductProperty')
 def sales_channels__product_property__post_update_multiselect_receiver(sender, instance: ProductProperty, **kwargs):
-    from .tasks import update_configurators_for_product_property_db_task
+    from sales_channels.flows.update_configurator import update_configurator_if_needed_flow
 
     if instance.property.is_product_type:
         sync_remote_product.send(sender=instance.product.__class__, instance=instance.product)
@@ -268,7 +268,7 @@ def sales_channels__product_property__post_update_multiselect_receiver(sender, i
     if instance.property.is_public_information and instance.property.type == Property.TYPES.MULTISELECT:
         update_remote_product_property.send(sender=instance.__class__, instance=instance)
 
-        update_configurators_for_product_property_db_task(instance.product, instance.property)
+        update_configurator_if_needed_flow(instance.product, instance.property)
 
 @receiver(pre_delete, sender='properties.ProductProperty')
 def sales_channels__product_property__pre_delete_receiver(sender, instance: ProductProperty, **kwargs):
