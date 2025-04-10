@@ -37,13 +37,14 @@ class MultiTenantCompany(models.Model):
     city = models.CharField(max_length=100, null=True, blank=True)
     country = models.CharField(max_length=3, choices=COUNTRY_CHOICES, null=True, blank=True)
     language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
+    languages = models.JSONField(default=list, blank=True, help_text="List of enabled language codes for this company.")
 
     email = models.EmailField(blank=True, null=True)
     phone_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
     vat_number = models.CharField(max_length=30, null=True, blank=True)
     website = models.URLField(blank=True, null=True)
 
-    ai_points = models.IntegerField(default=0, help_text="Points allocated for AI processes.")
+    ai_points = models.IntegerField(default=20, help_text="Points allocated for AI processes.")
 
 
     def __str__(self):

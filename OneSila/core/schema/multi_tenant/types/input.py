@@ -18,7 +18,7 @@ class MultiTenantCompanyInput:
 
 
 @partial(MultiTenantCompany, fields=['name', 'address1', 'address2', 'postcode', 'city', 'country',
-    'language', 'email', 'phone_number', 'vat_number', 'website'])
+    'languages', 'email', 'phone_number', 'vat_number', 'website'])
 class MultiTenantCompanyPartialInput:
     pass
 

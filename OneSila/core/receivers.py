@@ -1,4 +1,4 @@
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from core.models.multi_tenant import MultiTenantUser, MultiTenantCompany
 from core.signals import post_create, post_update
@@ -29,3 +29,14 @@ def core__post_create_update_triggers(sender, instance, created, **kwargs):
         post_create.send(sender=instance.__class__, instance=instance)
     else:
         post_update.send(sender=instance.__class__, instance=instance)
+
+
+@receiver(pre_save, sender=MultiTenantCompany)
+def core__multi_tenant_company__pres_save__ensure_languages_contains_default(sender, instance, **kwargs):
+    # Initialize as list if None
+    if not instance.languages:
+        instance.languages = []
+
+    # Ensure the default language is present
+    if instance.language and instance.language not in instance.languages:
+        instance.languages.append(instance.language)
