@@ -5,11 +5,11 @@ from products.models import Product
 from properties.models import Property, PropertySelectValue, ProductPropertiesRule
 from sales_channels.decorators import remote_task
 from integrations.factories.remote_task import BaseRemoteTask
-from sales_channels.integrations.magento2.factories.properties.properties import MagentoPropertyUpdateFactory
 from sales_channels.integrations.magento2.helpers import run_generic_magento_factory, run_remote_product_dependent_magento_factory
 from sales_channels.integrations.magento2.models import MagentoSalesChannel, MagentoProduct, MagentoProductProperty, \
     MagentoImageProductAssociation
 from sales_channels.models import SalesChannel
+from taxes.models import VatRate
 
 
 # !IMPORTANT: @remote_task needs to be above in order to work
@@ -39,6 +39,8 @@ def create_magento_property_db_task(task_queue_item_id, sales_channel_id, proper
 @remote_task(number_of_remote_requests=3)
 @db_task()
 def update_magento_property_db_task(task_queue_item_id, sales_channel_id, property_id, language=None):
+    from sales_channels.integrations.magento2.factories.properties.properties import MagentoPropertyUpdateFactory
+
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
@@ -577,6 +579,43 @@ def delete_magento_product_db_task(task_queue_item_id, sales_channel_id, remote_
         factory_kwargs = {'remote_instance': remote_instance, 'sales_channel': sales_channel}
         factory = MagentoProductDeleteFactory(**factory_kwargs)
         factory.run()
+
+    task.execute(actual_task)
+
+@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
+@db_task()
+def create_magento_vat_rate_db_task(task_queue_item_id, sales_channel_id, vat_rate_id):
+    from .factories.taxes import MagentoTaxClassCreateFactory
+
+    task = BaseRemoteTask(task_queue_item_id)
+
+    def actual_task():
+
+        run_generic_magento_factory(
+            sales_channel_id=sales_channel_id,
+            factory_class=MagentoTaxClassCreateFactory,
+            local_instance_id=vat_rate_id,
+            local_instance_class=VatRate
+        )
+
+    task.execute(actual_task)
+
+
+@remote_task(number_of_remote_requests=3)
+@db_task()
+def update_magento_vat_rate_db_task(task_queue_item_id, sales_channel_id, vat_rate_id):
+    from .factories.taxes import MagentoTaxClassUpdateFactory
+
+    task = BaseRemoteTask(task_queue_item_id)
+
+    def actual_task():
+
+        run_generic_magento_factory(
+            sales_channel_id=sales_channel_id,
+            factory_class=MagentoTaxClassUpdateFactory,
+            local_instance_id=vat_rate_id,
+            local_instance_class=VatRate,
+        )
 
     task.execute(actual_task)
 

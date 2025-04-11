@@ -46,6 +46,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.set_field_if_exists('active')
         self.set_field_if_exists('vat_rate')
+        self.set_field_if_exists('use_vat_rate_name')
         self.set_field_if_exists('ean_code')
         self.set_field_if_exists('allow_backorder')
 
@@ -106,15 +107,25 @@ class ImportProductInstance(AbstractImportInstance):
 
         if hasattr(self, 'vat_rate'):
 
-            if isinstance(self.vat_rate, str):
-                self.vat_rate = int(self.vat_rate)
+            if self.vat_rate is None:
+                # that means that the values is None so we should set it as None
+                return
 
-            vat_rate_object, _ = VatRate.objects.get_or_create(
-                multi_tenant_company=self.multi_tenant_company,
-                rate=self.vat_rate)
+            get_or_create_kwargs = {
+                'multi_tenant_company': self.multi_tenant_company
+            }
+
+            if getattr(self, 'use_vat_rate_name', False):
+                get_or_create_kwargs['name'] = self.vat_rate
+            else:
+                if isinstance(self.vat_rate, str):
+                    self.vat_rate = int(self.vat_rate)
+
+                get_or_create_kwargs['rate'] = self.vat_rate
+
+            vat_rate_object, _ = VatRate.objects.get_or_create(**get_or_create_kwargs)
 
             self.vat_rate = vat_rate_object
-
             self.vat_rate_instance = self.vat_rate
 
 

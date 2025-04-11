@@ -4,7 +4,7 @@ from copy import deepcopy
 from decimal import Decimal
 from typing import Optional
 from django.core.exceptions import ValidationError
-from magento.models import ProductAttribute, AttributeOption, AttributeSet
+from magento.models import ProductAttribute, AttributeOption, AttributeSet, TaxClass
 from core.helpers import clean_json_data
 from currencies.models import Currency
 from imports_exports.factories.imports import ImportMixin
@@ -22,6 +22,7 @@ from sales_channels.integrations.magento2.models.products import MagentoEanCode,
     MagentoImageProductAssociation
 from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet, MagentoProductProperty
 from sales_channels.integrations.magento2.models.sales_channels import MagentoRemoteLanguage
+from sales_channels.integrations.magento2.models.taxes import MagentoTaxClass
 from sales_channels.models import ImportProperty, ImportPropertySelectValue, ImportProduct, SalesChannelViewAssign, \
     SalesChannelImport
 from django.contrib.contenttypes.models import ContentType
@@ -29,6 +30,8 @@ from magento.models import Product as MagentoApiProduct
 from magento.models import ConfigurableProduct as MagentoApiConfigurableProduct
 from sales_channels.models.products import RemoteProductConfigurator
 import logging
+
+from taxes.models import VatRate
 
 logger = logging.getLogger(__name__)
 
@@ -556,6 +559,18 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 return custom_attributes[ean_code_key]
         return None
 
+    def get_vat_name(self, custom_attributes: dict) -> Optional[str]:
+        if 'tax_class_id' in custom_attributes:
+            tax_class_id = custom_attributes.get('tax_class_id')
+
+            try:
+                tax_class_id = int(tax_class_id)
+            except (ValueError, TypeError):
+                pass
+
+            return self.tax_map.get(tax_class_id, None)
+
+        return None
 
     def get_product_data(self, product: MagentoApiProduct, rule: ProductPropertiesRule):
         type_map = {
@@ -593,6 +608,9 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
             structured_data['variations'], structured_data['__variation_sku_to_id_map'] = self.get_product_variations(product, rule)
             self.sync_configurator_rule_items(product, rule)
 
+        structured_data['vat_rate'] = self.get_vat_name(custom_attributes)
+        structured_data['use_vat_rate_name'] = True
+
         return structured_data
 
     def create_log_instance(self, import_instance: ImportProductInstance, structured_data: dict):
@@ -608,10 +626,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
         log_instance.content_type = ContentType.objects.get_for_model(import_instance.instance)
         log_instance.object_id = import_instance.instance.pk
-
-    def handle_vat_rate(self, import_instance, product):
-        # @TODO: when we find out how to import the vat
-        pass
 
     def handle_ean_code(self, import_instance: ImportProductInstance):
 
@@ -791,7 +805,30 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         return is_variation
 
 
+    def set_taxes_map(self):
+        self.tax_map = {}
+
+        tax_classes = self.api.taxes.all_in_memory()
+        for tax_class in tax_classes:
+            if tax_class.class_type == TaxClass.CLASS_TYPE_PRODUCT:
+                local_instance, _ = VatRate.objects.get_or_create(
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    name=tax_class.class_name
+                )
+
+                remote_instance, _ = MagentoTaxClass.objects.get_or_create(
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    local_instance=local_instance,
+                    remote_id=tax_class.class_id
+                )
+
+                self.tax_map[tax_class.class_id] = tax_class.class_name
+
+
+
     def import_products_process(self):
+        self.set_taxes_map()
 
         products_api = self.api.products
         products_api.clear_pagination()
@@ -838,7 +875,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
                 self.update_remote_product(product_import_instance, product, is_variation)
                 self.create_log_instance(product_import_instance, structured_data)
-                self.handle_vat_rate(product_import_instance, product)
                 self.handle_ean_code(product_import_instance)
                 self.handle_attributes(product_import_instance)
                 self.handle_translations(product_import_instance)

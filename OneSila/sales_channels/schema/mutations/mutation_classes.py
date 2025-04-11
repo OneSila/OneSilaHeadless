@@ -15,8 +15,5 @@ class ResyncSalesChannelAssignMutation(UpdateMutation, GetCurrentUserMixin):
 
 
         sync_remote_product.send(sender=instance.remote_product.__class__, instance=instance.remote_product)
-        print('----------------------------')
-        print(instance.remote_product.__class__)
-
 
         return instance

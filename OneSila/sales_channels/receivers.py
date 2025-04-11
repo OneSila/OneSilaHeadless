@@ -23,7 +23,8 @@ from .signals import (
     create_remote_image_association,
     update_remote_image_association, delete_remote_image_association, delete_remote_image, sales_channel_created,
     delete_remote_product,
-    sales_view_assign_updated, create_remote_product, update_remote_product, sync_remote_product, update_remote_product_eancode,
+    sales_view_assign_updated, create_remote_product, update_remote_product, sync_remote_product,
+    update_remote_product_eancode, create_remote_vat_rate, update_remote_vat_rate,
 )
 from django.dispatch import receiver
 from properties.models import Property, PropertyTranslation, PropertySelectValueTranslation, PropertySelectValue, ProductProperty, \
@@ -558,7 +559,7 @@ def sales_channels__product__post_update_receiver(sender, instance, **kwargs):
     Sends update_remote_product signal if any of the fields 'active' or 'allow_backorder' are dirty.
     """
     # Check if any of the specified fields have changed
-    if instance.is_any_field_dirty(['active', 'allow_backorder']):
+    if instance.is_any_field_dirty(['active', 'allow_backorder', 'vat_rate'], check_relationship=True):
         # Send update_remote_product signal
         update_remote_product.send(sender=instance.__class__, instance=instance)
 
@@ -604,3 +605,19 @@ def sales_channels__ean_code_changed_receiver(sender, instance, **kwargs):
 @receiver(ean_code_released_for_product, sender='products.BundleProduct')
 def sales_channels__ean_code_released_receiver(sender, instance, **kwargs):
     update_remote_product_eancode.send(sender=instance.__class__, instance=instance)
+
+
+@receiver(post_create, sender='taxes.VatRate')
+def sales_channels__vat_rate__post_create_receiver(sender, instance, **kwargs):
+    """
+    Handles the creation of VatRate instances.
+    """
+    create_remote_vat_rate.send(sender=instance.__class__, instance=instance)
+
+@receiver(post_update, sender='taxes.VatRate')
+def sales_channels__vat_rate__post_update_receiver(sender, instance, **kwargs):
+    """
+    Handles the update of taxes.VatRate instances.
+    """
+    if instance.is_any_field_dirty(['name']):
+        update_remote_vat_rate.send(sender=instance.__class__, instance=instance)

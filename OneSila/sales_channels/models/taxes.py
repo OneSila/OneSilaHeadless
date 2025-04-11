@@ -15,7 +15,13 @@ class RemoteVat(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Remote VATs'
 
     def __str__(self):
-        return f"Remote VAT for {self.local_instance.name} ({self.local_instance.rate}%)"
+        if self.local_instance:
+            name = self.local_instance.name if self.local_instance.name else "Unnamed VAT"
+            rate = f"{self.local_instance.rate}%" if self.local_instance.rate is not None else "No rate"
+        else:
+            name = "No local instance"
+            rate = ""
+        return f"Remote VAT for {name} ({rate})"
 
 class RemoteCurrency(PolymorphicModel, RemoteObjectMixin, models.Model):
     """

@@ -382,6 +382,19 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """
         pass
 
+    def set_vat_rate(self):
+        """Sets the status for the product or variation in the payload."""
+        self.vat_rate = self.local_instance.vat_rate
+
+        if self.is_variation:
+            self.set_variation_vat_rate()
+
+        self.add_field_in_payload('vat_rate', self.vat_rate)
+
+    def set_variation_vat_rate(self):
+        """Sets the status for variations, allowing for overrides."""
+        pass
+
     def set_categories(self):
         """Sets the categories for the product or variation in the payload."""
         pass # @TODO: Pass for now

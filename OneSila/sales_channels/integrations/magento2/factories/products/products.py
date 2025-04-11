@@ -18,6 +18,7 @@ from sales_channels.integrations.magento2.models.properties import MagentoAttrib
 from magento.models import Product as MagentoApiProduct
 
 from sales_channels.integrations.magento2.models.sales_channels import MagentoRemoteLanguage
+from sales_channels.integrations.magento2.models.taxes import MagentoTaxClass
 from sales_channels.models import SalesChannelViewAssign
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,7 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
         'assigns': 'views',
         'price': 'price',
         'discount': 'special_price',
+        'vat_rate': 'tax_class_id',
         'url_key': 'url_key',
         'description': 'description',
         'short_description': 'short_description',
@@ -147,6 +149,40 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
         self.add_field_in_payload('price', self.price)
         self.add_field_in_payload('discount', self.discount)
 
+
+    def set_vat_rate(self):
+        self.vat_rate = None
+
+        local_vat_rate = self.local_instance.vat_rate
+
+        if local_vat_rate is None:
+            self.vat_rate = None
+            self.add_field_in_payload('vat_rate', self.vat_rate)
+            return
+
+        remote_vat_rate = MagentoTaxClass.objects.filter(
+            sales_channel=self.sales_channel,
+            local_instance=local_vat_rate
+        ).first()
+
+
+        if remote_vat_rate:
+            self.vat_rate = remote_vat_rate.remote_id
+            self.add_field_in_payload('vat_rate', self.vat_rate)
+            return
+
+        if local_vat_rate and not remote_vat_rate:
+            from sales_channels.integrations.magento2.factories.taxes.taxes import MagentoTaxClassCreateFactory
+
+            fac = MagentoTaxClassCreateFactory(
+                sales_channel=self.sales_channel,
+                local_instance=local_vat_rate,
+                api=self.api
+            )
+            fac.run()
+
+            self.vat_rate = fac.remote_instance.remote_id
+            self.add_field_in_payload('vat_rate', self.vat_rate)
 
     def customize_payload(self):
         try:

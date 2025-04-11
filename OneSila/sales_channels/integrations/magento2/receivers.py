@@ -17,7 +17,8 @@ from sales_channels.signals import create_remote_property, update_remote_propert
     create_remote_image_association, \
     update_remote_image_association, delete_remote_image_association, delete_remote_image, update_remote_product, \
     sync_remote_product, \
-    sales_view_assign_updated, delete_remote_product, update_remote_product_eancode
+    sales_view_assign_updated, delete_remote_product, update_remote_product_eancode, update_remote_vat_rate, \
+    create_remote_vat_rate
 
 
 @receiver(create_remote_property, sender='properties.Property')
@@ -393,3 +394,23 @@ def sales_channels__magento__product__delete_from_product(sender, instance, **kw
         multi_tenant_company=instance.multi_tenant_company,
         is_multiple=True
     )
+
+@receiver(create_remote_vat_rate, sender='taxes.VatRate')
+def sales_channels__magento__vat_rate__create(sender, instance, **kwargs):
+    from .tasks import create_magento_vat_rate_db_task
+
+    task_kwargs = {'vat_rate_id': instance.id}
+    run_generic_magento_task_flow(create_magento_vat_rate_db_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
+
+@receiver(update_remote_vat_rate, sender='taxes.VatRate')
+def sales_channels__magento__vat_rate__update(sender, instance, **kwargs):
+    from .tasks import update_magento_vat_rate_db_task
+
+    task_kwargs = {'vat_rate_id': instance.id}
+    run_generic_magento_task_flow(update_magento_vat_rate_db_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
+
+@receiver(pre_delete, sender='taxes.VatRate')
+def sales_channels__magento__vat_rate__delete(sender, instance, **kwargs):
+    from sales_channels.integrations.magento2.models.taxes import MagentoTaxClass
+
+    MagentoTaxClass.objects.filter(local_instance=instance).delete()

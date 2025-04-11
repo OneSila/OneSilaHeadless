@@ -6,7 +6,7 @@ from .models import MagentoSalesChannel, MagentoProperty, MagentoPropertySelectV
 from .models.products import MagentoEanCode, MagentoPrice
 from .models.properties import MagentoAttributeSet, MagentoAttributeSetAttribute
 from .models.sales_channels import MagentoRemoteLanguage
-from .models.taxes import MagentoCurrency
+from .models.taxes import MagentoCurrency, MagentoTaxClass
 from ...models import SalesChannelViewAssign
 
 @admin.register(MagentoSalesChannel)
@@ -90,4 +90,8 @@ class MagentoEanCodeAdmin(admin.ModelAdmin):
 
 @admin.register(MagentoImageProductAssociation)
 class MagentoImageProductAssociationAdmin(admin.ModelAdmin):
+    pass
+
+@admin.register(MagentoTaxClass)
+class MagentoTaxClassAdmin(admin.ModelAdmin):
     pass
