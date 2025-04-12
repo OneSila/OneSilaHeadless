@@ -32,7 +32,7 @@ tblib
 django-cleanup
 openai~=1.66.3
 replicate
-pydantic
+pydantic<2.0
 
 strawberry-graphql==0.261.0
 strawberry-graphql-django==0.56.0
