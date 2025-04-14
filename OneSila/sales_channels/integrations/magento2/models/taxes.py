@@ -6,13 +6,10 @@ class MagentoCurrency(RemoteCurrency):
     """
     Magento-specific Remote Currency.
     """
-    sales_channel_view = models.ForeignKey(
-        MagentoSalesChannelView,
-        on_delete=models.CASCADE,
-        related_name='remote_currencies',
-        help_text="The sales channel view associated with this remote currency."
+    website_code = models.CharField(
+        max_length=64,
+        help_text="Magento website code. Prices are scoped at the website level."
     )
-    store_view_code = models.CharField(max_length=126, help_text="The language code store view (will be used as scope).")
 
 
 class MagentoTaxClass(RemoteVat):

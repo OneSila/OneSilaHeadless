@@ -84,8 +84,8 @@ class RemoteCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):
     def name(self, info) -> str:
         name = self.remote_code
 
-        if hasattr(self, 'store_view_code'):
-            name = f"{name} ({self.store_view_code})"
+        if hasattr(self, 'website_code'):
+            name = f"{name} ({self.website_code})"
 
         return name
 
