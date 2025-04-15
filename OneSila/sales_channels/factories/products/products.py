@@ -7,7 +7,7 @@ from sales_channels.factories.mixins import IntegrationInstanceOperationMixin, R
     EanCodeValueMixin, SyncProgressMixin
 import logging
 
-from sales_channels.models import RemoteLog, SalesChannel, RemoteImageProductAssociation
+from sales_channels.models import RemoteLog, SalesChannel, RemoteImageProductAssociation, RemoteCurrency
 from sales_channels.models.products import RemoteProductConfigurator, RemoteProduct
 from sales_channels.models.sales_channels import RemoteLanguage, SalesChannelViewAssign
 
@@ -413,24 +413,42 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         pass
 
     def set_price(self):
-        """Sets the price for the product or variation in the payload."""
+        """Sets the price(s) for the product or variation in the payload, supporting multiple currencies."""
 
         if not self.sales_channel.sync_prices:
             return
 
-        self.price, self.discount = self.local_instance.get_price_for_sales_channel(self.sales_channel)
+        self.prices_data = {}
+        self.default_currency_code = None
 
-        # Convert price and discount to float if they are not None
-        if self.price is not None:
-            self.price = float(self.price)
-        if self.discount is not None:
-            self.discount = float(self.discount)
+        remote_currencies = RemoteCurrency.objects.filter(sales_channel=self.sales_channel)
 
-        if self.is_variation:
-            self.set_variation_price()
+        for remote_currency in remote_currencies:
+            local_currency = remote_currency.local_instance
 
-        self.add_field_in_payload('price', self.price)
-        self.add_field_in_payload('discount', self.discount)
+            if not local_currency:
+                continue
+
+            full_price, discounted_price = self.local_instance.get_price_for_sales_channel(
+                self.sales_channel, currency=local_currency
+            )
+
+            price = float(full_price) if full_price is not None else None
+            discount = float(discounted_price) if discounted_price is not None else None
+
+            self.prices_data[local_currency.iso_code] = {
+                "price": price,
+                "discount_price": discount,
+            }
+
+        # Legacy payload (used by Magento create or flat fallback)
+        first_currency_code = next(iter(self.prices_data), None)
+        if first_currency_code:
+            self.default_currency_code = first_currency_code
+            self.price = self.prices_data[first_currency_code]['price']
+            self.discount = self.prices_data[first_currency_code]['discount_price']
+            self.add_field_in_payload('price', self.price)
+            self.add_field_in_payload('discount', self.discount)
 
     def set_variation_price(self):
         """Sets the price for variations, allowing for overrides."""
@@ -838,6 +856,9 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """
         raise NotImplementedError("Subclasses must implement run_sync_flow method.")
 
+    def update_multi_currency_prices(self):
+        raise NotImplementedError("Subclasses must implement update_multi_currency_prices method.")
+
     def run(self):
 
         if not self.preflight_check():
@@ -874,6 +895,10 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.update_progress()
             self.assign_ean_code()
             self.assign_saleschannels()
+
+            if not self.sales_channel.is_single_currency() and len(self.prices_data.keys()) > 1:
+                self.update_multi_currency_prices()
+
             self.update_progress()
 
             if self.remote_type == self.REMOTE_TYPE_CONFIGURABLE:
@@ -1108,14 +1133,18 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
         super().set_price()
 
         if self.remote_price_class:
-            self.remote_instance.price, _ = self.remote_price_class.objects.get_or_create(
+            # Get or create the RemotePrice object
+            remote_price_obj, _ = self.remote_price_class.objects.get_or_create(
                 remote_product=self.remote_instance,
-                price=self.price,
-                discount_price=self.discount_price if hasattr(self, 'discount_price') else None,
                 sales_channel=self.sales_channel,
-                multi_tenant_company=self.sales_channel.multi_tenant_company
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
             )
-            logger.debug(f"Created RemotePrice for {self.remote_instance}")
+
+            # Update the price_data JSON field with the current self.prices_data
+            if hasattr(self, "prices_data"):
+                remote_price_obj.price_data = self.prices_data
+                remote_price_obj.save(update_fields=["price_data"])
+                logger.debug(f"Updated price_data for {self.remote_instance} → {self.prices_data}")
 
     def perform_non_subclassed_remote_action(self):
         """

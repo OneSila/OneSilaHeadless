@@ -6,53 +6,65 @@ class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFacto
     local_model_class = Product
     local_product_map = 'local_instance'
 
-    def __init__(self, sales_channel, local_instance, remote_product, api=None):
+    def __init__(self, sales_channel, local_instance, remote_product, api=None, currency=None, skip_checks=False):
         super().__init__(sales_channel, local_instance, api=api, remote_product=remote_product)
-        self.discounted_price = None
-        self.full_price = None
+        self.currency = currency  # Currency model instance (optional)
+        self.skip_checks = skip_checks
+        self.to_update_currencies = []
         self.remote_instance = None
+        self.price_data = {}
 
     def preflight_check(self):
-        """
-        Checks that the RemoteProduct and associated SalesChannelViewAssign exist before proceeding.
-        Also sets the remote_instance if conditions are met.
-        """
-        if not self.sales_channel.sync_prices:
-            return
+        from sales_channels.models import RemoteCurrency
 
-        if not self.remote_product:
-            return False
+        if not self.skip_checks:
+            if not self.sales_channel.sync_prices:
+                return False
+            if not self.remote_product:
+                return False
+            if not self.assigned_to_website():
+                return False
 
-        if not self.assigned_to_website():
-            return False
-
-        # Set the remote_instance for the factory based on existing data
         try:
-            self.remote_instance = self.remote_model_class.objects.get(
-                remote_product=self.remote_product
-            )
+            self.remote_instance = self.remote_model_class.objects.get(remote_product=self.remote_product)
         except self.remote_model_class.DoesNotExist:
             return False
 
-        self.full_price, self.discounted_price = self.local_instance.get_price_for_sales_channel(self.sales_channel)
+        existing_price_data = self.remote_instance.price_data or {}
 
-        # Convert price and discount to float if they are not None
-        if self.full_price is not None:
-            self.full_price = float(self.full_price)
-        if self.discounted_price is not None:
-            self.discounted_price = float(self.discounted_price)
+        all_remote_currencies = RemoteCurrency.objects.filter(sales_channel=self.sales_channel)
+        for remote_currency in all_remote_currencies:
+            local_currency = remote_currency.local_instance
+            if not local_currency:
+                continue
 
-        # If the remote instance already has the correct price, no update is needed
-        if self.remote_instance.price == self.full_price and self.remote_instance.discount_price == self.discounted_price:
-            return False
+            full_price, discount_price = self.local_instance.get_price_for_sales_channel(
+                self.sales_channel, currency=local_currency
+            )
 
-        return True
+            price = float(full_price) if full_price is not None else None
+            discount = float(discount_price) if discount_price is not None else None
 
-    def get_remote_instance(self):
-        """
-        Override to prevent fetching in the default way since it is already set in preflight_check.
-        """
-        pass
+            self.price_data[local_currency.iso_code] = {
+                "price": price,
+                "discount_price": discount,
+            }
+
+            # Only append to update list if currency matches or we're updating all
+            if not self.currency or self.currency == local_currency:
+                current = existing_price_data.get(local_currency.iso_code, {})
+                if current.get("price") != price or current.get("discount_price") != discount:
+                    self.to_update_currencies.append(local_currency.iso_code)
+
+        return bool(self.to_update_currencies)
 
     def needs_update(self):
-        return True # the actual check is done in preflight_check
+        return bool(self.to_update_currencies)
+
+    def get_remote_instance(self):
+        # Already resolved in preflight_check
+        pass
+
+    def post_update_process(self):
+        self.remote_instance.price_data = self.price_data
+        self.remote_instance.save()

@@ -41,6 +41,12 @@ class  SalesChannel(Integration, models.Model):
         self.connect()
         super().save(*args, **kwargs)
 
+    def is_single_currency(self):
+        from .taxes import RemoteCurrency
+
+        remote_currencies_cnt = RemoteCurrency.objects.filter(sales_channel=self).count()
+        return remote_currencies_cnt == 1
+
     def connect(self):
         raise NotImplementedError("This method must be implemented by child class")
 

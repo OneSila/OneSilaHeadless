@@ -104,8 +104,7 @@ class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
 
     remote_product = models.OneToOneField('sales_channels.RemoteProduct',related_name='price', on_delete=models.CASCADE, help_text="The remote product associated with this price.")
-    price = models.DecimalField(max_digits=10, decimal_places=2, help_text="The price of the product in the remote system.", null=True, blank=True,) # null for configurable products
-    discount_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="The discounted price of the product in the remote system, if any.")
+    price_data = models.JSONField(default=dict, blank=True, help_text="Multi-currency price and discount data.")
 
     class Meta:
         unique_together = ('remote_product',)
@@ -113,14 +112,27 @@ class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Remote Prices'
 
     def __str__(self):
-        return f"Price for {self.remote_product} - {self.price}"
+        return f"Price for {self.remote_product} - {self.frontend_name}"
+
+    def get_price_for_currency(self, currency_code):
+        return self.price_data.get(currency_code, {})
 
     @property
     def frontend_name(self):
-        if self.discount_price is not None:
-            return f"{self.price} - {self.discount_price}"
 
-        return f"{self.price}"
+        if not self.price_data:
+            return "No prices"
+
+        parts = []
+        for currency_code, values in self.price_data.items():
+            price = values.get("price")
+            discount = values.get("discount_price")
+            if discount is not None:
+                parts.append(f"{currency_code}: {price} → {discount}")
+            else:
+                parts.append(f"{currency_code}: {price}")
+
+        return " | ".join(parts)
 
 
 class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):

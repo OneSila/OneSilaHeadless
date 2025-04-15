@@ -239,10 +239,14 @@ class Product(TranslatedModelMixin, models.Model):
 
         return Product.objects.filter(id__in=unique_variations_ids)
 
-    def get_price_for_sales_channel(self, sales_channel):
+    def get_price_for_sales_channel(self, sales_channel, currency=None):
         from datetime import date
         from sales_prices.models import SalesPrice, SalesPriceListItem
         from sales_channels.models.sales_channels import SalesChannelIntegrationPricelist
+        from currencies.models import Currency
+
+        if currency is None:
+            currency = Currency.objects.filter(multi_tenant_company=self.multi_tenant_company, is_default_currency=True).first()
 
         today = date.today()
 
@@ -250,7 +254,8 @@ class Product(TranslatedModelMixin, models.Model):
         periodic_pricelist = SalesChannelIntegrationPricelist.objects.filter(
             sales_channel=sales_channel,
             price_list__start_date__lte=today,
-            price_list__end_date__gte=today
+            price_list__end_date__gte=today,
+            price_list__currency=currency
         ).first()
 
         if periodic_pricelist:
@@ -266,6 +271,7 @@ class Product(TranslatedModelMixin, models.Model):
         # Step 2: Check for Non-Periodic Pricelist
         non_periodic_pricelist = SalesChannelIntegrationPricelist.objects.filter(
             sales_channel=sales_channel,
+            price_list__currency=currency,
             price_list__start_date__isnull=True,
             price_list__end_date__isnull=True
         ).first()
@@ -280,7 +286,7 @@ class Product(TranslatedModelMixin, models.Model):
                 return price_item.price, price_item.discount
 
         # Step 3: Use Default Product Price
-        sales_price = SalesPrice.objects.filter(product=self).first()
+        sales_price = SalesPrice.objects.filter(product=self, currency=currency).first()
 
         if sales_price:
             # Handle Case 1: Both RRP and price are available (and not None)

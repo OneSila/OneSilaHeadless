@@ -1,7 +1,7 @@
 from core.schema.core.types.ordering import order
 from core.schema.core.types.types import auto
 
-from sales_channels.models import ImportCurrency, ImportImage, SalesChannelImport, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
+from sales_channels.models import ImportCurrency, ImportImage, SalesChannelImport, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
 from sales_channels.models.sales_channels import RemoteLanguage
 
 
@@ -78,12 +78,6 @@ class RemoteLogOrder:
 @order(RemoteOrder)
 class RemoteOrderOrder:
     id: auto
-
-
-@order(RemotePrice)
-class RemotePriceOrder:
-    id: auto
-
 
 @order(RemoteProduct)
 class RemoteProductOrder:
