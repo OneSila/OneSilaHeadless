@@ -19,7 +19,7 @@ from magento.models import Product as MagentoApiProduct
 
 from sales_channels.integrations.magento2.models.sales_channels import MagentoRemoteLanguage
 from sales_channels.integrations.magento2.models.taxes import MagentoTaxClass
-from sales_channels.models import SalesChannelViewAssign
+from sales_channels.models import SalesChannelViewAssign, RemoteCurrency
 
 logger = logging.getLogger(__name__)
 
@@ -148,9 +148,12 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
             self.add_field_in_payload('discount', self.discount)
             return
 
-        from sales_channels.models.taxes import RemoteCurrency  # optional: move to top of file
+        from sales_channels.integrations.magento2.models import MagentoCurrency
 
-        remote_currencies = RemoteCurrency.objects.filter(sales_channel=self.sales_channel)
+        remote_currencies = MagentoCurrency.objects.filter(sales_channel=self.sales_channel).select_related(
+            "local_instance")
+
+        default_currency = remote_currencies.filter(is_default=True).first()
 
         for remote_currency in remote_currencies:
             local_currency = remote_currency.local_instance
@@ -169,15 +172,14 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
                 "discount_price": discount,
             }
 
-        # Set legacy price fields for payload and Magento compatibility
-        first_currency_code = next(iter(self.prices_data), None)
-        if first_currency_code:
-            self.default_currency_code = first_currency_code
-            self.price = self.prices_data[first_currency_code]['price']
-            self.discount = self.prices_data[first_currency_code]['discount_price']
+        # Set legacy price fields from default currency (for Magento backward compatibility)
+        if default_currency and default_currency.local_instance:
+            code = default_currency.local_instance.iso_code
+            self.default_currency_code = code
+            self.price = self.prices_data[code]['price']
+            self.discount = self.prices_data[code]['discount_price']
             self.add_field_in_payload('price', self.price)
             self.add_field_in_payload('discount', self.discount)
-
 
     def set_vat_rate(self):
         self.vat_rate = None
@@ -257,8 +259,25 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
 
     def update_multi_currency_prices(self):
 
+        currencies_to_scope_map = {}
+        for remote_currency in RemoteCurrency.objects.filter(sales_channel=self.sales_channel, local_instance__iso_code__in=self.prices_data.keys()):
+            if len(remote_currency.store_view_codes):
+                currencies_to_scope_map[remote_currency.local_instance.iso_code] = remote_currency.store_view_codes[0]
+
         for iso_code, current_price in self.prices_data.items():
-            pass
+
+            # the price was already created / updated
+            if iso_code == self.default_currency_code:
+                continue
+
+            scope = currencies_to_scope_map.get(iso_code)
+            price = current_price.get('price')
+            discount_price = current_price.get('discount_price')
+
+            self.magento_product.price = price
+            self.magento_product.discount_price = discount_price
+            self.magento_product.save(scope=scope)
+
 
     def final_process(self):
         translated_product_properties = ProductProperty.objects.filter(product=self.local_instance, property__is_public_information=True, property__type__in=Property.TYPES.TRANSLATED)

@@ -329,7 +329,7 @@ def sales_channels__sales_channel_integration_pricelist__post_create_receiver(se
     sales_channel = instance.sales_channel
     assigns = SalesChannelViewAssign.objects.filter(sales_channel=sales_channel, sales_channel__active=True)
     for assign in assigns:
-        update_remote_price.send(sender=assign.product.__class__, instance=assign.product)
+        update_remote_price.send(sender=assign.product.__class__, instance=assign.product, currency=instance.price_list.currency)
 
 @receiver(post_delete, sender='sales_channels.SalesChannelIntegrationPricelist')
 def sales_channels__sales_channel_integration_pricelist__post_delete_receiver(sender, instance, **kwargs):
@@ -339,7 +339,7 @@ def sales_channels__sales_channel_integration_pricelist__post_delete_receiver(se
     sales_channel = instance.sales_channel
     assigns = SalesChannelViewAssign.objects.filter(sales_channel=sales_channel, sales_channel__active=True)
     for assign in assigns:
-        update_remote_price.send(sender=assign.product.__class__, instance=assign.product)
+        update_remote_price.send(sender=assign.product.__class__, instance=assign.product, currency=instance.price_list.currency)
 
 
 @receiver(post_update, sender='sales_prices.SalesPriceList')
@@ -350,7 +350,7 @@ def sales_channels__sales_price_list__post_update_receiver(sender, instance, **k
     if instance.is_any_field_dirty(['start_date', 'end_date']):
         price_list_items = SalesPriceListItem.objects.filter(salespricelist=instance)
         for item in price_list_items:
-            update_remote_price.send(sender=item.product.__class__, instance=item.product)
+            update_remote_price.send(sender=item.product.__class__, instance=item.product, currency=instance.currency)
 
 
 @receiver(post_delete, sender='sales_prices.SalesPriceList')
@@ -360,14 +360,14 @@ def sales_channels__sales_price_list__pre_delete_receiver(sender, instance, **kw
     """
     price_list_items = SalesPriceListItem.objects.filter(salespricelist=instance)
     for item in price_list_items:
-        update_remote_price.send(sender=item.product.__class__, instance=item.product)
+        update_remote_price.send(sender=item.product.__class__, instance=item.product, currency=instance.currency)
 
 
 @receiver(post_create, sender='sales_prices.SalesPriceListItem')
 @receiver(post_update, sender='sales_prices.SalesPriceListItem')
 @receiver(post_delete, sender='sales_prices.SalesPriceListItem')
 def sales_channels__sales_price_list_item__post_create_receiver(sender, instance, **kwargs):
-    update_remote_price.send(sender=instance.product.__class__, instance=instance.product)
+    update_remote_price.send(sender=instance.product.__class__, instance=instance.product, currency=instance.salespricelist.currency)
 
 
 @receiver(post_update, sender='sales_prices.SalesPrice')
@@ -375,14 +375,15 @@ def sales_channels__sales_price__post_update_receiver(sender, instance, **kwargs
     """
     Trigger a price change signal when the product price or RRP is updated.
     """
-    update_remote_price.send(sender=instance.product.__class__, instance=instance.product)
+    update_remote_price.send(sender=instance.product.__class__, instance=instance.product, currency=instance.currency)
 
 @receiver(price_changed, sender='products.Product')
 def sales_channels__price_changed__receiver(sender, instance, **kwargs):
     """
     Handle the price_changed signal to check trigger the update_remote_price signal if so.
     """
-    update_remote_price.send(sender=instance.__class__, instance=instance)
+    currency = kwargs.get('currency', None)
+    update_remote_price.send(sender=instance.__class__, instance=instance, currency=currency)
 
 # ------------------------------------------------------------- SEND SIGNALS FOR PRODUCT CONTENT
 

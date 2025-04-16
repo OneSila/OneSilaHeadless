@@ -35,6 +35,7 @@ class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFacto
         all_remote_currencies = RemoteCurrency.objects.filter(sales_channel=self.sales_channel)
         for remote_currency in all_remote_currencies:
             local_currency = remote_currency.local_instance
+
             if not local_currency:
                 continue
 
@@ -53,7 +54,7 @@ class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFacto
             # Only append to update list if currency matches or we're updating all
             if not self.currency or self.currency == local_currency:
                 current = existing_price_data.get(local_currency.iso_code, {})
-                if current.get("price") != price or current.get("discount_price") != discount:
+                if current.get("price", None) != price or current.get("discount_price", None) != discount:
                     self.to_update_currencies.append(local_currency.iso_code)
 
         return bool(self.to_update_currencies)

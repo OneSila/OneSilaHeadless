@@ -53,7 +53,7 @@ class  SalesChannel(Integration, models.Model):
     def __str__(self):
         return f"{self.hostname } @ {self.multi_tenant_company}"
 
-class SalesChannelIntegrationPricelist(models.Model): # @TODO: I don't think this is needed
+class SalesChannelIntegrationPricelist(models.Model):
     """
     Through model to handle the association between a SalesChannel and a PriceList.
     """

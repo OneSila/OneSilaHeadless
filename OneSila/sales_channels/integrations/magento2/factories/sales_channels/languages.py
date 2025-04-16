@@ -89,6 +89,20 @@ class MagentoRemoteLanguagePullFactory(GetMagentoAPIMixin, PullRemoteInstanceMix
             magento_currency.local_instance = local_currency
             update_fields.append('local_instance')
 
+        # Set is_default to True if this is the first default
+        if not MagentoCurrency.objects.filter(
+                sales_channel=self.sales_channel,
+                is_default=True
+        ).exclude(id=magento_currency.id).exists():
+            if not magento_currency.is_default:
+                magento_currency.is_default = True
+                update_fields.append('is_default')
+
+        # Update store_view_codes list
+        if remote_data.code and remote_data.code not in magento_currency.store_view_codes:
+            magento_currency.store_view_codes.append(remote_data.code)
+            update_fields.append('store_view_codes')
+
         if update_fields:
             magento_currency.save(update_fields=update_fields)
 

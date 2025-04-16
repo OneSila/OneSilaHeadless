@@ -71,9 +71,9 @@ def salespricelistitem__check_price_changed_periodic_task():
     ending_promotions = SalesPriceList.objects.filter(end_date=yesterday)
     for salespricelist in ending_promotions:
         for item in salespricelist.salespricelistitem_set.all().iterator():
-            price_changed.send(sender=item.product.__class__, instance=item.product)
+            price_changed.send(sender=item.product.__class__, instance=item.product, currency=salespricelist.currency)
 
     starting_promotions = SalesPriceList.objects.filter(start_date=today)
     for salespricelist in starting_promotions:
         for item in salespricelist.salespricelistitem_set.all().iterator():
-            price_changed.send(sender=item.product.__class__, instance=item.product)
+            price_changed.send(sender=item.product.__class__, instance=item.product, currency=salespricelist.currency)

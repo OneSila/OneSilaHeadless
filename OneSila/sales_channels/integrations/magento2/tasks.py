@@ -1,6 +1,7 @@
 from huey import crontab
 from huey.contrib.djhuey import db_task, periodic_task
 from core.huey import HIGH_PRIORITY, LOW_PRIORITY, MEDIUM_PRIORITY
+from currencies.models import Currency
 from products.models import Product
 from properties.models import Property, PropertySelectValue, ProductPropertiesRule
 from sales_channels.decorators import remote_task
@@ -311,18 +312,24 @@ def delete_magento_product_property_db_task(task_queue_item_id, sales_channel_id
 
 @remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def update_magento_price_db_task(task_queue_item_id, sales_channel_id, product_id, remote_product_id):
+def update_magento_price_db_task(task_queue_item_id, sales_channel_id, product_id, remote_product_id, currency_id=None):
     from .factories.prices import MagentoPriceUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
+
+        currency = None
+        if currency_id:
+            currency = Currency.objects.get(id=currency_id)
+
         run_remote_product_dependent_magento_factory(
             sales_channel_id=sales_channel_id,
             factory_class=MagentoPriceUpdateFactory,
             local_instance_id=product_id,
             local_instance_class=Product,
-            remote_product_id=remote_product_id
+            remote_product_id=remote_product_id,
+            factory_kwargs={'currency': currency}
         )
 
     task.execute(actual_task)

@@ -128,32 +128,44 @@ class ImportProductInstance(AbstractImportInstance):
             self.vat_rate = vat_rate_object
             self.vat_rate_instance = self.vat_rate
 
-
     def update_ean_code(self):
 
-        if hasattr(self, 'ean_code'):
+        if not hasattr(self, 'ean_code') or not self.ean_code:
+            return
 
-            self.ean_code_instance = EanCode.objects.filter(
+        # Try to find by product first (for update case)
+        self.ean_code_instance = EanCode.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.instance,
+        ).first()
+
+        if self.ean_code_instance:
+            # Product match found, but maybe EAN changed
+            if self.ean_code_instance.ean_code != self.ean_code:
+                self.ean_code_instance.ean_code = self.ean_code
+        else:
+            # Try to find an existing ean_code assigned elsewhere or unassigned
+            existing_ean = EanCode.objects.filter(
                 multi_tenant_company=self.multi_tenant_company,
-                product=self.instance,
+                ean_code=self.ean_code,
             ).first()
 
-            if self.ean_code_instance is None:
+            if existing_ean:
+                # Reassign to the correct product
+                self.ean_code_instance = existing_ean
+                self.ean_code_instance.product = self.instance
+            else:
+                # Create new
                 self.ean_code_instance = EanCode.objects.create(
                     multi_tenant_company=self.multi_tenant_company,
                     product=self.instance,
-                    ean_code=self.ean_code)
+                    ean_code=self.ean_code,
+                )
 
-                self.ean_code_instance.already_used= True
-                self.ean_code_instance.internal= False
-            else:
-                if self.ean_code_instance.ean_code != self.ean_code:
-                    self.ean_code_instance.ean_code = self.ean_code
-
-                self.ean_code_instance.already_used = True
-                self.ean_code_instance.internal = False
-                self.ean_code_instance.save()
-
+        # Common fields
+        self.ean_code_instance.already_used = True
+        self.ean_code_instance.internal = False
+        self.ean_code_instance.save()
 
     def _set_rule(self):
 

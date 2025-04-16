@@ -361,6 +361,10 @@ class RemoteEanCode(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     @property
     def frontend_name(self):
+
+        if self.ean_code is None:
+            return "N/A"
+
         return self.ean_code
 
     def __str__(self):
