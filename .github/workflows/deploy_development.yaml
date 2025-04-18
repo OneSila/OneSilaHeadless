@@ -30,6 +30,5 @@ jobs:
             cd OneSila
             ./manage.py migrate
             ./manage.py collectstatic --noinput
-            sudo supervisorctl restart hypercornctl
-            sudo chmod 777 /home/${{ secrets.DEVELOPMENT_USERNAME }}/hypercorn.sock
+            sudo supervisorctl restart gunicornctl
             sudo supervisorctl restart huey
