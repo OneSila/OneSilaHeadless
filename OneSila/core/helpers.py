@@ -127,3 +127,12 @@ def is_json_serializable(value):
         return True
     except (TypeError, OverflowError):
         return False
+
+
+def safe_run_task(task_func, *args, **kwargs):
+    from django.db import transaction, connection
+
+    if connection.in_atomic_block:
+        transaction.on_commit(lambda: task_func(*args, **kwargs))
+    else:
+        task_func(*args, **kwargs)

@@ -16,7 +16,7 @@ class PropertiesMutation:
     create_properties: List[PropertyType] = create(PropertyInput)
     update_property: PropertyType = update(PropertyPartialInput)
     delete_property: PropertyType = delete()
-    delete_properties: List[PropertyType] = delete()
+    delete_properties: List[PropertyType] = delete(is_bulk=True)
 
     create_property_translation: PropertyTranslationType = create(PropertyTranslationInput)
     create_property_translations: List[PropertyTranslationType] = create(PropertyTranslationInput)
@@ -28,7 +28,7 @@ class PropertiesMutation:
     create_property_select_values: List[PropertySelectValueType] = create(PropertySelectValueInput)
     update_property_select_value: PropertySelectValueType = update(PropertySelectValuePartialInput)
     delete_property_select_value: PropertySelectValueType = delete()
-    delete_property_select_values: List[PropertySelectValueType] = delete()
+    delete_property_select_values: List[PropertySelectValueType] = delete(is_bulk=True)
 
     create_product_property: ProductPropertyType = create(ProductPropertyInput)
     create_product_properties: List[ProductPropertyType] = create(ProductPropertyInput)
@@ -54,7 +54,7 @@ class PropertiesMutation:
     update_product_properties_rule: ProductPropertiesRuleType = update(ProductPropertiesRulePartialInput)
     complete_update_product_properties_rule: ProductPropertiesRuleType = complete_update_product_properties_rule()
     delete_product_properties_rule: ProductPropertiesRuleType = delete()
-    delete_product_properties_rules: List[ProductPropertiesRuleType] = delete()
+    delete_product_properties_rules: List[ProductPropertiesRuleType] = delete(is_bulk=True)
 
     create_product_properties_rule_item: ProductPropertiesRuleItemType = create(ProductPropertiesRuleItemInput)
     create_product_properties_rule_items: List[ProductPropertiesRuleItemType] = create(ProductPropertiesRuleItemInput)

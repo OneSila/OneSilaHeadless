@@ -482,14 +482,14 @@ class ImportSalesPriceInstance(AbstractImportInstance):
         self.set_field_if_exists('currency')
         self.set_field_if_exists('product_data')
 
-        self.validate()
-        self._set_product_import_instance()
-
         if currency_object:
             self.currency = currency_object
         else:
             self._set_public_currency()
             self._set_currency()
+
+        self.validate()
+        self._set_product_import_instance()
 
     @property
     def local_class(self):
@@ -511,6 +511,9 @@ class ImportSalesPriceInstance(AbstractImportInstance):
 
         if not getattr(self, 'product_data', None) and not self.product:
             raise ValueError("Either a 'product' or 'product_data' must be provided.")
+
+        if hasattr(self, 'currency') and getattr(self, 'currency', None) is None:
+            raise ValueError("Both 'currency' cannot be None.")
 
 
     def _set_public_currency(self):

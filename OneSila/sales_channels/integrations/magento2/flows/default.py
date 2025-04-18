@@ -2,6 +2,7 @@ from sales_channels.integrations.magento2.models import MagentoSalesChannel
 from sales_channels.models import RemoteProduct
 from integrations.tasks import add_task_to_queue
 from integrations.helpers import get_import_path
+from django.db import transaction
 
 
 def run_generic_magento_task_flow(task_func, multi_tenant_company, number_of_remote_requests=None, sales_channels_filter_kwargs=None, **kwargs):
@@ -27,12 +28,12 @@ def run_generic_magento_task_flow(task_func, multi_tenant_company, number_of_rem
             **kwargs
         }
 
-        add_task_to_queue(
+        transaction.on_commit(lambda: add_task_to_queue(
             integration_id=sales_channel.id,
             task_func_path=get_import_path(task_func),
             task_kwargs=task_kwargs,
             number_of_remote_requests=number_of_remote_requests
-        )
+        ))
 
 def run_product_specific_magento_task_flow(
     task_func,
@@ -75,12 +76,12 @@ def run_product_specific_magento_task_flow(
                 **kwargs
             }
 
-            add_task_to_queue(
+            transaction.on_commit(lambda: add_task_to_queue(
                 integration_id=sales_channel.id,
                 task_func_path=get_import_path(task_func),
                 task_kwargs=task_kwargs,
                 number_of_remote_requests=number_of_remote_requests
-            )
+            ))
 
 
 def run_delete_generic_magento_task_flow(
@@ -117,12 +118,13 @@ def run_delete_generic_magento_task_flow(
             'sales_channel_id': sales_channel.id,
             'remote_instance': remote_instance.id
         }
-        add_task_to_queue(
+
+        transaction.on_commit(lambda: add_task_to_queue(
             integration_id=sales_channel.id,
             task_func_path=get_import_path(task_func),
             task_kwargs=task_kwargs,
             number_of_remote_requests=number_of_remote_requests
-        )
+        ))
 
     for sales_channel in MagentoSalesChannel.objects.filter(**sales_channels_filter_kwargs):
         get_kwargs = {
@@ -189,13 +191,14 @@ def run_delete_product_specific_generic_magento_task_flow(
                         'remote_product_id': remote_product.id
                     }
 
-                    add_task_to_queue(
+                    transaction.on_commit(lambda: add_task_to_queue(
                         integration_id=sales_channel.id,
                         task_func_path=get_import_path(task_func),
                         task_kwargs=task_kwargs,
                         number_of_remote_requests=number_of_remote_requests,
                         **kwargs
-                    )
+                    ))
+
                 except remote_class.DoesNotExist:
                     # If the remote instance does not exist for this sales channel, skip
                     pass

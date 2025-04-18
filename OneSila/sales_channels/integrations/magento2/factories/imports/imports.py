@@ -556,7 +556,7 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         return attributes, mirror_map
 
     def get_product_prices(self, product: MagentoApiProduct,
-                           currency_product_map: dict[Currency, MagentoApiProduct] = None):
+                           currency_product_map = None):
         """
         Returns a list of price entries.
 

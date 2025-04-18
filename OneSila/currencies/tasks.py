@@ -1,5 +1,5 @@
 from huey import crontab
-from huey.contrib.djhuey import db_task, db_periodic_task
+from huey.contrib.djhuey import db_periodic_task
 
 from currencies.flows import update_rate_flow
 

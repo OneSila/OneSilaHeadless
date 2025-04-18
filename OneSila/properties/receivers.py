@@ -1,7 +1,8 @@
-from django.db.models.signals import post_delete
+from django.core.exceptions import ValidationError
+from django.db.models.signals import post_delete, pre_delete
 from django.dispatch import receiver
 from django.utils.text import slugify
-
+from django.utils.translation import gettext_lazy as _
 from core.models import MultiTenantCompany
 from core.signals import post_create, post_update
 from properties.models import Property, PropertyTranslation, PropertySelectValue, ProductProperty, PropertySelectValueTranslation, ProductPropertiesRule
@@ -61,3 +62,11 @@ def delete_product_type_property_select_value(sender, instance, **kwargs):
     value = instance.product_type
     value.delete(force_delete=True)
 
+
+@receiver(pre_delete, sender=PropertySelectValue)
+def prevent_property_select_value_deletion(sender, instance, **kwargs):
+
+    if ProductProperty.objects.filter(value_multi_select=instance).exists():
+        raise ValidationError(
+            _("This value cannot be deleted because it is used in as a product property multi-select field.")
+        )
