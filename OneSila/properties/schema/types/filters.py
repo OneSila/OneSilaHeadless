@@ -3,12 +3,13 @@ from typing import Optional
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin
 from media.schema.types.filters import ImageFilter
-
+from strawberry_django import filter_field as custom_filter
 from properties.models import Property, ProductProperty, \
     ProductProperty, PropertySelectValue, PropertyTranslation, ProductPropertyTextTranslation, PropertySelectValueTranslation, ProductPropertiesRule, \
     ProductPropertiesRuleItem
 from products.schema.types.filters import ProductFilter
-
+from django.db.models import Q
+from strawberry import UNSET
 
 @filter(Property)
 class PropertyFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
@@ -23,6 +24,13 @@ class PropertySelectValueFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     property: Optional[PropertyFilter]
     image: Optional[ImageFilter]
+
+    @custom_filter
+    def is_product_type(self, queryset, value: bool, prefix: str):
+        if value not in (None, UNSET):
+            queryset = queryset.filter(property__is_product_type=value)
+
+        return queryset, Q()
 
 
 @filter(PropertySelectValueTranslation)
