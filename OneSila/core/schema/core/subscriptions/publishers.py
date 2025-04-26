@@ -48,8 +48,8 @@ class ModelInstanceSubscribePublisher:
     async def verify_multi_tenant_company(self):
         """ensure there is a multi tenant user present"""
         if self.multi_tenant_company_protection:
-            # multi_tenant_company = await aget_multi_tenant_company(self.info, fail_silently=False)
-            multi_tenant_company = get_multi_tenant_company(self.info, fail_silently=False)
+            multi_tenant_company = await aget_multi_tenant_company(self.info, fail_silently=False)
+            # multi_tenant_company = get_multi_tenant_company(self.info, fail_silently=False)
 
     async def verify_return_type(self):
         return_type = self.info.return_type.__name__

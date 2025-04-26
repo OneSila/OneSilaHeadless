@@ -2,7 +2,7 @@ from core.schema.core.types.types import auto
 from core.schema.core.types.input import NodeInput, input, partial, List
 
 from sales_channels.models import SalesChannelImport, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, \
-    RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, \
+    RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemoteProduct, \
     RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, \
     SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign, ImportProperty
 from sales_channels.models.sales_channels import RemoteLanguage
@@ -110,12 +110,6 @@ class RemoteOrderPartialInput(NodeInput):
 @partial(RemoteOrder, fields="__all__")
 class RemoteOrderPartialInput(NodeInput):
     pass
-
-
-@input(RemotePrice, fields="__all__")
-class RemotePriceInput:
-    pass
-
 
 @input(RemoteProduct, fields="__all__")
 class RemoteProductInput:

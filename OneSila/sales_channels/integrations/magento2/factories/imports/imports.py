@@ -4,7 +4,7 @@ from copy import deepcopy
 from decimal import Decimal
 from typing import Optional
 from django.core.exceptions import ValidationError
-from magento.models import ProductAttribute, AttributeOption, AttributeSet
+from magento.models import ProductAttribute, AttributeOption, AttributeSet, TaxClass
 from core.helpers import clean_json_data
 from currencies.models import Currency
 from imports_exports.factories.imports import ImportMixin
@@ -22,6 +22,7 @@ from sales_channels.integrations.magento2.models.products import MagentoEanCode,
     MagentoImageProductAssociation
 from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet, MagentoProductProperty
 from sales_channels.integrations.magento2.models.sales_channels import MagentoRemoteLanguage
+from sales_channels.integrations.magento2.models.taxes import MagentoTaxClass, MagentoCurrency
 from sales_channels.models import ImportProperty, ImportPropertySelectValue, ImportProduct, SalesChannelViewAssign, \
     SalesChannelImport
 from django.contrib.contenttypes.models import ContentType
@@ -29,6 +30,8 @@ from magento.models import Product as MagentoApiProduct
 from magento.models import ConfigurableProduct as MagentoApiConfigurableProduct
 from sales_channels.models.products import RemoteProductConfigurator
 import logging
+
+from taxes.models import VatRate
 
 logger = logging.getLogger(__name__)
 
@@ -80,17 +83,39 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
             local_instance__isnull=False
         )
 
+        magento_currencies = MagentoCurrency.objects.filter(
+            sales_channel=self.sales_channel,
+            local_instance__isnull=False
+        )
+
         self.magento_translation_id_map = {}
         self.magento_translation_store_code_map = {}
+        self.magento_scope_currency_map = {}
 
         seen_languages = set()
+        seen_currencies = set()
+        store_view_codes = []
+
         for magento_language in magento_languages:
+
+            store_view_codes.append(magento_language.store_view_code)
             if magento_language.local_instance in seen_languages:
                 continue
 
             self.magento_translation_id_map[magento_language.remote_id] = magento_language.local_instance
             self.magento_translation_store_code_map[magento_language.store_view_code] = magento_language.local_instance
             seen_languages.add(magento_language.local_instance)
+
+        for magento_currency in magento_currencies:
+            currency = magento_currency.local_instance
+            if currency in seen_currencies:
+                continue
+
+            for store_view_code in store_view_codes:
+                if store_view_code in magento_currency.store_view_codes:
+                    self.magento_scope_currency_map[store_view_code] = (currency, magento_currency.remote_id)
+                    seen_currencies.add(currency)
+                    break  # Stop once we assigned this currency
 
         self.select_values = []
         if len(self.magento_translation_store_code_map) == 1:
@@ -366,22 +391,61 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         Returns a mapping of local language → scoped MagentoApiProduct
         without mutating the original product.
         """
-
         if len(self.magento_translation_store_code_map) == 1:
             return None
 
-        translation_product_map = {}
+        self.translation_product_map = {}
 
         for store_code, language in self.magento_translation_store_code_map.items():
             try:
                 translated_product = deepcopy(product)
                 translated_product.refresh(scope=store_code)
-                translation_product_map[language] = translated_product
+                self.translation_product_map[language] = translated_product
             except Exception as e:
                 logger.debug(f"Failed to fetch translation for scope {store_code}: {e}")
                 continue
 
-        return translation_product_map
+        return self.translation_product_map
+
+    def get_product_currency_map(self, product: MagentoApiProduct) -> dict | None:
+        """
+        Returns a mapping of local currency → scoped MagentoApiProduct,
+        reusing translation-product mapping where possible.
+        """
+        if len(self.magento_scope_currency_map) == 0:
+            return None
+
+        if self.sales_channel.is_single_currency():
+            return None
+
+        currency_product_map = {}
+
+        for store_code, currency_tuple in self.magento_scope_currency_map.items():
+            currency = currency_tuple[0]
+            website_id = int(currency_tuple[1])
+
+            if website_id not in product.views:
+                continue
+
+            # Reuse from translation map if available
+            reused_translation = None
+            if store_code in self.magento_translation_store_code_map:
+                language = self.magento_translation_store_code_map[store_code]
+                reused_translation = self.translation_product_map.get(language)
+
+            if reused_translation:
+                currency_product_map[currency] = reused_translation
+                continue
+
+            try:
+                refreshed_product = deepcopy(product)
+                refreshed_product.refresh(scope=store_code)
+                currency_product_map[currency] = refreshed_product
+            except Exception as e:
+                logger.debug(f"Failed to fetch currency-scoped product for scope {store_code}: {e}")
+                continue
+
+        return currency_product_map
 
     def get_product_translations(self, product: MagentoApiProduct, translation_product_map=None):
         if translation_product_map is None:
@@ -491,21 +555,42 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
         return attributes, mirror_map
 
-    def get_product_prices(self, product: MagentoApiProduct):
-        # @TODO: HOW WE GET VAT RATE FROM MAGENTO PRODUCT?
-        currency = Currency.objects.get(
-            multi_tenant_company=self.import_process.multi_tenant_company,
-            is_default_currency=True
-        )
+    def get_product_prices(self, product: MagentoApiProduct,
+                           currency_product_map = None):
+        """
+        Returns a list of price entries.
 
-        try:
-            return [{
-                "price": product.special_price,
-                "rrp": product.price,
-                "currency": currency.iso_code,
-            }]
-        except:
-            return []
+        - If `currency_product_map` is provided, returns one price entry per currency.
+        - If not, falls back to a single price using the default currency and given product.
+        """
+        prices = []
+
+        if currency_product_map:
+            for currency, scoped_product in currency_product_map.items():
+                try:
+                    prices.append({
+                        "price": scoped_product.special_price,
+                        "rrp": scoped_product.price,
+                        "currency": currency.iso_code,
+                    })
+                except Exception as e:
+                    logger.debug(f"Failed to extract price for currency {currency.iso_code}: {e}")
+                    continue
+        else:
+            try:
+                currency = Currency.objects.get(
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    is_default_currency=True
+                )
+                prices.append({
+                    "price": product.special_price,
+                    "rrp": product.price,
+                    "currency": currency.iso_code,
+                })
+            except Exception as e:
+                logger.debug(f"Failed to fallback to default currency pricing: {e}")
+
+        return prices
 
     def get_product_variations(self, product: MagentoApiProduct, rule: ProductPropertiesRule):
         variations = []
@@ -513,6 +598,10 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
         for child in product.get_children():
             variation_data = self.get_product_data(child, rule)
+
+            if not variation_data:
+                continue
+
             variations.append({
                 "variation_data": variation_data,
             })
@@ -552,6 +641,18 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 return custom_attributes[ean_code_key]
         return None
 
+    def get_vat_name(self, custom_attributes: dict) -> Optional[str]:
+        if 'tax_class_id' in custom_attributes:
+            tax_class_id = custom_attributes.get('tax_class_id')
+
+            try:
+                tax_class_id = int(tax_class_id)
+            except (ValueError, TypeError):
+                pass
+
+            return self.tax_map.get(tax_class_id, None)
+
+        return None
 
     def get_product_data(self, product: MagentoApiProduct, rule: ProductPropertiesRule):
         type_map = {
@@ -559,7 +660,11 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
             MagentoApiProduct.PRODUCT_TYPE_CONFIGURABLE: Product.CONFIGURABLE,
         }
 
-        product_type = type_map.get(product.type_id, Product.SIMPLE)
+        product_type = type_map.get(product.type_id, None)
+
+        if product_type is None:
+            return False
+
         custom_attributes = product.custom_attributes
 
         structured_data = {
@@ -571,6 +676,8 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         }
 
         translation_map = self.get_product_translation_map(product)
+        currency_map = self.get_product_currency_map(product)
+
         ean_code = self.get_product_ean_code(custom_attributes)
         if ean_code:
             structured_data['ean_code'] = ean_code
@@ -580,10 +687,14 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
         if product_type == Product.SIMPLE:
             structured_data['attributes'], structured_data['__mirror_product_properties_map'] = self.get_product_attributes(custom_attributes, translation_map)
-            structured_data['prices'] = self.get_product_prices(product)
+            structured_data['prices'] = self.get_product_prices(product, currency_map)
+
         elif product_type == Product.CONFIGURABLE:
             structured_data['variations'], structured_data['__variation_sku_to_id_map'] = self.get_product_variations(product, rule)
             self.sync_configurator_rule_items(product, rule)
+
+        structured_data['vat_rate'] = self.get_vat_name(custom_attributes)
+        structured_data['use_vat_rate_name'] = True
 
         return structured_data
 
@@ -601,20 +712,18 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         log_instance.content_type = ContentType.objects.get_for_model(import_instance.instance)
         log_instance.object_id = import_instance.instance.pk
 
-    def handle_vat_rate(self, import_instance, product):
-        # @TODO: when we find out how to import the vat
-        pass
-
     def handle_ean_code(self, import_instance: ImportProductInstance):
-        # @TODO: FIX THIS
 
-        if hasattr(import_instance, 'ean_code'):
-            MagentoEanCode.objects.get_or_create(
+        magento_ean_code, _ = MagentoEanCode.objects.get_or_create(
                 multi_tenant_company=self.import_process.multi_tenant_company,
                 sales_channel=self.sales_channel,
                 remote_product=import_instance.remote_instance,
-                ean_code=import_instance.ean_code
             )
+
+        if hasattr(import_instance, 'ean_code'):
+            if magento_ean_code.ean_code != import_instance.ean_code:
+                magento_ean_code.ean_code = import_instance.ean_code
+                magento_ean_code.save()
 
 
     def handle_attributes(self, import_instance: ImportProductInstance):
@@ -655,7 +764,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
             if discounted_price is not None:
                 discounted_price = Decimal(discounted_price)
 
-            # @TODO: THIS SHOULD BE MULTICURRENCY
             for price in import_instance.prices:
                 magento_price, _ = MagentoPrice.objects.get_or_create(
                     multi_tenant_company=self.import_process.multi_tenant_company,
@@ -781,14 +889,41 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         return is_variation
 
 
+    def set_taxes_map(self):
+        self.tax_map = {}
+
+        tax_classes = self.api.taxes.all_in_memory()
+        for tax_class in tax_classes:
+            if tax_class.class_type == TaxClass.CLASS_TYPE_PRODUCT:
+                local_instance, _ = VatRate.objects.get_or_create(
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    name=tax_class.class_name
+                )
+
+                remote_instance, _ = MagentoTaxClass.objects.get_or_create(
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    local_instance=local_instance,
+                    remote_id=tax_class.class_id
+                )
+
+                self.tax_map[tax_class.class_id] = tax_class.class_name
+
+
+
     def import_products_process(self):
+        self.set_taxes_map()
 
         products_api = self.api.products
         products_api.clear_pagination()
         products_api.per_page = 200
 
         # Fetch first page
-        product_batch = products_api.execute_search()
+        product_batch = products_api.add_criteria(
+            field="type_id",
+            value=f"{MagentoApiProduct.PRODUCT_TYPE_SIMPLE},{MagentoApiProduct.PRODUCT_TYPE_CONFIGURABLE}",
+            condition="in").execute_search()
+
         self.configurable_skus = set()
 
         while True:
@@ -803,6 +938,10 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 is_variation = self.is_magento_variation(product)
                 rule = self.get_product_rule(product)
                 structured_data = self.get_product_data(product, rule)
+
+                if not structured_data:
+                    continue
+
                 product_import_instance = ImportProductInstance(
                     data=structured_data,
                     import_process=self.import_process,
@@ -824,7 +963,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
                 self.update_remote_product(product_import_instance, product, is_variation)
                 self.create_log_instance(product_import_instance, structured_data)
-                self.handle_vat_rate(product_import_instance, product)
                 self.handle_ean_code(product_import_instance)
                 self.handle_attributes(product_import_instance)
                 self.handle_translations(product_import_instance)

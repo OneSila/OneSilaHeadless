@@ -32,7 +32,11 @@ class RequestLoginTokenMutation(CleanupDataMixin, DjangoCreateMutation):
 
     def create(self, data: dict[str, Any], *, info: Info):
         with DjangoOptimizerExtension.disabled():
-            user = MultiTenantUser.objects.get(username=data['username'])
+            try:
+                user = MultiTenantUser.objects.get(username=data['username'])
+            except MultiTenantUser.DoesNotExist:
+                raise ValueError(_("User does not exist"))
+
             data = self.cleanup_data(data)
             return self.create_token(user=user)
 

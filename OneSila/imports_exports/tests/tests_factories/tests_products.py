@@ -9,6 +9,7 @@ from products.models import Product, ProductTranslation, ConfigurableVariation
 from properties.models import ProductPropertiesRuleItem, ProductPropertiesRule, PropertySelectValue, \
     PropertySelectValueTranslation, Property, ProductProperty
 from sales_prices.models import SalesPrice
+from currencies.currencies import currencies
 
 
 class ImportProductInstanceValidateTest(TestCase):
@@ -408,6 +409,16 @@ class ImportProductInstanceProcessTest(TestCase):
             ]
         }
 
+        Currency.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            **currencies['US']
+        )
+
+        Currency.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            **currencies['DE']
+        )
+
         instance = ImportProductInstance(data, self.import_process)
         instance.process()
 
@@ -464,7 +475,9 @@ class ImportProductInstanceProcessTest(TestCase):
                 {"property_data": {"name": "Color", "type": "SELECT"}, "value": "Red"}
             ],
             "variations": [
-                {"name": "Red Variant"}
+                {
+                    'variation_data': {"name": "Red Variant"}
+                }
             ]
         }
 
@@ -480,6 +493,7 @@ class ImportProductInstanceProcessTest(TestCase):
 
 
     def test_full_example(self):
+
         data = {
             "name": "Ultimate Product",
             "sku": "ALL001",
@@ -508,13 +522,19 @@ class ImportProductInstanceProcessTest(TestCase):
                 { "price": 29.99, "currency": "EUR" },
                 { "rrp": 34.99, "currency": "USD" }
             ],
-            "variations": [
-                { "name": "Elegant Variant" }
-            ],
             "configurator_select_values": [
                 { "property_data": { "name": "Style", "type": "SELECT" }, "value": "Elegant" }
             ]
         }
+        Currency.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            **currencies['US']
+        )
+
+        Currency.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            **currencies['DE']
+        )
 
         instance = ImportProductInstance(data, self.import_process)
         instance.process()

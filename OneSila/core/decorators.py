@@ -1,5 +1,6 @@
 from datetime import datetime
 from functools import wraps
+from django.db import transaction
 
 
 def timeit_and_log(logger, default_msg='', print_logger=False):
@@ -72,3 +73,14 @@ def trigger_signal_for_dirty_fields(*fields):
             return None
         return wrapper
     return decorator
+
+def run_task_after_commit(task_func):
+    """
+    Decorator to wrap any @db_task() to ensure it runs only after the outer transaction commits.
+    Safe to use globally — runs immediately if there's no transaction.
+    """
+    @wraps(task_func)
+    def wrapper(*args, **kwargs):
+        transaction.on_commit(lambda: task_func(*args, **kwargs))
+
+    return wrapper

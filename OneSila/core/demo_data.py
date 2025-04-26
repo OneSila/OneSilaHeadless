@@ -1,6 +1,6 @@
 import importlib
 
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 
 from core.exceptions import NotDemoDataGeneratorError
 from core.models import DemoDataRelation
@@ -144,18 +144,27 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
         self.load_apps()
         self.populate_db(multi_tenant_company=multi_tenant_company)
 
+
     def delete_traversed_content_object(self, content_object):
+
         try:
-            content_object.delete()
+            with transaction.atomic():  # isolate delete
+                content_object.delete()
         except ProtectedError as e:
-            for protected_intance in e.protected_objects:
-                self.delete_traversed_content_object(protected_intance)
+            for protected_instance in e.protected_objects:
+                self.delete_traversed_content_object(protected_instance)
 
-            self.delete_traversed_content_object(content_object)
+            try:
+                with transaction.atomic():
+                    content_object.delete()
+            except ProtectedError as e2:
+                for protected_instance in e2.protected_objects:
+                    self.delete_traversed_content_object(protected_instance)
+
+
         except ValidationError as e:
-
             if 'removed directly' in str(e):
-                pass # this is for select values that are deleted by deleting the rule
+                pass  # known expected case
 
     def delete_demo_data(self, *, multi_tenant_company):
         # we reverse the sequence, to avoid dealing with protected instances.
@@ -167,6 +176,7 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
             except AttributeError:
                 # Already deleted.
                 pass
+
             instance.delete()
 
 

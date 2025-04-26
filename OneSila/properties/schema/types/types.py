@@ -16,6 +16,7 @@ from .ordering import PropertyOrder, PropertyTranslationOrder, \
 
 @type(Property, filters=PropertyFilter, order=PropertyOrder, pagination=True, fields="__all__")
 class PropertyType(relay.Node, GetQuerysetMultiTenantMixin):
+    propertytranslation_set: List[Annotated['PropertyTranslationType', lazy("properties.schema.types.types")]]
 
     @field()
     def name(self, info) -> str | None:
@@ -32,6 +33,8 @@ class PropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
     property: PropertyType
     image: Optional[ImageType]
     productpropertiesrule_set: List[Annotated['ProductPropertiesRuleType', lazy("properties.schema.types.types")]]
+    propertyselectvaluetranslation_set: List[Annotated['PropertySelectValueTranslationType', lazy("properties.schema.types.types")]]
+
 
     @field()
     def value(self, info) -> str | None:

@@ -2,8 +2,8 @@ from django.core.exceptions import ValidationError
 from core.schema.core.mixins import GetCurrentUserMixin
 from core.schema.core.mutations import Info, Any
 from core.schema.core.mutations import UpdateMutation
-from sales_channels.models import SalesChannelViewAssign
-from sales_channels.signals import sync_remote_product
+from sales_channels.models import SalesChannelViewAssign, SalesChannel
+from sales_channels.signals import sync_remote_product, refresh_website_pull_models
 from django.utils.translation import gettext_lazy as _
 
 
@@ -15,8 +15,15 @@ class ResyncSalesChannelAssignMutation(UpdateMutation, GetCurrentUserMixin):
 
 
         sync_remote_product.send(sender=instance.remote_product.__class__, instance=instance.remote_product)
-        print('----------------------------')
-        print(instance.remote_product.__class__)
 
+        return instance
+
+
+class RefreshSalesChannelWebsiteModelsMutation(UpdateMutation, GetCurrentUserMixin):
+    def update(self, info: Info, instance: SalesChannel, data: dict[str, Any]):
+        if not instance.active:
+            raise ValidationError(_("Sales channel is not active."))
+
+        refresh_website_pull_models.send(sender=instance.__class__, instance=instance)
 
         return instance

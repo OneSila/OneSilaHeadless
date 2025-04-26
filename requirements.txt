@@ -32,6 +32,7 @@ tblib
 django-cleanup
 openai~=1.66.3
 replicate
+pydantic<2.0
 
 strawberry-graphql==0.261.0
 strawberry-graphql-django==0.56.0
@@ -44,4 +45,4 @@ django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absol
 starlette
 
 git+https://github.com/jazzband/django-polymorphic.git@v4.0.0a#egg=django-polymorphic
-git+https://github.com/OneSila/OneSilaMagento2Api.git@v1.0.26
+git+https://github.com/OneSila/OneSilaMagento2Api.git@v1.0.28

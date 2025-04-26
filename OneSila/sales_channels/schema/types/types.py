@@ -9,18 +9,22 @@ from currencies.schema.types.types import CurrencyType
 from imports_exports.schema.queries import ImportType
 from products.schema.types.types import ProductType
 
-from sales_channels.models import ImportCurrency, ImportImage, SalesChannelImport, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
+from sales_channels.models import ImportCurrency, ImportImage, SalesChannelImport, ImportProduct, ImportProperty, \
+    ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, \
+    RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteProduct, RemoteProductContent, \
+    RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, \
+    SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign, RemoteOrder
 from .filters import ImportCurrencyFilter, ImportImageFilter, SalesChannelImportFilter, ImportProductFilter, \
     ImportPropertyFilter, ImportPropertySelectValueFilter, ImportVatFilter, RemoteCategoryFilter, RemoteCurrencyFilter, \
     RemoteCustomerFilter, RemoteImageFilter, RemoteImageProductAssociationFilter, RemoteInventoryFilter, \
-    RemoteLogFilter, RemoteOrderFilter, RemotePriceFilter, RemoteProductFilter, RemoteProductContentFilter, \
+    RemoteLogFilter, RemoteOrderFilter, RemoteProductFilter, RemoteProductContentFilter, \
     RemoteProductPropertyFilter, RemotePropertyFilter, RemotePropertySelectValueFilter, RemoteVatFilter, \
     SalesChannelFilter, SalesChannelIntegrationPricelistFilter, SalesChannelViewFilter, SalesChannelViewAssignFilter, \
     RemoteLanguageFilter
 from .ordering import ImportCurrencyOrder, ImportImageOrder, SalesChannelImportOrder, ImportProductOrder, \
     ImportPropertyOrder, ImportPropertySelectValueOrder, ImportVatOrder, RemoteCategoryOrder, RemoteCurrencyOrder, \
     RemoteCustomerOrder, RemoteImageOrder, RemoteImageProductAssociationOrder, RemoteInventoryOrder, RemoteLogOrder, \
-    RemoteOrderOrder, RemotePriceOrder, RemoteProductOrder, RemoteProductContentOrder, RemoteProductPropertyOrder, \
+    RemoteOrderOrder, RemoteProductOrder, RemoteProductContentOrder, RemoteProductPropertyOrder, \
     RemotePropertyOrder, RemotePropertySelectValueOrder, RemoteVatOrder, SalesChannelOrder, \
     SalesChannelIntegrationPricelistOrder, SalesChannelViewOrder, SalesChannelViewAssignOrder, RemoteLanguageOrder
 from ...models.sales_channels import RemoteLanguage
@@ -84,8 +88,8 @@ class RemoteCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):
     def name(self, info) -> str:
         name = self.remote_code
 
-        if hasattr(self, 'store_view_code'):
-            name = f"{name} ({self.store_view_code})"
+        if hasattr(self, 'website_code'):
+            name = f"{name} ({self.website_code})"
 
         return name
 
@@ -113,12 +117,6 @@ class RemoteInventoryType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(RemoteOrder, filters=RemoteOrderFilter, order=RemoteOrderOrder, pagination=True, fields='__all__')
 class RemoteOrderType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
-
-
-@type(RemotePrice, filters=RemotePriceFilter, order=RemotePriceOrder, pagination=True, fields='__all__')
-class RemotePriceType(relay.Node, GetQuerysetMultiTenantMixin):
-    sales_channel: SalesChannelType
-
 
 @type(RemoteProductContent, filters=RemoteProductContentFilter, order=RemoteProductContentOrder, pagination=True, fields='__all__')
 class RemoteProductContentType(relay.Node, GetQuerysetMultiTenantMixin):

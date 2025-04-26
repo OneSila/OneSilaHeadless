@@ -30,6 +30,6 @@ jobs:
             cd OneSila
             ./manage.py migrate
             ./manage.py collectstatic --noinput
-            sudo supervisorctl restart hypercornctl
-            sudo chmod 777 /home/${{ secrets.DEVELOPMENT_USERNAME }}/hypercorn.sock
+            echo "Reload Gunicorn for 0-downtime" 
+            /home/${{ secrets.DEVELOPMENT_USERNAME }}/./reload_gunicorn.sh
             sudo supervisorctl restart huey

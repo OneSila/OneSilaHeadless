@@ -100,7 +100,8 @@ class SearchQuerySetMixin:
             search_term=search_term,
             search_fields=search_fields,
             multi_tenant_company=multi_tenant_company)
-        return qs
+
+        return qs.distinct()
 
 
 class SearchManagerMixin:

@@ -148,7 +148,7 @@ class ProductProperty(TranslatedModelMixin, models.Model):
     value_float = models.FloatField(null=True, blank=True)
     value_date = models.DateField(null=True, blank=True)
     value_datetime = models.DateTimeField(null=True, blank=True)
-    value_select = models.ForeignKey(PropertySelectValue, on_delete=models.CASCADE, related_name='value_select_set', null=True, blank=True)
+    value_select = models.ForeignKey(PropertySelectValue, on_delete=models.PROTECT, related_name='value_select_set', null=True, blank=True)
     value_multi_select = models.ManyToManyField(PropertySelectValue, related_name='value_multi_select_set', blank=True)
 
     def __str__(self):

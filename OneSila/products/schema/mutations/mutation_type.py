@@ -17,7 +17,7 @@ class ProductsMutation:
     create_products: List[ProductType] = create(ProductInput)
     update_product: ProductType = update(ProductPartialInput)
     delete_product: ProductType = delete()
-    delete_products: List[ProductType] = delete()
+    delete_products: List[ProductType] = delete(is_bulk=True)
 
     create_bundle_product: BundleProductType = create(BundleProductInput)
     create_bundle_products: List[BundleProductType] = create(BundleProductInput)

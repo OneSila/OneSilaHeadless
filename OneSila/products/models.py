@@ -19,7 +19,7 @@ class Product(TranslatedModelMixin, models.Model):
     from products.product_types import CONFIGURABLE, BUNDLE, SIMPLE,  PRODUCT_TYPE_CHOICES, HAS_PRICES_TYPES
 
     # Mandatory
-    sku = models.CharField(max_length=100, db_index=True, blank=True, null=True)
+    sku = models.CharField(max_length=256, db_index=True, blank=True, null=True)
     active = models.BooleanField(default=True)
     type = models.CharField(max_length=15, choices=PRODUCT_TYPE_CHOICES)
 
@@ -239,10 +239,14 @@ class Product(TranslatedModelMixin, models.Model):
 
         return Product.objects.filter(id__in=unique_variations_ids)
 
-    def get_price_for_sales_channel(self, sales_channel):
+    def get_price_for_sales_channel(self, sales_channel, currency=None):
         from datetime import date
         from sales_prices.models import SalesPrice, SalesPriceListItem
         from sales_channels.models.sales_channels import SalesChannelIntegrationPricelist
+        from currencies.models import Currency
+
+        if currency is None:
+            currency = Currency.objects.filter(multi_tenant_company=self.multi_tenant_company, is_default_currency=True).first()
 
         today = date.today()
 
@@ -250,7 +254,8 @@ class Product(TranslatedModelMixin, models.Model):
         periodic_pricelist = SalesChannelIntegrationPricelist.objects.filter(
             sales_channel=sales_channel,
             price_list__start_date__lte=today,
-            price_list__end_date__gte=today
+            price_list__end_date__gte=today,
+            price_list__currency=currency
         ).first()
 
         if periodic_pricelist:
@@ -266,6 +271,7 @@ class Product(TranslatedModelMixin, models.Model):
         # Step 2: Check for Non-Periodic Pricelist
         non_periodic_pricelist = SalesChannelIntegrationPricelist.objects.filter(
             sales_channel=sales_channel,
+            price_list__currency=currency,
             price_list__start_date__isnull=True,
             price_list__end_date__isnull=True
         ).first()
@@ -280,7 +286,7 @@ class Product(TranslatedModelMixin, models.Model):
                 return price_item.price, price_item.discount
 
         # Step 3: Use Default Product Price
-        sales_price = SalesPrice.objects.filter(product=self).first()
+        sales_price = SalesPrice.objects.filter(product=self, currency=currency).first()
 
         if sales_price:
             # Handle Case 1: Both RRP and price are available (and not None)
@@ -408,10 +414,10 @@ class BundleVariation(models.Model):
 class ProductTranslation(TranslationFieldsMixin, models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations")
 
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=256)
     short_description = models.TextField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
-    url_key = models.CharField(max_length=100, null=True, blank=True)
+    url_key = models.CharField(max_length=256, null=True, blank=True)
 
     def __str__(self):
         return f"{self.product} <{self.language}>"

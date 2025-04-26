@@ -41,13 +41,19 @@ class  SalesChannel(Integration, models.Model):
         self.connect()
         super().save(*args, **kwargs)
 
+    def is_single_currency(self):
+        from .taxes import RemoteCurrency
+
+        remote_currencies_cnt = RemoteCurrency.objects.filter(sales_channel=self).count()
+        return remote_currencies_cnt == 1
+
     def connect(self):
         raise NotImplementedError("This method must be implemented by child class")
 
     def __str__(self):
         return f"{self.hostname } @ {self.multi_tenant_company}"
 
-class SalesChannelIntegrationPricelist(models.Model): # @TODO: I don't think this is needed
+class SalesChannelIntegrationPricelist(models.Model):
     """
     Through model to handle the association between a SalesChannel and a PriceList.
     """
@@ -69,7 +75,7 @@ class SalesChannelView(PolymorphicModel, RemoteObjectMixin, models.Model):
     Model representing a specific view of a sales channel
     """
 
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=216, null=True, blank=True)
     url = models.CharField(max_length=512, null=True, blank=True)
 
     class Meta:
@@ -78,7 +84,7 @@ class SalesChannelView(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Sales Channel Views'
 
     def __str__(self):
-        return self.name
+        return str(self.name)
 
 class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     """

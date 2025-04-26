@@ -17,7 +17,8 @@ from sales_channels.signals import create_remote_property, update_remote_propert
     create_remote_image_association, \
     update_remote_image_association, delete_remote_image_association, delete_remote_image, update_remote_product, \
     sync_remote_product, \
-    sales_view_assign_updated, delete_remote_product, update_remote_product_eancode
+    sales_view_assign_updated, delete_remote_product, update_remote_product_eancode, update_remote_vat_rate, \
+    create_remote_vat_rate
 
 
 @receiver(create_remote_property, sender='properties.Property')
@@ -83,21 +84,14 @@ def sales_channels__magento__property_select_value__delete(sender, instance, **k
 @receiver(refresh_website_pull_models, sender='magento2.MagentoSalesChannel')
 @receiver(sales_channel_created, sender='magento2.MagentoSalesChannel')
 def sales_channels__magento__handle_pull_magento_sales_chjannel_views(sender, instance, **kwargs):
-    from integrations.tasks import add_task_to_queue
-    from integrations.helpers import get_import_path
-    from .tasks import pull_magento_sales_channel_views_task, pull_magento_languages_task
+    from sales_channels.integrations.magento2.factories.sales_channels.views import MagentoSalesChannelViewPullFactory
+    from sales_channels.integrations.magento2.factories.sales_channels.languages import MagentoRemoteLanguagePullFactory
 
-    task_kwargs = {'sales_channel_id': instance.id}
-    add_task_to_queue(
-        integration_id=instance.id,
-        task_func_path=get_import_path(pull_magento_sales_channel_views_task),
-        task_kwargs=task_kwargs,
-    )
-    add_task_to_queue(
-        integration_id=instance.id,
-        task_func_path=get_import_path(pull_magento_languages_task),
-        task_kwargs=task_kwargs,
-    )
+    views_factory = MagentoSalesChannelViewPullFactory(sales_channel=instance)
+    views_factory.run()
+
+    languages_factory = MagentoRemoteLanguagePullFactory(sales_channel=instance)
+    languages_factory.run()
 
 
 @receiver(product_properties_rule_created, sender='properties.ProductPropertiesRule')
@@ -193,8 +187,9 @@ def sales_channels__magento__product_property__delete(sender, instance, **kwargs
 @receiver(update_remote_price, sender='products.Product')
 def sales_channels__magento__price__update(sender, instance, **kwargs):
     from .tasks import update_magento_price_db_task
+    currency = kwargs.get('currency', None)
 
-    task_kwargs = {'product_id': instance.id}
+    task_kwargs = {'product_id': instance.id, 'currency_id': currency.id}
     run_product_specific_magento_task_flow(
         task_func=update_magento_price_db_task,
         multi_tenant_company=instance.multi_tenant_company,
@@ -400,3 +395,23 @@ def sales_channels__magento__product__delete_from_product(sender, instance, **kw
         multi_tenant_company=instance.multi_tenant_company,
         is_multiple=True
     )
+
+@receiver(create_remote_vat_rate, sender='taxes.VatRate')
+def sales_channels__magento__vat_rate__create(sender, instance, **kwargs):
+    from .tasks import create_magento_vat_rate_db_task
+
+    task_kwargs = {'vat_rate_id': instance.id}
+    run_generic_magento_task_flow(create_magento_vat_rate_db_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
+
+@receiver(update_remote_vat_rate, sender='taxes.VatRate')
+def sales_channels__magento__vat_rate__update(sender, instance, **kwargs):
+    from .tasks import update_magento_vat_rate_db_task
+
+    task_kwargs = {'vat_rate_id': instance.id}
+    run_generic_magento_task_flow(update_magento_vat_rate_db_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
+
+@receiver(pre_delete, sender='taxes.VatRate')
+def sales_channels__magento__vat_rate__delete(sender, instance, **kwargs):
+    from sales_channels.integrations.magento2.models.taxes import MagentoTaxClass
+
+    MagentoTaxClass.objects.filter(local_instance=instance).delete()

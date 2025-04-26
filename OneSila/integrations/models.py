@@ -167,6 +167,10 @@ class IntegrationTaskQueue(models.Model):
         else:
             logger.error(f"Task '{self.task_name}' not found.")
 
+    def safe_dispatch(self):
+        from django.db import transaction
+        transaction.on_commit(lambda: self.dispatch())
+
     def retry_task(self, retry_now=False):
         self.retry = 0
 

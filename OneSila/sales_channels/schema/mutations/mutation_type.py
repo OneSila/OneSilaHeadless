@@ -1,5 +1,5 @@
 from core.schema.core.mutations import create, update, delete, type, List, field
-from .fields import resync_sales_channel_assign
+from .fields import resync_sales_channel_assign, refresh_website_models_mutation
 from ..types.types import SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, \
     SalesChannelViewAssignType, SalesChannelImportType, RemoteLanguageType, RemoteCurrencyType, ImportPropertyType
 from ..types.input import SalesChannelImportInput, SalesChannelImportPartialInput, SalesChannelInput, \
@@ -22,6 +22,7 @@ class SalesChannelsMutation:
     update_sales_channel: SalesChannelType = update(SalesChannelPartialInput)
     delete_sales_channel: SalesChannelType = delete()
     delete_sales_channels: List[SalesChannelType] = delete()
+    refresh_sales_channel_websites: SalesChannelType = refresh_website_models_mutation()
 
     create_sales_channel_integration_pricelist: SalesChannelIntegrationPricelistType = create(SalesChannelIntegrationPricelistInput)
     create_sales_channel_integration_pricelists: List[SalesChannelIntegrationPricelistType] = create(List[SalesChannelIntegrationPricelistInput])

@@ -23,7 +23,8 @@ from .signals import (
     create_remote_image_association,
     update_remote_image_association, delete_remote_image_association, delete_remote_image, sales_channel_created,
     delete_remote_product,
-    sales_view_assign_updated, create_remote_product, update_remote_product, sync_remote_product, update_remote_product_eancode,
+    sales_view_assign_updated, create_remote_product, update_remote_product, sync_remote_product,
+    update_remote_product_eancode, create_remote_vat_rate, update_remote_vat_rate,
 )
 from django.dispatch import receiver
 from properties.models import Property, PropertyTranslation, PropertySelectValueTranslation, PropertySelectValue, ProductProperty, \
@@ -246,7 +247,7 @@ def sales_channels__product_property__post_create_receiver(sender, instance: Pro
 
 @receiver(post_update, sender='properties.ProductProperty')
 def sales_channels__product_property__post_update_receiver(sender, instance: ProductProperty, **kwargs):
-    from .tasks import update_configurators_for_product_property_db_task
+    from sales_channels.flows.update_configurator import update_configurator_if_needed_flow
 
     if instance.property.is_product_type:
         sync_remote_product.send(sender=instance.product.__class__, instance=instance.product)
@@ -255,11 +256,11 @@ def sales_channels__product_property__post_update_receiver(sender, instance: Pro
     if instance.property.is_public_information:
         update_remote_product_property.send(sender=instance.__class__, instance=instance)
 
-        update_configurators_for_product_property_db_task(instance.product, instance.property)
+        update_configurator_if_needed_flow(instance.product, instance.property)
 
 @receiver(mutation_update, sender='properties.ProductProperty')
 def sales_channels__product_property__post_update_multiselect_receiver(sender, instance: ProductProperty, **kwargs):
-    from .tasks import update_configurators_for_product_property_db_task
+    from sales_channels.flows.update_configurator import update_configurator_if_needed_flow
 
     if instance.property.is_product_type:
         sync_remote_product.send(sender=instance.product.__class__, instance=instance.product)
@@ -268,7 +269,7 @@ def sales_channels__product_property__post_update_multiselect_receiver(sender, i
     if instance.property.is_public_information and instance.property.type == Property.TYPES.MULTISELECT:
         update_remote_product_property.send(sender=instance.__class__, instance=instance)
 
-        update_configurators_for_product_property_db_task(instance.product, instance.property)
+        update_configurator_if_needed_flow(instance.product, instance.property)
 
 @receiver(pre_delete, sender='properties.ProductProperty')
 def sales_channels__product_property__pre_delete_receiver(sender, instance: ProductProperty, **kwargs):
@@ -328,7 +329,7 @@ def sales_channels__sales_channel_integration_pricelist__post_create_receiver(se
     sales_channel = instance.sales_channel
     assigns = SalesChannelViewAssign.objects.filter(sales_channel=sales_channel, sales_channel__active=True)
     for assign in assigns:
-        update_remote_price.send(sender=assign.product.__class__, instance=assign.product)
+        update_remote_price.send(sender=assign.product.__class__, instance=assign.product, currency=instance.price_list.currency)
 
 @receiver(post_delete, sender='sales_channels.SalesChannelIntegrationPricelist')
 def sales_channels__sales_channel_integration_pricelist__post_delete_receiver(sender, instance, **kwargs):
@@ -338,7 +339,7 @@ def sales_channels__sales_channel_integration_pricelist__post_delete_receiver(se
     sales_channel = instance.sales_channel
     assigns = SalesChannelViewAssign.objects.filter(sales_channel=sales_channel, sales_channel__active=True)
     for assign in assigns:
-        update_remote_price.send(sender=assign.product.__class__, instance=assign.product)
+        update_remote_price.send(sender=assign.product.__class__, instance=assign.product, currency=instance.price_list.currency)
 
 
 @receiver(post_update, sender='sales_prices.SalesPriceList')
@@ -349,7 +350,7 @@ def sales_channels__sales_price_list__post_update_receiver(sender, instance, **k
     if instance.is_any_field_dirty(['start_date', 'end_date']):
         price_list_items = SalesPriceListItem.objects.filter(salespricelist=instance)
         for item in price_list_items:
-            update_remote_price.send(sender=item.product.__class__, instance=item.product)
+            update_remote_price.send(sender=item.product.__class__, instance=item.product, currency=instance.currency)
 
 
 @receiver(post_delete, sender='sales_prices.SalesPriceList')
@@ -359,14 +360,14 @@ def sales_channels__sales_price_list__pre_delete_receiver(sender, instance, **kw
     """
     price_list_items = SalesPriceListItem.objects.filter(salespricelist=instance)
     for item in price_list_items:
-        update_remote_price.send(sender=item.product.__class__, instance=item.product)
+        update_remote_price.send(sender=item.product.__class__, instance=item.product, currency=instance.currency)
 
 
 @receiver(post_create, sender='sales_prices.SalesPriceListItem')
 @receiver(post_update, sender='sales_prices.SalesPriceListItem')
 @receiver(post_delete, sender='sales_prices.SalesPriceListItem')
 def sales_channels__sales_price_list_item__post_create_receiver(sender, instance, **kwargs):
-    update_remote_price.send(sender=instance.product.__class__, instance=instance.product)
+    update_remote_price.send(sender=instance.product.__class__, instance=instance.product, currency=instance.salespricelist.currency)
 
 
 @receiver(post_update, sender='sales_prices.SalesPrice')
@@ -374,14 +375,15 @@ def sales_channels__sales_price__post_update_receiver(sender, instance, **kwargs
     """
     Trigger a price change signal when the product price or RRP is updated.
     """
-    update_remote_price.send(sender=instance.product.__class__, instance=instance.product)
+    update_remote_price.send(sender=instance.product.__class__, instance=instance.product, currency=instance.currency)
 
 @receiver(price_changed, sender='products.Product')
 def sales_channels__price_changed__receiver(sender, instance, **kwargs):
     """
     Handle the price_changed signal to check trigger the update_remote_price signal if so.
     """
-    update_remote_price.send(sender=instance.__class__, instance=instance)
+    currency = kwargs.get('currency', None)
+    update_remote_price.send(sender=instance.__class__, instance=instance, currency=currency)
 
 # ------------------------------------------------------------- SEND SIGNALS FOR PRODUCT CONTENT
 
@@ -558,7 +560,7 @@ def sales_channels__product__post_update_receiver(sender, instance, **kwargs):
     Sends update_remote_product signal if any of the fields 'active' or 'allow_backorder' are dirty.
     """
     # Check if any of the specified fields have changed
-    if instance.is_any_field_dirty(['active', 'allow_backorder']):
+    if instance.is_any_field_dirty(['active', 'allow_backorder', 'vat_rate'], check_relationship=True):
         # Send update_remote_product signal
         update_remote_product.send(sender=instance.__class__, instance=instance)
 
@@ -604,3 +606,19 @@ def sales_channels__ean_code_changed_receiver(sender, instance, **kwargs):
 @receiver(ean_code_released_for_product, sender='products.BundleProduct')
 def sales_channels__ean_code_released_receiver(sender, instance, **kwargs):
     update_remote_product_eancode.send(sender=instance.__class__, instance=instance)
+
+
+@receiver(post_create, sender='taxes.VatRate')
+def sales_channels__vat_rate__post_create_receiver(sender, instance, **kwargs):
+    """
+    Handles the creation of VatRate instances.
+    """
+    create_remote_vat_rate.send(sender=instance.__class__, instance=instance)
+
+@receiver(post_update, sender='taxes.VatRate')
+def sales_channels__vat_rate__post_update_receiver(sender, instance, **kwargs):
+    """
+    Handles the update of taxes.VatRate instances.
+    """
+    if instance.is_any_field_dirty(['name']):
+        update_remote_vat_rate.send(sender=instance.__class__, instance=instance)

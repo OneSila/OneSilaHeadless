@@ -46,6 +46,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.set_field_if_exists('active')
         self.set_field_if_exists('vat_rate')
+        self.set_field_if_exists('use_vat_rate_name')
         self.set_field_if_exists('ean_code')
         self.set_field_if_exists('allow_backorder')
 
@@ -106,43 +107,65 @@ class ImportProductInstance(AbstractImportInstance):
 
         if hasattr(self, 'vat_rate'):
 
-            if isinstance(self.vat_rate, str):
-                self.vat_rate = int(self.vat_rate)
+            if self.vat_rate is None:
+                # that means that the values is None so we should set it as None
+                return
 
-            vat_rate_object, _ = VatRate.objects.get_or_create(
-                multi_tenant_company=self.multi_tenant_company,
-                rate=self.vat_rate)
+            get_or_create_kwargs = {
+                'multi_tenant_company': self.multi_tenant_company
+            }
+
+            if getattr(self, 'use_vat_rate_name', False):
+                get_or_create_kwargs['name'] = self.vat_rate
+            else:
+                if isinstance(self.vat_rate, str):
+                    self.vat_rate = int(self.vat_rate)
+
+                get_or_create_kwargs['rate'] = self.vat_rate
+
+            vat_rate_object, _ = VatRate.objects.get_or_create(**get_or_create_kwargs)
 
             self.vat_rate = vat_rate_object
-
             self.vat_rate_instance = self.vat_rate
-
 
     def update_ean_code(self):
 
-        if hasattr(self, 'ean_code'):
+        if not hasattr(self, 'ean_code') or not self.ean_code:
+            return
 
-            self.ean_code_instance = EanCode.objects.filter(
+        # Try to find by product first (for update case)
+        self.ean_code_instance = EanCode.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.instance,
+        ).first()
+
+        if self.ean_code_instance:
+            # Product match found, but maybe EAN changed
+            if self.ean_code_instance.ean_code != self.ean_code:
+                self.ean_code_instance.ean_code = self.ean_code
+        else:
+            # Try to find an existing ean_code assigned elsewhere or unassigned
+            existing_ean = EanCode.objects.filter(
                 multi_tenant_company=self.multi_tenant_company,
-                product=self.instance,
+                ean_code=self.ean_code,
             ).first()
 
-            if self.ean_code_instance is None:
+            if existing_ean:
+                # Reassign to the correct product
+                self.ean_code_instance = existing_ean
+                self.ean_code_instance.product = self.instance
+            else:
+                # Create new
                 self.ean_code_instance = EanCode.objects.create(
                     multi_tenant_company=self.multi_tenant_company,
                     product=self.instance,
-                    ean_code=self.ean_code)
+                    ean_code=self.ean_code,
+                )
 
-                self.ean_code_instance.already_used= True
-                self.ean_code_instance.internal= False
-            else:
-                if self.ean_code_instance.ean_code != self.ean_code:
-                    self.ean_code_instance.ean_code = self.ean_code
-
-                self.ean_code_instance.already_used = True
-                self.ean_code_instance.internal = False
-                self.ean_code_instance.save()
-
+        # Common fields
+        self.ean_code_instance.already_used = True
+        self.ean_code_instance.internal = False
+        self.ean_code_instance.save()
 
     def _set_rule(self):
 
@@ -459,14 +482,14 @@ class ImportSalesPriceInstance(AbstractImportInstance):
         self.set_field_if_exists('currency')
         self.set_field_if_exists('product_data')
 
-        self.validate()
-        self._set_product_import_instance()
-
         if currency_object:
             self.currency = currency_object
         else:
             self._set_public_currency()
             self._set_currency()
+
+        self.validate()
+        self._set_product_import_instance()
 
     @property
     def local_class(self):
@@ -488,6 +511,9 @@ class ImportSalesPriceInstance(AbstractImportInstance):
 
         if not getattr(self, 'product_data', None) and not self.product:
             raise ValueError("Either a 'product' or 'product_data' must be provided.")
+
+        if hasattr(self, 'currency') and getattr(self, 'currency', None) is None:
+            raise ValueError("Both 'currency' cannot be None.")
 
 
     def _set_public_currency(self):

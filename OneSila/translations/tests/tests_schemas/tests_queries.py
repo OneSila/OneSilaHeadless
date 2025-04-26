@@ -21,6 +21,9 @@ class TranslationsQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
               }
             }
         """
+        multi_company_languages = ["en", "nl"]
+        self.multi_tenant_company.languages = multi_company_languages
+        self.multi_tenant_company.save()
 
         resp = self.strawberry_test_client(
             query=query,
@@ -31,7 +34,7 @@ class TranslationsQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         # Prepare expected results
         expected_languages = [
             TranslationLanguageType(code=code, name=name)
-            for code, name in TranslationFieldsMixin.LANGUAGES
+            for code, name in TranslationFieldsMixin.LANGUAGES if code in multi_company_languages
         ]
 
         default_language_code = "en"

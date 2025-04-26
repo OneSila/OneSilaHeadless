@@ -115,7 +115,7 @@ class TaskQueueFactory:
         Dispatch the task if conditions allow, using the created task_queue_item.
         """
         if self.process_now and self.task_queue_item:
-            self.task_queue_item.dispatch()
+            self.task_queue_item.safe_dispatch()
 
     def run(self):
         """
@@ -165,7 +165,7 @@ class ProcessIntegrationTasksFactory:
 
         # If active, continue with normal dispatch
         for task_queue_item in pending_tasks:
-            task_queue_item.dispatch()
+            task_queue_item.safe_dispatch()
             logger.info(
                 f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
                 f"Dispatched task '{task_queue_item.task_name}' for Integration '{integration.hostname}'"

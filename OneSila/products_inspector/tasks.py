@@ -1,9 +1,10 @@
 from huey.contrib.djhuey import db_task
 
-from core.schema.core.subscriptions import refresh_subscription_receiver
+from core.decorators import run_task_after_commit
 from products_inspector.factories.inspector import ResyncInspectorFactory
 
 
+@run_task_after_commit
 @db_task()
 def resync_inspector_task(inspector_id):
     from products_inspector.models import Inspector
@@ -16,6 +17,7 @@ def resync_inspector_task(inspector_id):
     factory.run()
 
 
+@run_task_after_commit
 @db_task()
 def resync_inspector_block_task(block_id):
     from products_inspector.factories.inspector_block import InspectorBlockFactoryRegistry
@@ -28,6 +30,7 @@ def resync_inspector_block_task(block_id):
     block_factory.run()
 
 
+@run_task_after_commit
 @db_task()
 def trigger_rule_dependent_inspector_blocks_task(rule_id):
     from properties.models import ProductPropertiesRule

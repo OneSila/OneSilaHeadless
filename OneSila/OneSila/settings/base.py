@@ -144,11 +144,52 @@ LOCALE_PATHS = (
 )
 
 LANGUAGE_CODE = 'en'
+
+# the languages the interface is translated on
+INTERFACE_LANGUAGES = (
+    ('en', _('English')),
+    ('nl', _('Dutch')),
+)
+
 LANGUAGES = (
-    ('nl', _('Nederlands')),
     ('en', _('English')),
     ('fr', _('French')),
-    # ('en-gb', _('English GB')),
+    ('nl', _('Dutch')),
+    ('de', _('German')),
+    ('it', _('Italian')),
+    ('es', _('Spanish')),
+    ('pt', _('Portuguese')),
+    ('pl', _('Polish')),
+    ('ro', _('Romanian')),
+    ('bg', _('Bulgarian')),
+    ('hr', _('Croatian')),
+    ('cs', _('Czech')),
+    ('da', _('Danish')),
+    ('et', _('Estonian')),
+    ('fi', _('Finnish')),
+    ('el', _('Greek')),
+    ('hu', _('Hungarian')),
+    ('lv', _('Latvian')),
+    ('lt', _('Lithuanian')),
+    ('sk', _('Slovak')),
+    ('sl', _('Slovenian')),
+    ('sv', _('Swedish')),
+    ('th', _('Thai')),
+    ('ja', _('Japanese')),
+    ('zh-hans', _('Chinese (Simplified)')),
+    ('hi', _('Hindi')),
+    ('pt-br', _('Portuguese (Brazil)')),
+    ('ru', _('Russian')),
+    ('af', _('Afrikaans')),
+    ('ar', _('Arabic')),
+    ('he', _('Hebrew')),
+    ('tr', _('Turkish')),
+    ('id', _('Indonesian')),
+    ('ko', _('Korean')),
+    ('ms', _('Malay')),
+    ('vi', _('Vietnamese')),
+    ('fa', _('Persian')),
+    ('ur', _('Urdu')),
 )
 
 

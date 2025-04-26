@@ -28,11 +28,11 @@ class OnlySaveOnChangeMixin(DirtyFieldsMixin, OldModel):
         if self.is_dirty(check_relationship=True) or force_save:
             super().save(*args, **kwargs)
 
-    def is_dirty_field(self, field):
-        return field in self.get_dirty_fields().keys()
+    def is_dirty_field(self, field, check_relationship=False):
+        return field in self.get_dirty_fields(check_relationship=check_relationship).keys()
 
-    def is_any_field_dirty(self, fields: list) -> bool:
-        return any(self.is_dirty_field(field) for field in fields)
+    def is_any_field_dirty(self, fields: list, check_relationship=False) -> bool:
+        return any(self.is_dirty_field(field, check_relationship=check_relationship) for field in fields)
 
     class Meta:
         abstract = True
