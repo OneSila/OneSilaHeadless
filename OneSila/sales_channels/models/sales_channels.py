@@ -75,7 +75,7 @@ class SalesChannelView(PolymorphicModel, RemoteObjectMixin, models.Model):
     Model representing a specific view of a sales channel
     """
 
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=216, null=True, blank=True)
     url = models.CharField(max_length=512, null=True, blank=True)
 
     class Meta:
@@ -84,7 +84,7 @@ class SalesChannelView(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Sales Channel Views'
 
     def __str__(self):
-        return self.name
+        return str(self.name)
 
 class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     """

@@ -16,6 +16,7 @@ class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFacto
 
     def preflight_check(self):
         from sales_channels.models import RemoteCurrency
+        from currencies.models import Currency
 
         if not self.skip_checks:
             if not self.sales_channel.sync_prices:
@@ -30,8 +31,14 @@ class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFacto
         except self.remote_model_class.DoesNotExist:
             return False
 
-        existing_price_data = self.remote_instance.price_data or {}
+        # we do that so if the currency inherit other currencies we make sure the updates goes for all
+        # because the price_data here will override the inherited currency one and if this happen that one will be skipped
+        if self.currency:
+            reset_currency = Currency.objects.filter(inherits_from=self.currency, multi_tenant_company=self.sales_channel.multi_tenant_company).exists()
+            if reset_currency:
+                self.currency = None
 
+        existing_price_data = self.remote_instance.price_data or {}
         all_remote_currencies = RemoteCurrency.objects.filter(sales_channel=self.sales_channel)
         for remote_currency in all_remote_currencies:
             local_currency = remote_currency.local_instance

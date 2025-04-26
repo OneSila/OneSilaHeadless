@@ -11,7 +11,6 @@ class MagentoSalesChannelViewPullFactory(GetMagentoAPIMixin, PullRemoteInstanceM
     field_mapping = {
         'remote_id': 'id',
         'code': 'code',
-        'name': 'name',
     }
     update_field_mapping = field_mapping
     get_or_create_fields = ['remote_id', 'code']
@@ -26,6 +25,11 @@ class MagentoSalesChannelViewPullFactory(GetMagentoAPIMixin, PullRemoteInstanceM
     def allow_process(self, remote_data):
         return int(remote_data.id) != 0
 
+    def process_remote_instance(self, remote_data, remote_instance_mirror, created):
+
+        if created:
+            remote_instance_mirror.name = remote_data.name
+            remote_instance_mirror.save()
 
     def serialize_response(self, response):
         """
