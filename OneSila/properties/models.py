@@ -128,7 +128,7 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
 
 class PropertySelectValueTranslation(TranslationFieldsMixin, models.Model):
     propertyselectvalue = models.ForeignKey(PropertySelectValue, on_delete=models.CASCADE)
-    value = models.CharField(max_length=200, verbose_name=_('Value'))
+    value = models.CharField(max_length=255, verbose_name=_('Value'))
 
     class Meta:
         translated_field = 'propertyselectvalue'
