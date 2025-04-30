@@ -195,6 +195,10 @@ class ProductProperty(TranslatedModelMixin, models.Model):
     class Meta:
         verbose_name_plural = _("Product Properties")
         unique_together = ("product", "property")
+        indexes = [
+            models.Index(fields=['product', 'property']),
+            models.Index(fields=['property', 'value_select']),
+        ]
 
 
 class ProductPropertyTextTranslation(TranslationFieldsMixin, models.Model):
@@ -206,6 +210,7 @@ class ProductPropertyTextTranslation(TranslationFieldsMixin, models.Model):
         translated_field = 'product_property'
         search_terms = ['value_text', 'value_description']
         unique_together = ("product_property", "language")
+
 
 
 class ProductPropertiesRule(models.Model):

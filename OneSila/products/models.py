@@ -155,12 +155,12 @@ class Product(TranslatedModelMixin, models.Model):
         except (ObjectDoesNotExist, AttributeError):
             return None
 
-    def get_configurator_properties(self, product_rule=None):
+    def get_configurator_properties(self, product_rule=None, public_information_only=True):
         from properties.models import ProductPropertiesRuleItem
 
         return ProductPropertiesRuleItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-            property__is_public_information=True,
+            property__is_public_information=public_information_only,
             rule=product_rule or self.get_product_rule(),
             type__in=[
                 ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
@@ -168,22 +168,22 @@ class Product(TranslatedModelMixin, models.Model):
             ]
         ).select_related('property')
 
-    def get_optional_in_configurator_properties(self, product_rule=None):
+    def get_optional_in_configurator_properties(self, product_rule=None, public_information_only=True):
         from properties.models import ProductPropertiesRuleItem
 
         return ProductPropertiesRuleItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-            property__is_public_information=True,
+            property__is_public_information=public_information_only,
             rule=product_rule or self.get_product_rule(),
             type=ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
         ).select_related('property')
 
-    def get_required_properties(self, product_rule=None):
+    def get_required_properties(self, product_rule=None, public_information_only=True):
         from properties.models import ProductPropertiesRuleItem
 
         return ProductPropertiesRuleItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-            property__is_public_information=True,
+            property__is_public_information=public_information_only,
             rule=product_rule or self.get_product_rule(),
             type__in=[
                 ProductPropertiesRuleItem.REQUIRED,
@@ -192,22 +192,22 @@ class Product(TranslatedModelMixin, models.Model):
             ]
         ).select_related('property')
 
-    def get_optional_properties(self, product_rule=None):
+    def get_optional_properties(self, product_rule=None, public_information_only=True):
         from properties.models import ProductPropertiesRuleItem
 
         return ProductPropertiesRuleItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-            property__is_public_information=True,
+            property__is_public_information=public_information_only,
             rule=product_rule or self.get_product_rule(),
             type=ProductPropertiesRuleItem.OPTIONAL
         ).select_related('property')
 
-    def get_required_and_optional_properties(self, product_rule=None):
+    def get_required_and_optional_properties(self, product_rule=None, public_information_only=True):
         from properties.models import ProductPropertiesRuleItem
 
         return ProductPropertiesRuleItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-            property__is_public_information=True,
+            property__is_public_information=public_information_only,
             rule=product_rule or self.get_product_rule(),
         ).select_related('property')
 
