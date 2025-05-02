@@ -1,21 +1,24 @@
 from django.utils.translation import gettext_lazy as _
 from core import models
 from sales_channels.models.sales_channels import SalesChannel, SalesChannelView, RemoteLanguage
+import uuid
 
 
 class ShopifySalesChannel(SalesChannel):
     """
     Shopify-specific Sales Channel model with credentials and config.
     """
-    shop_url = models.URLField(max_length=255, help_text="The myshopify.com domain for this store.")
-    api_version = models.CharField(
-        max_length=32,
-        default='2024-07',
-        help_text=_('Shopify API version to use for requests.')
-    )
+
     access_token = models.CharField(
         max_length=255,
-        help_text="OAuth access token for this Shopify store."
+        help_text="OAuth access token for this Shopify store.",
+        null=True, blank=True
+    )
+
+    state = models.CharField(
+        max_length=64,
+        unique=True,
+        help_text="Unique state used for OAuth verification"
     )
 
     class Meta:
@@ -23,7 +26,15 @@ class ShopifySalesChannel(SalesChannel):
         verbose_name_plural = 'Shopify Sales Channels'
 
     def __str__(self):
-        return f"Shopify Store: {self.shop_url}"
+        return f"Shopify Store: {self.hostname}"
+
+    def connect(self):
+        pass
+
+    def save(self, *args, **kwargs):
+        if not self.access_token and not self.state:
+            self.state = uuid.uuid4().hex
+        super().save(*args, **kwargs)
 
 
 class ShopifySalesChannelView(SalesChannelView):

@@ -49,7 +49,7 @@ class RemoteProductProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     local_instance = models.ForeignKey('properties.ProductProperty', on_delete=models.SET_NULL, null=True, help_text="The local ProductProperty instance associated with this remote property.")
     remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.CASCADE, help_text="The remote product associated with this property.")
-    remote_property = models.ForeignKey('sales_channels.RemoteProperty', on_delete=models.CASCADE, help_text="The remote property associated with this product property.")
+    remote_property = models.ForeignKey('sales_channels.RemoteProperty', on_delete=models.CASCADE, null=True, help_text="The remote property associated with this product property.")
     remote_value = models.TextField(null=True, blank=True,  help_text="The value of this property in the remote system, stored as a string.")
 
     class Meta:

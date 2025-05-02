@@ -7,12 +7,4 @@ class ShopifyProductProperty(RemoteProductProperty):
     Shopify does not manage standalone property definitions or select values.
     This are the individual metafield assigned to product
     """
-
-    # override remote property to allow null
-    remote_property = models.ForeignKey(
-        'sales_channels.RemoteProperty',
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        help_text="Not used for Shopify—Shopify has no separate property definitions."
-    )
+    pass
