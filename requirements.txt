@@ -1,4 +1,4 @@
-Django>=5
+Django>=5,<5.3
 django-imagekit>=4.1.0
 Pillow>=10.0.0
 CurrencyConverter
@@ -34,8 +34,8 @@ openai~=1.66.3
 replicate
 pydantic<2.0
 
-strawberry-graphql==0.261.0
-strawberry-graphql-django==0.56.0
+strawberry-graphql==0.266.0
+strawberry-graphql-django==0.59.0
 
 django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absolute_url.git@master
 

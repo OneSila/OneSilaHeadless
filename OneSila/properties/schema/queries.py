@@ -1,4 +1,4 @@
-from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, type
+from core.schema.core.queries import node, connection, DjangoListConnection, type
 from typing import List
 
 
@@ -10,25 +10,25 @@ from .types.types import PropertyType, PropertyTranslationType, \
 @type(name="Query")
 class PropertiesQuery:
     property: PropertyType = node()
-    properties: ListConnectionWithTotalCount[PropertyType] = connection()
+    properties: DjangoListConnection[PropertyType] = connection()
 
     property_translation: PropertyTranslationType = node()
-    property_translations: ListConnectionWithTotalCount[PropertyTranslationType] = connection()
+    property_translations: DjangoListConnection[PropertyTranslationType] = connection()
 
     property_select_value: PropertySelectValueType = node()
-    property_select_values: ListConnectionWithTotalCount[PropertySelectValueType] = connection()
+    property_select_values: DjangoListConnection[PropertySelectValueType] = connection()
 
     product_property: ProductPropertyType = node()
-    product_properties: ListConnectionWithTotalCount[ProductPropertyType] = connection()
+    product_properties: DjangoListConnection[ProductPropertyType] = connection()
 
     product_property_text_translation: ProductPropertyTextTranslationType = node()
-    product_property_text_translations: ListConnectionWithTotalCount[ProductPropertyTextTranslationType] = connection()
+    product_property_text_translations: DjangoListConnection[ProductPropertyTextTranslationType] = connection()
 
     property_select_value_translation: PropertySelectValueTranslationType = node()
-    property_select_value_translations: ListConnectionWithTotalCount[PropertySelectValueTranslationType] = connection()
+    property_select_value_translations: DjangoListConnection[PropertySelectValueTranslationType] = connection()
 
     product_properties_rule: ProductPropertiesRuleType = node()
-    product_properties_rules: ListConnectionWithTotalCount[ProductPropertiesRuleType] = connection()
+    product_properties_rules: DjangoListConnection[ProductPropertiesRuleType] = connection()
 
     product_properties_rule_item: ProductPropertiesRuleItemType = node()
-    product_properties_rule_items: ListConnectionWithTotalCount[ProductPropertiesRuleItemType] = connection()
+    product_properties_rule_items: DjangoListConnection[ProductPropertiesRuleItemType] = connection()

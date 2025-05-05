@@ -2,7 +2,7 @@ import json
 from typing import List
 from strawberry import Info, ID
 from core.schema.core.helpers import get_multi_tenant_company
-from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, type, field
+from core.schema.core.queries import node, connection, DjangoListConnection, type, field
 from sales_channels.integrations.magento2.constants import EXCLUDED_ATTRIBUTE_CODES
 from sales_channels.integrations.magento2.factories.sales_channels.sales_channel import TryConnection
 from sales_channels.integrations.magento2.models import MagentoSalesChannel
@@ -36,7 +36,7 @@ def get_magento_attributes(info: Info, sales_channel_id: ID) -> List[MagentoRemo
         )
         for attr in attributes
         if hasattr(attr, 'default_frontend_label')
-           and attr.attribute_code not in EXCLUDED_ATTRIBUTE_CODES
+        and attr.attribute_code not in EXCLUDED_ATTRIBUTE_CODES
     ]
 
 
@@ -64,6 +64,7 @@ def get_magento_attribute_sets(info: Info, sales_channel_id: ID) -> list[Magento
         for attr in attribute_sets
     ]
 
+
 @type(name="Query")
 class MagentoSalesChannelsQuery:
     magento_remote_attributes: List[MagentoRemoteAttributeType] = field(
@@ -73,4 +74,4 @@ class MagentoSalesChannelsQuery:
     )
 
     magento_channel: MagentoSalesChannelType = node()
-    magento_channels: ListConnectionWithTotalCount[MagentoSalesChannelType] = connection()
+    magento_channels: DjangoListConnection[MagentoSalesChannelType] = connection()

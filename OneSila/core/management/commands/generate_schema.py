@@ -1,9 +1,7 @@
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db.models import Model as BaseModel
 import os
-import shutil
-import importlib
 
 from .generate_views import generate_view, VIEW_TYPES, \
     generate_views_list, import_app, get_model_app, \
@@ -175,7 +173,7 @@ def generate_schema_init(app_name, models):
 
 def generate_queries(app_name, models):
     content = [
-        "from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, type, field",
+        "from core.schema.core.queries import node, connection, DjangoListConnection, type, field",
         get_model_import(app_name, models),
         get_type_import(app_name, models),
         "",
@@ -187,7 +185,7 @@ def generate_queries(app_name, models):
     for model in models:
         content.extend([
             f"    {to_snake_case(model)}: {model}Type = node()",
-            f"    {to_snake_case(model)}s: ListConnectionWithTotalCount[{model}Type] = connection()",
+            f"    {to_snake_case(model)}s: DjangoListConnection[{model}Type] = connection()",
             "",
         ])
     return '\n'.join(content)
