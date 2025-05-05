@@ -1,7 +1,7 @@
 import strawberry_django
 from strawberry.relay import from_base64
 from strawberry_django.fields.field import StrawberryDjangoField, filter_with_perms, optimizer
-from strawberry_django.relay import ListConnectionWithTotalCount
+from strawberry_django.relay import DjangoListConnection
 from strawberry.types import Info
 from strawberry import type, field
 from typing import Any, List
