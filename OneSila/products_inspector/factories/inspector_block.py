@@ -261,7 +261,7 @@ class MissingRequiredPropertiesInspectorBlockFactory(InspectorBlockFactory):
     def _check(self):
         from properties.models import ProductProperty
 
-        rule_item_properties_ids = self.product.get_required_properties().values_list('property_id', flat=True)
+        rule_item_properties_ids = self.product.get_required_properties(public_information_only=False).values_list('property_id', flat=True)
         product_properties = ProductProperty.objects.filter_multi_tenant(self.multi_tenant_company). \
             filter(product=self.product, property_id__in=rule_item_properties_ids)
 
@@ -278,7 +278,7 @@ class MissingOptionalPropertiesInspectorBlockFactory(InspectorBlockFactory):
     def _check(self):
         from properties.models import ProductProperty
 
-        rule_item_properties_ids = self.product.get_optional_properties().values_list('property_id', flat=True)
+        rule_item_properties_ids = self.product.get_optional_properties(public_information_only=False).values_list('property_id', flat=True)
         product_properties = ProductProperty.objects.filter_multi_tenant(self.multi_tenant_company). \
             filter(product=self.product, property_id__in=rule_item_properties_ids)
 
