@@ -1,4 +1,4 @@
-Django>=5
+Django>=5,<5.3
 django-imagekit>=4.1.0
 Pillow>=10.0.0
 CurrencyConverter
