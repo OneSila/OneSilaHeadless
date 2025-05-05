@@ -3,11 +3,12 @@ from typing import Optional
 from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from django.db.models import Q
-from strawberry_django.filters import filter as strawberry_filter
+from strawberry_django.filters import filter_type as strawberry_filter
 from strawberry_django import filter_field as custom_filter
 from strawberry import UNSET
 from strawberry import LazyType as lazy
 from core.managers import QuerySet
+
 
 class AnnotationMergerMixin:
 
@@ -20,6 +21,7 @@ class AnnotationMergerMixin:
             annotations.update(getattr(base, '__annotations__', {}))
         annotations.update(cls.__annotations__)
         cls.__annotations__ = annotations
+
 
 class SearchFilterMixin(AnnotationMergerMixin):
     search: Optional[str]
