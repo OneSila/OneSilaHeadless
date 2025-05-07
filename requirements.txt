@@ -37,7 +37,7 @@ gunicorn
 uvicorn
 
 strawberry-graphql==0.266.0
-strawberry-graphql-django==0.59.0
+strawberry-graphql-django==0.59.1
 
 django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absolute_url.git@master
 
