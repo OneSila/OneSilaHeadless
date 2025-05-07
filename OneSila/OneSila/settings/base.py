@@ -59,6 +59,7 @@ INSTALLED_LOCAL_APPS = [
     'inventory',
     'sales_channels',
     'sales_channels.integrations.magento2',
+    # 'sales_channels.integrations.woocommerce',
     'sales_prices',
     'properties',
     'orders',
