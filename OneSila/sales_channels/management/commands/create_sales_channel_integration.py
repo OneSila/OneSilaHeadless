@@ -94,7 +94,7 @@ class {class_name}ProductAdmin(admin.ModelAdmin):
 
     FACTORY_TEMPLATE = '''from sales_channels.factories import RemoteInstanceCreateFactory, RemoteInstanceUpdateFactory
 from ..models import {model_name}
-from {model_type.lower()}s.models import {model_type}
+from {model_type_lower}s.models import {model_type}
 from ..mixins import Get{class_name}APIMixin
 
 
@@ -104,7 +104,7 @@ class {model_name}CreateFactory(RemoteInstanceCreateFactory, Get{class_name}APIM
     """
     local_model_class = {model_type}
     remote_model_class = {model_name}
-    api_package_name = '{model_type.lower()}'
+    api_package_name = '{model_type_lower}'
     api_method_name = 'create'
 
     field_mapping = {{
@@ -138,7 +138,7 @@ class {model_name}UpdateFactory(RemoteInstanceUpdateFactory, Get{class_name}APIM
     """
     local_model_class = {model_type}
     remote_model_class = {model_name}
-    api_package_name = '{model_type.lower()}'
+    api_package_name = '{model_type_lower}'
     api_method_name = 'update'
 
     field_mapping = {{
@@ -321,21 +321,22 @@ urlpatterns = [
             raise CommandError('Integration name must contain only lowercase letters, numbers, and underscores')
 
         # Ensure the sales_channels/integrations directory exists
-        integrations_dir = os.path.join(settings.BASE_DIR, 'OneSila', 'sales_channels', 'integrations')
+        integrations_dir = os.path.join(settings.APP_ROOT, 'OneSila', 'sales_channels', 'integrations')
         integration_path = os.path.join(integrations_dir, integration_name)
+
         # Check if the integration directory already exists
         if os.path.exists(integration_path):
-            self.stdout.write(self.style.WARNING(f'Integration directory for {integration_name} already exists'))
+            self.stdout.write(self.style.WARNING(f'Integration directory {integration_path} already exists.'))
         else:
-            os.makedirs(integrations_dir, exist_ok=True)
+            os.makedirs(integration_path, exist_ok=True)
 
-        self.stdout.write(self.style.SUCCESS(f'Created integration directory for {integration_name}'))
+        self.stdout.write(self.style.SUCCESS(f'Created integration directory {integration_path}'))
 
         # Use Django's startapp command to create base app structure
         call_command(
             'startapp',
             integration_name,
-            os.path.join('OneSila', 'sales_channels', 'integrations', integration_name)
+            os.path.join('sales_channels', 'integrations', integration_name)
         )
 
         # Create additional directories needed
@@ -421,10 +422,12 @@ urlpatterns = [
         """Template for factory files"""
         class_name = self._get_class_name(integration_name)
         model_name = f"{class_name}{model_type}"
+        model_type_lower = model_type.lower()
         return self.FACTORY_TEMPLATE.format(
             class_name=class_name,
             model_name=model_name,
-            model_type=model_type
+            model_type=model_type,
+            model_type_lower=model_type_lower
         )
 
     def _get_constants_template(self, integration_name):
