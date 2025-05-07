@@ -1,17 +1,30 @@
 from django.contrib import admin
+from polymorphic.admin import PolymorphicChildModelAdmin
 from .models import WoocommerceSalesChannel, WoocommerceProduct
 
 
 @admin.register(WoocommerceSalesChannel)
-class WoocommerceSalesChannelAdmin(admin.ModelAdmin):
-    list_display = ('name', 'api_url', 'is_active')
-    search_fields = ('name', 'api_url')
-    list_filter = ('is_active',)
+class WoocommerceSalesChannelAdmin(PolymorphicChildModelAdmin):
+    base_model = WoocommerceSalesChannel
+    list_display = ('hostname', 'api_url', 'active')
+    search_fields = ('hostname', 'api_url')
+    list_filter = ('active',)
+
+    fieldsets = (
+        (None, {
+            'fields': ('hostname', 'active', 'verify_ssl', 'multi_tenant_company')
+        }),
+        ('WooCommerce API Settings', {
+            'fields': ('api_url', 'api_key', 'api_secret', 'api_version')
+        }),
+        ('Synchronization Settings', {
+            'fields': ('use_configurable_name', 'sync_contents', 'sync_ean_codes',
+                      'sync_prices', 'import_orders', 'first_import_complete',
+                      'is_importing', 'requests_per_minute', 'max_retries')
+        }),
+    )
 
 
 @admin.register(WoocommerceProduct)
 class WoocommerceProductAdmin(admin.ModelAdmin):
-    list_display = ('remote_id', 'product', 'sales_channel')
-    search_fields = ('remote_id', 'product__name')
-    list_filter = ('sales_channel',)
-    raw_id_fields = ('product', 'sales_channel')
+    pass

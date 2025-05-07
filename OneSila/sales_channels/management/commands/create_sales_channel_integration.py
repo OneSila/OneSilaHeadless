@@ -342,7 +342,6 @@ urlpatterns = [
         # Create additional directories needed
         dirs_to_create = [
             'factories',
-            'models',
             'tests',
             'flows',
             'schema',
