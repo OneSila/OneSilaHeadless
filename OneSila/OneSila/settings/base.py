@@ -274,6 +274,29 @@ CORS_ALLOWED_METHODS = [
 
 ONESILA_DEFAULT_USER_AGENT = "OneSila PIM/1.0"
 
+
+#
+# Integrations test settings
+#
+
+SALES_CHANNELS_INTEGRATIONS_TEST_STORES = {
+    'WOOCOMMERCE': {
+        'hostname': os.getenv('INTEGRATIONS_TEST_STORES_WOOCOMMERCE_HOSTNAME'),
+        'api_key': os.getenv('INTEGRATIONS_TEST_STORES_WOOCOMMERCE_API_KEY'),
+        'api_secret': os.getenv('INTEGRATIONS_TEST_STORES_WOOCOMMERCE_API_SECRET'),
+        'verify_ssl': False,
+        'requests_per_minute': 60,
+        'active': True,
+        'import_products': True,
+        'import_orders': True,
+        'api_version': 'wc/v3',
+        'timeout': 10,
+    }
+}
+
+#
+# Huey settings
+#
 HUEY = {
     'huey_class': 'huey.RedisHuey',
     'name': 'hueyonesilaheadless',
