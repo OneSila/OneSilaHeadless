@@ -6,6 +6,9 @@ from .exceptions import FailedToGetAttributesError, FailedToGetError, \
     FailedToDeleteAttributeError, DuplicateError, FailedToUpdateAttributeError, \
     FailedToPutError
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 class WoocommerceApiWrapper:
     attribute_prefix = 'pa_'
@@ -70,16 +73,15 @@ class WoocommerceApiWrapper:
         except Exception as e:
             raise FailedToPutError(e, response=resp) from e
 
-    def delete(self, endpoint, force=False):
+    def delete(self, endpoint, force=True):
         params = {}
         if force:
             params['force'] = True
 
         resp = self.woocom.delete(endpoint, params=params)
-
         try:
             resp.raise_for_status()
-            return True
+            return resp.json()
         except Exception as e:
             raise FailedToDeleteError(e, response=resp) from e
 

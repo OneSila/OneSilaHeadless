@@ -2,29 +2,18 @@ from .mixins import TestCaseWoocommerceMixin
 from django.conf import settings
 
 from properties.models import Property, PropertyTranslation
-from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel, WoocommerceGlobalAttribute
+from sales_channels.integrations.woocommerce.models import WoocommerceGlobalAttribute
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
-from sales_channels.integrations.woocommerce.factories.properties import WooCommerceGlobalAttributeCreateFactory
+from sales_channels.integrations.woocommerce.factories.properties import WooCommerceGlobalAttributeCreateFactory, \
+    WooCommerceGlobalAttributeUpdateFactory, WooCommerceGlobalAttributeDeleteFactory
+
+import logging
+logger = logging.getLogger(__name__)
 
 
-class WooCommercePropertyCreateFactoryTest(TestCaseWoocommerceMixin):
+class WooCommercePropertyFactoryTest(TestCaseWoocommerceMixin):
     def setUp(self):
         super().setUp()
-
-        # Create a property for testing
-        self.property = Property.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            internal_name="test_property",
-            type="select",
-            is_public_information=True,
-            add_to_filters=True
-        )
-        PropertyTranslation.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            property=self.property,
-            language=self.multi_tenant_company.language,
-            name="Test Property"
-        )
 
     def tearDown(self):
         # Clean up created attributes in WooCommerce
@@ -53,71 +42,143 @@ class WooCommercePropertyCreateFactoryTest(TestCaseWoocommerceMixin):
 
     def test_create_property(self):
         """Test that WooCommercePropertyCreateFactory properly creates a remote property"""
-        # Initial state check
-        initial_remote_props_count = WoocommerceGlobalAttribute.objects.filter(
-            sales_channel=self.sales_channel,
-            local_instance=self.property
-        ).count()
-        self.assertEqual(initial_remote_props_count, 0)
+        prop = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            internal_name="test_property",
+            type="select",
+            is_public_information=True,
+            add_to_filters=True
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=prop,
+            language=self.multi_tenant_company.language,
+            name="Test Property"
+        )
 
         # Create factory instance and run it
         factory = WooCommerceGlobalAttributeCreateFactory(
             sales_channel=self.sales_channel,
-            local_instance=self.property
+            local_instance=prop
         )
         factory.run()
 
         # Verify the remote property was created in database
-        final_remote_props_count = WoocommerceGlobalAttribute.objects.filter(
+        remote_prop = WoocommerceGlobalAttribute.objects.get(
             sales_channel=self.sales_channel,
-            local_instance=self.property
-        ).count()
-        self.assertEqual(final_remote_props_count, 1)
-
-        # Verify remote property details
-        remote_property = WoocommerceGlobalAttribute.objects.get(
-            sales_channel=self.sales_channel,
-            local_instance=self.property
+            local_instance=prop
         )
-        self.assertIsNotNone(remote_property.remote_id)
+        self.assertIsNotNone(remote_prop.remote_id)
 
         # Verify it exists in WooCommerce
         api = factory.get_api()
-        attribute = api.get_attribute(remote_property.remote_id)
+        attribute = api.get_attribute(remote_prop.remote_id)
         self.assertIsNotNone(attribute)
-        self.assertEqual(attribute['name'], self.property.name)
-        self.assertEqual(attribute['slug'], self.property.code)
+        self.assertEqual(attribute['name'], prop.name)
+        self.assertEqual(attribute['slug'], prop.internal_name)
 
-    def test_fetch_existing_property(self):
-        """Test that factory updates existing property rather than creating a new one"""
-        # First create the property
-        factory = WooCommerceGlobalAttributeCreateFactory(
-            sales_channel=self.sales_channel,
-            local_instance=self.property
+        # cleanup
+        api.delete_attribute(remote_prop.remote_id)
+
+        # ensure it's deleted
+        with self.assertRaises(Exception):
+            api.get_attribute(remote_prop.remote_id)
+
+    def test_update_attribute_property(self):
+        """Test that WooCommercePropertyUpdateFactory properly updates a remote property"""
+        # Create a property
+        prop = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            internal_name="update_test_property",
+            type="select",
+            is_public_information=True,
+            add_to_filters=True
         )
-        factory.run()
-
-        # Get the remote property data
-        remote_property = WoocommerceGlobalAttribute.objects.get(
-            sales_channel=self.sales_channel,
-            local_instance=self.property
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=prop,
+            language=self.multi_tenant_company.language,
+            name="Update Test Property"
         )
-        initial_remote_id = remote_property.remote_id
 
-        # Now try to create it again - should reuse the existing one
-        factory = WooCommerceGlobalAttributeCreateFactory(
+        # Create the remote property first
+        create_factory = WooCommerceGlobalAttributeCreateFactory(
             sales_channel=self.sales_channel,
-            local_instance=self.property
+            local_instance=prop
         )
-        factory.run()
-
-        # Verify we still have only one remote property
-        count = WoocommerceGlobalAttribute.objects.filter(
+        create_factory.run()
+        remote_prop = WoocommerceGlobalAttribute.objects.get(
             sales_channel=self.sales_channel,
-            local_instance=self.property
-        ).count()
-        self.assertEqual(count, 1)
+            local_instance=prop
+        )
+        # Update the property name
+        PropertyTranslation.objects.filter(
+            property=prop,
+            language=self.multi_tenant_company.language
+        ).update(name="Updated Property Name")
 
-        # Verify the ID didn't change - we're reusing the same remote property
-        remote_property.refresh_from_db()
-        self.assertEqual(remote_property.remote_id, initial_remote_id)
+        # Create update factory instance and run it
+        update_factory = WooCommerceGlobalAttributeUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=prop,
+            remote_instance=remote_prop
+        )
+        update_factory.run()
+
+        # Verify it was updated in WooCommerce
+        api = update_factory.get_api()
+        updated_attribute = api.get_attribute(remote_prop.remote_id)
+        self.assertIsNotNone(updated_attribute)
+        self.assertEqual(updated_attribute['name'], "Updated Property Name")
+        self.assertEqual(updated_attribute['slug'], prop.internal_name)
+
+        # cleanup
+        api.delete_attribute(remote_prop.remote_id)
+
+        # ensure it's deleted
+        with self.assertRaises(Exception):
+            api.get_attribute(remote_prop.remote_id)
+
+    def test_delete_attribute(self):
+        """Test deleting a WooCommerce global attribute"""
+        # Create a property to delete
+        prop = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            internal_name="delete_test_property",
+            type="select",
+            is_public_information=True,
+            add_to_filters=True
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=prop,
+            language=self.multi_tenant_company.language,
+            name="Delete Test Property"
+        )
+
+        # Create the remote property first
+        create_factory = WooCommerceGlobalAttributeCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=prop
+        )
+        create_factory.run()
+        remote_prop = WoocommerceGlobalAttribute.objects.get(
+            sales_channel=self.sales_channel,
+            local_instance=prop
+        )
+
+        # Verify it exists in WooCommerce
+        api = create_factory.get_api()
+        attribute = api.get_attribute(remote_prop.remote_id)
+        self.assertIsNotNone(attribute)
+
+        # Create delete factory instance and run it
+        delete_factory = WooCommerceGlobalAttributeDeleteFactory(
+            sales_channel=self.sales_channel,
+            remote_instance=remote_prop
+        )
+        delete_factory.run()
+
+        # Verify it was deleted from WooCommerce
+        with self.assertRaises(Exception):
+            api.get_attribute(remote_prop.remote_id)

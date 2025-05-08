@@ -10,8 +10,7 @@ class TestCaseWoocommerceMixin(TestCase):
         Set up the test case with a mock WoocommerceSalesChannel.
         """
         self.test_store_settings = settings.SALES_CHANNELS_INTEGRATIONS_TEST_STORES['WOOCOMMERCE']
-        self.sales_channel = WoocommerceSalesChannel(
-            # name="Test WooCommerce Store",
+        self.sales_channel = WoocommerceSalesChannel.objects.create(
             hostname=self.test_store_settings['hostname'],
             api_url=self.test_store_settings['hostname'] + "/wp-json",
             api_key=self.test_store_settings['api_key'],

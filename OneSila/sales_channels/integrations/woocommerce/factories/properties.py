@@ -5,9 +5,11 @@ from sales_channels.factories.properties.properties import (
 )
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceGlobalAttribute
+from .mixins import SerialiserMixin
+from ..exceptions import DuplicateError
 
 
-class WooCommerceGloablAttributeMixin:
+class WooCommerceGloablAttributeMixin(SerialiserMixin):
     remote_model_class = WoocommerceGlobalAttribute
     remote_id_map = 'id'
     # Key is the local field, value is the remote field
@@ -15,6 +17,7 @@ class WooCommerceGloablAttributeMixin:
         'name': 'name',
         'internal_name': 'slug',
     }
+    already_exists_exception = DuplicateError
 
     def customize_payload(self):
         """
@@ -27,21 +30,16 @@ class WooCommerceGloablAttributeMixin:
 
 
 class WooCommerceGlobalAttributeCreateFactory(WooCommerceGloablAttributeMixin, GetWoocommerceAPIMixin, RemotePropertyCreateFactory):
-    def get_update_property_factory(self):
-        from sales_channels.integrations.woocommerce.factories.properties import WooCommerceGlobalAttributeUpdateFactory
-        return WooCommerceGlobalAttributeUpdateFactory
-
     enable_fetch_and_update = True
     update_if_not_exists = True
-    update_factory_class = property(get_update_property_factory)
+    update_factory_class = "sales_channels.integrations.woocommerce.factories.properties.WooCommerceGlobalAttributeUpdateFactory"
 
     def create_remote(self):
         """
         Creates a remote property in WooCommerce.
         """
         # Implement WooCommerce-specific attribute creation
-        response = self.api.create_attribute(**self.payload)
-        return response
+        return self.api.create_attribute(**self.payload)
 
     def fetch_existing_remote_data(self):
         """
@@ -59,12 +57,10 @@ class WooCommerceGlobalAttributeUpdateFactory(WooCommerceGloablAttributeMixin, G
         Updates a remote property in WooCommerce.
         """
         # Implement WooCommerce-specific attribute update
-        response = self.api.update_attribute(self.remote_instance.remote_id, self.payload)
-        return response
+        return self.api.update_attribute(self.remote_instance.remote_id, self.payload)
 
 
-class WooCommerceGlobalAttributeDeleteFactory(GetWoocommerceAPIMixin, RemotePropertyDeleteFactory):
-    remote_model_class = WoocommerceGlobalAttribute
+class WooCommerceGlobalAttributeDeleteFactory(WooCommerceGloablAttributeMixin, GetWoocommerceAPIMixin, RemotePropertyDeleteFactory):
     delete_remote_instance = True
 
     def delete_remote(self):
@@ -72,5 +68,4 @@ class WooCommerceGlobalAttributeDeleteFactory(GetWoocommerceAPIMixin, RemoteProp
         Deletes a remote property in WooCommerce.
         """
         # Implement WooCommerce-specific attribute deletion
-        response = self.api.delete_attribute(self.remote_instance.remote_id)
-        return response
+        return self.api.delete_attribute(self.remote_instance.remote_id)

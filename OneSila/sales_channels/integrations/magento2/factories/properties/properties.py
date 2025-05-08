@@ -29,14 +29,9 @@ class MagentoPropertyCreateFactory(GetMagentoAPIMixin, MagentoEntityNotFoundGene
 
     api_package_name = 'product_attributes'
     api_method_name = 'create'
-
-    def get_update_property_factory(self):
-        from sales_channels.integrations.magento2.factories.properties import MagentoPropertyUpdateFactory
-        return MagentoPropertyUpdateFactory
-
     enable_fetch_and_update = True
     update_if_not_exists = True
-    update_factory_class = property(get_update_property_factory)
+    update_factory_class = 'sales_channels.integrations.magento2.factories.properties.MagentoPropertyUpdateFactory'
 
     def get_attribute_code(self):
         return slugify(self.local_instance.name).replace('-', '_')
@@ -128,14 +123,9 @@ class MagentoPropertySelectValueCreateFactory(GetMagentoAPIMixin, MagentoEntityN
 
     api_package_name = 'product_attribute_options'
     api_method_name = 'create'
-
-    def get_update_property_select_value_factory(self):
-        from sales_channels.integrations.magento2.factories.properties import MagentoPropertySelectValueUpdateFactory
-        return MagentoPropertySelectValueUpdateFactory
-
     enable_fetch_and_update = True
     update_if_not_exists = True
-    update_factory_class = property(get_update_property_select_value_factory)
+    update_factory_class = 'sales_channels.integrations.magento2.factories.properties.MagentoPropertySelectValueUpdateFactory'
 
     def preflight_check(self):
         return not self.local_instance.property.is_product_type
@@ -229,14 +219,9 @@ class MagentoProductPropertyCreateFactory(GetMagentoAPIMixin, RemoteProductPrope
     remote_model_class = MagentoProductProperty
     remote_property_factory = MagentoPropertyCreateFactory
     remote_property_select_value_factory = MagentoPropertySelectValueCreateFactory
-
-    def get_update_product_property_factory(self):
-        from sales_channels.integrations.magento2.factories.properties import MagentoProductPropertyUpdateFactory
-        return MagentoProductPropertyUpdateFactory
-
     enable_fetch_and_update = True
     update_if_not_exists = True
-    update_factory_class = property(get_update_product_property_factory)
+    update_factory_class = 'sales_channels.integrations.magento2.factories.properties.MagentoProductPropertyUpdateFactory'
 
     def create_remote(self):
 
@@ -318,13 +303,9 @@ class MagentoAttributeSetCreateFactory(GetMagentoAPIMixin, MagentoEntityNotFound
     api_package_name = 'product_attribute_set'
     api_method_name = 'create'
 
-    def get_update_attribute_set_factory(self):
-        from sales_channels.integrations.magento2.factories.properties import MagentoAttributeSetUpdateFactory
-        return MagentoAttributeSetUpdateFactory
-
     enable_fetch_and_update = True
     update_if_not_exists = True
-    update_factory_class = property(get_update_attribute_set_factory)
+    update_factory_class = "sales_channels.integrations.magento2.factories.properties.MagentoAttributeSetUpdateFactory"
 
     def customize_payload(self):
         """
