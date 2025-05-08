@@ -1,11 +1,17 @@
 from .mixins import TestCaseWoocommerceMixin
 from django.conf import settings
 
-from properties.models import Property, PropertyTranslation
-from sales_channels.integrations.woocommerce.models import WoocommerceGlobalAttribute
+from properties.models import Property, PropertyTranslation, PropertySelectValue, PropertySelectValueTranslation
+from sales_channels.integrations.woocommerce.models import WoocommerceGlobalAttribute, WoocommerceGlobalAttributeValue
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
-from sales_channels.integrations.woocommerce.factories.properties import WooCommerceGlobalAttributeCreateFactory, \
-    WooCommerceGlobalAttributeUpdateFactory, WooCommerceGlobalAttributeDeleteFactory
+from sales_channels.integrations.woocommerce.factories.properties import (
+    WooCommerceGlobalAttributeCreateFactory,
+    WooCommerceGlobalAttributeUpdateFactory,
+    WooCommerceGlobalAttributeDeleteFactory,
+    WoocommerceGlobalAttributeValueCreateFactory,
+    WoocommerceGlobalAttributeValueUpdateFactory,
+    WoocommerceGlobalAttributeValueDeleteFactory,
+)
 
 import logging
 logger = logging.getLogger(__name__)
@@ -182,3 +188,143 @@ class WooCommercePropertyFactoryTest(TestCaseWoocommerceMixin):
         # Verify it was deleted from WooCommerce
         with self.assertRaises(Exception):
             api.get_attribute(remote_prop.remote_id)
+
+
+class WooCommercePropertyValueFactoryTest(TestCaseWoocommerceMixin):
+    def test_create_property_value(self):
+        """Test that WooCommercePropertyValueCreateFactory properly creates a remote property value"""
+        prop = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            internal_name="test_create_property_value",
+            type="select",
+            is_public_information=True,
+            add_to_filters=True
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=prop,
+            language=self.multi_tenant_company.language,
+            name="Test Property for Values"
+        )
+
+        # Create the remote property
+        create_factory = WooCommerceGlobalAttributeCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=prop
+        )
+        create_factory.run()
+        remote_property = WoocommerceGlobalAttribute.objects.get(
+            sales_channel=self.sales_channel,
+            local_instance=prop
+        )
+        api = create_factory.get_api()
+
+        # Create a property value
+        property_value = PropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=prop,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=property_value,
+            language=self.multi_tenant_company.language,
+            value="Test Value"
+        )
+
+        # Create factory instance and run it
+        factory = WoocommerceGlobalAttributeValueCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=property_value,
+        )
+        factory.run()
+
+        # Verify the property value was created in WooCommerce
+        remote_value = WoocommerceGlobalAttributeValue.objects.get(
+            sales_channel=self.sales_channel,
+            local_instance=property_value
+        )
+        self.assertIsNotNone(remote_value)
+        self.assertIsNotNone(remote_value.remote_id)
+
+        # Verify it exists in WooCommerce API
+        remote_attribute_value = api.get_attribute_value_by_name(remote_property.remote_id, property_value.value)
+        self.assertTrue(int(remote_attribute_value['id']) == int(remote_value.remote_id))
+
+        # cleanup
+        api.delete_attribute_value(remote_property.remote_id, remote_value.remote_id)
+        api.delete_attribute(remote_property.remote_id)
+
+        # ensure it's deleted
+        with self.assertRaises(Exception):
+            api.get_attribute_value(remote_property.remote_id, remote_value.remote_id)
+
+    def test_update_property_value(self):
+        """Test that WooCommercePropertyValueCreateFactory properly creates a remote property value"""
+        prop = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            internal_name="test_create_property_value",
+            type="select",
+            is_public_information=True,
+            add_to_filters=True
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=prop,
+            language=self.multi_tenant_company.language,
+            name="Test Property for Values"
+        )
+
+        # Create the remote property
+        create_factory = WooCommerceGlobalAttributeCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=prop
+        )
+        create_factory.run()
+        remote_property = WoocommerceGlobalAttribute.objects.get(
+            sales_channel=self.sales_channel,
+            local_instance=prop
+        )
+        api = create_factory.get_api()
+
+        # Create a property value
+        property_value = PropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=prop,
+        )
+        translation = PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=property_value,
+            language=self.multi_tenant_company.language,
+            value="Test Value"
+        )
+
+        # Create factory instance and run it
+        factory = WoocommerceGlobalAttributeValueCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=property_value,
+        )
+        factory.run()
+        remote_property_value = WoocommerceGlobalAttributeValue.objects.get(
+            sales_channel=self.sales_channel,
+            local_instance=property_value
+        )
+
+        # Update the property value
+        translation.value = "Updated Value"
+        translation.save()
+
+        # Create update factory instance and run it
+        update_factory = WoocommerceGlobalAttributeValueUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=property_value,
+            remote_instance=remote_property_value
+        )
+        update_factory.run()
+
+        # Verify it was updated in WooCommerce
+        updated_value = api.get_attribute_value(remote_property.remote_id, remote_property_value.remote_id)
+        self.assertEqual(updated_value['name'], "Updated Value")
+
+        # cleanup
+        api.delete_attribute_value(remote_property.remote_id, remote_property_value.remote_id)
+        api.delete_attribute(remote_property.remote_id)

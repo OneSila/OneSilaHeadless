@@ -1,5 +1,6 @@
 import traceback
 import inspect
+import sys
 
 from django.db import IntegrityError
 
@@ -332,6 +333,15 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
             return self.update_factory_class
         elif isinstance(self.update_factory_class, str):
             # If it's a string, import it dynamically
+            # Handle case where update_factory_class is in the same file
+            # or is a relative import without full path
+            if '.' not in self.update_factory_class:
+                # Try to get the class from the current module
+                current_module = sys.modules[self.__class__.__module__]
+                if hasattr(current_module, self.update_factory_class):
+                    return getattr(current_module, self.update_factory_class)
+
+            # If not in current module, we'll fall through to the standard import
             module_path, class_name = self.update_factory_class.rsplit('.', 1)
             module = __import__(module_path, fromlist=[class_name])
             return getattr(module, class_name)
@@ -343,10 +353,11 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
         """
         Flow to trigger the update factory. This can be overrided
         """
-        update_factory = self.get_update_factory_class(self.integration,
-                                                   self.local_instance,
-                                                   api=self.api,
-                                                   remote_instance=self.remote_instance)
+        update_factory_class = self.get_update_factory_class()
+        update_factory = update_factory_class(self.integration,
+           self.local_instance,
+           api=self.api,
+           remote_instance=self.remote_instance)
         update_factory.run()
 
     def create(self):

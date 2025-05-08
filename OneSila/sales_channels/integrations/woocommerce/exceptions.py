@@ -102,3 +102,31 @@ class DuplicateError(WoocommerceError):
     Exception raised when trying to create an item that already exists.
     """
     pass
+
+
+class FailedToCreateAttributeValueError(FailedToPostError):
+    """
+    Exception raised when the attribute value creation fails on the WooCommerce API.
+    """
+    pass
+
+
+class FailedToUpdateAttributeValueError(FailedToPutError):
+    """
+    Exception raised when the attribute value update fails on the WooCommerce API.
+    """
+    pass
+
+
+class FailedToDeleteAttributeValueError(FailedToDeleteError):
+    """
+    Exception raised when the attribute value deletion fails on the WooCommerce API.
+    """
+    pass
+
+
+class FailedToGetAttributeValueError(FailedToGetError):
+    """
+    Exception raised when the attribute value is not retrieved from the WooCommerce API.
+    """
+    pass

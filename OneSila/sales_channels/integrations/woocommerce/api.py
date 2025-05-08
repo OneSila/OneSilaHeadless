@@ -1,13 +1,17 @@
+import logging
 from woocommerce import API
 from django.conf import settings
 from .exceptions import FailedToGetAttributesError, FailedToGetError, \
     FailedToGetAttributeError, FailedToGetAttributeTermsError, FailedToGetProductsError, \
     FailedToCreateAttributeError, FailedToPostError, FailedToDeleteError, \
     FailedToDeleteAttributeError, DuplicateError, FailedToUpdateAttributeError, \
-    FailedToPutError
+    FailedToPutError, FailedToCreateAttributeValueError, FailedToUpdateAttributeValueError, \
+    FailedToDeleteAttributeValueError, FailedToGetAttributeValueError
 
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+logger = logging.getLogger(__name__)
 
 
 class WoocommerceApiWrapper:
@@ -56,6 +60,7 @@ class WoocommerceApiWrapper:
             raise FailedToGetError(e, response=resp) from e
 
     def post(self, endpoint, data=None):
+        logger.debug(f"POSTing to {endpoint} with data: {data}")
         resp = self.woocom.post(endpoint, data=data)
         try:
             resp.raise_for_status()
@@ -73,10 +78,10 @@ class WoocommerceApiWrapper:
         except Exception as e:
             raise FailedToPutError(e, response=resp) from e
 
-    def delete(self, endpoint, force=True):
-        params = {}
-        if force:
-            params['force'] = True
+    def delete(self, endpoint):
+        # Why force?  https://docs.woocommerce.com/rest-api-reference/products/delete-a-product/
+        # We want to bypass trash and permanently delete the instance.
+        params = {'force': True}
 
         resp = self.woocom.delete(endpoint, params=params)
         try:
@@ -111,12 +116,6 @@ class WoocommerceApiWrapper:
         except FailedToGetError as e:
             raise FailedToGetAttributeTermsError(e, response=e.response) from e
 
-    def get_products(self):
-        try:
-            return self.get('products')
-        except FailedToGetError as e:
-            raise FailedToGetProductsError(e, response=e.response) from e
-
     def create_attribute(self, slug, name, has_archives=True, type='select'):
         payload = {
             'slug': self.attribute_prefix + slug,
@@ -140,3 +139,65 @@ class WoocommerceApiWrapper:
             return self.delete(f'products/attributes/{attribute_id}')
         except FailedToGetError as e:
             raise FailedToDeleteAttributeError(e, response=e.response) from e
+
+    def get_attribute_values(self, attribute_id):
+        try:
+            return self.get(f'products/attributes/{attribute_id}/terms')
+        except FailedToGetError as e:
+            raise FailedToGetAttributeTermsError(e, response=e.response) from e
+
+    def get_attribute_value(self, attribute_id, value_id):
+        try:
+            return self.get(f'products/attributes/{attribute_id}/terms/{value_id}')
+        except FailedToGetError as e:
+            raise FailedToGetAttributeValueError(e, response=e.response) from e
+
+    def get_attribute_value_by_name(self, attribute_id, name):
+        for value in self.get_attribute_values(attribute_id):
+            if value['name'] == name:
+                return value
+        raise FailedToGetAttributeValueError(f"Attribute value with name {name} not found")
+
+    def create_attribute_value(self, attribute_id, name, slug=None):
+        payload = {
+            'name': name,
+        }
+
+        if slug:
+            payload['slug'] = slug
+
+        try:
+            return self.post(f'products/attributes/{attribute_id}/terms', data=payload)
+        except FailedToPostError as e:
+            # It's likely that the value already exists.  We should go and get it.
+            # before raising and error
+            try:
+                return self.get_attribute_value_by_name(attribute_id, name)
+            except FailedToGetAttributeValueError:
+                # Return from original error since that's what actually matters.
+                raise FailedToCreateAttributeValueError(e, response=e.response) from e
+
+    def update_attribute_value(self, attribute_id, value_id, name, slug=None):
+        payload = {
+            'name': name,
+        }
+
+        if slug:
+            payload['slug'] = slug
+
+        try:
+            return self.put(f'products/attributes/{attribute_id}/terms/{value_id}', data=payload)
+        except FailedToPutError as e:
+            raise FailedToUpdateAttributeValueError(e, response=e.response) from e
+
+    def delete_attribute_value(self, attribute_id, value_id):
+        try:
+            return self.delete(f'products/attributes/{attribute_id}/terms/{value_id}')
+        except FailedToDeleteError as e:
+            raise FailedToDeleteAttributeValueError(e, response=e.response) from e
+
+    def get_products(self):
+        try:
+            return self.get('products')
+        except FailedToGetError as e:
+            raise FailedToGetProductsError(e, response=e.response) from e

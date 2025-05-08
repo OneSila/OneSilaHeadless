@@ -125,7 +125,9 @@ class MagentoPropertySelectValueCreateFactory(GetMagentoAPIMixin, MagentoEntityN
     api_method_name = 'create'
     enable_fetch_and_update = True
     update_if_not_exists = True
-    update_factory_class = 'sales_channels.integrations.magento2.factories.properties.MagentoPropertySelectValueUpdateFactory'
+    # update_factory_class = 'sales_channels.integrations.magento2.factories.properties.MagentoPropertySelectValueUpdateFactory'
+    # FIXME: the line above is the full import.  Verify if the line below also works.
+    update_factory_class = 'MagentoPropertySelectValueUpdateFactory'
 
     def preflight_check(self):
         return not self.local_instance.property.is_product_type

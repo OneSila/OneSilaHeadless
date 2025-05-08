@@ -49,3 +49,10 @@ class WoocommerceGlobalAttribute(RemoteProperty):
     Woocommerce attribute model
     """
     pass
+
+
+class WoocommerceGlobalAttributeValue(RemotePropertySelectValue):
+    """
+    Woocommerce attribute value model for global attributes
+    """
+    pass

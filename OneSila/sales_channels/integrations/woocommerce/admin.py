@@ -1,6 +1,7 @@
 from django.contrib import admin
 from polymorphic.admin import PolymorphicChildModelAdmin
-from .models import WoocommerceSalesChannel
+from .models import WoocommerceSalesChannel, \
+    WoocommerceGlobalAttribute, WoocommerceGlobalAttributeValue
 
 
 @admin.register(WoocommerceSalesChannel)
@@ -23,3 +24,25 @@ class WoocommerceSalesChannelAdmin(PolymorphicChildModelAdmin):
                       'is_importing', 'requests_per_minute', 'max_retries')
         }),
     )
+
+
+@admin.register(WoocommerceGlobalAttribute)
+class WoocommerceGlobalAttributeAdmin(admin.ModelAdmin):
+    # base_model = WoocommerceGlobalAttribute
+    list_display = ('get_name', 'remote_id')
+    search_fields = ('get_name', 'remote_id')
+    list_filter = ('sales_channel',)
+
+    def get_name(self, obj):
+        return obj.local_instance.name
+
+
+@admin.register(WoocommerceGlobalAttributeValue)
+class WoocommerceGlobalAttributeValueAdmin(admin.ModelAdmin):
+    # base_model = WoocommerceGlobalAttributeValue
+    list_display = ('get_value', 'remote_id')
+    search_fields = ('get_value', 'remote_id')
+    list_filter = ('sales_channel',)
+
+    def get_value(self, obj):
+        return obj.local_instance.value
