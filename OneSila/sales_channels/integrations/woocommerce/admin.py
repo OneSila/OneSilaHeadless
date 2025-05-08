@@ -1,6 +1,6 @@
 from django.contrib import admin
 from polymorphic.admin import PolymorphicChildModelAdmin
-from .models import WoocommerceSalesChannel, WoocommerceProduct
+from .models import WoocommerceSalesChannel
 
 
 @admin.register(WoocommerceSalesChannel)
@@ -23,8 +23,3 @@ class WoocommerceSalesChannelAdmin(PolymorphicChildModelAdmin):
                       'is_importing', 'requests_per_minute', 'max_retries')
         }),
     )
-
-
-@admin.register(WoocommerceProduct)
-class WoocommerceProductAdmin(admin.ModelAdmin):
-    pass

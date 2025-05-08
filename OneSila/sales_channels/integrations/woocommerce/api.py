@@ -3,7 +3,8 @@ from django.conf import settings
 from .exceptions import FailedToGetAttributesError, FailedToGetError, \
     FailedToGetAttributeError, FailedToGetAttributeTermsError, FailedToGetProductsError, \
     FailedToCreateAttributeError, FailedToPostError, FailedToDeleteError, \
-    FailedToDeleteAttributeError, DuplicateError
+    FailedToDeleteAttributeError, DuplicateError, FailedToUpdateAttributeError, \
+    FailedToPutError
 
 
 class WoocommerceApiWrapper:
@@ -61,6 +62,14 @@ class WoocommerceApiWrapper:
                 raise DuplicateError(e, response=resp) from e
             raise FailedToPostError(e, response=resp) from e
 
+    def put(self, endpoint, data=None):
+        resp = self.woocom.put(endpoint, data=data)
+        try:
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            raise FailedToPutError(e, response=resp) from e
+
     def delete(self, endpoint, force=False):
         params = {}
         if force:
@@ -106,16 +115,23 @@ class WoocommerceApiWrapper:
         except FailedToGetError as e:
             raise FailedToGetProductsError(e, response=e.response) from e
 
-    def create_attribute(self, slug, name, type='select'):
+    def create_attribute(self, slug, name, has_archives=True, type='select'):
         payload = {
             'slug': self.attribute_prefix + slug,
             'name': name,
-            'type': type
+            'type': type,
+            'has_archives': has_archives
         }
         try:
             return self.remove_attribute_slug_prefix(self.post('products/attributes', data=payload))
         except FailedToGetError as e:
             raise FailedToCreateAttributeError(e, response=e.response) from e
+
+    def update_attribute(self, attribute_id, payload):
+        try:
+            return self.put(f'products/attributes/{attribute_id}', data=payload)
+        except FailedToPutError as e:
+            raise FailedToUpdateAttributeError(e, response=e.response) from e
 
     def delete_attribute(self, attribute_id):
         try:

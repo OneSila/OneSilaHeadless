@@ -1,6 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext as _
-from sales_channels.models import SalesChannel, RemoteProduct
+from sales_channels.models import SalesChannel, SalesChannelView, RemoteProduct
 from sales_channels.models.properties import RemoteProperty, \
     RemotePropertySelectValue, RemoteProductProperty
 from sales_channels.models.mixins import RemoteObjectMixin
@@ -36,36 +36,16 @@ class WoocommerceSalesChannel(SalesChannel):
                 )
 
 
-class WoocommerceProduct(RemoteProduct):
+class WoocommerceSalesChannelView(SalesChannelView):
     """
-    Woocommerce product model
+    Woocommerce-specific Sales Channel View.
     """
     pass
+    # code = models.CharField(max_length=50, help_text="Unique code for the sales channel view.")
 
 
-class WoocommerceAttribute(RemoteProperty):
+class WoocommerceGlobalAttribute(RemoteProperty):
     """
     Woocommerce attribute model
-    """
-    pass
-
-
-class WoocommerceAttributeSelectValue(RemotePropertySelectValue):
-    """
-    Woocommerce attribute select value model
-    """
-    pass
-
-
-class WoocommerceProductProperty(RemoteProductProperty):
-    """
-    Woocommerce product property model
-    """
-    pass
-
-
-class WoocommerceBrand(RemoteObjectMixin, models.Model):
-    """
-    Woocommerce brand model
     """
     pass

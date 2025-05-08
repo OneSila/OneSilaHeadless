@@ -83,6 +83,20 @@ class FailedToDeleteAttributeError(FailedToDeleteError):
     pass
 
 
+class FailedToPutError(WoocommerceError):
+    """
+    Exception raised when the WooCommerce API put request fails.
+    """
+    pass
+
+
+class FailedToUpdateAttributeError(FailedToPutError):
+    """
+    Exception raised when the attribute update fails on the WooCommerce API.
+    """
+    pass
+
+
 class DuplicateError(WoocommerceError):
     """
     Exception raised when trying to create an item that already exists.
