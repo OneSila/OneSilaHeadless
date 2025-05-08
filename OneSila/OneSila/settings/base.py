@@ -268,6 +268,11 @@ CORS_ALLOWED_METHODS = [
     '*'
 ]
 
+#
+# Default User Agent.  Used by integrations to identify the source of the request.
+#
+
+ONESILA_DEFAULT_USER_AGENT = "OneSila PIM/1.0"
 
 HUEY = {
     'huey_class': 'huey.RedisHuey',

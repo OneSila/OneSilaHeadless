@@ -1,4 +1,4 @@
-from woocommerce import API
+from .api import WoocommerceApiWrapper
 
 
 class GetWoocommerceAPIMixin:
@@ -10,9 +10,11 @@ class GetWoocommerceAPIMixin:
         """
         Returns an authenticated Woocommerce API client
         """
-        return API(
-            url=self.sales_channel.api_url,
+        return WoocommerceApiWrapper(
+            url=self.sales_channel.hostname,
             consumer_key=self.sales_channel.api_key,
             consumer_secret=self.sales_channel.api_secret,
-            version=self.sales_channel.api_version
+            version=self.sales_channel.api_version,
+            verify_ssl=self.sales_channel.verify_ssl,
+            timeout=self.sales_channel.timeout,
         )

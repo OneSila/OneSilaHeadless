@@ -17,6 +17,7 @@ from sales_channels.integrations.magento2.models.properties import MagentoAttrib
 class MagentoPropertyCreateFactory(GetMagentoAPIMixin, MagentoEntityNotFoundGeneralErrorMixin, MagentoTranslationMixin, RemotePropertyCreateFactory):
     remote_model_class = MagentoProperty
     remote_id_map = 'attribute_id'
+    # Key is the local field, value is the remote field
     field_mapping = {
         'add_to_filters': 'is_filterable',
         'name': 'default_frontend_label'
@@ -151,17 +152,16 @@ class MagentoPropertySelectValueCreateFactory(GetMagentoAPIMixin, MagentoEntityN
         self.payload = {
             'label': self.local_instance.value,
             'store_labels': self.get_frontend_labels(
-            translations=self.local_instance.propertyselectvaluetranslation_set.all(),
-            value_field='value',
-            language=self.language
-        )
+                translations=self.local_instance.propertyselectvaluetranslation_set.all(),
+                value_field='value',
+                language=self.language
+            )
         }
         self.payload = {'data': self.payload}
         return self.payload
 
     def serialize_response(self, response):
         return response.to_dict()
-
 
     def fetch_existing_remote_data(self):
         option = self.api.product_attribute_options.by_label(self.local_instance.value)
@@ -300,7 +300,7 @@ class MagentoProductPropertyDeleteFactory(GetMagentoAPIMixin, RemoteProductPrope
         try:
             self.magento_product: Product = self.api.products.by_sku(self.remote_instance.remote_product.remote_sku)
         except InstanceGetFailed:
-            return True # if the product was deleted then is no need to delete the association
+            return True  # if the product was deleted then is no need to delete the association
 
         self.magento_product.update_custom_attributes({self.remote_instance.remote_property.attribute_code: None})
 
@@ -317,7 +317,6 @@ class MagentoAttributeSetCreateFactory(GetMagentoAPIMixin, MagentoEntityNotFound
 
     api_package_name = 'product_attribute_set'
     api_method_name = 'create'
-
 
     def get_update_attribute_set_factory(self):
         from sales_channels.integrations.magento2.factories.properties import MagentoAttributeSetUpdateFactory
@@ -351,9 +350,9 @@ class MagentoAttributeSetCreateFactory(GetMagentoAPIMixin, MagentoEntityNotFound
         self.set_group_id()
         self.create_existing_attributes(self.remote_instance, self.attribute_set_magento_instance)
 
-
     def fetch_existing_remote_data(self):
         return self.api.product_attribute_set.by_name(self.local_instance.product_type.value)
+
 
 class MagentoAttributeSetUpdateFactory(GetMagentoAPIMixin, RemoteInstanceUpdateFactory, EnsureMagentoAttributeSetAttributesMixin):
     remote_model_class = MagentoAttributeSet
@@ -404,7 +403,6 @@ class MagentoAttributeSetUpdateFactory(GetMagentoAPIMixin, RemoteInstanceUpdateF
                     else:
                         raise
 
-
                 attribute.delete()
 
     def update_attribute_set_attributes_sort_order(self):
@@ -415,7 +413,6 @@ class MagentoAttributeSetUpdateFactory(GetMagentoAPIMixin, RemoteInstanceUpdateF
             sort_order_dict[attribute.remote_property.attribute_code] = attribute.local_instance.sort_order
 
         self.attribute_set_magento_instance.update_attribute_sort_orders(self.remote_instance.group_remote_id, sort_order_dict)
-
 
     def post_update_process(self):
 

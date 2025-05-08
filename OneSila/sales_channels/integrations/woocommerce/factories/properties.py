@@ -15,8 +15,14 @@ from sales_channels.integrations.woocommerce.models import WooCommerceProperty, 
 
 class WooCommercePropertyCreateFactory(GetWooCommerceAPIMixin, RemotePropertyCreateFactory):
     remote_model_class = WooCommerceProperty
-    remote_id_map = ''
+    remote_id_map = 'id'
+    # Key is the local field, value is the remote field
     field_mapping = {
+        'name': 'name',
+        'code': 'slug',
+        'type': 'type',
+        'order_by': 'menu_order',
+        # 'has_archives': True
     }
 
     def get_update_property_factory(self):
@@ -49,7 +55,7 @@ class WooCommercePropertyCreateFactory(GetWooCommerceAPIMixin, RemotePropertyCre
         Creates a remote property in WooCommerce.
         """
         # Implement WooCommerce-specific attribute creation
-        response = self.api.post('products/attributes', data=self.payload)
+        response = self.api.create_attribute(self.payload)
         return response
 
     def serialize_response(self, response):
@@ -63,7 +69,7 @@ class WooCommercePropertyCreateFactory(GetWooCommerceAPIMixin, RemotePropertyCre
         Attempts to fetch an existing property by name.
         """
         # Implement WooCommerce-specific attribute fetching
-        pass
+        return self.api.get_attribute(self.local_instance.code)
 
 
 class WooCommercePropertyUpdateFactory(GetWooCommerceAPIMixin, RemotePropertyUpdateFactory):

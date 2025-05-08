@@ -19,6 +19,7 @@ class WoocommerceSalesChannel(SalesChannel):
     api_secret = models.CharField(max_length=255, help_text="Woocommerce API Secret")
     api_version = models.CharField(max_length=5, help_text="Woocommerce API Version",
         choices=API_VERSION_CHOICES)
+    timeout = models.IntegerField(default=10, help_text="Woocommerce API Timeout")
 
 
 class WoocommerceProduct(RemoteProduct):
