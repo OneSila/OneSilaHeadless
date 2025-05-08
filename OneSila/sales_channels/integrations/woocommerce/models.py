@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.translation import gettext as _
 from sales_channels.models import SalesChannel, RemoteProduct
 from sales_channels.models.properties import RemoteProperty, \
     RemotePropertySelectValue, RemoteProductProperty
@@ -20,6 +21,19 @@ class WoocommerceSalesChannel(SalesChannel):
     api_version = models.CharField(max_length=5, help_text="Woocommerce API Version",
         choices=API_VERSION_CHOICES)
     timeout = models.IntegerField(default=10, help_text="Woocommerce API Timeout")
+
+    def connect(self):
+        from sales_channels.integrations.woocommerce.factories.sales_channels.sales_channel import TryConnection
+
+        required_fields = {'api_url', 'api_key', 'api_secret', 'api_version'}
+
+        if required_fields.intersection(self.get_dirty_fields().keys()):
+            try:
+                TryConnection(sales_channel=self)
+            except Exception:
+                raise Exception(
+                    _("Could not connect to the Woocommerce server. Make sure all the details are correctly completed.")
+                )
 
 
 class WoocommerceProduct(RemoteProduct):

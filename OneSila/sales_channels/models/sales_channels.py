@@ -11,12 +11,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class  SalesChannel(Integration, models.Model):
+
+class SalesChannel(Integration, models.Model):
     """
     Polymorphic model representing a sales channel, such as a website or marketplace.
     """
 
-    use_configurable_name = models.BooleanField(default=False,verbose_name=_('Always use Configurable name over child'))
+    use_configurable_name = models.BooleanField(default=False, verbose_name=_('Always use Configurable name over child'))
     sync_contents = models.BooleanField(default=True, verbose_name=_('Sync Contents'))
     sync_ean_codes = models.BooleanField(default=True, verbose_name=_('Sync EAN Codes'))
     sync_prices = models.BooleanField(default=True, verbose_name=_('Sync Prices'))
@@ -27,7 +28,6 @@ class  SalesChannel(Integration, models.Model):
     class Meta:
         verbose_name = 'Sales Channel'
         verbose_name_plural = 'Sales Channels'
-
 
     def save(self, *args, **kwargs):
 
@@ -48,10 +48,11 @@ class  SalesChannel(Integration, models.Model):
         return remote_currencies_cnt == 1
 
     def connect(self):
-        raise NotImplementedError("This method must be implemented by child class")
+        raise NotImplementedError("The SalesChannel connect method must be implemented by child class")
 
     def __str__(self):
         return f"{self.hostname } @ {self.multi_tenant_company}"
+
 
 class SalesChannelIntegrationPricelist(models.Model):
     """
@@ -70,6 +71,7 @@ class SalesChannelIntegrationPricelist(models.Model):
     def __str__(self):
         return f"{self.sales_channel} - {self.price_list}"
 
+
 class SalesChannelView(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Model representing a specific view of a sales channel
@@ -86,13 +88,15 @@ class SalesChannelView(PolymorphicModel, RemoteObjectMixin, models.Model):
     def __str__(self):
         return str(self.name)
 
+
 class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Model representing the assignment of a product to a specific sales channel view.
     """
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE, db_index=True)
     sales_channel_view = models.ForeignKey('SalesChannelView', on_delete=models.CASCADE, db_index=True)
-    remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.SET_NULL, null=True, blank=True, help_text="The remote product associated with this assign.")
+    remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.SET_NULL, null=True,
+                                       blank=True, help_text="The remote product associated with this assign.")
     needs_resync = models.BooleanField(default=False, help_text="Indicates if a resync is needed.")
 
     class Meta:
@@ -107,6 +111,7 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     @property
     def remote_url(self):
         return f"{self.sales_channel_view.url}{self.product.url_key}.html"
+
 
 class RemoteLanguage(PolymorphicModel, RemoteObjectMixin, models.Model):
     """

@@ -1,4 +1,4 @@
-from core.tests import TestCase
+from .mixins import TestCaseWoocommerceMixin
 from django.conf import settings
 
 from properties.models import Property
@@ -7,27 +7,23 @@ from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixi
 from sales_channels.integrations.woocommerce.factories.properties import WooCommercePropertyCreateFactory
 
 
-class WooCommercePropertyCreateFactoryTest(TestCase):
+class WooCommercePropertyCreateFactoryTest(TestCaseWoocommerceMixin):
     def setUp(self):
         super().setUp()
-
-        # Get test store settings from settings.py
-        self.test_store_settings = settings.SALES_CHANNELS_INTEGRATIONS_TEST_STORES['WOOCOMMERCE']
 
         # Create a sales channel for testing with test store credentials
         self.sales_channel = WoocommerceSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            name="Test WooCommerce Store",
             hostname=self.test_store_settings['hostname'],
-            consumer_key=self.test_store_settings['api_key'],
-            consumer_secret=self.test_store_settings['api_secret']
+            api_key=self.test_store_settings['api_key'],
+            api_secret=self.test_store_settings['api_secret']
         )
 
         # Create a property for testing
         self.property = Property.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             internal_name="test_property",
-            code="test_property_code",
+            name="Test Property",
             type="select",
             is_public_information=True,
             add_to_filters=True
@@ -42,7 +38,9 @@ class WooCommercePropertyCreateFactoryTest(TestCase):
             )
 
             # Get API through the mixin
-            api = GetWoocommerceAPIMixin(sales_channel=self.sales_channel).get_api_client()
+            api = GetWoocommerceAPIMixin()
+            api.sales_channel = self.sales_channel
+            api = api.get_api_client()
 
             # Delete each property
             for remote_property in remote_properties:

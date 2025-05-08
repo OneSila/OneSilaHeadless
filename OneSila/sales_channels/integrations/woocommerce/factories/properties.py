@@ -9,17 +9,17 @@ from sales_channels.factories.properties.properties import (
     RemoteProductPropertyUpdateFactory,
     RemoteProductPropertyDeleteFactory
 )
-from sales_channels.integrations.woocommerce.mixins import GetWooCommerceAPIMixin
-from sales_channels.integrations.woocommerce.models import WooCommerceProperty, WooCommercePropertySelectValue, WooCommerceProductProperty
+from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
+from sales_channels.integrations.woocommerce.models import WoocommerceAttribute, WoocommerceAttributeSelectValue, WoocommerceProductProperty
 
 
-class WooCommercePropertyCreateFactory(GetWooCommerceAPIMixin, RemotePropertyCreateFactory):
-    remote_model_class = WooCommerceProperty
+class WooCommercePropertyCreateFactory(GetWoocommerceAPIMixin, RemotePropertyCreateFactory):
+    remote_model_class = WoocommerceAttribute
     remote_id_map = 'id'
     # Key is the local field, value is the remote field
     field_mapping = {
         'name': 'name',
-        'code': 'slug',
+        'internal_name': 'slug',
         'type': 'type',
         'order_by': 'menu_order',
         # 'has_archives': True
@@ -46,7 +46,7 @@ class WooCommercePropertyCreateFactory(GetWooCommerceAPIMixin, RemotePropertyCre
         else:
             self.payload['type'] = 'text'  # Default type
 
-        self.payload['slug'] = self.local_instance.code
+        self.payload['slug'] = self.local_instance.internal_name
 
         return self.payload
 
@@ -69,11 +69,11 @@ class WooCommercePropertyCreateFactory(GetWooCommerceAPIMixin, RemotePropertyCre
         Attempts to fetch an existing property by name.
         """
         # Implement WooCommerce-specific attribute fetching
-        return self.api.get_attribute(self.local_instance.code)
+        return self.api.get_attribute_by_code(self.local_instance.internal_name)
 
 
-class WooCommercePropertyUpdateFactory(GetWooCommerceAPIMixin, RemotePropertyUpdateFactory):
-    remote_model_class = WooCommerceProperty
+class WooCommercePropertyUpdateFactory(GetWoocommerceAPIMixin, RemotePropertyUpdateFactory):
+    remote_model_class = WoocommerceAttribute
     create_factory_class = WooCommercePropertyCreateFactory
     field_mapping = {
         'name': 'name'
@@ -100,8 +100,8 @@ class WooCommercePropertyUpdateFactory(GetWooCommerceAPIMixin, RemotePropertyUpd
         return response
 
 
-class WooCommercePropertyDeleteFactory(GetWooCommerceAPIMixin, RemotePropertyDeleteFactory):
-    remote_model_class = WooCommerceProperty
+class WooCommercePropertyDeleteFactory(GetWoocommerceAPIMixin, RemotePropertyDeleteFactory):
+    remote_model_class = WoocommerceAttribute
     delete_remote_instance = True
 
     def delete_remote(self):
@@ -119,8 +119,8 @@ class WooCommercePropertyDeleteFactory(GetWooCommerceAPIMixin, RemotePropertyDel
         return response
 
 
-class WooCommercePropertySelectValueCreateFactory(GetWooCommerceAPIMixin, RemotePropertySelectValueCreateFactory):
-    remote_model_class = WooCommercePropertySelectValue
+class WooCommercePropertySelectValueCreateFactory(GetWoocommerceAPIMixin, RemotePropertySelectValueCreateFactory):
+    remote_model_class = WoocommerceAttributeSelectValue
     remote_property_factory = WooCommercePropertyCreateFactory
     remote_id_map = 'term_id'
     field_mapping = {
@@ -144,7 +144,7 @@ class WooCommercePropertySelectValueCreateFactory(GetWooCommerceAPIMixin, Remote
         Customizes the payload for WooCommerce API requirements.
         """
         # Use select value code for slug if available, otherwise fallback to value
-        self.payload['slug'] = getattr(self.local_instance, 'code', self.local_instance.value.lower().replace(' ', '-'))
+        self.payload['slug'] = self.local_instance.internal_name
         return self.payload
 
     def create_remote(self):
@@ -169,8 +169,8 @@ class WooCommercePropertySelectValueCreateFactory(GetWooCommerceAPIMixin, Remote
         pass
 
 
-class WooCommercePropertySelectValueUpdateFactory(GetWooCommerceAPIMixin, RemotePropertySelectValueUpdateFactory):
-    remote_model_class = WooCommercePropertySelectValue
+class WooCommercePropertySelectValueUpdateFactory(GetWoocommerceAPIMixin, RemotePropertySelectValueUpdateFactory):
+    remote_model_class = WoocommerceAttributeSelectValue
     create_factory_class = WooCommercePropertySelectValueCreateFactory
     field_mapping = {
         'value': 'name'
@@ -207,8 +207,8 @@ class WooCommercePropertySelectValueUpdateFactory(GetWooCommerceAPIMixin, Remote
         return response
 
 
-class WooCommercePropertySelectValueDeleteFactory(GetWooCommerceAPIMixin, RemotePropertySelectValueDeleteFactory):
-    remote_model_class = WooCommercePropertySelectValue
+class WooCommercePropertySelectValueDeleteFactory(GetWoocommerceAPIMixin, RemotePropertySelectValueDeleteFactory):
+    remote_model_class = WoocommerceAttributeSelectValue
 
     def delete_remote(self):
         """
@@ -229,8 +229,8 @@ class WooCommercePropertySelectValueDeleteFactory(GetWooCommerceAPIMixin, Remote
         return response
 
 
-class WooCommerceProductPropertyCreateFactory(GetWooCommerceAPIMixin, RemoteProductPropertyCreateFactory):
-    remote_model_class = WooCommerceProductProperty
+class WooCommerceProductPropertyCreateFactory(GetWoocommerceAPIMixin, RemoteProductPropertyCreateFactory):
+    remote_model_class = WoocommerceProductProperty
     remote_property_factory = WooCommercePropertyCreateFactory
     remote_property_select_value_factory = WooCommercePropertySelectValueCreateFactory
 
@@ -277,8 +277,8 @@ class WooCommerceProductPropertyCreateFactory(GetWooCommerceAPIMixin, RemoteProd
         return response
 
 
-class WooCommerceProductPropertyUpdateFactory(GetWooCommerceAPIMixin, RemoteProductPropertyUpdateFactory):
-    remote_model_class = WooCommerceProductProperty
+class WooCommerceProductPropertyUpdateFactory(GetWoocommerceAPIMixin, RemoteProductPropertyUpdateFactory):
+    remote_model_class = WoocommerceProductProperty
     create_factory_class = WooCommerceProductPropertyCreateFactory
     remote_property_factory = WooCommercePropertyCreateFactory
     remote_property_select_value_factory = WooCommercePropertySelectValueCreateFactory
@@ -311,8 +311,8 @@ class WooCommerceProductPropertyUpdateFactory(GetWooCommerceAPIMixin, RemoteProd
         return response
 
 
-class WooCommerceProductPropertyDeleteFactory(GetWooCommerceAPIMixin, RemoteProductPropertyDeleteFactory):
-    remote_model_class = WooCommerceProductProperty
+class WooCommerceProductPropertyDeleteFactory(GetWoocommerceAPIMixin, RemoteProductPropertyDeleteFactory):
+    remote_model_class = WoocommerceProductProperty
     delete_remote_instance = True
 
     def delete_remote(self):
