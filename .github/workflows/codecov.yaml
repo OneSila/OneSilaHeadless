@@ -41,6 +41,9 @@ jobs:
         POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
         REDIS_HOST: localhost
         REDIS_PORT: ${{ job.services.redis.ports[6379] }}
+        INTEGRATIONS_TEST_STORES_WOOCOMMERCE_HOSTNAME: ${{ secrets.INTEGRATIONS_TEST_STORES_WOOCOMMERCE_HOSTNAME }}
+        INTEGRATIONS_TEST_STORES_WOOCOMMERCE_API_KEY: ${{ secrets.INTEGRATIONS_TEST_STORES_WOOCOMMERCE_API_KEY }}
+        INTEGRATIONS_TEST_STORES_WOOCOMMERCE_API_SECRET: ${{ secrets.INTEGRATIONS_TEST_STORES_WOOCOMMERCE_API_SECRET }}
       run: cd OneSila && ./manage.py collectstatic --noinput && coverage run --source='.' manage.py test && coverage json
     - name: Upload coverage reports to Codecov with GitHub Action
       uses: codecov/codecov-action@v3
