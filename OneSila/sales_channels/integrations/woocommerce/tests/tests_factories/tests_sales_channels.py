@@ -1,7 +1,7 @@
 from .mixins import TestCaseWoocommerceMixin
 from django.utils.translation import gettext as _
 
-from sales_channels.integrations.woocommerce.factories.sales_channels.sales_channel import TryConnection
+from sales_channels.integrations.woocommerce.factories.sales_channels import TryConnection
 from sales_channels.integrations.woocommerce.exceptions import FailedToGetError
 
 

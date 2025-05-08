@@ -23,7 +23,7 @@ class WoocommerceSalesChannel(SalesChannel):
     timeout = models.IntegerField(default=10, help_text="Woocommerce API Timeout")
 
     def connect(self):
-        from sales_channels.integrations.woocommerce.factories.sales_channels.sales_channel import TryConnection
+        from sales_channels.integrations.woocommerce.factories.sales_channels import TryConnection
 
         required_fields = {'api_url', 'api_key', 'api_secret', 'api_version'}
 
