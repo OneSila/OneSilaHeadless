@@ -247,16 +247,16 @@ class WooCommercePropertyValueFactoryTest(TestCaseWoocommerceMixin):
         self.assertIsNotNone(remote_value.remote_id)
 
         # Verify it exists in WooCommerce API
-        remote_attribute_value = api.get_attribute_value_by_name(remote_property.remote_id, property_value.value)
+        remote_attribute_value = api.get_attribute_term(remote_property.remote_id, remote_value.remote_id)
         self.assertTrue(int(remote_attribute_value['id']) == int(remote_value.remote_id))
 
         # cleanup
-        api.delete_attribute_value(remote_property.remote_id, remote_value.remote_id)
+        api.delete_attribute_term(remote_property.remote_id, remote_value.remote_id)
         api.delete_attribute(remote_property.remote_id)
 
         # ensure it's deleted
         with self.assertRaises(Exception):
-            api.get_attribute_value(remote_property.remote_id, remote_value.remote_id)
+            api.get_attribute_term(remote_property.remote_id, remote_value.remote_id)
 
     def test_update_property_value(self):
         """Test that WooCommercePropertyValueCreateFactory properly creates a remote property value"""
@@ -322,9 +322,18 @@ class WooCommercePropertyValueFactoryTest(TestCaseWoocommerceMixin):
         update_factory.run()
 
         # Verify it was updated in WooCommerce
-        updated_value = api.get_attribute_value(remote_property.remote_id, remote_property_value.remote_id)
+        updated_value = api.get_attribute_term(remote_property.remote_id, remote_property_value.remote_id)
         self.assertEqual(updated_value['name'], "Updated Value")
 
         # cleanup
-        api.delete_attribute_value(remote_property.remote_id, remote_property_value.remote_id)
+        factory = WoocommerceGlobalAttributeValueDeleteFactory(
+            sales_channel=self.sales_channel,
+            remote_instance=remote_property_value
+        )
+        factory.run()
+
+        # ensure it's deleted
+        with self.assertRaises(Exception):
+            api.get_attribute_term(remote_property.remote_id, remote_property_value.remote_id)
+
         api.delete_attribute(remote_property.remote_id)

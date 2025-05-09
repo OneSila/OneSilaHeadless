@@ -1,9 +1,9 @@
 from django.db import models
 from django.utils.translation import gettext as _
-from sales_channels.models import SalesChannel, SalesChannelView, RemoteProduct
+from sales_channels.models import SalesChannel, SalesChannelView, \
+    RemoteProduct, RemoteEanCode
 from sales_channels.models.properties import RemoteProperty, \
     RemotePropertySelectValue, RemoteProductProperty
-from sales_channels.models.mixins import RemoteObjectMixin
 
 
 class WoocommerceSalesChannel(SalesChannel):
@@ -54,5 +54,26 @@ class WoocommerceGlobalAttribute(RemoteProperty):
 class WoocommerceGlobalAttributeValue(RemotePropertySelectValue):
     """
     Woocommerce attribute value model for global attributes
+    """
+    pass
+
+
+class WoocommerceProduct(RemoteProduct):
+    """
+    Woocommerce product model
+    """
+    pass
+
+
+class WoocommerceProductProperty(RemoteProductProperty):
+    """
+    Woocommerce product property model
+    """
+    pass
+
+
+class WoocommerceEanCode(RemoteEanCode):
+    """
+    Woocommerce ean code model
     """
     pass

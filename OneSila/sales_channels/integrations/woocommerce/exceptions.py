@@ -130,3 +130,31 @@ class FailedToGetAttributeValueError(FailedToGetError):
     Exception raised when the attribute value is not retrieved from the WooCommerce API.
     """
     pass
+
+
+class FailedToGetProductBySkuError(FailedToGetError):
+    """
+    Exception raised when the product by SKU is not retrieved from the WooCommerce API.
+    """
+    pass
+
+
+class FailedToCreateProductError(FailedToPostError):
+    """
+    Exception raised when the product creation fails on the WooCommerce API.
+    """
+    pass
+
+
+class FailedToUpdateProductError(FailedToPutError):
+    """
+    Exception raised when the product update fails on the WooCommerce API.
+    """
+    pass
+
+
+class FailedToDeleteProductError(FailedToDeleteError):
+    """
+    Exception raised when the product deletion fails on the WooCommerce API.
+    """
+    pass

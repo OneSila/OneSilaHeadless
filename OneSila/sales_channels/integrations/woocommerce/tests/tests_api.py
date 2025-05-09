@@ -135,14 +135,14 @@ class WoocommerceApiWrapperTestCase(TestCase):
         result = self.api_wrapper.delete_attribute(result['id'])
         self.assertTrue(result)
 
-    def test_create_and_delete_attribute_value(self):
+    def test_create_and_delete_attribute_term(self):
         """
-        Test that create_attribute_value creates an delete an attribute value successfully.
+        Test that create_attribute_term creates an delete an attribute term successfully.
         """
         # Create an attribute
-        attribute_result = self.api_wrapper.create_attribute('test-attribute-value-test', 'Test Attribute')
+        attribute_result = self.api_wrapper.create_attribute('test-attribute-term-test', 'Test Attribute')
         # Create an attribute value
-        result = self.api_wrapper.create_attribute_value(attribute_result['id'], 'Test Attribute Value')
+        result = self.api_wrapper.create_attribute_term(attribute_result['id'], 'Test Attribute Term')
         self.assertIsInstance(result, dict)
-        self.api_wrapper.delete_attribute_value(attribute_result['id'], result['id'])
+        self.api_wrapper.delete_attribute_term(attribute_result['id'], result['id'])
         self.api_wrapper.delete_attribute(attribute_result['id'])
