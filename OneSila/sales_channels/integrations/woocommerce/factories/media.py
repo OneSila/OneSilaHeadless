@@ -1,8 +1,5 @@
-from sales_channels.factories.products.images import (
-    RemoteProductImageCreateFactory,
-    RemoteProductImageUpdateFactory,
-    RemoteProductImageDeleteFactory,
-)
+from sales_channels.factories.products.images import RemoteMediaProductThroughCreateFactory, RemoteMediaProductThroughUpdateFactory, \
+    RemoteMediaProductThroughDeleteFactory, RemoteImageDeleteFactory
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 
 from .mixins import SerialiserMixin
@@ -19,13 +16,17 @@ class WooCommerceMediaProductThroughMixin(SerialiserMixin):
     }
 
 
-class WooCommerceMediaProductThroughCreateFactory(WooCommerceMediaProductThroughMixin, GetWoocommerceAPIMixin, RemoteProductImageCreateFactory):
+class WooCommerceMediaProductThroughCreateFactory(WooCommerceMediaProductThroughMixin, GetWoocommerceAPIMixin, RemoteMediaProductThroughCreateFactory):
     pass
 
 
-class WooCommerceMediaProductThroughUpdateFactory(WooCommerceMediaProductThroughMixin, GetWoocommerceAPIMixin, RemoteProductImageUpdateFactory):
+class WooCommerceMediaProductThroughUpdateFactory(WooCommerceMediaProductThroughMixin, GetWoocommerceAPIMixin, RemoteMediaProductThroughUpdateFactory):
     pass
 
 
-class WooCommerceMediaProductThroughDeleteFactory(WooCommerceMediaProductThroughMixin, GetWoocommerceAPIMixin, RemoteProductImageDeleteFactory):
+class WooCommerceMediaProductThroughDeleteFactory(WooCommerceMediaProductThroughMixin, GetWoocommerceAPIMixin, RemoteMediaProductThroughDeleteFactory):
+    pass
+
+
+class WooCommerceImageDeleteFactory(WooCommerceMediaProductThroughMixin, GetWoocommerceAPIMixin, RemoteImageDeleteFactory):
     pass
