@@ -10,6 +10,7 @@ from .exceptions import FailedToGetAttributesError, FailedToGetError, \
     FailedToCreateProductError, FailedToDeleteProductError, FailedToUpdateProductError
 from .constants import API_ATTRIBUTE_PREFIX
 import urllib3
+from copy import deepcopy
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
@@ -229,27 +230,48 @@ class WoocommerceApiWrapper:
         except FailedToGetError as e:
             raise FailedToGetProductBySkuError(e, response=e.response) from e
 
-    def create_product(self, name, type, regular_price, description='', short_description='', categories=[], images=[], attributes=[]):
+    def create_product(self, name, type, sku, status, visibility, regular_price, sale_price=None, description='', short_description='', categories=[], images=[], attributes=[]):
         """
         Create a product in WooCommerce.
         """
         payload = {
             'name': name,
             'type': type,
+            'sku': sku,
+            'status': status,
+            'visibility': visibility,
             'regular_price': regular_price,
+            'sale_price': sale_price,
             'description': description,
             'short_description': short_description,
             'categories': categories,
             'images': images,
             'attributes': attributes,
         }
+        for k, v in deepcopy(payload).items():
+            if v is None or v == []:
+                del payload[k]
+
+        # Convert prices to strings, or you will get a 400 errors.
+        payload['regular_price'] = str(regular_price)
+        if sale_price:
+            payload['sale_price'] = str(sale_price)
+
         try:
             return self.post('products', data=payload)
         except FailedToPostError as e:
+            # It seems duplicates are raised as 400 errors.
+            try:
+                self.get_product_by_sku(sku)
+                raise DuplicateError(e, response=e.response) from e
+            except FailedToGetProductBySkuError:
+                pass
+
             raise FailedToCreateProductError(e, response=e.response) from e
 
     def update_product(self, product_id, **payload):
-        fields_to_update = ['name', 'type', 'regular_price', 'description', 'short_description', 'categories', 'images', 'attributes']
+        fields_to_update = ['name', 'type', 'sku', 'status', 'visibility', 'regular_price',
+            'sale_price', 'description', 'short_description', 'categories', 'images', 'attributes']
         for key in payload.keys():
             if key not in fields_to_update:
                 raise ValueError(f"Field {key} is not updateable")

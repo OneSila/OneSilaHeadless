@@ -7,6 +7,7 @@ from sales_channels.integrations.woocommerce.exceptions import (
     FailedToGetAttributeError,
     FailedToGetAttributeTermsError,
 )
+from sales_channels.integrations.woocommerce.exceptions import DuplicateError
 
 
 class WoocommerceApiWrapperTestCase(TestCase):
@@ -146,3 +147,46 @@ class WoocommerceApiWrapperTestCase(TestCase):
         self.assertIsInstance(result, dict)
         self.api_wrapper.delete_attribute_term(attribute_result['id'], result['id'])
         self.api_wrapper.delete_attribute(attribute_result['id'])
+
+    def test_create_and_delete_product_woocommerce(self):
+        """
+        Test that create_product creates an delete a product successfully.
+        """
+        kwargs = {
+            'name': 'Test Product',
+            'type': 'simple',
+            'sku': 'TEST-PRODUCT-001',
+            'status': 'publish',
+            'visibility': 'visible',
+            'regular_price': '0.9',
+            'sale_price': '0.8',
+        }
+        result = self.api_wrapper.create_product(**kwargs)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result['name'], 'Test Product')
+
+        result = self.api_wrapper.delete_product(result['id'])
+        self.assertTrue(result)
+
+    def test_create_duplicate_product_woocommerce(self):
+        """
+        Test that create_product raises a DuplicateError when the product already exists.
+        """
+        kwargs = {
+            'name': 'Test Product',
+            'type': 'simple',
+            'sku': 'TEST-PRODUCT-DUPLICATE',
+            'status': 'publish',
+            'visibility': 'visible',
+            'regular_price': '0.9',
+            'sale_price': '0.8',
+        }
+        result = self.api_wrapper.create_product(**kwargs)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result['name'], 'Test Product')
+
+        self.assertTrue(result)
+        with self.assertRaises(DuplicateError):
+            self.api_wrapper.create_product(**kwargs)
+
+        result = self.api_wrapper.delete_product(result['id'])

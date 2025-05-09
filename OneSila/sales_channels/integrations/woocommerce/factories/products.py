@@ -13,7 +13,11 @@ from .properties import WooCommerceProductPropertyCreateFactory, \
     WooCommerceProductPropertyUpdateFactory, WooCommerceProductPropertyDeleteFactory
 from .media import WooCommerceMediaProductThroughCreateFactory, \
     WooCommerceMediaProductThroughUpdateFactory, WooCommerceMediaProductThroughDeleteFactory
+from .ean import WooCommerceEanCodeUpdateFactory
 from ..exceptions import DuplicateError
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class WooCommerceProductMixin(SerialiserMixin):
@@ -53,9 +57,9 @@ class WooCommerceProductMixin(SerialiserMixin):
         self.payload['short_description'] = short_description
         self.payload['description'] = description
 
-        price = 0.9
+        regular_price = 0.9
         sale_price = 0.8
-        self.payload['regular_price'] = price
+        self.payload['regular_price'] = regular_price
         self.payload['sale_price'] = sale_price
 
         if self.local_instance.active:
@@ -85,7 +89,7 @@ class WooCommerceProductSyncFactory(WooCommerceProductMixin, GetWoocommerceAPIMi
     remote_image_assign_update_factory = WooCommerceMediaProductThroughUpdateFactory
     remote_image_assign_delete_factory = WooCommerceMediaProductThroughDeleteFactory
 
-    # remote_eancode_update_factory = MagentoEanCodeUpdateFactory
+    remote_eancode_update_factory = WooCommerceEanCodeUpdateFactory
 
     def get_sync_product_factory(self):
         return WooCommerceProductSyncFactory
@@ -109,39 +113,30 @@ class WooCommerceProductSyncFactory(WooCommerceProductMixin, GetWoocommerceAPIMi
 
     add_variation_factory = property(get_add_variation_factory)
 
-    field_mapping = {
-        'name': 'name',
-        'sku': 'sku',
-        'type': 'type_id',
-        'active': 'status',
-        'stock': 'stock',
-        'allow_backorder': 'backorders',
-        'visibility': 'visibility',
-        'content': 'content',
-        'assigns': 'views',
-        'price': 'price',
-        'discount': 'special_price',
-        'vat_rate': 'tax_class_id',
-        'url_key': 'url_key',
-        'description': 'description',
-        'short_description': 'short_description',
-    }
-
-    # Remote product types, to be set in specific layer implementations
-    # REMOTE_TYPE_SIMPLE = MagentoApiProduct.PRODUCT_TYPE_SIMPLE
-    # REMOTE_TYPE_CONFIGURABLE = MagentoApiProduct.PRODUCT_TYPE_CONFIGURABLE
+    def perform_remote_action(self):
+        """
+        Performs the remote action for WooCommerce products.
+        """
+        return self.api.update_product(self.remote_instance.remote_id, **self.payload)
 
 
 class WooCommerceProductCreateFactory(WooCommerceProductMixin, GetWoocommerceAPIMixin, RemoteProductCreateFactory):
     enable_fetch_and_update = True
     update_if_not_exists = True
     update_factory_class = "WooCommerceProductUpdateFactory"
+    remote_eancode_update_factory = WooCommerceEanCodeUpdateFactory
 
     def create_remote(self):
         """
         Creates a remote product in WooCommerce.
         """
         return self.api.create_product(**self.payload)
+
+    def perform_remote_action(self):
+        """
+        Performs the remote action for WooCommerce products.
+        """
+        return self.create_remote()
 
     def fetch_existing_remote_data(self):
         """
