@@ -30,8 +30,9 @@ class WooCommerceProductMixin(SerialiserMixin):
         """
         Customizes the payload for WooCommerce products
         """
-        # FIXME: This should be set on the sales-channel.
-        language = self.multi_tenant_company.language
+        # FIXME: This language configuration be set on the sales-channel and
+        # dynamically fetched here.
+        language = self.local_instance.multi_tenant_company.language
         name = self.local_instance._get_translated_value(
             field_name='name',
             language=language,
