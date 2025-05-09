@@ -303,3 +303,6 @@ HUEY = {
 
 ADMIN_ROUTE_SUFFIX = ""
 MAGENTO_LOG_DIR_PATH = '/var/log/OneSilaHeadless/magento'
+
+SHOPIFY_SCOPES = ['read_products', 'write_products', 'read_markets_home', 'read_orders']
+SHOPIFY_API_VERSION = "2025-04"

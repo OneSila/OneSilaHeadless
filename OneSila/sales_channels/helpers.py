@@ -64,5 +64,10 @@ def run_remote_product_dependent_sales_channel_factory(
         'remote_product': remote_product,
     })
 
+    print('------------------------ KWARGS')
+    print(factory_kwargs)
+
     factory = factory_class(**factory_kwargs)
+    print('------------- 2')
     factory.run()
+    print('------------- 3')

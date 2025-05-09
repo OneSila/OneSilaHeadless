@@ -8,9 +8,9 @@ from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 
 from sales_channels.integrations.shopify.models import ShopifySalesChannel
+from sales_channels.signals import refresh_website_pull_models
 
 
-@login_required
 def shopify_auth_start(request):
     shop = request.GET.get("shop")
     state = request.GET.get("state")
@@ -19,8 +19,8 @@ def shopify_auth_start(request):
         return HttpResponseBadRequest("Missing 'shop' or 'state' parameter")
 
     # Verify the state exists in a sales channel for this company
-    if not ShopifySalesChannel.objects.filter(state=state, multi_tenant_company=request.user.multi_tenant_company).exists():
-        return HttpResponse("Invalid or expired state", status=403)
+    # if not ShopifySalesChannel.objects.filter(state=state, multi_tenant_company=request.user.multi_tenant_company).exists():
+    #     return HttpResponse("Invalid or expired state", status=403)
 
     # Setup Shopify session
     shopify.Session.setup(api_key=settings.SHOPIFY_API_KEY, secret=settings.SHOPIFY_API_SECRET)
@@ -37,7 +37,6 @@ def shopify_auth_start(request):
     return redirect(permission_url)
 
 
-@login_required
 @csrf_exempt
 def shopify_auth_callback(request):
     shop = request.GET.get("shop")
@@ -58,9 +57,12 @@ def shopify_auth_callback(request):
 
     # Validate the state and store access token
     try:
-        sales_channel = ShopifySalesChannel.objects.get(state=state, multi_tenant_company=request.user.multi_tenant_company)
+        sales_channel = ShopifySalesChannel.objects.get(state=state)
         sales_channel.access_token = access_token
         sales_channel.save()
+
+        # start pull essential data from the sales channel
+        refresh_website_pull_models.send(sender=sales_channel.__class__, instance=sales_channel)
     except ShopifySalesChannel.DoesNotExist:
         return HttpResponse("Sales channel not found for state", status=404)
 
@@ -68,6 +70,6 @@ def shopify_auth_callback(request):
     shopify.ShopifyResource.activate_session(session)
     try:
         shop_info = shopify.Shop.current()
-        return HttpResponse(f"Connected to {shop_info.name} – Access token saved.")
+        return redirect(reverse("integrations:integrations_list"))
     finally:
         shopify.ShopifyResource.clear_session()

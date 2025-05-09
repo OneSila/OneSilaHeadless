@@ -27,19 +27,25 @@ class ShopifyRemoteLanguagePullFactory(GetShopifyApiMixin, PullRemoteInstanceMix
         """
         gql = self.api.GraphQL()
         query = '''
-        {
-          shop {
-            locales {
-              isoCode
+            query {
+              shopLocales {
+                locale
+                primary
+                published
+              }
             }
-          }
-        }
         '''
+
         response = gql.execute(query)
         data = json.loads(response)
+        locales = data.get('data', {}).get('shopLocales', [])
 
-        locales = data.get('data', {}).get('shop', {}).get('locales', [])
-        self.remote_instances = [{ 'code': loc['isoCode'] } for loc in locales]
+        self.remote_instances = [
+            {
+                'code': loc.get('locale'),
+            }
+            for loc in locales if loc.get('locale')
+        ]
 
     def update_get_or_create_lookup(self, lookup, remote_data):
         return lookup

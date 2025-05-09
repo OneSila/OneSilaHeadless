@@ -2,6 +2,33 @@ from media.models import MediaProductThrough, Media
 from sales_channels.factories.mixins import RemoteInstanceCreateFactory, ProductAssignmentMixin, RemoteInstanceUpdateFactory, RemoteInstanceDeleteFactory
 
 
+class RemoteMediaCreateFactory(RemoteInstanceCreateFactory):
+    local_model_class = Media
+
+
+class RemoteMediaUpdateFactory(RemoteInstanceUpdateFactory):
+    local_model_class = Media
+
+
+class RemoteImageDeleteFactory(RemoteInstanceDeleteFactory):
+    local_model_class = Media
+    has_remote_media_instance = False
+    delete_media_assign_factory = None
+
+    def run(self):
+        """
+        Custom run method for handling deletions with or without a remote media instance.
+        """
+        if self.has_remote_media_instance:
+            # Normal delete operation
+            super().run()
+        else:
+            # Custom behavior for deleting all associated media assignments
+            media_product_throughs = MediaProductThrough.objects.filter(media=self.local_instance)
+            for media_product_through in media_product_throughs:
+                delete_factory = self.delete_media_assign_factory(media_product_through, self.sales_channel)
+                delete_factory.run()
+
 class RemoteMediaProductThroughCreateFactory(ProductAssignmentMixin, RemoteInstanceCreateFactory):
     local_model_class = MediaProductThrough
     has_remote_media_instance = False
@@ -100,22 +127,3 @@ class RemoteMediaProductThroughDeleteFactory(ProductAssignmentMixin, RemoteInsta
             return False
 
         return True
-
-class RemoteImageDeleteFactory(RemoteInstanceDeleteFactory):
-    local_model_class = Media
-    has_remote_media_instance = False
-    delete_media_assign_factory = None
-
-    def run(self):
-        """
-        Custom run method for handling deletions with or without a remote media instance.
-        """
-        if self.has_remote_media_instance:
-            # Normal delete operation
-            super().run()
-        else:
-            # Custom behavior for deleting all associated media assignments
-            media_product_throughs = MediaProductThrough.objects.filter(media=self.local_instance)
-            for media_product_through in media_product_throughs:
-                delete_factory = self.delete_media_assign_factory(media_product_through, self.sales_channel)
-                delete_factory.run()

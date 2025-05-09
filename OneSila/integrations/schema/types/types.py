@@ -19,6 +19,16 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
         return INTEGRATIONS_TYPES_MAP.get(self.__class__, MAGENTO_INTEGRATION)
 
     @field()
+    def connected(self, info) -> bool:
+
+        if isinstance(self, MagentoSalesChannel):
+            return True
+
+        elif isinstance(self, ShopifySalesChannel):
+            return self.access_token is not None
+
+        return False
+    @field()
     def proxy_id(self, info) -> str:
         if isinstance(self, MagentoSalesChannel):
             graphql_type = MagentoSalesChannelType

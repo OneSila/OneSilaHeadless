@@ -60,7 +60,20 @@ class Migration(migrations.Migration):
                 ('product', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='products.product')),
             ],
             options={
-                'constraints': [models.CheckConstraint(condition=models.Q(('rrp__gte', models.F('price'))), name='RRP cannot be less then the price'), models.CheckConstraint(condition=models.Q(('rrp__gte', '0.01')), name='RRP cannot be 0'), models.CheckConstraint(condition=models.Q(('price__gte', '0.01')), name='Price cannot be 0')],
+                'constraints': [
+                    models.CheckConstraint(
+                        check=models.Q(rrp__gte=models.F('price')),
+                        name='rrp_gte_price'
+                    ),
+                    models.CheckConstraint(
+                        check=models.Q(rrp__gte=0.01),
+                        name='rrp_nonzero'
+                    ),
+                    models.CheckConstraint(
+                        check=models.Q(price__gte=0.01),
+                        name='price_nonzero'
+                    ),
+                ],
                 'unique_together': {('product', 'currency', 'multi_tenant_company')},
             },
             bases=(dirtyfields.dirtyfields.DirtyFieldsMixin, models.Model),

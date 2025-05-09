@@ -17,7 +17,7 @@ class ShopifySalesChannelViewPullFactory(GetShopifyApiMixin, PullRemoteInstanceM
     get_or_create_fields = ['remote_id']
 
     allow_create = True
-    allow_update = True
+    allow_update = False
     allow_delete = False
     is_model_response = False
 
@@ -25,9 +25,9 @@ class ShopifySalesChannelViewPullFactory(GetShopifyApiMixin, PullRemoteInstanceM
         """
         Override to fetch the single shop as the one view.
         """
-        self.set_api()
         shop = self.api.Shop.current()
-        domain = getattr(shop, 'domain', None) or getattr(shop, 'myshopify_domain', None)
+
+        domain = getattr(shop, 'domain', None)
         url = f"https://{domain}" if domain else ''
         self.remote_instances = [{
             'id':   shop.id,

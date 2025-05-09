@@ -87,7 +87,7 @@ class RemoteProductPropertyCreateFactory(ProductAssignmentMixin, RemotePropertyE
         super().preflight_process()
         self.get_select_values()
 
-    def set_remote_id(self, response_data):
+    def post_create_process(self):
         self.remote_instance.remote_value = str(self.remote_value)
 
     def customize_remote_instance_data(self):

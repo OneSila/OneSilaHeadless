@@ -18,7 +18,16 @@ class ShopifySalesChannel(SalesChannel):
     state = models.CharField(
         max_length=64,
         unique=True,
+        null=True, blank=True,
         help_text="Unique state used for OAuth verification"
+    )
+
+    vendor_property = models.ForeignKey(
+        'properties.Property',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        help_text="The product property that maps to Shopify vendor (brand)."
     )
 
     class Meta:

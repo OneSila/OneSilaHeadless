@@ -7,4 +7,4 @@ class ShopifyProductProperty(RemoteProductProperty):
     Shopify does not manage standalone property definitions or select values.
     This are the individual metafield assigned to product
     """
-    pass
+    key = models.CharField(max_length=256)

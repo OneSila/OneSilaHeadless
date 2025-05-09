@@ -1,3 +1,4 @@
+from core import models
 from sales_channels.models.products import (
     RemoteProduct,
     RemotePrice,
@@ -7,12 +8,16 @@ from sales_channels.models.products import (
     RemoteEanCode,
 )
 
-
 class ShopifyProduct(RemoteProduct):
     """
     Shopify-specific model for remote products, inheriting from the general RemoteProduct.
     """
-    pass
+    default_variant_id = models.CharField(
+        max_length=128,
+        null=True,
+        blank=True,
+        help_text="The ID of the default variant returned when the product is created on Shopify."
+    )
 
 
 class ShopifyPrice(RemotePrice):
@@ -31,10 +36,7 @@ class ShopifyProductContent(RemoteProductContent):
 
 
 class ShopifyImageProductAssociation(RemoteImageProductAssociation):
-    """
-    Shopify-specific model for associating images with remote products.
-    """
-    pass
+    current_position = models.IntegerField(default=10)
 
 
 class ShopifyCollection(RemoteCategory):

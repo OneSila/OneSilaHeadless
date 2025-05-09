@@ -1,6 +1,7 @@
 from huey import crontab
 from huey.contrib.djhuey import db_task, periodic_task
 from core.huey import HIGH_PRIORITY, MEDIUM_PRIORITY, LOW_PRIORITY
+from currencies.models import Currency
 from products.models import Product
 from media.models import MediaProductThrough, Media
 from properties.models import ProductProperty
@@ -10,7 +11,7 @@ from sales_channels.helpers import (
     run_generic_sales_channel_factory,
     run_remote_product_dependent_sales_channel_factory,
 )
-from sales_channels.integrations.shopify.models import ShopifySalesChannel
+from sales_channels.integrations.shopify.models import ShopifySalesChannel, ShopifyProduct, ShopifyProductProperty
 from sales_channels.models import RemoteProduct
 from orders.models import Order, OrderItem
 
@@ -89,14 +90,16 @@ def delete_shopify_product_property_db_task(
 
     def actual_task():
         sales_channel = ShopifySalesChannel.objects.get(id=sales_channel_id)
-        remote_instance = sales_channel.shopifyproductproperty_set.get(id=remote_instance_id)
+        remote_instance = ShopifyProductProperty.objects.get(id=remote_instance_id)
+        print(remote_instance.__dict__)
 
-        factory = ShopifyProductPropertyDeleteFactory(
-            sales_channel=sales_channel,
-            local_instance=remote_instance.local_instance,
-            remote_product=remote_instance.remote_product,
-            remote_instance=remote_instance,
-        )
+        factory_kwargs = {
+            'remote_instance': remote_instance,
+            'local_instance': remote_instance.local_instance,
+            'sales_channel': sales_channel,
+            'remote_product': ShopifyProduct.objects.get(id=remote_product_id)
+        }
+        factory = ShopifyProductPropertyDeleteFactory(**factory_kwargs)
         factory.run()
 
     task.execute(actual_task)
@@ -105,10 +108,14 @@ def delete_shopify_product_property_db_task(
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def update_shopify_price_db_task(
-    task_queue_item_id, sales_channel_id, product_id, remote_product_id
-):
+    task_queue_item_id, sales_channel_id, product_id, remote_product_id, currency_id=None):
     from .factories.prices import ShopifyPriceUpdateFactory
+
     task = BaseRemoteTask(task_queue_item_id)
+
+    currency = None
+    if currency_id:
+        currency = Currency.objects.get(id=currency_id)
 
     def actual_task():
         run_remote_product_dependent_sales_channel_factory(
@@ -118,6 +125,7 @@ def update_shopify_price_db_task(
             local_instance_class=Product,
             remote_product_id=remote_product_id,
             sales_channel_class=ShopifySalesChannel,
+            factory_kwargs={'currency': currency}
         )
 
     task.execute(actual_task)
@@ -126,13 +134,20 @@ def update_shopify_price_db_task(
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def update_shopify_product_content_db_task(
-    task_queue_item_id, sales_channel_id, product_id, remote_product_id
+    task_queue_item_id, sales_channel_id, product_id, remote_product_id, language=None
 ):
     from .factories.products import ShopifyProductContentUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
+
+        factory_kwargs = None
+        if language:
+            factory_kwargs = {
+                'language': language,
+            }
+
         run_remote_product_dependent_sales_channel_factory(
             sales_channel_id=sales_channel_id,
             factory_class=ShopifyProductContentUpdateFactory,
@@ -140,6 +155,7 @@ def update_shopify_product_content_db_task(
             local_instance_class=Product,
             remote_product_id=remote_product_id,
             sales_channel_class=ShopifySalesChannel,
+            factory_kwargs=factory_kwargs
         )
 
     task.execute(actual_task)
@@ -155,6 +171,7 @@ def update_shopify_product_eancode_db_task(
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
+
         run_remote_product_dependent_sales_channel_factory(
             sales_channel_id=sales_channel_id,
             factory_class=ShopifyEanCodeUpdateFactory,

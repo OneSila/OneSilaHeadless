@@ -1,5 +1,8 @@
+import json
+
 from sales_channels.factories.products.eancodes import RemoteEanCodeUpdateFactory
 from sales_channels.integrations.shopify.constants import DEFAULT_METAFIELD_NAMESPACE
+from sales_channels.integrations.shopify.exceptions import ShopifyGraphqlException
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin
 from sales_channels.integrations.shopify.models import ShopifyEanCode
 
@@ -9,30 +12,48 @@ class ShopifyEanCodeUpdateFactory(GetShopifyApiMixin, RemoteEanCodeUpdateFactory
 
     def needs_update(self):
         self.ean_code_value = self.get_ean_code_value()
-        return self.ean_code_value != (self.remote_instance.remote_value or '')
+        return self.ean_code_value != (self.remote_instance.ean_code or '')
 
     def update_remote(self):
-        # Assumes set_api() has already been called by the base
-        product = self.api.Product.find(self.remote_product.remote_id)
-        if not product:
-            raise ValueError(f"No Shopify product found with id {self.remote_product.remote_id}")
+        gql = self.api.GraphQL()
 
-        key = self.sales_channel.ean_metafield_key
-        mf_payload = {
-            'namespace': DEFAULT_METAFIELD_NAMESPACE,
-            'key':       key,
-            'value':     str(self.ean_code_value),
-            'type':      'single_line_text_field',
+        query = """
+        mutation UpdateBarcode($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+          productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+            product {
+              id
+            }
+            productVariants {
+              id
+              barcode
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+        """
+
+        variables = {
+            "productId": self.remote_product.remote_id,
+            "variants": [{
+                "id": self.remote_product.default_variant_id,
+                "barcode": str(self.ean_code_value),
+            }]
         }
 
-        mf = self.api.Metafield(mf_payload)
-        product.add_metafield(mf)
-        # product.save()
+        response = gql.execute(query, variables=variables)
+        data = json.loads(response)
 
-        return mf
+        errors = data.get("data", {}).get("productVariantsBulkUpdate", {}).get("userErrors", [])
+        if errors:
+            raise ShopifyGraphqlException(f"productVariantsBulkUpdate (barcode) userErrors: {errors}")
+
+        return data["data"]["productVariantsBulkUpdate"]
 
     def post_update_process(self):
         self.remote_instance.ean_code = self.ean_code_value
 
     def serialize_response(self, response):
-        return response.to_dict()
+        return response

@@ -22,13 +22,13 @@ from sales_channels.signals import (
     create_remote_image_association,
     update_remote_image_association,
     delete_remote_image_association,
-    delete_remote_image,
+    delete_remote_image, refresh_website_pull_models,
 )
 
 from sales_channels.flows.default import (
     run_generic_sales_channel_task_flow,
     run_product_specific_sales_channel_task_flow,
-    run_delete_product_specific_generic_sales_channel_task_flow,
+    run_delete_product_specific_generic_sales_channel_task_flow, run_delete_generic_sales_channel_task_flow,
 )
 
 from sales_channels.integrations.shopify.models import ShopifySalesChannel, ShopifyProductProperty, \
@@ -40,18 +40,24 @@ from sales_channels.integrations.shopify.models import ShopifySalesChannel, Shop
 #
 @receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
 def shopify__product__create_from_assign(sender, instance, **kwargs):
+    from sales_channels.integrations.shopify.factories.products.products import  ShopifyProductCreateFactory
+    from django.db import transaction
+
     product = instance.product
     sc = instance.sales_channel
 
-    count = 1 + (product.get_configurable_variations().count() if hasattr(product, 'get_configurable_variations') else 0)
-    run_generic_sales_channel_task_flow(
-        task_func=create_shopify_product_db_task,
-        multi_tenant_company=product.multi_tenant_company,
-        sales_channels_filter_kwargs={'id': sc.id},
-        number_of_remote_requests=count,
-        sales_channel_class=ShopifySalesChannel,
-        product_id=product.id,
-    )
+    fac = ShopifyProductCreateFactory(sales_channel=sc, local_instance=product)
+    fac.run()
+
+    # count = 1 + (product.get_configurable_variations().count() if hasattr(product, 'get_configurable_variations') else 0)
+    # run_generic_sales_channel_task_flow(
+    #     task_func=create_shopify_product_db_task,
+    #     multi_tenant_company=product.multi_tenant_company,
+    #     sales_channels_filter_kwargs={'id': sc.id},
+    #     number_of_remote_requests=count,
+    #     sales_channel_class=ShopifySalesChannel,
+    #     product_id=product.id,
+    # )
 
 
 #
@@ -73,7 +79,11 @@ def shopify__product__update(sender, instance, **kwargs):
 #
 @receiver(delete_remote_product, sender='sales_channels.SalesChannelViewAssign')
 def shopify__product__delete_from_assign(sender, instance, **kwargs):
-    run_delete_product_specific_generic_sales_channel_task_flow(
+
+    product = instance.product
+    sales_channel = instance.sales_channel
+
+    run_delete_generic_sales_channel_task_flow(
         task_func=delete_shopify_product_db_task,
         multi_tenant_company=instance.product.multi_tenant_company,
         sales_channels_filter_kwargs={'id': instance.sales_channel.id},
@@ -81,6 +91,7 @@ def shopify__product__delete_from_assign(sender, instance, **kwargs):
         local_instance_id=instance.product.id,
         product=instance.product,
         sales_channel_class=ShopifySalesChannel,
+        is_variation=kwargs.get('is_variation', False)
     )
 
 
@@ -89,6 +100,7 @@ def shopify__product__delete_from_assign(sender, instance, **kwargs):
 #
 @receiver(delete_remote_product, sender='products.Product')
 def shopify__product__delete_from_product(sender, instance, **kwargs):
+    return
     run_delete_product_specific_generic_sales_channel_task_flow(
         task_func=delete_shopify_product_db_task,
         multi_tenant_company=instance.multi_tenant_company,
@@ -173,14 +185,14 @@ def shopify__product_property__delete(sender, instance, **kwargs):
 @receiver(update_remote_price, sender='products.Product')
 def shopify__price__update(sender, instance, **kwargs):
     currency = kwargs.get('currency')
+
+    task_kwargs = {'product_id': instance.id, 'currency_id': currency.id}
     run_product_specific_sales_channel_task_flow(
         task_func=update_shopify_price_db_task,
         multi_tenant_company=instance.multi_tenant_company,
         product=instance,
         sales_channel_class=ShopifySalesChannel,
-        product_id=instance.id,
-        remote_product_id=kwargs.get('remote_product').id,
-        currency_id=(currency.id if currency else None),
+        **task_kwargs
     )
 
 
@@ -189,14 +201,15 @@ def shopify__price__update(sender, instance, **kwargs):
 #
 @receiver(update_remote_product_content, sender='products.Product')
 def shopify__content__update(sender, instance, **kwargs):
+    language = kwargs.get('language', None)
+
+    task_kwargs = {'product_id': instance.id, 'language': language}
     run_product_specific_sales_channel_task_flow(
         task_func=update_shopify_product_content_db_task,
         multi_tenant_company=instance.multi_tenant_company,
         product=instance,
         sales_channel_class=ShopifySalesChannel,
-        product_id=instance.id,
-        remote_product_id=kwargs.get('remote_product').id,
-        language=kwargs.get('language'),
+        **task_kwargs
     )
 
 
@@ -205,13 +218,14 @@ def shopify__content__update(sender, instance, **kwargs):
 #
 @receiver(update_remote_product_eancode, sender='products.Product')
 def shopify__ean_code__update(sender, instance, **kwargs):
+
+    task_kwargs = {'product_id': instance.id}
     run_product_specific_sales_channel_task_flow(
         task_func=update_shopify_product_eancode_db_task,
         multi_tenant_company=instance.multi_tenant_company,
         product=instance,
         sales_channel_class=ShopifySalesChannel,
-        product_id=instance.id,
-        remote_product_id=kwargs.get('remote_product').id,
+        **task_kwargs
     )
 
 
@@ -285,3 +299,22 @@ def shopify__image__delete(sender, instance, **kwargs):
         sales_channel_class=ShopifySalesChannel,
         image_id=instance.id,
     )
+
+@receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
+@receiver(refresh_website_pull_models, sender='shopify.ShopifySalesChannel')
+def sales_channels__shopify__handle_pull_magento_sales_channel_views(sender, instance, **kwargs):
+    from sales_channels.integrations.shopify.factories.sales_channels.views import ShopifySalesChannelViewPullFactory
+    from sales_channels.integrations.shopify.factories.sales_channels.languages import ShopifyRemoteLanguagePullFactory
+    from sales_channels.integrations.shopify.factories.sales_channels.currencies import ShopifyRemoteCurrencyPullFactory
+
+    if instance.access_token is None:
+        return
+
+    views_factory = ShopifySalesChannelViewPullFactory(sales_channel=instance)
+    views_factory.run()
+
+    languages_factory = ShopifyRemoteLanguagePullFactory(sales_channel=instance)
+    languages_factory.run()
+
+    currencies_factory = ShopifyRemoteCurrencyPullFactory(sales_channel=instance)
+    currencies_factory.run()

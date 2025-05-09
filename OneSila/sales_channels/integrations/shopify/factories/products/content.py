@@ -1,54 +1,86 @@
 import json
+
+from products.models import ProductTranslation
 from sales_channels.factories.products.content import RemoteProductContentUpdateFactory
-from sales_channels.integrations.shopify.contsnts import DEFAULT_METAFIELD_NAMESPACE
+from sales_channels.integrations.shopify.constants import DEFAULT_METAFIELD_NAMESPACE
+from sales_channels.integrations.shopify.exceptions import ShopifyGraphqlException
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin
 from sales_channels.integrations.shopify.models.products import ShopifyProductContent
+
 
 class ShopifyProductContentUpdateFactory(GetShopifyApiMixin, RemoteProductContentUpdateFactory):
     remote_model_class = ShopifyProductContent
 
     def customize_payload(self):
-        """
-        Build the dict of fields to update on the Shopify product itself.
-        We update: title (name), body_html (description), handle (url_key).
-        """
+
+        translation = ProductTranslation.objects.filter(product=self.local_instance, language=self.local_instance.multi_tenant_company.language).first()
         self.payload = {
-            'title': self.local_instance.name,
-            'body_html': self.local_instance.description,
-            'handle': self.local_instance.url_key
+            "id": self.remote_product.remote_id
         }
-        return self.payload
+
+        if not self.remote_product.is_variation:
+            self.payload.update({
+                "title": translation.name,
+                "descriptionHtml": translation.description,
+                "handle": translation.url_key,
+            })
+
+        short_desc = getattr(translation, 'short_description', None)
+
+        if short_desc:
+            self.payload["metafields"] = [{
+                "namespace": DEFAULT_METAFIELD_NAMESPACE,
+                "key": "short_description",
+                "type": "multi_line_text_field",
+                "value": short_desc
+            }]
 
     def update_remote(self):
+        gql = self.api.GraphQL()
+
+        query = """
+        mutation productUpdate($product: ProductUpdateInput!) {
+          productUpdate(product: $product) {
+            product {
+              id
+              title
+              descriptionHtml
+              handle
+              metafields(first: 5) {
+                edges {
+                  node {
+                    id
+                    key
+                    namespace
+                    type
+                    value
+                  }
+                }
+              }
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
         """
-        Activates the session, fetches the Product by its remote_id, updates
-        the core fields, then optionally writes a short_description metafield.
-        """
 
-        product = self.api.Product.find(self.remote_product.remote_id)
+        variables = {
+            "product": self.payload
+        }
 
-        if not product:
-            raise ValueError(f"No Shopify Product found with id {self.remote_product.remote_id}")
+        response = gql.execute(query, variables=variables)
+        data = json.loads(response)
 
-        # Update core fields
-        for field, val in self.payload.items():
-            setattr(product, field, val)
+        print(self.payload)
+        print(data)
 
-        product.save()
+        errors = data.get("data", {}).get("productUpdate", {}).get("userErrors", [])
+        if errors:
+            raise ShopifyGraphqlException(f"productUpdate userErrors: {errors}")
 
-        # Short description as a JSON-string metafield?
-        key = getattr(self.sales_channel, 'short_description_metafield_key', None)
-        short_desc = getattr(self.local_instance, 'short_description', None)
-        if key and short_desc:
-            mf = self.api.Metafield({
-                'namespace':   DEFAULT_METAFIELD_NAMESPACE,
-                'key':         key,
-                'value':       json.dumps({'short_description': short_desc}),
-                'type':        'json_string'
-            })
-            product.add_metafield(mf)
-
-        return product
+        return data["data"]["productUpdate"]["product"]
 
     def serialize_response(self, response):
-        return response.to_dict()
+        return response
