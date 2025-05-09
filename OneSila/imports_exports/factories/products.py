@@ -82,7 +82,6 @@ class ImportProductInstance(AbstractImportInstance):
         self.images_associations_instances = MediaProductThrough.objects.none()
         self.variations_products_instances = Product.objects.none()
 
-
     @property
     def local_class(self):
         return Product
@@ -90,7 +89,6 @@ class ImportProductInstance(AbstractImportInstance):
     @property
     def updatable_fields(self):
         return ['active', 'allow_backorder', 'vat_rate']
-
 
     def validate(self):
         """
@@ -101,7 +99,6 @@ class ImportProductInstance(AbstractImportInstance):
 
         if hasattr(self, 'type') and self.type not in [Product.SIMPLE, Product.CONFIGURABLE]:
             raise ValueError("Invalid 'type' value.")
-
 
     def _set_vat_rate(self):
 
@@ -180,7 +177,6 @@ class ImportProductInstance(AbstractImportInstance):
                     name = prop_data.get("name")
                     required_names.add(name)
 
-
             items = []
             if hasattr(self, 'attributes'):
                 for attribute in self.attributes:
@@ -193,13 +189,11 @@ class ImportProductInstance(AbstractImportInstance):
 
                         items.append(item_data)
 
-
             rule_import_instance = ImportProductPropertiesRuleInstance({"value": self.product_type, "items": items}, self.import_process)
             rule_import_instance.process()
             self.rule = rule_import_instance.instance
 
         self.rule_instance = self.rule
-
 
     def _set_translations(self):
 
@@ -210,12 +204,10 @@ class ImportProductInstance(AbstractImportInstance):
                 'language': self.language
             }]
 
-
     def pre_process_logic(self):
         self._set_vat_rate()
         self._set_rule()
         self._set_translations()
-
 
     def process_logic(self):
         fac = ProductImport(self, self.import_process)
@@ -231,7 +223,7 @@ class ImportProductInstance(AbstractImportInstance):
     def set_product_properties(self):
 
         product_type_property = Property.objects.get(
-           multi_tenant_company=self.multi_tenant_company,
+            multi_tenant_company=self.multi_tenant_company,
             is_product_type=True
         )
 
@@ -262,7 +254,6 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.product_property_instances = ProductProperty.objects.filter(id__in=product_property_ids)
 
-
     def set_images(self):
 
         images_instances_ids = []
@@ -281,9 +272,7 @@ class ImportProductInstance(AbstractImportInstance):
                 images_instances_associations_ids.append(image_import_instance.media_assign.id)
 
         self.image_instances = Image.objects.filter(id__in=images_instances_ids)
-        self.images_associations_instances  = MediaProductThrough.objects.filter(id__in=images_instances_associations_ids)
-
-
+        self.images_associations_instances = MediaProductThrough.objects.filter(id__in=images_instances_associations_ids)
 
     def set_prices(self):
         sales_price_ids = []
@@ -294,10 +283,9 @@ class ImportProductInstance(AbstractImportInstance):
     def set_variations(self):
         from .variations import ImportConfiguratorVariationsInstance, ImportConfigurableVariationInstance
 
-
         if hasattr(self, 'configurator_select_values') and not hasattr(self, 'variations') and self.rule:
             variation_import = ImportConfiguratorVariationsInstance(
-                { 'values': self.configurator_select_values },
+                {'values': self.configurator_select_values},
                 import_process=self.import_process,
                 rule=self.rule,
                 config_product=self.instance,
@@ -318,7 +306,6 @@ class ImportProductInstance(AbstractImportInstance):
                 variation_products_ids.append(variation_import.instance.variation.id)
 
         self.variations_products_instances = Product.objects.filter(id__in=variation_products_ids)
-
 
     def set_rule_product_property(self):
 
@@ -347,11 +334,10 @@ class ImportProductInstance(AbstractImportInstance):
             self.set_images()
 
         if hasattr(self, 'prices'):
-           self.set_prices()
+            self.set_prices()
 
         if (hasattr(self, 'variations') or hasattr(self, 'configurator_select_values')) and self.type == Product.CONFIGURABLE:
             self.set_variations()
-
 
     def update_translations(self):
         translation_instance_ids = []
@@ -453,7 +439,6 @@ class ImportProductTranslationInstance(AbstractImportInstance):
         if not getattr(self, 'product_data', None) and not self.product:
             raise ValueError("Either a 'product' or 'product_data' must be provided.")
 
-
     def _set_product_import_instance(self):
 
         if not self.product:
@@ -469,7 +454,8 @@ class ImportProductTranslationInstance(AbstractImportInstance):
         fac = ProductTranslationImport(self, self.import_process)
         fac.run()
 
-        self.instance= fac.instance
+        self.instance = fac.instance
+
 
 class ImportSalesPriceInstance(AbstractImportInstance):
 
@@ -503,7 +489,7 @@ class ImportSalesPriceInstance(AbstractImportInstance):
         """
         Validate that the 'value' key exists.
         """
-        if not hasattr(self, 'rrp') and  not hasattr(self, 'price') :
+        if not hasattr(self, 'rrp') and not hasattr(self, 'price'):
             raise ValueError("Both 'rrp' and 'price' cannot be None.")
 
         if getattr(self, 'rrp', None) is None and getattr(self, 'price', None) is None:
@@ -515,11 +501,10 @@ class ImportSalesPriceInstance(AbstractImportInstance):
         if hasattr(self, 'currency') and getattr(self, 'currency', None) is None:
             raise ValueError("Both 'currency' cannot be None.")
 
-
     def _set_public_currency(self):
 
         if hasattr(self, 'currency'):
-            self.public_currency = PublicCurrency.objects.filter(iso_code=self.currency).first()
+            self.public_currency, _ = PublicCurrency.objects.get_or_create(iso_code=self.currency)
 
             if self.public_currency is None:
                 raise ValueError("The price use unsupported currency.")
@@ -527,12 +512,12 @@ class ImportSalesPriceInstance(AbstractImportInstance):
     def _set_currency(self):
 
         if not hasattr(self, 'currency'):
-            self.currency = Currency.objects.get(multi_tenant_company=self.multi_tenant_company, is_default_currency=True)
+            self.currency, _ = Currency.objects.get_or_create(multi_tenant_company=self.multi_tenant_company, is_default_currency=True)
             return
 
         if hasattr(self, 'currency') and hasattr(self, 'public_currency'):
 
-            self.currency = Currency.objects.get(
+            self.currency, _ = Currency.objects.get_or_create(
                 multi_tenant_company=self.multi_tenant_company,
                 iso_code=self.public_currency.iso_code,
             )
@@ -540,7 +525,6 @@ class ImportSalesPriceInstance(AbstractImportInstance):
             return
 
         raise ValueError("There is no way to receive the currency.")
-
 
     def _set_product_import_instance(self):
 
@@ -575,7 +559,6 @@ class ImportSalesPriceInstance(AbstractImportInstance):
             else:
                 self.rrp = rrp
                 self.price = price
-
 
     def process_logic(self):
 

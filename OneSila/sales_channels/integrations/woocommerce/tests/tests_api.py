@@ -157,7 +157,7 @@ class WoocommerceApiWrapperTestCase(TestCase):
             'type': 'simple',
             'sku': 'TEST-PRODUCT-001',
             'status': 'publish',
-            'visibility': 'visible',
+            'catalog_visibility': 'visible',
             'regular_price': '0.9',
             'sale_price': '0.8',
         }
@@ -177,7 +177,7 @@ class WoocommerceApiWrapperTestCase(TestCase):
             'type': 'simple',
             'sku': 'TEST-PRODUCT-DUPLICATE',
             'status': 'publish',
-            'visibility': 'visible',
+            'catalog_visibility': 'visible',
             'regular_price': 0.9,
             'sale_price': 0.8,
         }
@@ -197,7 +197,7 @@ class WoocommerceApiWrapperTestCase(TestCase):
             'type': 'simple',
             'sku': 'TEST-PRODUCT-IMG-ADD',
             'status': 'publish',
-            'visibility': 'visible',
+            'catalog_visibility': 'visible',
             'regular_price': '0.9',
             'sale_price': '0.8',
             'images': [{"src": 'https://www.onesila.com/media/images/Frame_666_JLKFadU.2e16d0ba.fill-1200x1200.png'}]
@@ -207,5 +207,4 @@ class WoocommerceApiWrapperTestCase(TestCase):
         extra_img = [{"src": 'https://www.onesila.com/media/images/Frame_666_JLKFadU.2e16d0ba.fill-1200x1200.png'},
             {"src": 'https://www.onesila.com/static/images/logo.png'}]
         result = self.api_wrapper.update_product(result['id'], images=extra_img)
-
-        # result = self.api_wrapper.delete_product(result['id'])
+        result = self.api_wrapper.delete_product(result['id'])

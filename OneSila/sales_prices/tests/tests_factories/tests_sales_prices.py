@@ -33,14 +33,14 @@ class SalesPriceUpdateCreateFactoryTestCase(TestCase):
         The tasks should create and update all the other prices.
         """
         product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company, active=True)
-        currency = Currency.objects.create(is_default_currency=True, multi_tenant_company=self.multi_tenant_company, **currencies['BE'])
-        other_currency = Currency.objects.create(
+        currency, _ = Currency.objects.get_or_create(is_default_currency=True, multi_tenant_company=self.multi_tenant_company, **currencies['GB'])
+        other_currency, _ = Currency.objects.get_or_create(
             is_default_currency=False,
             multi_tenant_company=self.multi_tenant_company,
             inherits_from=currency,
             follow_official_rate=False,
             exchange_rate=1.3,
-            **currencies['GB'])
+            **currencies['BE'])
 
         ori_main_price_instance, _ = SalesPrice.objects.get_or_create(
             product=product,
@@ -88,14 +88,14 @@ class SalesPriceUpdateCreateFactoryTestCase(TestCase):
         The tasks should create and update all the other prices.
         """
         product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company, active=True)
-        currency = Currency.objects.create(is_default_currency=True, multi_tenant_company=self.multi_tenant_company, **currencies['BE'])
-        other_currency = Currency.objects.create(
+        currency, _ = Currency.objects.get_or_create(is_default_currency=True, multi_tenant_company=self.multi_tenant_company, **currencies['GB'])
+        other_currency, _ = Currency.objects.get_or_create(
             is_default_currency=False,
             multi_tenant_company=self.multi_tenant_company,
             inherits_from=currency,
             follow_official_rate=False,
             exchange_rate=1.3,
-            **currencies['GB'])
+            **currencies['BE'])
 
         ori_main_price_instance, _ = SalesPrice.objects.get_or_create(
             product=product,
