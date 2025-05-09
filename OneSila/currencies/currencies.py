@@ -41,3 +41,5 @@ currencies = {
     'AE': {'name': 'United Arab Emirates Dirham', 'iso_code': 'AED', 'symbol': 'د.إ'},
     'MX': {'name': 'Mexican Peso', 'iso_code': 'MXN', 'symbol': '$'}
 }
+
+iso_list = [currency['iso_code'] for currency in currencies.values()]

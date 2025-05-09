@@ -14,6 +14,7 @@ from products.models import Product, ProductTranslation
 from properties.models import Property, ProductPropertiesRuleItem, ProductProperty
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
+from currencies.currencies import iso_list
 
 
 class ProductImport(ImportOperationMixin):
@@ -475,6 +476,7 @@ class ImportSalesPriceInstance(AbstractImportInstance):
             self._set_currency()
 
         self.validate()
+        self.validate_currency()
         self._set_product_import_instance()
 
     @property
@@ -485,9 +487,13 @@ class ImportSalesPriceInstance(AbstractImportInstance):
     def updatable_fields(self):
         return ['rrp', 'price']
 
+    def validate_currency(self):
+        if self.data['currency'] not in iso_list:
+            raise ValueError(f"The price use unsupported currency in data dict: {self.data['currency']}")
+
     def validate(self):
         """
-        Validate that the 'value' key exists.
+        Validate that the 'value' key exists
         """
         if not hasattr(self, 'rrp') and not hasattr(self, 'price'):
             raise ValueError("Both 'rrp' and 'price' cannot be None.")
