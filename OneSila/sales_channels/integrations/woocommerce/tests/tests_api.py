@@ -178,8 +178,8 @@ class WoocommerceApiWrapperTestCase(TestCase):
             'sku': 'TEST-PRODUCT-DUPLICATE',
             'status': 'publish',
             'visibility': 'visible',
-            'regular_price': '0.9',
-            'sale_price': '0.8',
+            'regular_price': 0.9,
+            'sale_price': 0.8,
         }
         result = self.api_wrapper.create_product(**kwargs)
         self.assertIsInstance(result, dict)
@@ -190,3 +190,22 @@ class WoocommerceApiWrapperTestCase(TestCase):
             self.api_wrapper.create_product(**kwargs)
 
         result = self.api_wrapper.delete_product(result['id'])
+
+    def test_create_product_and_add_img(self):
+        kwargs = {
+            'name': 'Test test_create_product_and_add_img',
+            'type': 'simple',
+            'sku': 'TEST-PRODUCT-IMG-ADD',
+            'status': 'publish',
+            'visibility': 'visible',
+            'regular_price': '0.9',
+            'sale_price': '0.8',
+            'images': [{"src": 'https://www.onesila.com/media/images/Frame_666_JLKFadU.2e16d0ba.fill-1200x1200.png'}]
+        }
+        result = self.api_wrapper.create_product(**kwargs)
+
+        extra_img = [{"src": 'https://www.onesila.com/media/images/Frame_666_JLKFadU.2e16d0ba.fill-1200x1200.png'},
+            {"src": 'https://www.onesila.com/static/images/logo.png'}]
+        result = self.api_wrapper.update_product(result['id'], images=extra_img)
+
+        # result = self.api_wrapper.delete_product(result['id'])

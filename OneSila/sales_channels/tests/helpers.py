@@ -1,6 +1,8 @@
 from products.models import Product, ProductTranslation
 from properties.models import Property, PropertySelectValue, PropertySelectValueTranslation, \
     ProductPropertiesRule, ProductProperty
+from sales_prices.models import SalesPrice
+from currencies.models import Currency
 
 
 class CreateTestProductMixin:
@@ -42,6 +44,18 @@ class CreateTestProductMixin:
         property_rule, _ = ProductPropertiesRule.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             product_type=test_type_value,
+        )
+
+        self.currency = Currency.objects.get(
+            multi_tenant_company=self.multi_tenant_company,
+            is_default_currency=True)
+
+        self.price, created = SalesPrice.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            currency=self.currency,
+            price=90,
+            rrp=100,
         )
 
         ProductProperty.objects.get_or_create(

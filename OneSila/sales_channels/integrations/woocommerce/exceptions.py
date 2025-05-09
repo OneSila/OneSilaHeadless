@@ -158,3 +158,17 @@ class FailedToDeleteProductError(FailedToDeleteError):
     Exception raised when the product deletion fails on the WooCommerce API.
     """
     pass
+
+
+class FailedToGetStoreCurrencyError(FailedToGetError):
+    """
+    Exception raised when the store currency is not retrieved from the WooCommerce API.
+    """
+    pass
+
+
+class FailedToGetProductError(FailedToGetError):
+    """
+    Exception raised when the product is not retrieved from the WooCommerce API.
+    """
+    pass

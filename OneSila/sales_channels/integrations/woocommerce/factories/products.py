@@ -27,47 +27,27 @@ class WooCommerceProductMixin(SerialiserMixin):
     # Key is the local field, value is the remote field
     field_mapping = {
         'sku': 'sku',
+        # The price fields are not really fields
+        # but "magic" and get set during the payload build.
+        'price': 'regular_price',
+        'discount': 'sale_price',
+        'name': 'name',
+        'description': 'description',
+        'short_description': 'short_description',
     }
+
     already_exists_exception = DuplicateError
 
     def customize_payload(self):
         """
         Customizes the payload for WooCommerce products
         """
-        # FIXME: This language configuration be set on the sales-channel and
-        # dynamically fetched here.
-        language = self.local_instance.multi_tenant_company.language
-        name = self.local_instance._get_translated_value(
-            field_name='name',
-            language=language,
-            related_name='translations'
-        )
-        short_description = self.local_instance._get_translated_value(
-            field_name='short_description',
-            language=language,
-            related_name='translations'
-        )
-        description = self.local_instance._get_translated_value(
-            field_name='description',
-            language=language,
-            related_name='translations'
-        )
-
-        self.payload['name'] = name
-        self.payload['short_description'] = short_description
-        self.payload['description'] = description
-
-        regular_price = 0.9
-        sale_price = 0.8
-        self.payload['regular_price'] = regular_price
-        self.payload['sale_price'] = sale_price
-
         if self.local_instance.active:
             self.payload['status'] = 'publish'
-            self.payload['visibility'] = 'visible'
+            self.payload['catalog_visibility'] = 'visible'
         else:
             self.payload['status'] = 'draft'
-            self.payload['visibility'] = 'hidden'
+            self.payload['catalog_visibility'] = 'hidden'
 
         if self.local_instance.is_configurable():
             # This also needs the variations to be created.
@@ -113,30 +93,17 @@ class WooCommerceProductSyncFactory(WooCommerceProductMixin, GetWoocommerceAPIMi
 
     add_variation_factory = property(get_add_variation_factory)
 
-    def perform_remote_action(self):
-        """
-        Performs the remote action for WooCommerce products.
-        """
-        return self.api.update_product(self.remote_instance.remote_id, **self.payload)
 
-
-class WooCommerceProductCreateFactory(WooCommerceProductMixin, GetWoocommerceAPIMixin, RemoteProductCreateFactory):
+class WooCommerceProductCreateFactory(RemoteProductCreateFactory, WooCommerceProductSyncFactory):
     enable_fetch_and_update = True
     update_if_not_exists = True
     update_factory_class = "WooCommerceProductUpdateFactory"
-    remote_eancode_update_factory = WooCommerceEanCodeUpdateFactory
 
-    def create_remote(self):
+    def perform_non_subclassed_remote_action(self):
         """
         Creates a remote product in WooCommerce.
         """
         return self.api.create_product(**self.payload)
-
-    def perform_remote_action(self):
-        """
-        Performs the remote action for WooCommerce products.
-        """
-        return self.create_remote()
 
     def fetch_existing_remote_data(self):
         """
@@ -145,10 +112,21 @@ class WooCommerceProductCreateFactory(WooCommerceProductMixin, GetWoocommerceAPI
         return self.api.get_product_by_sku(self.local_instance.sku)
 
 
-class WooCommerceProductUpdateFactory(WooCommerceProductMixin, GetWoocommerceAPIMixin, RemoteProductUpdateFactory):
+class WooCommerceProductUpdateFactory(RemoteProductUpdateFactory, WooCommerceProductSyncFactory):
+    field_mapping = {
+        'sku': 'sku',
+        # The price fields are not really fields
+        # but "magic" and get set during the payload build.
+        'price': 'regular_price',
+        'discount': 'sale_price',
+        'name': 'name',
+        'description': 'description',
+        'short_description': 'short_description',
+    }
+
     create_factory_class = WooCommerceProductCreateFactory
 
-    def update_remote(self):
+    def perform_remote_action(self):
         """
         Updates a remote product in WooCommerce.
         """

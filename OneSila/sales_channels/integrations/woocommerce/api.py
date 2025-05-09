@@ -7,7 +7,8 @@ from .exceptions import FailedToGetAttributesError, FailedToGetError, \
     FailedToDeleteAttributeError, DuplicateError, FailedToUpdateAttributeError, \
     FailedToPutError, FailedToCreateAttributeValueError, FailedToUpdateAttributeValueError, \
     FailedToDeleteAttributeValueError, FailedToGetAttributeValueError, FailedToGetProductBySkuError, \
-    FailedToCreateProductError, FailedToDeleteProductError, FailedToUpdateProductError
+    FailedToCreateProductError, FailedToDeleteProductError, FailedToUpdateProductError, \
+    FailedToGetStoreCurrencyError, FailedToGetProductError
 from .constants import API_ATTRIBUTE_PREFIX
 import urllib3
 from copy import deepcopy
@@ -224,13 +225,24 @@ class WoocommerceApiWrapper:
         except FailedToGetError as e:
             raise FailedToGetProductsError(e, response=e.response) from e
 
+    def get_product(self, product_id):
+        try:
+            return self.get(f'products/{product_id}')
+        except FailedToGetError as e:
+            raise FailedToGetProductError(e, response=e.response) from e
+
     def get_product_by_sku(self, sku):
         try:
-            return self.get(f'products?sku={sku}')
-        except FailedToGetError as e:
-            raise FailedToGetProductBySkuError(e, response=e.response) from e
+            return self.get(f'products?sku={sku}')[0]
+        except IndexError as e:
+            raise FailedToGetProductBySkuError(e) from e
 
-    def create_product(self, name, type, sku, status, visibility, regular_price, sale_price=None, description='', short_description='', categories=[], images=[], attributes=[]):
+    def _convert_price_to_string(self, price):
+        if price is None:
+            return None
+        return str(price)
+
+    def create_product(self, name, type, sku, status, catalog_visibility, regular_price, sale_price=None, description='', short_description='', categories=[], images=[], attributes=[]):
         """
         Create a product in WooCommerce.
         """
@@ -239,9 +251,9 @@ class WoocommerceApiWrapper:
             'type': type,
             'sku': sku,
             'status': status,
-            'visibility': visibility,
-            'regular_price': regular_price,
-            'sale_price': sale_price,
+            'catalog_visibility': catalog_visibility,
+            'regular_price': self._convert_price_to_string(regular_price),
+            'sale_price': self._convert_price_to_string(sale_price),
             'description': description,
             'short_description': short_description,
             'categories': categories,
@@ -251,11 +263,6 @@ class WoocommerceApiWrapper:
         for k, v in deepcopy(payload).items():
             if v is None or v == []:
                 del payload[k]
-
-        # Convert prices to strings, or you will get a 400 errors.
-        payload['regular_price'] = str(regular_price)
-        if sale_price:
-            payload['sale_price'] = str(sale_price)
 
         try:
             return self.post('products', data=payload)
@@ -270,12 +277,17 @@ class WoocommerceApiWrapper:
             raise FailedToCreateProductError(e, response=e.response) from e
 
     def update_product(self, product_id, **payload):
-        fields_to_update = ['name', 'type', 'sku', 'status', 'visibility', 'regular_price',
+        fields_to_update = ['name', 'type', 'sku', 'status', 'catalog_visibility', 'regular_price',
             'sale_price', 'description', 'short_description', 'categories', 'images', 'attributes']
         for key in payload.keys():
             if key not in fields_to_update:
                 raise ValueError(f"Field {key} is not updateable")
 
+        for k, v in payload.items():
+            if k in ['regular_price', 'sale_price']:
+                payload[k] = self._convert_price_to_string(v)
+
+        logger.debug(f"Update Payload: {payload}")
         try:
             return self.put(f'products/{product_id}', data=payload)
         except FailedToPutError as e:
@@ -286,3 +298,13 @@ class WoocommerceApiWrapper:
             return self.delete(f'products/{product_id}')
         except FailedToDeleteError as e:
             raise FailedToDeleteProductError(e, response=e.response) from e
+
+    def get_store_currency(self):
+        """
+        Get the configured currency for the store.
+        """
+        key = 'woocommerce_currency'
+        for i in self.get('settings/general'):
+            if i['id'] == key:
+                return i['default']
+        raise FailedToGetStoreCurrencyError(f"Currency not found for key {key}")

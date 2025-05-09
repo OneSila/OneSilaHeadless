@@ -4,7 +4,7 @@ from model_bakery import baker
 from django.test import TestCase as DjangoTestCase
 from django.test import TransactionTestCase
 from .tests_schemas.tests_queries import TransactionTestCaseMixin
-
+from currencies.models import Currency
 from core.demo_data import DemoDataLibrary
 
 
@@ -12,6 +12,9 @@ class TestCaseMixin:
     def setUp(self):
         super().setUp()
         self.multi_tenant_company = baker.make(MultiTenantCompany)
+        self.currency = baker.make(Currency,
+            multi_tenant_company=self.multi_tenant_company,
+            is_default_currency=True)
         self.user = baker.make(get_user_model(), multi_tenant_company=self.multi_tenant_company)
         self.user.is_multi_tenant_company_owner = True
         self.user.save()

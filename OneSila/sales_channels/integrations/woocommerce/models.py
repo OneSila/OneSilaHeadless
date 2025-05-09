@@ -1,9 +1,10 @@
 from django.db import models
 from django.utils.translation import gettext as _
 from sales_channels.models import SalesChannel, SalesChannelView, \
-    RemoteProduct, RemoteEanCode
+    RemoteProduct, RemoteEanCode, RemoteCurrency
 from sales_channels.models.properties import RemoteProperty, \
     RemotePropertySelectValue, RemoteProductProperty
+from sales_channels.models.products import RemoteImageProductAssociation
 
 
 class WoocommerceSalesChannel(SalesChannel):
@@ -75,5 +76,19 @@ class WoocommerceProductProperty(RemoteProductProperty):
 class WoocommerceEanCode(RemoteEanCode):
     """
     Woocommerce ean code model
+    """
+    pass
+
+
+class WoocommerceMediaThroughProduct(RemoteImageProductAssociation):
+    """
+    Woocommerce media through product model
+    """
+    pass
+
+
+class WoocommerceCurrency(RemoteCurrency):
+    """
+    Woocommerce currency model
     """
     pass

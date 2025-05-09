@@ -1,5 +1,13 @@
 **Integrations Folder README**
 
+
+To do this integration:
+1. Do the PULL factories (or you end up with strange situations in the final step when creating the ProductSyncFactories)
+2. You do the Attributes, Media,......
+3. Lastly the Productfactories
+4. Only now do the import factories.
+
+
 This document explains how to add new sales-channel integrations under `sales_channels/integrations/` so we keep a consistent structure and approach across all integrations (e.g., Magento, Shopify, etc.).
 
 ---
