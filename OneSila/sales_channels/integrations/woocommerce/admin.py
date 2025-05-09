@@ -1,7 +1,8 @@
 from django.contrib import admin
 from polymorphic.admin import PolymorphicChildModelAdmin
 from .models import WoocommerceSalesChannel, \
-    WoocommerceGlobalAttribute, WoocommerceGlobalAttributeValue
+    WoocommerceGlobalAttribute, WoocommerceGlobalAttributeValue, \
+    WoocommerceProduct
 
 
 @admin.register(WoocommerceSalesChannel)
@@ -46,3 +47,16 @@ class WoocommerceGlobalAttributeValueAdmin(admin.ModelAdmin):
 
     def get_value(self, obj):
         return obj.local_instance.value
+
+
+@admin.register(WoocommerceProduct)
+class WoocommerceProductAdmin(admin.ModelAdmin):
+    list_display = ('get_name', 'get_sku')
+    search_fields = ('get_name', 'get_sku')
+    list_filter = ('sales_channel',)
+
+    def get_name(self, obj):
+        return obj.local_instance.name
+
+    def get_sku(self, obj):
+        return obj.local_instance.sku

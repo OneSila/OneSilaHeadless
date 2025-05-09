@@ -22,12 +22,7 @@ class WooCommerceProductMixin(SerialiserMixin):
     remote_id_map = 'id'
     # Key is the local field, value is the remote field
     field_mapping = {
-        'name': 'name',
-        'description': 'description',
-        'short_description': 'short_description',
         'sku': 'sku',
-        'price': 'regular_price',
-        'sale_price': 'sale_price',
     }
     already_exists_exception = DuplicateError
 
@@ -35,6 +30,40 @@ class WooCommerceProductMixin(SerialiserMixin):
         """
         Customizes the payload for WooCommerce products
         """
+        # FIXME: This should be set on the sales-channel.
+        language = self.multi_tenant_company.language
+        name = self.local_instance._get_translated_value(
+            field_name='name',
+            language=language,
+            related_name='translations'
+        )
+        short_description = self.local_instance._get_translated_value(
+            field_name='short_description',
+            language=language,
+            related_name='translations'
+        )
+        description = self.local_instance._get_translated_value(
+            field_name='description',
+            language=language,
+            related_name='translations'
+        )
+
+        self.payload['name'] = name
+        self.payload['short_description'] = short_description
+        self.payload['description'] = description
+
+        price = 0.9
+        sale_price = 0.8
+        self.payload['regular_price'] = price
+        self.payload['sale_price'] = sale_price
+
+        if self.local_instance.active:
+            self.payload['status'] = 'publish'
+            self.payload['visibility'] = 'visible'
+        else:
+            self.payload['status'] = 'draft'
+            self.payload['visibility'] = 'hidden'
+
         if self.local_instance.is_configurable():
             # This also needs the variations to be created.
             self.payload['type'] = 'variable'
