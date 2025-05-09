@@ -104,28 +104,28 @@ class DuplicateError(WoocommerceError):
     pass
 
 
-class FailedToCreateAttributeValueError(FailedToPostError):
+class FailedToCreateAttributeTermError(FailedToPostError):
     """
     Exception raised when the attribute value creation fails on the WooCommerce API.
     """
     pass
 
 
-class FailedToUpdateAttributeValueError(FailedToPutError):
+class FailedToUpdateAttributeTermError(FailedToPutError):
     """
     Exception raised when the attribute value update fails on the WooCommerce API.
     """
     pass
 
 
-class FailedToDeleteAttributeValueError(FailedToDeleteError):
+class FailedToDeleteAttributeTermError(FailedToDeleteError):
     """
     Exception raised when the attribute value deletion fails on the WooCommerce API.
     """
     pass
 
 
-class FailedToGetAttributeValueError(FailedToGetError):
+class FailedToGetAttributeTermError(FailedToGetError):
     """
     Exception raised when the attribute value is not retrieved from the WooCommerce API.
     """

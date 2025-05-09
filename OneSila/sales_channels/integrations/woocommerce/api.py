@@ -5,10 +5,11 @@ from .exceptions import FailedToGetAttributesError, FailedToGetError, \
     FailedToGetAttributeError, FailedToGetAttributeTermsError, FailedToGetProductsError, \
     FailedToCreateAttributeError, FailedToPostError, FailedToDeleteError, \
     FailedToDeleteAttributeError, DuplicateError, FailedToUpdateAttributeError, \
-    FailedToPutError, FailedToCreateAttributeValueError, FailedToUpdateAttributeValueError, \
-    FailedToDeleteAttributeValueError, FailedToGetAttributeValueError, FailedToGetProductBySkuError, \
-    FailedToCreateProductError, FailedToDeleteProductError, FailedToUpdateProductError, \
-    FailedToGetStoreCurrencyError, FailedToGetProductError
+    FailedToPutError, FailedToCreateAttributeTermError, FailedToUpdateAttributeTermError, \
+    FailedToDeleteAttributeTermError, FailedToGetAttributeTermError, FailedToGetAttributeTermError, \
+    FailedToCreateAttributeTermError, FailedToDeleteAttributeTermError, FailedToUpdateAttributeTermError, \
+    FailedToGetStoreCurrencyError, FailedToGetProductError, FailedToGetProductBySkuError, FailedToCreateProductError, \
+    FailedToUpdateProductError, FailedToDeleteProductError
 from .constants import API_ATTRIBUTE_PREFIX
 import urllib3
 from copy import deepcopy
@@ -173,15 +174,15 @@ class WoocommerceApiWrapper:
         try:
             return self.get(f'products/attributes/{attribute_id}/terms/{value_id}')
         except FailedToGetError as e:
-            raise FailedToGetAttributeValueError(e, response=e.response) from e
+            raise FailedToGetAttributeTermError(e, response=e.response) from e
 
     def get_attribute_term_by_name(self, attribute_id, name):
         for value in self.get_attribute_terms(attribute_id):
             if value['name'] == name:
                 return value
-        raise FailedToGetAttributeValueError(f"Attribute value with name {name} not found")
+        raise FailedToGetAttributeTermError(f"Attribute value with name {name} not found")
 
-    def create_attribute_value(self, attribute_id, name, slug=None):
+    def create_attribute_term(self, attribute_id, name, slug=None):
         payload = {
             'name': name,
         }
@@ -196,9 +197,9 @@ class WoocommerceApiWrapper:
             # before raising and error
             try:
                 return self.get_attribute_term_by_name(attribute_id, name)
-            except FailedToGetAttributeValueError:
+            except FailedToGetAttributeTermError:
                 # Return from original error since that's what actually matters.
-                raise FailedToCreateAttributeValueError(e, response=e.response) from e
+                raise FailedToCreateAttributeTermError(e, response=e.response) from e
 
     def update_attribute_value(self, attribute_id, value_id, name, slug=None):
         payload = {
@@ -211,13 +212,13 @@ class WoocommerceApiWrapper:
         try:
             return self.put(f'products/attributes/{attribute_id}/terms/{value_id}', data=payload)
         except FailedToPutError as e:
-            raise FailedToUpdateAttributeValueError(e, response=e.response) from e
+            raise FailedToUpdateAttributeTermError(e, response=e.response) from e
 
     def delete_attribute_term(self, attribute_id, value_id):
         try:
             return self.delete(f'products/attributes/{attribute_id}/terms/{value_id}')
         except FailedToDeleteError as e:
-            raise FailedToDeleteAttributeValueError(e, response=e.response) from e
+            raise FailedToDeleteAttributeTermError(e, response=e.response) from e
 
     def get_products(self):
         try:

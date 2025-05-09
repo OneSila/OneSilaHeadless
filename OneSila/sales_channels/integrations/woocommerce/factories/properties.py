@@ -111,7 +111,7 @@ class WoocommerceGlobalAttributeValueCreateFactory(WoocommerceGlobalAttributeVal
     remote_property_factory = WooCommerceGlobalAttributeCreateFactory
 
     def create_remote(self):
-        return self.api.create_attribute_value(
+        return self.api.create_attribute_term(
             self.remote_instance.remote_property.remote_id, **self.payload)
 
 
