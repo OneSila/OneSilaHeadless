@@ -2,7 +2,7 @@ from django.contrib import admin
 from polymorphic.admin import PolymorphicChildModelAdmin
 from .models import WoocommerceSalesChannel, \
     WoocommerceGlobalAttribute, WoocommerceGlobalAttributeValue, \
-    WoocommerceProduct
+    WoocommerceProduct, WoocommerceMediaThroughProduct
 
 
 @admin.register(WoocommerceSalesChannel)
@@ -60,3 +60,8 @@ class WoocommerceProductAdmin(admin.ModelAdmin):
 
     def get_sku(self, obj):
         return obj.local_instance.sku
+
+
+@admin.register(WoocommerceMediaThroughProduct)
+class WoocommerceMediaThroughProductAdmin(admin.ModelAdmin):
+    pass

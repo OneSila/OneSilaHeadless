@@ -41,7 +41,7 @@ class RemoteMediaProductThroughCreateFactory(ProductAssignmentMixin, RemoteInsta
         """
         Placeholder method to create remote image, should be overridden in the third layer.
         """
-        pass
+        raise NotImplementedError("This method should be overridden in the third layer.")
 
     def customize_remote_instance_data(self):
         """
@@ -51,6 +51,7 @@ class RemoteMediaProductThroughCreateFactory(ProductAssignmentMixin, RemoteInsta
             self.remote_instance_data['remote_image'] = self.remote_image
 
         return self.remote_instance_data
+
 
 class RemoteMediaProductThroughUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = MediaProductThrough
@@ -78,6 +79,7 @@ class RemoteMediaProductThroughUpdateFactory(ProductAssignmentMixin, RemoteInsta
 
         return True
 
+
 class RemoteMediaProductThroughDeleteFactory(ProductAssignmentMixin, RemoteInstanceDeleteFactory):
     local_model_class = MediaProductThrough
 
@@ -100,6 +102,7 @@ class RemoteMediaProductThroughDeleteFactory(ProductAssignmentMixin, RemoteInsta
             return False
 
         return True
+
 
 class RemoteImageDeleteFactory(RemoteInstanceDeleteFactory):
     local_model_class = Media

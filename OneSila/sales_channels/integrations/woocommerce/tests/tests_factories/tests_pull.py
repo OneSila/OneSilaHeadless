@@ -3,7 +3,7 @@
 from .mixins import TestCaseWoocommerceMixin
 from django.conf import settings
 
-from sales_channels.tests.helpers import CreateTestProductMixin
+from sales_channels.integrations.woocommerce.tests.helpers import CreateTestProductMixin
 from sales_channels.integrations.woocommerce.factories.pulling import WoocommerceRemoteCurrencyPullFactory
 
 import logging

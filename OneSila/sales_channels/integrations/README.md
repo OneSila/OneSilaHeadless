@@ -1,18 +1,17 @@
-**Integrations Folder README**
-
-
-To do this integration:
-1. Do the PULL factories (or you end up with strange situations in the final step when creating the ProductSyncFactories)
-2. You do the Attributes, Media,......
-3. Lastly the Productfactories
-4. Only now do the import factories.
-
+# Integrations Folder README
 
 This document explains how to add new sales-channel integrations under `sales_channels/integrations/` so we keep a consistent structure and approach across all integrations (e.g., Magento, Shopify, etc.).
 
----
+## Macro steps to follow
 
-## 📁 Directory Structure
+To do this integration:
+1. Do the PULL factories (or you end up with strange situations in the final step when creating the ProductSyncFactories)
+2. Make sure your SalesChannelViewAssign SalesChannelView and SalesChannel infrastructure exists and your test-mixins are connected to it
+3. You do the Attributes, Media, etc.
+4. Lastly the Productfactories
+5. Only now do the import factories
+
+## Directory Structure
 
 ```
 sales_channels/
@@ -41,9 +40,7 @@ sales_channels/
     - `factories/` – layered `CreateFactory` / `UpdateFactory` classes
     - `admin.py`, etc., as required.
 
----
-
-## 🚀 Creating a New Integration App
+## Creating a New Integration App
 
 1. **Use the management command to scaffold a new integration**
    ```bash
@@ -56,6 +53,7 @@ sales_channels/
    - Set up the `AppConfig`
    - Create necessary subfolders and files
    - Generate boilerplate for models, mixins, and factories
+
 2. **Add to `INSTALLED_APPS`**
    In your settings (e.g. `base.py`), register the new app:
    ```python
@@ -66,27 +64,28 @@ sales_channels/
        # …
    ]
    ```
+
 3. **Layered architecture**
    - **Layer 1**: `IntegrationInstanceCreateFactory` & `IntegrationInstanceUpdateFactory` live in a shared base (e.g., `sales_channels/factories/`).
    - **Layer 2**: `RemoteXxxCreateFactory` subclasses for all channels (in each integration's `factories/`).
    - **Layer 3**: Channel‑specific details (`MagentoPropertyCreateFactory`, `ShopifyProductCreateFactory`, etc.).
 
-3. **Models**
+4. **Models**
    - Define your channel's mirror models in `models.py`:
-     ```python
-     class ShopifySalesChannel(SalesChannel):
-         shop_url = models.URLField()
-         access_token = models.CharField(max_length=255)
-         # …
+   ```python
+   class ShopifySalesChannel(SalesChannel):
+       shop_url = models.URLField()
+       access_token = models.CharField(max_length=255)
+       # …
 
-     class ShopifyProduct(RemoteProduct):
-         # any Shopify‑specific fields
-     ```
+   class ShopifyProduct(RemoteProduct):
+       # any Shopify‑specific fields
+   ```
 
-4. **API mixin**
+5. **API mixin**
    In `mixins.py`, add your `Get<Integration>APIMixin` that encapsulates session setup and activation.
 
-5. **Factories**
+6. **Factories**
    In `factories/products.py`, scaffold your `CreateFactory` and `UpdateFactory`:
    ```python
    class ShopifyProductCreateFactory(RemoteInstanceCreateFactory):
@@ -99,14 +98,12 @@ sales_channels/
        # override customize_payload(), serialize_response(), etc.
    ```
 
-6. **Testing & Sanity Check**
+7. **Testing & Sanity Check**
    - Write a TESTS to instantiate your mixin and factories, call .run(), and verify your integration API sees your test data.
    - Add any admin registrations or serializers as needed.
-   - Add the logins to a fake test-store to your local settings and se it up in github as well.
+   - Add the logins to a fake test-store to your local settings and set it up in github as well.
 
----
-
-## ✅ Checklist for New Integrations
+## Checklist for New Integrations
 
 - [ ] Integration created via `create_sales_channel_integration` command
 - [ ] Mirror models customized in `models.py`
