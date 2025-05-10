@@ -78,7 +78,6 @@ class WooCommerceMediaProductThroughMixin(WooCommerceMediaMixin, SerialiserMixin
         return self.api.update_product(self.remote_product.remote_id, **self.payload)
 
 
-@log_method_calls
 class WooCommerceMediaProductThroughCreateFactory(WooCommerceMediaProductThroughMixin, GetWoocommerceAPIMixin, RemoteMediaProductThroughCreateFactory):
     def create_remote(self):
         return self.create_or_update_images()

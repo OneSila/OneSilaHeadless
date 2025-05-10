@@ -1,4 +1,4 @@
-from core.tests import TestCase
+from core.tests import TestCase, TransactionTestCase
 from django.conf import settings
 
 from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class TestCaseWoocommerceMixin(TestCase):
+class TestCaseWoocommerceMixin(TransactionTestCase):
     def setUp(self):
         """
         Set up the test case with a mock WoocommerceSalesChannel.
