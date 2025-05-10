@@ -22,8 +22,16 @@ class WooCommerceMediaMixin(SerialiserMixin):
     """
 
     def get_image_url(self, media):
-        if settings.DEBUG:
-            return f"https://via.placeholder.com/{random.randint(100, 200)}"
+        import random
+        import sys
+
+        # Check if we're running in a test environment
+        is_test = 'unittest' in sys.modules or 'pytest' in sys.modules
+
+        logger.debug(f"Checking if in test environment: {is_test}")
+        if is_test:
+            logger.debug(f"Returning placeholder image for {media=} {settings.DEBUG=}")
+            return f"https://placehold.co/{random.randint(100, 200)}.png"
 
         return media.image_web_url
 
@@ -38,7 +46,7 @@ class WooCommerceMediaMixin(SerialiserMixin):
         #     ]
         # }
         product = self.get_local_product()
-        image_throughs = product.mediaproductthrough_set.filter(media__image_type=Media.IMAGE)
+        image_throughs = product.mediaproductthrough_set.filter(media__type=Media.IMAGE)
 
         logger.debug(f"Found {image_throughs.count()} image_throughs for {product=}")
 
@@ -63,6 +71,7 @@ class WooCommerceMediaProductThroughMixin(WooCommerceMediaMixin, SerialiserMixin
         return super().preflight_process()
 
     def customize_payload(self):
+        logger.debug(f"Customizing payload for {self.local_instance=}")
         return self.apply_media_payload()
 
     def create_or_update_images(self):
@@ -74,13 +83,22 @@ class WooCommerceMediaProductThroughCreateFactory(WooCommerceMediaProductThrough
     def create_remote(self):
         return self.create_or_update_images()
 
+    def create_remote_image(self):
+        return self.create_or_update_images()
+
 
 class WooCommerceMediaProductThroughUpdateFactory(WooCommerceMediaProductThroughMixin, GetWoocommerceAPIMixin, RemoteMediaProductThroughUpdateFactory):
     def update_remote(self):
         return self.create_or_update_images()
 
+    def update_remote_image(self):
+        return self.create_or_update_images()
+
 
 class WooCommerceMediaProductThroughDeleteFactory(WooCommerceMediaProductThroughMixin, GetWoocommerceAPIMixin, RemoteMediaProductThroughDeleteFactory):
+    def delete_remote(self):
+        return self.create_or_update_images()
+
     def delete_remote_image(self):
         return self.create_or_update_images()
 

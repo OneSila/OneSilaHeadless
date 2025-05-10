@@ -10,7 +10,7 @@ class CreateImageMixin:
         image_path = os.path.join(settings.BASE_DIR.parent, 'core', 'tests', 'image_files', fname)
         image = Image.objects.create(
             multi_tenant_company=multi_tenant_company,
-            image_type=Image.IMAGE)
+            type=Image.IMAGE)
 
         with open(image_path, 'rb') as f:
             image.image.save(fname, File(f))
