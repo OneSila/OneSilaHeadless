@@ -8,7 +8,9 @@ from django.core.files import File
 class CreateImageMixin:
     def create_image(self, multi_tenant_company, fname='red.png'):
         image_path = os.path.join(settings.BASE_DIR.parent, 'core', 'tests', 'image_files', fname)
-        image = baker.make(Image, multi_tenant_company=multi_tenant_company)
+        image = Image.objects.create(
+            multi_tenant_company=multi_tenant_company,
+            image_type=Image.IMAGE)
 
         with open(image_path, 'rb') as f:
             image.image.save(fname, File(f))

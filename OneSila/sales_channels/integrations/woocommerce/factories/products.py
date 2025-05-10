@@ -15,12 +15,14 @@ from .media import WooCommerceMediaProductThroughCreateFactory, \
     WooCommerceMediaProductThroughUpdateFactory, WooCommerceMediaProductThroughDeleteFactory
 from .ean import WooCommerceEanCodeUpdateFactory
 from ..exceptions import DuplicateError
+from .properties import WooCommerceProductAttributeMixin
+from .media import WooCommerceMediaMixin
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class WooCommerceProductMixin(SerialiserMixin):
+class WooCommerceProductMixin(WooCommerceMediaMixin, WooCommerceProductAttributeMixin, SerialiserMixin):
     remote_model_class = WoocommerceProduct
     remote_product_property_class = WoocommerceProductProperty
     remote_id_map = 'id'
@@ -38,10 +40,18 @@ class WooCommerceProductMixin(SerialiserMixin):
 
     already_exists_exception = DuplicateError
 
+    def get_local_product(self):
+        return self.local_instance
+
     def customize_payload(self):
         """
         Customizes the payload for WooCommerce products
         """
+        # Products must be created and updated with the attributes
+        # included in the product payload.
+        self.apply_attribute_payload()
+        self.apply_media_payload()
+
         if self.local_instance.active:
             self.payload['status'] = 'publish'
             self.payload['catalog_visibility'] = 'visible'

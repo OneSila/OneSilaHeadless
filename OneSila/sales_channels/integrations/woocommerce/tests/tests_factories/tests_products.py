@@ -13,6 +13,7 @@ from sales_channels.integrations.woocommerce.factories.products import (
     WooCommerceProductUpdateFactory,
     WooCommerceProductDeleteFactory,
 )
+from sales_channels.integrations.woocommerce.factories.properties import WooCommerceGlobalAttributeCreateFactory
 
 import logging
 logger = logging.getLogger(__name__)
@@ -22,6 +23,22 @@ class WooCommerceProductFactoryTest(CreateTestProductMixin, TestCaseWoocommerceM
     def test_create_update_delete_product(self):
         """Test that WooCommerceProductCreateFactory properly creates a remote product"""
         product = self.create_test_product(sku="TEST-SKU-001-create-delete", name="Test Product")
+
+        # Find product-type properties for this product
+        product_type_properties = Property.objects.filter(
+            is_product_type=True,
+            productproperty__product=product
+        ).distinct()
+
+        # We must create the product-type remotely to ensure we can try full payload test.
+        logger.debug(f"Found {product_type_properties.count()} product-type properties for {product}")
+        for prop in product_type_properties:
+            # Create and run the attribute factory for each product-type property
+            attribute_factory = WooCommerceGlobalAttributeCreateFactory(
+                sales_channel=self.sales_channel,
+                local_instance=prop
+            )
+            attribute_factory.run()
 
         # Create factory instance and run it
         factory = WooCommerceProductCreateFactory(
@@ -38,7 +55,7 @@ class WooCommerceProductFactoryTest(CreateTestProductMixin, TestCaseWoocommerceM
         self.assertIsNotNone(remote_product.remote_id)
 
         # Verify it exists in WooCommerce
-        resp_product = api.get_product(remote_product.remote_id)
+        resp_product = self.api.get_product(remote_product.remote_id)
         self.assertIsNotNone(resp_product)
         self.assertEqual(resp_product['name'], product.name)
         self.assertEqual(resp_product['sku'], product.sku)
@@ -59,7 +76,7 @@ class WooCommerceProductFactoryTest(CreateTestProductMixin, TestCaseWoocommerceM
         factory.run()
 
         # Verify the remote property was updated in database
-        resp_product = api.get_product(remote_product.remote_id)
+        resp_product = self.api.get_product(remote_product.remote_id)
 
         self.assertEqual(float(resp_product['price']), 812.00)
         self.assertEqual(resp_product['catalog_visibility'], 'hidden')
@@ -74,4 +91,4 @@ class WooCommerceProductFactoryTest(CreateTestProductMixin, TestCaseWoocommerceM
 
         # ensure it's deleted
         with self.assertRaises(Exception):
-            api.get_product(remote_product.remote_id)
+            self.api.get_product(remote_product.remote_id)

@@ -27,7 +27,7 @@ class CreateTestProductMixin:
         for product in WoocommerceProduct.objects.filter(remote_id__isnull=False):
             self.api.delete_product(product.remote_id)
 
-    def create_test_product(self, sku, name):
+    def create_test_product(self, sku, name, assign_to_sales_channel=False):
         product, created = Product.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             sku=sku,
@@ -86,15 +86,16 @@ class CreateTestProductMixin:
             value_select=test_type_value,
         )
 
-        # finally we also assign the product to the sales channel
-        self.sales_channel_view = SalesChannelView.objects.get(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-        )
-        self.sales_channel_view_assign = SalesChannelViewAssign.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel_view=self.sales_channel_view,
-            product=product,
-        )
+        if assign_to_sales_channel:
+            # finally we also assign the product to the sales channel
+            self.sales_channel_view = SalesChannelView.objects.get(
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel=self.sales_channel,
+            )
+            self.sales_channel_view_assign = SalesChannelViewAssign.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                sales_channel_view=self.sales_channel_view,
+                product=product,
+            )
 
         return product
