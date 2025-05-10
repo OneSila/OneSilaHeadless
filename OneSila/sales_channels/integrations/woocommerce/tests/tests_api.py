@@ -112,6 +112,10 @@ class WoocommerceApiWrapperTestCase(TestCase):
         """
         Test that get_attribute_by_code returns the correct attribute.
         """
+        try:
+            self.api_wrapper.create_attribute('colour', 'Colour')
+        except DuplicateError:
+            pass
         result = self.api_wrapper.get_attribute_by_code('colour')
         self.assertIsInstance(result, dict)
         self.assertEqual(result['slug'], 'colour')

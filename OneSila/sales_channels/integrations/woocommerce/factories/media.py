@@ -59,10 +59,14 @@ class WooCommerceMediaMixin(SerialiserMixin):
 
 class WooCommerceMediaProductThroughMixin(WooCommerceMediaMixin, SerialiserMixin):
     # We dont need to store images remotely.
-    remote_model_class = WoocommerceMediaThroughProduct
+    remote_model_class = None  # WoocommerceMediaThroughProduct
     remote_id_map = 'id'
     # Key is the local field, value is the remote field
     field_mapping = {}
+
+    def initialize_remote_instance(self):
+        # We dont actually store any remote references.
+        pass
 
     def preflight_process(self):
         if not self.local_instance.media.is_image():

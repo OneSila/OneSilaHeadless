@@ -40,14 +40,8 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
     - ean-codes
     are all part of the payload always and every time.
     """
-    # raise NotImplementedError("Setup the WooCommerceProductAttributeMixin to make things work..\n"
-    #                           "Also look at the payload of the product create/update factory.")
-    # # remote_model_class = WoocommerceProductAttribute
     remote_id_map = 'id'
     global_attribute_model_class = WoocommerceGlobalAttribute
-
-    # def update_remote(self):
-    #     return self.api.update_product(self.remote_product.remote_id, self.payload)
 
     def slugified_internal_name(self, property):
         return f"{API_ATTRIBUTE_PREFIX}{property.internal_name}"
@@ -73,6 +67,8 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
         #         }
         #     ]
         # }
+        # FIXME: The properties names and values should be loaded dynamically based on the language.
+        # currently they are just the default values.
         product = self.get_local_product()
         product_properties = ProductProperty.objects.\
             filter(
