@@ -35,5 +35,30 @@ class ShopifySalesChannelViewPullFactory(GetShopifyApiMixin, PullRemoteInstanceM
             'url':  url,
         }]
 
+        # 📦 Print publications using GraphQL
+        gql = self.api.GraphQL()
+        query = """
+        query {
+          publications(first: 10) {
+            edges {
+              node {
+                id
+                name
+              }
+            }
+          }
+        }
+        """
+        response = gql.execute(query)
+        import json
+        data = json.loads(response)
+
+        print('--- Shopify Publications ---')
+        print(data)
+        publications = data.get("data", {}).get("publications", {}).get("edges", [])
+        for pub in publications:
+            node = pub["node"]
+            print(f"{node['name']} ({node['channel']['handle']}): {node['id']}")
+
     def serialize_response(self, response):
         return response

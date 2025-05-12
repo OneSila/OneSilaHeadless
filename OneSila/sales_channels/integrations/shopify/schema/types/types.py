@@ -5,4 +5,12 @@ from sales_channels.integrations.shopify.schema.types.ordering import ShopifySal
 
 @type(ShopifySalesChannel, filters=ShopifySalesChannelFilter, order=ShopifySalesChannelOrder, pagination=True, fields="__all__")
 class ShopifySalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
-    pass
+
+    @field()
+    def integration_ptr(self, info) -> str:
+        return self.integration_ptr
+
+
+    @field()
+    def saleschannel_ptr(self, info) -> str:
+        return self.saleschannel_ptr

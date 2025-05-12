@@ -115,12 +115,137 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         self.payload['metafields'] = self.metafields
         self.payload['tags'] = self.tags
 
+        print('-------------------------------------------------- RESYNC 1')
+
     def get_saleschannel_remote_object(self, sku):
+        gql = self.api.GraphQL()
+        query = """
+        query getProductByVariantSku($sku: String!) {
+          productVariants(first: 1, query: $sku) {
+            edges {
+              node {
+                id
+                title
+                handle
+                variants(first: 10) {
+                  edges {
+                    node {
+                      id
+                      sku
+                      title
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
         """
-        Used by CreateFactory to detect existing remote product by handle/variants.
-        Override if needed.
+
+        variables = {"sku": f"sku:{sku}"}
+
+        response = gql.execute(query, variables=variables)
+        data = json.loads(response)
+
+        print('--------------------------------- DATA')
+        print(data)
+
+        product_edges = data.get("data", {}).get("products", {}).get("edges", [])
+
+        if not product_edges:
+            raise ValueError(f"No Shopify product found with variant SKU: {sku}")
+
+        return product_edges[0]["node"]
+
+    def perform_remote_action(self):
+
+        if not self.is_variation:
+            product_result = self._update_product()
+
+        variant_result = self._update_product_variant_only()
+
+        print('----------------------------------------------------------------- RESYNCED')
+
+        return {
+            "product": self.payload,
+            "variant": self.variant_payload
+        }
+
+    def _update_product(self):
+        gql = self.api.GraphQL()
+        query = """
+        mutation productUpdate($product: ProductUpdateInput!) {
+          productUpdate(product: $product) {
+            product {
+              id
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
         """
-        return self.api.Product.find(handle=sku)
+
+        self.payload["id"] = self.remote_instance.remote_id
+
+        variables = {
+            "product": self.payload
+        }
+
+        response = gql.execute(query, variables=variables)
+        data = json.loads(response)
+
+        print('----------------------------------- RETURN DATA 1')
+        print(data)
+
+        errors = data.get("data", {}).get("productUpdate", {}).get("userErrors", [])
+        if errors:
+            raise ShopifyGraphqlException(f"productUpdate userErrors: {errors}")
+
+        return data["data"]["productUpdate"]
+
+    def _update_product_variant_only(self):
+        gql = self.api.GraphQL()
+        query = """
+        mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+          productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+            product {
+              id
+            }
+            productVariants {
+              id
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+        """
+
+        self.variant_payload['id'] = self.remote_instance.default_variant_id
+        parent_id = (
+            self.remote_parent_product.remote_id
+            if self.is_variation else self.remote_instance.remote_id
+        )
+
+        variables = {
+            "productId": parent_id,
+            "variants": [self.variant_payload]
+        }
+
+        response = gql.execute(query, variables=variables)
+        data = json.loads(response)
+
+        print('----------------------------------- RETURN DATA')
+        print(data)
+
+        errors = data.get("data", {}).get("productVariantsBulkUpdate", {}).get("userErrors", [])
+        if errors:
+            raise ShopifyGraphqlException(f"productVariantsBulkUpdate userErrors: {errors}")
+
+        return data["data"]["productVariantsBulkUpdate"]
 
     def process_content_translation(self, short_description, description, url_key, remote_language):
         # @TODO: Come back to this
@@ -301,9 +426,14 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
 
     def perform_remote_action(self):
         if self.is_variation:
-            return self._create_product_variant_only()
+            self._create_product_variant_only()
         else:
-            return self._create_full_product_with_default_variant()
+            self._create_full_product_with_default_variant()
+
+        return {
+            "product": self.payload,
+            "variant": self.variant_payload
+        }
 
     def _create_product_variant_only(self):
         gql = self.api.GraphQL()
@@ -462,24 +592,7 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
 
 
 class ShopifyProductUpdateFactory(ShopifyProductSyncFactory, RemoteProductUpdateFactory):
-    api_package_name = 'Product'
-    api_method_name = 'update'
-
-    def perform_remote_action(self):
-        product = self.api.Product.find(self.remote_instance.remote_id)
-        if not product:
-            raise ValueError(f"No Shopify product found with id {self.remote_instance.remote_id}")
-
-        # Apply top-level updates
-        for field, val in self.payload.items():
-            setattr(product, field, val)
-
-        product.save()
-
-        return product
-
-    def serialize_response(self, response):
-        return response.to_dict()
+    fixing_identifier_class = ShopifyProductSyncFactory
 
 
 class ShopifyProductDeleteFactory(GetShopifyApiMixin, RemoteProductDeleteFactory):
