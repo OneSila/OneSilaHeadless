@@ -59,11 +59,8 @@ INSTALLED_LOCAL_APPS = [
     'inventory',
     'sales_channels',
     'sales_channels.integrations.magento2',
-    << << << < HEAD
-    'sales_channels.integrations.woocommerce',
-    == == == =
     'sales_channels.integrations.shopify',
-    >>>>>> > feature / shopify
+    'sales_channels.integrations.woocommerce',
     'sales_prices',
     'properties',
     'orders',
