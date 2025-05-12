@@ -598,14 +598,17 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         # Optional: Additional handling or finalization of content translations
         self.finalize_content_translations()
 
+    def get_medias(self):
+        return MediaProductThrough.objects.filter(
+            product=self.local_instance,
+            media__type=Media.IMAGE
+        ).order_by('-is_main_image', 'sort_order')
+
     def assign_images(self):
         """
         Assigns images to the remote product.
         """
-        media_throughs = MediaProductThrough.objects.filter(
-            product=self.local_instance,
-            media__type=Media.IMAGE
-        ).order_by('-is_main_image', 'sort_order')
+        media_throughs = self.get_medias()
 
         # For each MediaProductThrough instance, process the image assignment
         existing_remote_images_ids = []
@@ -1001,6 +1004,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
                     sales_channel=self.sales_channel
                 )
 
+        print('---------------- 1')
         # Attempt to get or create the RemoteProduct instance without filtering on remote_id
         self.remote_instance, created = self.remote_model_class.objects.get_or_create(
             local_instance=self.local_instance,
@@ -1011,14 +1015,20 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
             remote_sku=remote_sku,
         )
 
+        print('--------------2')
+        print(self.remote_instance)
+        print('----------------------------- AGAIN?')
+
         # If the remote_instance has a remote_id, it means it's already linked to a remote product
         if self.remote_instance.remote_id:
+            print('-------------------------- AICI1?')
             raise SwitchedToSyncException(f"RemoteProduct already exists with remote_id: {self.remote_instance.remote_id}. Switching to sync mode...")
 
         # Try to fetch the remote product from the remote API
         try:
             response = self.get_saleschannel_remote_object(remote_sku)
             remote_data = self.serialize_response(response)
+            print('--------------------- AICI?')
             if remote_data:
                 # Remote product exists but wasn't linked locally
                 self.remote_instance.remote_id = self.extract_remote_id(remote_data)
@@ -1037,6 +1047,8 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
         """
         Runs the sync/update flow.
         """
+
+        print('------------------------ RUN SYNC FLOW')
         if self.sync_product_factory is None:
             raise ValueError("sync_product_factory must be specified in the RemoteProductCreateFactory.")
 

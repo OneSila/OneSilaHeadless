@@ -56,15 +56,24 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='leadtime',
-            constraint=models.CheckConstraint(condition=models.Q(('max_time__gte', models.F('min_time'))), name='Maximum Time cannot be less then Minimum Time'),
+            constraint=models.CheckConstraint(
+                check=models.Q(max_time__gte=models.F('min_time')),
+                name='max_time_gte_min_time'
+            ),
         ),
         migrations.AddConstraint(
             model_name='leadtime',
-            constraint=models.CheckConstraint(condition=models.Q(('max_time__gte', 0)), name='Maximum time cannot be 0'),
+            constraint=models.CheckConstraint(
+                check=models.Q(max_time__gte=0),
+                name='max_time_non_negative'
+            ),
         ),
         migrations.AddConstraint(
             model_name='leadtime',
-            constraint=models.CheckConstraint(condition=models.Q(('min_time__gte', 0)), name='Minimum Time cannot be 0'),
+            constraint=models.CheckConstraint(
+                check=models.Q(min_time__gte=0),
+                name='min_time_non_negative'
+            ),
         ),
         migrations.AlterUniqueTogether(
             name='leadtime',

@@ -23,6 +23,8 @@ from sales_prices.schema import SalesPricesQuery, SalesPricesMutation, SalesPric
 from sales_channels.schema import SalesChannelsQuery, SalesChannelsMutation, SalesChannelsSubscription
 from sales_channels.integrations.magento2.schema import MagentoSalesChannelMutation, MagentoSalesChannelsQuery, \
     MagentoSalesChannelsSubscription
+from sales_channels.integrations.shopify.schema import ShopifySalesChannelMutation, ShopifySalesChannelsQuery, \
+    ShopifySalesChannelsSubscription
 from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
 from translations.schema import TranslationsQuery
 from integrations.schema import IntegrationsQuery, IntegrationsMutation
@@ -35,14 +37,14 @@ from llm.schema import LlmMutation
 
 @strawberry.type
 class Query(CurrenciesQuery, CountryQuery, EanCodesQuery, IntegrationsQuery,
-        LanguageQuery, LeadTimesQuery, MediaQuery, MultiTenantQuery, MagentoSalesChannelsQuery,
+        LanguageQuery, LeadTimesQuery, MediaQuery, MultiTenantQuery, MagentoSalesChannelsQuery, ShopifySalesChannelsQuery,
         ProductsQuery, PropertiesQuery, SalesPricesQuery, SalesChannelsQuery,
         TaxesQuery, TimeZoneQuery, TranslationsQuery):
     pass
 
 
 @strawberry.type
-class Mutation(CurrenciesMutation, EanCodesMutation,MediaMutation, MultiTenantMutation,
+class Mutation(CurrenciesMutation, EanCodesMutation,MediaMutation, MultiTenantMutation, ShopifySalesChannelMutation,
        ProductsInspectorMutation, ProductsMutation, PropertiesMutation, IntegrationsMutation, LlmMutation,
        SalesPricesMutation, SalesChannelsMutation, MagentoSalesChannelMutation, TaxesMutation):
     pass
@@ -51,7 +53,7 @@ class Mutation(CurrenciesMutation, EanCodesMutation,MediaMutation, MultiTenantMu
 @strawberry.type
 class Subscription(CurrenciesSubscription,EanCodesSubscription, MediaSubscription, MultiTenantSubscription,
         ProductsInspectorSubscription, ProductsSubscription, PropertiesSubscription, SalesPriceSubscription,
-        MagentoSalesChannelsSubscription, SalesChannelsSubscription, TaxSubscription):
+        MagentoSalesChannelsSubscription, SalesChannelsSubscription, TaxSubscription, ShopifySalesChannelsSubscription):
     pass
 
 #

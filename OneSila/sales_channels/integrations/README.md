@@ -11,7 +11,8 @@ To do this integration:
 4. Lastly the Productfactories
 5. Only now do the import factories
 
-## Directory Structure
+
+## 📁 Directory Structure
 
 ```
 sales_channels/
@@ -55,6 +56,39 @@ sales_channels/
    - Generate boilerplate for models, mixins, and factories
 
 2. **Add to `INSTALLED_APPS`**
+```
+
+- **Root integration package**: `sales_channels/integrations` is a Python package (contains `__init__.py`).
+- **Each integration** is a Django app (one directory per channel):
+  - Name the directory after the integration (e.g., `shopify`, `magento2`).
+  - Inside each, you’ll have standard Django app files (`apps.py`, `models.py`, `views.py` if needed), plus your layered subfolders:
+    - `models.py` – sales-channel-specific mirror models
+    - `mixins.py` – API client mixins (e.g., `GetMagentoAPIMixin`, `GetShopifyAPIMixin`)
+    - `factories/` – layered `CreateFactory` / `UpdateFactory` classes
+    - `admin.py`, etc., as required.
+
+---
+
+## 🚀 Creating a New Integration App
+
+1. **Ensure the integrations package exists**
+   ```bash
+   ls sales_channels/integrations/__init__.py
+   ```
+
+2. **Scaffold a new Django app** under `integrations/`. Two options:
+   - **Option A (preferred)**: Pre-create the folder, then run `startapp` into it:
+     ```bash
+     mkdir sales_channels/integrations/<integration_name>
+     python manage.py startapp <integration_name> sales_channels/integrations/<integration_name>
+     ```
+   - **Option B**: Change directory into `integrations`, then run `startapp`:
+     ```bash
+     cd sales_channels/integrations
+     python ../../manage.py startapp <integration_name>
+     ```
+
+3. **Add to `INSTALLED_APPS`**
    In your settings (e.g. `base.py`), register the new app:
    ```python
    INSTALLED_APPS = [
@@ -65,27 +99,45 @@ sales_channels/
    ]
    ```
 
-3. **Layered architecture**
-   - **Layer 1**: `IntegrationInstanceCreateFactory` & `IntegrationInstanceUpdateFactory` live in a shared base (e.g., `sales_channels/factories/`).
-   - **Layer 2**: `RemoteXxxCreateFactory` subclasses for all channels (in each integration's `factories/`).
-   - **Layer 3**: Channel‑specific details (`MagentoPropertyCreateFactory`, `ShopifyProductCreateFactory`, etc.).
-
-4. **Models**
-   - Define your channel's mirror models in `models.py`:
+4. **Define AppConfig**
+   In `sales_channels/integrations/<integration_name>/apps.py`:
    ```python
-   class ShopifySalesChannel(SalesChannel):
-       shop_url = models.URLField()
-       access_token = models.CharField(max_length=255)
-       # …
+   from django.apps import AppConfig
 
-   class ShopifyProduct(RemoteProduct):
-       # any Shopify‑specific fields
+   class <IntegrationName>Config(AppConfig):
+       name = 'sales_channels.integrations.<integration_name>'
+       default_auto_field = 'django.db.models.BigAutoField'
+       verbose_name = '<Integration Name> Integration'
    ```
 
-5. **API mixin**
+5. **Create subfolders**
+   Mirror the Magento/Shopify pattern:
+   ```bash
+   mkdir -p sales_channels/integrations/<integration_name>/{factories,mixins}
+   touch sales_channels/integrations/<integration_name>/mixins.py
+   ```
+
+6. **Layered architecture**
+   - **Layer 1**: `IntegrationInstanceCreateFactory` & `IntegrationInstanceUpdateFactory` live in a shared base (e.g., `sales_channels/factories/`).
+   - **Layer 2**: `RemoteXxxCreateFactory` subclasses for all channels (in each integration’s `factories/`).
+   - **Layer 3**: Channel‑specific details (`MagentoPropertyCreateFactory`, `ShopifyProductCreateFactory`, etc.).
+
+7. **Models**
+   - Define your channel’s mirror models in `models.py`:
+     ```python
+     class ShopifySalesChannel(SalesChannel):
+         shop_url = models.URLField()
+         access_token = models.CharField(max_length=255)
+         # …
+
+     class ShopifyProduct(RemoteProduct):
+         # any Shopify‑specific fields
+     ```
+
+8. **API mixin**
    In `mixins.py`, add your `Get<Integration>APIMixin` that encapsulates session setup and activation.
 
-6. **Factories**
+9. **Factories**
    In `factories/products.py`, scaffold your `CreateFactory` and `UpdateFactory`:
    ```python
    class ShopifyProductCreateFactory(RemoteInstanceCreateFactory):
@@ -98,7 +150,7 @@ sales_channels/
        # override customize_payload(), serialize_response(), etc.
    ```
 
-7. **Testing & Sanity Check**
+10. **Testing & Sanity Check**
    - Write a TESTS to instantiate your mixin and factories, call .run(), and verify your integration API sees your test data.
    - Add any admin registrations or serializers as needed.
    - Add the logins to a fake test-store to your local settings and set it up in github as well.
@@ -112,3 +164,7 @@ sales_channels/
 - [ ] Sample `.run()` script or test demonstrating a successful API interaction
 
 Keep this README up-to-date as we refine our integration conventions! 🎉
+
+10. **Testing & Sanity Check**
+    - Write a quick Django shell script to instantiate your mixin and factories, call .run(), and verify the Shopify API sees your test product.
+    - Add any admin registrations or serializers as needed.

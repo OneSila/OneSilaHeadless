@@ -38,7 +38,7 @@ uvicorn
 WooCommerce
 
 strawberry-graphql==0.266.0
-strawberry-graphql-django==0.59.0
+strawberry-graphql-django==0.59.1
 
 django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absolute_url.git@master
 
@@ -49,3 +49,4 @@ starlette
 
 git+https://github.com/jazzband/django-polymorphic.git@v4.0.0a#egg=django-polymorphic
 git+https://github.com/OneSila/OneSilaMagento2Api.git@v1.0.28
+shopifyapi

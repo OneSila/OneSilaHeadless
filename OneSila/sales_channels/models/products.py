@@ -36,6 +36,7 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         """
         if not (0 <= new_percentage <= 100):
             raise ValueError("Sync percentage must be between 0 and 100.")
+
         self.syncing_current_percentage = new_percentage
         self.save(update_fields=['syncing_current_percentage'])
 
