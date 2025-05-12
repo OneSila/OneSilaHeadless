@@ -3,13 +3,10 @@ from strawberry_django import auth, field
 from django.contrib.auth.models import AnonymousUser
 
 from core.schema.core.helpers import get_multi_tenant_company
-from core.schema.multi_tenant.types.types import MultiTenantUserType, MultiTenantCompanyType
-from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, \
-    type, field, default_extensions, Info, anonymous_field
+from core.schema.core.queries import type, field, anonymous_field
 
 from typing import List
 
-from core.countries import COUNTRY_CHOICES
 from core.schema.languages.types.types import LanguageType
 from core.schema.core.helpers import get_current_user
 from django.conf import settings
@@ -29,6 +26,7 @@ def get_languages(info) -> List[LanguageType]:
 
     return languages
 
+
 def get_interface_languages(info) -> List[LanguageType]:
     user = get_current_user(info)
 
@@ -41,6 +39,7 @@ def get_interface_languages(info) -> List[LanguageType]:
         deactivate()
 
     return languages
+
 
 def get_default_language() -> LanguageType:
     return LanguageType(**get_language_info(settings.LANGUAGE_CODE))
@@ -69,6 +68,7 @@ def get_company_languages(info) -> List[LanguageType]:
 
     deactivate()
     return languages
+
 
 @type(name="Query")
 class LanguageQuery:

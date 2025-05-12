@@ -1,4 +1,4 @@
-from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, type, field, anonymous_field
+from core.schema.core.queries import node, connection, DjangoListConnection, type, field, anonymous_field
 from contacts.models import Company
 
 from typing import List
@@ -17,33 +17,33 @@ def get_customer_languages(info) -> List[CustomerLanguageType]:
 @type(name="Query")
 class ContactsQuery:
     company: CompanyType = node()
-    companies: ListConnectionWithTotalCount[CompanyType] = connection()
+    companies: DjangoListConnection[CompanyType] = connection()
 
     supplier: SupplierType = node()
-    suppliers: ListConnectionWithTotalCount[SupplierType] = connection()
+    suppliers: DjangoListConnection[SupplierType] = connection()
 
     customer: CustomerType = node()
-    customers: ListConnectionWithTotalCount[CustomerType] = connection()
+    customers: DjangoListConnection[CustomerType] = connection()
 
     influencer: InfluencerType = node()
-    influencers: ListConnectionWithTotalCount[InfluencerType] = connection()
+    influencers: DjangoListConnection[InfluencerType] = connection()
 
     internal_company: InternalCompanyType = node()
-    internal_companies: ListConnectionWithTotalCount[InternalCompanyType] = connection()
+    internal_companies: DjangoListConnection[InternalCompanyType] = connection()
 
     person: PersonType = node()
-    people: ListConnectionWithTotalCount[PersonType] = connection()
+    people: DjangoListConnection[PersonType] = connection()
 
     address: AddressType = node()
-    addresses: ListConnectionWithTotalCount[AddressType] = connection()
+    addresses: DjangoListConnection[AddressType] = connection()
 
     shipping_address: ShippingAddressType = node()
-    shipping_addresses: ListConnectionWithTotalCount[ShippingAddressType] = connection()
+    shipping_addresses: DjangoListConnection[ShippingAddressType] = connection()
 
     invoice_address: InvoiceAddressType = node()
-    invoice_addresses: ListConnectionWithTotalCount[InvoiceAddressType] = connection()
+    invoice_addresses: DjangoListConnection[InvoiceAddressType] = connection()
 
     inventory_shipping_address: InventoryShippingAddressType = node()
-    inventory_shipping_addresses: ListConnectionWithTotalCount[InventoryShippingAddressType] = connection()
+    inventory_shipping_addresses: DjangoListConnection[InventoryShippingAddressType] = connection()
 
     customer_languages: List[CustomerLanguageType] = anonymous_field(resolver=get_customer_languages)

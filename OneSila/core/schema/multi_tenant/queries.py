@@ -1,10 +1,9 @@
 from strawberry_django import auth, field
 
 from core.schema.core.helpers import get_multi_tenant_company
-from core.schema.multi_tenant.types.filters import MultiTenantUserFilter
 from core.schema.multi_tenant.types.types import MultiTenantUserType, MultiTenantCompanyType, HasDemoDataType, MinimalMultiTenantUserType
-from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, \
-    type, field, default_extensions, Info, List, anonymous_field
+from core.schema.core.queries import connection, DjangoListConnection, \
+    type, field, Info, List, anonymous_field
 
 
 def my_multi_tenant_company_resolver(info: Info) -> MultiTenantCompanyType:
@@ -27,5 +26,5 @@ def has_demo_data(info: Info) -> HasDemoDataType:
 class MultiTenantQuery:
     me: MultiTenantUserType = auth.current_user()
     my_multi_tenant_company: MultiTenantCompanyType = field(resolver=my_multi_tenant_company_resolver)
-    users: ListConnectionWithTotalCount[MinimalMultiTenantUserType] = connection()
+    users: DjangoListConnection[MinimalMultiTenantUserType] = connection()
     has_demo_data: HasDemoDataType = anonymous_field(resolver=has_demo_data)

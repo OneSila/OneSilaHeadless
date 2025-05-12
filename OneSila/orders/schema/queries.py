@@ -1,4 +1,4 @@
-from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, type
+from core.schema.core.queries import node, connection, DjangoListConnection, type
 from typing import List
 
 from .types.types import OrderType, OrderItemType, OrderNoteType
@@ -7,10 +7,10 @@ from .types.types import OrderType, OrderItemType, OrderNoteType
 @type(name="Query")
 class OrdersQuery:
     order: OrderType = node()
-    orders: ListConnectionWithTotalCount[OrderType] = connection()
+    orders: DjangoListConnection[OrderType] = connection()
 
     order_item: OrderItemType = node()
-    order_items: ListConnectionWithTotalCount[OrderItemType] = connection()
+    order_items: DjangoListConnection[OrderItemType] = connection()
 
     order_note: OrderNoteType = node()
-    order_notes: ListConnectionWithTotalCount[OrderNoteType] = connection()
+    order_notes: DjangoListConnection[OrderNoteType] = connection()

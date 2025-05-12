@@ -1,4 +1,4 @@
-from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, type
+from core.schema.core.queries import node, connection, DjangoListConnection, type
 from typing import List
 
 from .types.types import CurrencyType, PublicCurrencyType
@@ -7,6 +7,6 @@ from .types.types import CurrencyType, PublicCurrencyType
 @type(name="Query")
 class CurrenciesQuery:
     currency: CurrencyType = node()
-    currencies: ListConnectionWithTotalCount[CurrencyType] = connection()
+    currencies: DjangoListConnection[CurrencyType] = connection()
 
-    public_currencies: ListConnectionWithTotalCount[PublicCurrencyType] = connection()
+    public_currencies: DjangoListConnection[PublicCurrencyType] = connection()
