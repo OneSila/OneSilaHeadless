@@ -58,6 +58,9 @@ fragment fieldsForMediaTypes on Media {
       altText
       url
     }
+    originalSource {
+      url
+    }
   }
 }
 '''

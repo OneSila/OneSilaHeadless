@@ -1,6 +1,6 @@
 from django.contrib import admin
 from sales_channels.integrations.shopify.models import ShopifySalesChannelView, ShopifyProduct, ShopifySalesChannel, \
-    ShopifyProductProperty
+    ShopifyProductProperty, ShopifyImageProductAssociation
 
 
 @admin.register(ShopifySalesChannelView)
@@ -17,4 +17,8 @@ class ShopifyProductPropertyAdmin(admin.ModelAdmin):
 
 @admin.register(ShopifySalesChannel)
 class ShopifySalesChannelAdmin(admin.ModelAdmin):
+    pass
+
+@admin.register(ShopifyImageProductAssociation)
+class ShopifyImageProductAssociationAdmin(admin.ModelAdmin):
     pass

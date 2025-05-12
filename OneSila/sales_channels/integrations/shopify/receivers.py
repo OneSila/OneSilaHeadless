@@ -85,13 +85,12 @@ def shopify__product__delete_from_assign(sender, instance, **kwargs):
 
     run_delete_generic_sales_channel_task_flow(
         task_func=delete_shopify_product_db_task,
-        multi_tenant_company=instance.product.multi_tenant_company,
-        sales_channels_filter_kwargs={'id': instance.sales_channel.id},
+        local_instance_id=product.id,
         remote_class=ShopifyProduct,
-        local_instance_id=instance.product.id,
-        product=instance.product,
-        sales_channel_class=ShopifySalesChannel,
-        is_variation=kwargs.get('is_variation', False)
+        multi_tenant_company=product.multi_tenant_company,
+        sales_channels_filter_kwargs={'id': sales_channel.id},
+        is_variation=kwargs.get('is_variation', False),
+        sales_channel_class=ShopifySalesChannel
     )
 
 
@@ -100,12 +99,12 @@ def shopify__product__delete_from_assign(sender, instance, **kwargs):
 #
 @receiver(delete_remote_product, sender='products.Product')
 def shopify__product__delete_from_product(sender, instance, **kwargs):
-    return
-    run_delete_product_specific_generic_sales_channel_task_flow(
+
+    run_delete_generic_sales_channel_task_flow(
         task_func=delete_shopify_product_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
-        remote_class=ShopifyProduct,
         local_instance_id=instance.id,
+        remote_class=ShopifyProduct,
+        multi_tenant_company=instance.multi_tenant_company,
         is_multiple=True,
         sales_channel_class=ShopifySalesChannel,
     )

@@ -371,7 +371,7 @@ def sync_shopify_product_db_task(
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
-def delete_shopify_product_db_task(task_queue_item_id, sales_channel_id, remote_instance_id):
+def delete_shopify_product_db_task(task_queue_item_id, sales_channel_id, remote_instance):
     from .factories.products import ShopifyProductDeleteFactory
 
     task = BaseRemoteTask(task_queue_item_id)
@@ -380,7 +380,7 @@ def delete_shopify_product_db_task(task_queue_item_id, sales_channel_id, remote_
         sales_channel = ShopifySalesChannel.objects.get(id=sales_channel_id)
         factory = ShopifyProductDeleteFactory(
             sales_channel=sales_channel,
-            remote_instance=sales_channel.shopifyproduct_set.get(id=remote_instance_id),
+            remote_instance=remote_instance
         )
         factory.run()
 

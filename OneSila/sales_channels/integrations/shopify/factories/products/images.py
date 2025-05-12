@@ -151,8 +151,10 @@ class ShopifyMediaProductThroughUpdateFactory(
         super().__init__(*args, **kwargs)
 
     def preflight_check(self):
+
         if not super().preflight_check():
             return False
+
         media = self.local_instance.media
         return media.is_image() or media.is_video()
 

@@ -14,7 +14,7 @@ from sales_channels.integrations.shopify.exceptions import ShopifyGraphqlExcepti
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin
 from sales_channels.integrations.shopify.models import ShopifyProductProperty
 from sales_channels.integrations.shopify.models.products import ShopifyProduct, ShopifyEanCode, ShopifyPrice, \
-    ShopifyProductContent
+    ShopifyProductContent, ShopifyImageProductAssociation
 from sales_channels.integrations.shopify.factories.products.eancodes import ShopifyEanCodeUpdateFactory
 from sales_channels.integrations.shopify.factories.products.images import (
     ShopifyMediaProductThroughCreateFactory,
@@ -46,7 +46,6 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
 
     remote_eancode_update_factory = ShopifyEanCodeUpdateFactory
 
-    # References to create/update/delete product factories
     sync_product_factory   = property(lambda self: ShopifyProductSyncFactory)
     create_product_factory = property(lambda self: ShopifyProductCreateFactory)
     delete_product_factory = property(lambda self: ShopifyProductDeleteFactory)
@@ -98,7 +97,7 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
 
     def set_ean_code(self):
         super().set_ean_code()
-        self.variant_payload['barcode'] = self.ean_code
+        self.variant_payload['barcode'] = self.ean_code if self.ean_code else ''
 
     def build_payload(self):
         super().build_payload()
@@ -128,7 +127,6 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         pass
 
     def process_single_property(self, product_property):
-        print('-------------------------- AICI E BUBA!')
         def add_to_metafields(fac):
             self.metafields.append({
                 "namespace": fac.namespace,
@@ -205,9 +203,6 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         factory.run()
         media_payload = factory.remote_instance_data
 
-        print('------------------- PAYLOAD')
-        print(media_payload)
-
         if not hasattr(self, 'medias'):
             self.medias = []
 
@@ -232,9 +227,6 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         factory.run()
         media_payload = factory.remote_instance_data
 
-        print('------------------- PAYLOAD 2')
-        print(media_payload)
-
         if not hasattr(self, 'medias'):
             self.medias = []
 
@@ -249,7 +241,60 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
     remote_product_eancode_class = ShopifyEanCode
 
     def assign_images(self):
+        # this will try to create the images AFTER the product but we already created them inside the product call
         pass
+
+    def final_process(self):
+        self._assign_metafield_remote_ids()
+        self._assign_image_remote_ids()
+
+    def _assign_image_remote_ids(self):
+        images = self.product_data.get("media", {}).get("edges", [])
+        if not images:
+            return
+
+        # Build lookup: alt text → media ID
+        image_lookup = {}
+        for edge in images:
+            node = edge.get("node", {})
+            if node.get("mediaContentType") == "IMAGE":
+                alt = node.get("alt")
+                if alt:
+                    image_lookup[alt] = node.get("id")
+
+        image_assocs = ShopifyImageProductAssociation.objects.filter(
+            remote_product=self.remote_instance
+        ).select_related("local_instance__media")
+
+        for assoc in image_assocs:
+            alt_name = getattr(assoc.local_instance.media.image, 'name', None)
+            remote_id = image_lookup.get(alt_name)
+            if remote_id:
+                assoc.remote_id = remote_id
+                assoc.save(update_fields=["remote_id"])
+
+    def _assign_metafield_remote_ids(self):
+        metafields = self.product_data.get("metafields", {}).get("edges", [])
+        if not metafields:
+            return
+
+        # Build lookup by key
+        metafield_lookup = {
+            node["key"]: node["id"]
+            for edge in metafields
+            if (node := edge.get("node"))
+        }
+
+        product_properties = ShopifyProductProperty.objects.filter(
+            remote_product=self.remote_instance
+        )
+
+        for prop in product_properties:
+            remote_id = metafield_lookup.get(prop.key)
+            if remote_id:
+                prop.remote_id = remote_id
+                prop.save(update_fields=["remote_id"])
+
     def customize_payload(self):
         super().customize_payload()
         super().assign_images()
@@ -354,10 +399,10 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         if errors:
             raise ShopifyGraphqlException(f"Shopify productCreate userErrors: {errors}")
 
-        product_data = data["data"]["productCreate"]["product"]
-        variant_node = product_data["variants"]["edges"][0]["node"]
+        self.product_data = data["data"]["productCreate"]["product"]
+        variant_node = self.product_data["variants"]["edges"][0]["node"]
 
-        remote_id = product_data["id"]
+        remote_id = self.product_data["id"]
         variant_id = variant_node["id"]
 
         self.remote_instance.remote_id = remote_id
@@ -372,10 +417,11 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
             print('--------------------- UPDATE VARIANT')
             self.initial_variant_updated(variant_id)
 
-        return product_data
+        return self.product_data
 
     def create_variations(self):
         pass
+
     def initial_variant_updated(self, variant_id):
         gql = self.api.GraphQL()
         query = """
@@ -386,15 +432,6 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
             }
             productVariants {
               id
-              metafields(first: 2) {
-                edges {
-                  node {
-                    namespace
-                    key
-                    value
-                  }
-                }
-              }
             }
             userErrors {
               field
@@ -450,7 +487,65 @@ class ShopifyProductDeleteFactory(GetShopifyApiMixin, RemoteProductDeleteFactory
     delete_remote_instance = True
 
     def delete_remote(self):
-        product = self.api.Product.find(self.remote_instance.remote_id)
-        if not product:
-            return True
-        return product.destroy()
+        gql = self.api.GraphQL()
+
+        if self.remote_instance.is_variation:
+            query = """
+            mutation bulkDeleteProductVariants($productId: ID!, $variantsIds: [ID!]!) {
+              productVariantsBulkDelete(productId: $productId, variantsIds: $variantsIds) {
+                product {
+                  id
+                  title
+                }
+                userErrors {
+                  field
+                  message
+                }
+              }
+            }
+            """
+
+            variables = {
+                "productId": self.remote_instance.remote_parent_product.remote_id,
+                "variantsIds": [self.remote_instance.remote_id],
+            }
+
+            response = gql.execute(query, variables=variables)
+            data = json.loads(response)
+
+            errors = data.get("data", {}).get("productVariantsBulkDelete", {}).get("userErrors", [])
+            if errors:
+                raise ShopifyGraphqlException(f"productVariantsBulkDelete userErrors: {errors}")
+
+            return data
+
+        else:
+            query = """
+            mutation deleteProduct($input: ProductDeleteInput!) {
+              productDelete(input: $input) {
+                deletedProductId
+                userErrors {
+                  field
+                  message
+                }
+              }
+            }
+            """
+
+            variables = {
+                "input": {
+                    "id": self.remote_instance.remote_id
+                }
+            }
+
+            response = gql.execute(query, variables=variables)
+            data = json.loads(response)
+
+            errors = data.get("data", {}).get("productDelete", {}).get("userErrors", [])
+            if errors:
+                raise ShopifyGraphqlException(f"productDelete userErrors: {errors}")
+
+            return data
+
+    def serialize_response(self, response):
+        return response
