@@ -4,6 +4,7 @@ from .sales_channels import (
     SalesChannelView,
     SalesChannelIntegrationPricelist,
     SalesChannelViewAssign,
+    RemoteLanguage
 )
 
 # Import related models
