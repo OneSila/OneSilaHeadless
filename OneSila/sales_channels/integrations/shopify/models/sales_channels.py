@@ -51,7 +51,7 @@ class ShopifySalesChannelView(SalesChannelView):
     Placeholder for Shopify store views (e.g., theme locales or markets).
     Shopify does not use separate store-views like Magento.
     """
-    pass
+    publication_id = models.CharField(max_length=216, null=True, blank=True)
 
 
 class ShopifyRemoteLanguage(RemoteLanguage):

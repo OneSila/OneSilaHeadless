@@ -12,7 +12,7 @@ from sales_channels.integrations.shopify.constants import DEFAULT_METAFIELD_NAME
     ALLOW_BACKORDER_CONTINUE, ALLOW_BACKORDER_DENY, MEDIA_FRAGMENT, get_metafields
 from sales_channels.integrations.shopify.exceptions import ShopifyGraphqlException
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin
-from sales_channels.integrations.shopify.models import ShopifyProductProperty
+from sales_channels.integrations.shopify.models import ShopifyProductProperty, ShopifySalesChannelView
 from sales_channels.integrations.shopify.models.products import ShopifyProduct, ShopifyEanCode, ShopifyPrice, \
     ShopifyProductContent, ShopifyImageProductAssociation
 from sales_channels.integrations.shopify.factories.products.eancodes import ShopifyEanCodeUpdateFactory
@@ -115,8 +115,6 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         self.payload['metafields'] = self.metafields
         self.payload['tags'] = self.tags
 
-        print('-------------------------------------------------- RESYNC 1')
-
     def get_saleschannel_remote_object(self, sku):
         gql = self.api.GraphQL()
         query = """
@@ -147,9 +145,6 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         response = gql.execute(query, variables=variables)
         data = json.loads(response)
 
-        print('--------------------------------- DATA')
-        print(data)
-
         product_edges = data.get("data", {}).get("products", {}).get("edges", [])
 
         if not product_edges:
@@ -163,8 +158,6 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
             product_result = self._update_product()
 
         variant_result = self._update_product_variant_only()
-
-        print('----------------------------------------------------------------- RESYNCED')
 
         return {
             "product": self.payload,
@@ -195,9 +188,6 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
 
         response = gql.execute(query, variables=variables)
         data = json.loads(response)
-
-        print('----------------------------------- RETURN DATA 1')
-        print(data)
 
         errors = data.get("data", {}).get("productUpdate", {}).get("userErrors", [])
         if errors:
@@ -237,9 +227,6 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
 
         response = gql.execute(query, variables=variables)
         data = json.loads(response)
-
-        print('----------------------------------- RETURN DATA')
-        print(data)
 
         errors = data.get("data", {}).get("productVariantsBulkUpdate", {}).get("userErrors", [])
         if errors:
@@ -372,6 +359,53 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
     def final_process(self):
         self._assign_metafield_remote_ids()
         self._assign_image_remote_ids()
+        self._publish_product()
+
+    def _publish_product(self):
+
+        publication_ids = ShopifySalesChannelView.objects.filter(sales_channel=self.sales_channel).values_list('publication_id', flat=True).distinct()
+
+        if not publication_ids:
+            return
+
+        gql = self.api.GraphQL()
+
+        query = """
+        mutation productPublish($input: ProductPublishInput!) {
+          productPublish(input: $input) {
+            product {
+              id
+            }
+            productPublications {
+              channel {
+                id
+              }
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+        """
+
+        variables = {
+            "input": {
+                "id": self.remote_instance.remote_id,
+                "productPublications": [
+                    {
+                        "publicationId": pub_id
+                    } for pub_id in publication_ids
+                ]
+            }
+        }
+
+        response = gql.execute(query, variables=variables)
+        data = json.loads(response)
+
+        errors = data.get("data", {}).get("productPublish", {}).get("userErrors", [])
+        if errors:
+            raise ShopifyGraphqlException(f"productPublish userErrors: {errors}")
 
     def _assign_image_remote_ids(self):
         images = self.product_data.get("media", {}).get("edges", [])
@@ -521,10 +555,6 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         response = gql.execute(query, variables=variables)
         data = json.loads(response)
 
-        print('-------------------- RETURN DATA')
-        import pprint
-        pprint.pprint(data)
-
         errors = data.get("data", {}).get("productCreate", {}).get("userErrors", [])
         if errors:
             raise ShopifyGraphqlException(f"Shopify productCreate userErrors: {errors}")
@@ -539,12 +569,9 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         self.remote_instance.default_variant_id = variant_id
         self.remote_instance.save()
 
-        print('---------------------- ???')
         if self.local_instance.type == Product.CONFIGURABLE:
-            print('----------------- CREATE VARIATIONS')
             self.create_variations()
         else:
-            print('--------------------- UPDATE VARIANT')
             self.initial_variant_updated(variant_id)
 
         return self.product_data
@@ -576,9 +603,6 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
             "productId": self.remote_instance.remote_id,
             "variants": [self.variant_payload]
         }
-
-        print('--------------- VARIANT PAYLOAD')
-        print(self.variant_payload)
 
         response = gql.execute(query, variables=variables)
         data = json.loads(response)

@@ -73,9 +73,6 @@ class ShopifyProductContentUpdateFactory(GetShopifyApiMixin, RemoteProductConten
         response = gql.execute(query, variables=variables)
         data = json.loads(response)
 
-        print(self.payload)
-        print(data)
-
         errors = data.get("data", {}).get("productUpdate", {}).get("userErrors", [])
         if errors:
             raise ShopifyGraphqlException(f"productUpdate userErrors: {errors}")

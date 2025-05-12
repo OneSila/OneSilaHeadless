@@ -1040,7 +1040,6 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
         Runs the sync/update flow.
         """
 
-        print('------------------------ RUN SYNC FLOW')
         if self.sync_product_factory is None:
             raise ValueError("sync_product_factory must be specified in the RemoteProductCreateFactory.")
 
