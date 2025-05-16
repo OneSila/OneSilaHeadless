@@ -17,22 +17,3 @@ class ShopifyProductVariationAddFactory(GetShopifyApiMixin, RemoteProductVariati
     def create_factory_class(self):
         from sales_channels.integrations.shopify.factories.products.products import ShopifyProductCreateFactory
         return ShopifyProductCreateFactory
-
-
-class ShopifyProductVariationDeleteFactory(GetShopifyApiMixin, RemoteProductVariationDeleteFactory):
-    """
-    Shopify-specific factory for deleting a product variant via REST.
-    """
-
-    def delete_remote(self):
-        # Attempt to fetch the variant by its remote_id
-        variant = self.api.Variant.find(self.remote_instance.remote_id)
-        if not variant:
-            # Already deleted or never existed
-            return True
-        # Destroy the variant
-        return variant.destroy()
-
-    def serialize_response(self, response):
-        # Shopify .destroy() returns True/False
-        return response
