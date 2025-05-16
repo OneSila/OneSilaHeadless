@@ -20,6 +20,7 @@ SECRET_KEY = "FAKE-KEY-DONT-KEEP-THIS-YOU-SHOULD-SET-A-NEW-ONE"
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DEBUG = False
+TESTING = False
 
 INSTALLED_APPS = [
     'django.contrib.admin',

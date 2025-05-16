@@ -12,6 +12,7 @@ class TestCaseWoocommerceMixin(TransactionTestCase):
         """
         Set up the test case with a mock WoocommerceSalesChannel.
         """
+        super().setUp()
         self.test_store_settings = settings.SALES_CHANNELS_INTEGRATIONS_TEST_STORES['WOOCOMMERCE']
         self.sales_channel = WoocommerceSalesChannel.objects.create(
             hostname=self.test_store_settings['hostname'],
@@ -20,9 +21,10 @@ class TestCaseWoocommerceMixin(TransactionTestCase):
             api_secret=self.test_store_settings['api_secret'],
             api_version=self.test_store_settings['api_version'],
             timeout=self.test_store_settings.get('timeout', 10),
-            verify_ssl=self.test_store_settings.get('verify_ssl', False)
+            verify_ssl=self.test_store_settings.get('verify_ssl', False),
+            active=True,
+            multi_tenant_company=self.multi_tenant_company,
         )
-        super().setUp()
 
     def tearDown(self):
         try:

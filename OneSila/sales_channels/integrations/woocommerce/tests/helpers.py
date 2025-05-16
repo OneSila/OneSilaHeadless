@@ -3,7 +3,8 @@ from properties.models import Property, PropertySelectValue, PropertySelectValue
     ProductPropertiesRule, ProductProperty
 from sales_prices.models import SalesPrice
 from currencies.models import Currency
-from sales_channels.integrations.woocommerce.factories.pulling import WoocommerceRemoteCurrencyPullFactory
+from sales_channels.integrations.woocommerce.factories.pulling import WoocommerceRemoteCurrencyPullFactory, \
+    WoocommerceSalesChannelViewPullFactory, WoocommerceLanguagePullFactory
 from sales_channels.integrations.woocommerce.models import WoocommerceCurrency, WoocommerceProduct, WoocommerceSalesChannel
 from sales_channels.models import SalesChannelView, SalesChannelViewAssign
 
@@ -15,6 +16,17 @@ class CreateTestProductMixin:
             sales_channel=self.sales_channel
         )
         pull_factory.run()
+
+        pull_factory = WoocommerceSalesChannelViewPullFactory(
+            sales_channel=self.sales_channel
+        )
+        pull_factory.run()
+
+        pull_factory = WoocommerceLanguagePullFactory(
+            sales_channel=self.sales_channel
+        )
+        pull_factory.run()
+
         self.api = pull_factory.get_api()
 
         remote_currency = WoocommerceCurrency.objects.get(
@@ -89,12 +101,13 @@ class CreateTestProductMixin:
         if assign_to_sales_channel:
             # finally we also assign the product to the sales channel
             self.sales_channel_view = SalesChannelView.objects.get(
-                multi_tenant_company=self.multi_tenant_company,
+                # multi_tenant_company=self.multi_tenant_company,
                 sales_channel=self.sales_channel,
             )
             self.sales_channel_view_assign = SalesChannelViewAssign.objects.create(
                 multi_tenant_company=self.multi_tenant_company,
                 sales_channel_view=self.sales_channel_view,
+                sales_channel=self.sales_channel,
                 product=product,
             )
 

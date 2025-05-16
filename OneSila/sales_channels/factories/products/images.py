@@ -2,6 +2,10 @@ from media.models import MediaProductThrough, Media
 from sales_channels.factories.mixins import RemoteInstanceCreateFactory, ProductAssignmentMixin, RemoteInstanceUpdateFactory, RemoteInstanceDeleteFactory
 
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 class RemoteMediaCreateFactory(RemoteInstanceCreateFactory):
     local_model_class = Media
 
@@ -48,12 +52,15 @@ class RemoteMediaProductThroughCreateFactory(ProductAssignmentMixin, RemoteInsta
         Checks for the presence of remote product and assignment to a website.
         """
         if self.skip_checks:
+            logger.warning("Skipping preflight check for RemoteMediaProductThroughCreateFactory")
             return True
 
         if not self.remote_product:
+            logger.warning("Remote product is not found for RemoteMediaProductThroughCreateFactory")
             return False
 
         if not self.assigned_to_website():
+            logger.warning("Product is not assigned to a website for RemoteMediaProductThroughCreateFactory")
             return False
 
         return True

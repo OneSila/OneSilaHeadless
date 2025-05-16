@@ -172,3 +172,10 @@ class FailedToGetProductError(FailedToGetError):
     Exception raised when the product is not retrieved from the WooCommerce API.
     """
     pass
+
+
+class FailedToGetStoreConfigError(FailedToGetError):
+    """
+    Exception raised when the store name is not retrieved from the WooCommerce API.
+    """
+    pass

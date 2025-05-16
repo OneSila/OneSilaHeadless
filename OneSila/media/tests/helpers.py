@@ -20,5 +20,5 @@ class CreateImageMixin:
 
     def create_and_attach_image(self, product, fname='red.png'):
         image = self.create_image(product.multi_tenant_company, fname)
-        MediaProductThrough.objects.create(product=product, media=image, multi_tenant_company=product.multi_tenant_company)
-        return image
+        media_product_through = MediaProductThrough.objects.create(product=product, media=image, multi_tenant_company=product.multi_tenant_company)
+        return image, media_product_through

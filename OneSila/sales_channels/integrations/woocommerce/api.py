@@ -9,9 +9,10 @@ from .exceptions import FailedToGetAttributesError, FailedToGetError, \
     FailedToDeleteAttributeTermError, FailedToGetAttributeTermError, FailedToGetAttributeTermError, \
     FailedToCreateAttributeTermError, FailedToDeleteAttributeTermError, FailedToUpdateAttributeTermError, \
     FailedToGetStoreCurrencyError, FailedToGetProductError, FailedToGetProductBySkuError, FailedToCreateProductError, \
-    FailedToUpdateProductError, FailedToDeleteProductError
+    FailedToUpdateProductError, FailedToDeleteProductError, FailedToGetStoreConfigError
 from .constants import API_ATTRIBUTE_PREFIX
 import urllib3
+import requests
 from copy import deepcopy
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -251,19 +252,21 @@ class WoocommerceApiWrapper:
             'name': name,
             'type': type,
             'sku': sku,
-            'status': status,
-            'catalog_visibility': catalog_visibility,
+            # 'status': status,
+            # 'catalog_visibility': catalog_visibility,
             'regular_price': self._convert_price_to_string(regular_price),
             'sale_price': self._convert_price_to_string(sale_price),
             'description': description,
             'short_description': short_description,
             'categories': categories,
-            'images': images,
-            'attributes': attributes,
+            # 'images': images,
+            # 'attributes': attributes,
         }
         for k, v in deepcopy(payload).items():
             if v is None or v == []:
                 del payload[k]
+
+        logger.debug(f"Create Product Payload: {payload}")
 
         try:
             return self.post('products', data=payload)
@@ -309,3 +312,17 @@ class WoocommerceApiWrapper:
             if i['id'] == key:
                 return i['default']
         raise FailedToGetStoreCurrencyError(f"Currency not found for key {key}")
+
+    def get_store_config(self):
+        """
+        Get the name of the store.
+        """
+        resp = requests.get(f"{self.hostname}/wp-json")
+        if resp.ok:
+            resp_data = resp.json()
+            return {
+                'name': resp_data['name'],
+                'url': resp_data['url'],
+            }
+        else:
+            raise FailedToGetStoreConfigError(f"Failed to get store config: {resp.status_code}")

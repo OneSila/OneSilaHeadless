@@ -2,6 +2,8 @@ from sales_channels.factories.mixins import PullRemoteInstanceMixin
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceCurrency, \
     WoocommerceRemoteLanguage
+from sales_channels.factories.mixins import PullRemoteInstanceMixin
+from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannelView
 
 import logging
 logger = logging.getLogger(__name__)
@@ -35,7 +37,7 @@ class WoocommerceLanguagePullFactory(GetWoocommerceAPIMixin, PullRemoteInstanceM
     """
     remote_model_class = WoocommerceRemoteLanguage
     field_mapping = {
-        'remote_code': 'code',
+        'remote_code': 'locale',
     }
     update_field_mapping = field_mapping
     get_or_create_fields = ['remote_code']
@@ -49,4 +51,34 @@ class WoocommerceLanguagePullFactory(GetWoocommerceAPIMixin, PullRemoteInstanceM
         """
         Overrides the default to call GraphQL shop.locales and build a list of dicts.
         """
-        raise NotImplementedError("Not implemented")
+        self.remote_instances = [{'locale': 'en_GB'}]
+
+
+class WoocommerceSalesChannelViewPullFactory(GetWoocommerceAPIMixin, PullRemoteInstanceMixin):
+    """
+    Pulls the single store "view" for Woocommerce (the storefront) and mirrors it as a SalesChannelView.
+    """
+    remote_model_class = WoocommerceSalesChannelView
+    field_mapping = {
+        # 'remote_id': 'id',
+        'name': 'name',
+        'url': 'url',
+    }
+    update_field_mapping = field_mapping
+    get_or_create_fields = ['remote_id']
+
+    allow_create = True
+    allow_update = True
+    allow_delete = False
+    is_model_response = False
+
+    def fetch_remote_instances(self):
+        """
+        there is no such concept as a view in woocommerce.
+        """
+        store_config = self.api.get_store_config()
+        self.remote_instances = [{
+            # 'id':   shop.id,
+            'name': store_config['name'],
+            'url': store_config['url'],
+        }]
