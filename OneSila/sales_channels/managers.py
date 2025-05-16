@@ -20,14 +20,18 @@ class RemoteProductConfiguratorQuerySet(PolymorphicQuerySet, MultiTenantQuerySet
         if rule is None:
             raise ValueError(f"No product properties rule found for {local_product.name}")
 
-        all_remote_props = self.model._get_all_remote_properties(
+        all_local_props = self.model._get_all_properties(
             local_product, sales_channel, rule=rule, variations=variations
         )
 
-        # Create the configurator
-        configurator = self.create(remote_product=remote_product, multi_tenant_company=remote_product.multi_tenant_company, sales_channel=sales_channel)
-        configurator.remote_properties.set(all_remote_props)
+        configurator = self.create(
+            remote_product=remote_product,
+            multi_tenant_company=remote_product.multi_tenant_company,
+            sales_channel=sales_channel
+        )
+        configurator.properties.set(all_local_props)
         configurator.save()
+
         return configurator
 
 class RemoteProductConfiguratorManager(PolymorphicManager, MultiTenantManager):

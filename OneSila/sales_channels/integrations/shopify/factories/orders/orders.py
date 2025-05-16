@@ -63,9 +63,6 @@ class ShopifyOrderPullFactory(GetShopifyApiMixin, RemoteOrderPullFactory):
         result = gql.execute(query, variables)
         data = json.loads(result)
 
-        print('----------------- DATA')
-        print(data)
-
         self.remote_instances = [
             edge["node"] for edge in data.get("data", {}).get("orders", {}).get("edges", [])
         ]

@@ -31,8 +31,6 @@ class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFacto
         except self.remote_model_class.DoesNotExist:
             return False
 
-        print('------------------------------ SOMETHING')
-
         # we do that so if the currency inherit other currencies we make sure the updates goes for all
         # because the price_data here will override the inherited currency one and if this happen that one will be skipped
         if self.currency:

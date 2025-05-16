@@ -91,7 +91,6 @@ def delete_shopify_product_property_db_task(
     def actual_task():
         sales_channel = ShopifySalesChannel.objects.get(id=sales_channel_id)
         remote_instance = ShopifyProductProperty.objects.get(id=remote_instance_id)
-        print(remote_instance.__dict__)
 
         factory_kwargs = {
             'remote_instance': remote_instance,

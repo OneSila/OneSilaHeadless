@@ -23,12 +23,10 @@ class ShopifyMediaProductThroughCreateFactory(GetShopifyApiMixin, ShopifyMediaPa
 
     def preflight_check(self):
 
-        print('------------------------- 1!')
         if not super().preflight_check():
             return False
 
         media = self.local_instance.media
-        print('-------------------------- 2')
         return media.is_image() or media.is_video()
 
     def customize_remote_instance_data(self):
@@ -37,7 +35,6 @@ class ShopifyMediaProductThroughCreateFactory(GetShopifyApiMixin, ShopifyMediaPa
         return self.remote_instance_data
 
     def create_remote(self):
-        print('--------------------------------- 1?')
 
         self.remote_instance_data = self.prepare_media_payload()
         if self.get_value_only:
@@ -87,11 +84,9 @@ class ShopifyMediaProductThroughCreateFactory(GetShopifyApiMixin, ShopifyMediaPa
 
         # Extract the remote ID and URL
         remote_id = media_data["id"]
-        remote_url = media_data.get("image", {}).get("url") or media_data.get("originUrl")
 
         self.remote_instance_data = {
-            "remote_id": remote_id,
-            "remote_url": remote_url,
+            "id": remote_id,
             "media_type": media_data["mediaContentType"],
             "alt": media_data.get("alt"),
             "current_position": self.local_instance.sort_order,
@@ -246,6 +241,9 @@ class ShopifyMediaProductThroughUpdateFactory(
     def serialize_response(self, response):
         return response
 
+    def needs_update(self):
+        return True
+
 class ShopifyMediaProductThroughDeleteFactory(
     GetShopifyApiMixin,
     RemoteMediaProductThroughDeleteFactory
@@ -258,8 +256,9 @@ class ShopifyMediaProductThroughDeleteFactory(
     delete_remote_instance = True
 
     def delete_remote(self):
+
         if not self.remote_instance.remote_id:
-            return True  # nothing to delete
+            return True
 
         if self.remote_product.is_variation:
             return self._detach_variant_media()
@@ -295,7 +294,7 @@ class ShopifyMediaProductThroughDeleteFactory(
         if errors:
             raise ShopifyGraphqlException(f"productDeleteMedia errors: {errors}")
 
-        return True
+        return data
 
     def _detach_variant_media(self):
         gql = self.api.GraphQL()
@@ -342,7 +341,10 @@ class ShopifyMediaProductThroughDeleteFactory(
         if errors:
             raise ShopifyGraphqlException(f"productVariantDetachMedia errors: {errors}")
 
-        return True
+        return data
+
+    def serialize_response(self, response):
+        return response
 
 class ShopifyImageDeleteFactory(RemoteImageDeleteFactory):
     """
