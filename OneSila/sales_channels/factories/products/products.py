@@ -58,6 +58,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.is_variation = parent_local_instance is not None  # Determine if this is a variation
         self.payload = {}
         self.remote_product_properties = []
+        self.local_type = self.local_instance.type
 
 
     def set_local_assigns(self):
@@ -228,9 +229,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         Determines the remote product type based on the local product type
         and sets it in the payload.
         """
-        local_type = self.local_instance.type
 
-        if local_type == Product.CONFIGURABLE:
+        if self.local_type == Product.CONFIGURABLE:
             self.remote_type = self.REMOTE_TYPE_CONFIGURABLE
         else:
             # All other types default to simple
@@ -625,7 +625,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
                 # If does not exist, use the create factory
                 remote_image = self.create_image_assignment(media_through)
 
-            existing_remote_images_ids.append(remote_image.id)
+            if remote_image:
+                existing_remote_images_ids.append(remote_image.id)
 
         remote_images_to_delete = RemoteImageProductAssociation.objects.filter(
             remote_product=self.remote_instance,
@@ -711,6 +712,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         existing_remote_variation_ids = []
 
         for variation in self.variations:
+
             # Try to get the remote variation
             try:
                 remote_variation = self.remote_model_class.objects.get(
@@ -876,7 +878,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.initialize_remote_product()
             self.set_remote_product_for_logging()
 
-            if self.remote_type == self.REMOTE_TYPE_CONFIGURABLE:
+            if self.local_type == Product.CONFIGURABLE:
                 self.get_variations()
 
             self.precalculate_progress_step_increment(4)
@@ -885,6 +887,10 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.build_payload()
             self.set_product_properties()
             self.process_product_properties()
+
+            if self.local_type == Product.CONFIGURABLE:
+                self.set_remote_configurator()
+
             self.customize_payload()
             self.pre_action_process()
             self.update_progress()
@@ -904,8 +910,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
             self.update_progress()
 
-            if self.remote_type == self.REMOTE_TYPE_CONFIGURABLE:
-                self.set_remote_configurator()
+            if self.local_type == Product.CONFIGURABLE:
                 self.create_or_update_children()
 
             if self.is_variation:

@@ -1,7 +1,5 @@
 import json
-
 from sales_channels.integrations.shopify.factories.mixins import RemoteValueMixin
-from sales_channels.integrations.shopify.constants import DEFAULT_METAFIELD_NAMESPACE
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin, ShopifyMetafieldMixin
 from sales_channels.factories.properties.properties import (
     RemoteProductPropertyCreateFactory,
@@ -105,6 +103,10 @@ class ShopifyProductPropertyUpdateFactory(
         prop = self.local_instance.property
         self.namespace, self.key, self.value, self.metafield_type = self.prepare_metafield_payload(raw_value, prop)
 
+        if self.remote_instance.namespace != self.namespace:
+            self.remote_instance = self.remote_instance.namespace
+            self.remote_instance.save()
+
         gql = self.api.GraphQL()
 
         owner_id = (
@@ -161,7 +163,7 @@ class ShopifyProductPropertyDeleteFactory(
     def delete_remote(self):
         gql = self.api.GraphQL()
 
-        self.namespace = DEFAULT_METAFIELD_NAMESPACE
+        self.namespace = self.remote_instance.namespace
         self.key = self.remote_instance.key
 
         owner_id = (

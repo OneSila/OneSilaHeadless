@@ -30,7 +30,7 @@ class ProductPropertiesRuleImport(ImportOperationMixin):
 
 
 class ProductPropertiesRuleItemImport(ImportOperationMixin):
-    get_identifiers = ['rule', 'property']
+    get_identifiers = ['rule', 'property', 'type']
 
 class ProductPropertyImport(ImportOperationMixin):
     get_identifiers = ['product', 'property']
@@ -463,7 +463,7 @@ class ImportProductPropertiesRuleItemInstance(AbstractImportInstance):
 
     @property
     def updatable_fields(self):
-        return ['sort_order', 'type']
+        return ['sort_order']
 
     def validate(self):
 

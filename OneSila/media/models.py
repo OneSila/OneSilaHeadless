@@ -85,10 +85,10 @@ class Media(models.Model):
 
     @property
     def image_web_url(self):
-        from django.conf import settings
-
-        if settings.DEBUG:
-            return 'https://images.pexels.com/photos/45201/kitty-cat-kitten-pet-45201.jpeg'
+        # from django.conf import settings
+        #
+        # if settings.DEBUG:
+        #     return 'https://images.pexels.com/photos/45201/kitty-cat-kitten-pet-45201.jpeg'
 
         if self.image:
             return f"{generate_absolute_url(trailing_slash=False)}{self.image_web.url}"

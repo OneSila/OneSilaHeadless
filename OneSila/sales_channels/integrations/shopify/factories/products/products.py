@@ -1,14 +1,17 @@
+import copy
 import json
 
 from media.models import MediaProductThrough, Media
 from products.models import Product
+from properties.models import ProductProperty
+from sales_channels.exceptions import SwitchedToCreateException, SwitchedToSyncException
 from sales_channels.factories.products.products import (
     RemoteProductSyncFactory,
     RemoteProductCreateFactory,
     RemoteProductUpdateFactory,
     RemoteProductDeleteFactory,
 )
-from sales_channels.integrations.shopify.constants import DEFAULT_METAFIELD_NAMESPACE, ACTIVE_STATUS, NON_ACTIVE_STATUS, \
+from sales_channels.integrations.shopify.constants import ACTIVE_STATUS, NON_ACTIVE_STATUS, \
     ALLOW_BACKORDER_CONTINUE, ALLOW_BACKORDER_DENY, MEDIA_FRAGMENT, get_metafields
 from sales_channels.integrations.shopify.exceptions import ShopifyGraphqlException
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin
@@ -67,6 +70,7 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
     medias = []
 
     def set_sku(self):
+        self.sku = self.local_instance.sku
         self.variant_payload['inventoryItem']['sku'] = self.local_instance.sku
         self.variant_payload['inventoryItem']['tracked'] = True
 
@@ -100,8 +104,8 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         self.variant_payload['barcode'] = self.ean_code if self.ean_code else ''
 
     def build_payload(self):
-        super().build_payload()
         self.set_sku()
+        super().build_payload()
         self.set_price()
         self.set_active()
         self.set_sku()
@@ -112,8 +116,13 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
     def customize_payload(self):
         self.set_vendor()
 
-        self.payload['metafields'] = self.metafields
+        if self.is_variation:
+            self.variant_payload['metafields'] = self.metafields
+        else:
+            self.payload['metafields'] = self.metafields
+
         self.payload['tags'] = self.tags
+
 
     def get_saleschannel_remote_object(self, sku):
         gql = self.api.GraphQL()
@@ -157,7 +166,9 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         if not self.is_variation:
             product_result = self._update_product()
 
-        variant_result = self._update_product_variant_only()
+        if self.local_type != Product.CONFIGURABLE:
+            # update the default variant fields if not configurable
+            variant_result = self._update_product_variant_only()
 
         return {
             "product": self.payload,
@@ -304,6 +315,10 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         Builds the media payload (get_value_only) and appends it to self.medias.
         Does NOT send the mutation yet.
         """
+        if self.is_variation:
+            # @TODO: For now we skip
+            return None
+
         factory = self.remote_image_assign_create_factory(
             local_instance=media_through,
             sales_channel=self.sales_channel,
@@ -346,23 +361,78 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
 
         return factory.remote_instance
 
+    def add_variation_to_parent(self):
+        pass
+
+    def run_for_payload(self):
+
+        # we run sync but don't do any remote action so it can be used for bulk operations
+        if not self.preflight_check():
+            logger.debug(f"Preflight check failed for {self.sales_channel}.")
+            return
+
+        self.set_api()
+        log_identifier, fixing_identifier = self.get_identifiers()
+
+        self.set_type()
+        try:
+            self.initialize_remote_product()
+            self.set_remote_product_for_logging()
+
+            if self.local_type == Product.CONFIGURABLE:
+                self.get_variations()
+
+            self.set_local_assigns()
+            self.set_rule()
+            self.build_payload()
+            self.set_product_properties()
+            self.process_product_properties()
+
+            if self.local_type == Product.CONFIGURABLE:
+                self.set_remote_configurator()
+
+            self.customize_payload()
+
+            self.final_process()
+            self.log_action(self.action_log, {}, self.payload, log_identifier)
+
+        except SwitchedToCreateException as stc:
+            logger.debug(stc)
+            self.run_create_flow()
+
+        except SwitchedToSyncException as sts:
+            logger.debug(sts)
+            self.run_sync_flow()
+
+        except Exception as e:
+            self.log_error(e, self.action_log, log_identifier, self.payload, fixing_identifier)
+            raise
+
+        finally:
+            self.finalize_progress()
+
 
 class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreateFactory):
     remote_price_class = ShopifyPrice
     remote_product_content_class = ShopifyProductContent
     remote_product_eancode_class = ShopifyEanCode
+    variations_payload = []
+    sku_variations_map = {}
 
     def assign_images(self):
         # this will try to create the images AFTER the product but we already created them inside the product call
         pass
 
     def final_process(self):
-        self._assign_metafield_remote_ids()
-        self._assign_image_remote_ids()
-        self._publish_product()
+
+        if not self.is_variation:
+            # we only publish the main product
+            # the _assign_metafield_remote_ids and _assign_image_remote_ids for variation happen in bulk method
+            self._assign_metafield_remote_ids()
+            self._assign_image_remote_ids()
+            self._publish_product()
 
     def _publish_product(self):
-
         publication_ids = ShopifySalesChannelView.objects.filter(sales_channel=self.sales_channel).values_list('publication_id', flat=True).distinct()
 
         if not publication_ids:
@@ -407,8 +477,20 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         if errors:
             raise ShopifyGraphqlException(f"productPublish userErrors: {errors}")
 
-    def _assign_image_remote_ids(self):
-        images = self.product_data.get("media", {}).get("edges", [])
+    def set_product_data_and_remote_product(self, product_data, remote_product):
+
+        if product_data is None:
+            product_data = self.product_data
+
+        if remote_product is None:
+            remote_product = self.remote_instance
+
+        return product_data, remote_product
+
+    def _assign_image_remote_ids(self, product_data=None, remote_product=None):
+
+        product_data, remote_product = self.set_product_data_and_remote_product(product_data, remote_product)
+        images = product_data.get("media", {}).get("edges", [])
         if not images:
             return
 
@@ -422,7 +504,7 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
                     image_lookup[alt] = node.get("id")
 
         image_assocs = ShopifyImageProductAssociation.objects.filter(
-            remote_product=self.remote_instance
+            remote_product=remote_product
         ).select_related("local_instance__media")
 
         for assoc in image_assocs:
@@ -432,8 +514,10 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
                 assoc.remote_id = remote_id
                 assoc.save(update_fields=["remote_id"])
 
-    def _assign_metafield_remote_ids(self):
-        metafields = self.product_data.get("metafields", {}).get("edges", [])
+    def _assign_metafield_remote_ids(self, product_data=None, remote_product=None):
+
+        product_data, remote_product = self.set_product_data_and_remote_product(product_data, remote_product)
+        metafields = product_data.get("metafields", {}).get("edges", [])
         if not metafields:
             return
 
@@ -445,7 +529,7 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         }
 
         product_properties = ShopifyProductProperty.objects.filter(
-            remote_product=self.remote_instance
+            remote_product=remote_product
         )
 
         for prop in product_properties:
@@ -457,6 +541,55 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
     def customize_payload(self):
         super().customize_payload()
         super().assign_images()
+
+        if self.local_instance.type == Product.CONFIGURABLE:
+            self.payload['productOptions'] = self.get_product_options()
+        else:
+            if self.is_variation:
+                self.variant_payload['optionValues'] = self.get_option_values()
+
+
+    def get_product_options(self):
+        from collections import defaultdict
+
+        options = defaultdict(set)
+
+        for variation in self.variations:
+            product_properties = ProductProperty.objects.filter(
+                property_id__in=self.configurator.properties.values_list('id', flat=True),
+                product=variation
+            ).select_related('property', 'value_select')
+
+            for prop in product_properties:
+                prop_name = prop.property.name
+                value = prop.value_select.value
+                if value:
+                    options[prop_name].add(value)
+
+        product_options = [
+            {
+                "name": name,
+                "values": [{"name": value} for value in sorted(values)]
+            }
+            for name, values in options.items()
+        ]
+
+        return product_options
+
+
+    def get_option_values(self):
+        props_qs = self.product_properties.filter(
+            property_id__in=self.remote_parent_product.configurator.properties.values_list('id', flat=True)
+        ).select_related('property', 'value_select')
+
+        values = []
+        for prop in props_qs:
+            value = prop.value_select.value
+            if value:
+                values.append({"name": value, "optionName": prop.property.name})
+
+        return values
+
 
     def perform_remote_action(self):
         if self.is_variation:
@@ -471,28 +604,29 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
 
     def _create_product_variant_only(self):
         gql = self.api.GraphQL()
-        query = """
-        mutation ProductVariantsCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-          productVariantsBulkCreate(productId: $productId, variants: $variants) {
-            productVariants {
+        query = f"""
+        mutation ProductVariantsCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {{
+          productVariantsBulkCreate(productId: $productId, variants: $variants) {{
+            productVariants {{
               id
               title
-              selectedOptions {
+              {get_metafields(len(self.metafields))}
+              selectedOptions {{
                 name
                 value
-              }
-            }
-            userErrors {
+              }}
+            }}
+            userErrors {{
               field
               message
-            }
-          }
-        }
+            }}
+          }}
+        }}
         """
 
         variables = {
-            "productId": self.parent_remote_product.remote_id,
-            "variants": [self.variant_payload]
+            "productId": self.remote_parent_product.remote_id,
+            "variants": [self.variant_payload],
         }
 
         response = gql.execute(query, variables=variables)
@@ -506,7 +640,8 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         if not variants:
             raise ShopifyGraphqlException("No variants returned from Shopify.")
 
-        variant_id = variants[0]["id"]
+        self.product_data = variants[0]
+        variant_id = self.product_data["id"]
         self.remote_instance.remote_id = variant_id
         self.remote_instance.default_variant_id = variant_id
         self.remote_instance.save()
@@ -523,6 +658,16 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
             product {{
               id
               title
+              options {{
+                  id
+                  name
+                  position
+                  optionValues {{
+                    id
+                    name
+                    hasVariants
+                  }}
+                }}
               variants(first: 1) {{
                 edges {{
                   node {{
@@ -555,6 +700,7 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         response = gql.execute(query, variables=variables)
         data = json.loads(response)
 
+
         errors = data.get("data", {}).get("productCreate", {}).get("userErrors", [])
         if errors:
             raise ShopifyGraphqlException(f"Shopify productCreate userErrors: {errors}")
@@ -569,15 +715,129 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         self.remote_instance.default_variant_id = variant_id
         self.remote_instance.save()
 
-        if self.local_instance.type == Product.CONFIGURABLE:
-            self.create_variations()
-        else:
+        if self.local_instance.type != Product.CONFIGURABLE:
             self.initial_variant_updated(variant_id)
 
         return self.product_data
 
     def create_variations(self):
-        pass
+
+        if not self.variations_payload:
+            return
+
+        gql = self.api.GraphQL()
+        query = f"""
+        {MEDIA_FRAGMENT}
+        
+        mutation ProductVariantsCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {{
+          productVariantsBulkCreate(productId: $productId, variants: $variants) {{
+            productVariants {{
+              id
+              title
+              sku
+              selectedOptions {{
+                name
+                value
+              }}
+            media(first: {len(self.medias)}) {{
+                edges {{
+                  node {{
+                    ...fieldsForMediaTypes
+                  }}
+                }}
+              }}
+              {get_metafields(25)}
+            }}
+            userErrors {{
+              field
+              message
+            }}
+          }}
+        }}
+        """
+
+        variables = {
+            "productId": self.remote_instance.remote_id,
+            "variants": self.variations_payload,
+        }
+
+        response = gql.execute(query, variables=variables)
+        data = json.loads(response)
+
+        errors = data.get("data", {}).get("productVariantsBulkCreate", {}).get("userErrors", [])
+        if errors:
+            raise ShopifyGraphqlException(f"productVariantsBulkCreate (bulk) userErrors: {errors}")
+
+        created_variants = data["data"]["productVariantsBulkCreate"]["productVariants"]
+
+        # Assign remote_id + default_variant_id to each variation RemoteProduct
+        for variant in created_variants:
+            sku = variant.get("sku")
+            remote_id = variant.get("id")
+            if not sku or not remote_id:
+                continue
+            remote_variation = self.sku_variations_map.get(sku)
+
+            if remote_variation:
+                remote_variation.remote_id = remote_id
+                remote_variation.default_variant_id = remote_id
+                remote_variation.save(update_fields=["remote_id", "default_variant_id"])
+
+            self._assign_image_remote_ids(variant, remote_variation)
+            self._assign_metafield_remote_ids(variant, remote_variation)
+
+
+    def create_or_update_children(self):
+        super().create_or_update_children()
+        self.create_variations()
+
+        self.delete_default_variant()
+
+
+    def create_child(self, variation):
+        factory = self.create_product_factory(
+            sales_channel=self.sales_channel,
+            local_instance=variation,
+            parent_local_instance=self.local_instance,
+            remote_parent_product=self.remote_instance,
+            api=self.api,
+        )
+        factory.metafields = []
+        factory.run_for_payload()
+        remote_variation = factory.remote_instance
+
+        self.variations_payload.append(copy.deepcopy(factory.variant_payload))
+        self.sku_variations_map[factory.sku] = remote_variation
+        return remote_variation
+
+    def delete_default_variant(self):
+
+        gql = self.api.GraphQL()
+        query = """
+        mutation deleteDefaultVariant($productId: ID!, $variantsIds: [ID!]!) {
+          productVariantsBulkDelete(productId: $productId, variantsIds: $variantsIds) {
+            product {
+              id
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+        """
+
+        variables = {
+            "productId": self.remote_instance.remote_id,
+            "variantsIds": [self.remote_instance.default_variant_id]
+        }
+
+        response = gql.execute(query, variables=variables)
+        data = json.loads(response)
+
+        errors = data.get("data", {}).get("productVariantsBulkDelete", {}).get("userErrors", [])
+        if errors:
+            raise ShopifyGraphqlException(f"Could not delete default variant: {errors}")
 
     def initial_variant_updated(self, variant_id):
         gql = self.api.GraphQL()
