@@ -64,10 +64,6 @@ class WooCommerceMediaProductThroughMixin(WooCommerceMediaMixin, SerialiserMixin
     # Key is the local field, value is the remote field
     field_mapping = {}
 
-    def initialize_remote_instance(self):
-        # We dont actually store any remote references.
-        pass
-
     def preflight_process(self):
         if not self.local_instance.media.is_image():
             return False
@@ -88,6 +84,10 @@ class WooCommerceMediaProductThroughCreateFactory(WooCommerceMediaProductThrough
 
     def create_remote_image(self):
         return self.create_or_update_images()
+
+    def customize_remote_instance_data(self):
+        self.remote_instance_data['remote_product'] = self.remote_product
+        return self.remote_instance_data
 
 
 class WooCommerceMediaProductThroughUpdateFactory(WooCommerceMediaProductThroughMixin, GetWoocommerceAPIMixin, RemoteMediaProductThroughUpdateFactory):

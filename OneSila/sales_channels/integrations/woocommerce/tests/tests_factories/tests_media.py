@@ -31,9 +31,10 @@ class WooCommerceMediaProductThroughFactoryTest(CreateTestProductMixin, CreateIm
         logger.debug(f"Created image: {image}")
         logger.debug(f"Product has {self.product.mediaproductthrough_set.count()} image_throughs")
 
+        image_two = self.create_and_attach_image(self.product, fname='red.png')
         media_create_factory = WooCommerceMediaProductThroughCreateFactory(
             sales_channel=self.sales_channel,
-            local_instance=image,
+            local_instance=image_two,
             remote_product=product_create_factory.remote_product,
         )
         media_create_factory.run()
