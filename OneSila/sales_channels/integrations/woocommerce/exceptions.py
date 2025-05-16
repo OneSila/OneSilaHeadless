@@ -179,3 +179,10 @@ class FailedToGetStoreConfigError(FailedToGetError):
     Exception raised when the store name is not retrieved from the WooCommerce API.
     """
     pass
+
+
+class FailedToGetStoreLanguageError(FailedToGetError):
+    """
+    Exception raised when the store languages are not retrieved from the WooCommerce API.
+    """
+    pass

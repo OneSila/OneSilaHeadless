@@ -67,6 +67,10 @@ class WooCommerceProductMixin(WooCommerceMediaMixin, WooCommerceProductAttribute
 
         return self.payload
 
+    def process_content_translation(self, short_description, description, url_key, remote_language):
+        # No translations are supported in woocommerce.
+        pass
+
 
 class WooCommerceProductSyncFactory(WooCommerceProductMixin, GetWoocommerceAPIMixin, RemoteProductSyncFactory):
     remote_model_class = WoocommerceProduct

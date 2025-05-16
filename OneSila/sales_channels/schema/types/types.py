@@ -8,6 +8,7 @@ from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from currencies.schema.types.types import CurrencyType
 from imports_exports.schema.queries import ImportType
 from products.schema.types.types import ProductType
+from integrations.schema.types.types import IntegrationType
 
 from sales_channels.models import ImportCurrency, ImportImage, SalesChannelImport, ImportProduct, ImportProperty, \
     ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, \
@@ -118,6 +119,7 @@ class RemoteInventoryType(relay.Node, GetQuerysetMultiTenantMixin):
 class RemoteOrderType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
 
+
 @type(RemoteProductContent, filters=RemoteProductContentFilter, order=RemoteProductContentOrder, pagination=True, fields='__all__')
 class RemoteProductContentType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
@@ -170,6 +172,7 @@ class RemoteLanguageType(relay.Node, GetQuerysetMultiTenantMixin):
 
         return name
 
+
 @type(RemoteLog, filters=RemoteLogFilter, order=RemoteLogOrder, pagination=True, fields='__all__')
 class RemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
@@ -194,6 +197,7 @@ class RemoteProductType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def has_errors(self, info) -> bool | None:
         return self.has_errors
+
 
 @type(SalesChannelViewAssign, filters=SalesChannelViewAssignFilter, order=SalesChannelViewAssignOrder, pagination=True, fields='__all__')
 class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):

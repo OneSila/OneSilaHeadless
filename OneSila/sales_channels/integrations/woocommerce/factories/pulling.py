@@ -15,7 +15,7 @@ class WoocommerceRemoteCurrencyPullFactory(GetWoocommerceAPIMixin, PullRemoteIns
     """
     remote_model_class = WoocommerceCurrency
     field_mapping = {
-        'remote_code': 'code',
+        'remote_code': 'remote_code',
     }
     update_field_mapping = field_mapping
     get_or_create_fields = ['remote_code']
@@ -27,7 +27,7 @@ class WoocommerceRemoteCurrencyPullFactory(GetWoocommerceAPIMixin, PullRemoteIns
 
     def fetch_remote_instances(self):
         currency = self.api.get_store_currency()
-        self.remote_instances = [{'code': currency, }]
+        self.remote_instances = [{'remote_code': currency, }]
 
 
 class WoocommerceLanguagePullFactory(GetWoocommerceAPIMixin, PullRemoteInstanceMixin):
@@ -51,7 +51,7 @@ class WoocommerceLanguagePullFactory(GetWoocommerceAPIMixin, PullRemoteInstanceM
         """
         Overrides the default to call GraphQL shop.locales and build a list of dicts.
         """
-        self.remote_instances = [{'locale': 'en_GB'}]
+        self.remote_instances = [{'locale': self.api.get_store_language()}]
 
 
 class WoocommerceSalesChannelViewPullFactory(GetWoocommerceAPIMixin, PullRemoteInstanceMixin):
@@ -78,7 +78,7 @@ class WoocommerceSalesChannelViewPullFactory(GetWoocommerceAPIMixin, PullRemoteI
         """
         store_config = self.api.get_store_config()
         self.remote_instances = [{
-            # 'id':   shop.id,
+            # 'id':   store_id,
             'name': store_config['name'],
             'url': store_config['url'],
         }]

@@ -9,7 +9,8 @@ from .exceptions import FailedToGetAttributesError, FailedToGetError, \
     FailedToDeleteAttributeTermError, FailedToGetAttributeTermError, FailedToGetAttributeTermError, \
     FailedToCreateAttributeTermError, FailedToDeleteAttributeTermError, FailedToUpdateAttributeTermError, \
     FailedToGetStoreCurrencyError, FailedToGetProductError, FailedToGetProductBySkuError, FailedToCreateProductError, \
-    FailedToUpdateProductError, FailedToDeleteProductError, FailedToGetStoreConfigError
+    FailedToUpdateProductError, FailedToDeleteProductError, FailedToGetStoreConfigError, \
+    FailedToGetStoreLanguageError
 from .constants import API_ATTRIBUTE_PREFIX
 import urllib3
 import requests
@@ -252,15 +253,15 @@ class WoocommerceApiWrapper:
             'name': name,
             'type': type,
             'sku': sku,
-            # 'status': status,
-            # 'catalog_visibility': catalog_visibility,
+            'status': status,
+            'catalog_visibility': catalog_visibility,
             'regular_price': self._convert_price_to_string(regular_price),
             'sale_price': self._convert_price_to_string(sale_price),
             'description': description,
             'short_description': short_description,
             'categories': categories,
-            # 'images': images,
-            # 'attributes': attributes,
+            'images': images,
+            'attributes': attributes,
         }
         for k, v in deepcopy(payload).items():
             if v is None or v == []:
@@ -303,15 +304,24 @@ class WoocommerceApiWrapper:
         except FailedToDeleteError as e:
             raise FailedToDeleteProductError(e, response=e.response) from e
 
+    def get_from_settings(self, key):
+        """
+        Get a setting from the WooCommerce settings.
+        """
+        for i in self.get('settings/general'):
+            if i['id'] == key:
+                return i['default']
+        raise ValueError(f"Setting with key {key} not found")
+
     def get_store_currency(self):
         """
         Get the configured currency for the store.
         """
         key = 'woocommerce_currency'
-        for i in self.get('settings/general'):
-            if i['id'] == key:
-                return i['default']
-        raise FailedToGetStoreCurrencyError(f"Currency not found for key {key}")
+        try:
+            return self.get_from_settings(key)
+        except ValueError:
+            raise FailedToGetStoreCurrencyError(f"Currency not found for key {key}")
 
     def get_store_config(self):
         """
@@ -326,3 +336,41 @@ class WoocommerceApiWrapper:
             }
         else:
             raise FailedToGetStoreConfigError(f"Failed to get store config: {resp.status_code}")
+
+    def get_store_language(self):
+        """
+        Get the language configured for the store.
+        """
+        # FIXME: This is a poor way to detect language.
+        # Instead, we should gain access to the wordpress application password
+        # and use the wordpress api instead of the woocom api.
+        # GET https://example.com/wp-json/wp/v2/settings
+        # and look for a language
+
+        key = 'woocommerce_default_country'
+        try:
+            value = self.get_from_settings(key)
+            country = value.split(':')[0]
+
+            if country in ['GB', 'US', 'CA', 'AU', 'NZ']:
+                return f'en_{country}'
+            elif country in ['DE', 'AT', 'CH']:
+                return 'de_DE'
+            elif country in ['FR', 'LU', 'CH']:
+                return 'fr_FR'
+            elif country in ['ES']:
+                return 'es_ES'
+            elif country in ['IT']:
+                return 'it_IT'
+            elif country in ['NL', 'BE']:
+                return 'nl_NL'
+            elif country in ['PL']:
+                return 'pl_PL'
+            elif country in ['PT']:
+                return 'pt_PT'
+            elif country in ['RO']:
+                return 'ro_RO'
+            else:
+                raise FailedToGetStoreLanguageError(f"Language not found for key {key}")
+        except ValueError:
+            raise FailedToGetStoreLanguageError(f"Language not found for key {key}")

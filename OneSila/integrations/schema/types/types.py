@@ -4,11 +4,6 @@ from integrations.schema.types.filters import IntegrationFilter
 from integrations.schema.types.ordering import IntegrationOrder
 from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION
 from strawberry.relay.utils import to_base64
-from sales_channels.integrations.magento2.models import MagentoSalesChannel
-from sales_channels.integrations.magento2.schema.types.types import MagentoSalesChannelType
-from sales_channels.integrations.shopify.models import ShopifySalesChannel
-from sales_channels.integrations.shopify.schema.types.types import ShopifySalesChannelType
-from sales_channels.schema.types.types import SalesChannelType
 
 
 @type(Integration, filters=IntegrationFilter, order=IntegrationOrder, pagination=True, fields="__all__")
@@ -20,6 +15,8 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
 
     @field()
     def connected(self, info) -> bool:
+        from sales_channels.integrations.magento2.models import MagentoSalesChannel
+        from sales_channels.integrations.shopify.models import ShopifySalesChannel
 
         if isinstance(self, MagentoSalesChannel):
             return True
@@ -28,8 +25,17 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
             return self.access_token is not None
 
         return False
+
     @field()
     def proxy_id(self, info) -> str:
+        from sales_channels.schema.types.types import SalesChannelType
+
+        from sales_channels.integrations.magento2.models import MagentoSalesChannel
+        from sales_channels.integrations.magento2.schema.types.types import MagentoSalesChannelType
+
+        from sales_channels.integrations.shopify.models import ShopifySalesChannel
+        from sales_channels.integrations.shopify.schema.types.types import ShopifySalesChannelType
+
         if isinstance(self, MagentoSalesChannel):
             graphql_type = MagentoSalesChannelType
         elif isinstance(self, ShopifySalesChannel):
