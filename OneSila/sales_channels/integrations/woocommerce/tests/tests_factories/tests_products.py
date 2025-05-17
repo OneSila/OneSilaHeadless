@@ -22,7 +22,10 @@ logger = logging.getLogger(__name__)
 class WooCommerceProductFactoryTest(CreateTestProductMixin, TestCaseWoocommerceMixin):
     def test_create_update_delete_product(self):
         """Test that WooCommerceProductCreateFactory properly creates a remote product"""
-        product = self.create_test_product(sku="TEST-SKU-create-delete", name="Test Product")
+        product = self.create_test_product(
+            sku="TEST-SKU-create-delete",
+            name="Test Product",
+            assign_to_sales_channel=True)
 
         # Find product-type properties for this product
         product_type_properties = Property.objects.filter(

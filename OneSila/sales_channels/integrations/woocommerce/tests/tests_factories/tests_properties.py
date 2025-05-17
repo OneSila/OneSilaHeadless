@@ -32,7 +32,7 @@ class WooCommercePropertyFactoryTest(TestCaseWoocommerceMixin):
             # Get API through the mixin
             api = GetWoocommerceAPIMixin()
             api.sales_channel = self.sales_channel
-            api = api.get_api_client()
+            self.api = api.get_api_client()
 
             # Delete each property
             for remote_property in remote_properties:

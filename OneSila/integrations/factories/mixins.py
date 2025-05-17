@@ -125,12 +125,16 @@ class IntegrationInstanceOperationMixin:
         result = data
 
         for field in fields:
-            if is_model:
-                result = getattr(result, field, None)
-            else:
-                result = result.get(field, None)
-            if result is None:
-                break
+            try:
+                if is_model:
+                    result = getattr(result, field, None)
+                else:
+                    result = result.get(field, None)
+
+                if result is None:
+                    break
+            except Exception as e:
+                raise e.__class__(f"Field {field} not found in data {data}") from e
 
         return result
 
@@ -271,7 +275,10 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
         Sets the remote ID based on the response data using the mapping provided.
         """
         # Retrieve remote_id using the get_mapped_field utility function
-        self.remote_instance.remote_id = self.get_mapped_field(response_data, self.remote_id_map)
+        try:
+            self.remote_instance.remote_id = self.get_mapped_field(response_data, self.remote_id_map)
+        except Exception as e:
+            raise e.__class__(f"Failed to set/find remote id for {self.local_instance}") from e
 
     def create_remote(self):
         """

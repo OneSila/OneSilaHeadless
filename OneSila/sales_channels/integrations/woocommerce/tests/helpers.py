@@ -5,6 +5,7 @@ from sales_prices.models import SalesPrice
 from currencies.models import Currency
 from sales_channels.integrations.woocommerce.factories.pulling import WoocommerceRemoteCurrencyPullFactory, \
     WoocommerceSalesChannelViewPullFactory, WoocommerceLanguagePullFactory
+from sales_channels.integrations.woocommerce.factories.properties import WooCommerceGlobalAttributeCreateFactory
 from sales_channels.integrations.woocommerce.models import WoocommerceCurrency, WoocommerceProduct, WoocommerceSalesChannel
 from sales_channels.models import SalesChannelView, SalesChannelViewAssign
 

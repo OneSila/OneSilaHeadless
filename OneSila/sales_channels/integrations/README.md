@@ -168,3 +168,8 @@ Keep this README up-to-date as we refine our integration conventions! 🎉
 10. **Testing & Sanity Check**
     - Write a quick Django shell script to instantiate your mixin and factories, call .run(), and verify the Shopify API sees your test product.
     - Add any admin registrations or serializers as needed.
+
+
+## Help / Tips & Tricks
+
+- **Magic failure of factories?**: Ensure the products you're testing with are assigned to the a sales channel view.  Often the reason is silent failure of the pre-flight checks, which stops the factory from running without any feedback.
