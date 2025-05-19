@@ -226,7 +226,6 @@ class MagentoProductPropertyCreateFactory(GetMagentoAPIMixin, RemoteProductPrope
     update_factory_class = 'sales_channels.integrations.magento2.factories.properties.MagentoProductPropertyUpdateFactory'
 
     def create_remote(self):
-
         self.remote_value = self.get_remote_value()
         if self.get_value_only:
             self.remote_instance.remote_value = str(self.remote_value)

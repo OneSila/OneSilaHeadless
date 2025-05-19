@@ -35,29 +35,29 @@ from sales_channels.integrations.shopify.models import ShopifySalesChannel, Shop
     ShopifyImageProductAssociation, ShopifyProduct
 
 
-#
-# 1) Product create (on assign)
-#
-@receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
-def shopify__product__create_from_assign(sender, instance, **kwargs):
-    from sales_channels.integrations.shopify.factories.products.products import  ShopifyProductCreateFactory
-    from django.db import transaction
+# #
+# # 1) Product create (on assign)
+# #
+# @receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
+# def shopify__product__create_from_assign(sender, instance, **kwargs):
+#     from sales_channels.integrations.shopify.factories.products.products import  ShopifyProductCreateFactory
+#     from django.db import transaction
 
-    product = instance.product
-    sc = instance.sales_channel
+#     product = instance.product
+#     sc = instance.sales_channel
 
-    fac = ShopifyProductCreateFactory(sales_channel=sc, local_instance=product)
-    fac.run()
+#     fac = ShopifyProductCreateFactory(sales_channel=sc, local_instance=product)
+#     fac.run()
 
-    # count = 1 + (product.get_configurable_variations().count() if hasattr(product, 'get_configurable_variations') else 0)
-    # run_generic_sales_channel_task_flow(
-    #     task_func=create_shopify_product_db_task,
-    #     multi_tenant_company=product.multi_tenant_company,
-    #     sales_channels_filter_kwargs={'id': sc.id},
-    #     number_of_remote_requests=count,
-    #     sales_channel_class=ShopifySalesChannel,
-    #     product_id=product.id,
-    # )
+#     # count = 1 + (product.get_configurable_variations().count() if hasattr(product, 'get_configurable_variations') else 0)
+#     # run_generic_sales_channel_task_flow(
+#     #     task_func=create_shopify_product_db_task,
+#     #     multi_tenant_company=product.multi_tenant_company,
+#     #     sales_channels_filter_kwargs={'id': sc.id},
+#     #     number_of_remote_requests=count,
+#     #     sales_channel_class=ShopifySalesChannel,
+#     #     product_id=product.id,
+#     # )
 
 
 #
@@ -156,6 +156,7 @@ def shopify__product_property__create(sender, instance, **kwargs):
         product_property_id=instance.id,
     )
 
+
 @receiver(update_remote_product_property, sender='properties.ProductProperty')
 def shopify__product_property__update(sender, instance, **kwargs):
     run_product_specific_sales_channel_task_flow(
@@ -165,6 +166,7 @@ def shopify__product_property__update(sender, instance, **kwargs):
         sales_channel_class=ShopifySalesChannel,
         product_property_id=instance.id,
     )
+
 
 @receiver(delete_remote_product_property, sender='properties.ProductProperty')
 def shopify__product_property__delete(sender, instance, **kwargs):
@@ -241,6 +243,7 @@ def shopify__variation__add(sender, parent_product, variation_product, **kwargs)
         variation_product_id=variation_product.id,
     )
 
+
 @receiver(remove_remote_product_variation, sender='products.ConfigurableVariation')
 def shopify__variation__remove(sender, parent_product, variation_product, **kwargs):
     run_generic_sales_channel_task_flow(
@@ -265,6 +268,7 @@ def shopify__image_assoc__create(sender, instance, **kwargs):
         media_product_through_id=instance.id,
     )
 
+
 @receiver(update_remote_image_association, sender='media.MediaProductThrough')
 def shopify__image_assoc__update(sender, instance, **kwargs):
     run_product_specific_sales_channel_task_flow(
@@ -274,6 +278,7 @@ def shopify__image_assoc__update(sender, instance, **kwargs):
         sales_channel_class=ShopifySalesChannel,
         media_product_through_id=instance.id,
     )
+
 
 @receiver(delete_remote_image_association, sender='media.MediaProductThrough')
 def shopify__image_assoc__delete(sender, instance, **kwargs):
@@ -298,6 +303,7 @@ def shopify__image__delete(sender, instance, **kwargs):
         sales_channel_class=ShopifySalesChannel,
         image_id=instance.id,
     )
+
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
 @receiver(refresh_website_pull_models, sender='shopify.ShopifySalesChannel')

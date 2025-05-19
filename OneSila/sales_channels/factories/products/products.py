@@ -130,6 +130,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.product_properties = ProductProperty.objects.filter_multi_tenant(self.sales_channel.multi_tenant_company). \
             filter(product=self.local_instance, property_id__in=rule_properties_ids)
 
+        logger.debug(f"Setting product properties {self.product_properties}")
+
     def process_product_properties(self):
         """
         Processes each property retrieved from the product and performs the necessary actions,
@@ -182,6 +184,9 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         except self.remote_product_property_class.DoesNotExist:
             # If the remote product property does not exist, create it
+            # This create factory is configured to not remotely actually create the property,
+            # but only to return the payload if it exists. (get_value_only=True)
+            # Skip check will ignore the pre-flight checks.
             create_factory = self.remote_product_property_create_factory(
                 local_instance=product_property,
                 sales_channel=self.sales_channel,

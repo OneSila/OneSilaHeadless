@@ -27,6 +27,83 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class WoocommerceRemoteValueConversionMixin:
+    """ Convert OneSila payloads to WooCommerce expected format."""
+
+    def get_remote_value(self):
+        # Get the local property type and value in the remote format
+        property_type = self.local_property.type
+        value = self.local_instance.get_value()
+
+        if property_type == Property.TYPES.INT:
+            return self.get_int_value(value)
+        elif property_type == Property.TYPES.FLOAT:
+            return self.get_float_value(value)
+        elif property_type == Property.TYPES.BOOLEAN:
+            return self.get_boolean_value(value)
+        elif property_type == Property.TYPES.SELECT:
+            return self.get_select_value(value)
+        elif property_type == Property.TYPES.MULTISELECT:
+            return self.get_multi_select_value(value)
+        elif property_type == Property.TYPES.TEXT:
+            return self.get_text_value(value)
+        elif property_type == Property.TYPES.DESCRIPTION:
+            return self.get_description_value(value)
+        elif property_type == Property.TYPES.DATE:
+            return self.get_date_value(value)
+        elif property_type == Property.TYPES.DATETIME:
+            return self.get_datetime_value(value)
+        else:
+            raise NotImplementedError(f"Property type {property_type} is not supported.")
+
+    def get_int_value(self, value):
+        """Handles int value types."""
+        return value
+
+    def get_float_value(self, value):
+        """Handles float value types."""
+        return value
+
+    def get_boolean_value(self, value: bool) -> int:
+        """Converts boolean values to 1 (True) or 0 (False) as required by Magento."""
+        return value
+
+    def get_select_value(self, value):
+        """Handles select and multiselect values."""
+        return value
+
+    def get_multi_select_value(self, value):
+        """Handles multi-select values."""
+        return value
+
+    def get_text_value(self, value):
+        """Handles text values."""
+        return value
+
+    def get_description_value(self, value):
+        """Handles description values."""
+        return value
+
+    def get_date_value(self, value):
+        """Handles date values."""
+        return value
+
+    def get_datetime_value(self, value):
+        """Handles datetime values."""
+        return value
+
+    # def format_date(self, date_value):
+    #     """Formats date values to include time as '00:00:00' in Magento compatible format."""
+    #     if date_value:
+    #         # Formatting date to include time as 00:00:00
+    #         return date_value.strftime('%d-%m-%Y 00:00:00')
+
+    # def format_datetime(self, datetime_value):
+    #     """Formats datetime values to Magento compatible string format."""
+    #     if datetime_value:
+    #         return datetime_value.strftime('%d-%m-%Y %H:%M:%S')
+
+
 class WooCommerceProductAttributeMixin(SerialiserMixin):
     """
     This is the class used to populate all of the
@@ -91,7 +168,7 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
         logger.debug(f"Collected configurator property values: {property_values}")
         return list(property_values)
 
-    def set_product_properties(self):
+    def set_product_properties_to_apply_payload(self):
         product = self.get_local_product()
         self.product_properties = ProductProperty.objects.filter(
             product=product
@@ -102,6 +179,10 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
             filter(Q(property__add_to_filters=True) | Q(property__is_product_type=True)).\
             distinct().\
             values_list('id', flat=True)
+
+    def set_product_rule(self):
+        product = self.get_local_product()
+        self.product_rule = product.get_product_rule()
 
     def apply_attribute_payload(self):
         # Woocom only supports select values for attributes
@@ -127,7 +208,7 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
         product = self.get_local_product()
         ean_code = product.eancode_set.last()
         self.set_product_rule()
-        self.set_product_properties()
+        self.set_product_properties_to_apply_payload()
         self.set_filterable_property_ids()
 
         # What is this product about?  How does it relate and what are the types?
@@ -335,7 +416,7 @@ class WoocommerceGlobalAttributeValueDeleteFactory(WoocommerceGlobalAttributeVal
         return self.api.delete_attribute_term(self.remote_instance.remote_property.remote_id, self.remote_instance.remote_id)
 
 
-class WooCommerceProductPropertyMixin(WooCommerceProductAttributeMixin, SerialiserMixin):
+class WooCommerceProductPropertyMixin(WooCommerceProductAttributeMixin, SerialiserMixin, WoocommerceRemoteValueConversionMixin):
     remote_model_class = WoocommerceProductProperty
     remote_id_map = 'id'
     # FIXME: remote_property_factory and remote_property_select_value_factory should be
@@ -352,7 +433,7 @@ class WooCommerceProductPropertyMixin(WooCommerceProductAttributeMixin, Serialis
     }
 
 
-class WooCommerceProductPropertyCreateFactory(WooCommerceProductPropertyMixin, GetWoocommerceAPIMixin, RemoteProductPropertyCreateFactory):
+class WooCommerceProductPropertyCreateFactory(WooCommerceProductPropertyMixin, GetWoocommerceAPIMixin, RemoteProductPropertyCreateFactory, WoocommerceRemoteValueConversionMixin):
     def create_remote(self):
         """To assign a property to a product we need to concider that woocommerce looks at things as follows:
         - Global Attributes need to be created first but are part of the product properties but must include the slug.
@@ -360,21 +441,26 @@ class WooCommerceProductPropertyCreateFactory(WooCommerceProductPropertyMixin, G
         """
         # The attributes are not actually assigned on the product.
         # They are part of the product create.
+        self.remote_value = self.get_remote_value()
+        logger.debug(f"WooCommerceProductPropertyCreateFactory Remote value: {self.remote_value}")
+        if self.get_value_only:
+            self.remote_instance.remote_value = str(self.remote_value)
+            logger.debug(f"WooCommerceProductPropertyCreateFactory Remote value id: {self.remote_instance.id}")
+            self.remote_instance.save()
+            return  # if we ony get the value we don't need to cotninue
 
-        # FIXME: These ProductProperty factories (check the update an delete as wel)
-        # should be triggering a product-update after applying the attribute payload.
-        pass
+        raise NotImplementedError("WooCommerceProductPropertyCreateFactory should be triggering a product-update after applying the attribute payload.")
 
 
 class WooCommerceProductPropertyUpdateFactory(WooCommerceProductPropertyMixin, GetWoocommerceAPIMixin, RemoteProductPropertyUpdateFactory):
     def update_remote(self):
         # The attributes are not actually updated on the product.
         # They are set as part of the product
-        pass
+        raise NotImplementedError("WooCommerceProductPropertyUpdateFactory should be triggering a product-update after applying the attribute payload.")
 
 
 class WooCommerceProductPropertyDeleteFactory(WooCommerceProductPropertyMixin, GetWoocommerceAPIMixin, RemoteProductPropertyDeleteFactory):
     def delete_remote(self):
         # The attributes are not actually updated on the product.
         # They are set as part of the product
-        pass
+        raise NotImplementedError("WooCommerceProductPropertyDeleteFactory should be triggering a product-update after applying the attribute payload.")
