@@ -14,13 +14,14 @@ from pathlib import Path
 from django.utils.translation import gettext_lazy as _
 from operator import itemgetter
 import os
+import sys
 
 SECRET_KEY = "FAKE-KEY-DONT-KEEP-THIS-YOU-SHOULD-SET-A-NEW-ONE"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DEBUG = False
-TESTING = False
+TESTING = 'test' in sys.argv
 
 INSTALLED_APPS = [
     'django.contrib.admin',
