@@ -87,6 +87,7 @@ class ImportProductInstanceValidateTest(TestCase):
             ],
             "prices": [
                 {"price": 12.99, "currency": "EUR"},
+                {"price": 12.99, "currency": "USD"},
             ],
             "variations": [
                 {
