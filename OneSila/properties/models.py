@@ -7,6 +7,7 @@ from builtins import property as django_property  # in this file we will use pro
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 
+
 class Property(TranslatedModelMixin, models.Model):
     """https://github.com/TweaveTech/django-classifier/blob/master/classifier/models.py"""
     class TYPES:
@@ -97,10 +98,10 @@ class PropertyTranslation(TranslationFieldsMixin, models.Model):
         translated_field = 'property'
         search_terms = ['name']
 
+
 class PropertySelectValue(TranslatedModelMixin, models.Model):
     property = models.ForeignKey(Property, on_delete=models.PROTECT)
     image = models.ForeignKey('media.Image', null=True, blank=True, on_delete=models.CASCADE)
-
 
     objects = PropertySelectValueManager()
 
@@ -120,7 +121,6 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
             )
 
         super().delete(*args, **kwargs)
-
 
     class Meta:
         search_terms = ['propertyselectvaluetranslation__value']
@@ -164,6 +164,16 @@ class ProductProperty(TranslatedModelMixin, models.Model):
             type = 'multi_select'
 
         return getattr(self, 'get_value_{}'.format(type.lower()))()
+
+    def get_serialised_value(self):
+        value = self.get_value()
+
+        if self.property.type == Property.TYPES.MULTISELECT:
+            return [v.id for v in value]
+        elif self.property.type == Property.TYPES.SELECT:
+            return value.value
+
+        return value
 
     def get_value_int(self):
         return self.value_int
@@ -210,7 +220,6 @@ class ProductPropertyTextTranslation(TranslationFieldsMixin, models.Model):
         translated_field = 'product_property'
         search_terms = ['value_text', 'value_description']
         unique_together = ("product_property", "language")
-
 
 
 class ProductPropertiesRule(models.Model):

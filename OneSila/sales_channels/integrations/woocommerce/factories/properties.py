@@ -22,6 +22,7 @@ from sales_channels.integrations.woocommerce.constants import API_ATTRIBUTE_PREF
 from properties.models import ProductProperty, Property
 from django.db.models import Q, Count
 from django.utils.functional import cached_property
+from collections.abc import Iterable
 
 import logging
 logger = logging.getLogger(__name__)
@@ -124,9 +125,14 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
     def slugified_internal_name(self, property):
         return f"{API_ATTRIBUTE_PREFIX}{property.internal_name}"
 
-    @cached_property
     def get_local_product(self):
         return self.remote_product.local_instance
+
+    def remote_product_is_variation(self):
+        try:
+            return self.remote_product.is_variation
+        except AttributeError:
+            return False
 
     def set_configurator_properties(self):
         product = self.get_local_product()
@@ -206,18 +212,19 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
         # currently they are just the default values.
 
         product = self.get_local_product()
+        is_variation = self.remote_product_is_variation()
         ean_code = product.eancode_set.last()
         self.set_product_rule()
         self.set_product_properties_to_apply_payload()
         self.set_filterable_property_ids()
 
         # What is this product about?  How does it relate and what are the types?
-        if self.product.is_configurable():
+        if product.is_configurable():
             is_woocommerce_simple_product = False
             is_woocommerce_configurable_product = True
             is_woocommerce_variant_product = False
-        elif self.product.is_simple():
-            if self.is_variation:
+        elif product.is_simple():
+            if is_variation:
                 is_woocommerce_simple_product = True
                 is_woocommerce_configurable_product = False
                 is_woocommerce_variant_product = False
@@ -250,15 +257,21 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
             for prop in self.product_properties.iterator():
                 try:
                     ga = self.global_attribute_model_class.objects.get(local_instance=prop.property)
+                    value = prop.get_serialised_value()
+
+                    # WooCommerce expects a list of values for all global attributes.
+                    if not isinstance(value, Iterable):
+                        value = [value]
+
                     attribute_payload.append({
                         'id': ga.remote_id,
-                        'name': prop.name,
-                        'options': [prop.get_value()]
+                        'name': prop.property.name,
+                        'options': value
                     })
                 except self.global_attribute_model_class.DoesNotExist:
                     attribute_payload.append({
-                        'name': prop.name,
-                        'options': [prop.get_value()]
+                        'name': prop.property.name,
+                        'options': [prop.get_serialised_value()]
                     })
 
                 if is_woocommerce_configurable_product:
@@ -283,14 +296,14 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
                     ga = self.global_attribute_model_class.objects.get(local_instance=prop.property)
                     attribute_payload.append({
                         'id': ga.remote_id,
-                        'option': ean_code.ean_code
+                        'option': prop.get_serialised_value(),
                     })
                 except self.global_attribute_model_class.DoesNotExist:
                     # FIXME: This does not support mulit-values.
                     attribute_payload.append({
-                        'name': prop.name,
+                        'name': prop.property.name,
                         'visible': True,
-                        'option': prop.get_value()
+                        'option': prop.get_serialised_value()
                     })
 
         self.payload['attributes'] = attribute_payload

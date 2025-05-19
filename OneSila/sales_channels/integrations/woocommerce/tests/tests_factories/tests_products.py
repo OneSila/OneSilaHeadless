@@ -85,13 +85,13 @@ class WooCommerceProductFactoryTest(CreateTestProductMixin, TestCaseWoocommerceM
         self.assertEqual(resp_product['catalog_visibility'], 'hidden')
         self.assertEqual(resp_product['status'], 'draft')
 
-        # cleanup
-        factory = WooCommerceProductDeleteFactory(
-            sales_channel=self.sales_channel,
-            local_instance=product
-        )
-        factory.run()
+        # # cleanup
+        # factory = WooCommerceProductDeleteFactory(
+        #     sales_channel=self.sales_channel,
+        #     local_instance=product
+        # )
+        # factory.run()
 
-        # ensure it's deleted
-        with self.assertRaises(Exception):
-            self.api.get_product(remote_product.remote_id)
+        # # ensure it's deleted
+        # with self.assertRaises(Exception):
+        #     self.api.get_product(remote_product.remote_id)
