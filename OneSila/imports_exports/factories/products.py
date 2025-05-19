@@ -181,10 +181,9 @@ class ImportProductInstance(AbstractImportInstance):
                         name = prop_data.get("name")
                         required_names.add(name)
 
-                    if "property" in self.configurator_select_values:
+                    if "property" in select_value:
                         prop = select_value["property"]
                         required_names.add(prop.name)
-
 
 
             items = []

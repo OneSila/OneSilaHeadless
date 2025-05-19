@@ -40,24 +40,21 @@ from sales_channels.integrations.shopify.models import ShopifySalesChannel, Shop
 #
 @receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
 def shopify__product__create_from_assign(sender, instance, **kwargs):
-    from sales_channels.integrations.shopify.factories.products.products import  ShopifyProductCreateFactory
-    from django.db import transaction
 
     product = instance.product
-    sc = instance.sales_channel
+    sc = instance.sales_channel.get_real_instance()
 
-    fac = ShopifyProductCreateFactory(sales_channel=sc, local_instance=product)
-    fac.run()
+    if not isinstance(sc, ShopifySalesChannel):
+        return
 
-    # count = 1 + (product.get_configurable_variations().count() if hasattr(product, 'get_configurable_variations') else 0)
-    # run_generic_sales_channel_task_flow(
-    #     task_func=create_shopify_product_db_task,
-    #     multi_tenant_company=product.multi_tenant_company,
-    #     sales_channels_filter_kwargs={'id': sc.id},
-    #     number_of_remote_requests=count,
-    #     sales_channel_class=ShopifySalesChannel,
-    #     product_id=product.id,
-    # )
+    run_generic_sales_channel_task_flow(
+        task_func=create_shopify_product_db_task,
+        multi_tenant_company=product.multi_tenant_company,
+        sales_channels_filter_kwargs={'id': sc.id},
+        number_of_remote_requests=1,
+        sales_channel_class=ShopifySalesChannel,
+        product_id=product.id,
+    )
 
 
 #
@@ -81,7 +78,10 @@ def shopify__product__update(sender, instance, **kwargs):
 def shopify__product__delete_from_assign(sender, instance, **kwargs):
 
     product = instance.product
-    sales_channel = instance.sales_channel
+    sales_channel = instance.sales_channel.get_real_instance()
+
+    if not isinstance(sales_channel, ShopifySalesChannel):
+        return
 
     run_delete_generic_sales_channel_task_flow(
         task_func=delete_shopify_product_db_task,
@@ -305,6 +305,9 @@ def sales_channels__shopify__handle_pull_magento_sales_channel_views(sender, ins
     from sales_channels.integrations.shopify.factories.sales_channels.views import ShopifySalesChannelViewPullFactory
     from sales_channels.integrations.shopify.factories.sales_channels.languages import ShopifyRemoteLanguagePullFactory
     from sales_channels.integrations.shopify.factories.sales_channels.currencies import ShopifyRemoteCurrencyPullFactory
+
+    if not isinstance(instance.get_real_instance(), ShopifySalesChannel):
+        return
 
     if instance.access_token is None:
         return
