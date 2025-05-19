@@ -176,23 +176,34 @@ class ImportProductInstance(AbstractImportInstance):
             required_names = set()
             if hasattr(self, 'configurator_select_values'):
                 for select_value in self.configurator_select_values:
-                    prop_data = select_value['property_data']
-                    name = prop_data.get("name")
-                    required_names.add(name)
+                    if 'property_data' in select_value:
+                        prop_data = select_value['property_data']
+                        name = prop_data.get("name")
+                        required_names.add(name)
+
+                    if "property" in select_value:
+                        prop = select_value["property"]
+                        required_names.add(prop.name)
 
 
             items = []
             if hasattr(self, 'attributes'):
                 for attribute in self.attributes:
-                    if 'property_data' in attribute:
-                        name = attribute['property_data'].get("name")
-                        item_data = {
-                            'property_data': attribute['property_data'],
-                            'type': ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if name in required_names else ProductPropertiesRuleItem.OPTIONAL
-                        }
+                    if 'property_data' in attribute or 'property' in attribute:
+                        if 'property_data' in attribute:
+                            name = attribute['property_data'].get("name")
+                            item_data = {
+                                'property_data': attribute['property_data'],
+                                'type': ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if name in required_names else ProductPropertiesRuleItem.OPTIONAL
+                            }
+                        else:
+                            name = attribute['property'].name
+                            item_data = {
+                                'property': attribute['property'],
+                                'type': ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if name in required_names else ProductPropertiesRuleItem.OPTIONAL
+                            }
 
                         items.append(item_data)
-
 
             rule_import_instance = ImportProductPropertiesRuleInstance({"value": self.product_type, "items": items}, self.import_process)
             rule_import_instance.process()
@@ -314,6 +325,7 @@ class ImportProductInstance(AbstractImportInstance):
                     import_process=self.import_process,
                     config_product=self.instance,
                 )
+
                 variation_import.process()
                 variation_products_ids.append(variation_import.instance.variation.id)
 

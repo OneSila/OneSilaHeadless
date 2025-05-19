@@ -48,5 +48,3 @@ class MagentoProductContentUpdateFactory(GetMagentoAPIMixin, RemoteProductConten
 
     def serialize_response(self, response):
         return self.magento_product.to_dict()
-
-

@@ -63,7 +63,7 @@ class ImportProductInstanceValidateTest(TestCase):
         data = {
             "name": "Fancy Product",
             "sku": "SKU987",
-            "type": "SIMPLE",
+            "type": "CONFIGURABLE",
             "active": True,
             "vat_rate": 19,
             "ean_code": "1234567890123",
@@ -75,6 +75,7 @@ class ImportProductInstanceValidateTest(TestCase):
             ],
             "translations": [
                 {
+                    "name": "Fancy Product",
                     "short_description": "Short desc",
                     "description": "Longer description",
                     "url_key": "fancy-product"
@@ -86,11 +87,14 @@ class ImportProductInstanceValidateTest(TestCase):
             ],
             "prices": [
                 {"price": 12.99, "currency": "EUR"},
-                {"price": 15.99, "currency": "USD"}
             ],
             "variations": [
-                {"name": "Variant 1"},
-                {"name": "Variant 2"},
+                {
+                    'variation_data': {"name": "Variant 1"}
+                },
+                {
+                    'variation_data': {"name": "Variant 2"}
+                }
             ],
             "configurator_select_values": [
                 {"property_data": {"name": "Size"}, "value": "Large"},

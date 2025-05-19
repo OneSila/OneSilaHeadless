@@ -92,9 +92,7 @@ class RemotePropertyEnsureMixin:
         self.remote_select_values = []
         # For select or multi-select properties, ensure RemotePropertySelectValue exists
         if self.local_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
-            self.local_instance.refresh_from_db()
             select_values = self.local_instance.value_multi_select.all() if self.local_property.type == Property.TYPES.MULTISELECT else [self.local_instance.value_select]
-            logger.debug(f"Available select values: {select_values}")
 
             for value in select_values:
                 try:

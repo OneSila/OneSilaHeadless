@@ -59,6 +59,7 @@ INSTALLED_LOCAL_APPS = [
     'inventory',
     'sales_channels',
     'sales_channels.integrations.magento2',
+    'sales_channels.integrations.shopify',
     'sales_prices',
     'properties',
     'orders',
@@ -302,3 +303,6 @@ HUEY = {
 
 ADMIN_ROUTE_SUFFIX = ""
 MAGENTO_LOG_DIR_PATH = '/var/log/OneSilaHeadless/magento'
+
+SHOPIFY_SCOPES = ['read_products', 'write_products', 'read_markets_home', 'read_orders', 'read_publications', 'write_publications']
+SHOPIFY_API_VERSION = "2025-04"

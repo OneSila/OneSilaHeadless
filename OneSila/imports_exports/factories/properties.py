@@ -1,3 +1,5 @@
+import logging
+from django.db.models.fields.related import ManyToManyField
 from datetime import datetime
 from types import SimpleNamespace
 from imports_exports.factories.mixins import ImportOperationMixin, AbstractImportInstance
@@ -5,6 +7,8 @@ from llm.factories.property_type_detector import DetectPropertyTypeLLM
 from properties.models import Property, PropertyTranslation, PropertySelectValue, PropertySelectValueTranslation, \
     ProductPropertiesRule, ProductPropertiesRuleItem, ProductProperty, ProductPropertyTextTranslation
 
+
+logger = logging.getLogger(__name__)
 
 class PropertyImportUsingInternalName(ImportOperationMixin):
     get_identifiers = ['internal_name', 'type']
@@ -31,6 +35,50 @@ class ProductPropertiesRuleImport(ImportOperationMixin):
 
 class ProductPropertiesRuleItemImport(ImportOperationMixin):
     get_identifiers = ['rule', 'property']
+
+    def update_instance(self):
+        """
+        Prevents downgrading from REQUIRED/CONFIGURATOR types to OPTIONAL.
+        """
+        to_save = False
+
+        for key in self.import_instance.updatable_fields:
+            if not hasattr(self.import_instance, key):
+                continue
+
+            val = getattr(self.import_instance, key)
+            field = self.instance._meta.get_field(key)
+
+            if key == 'type':
+                original = getattr(self.instance, key)
+
+                protected_types = {
+                    ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
+                    ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR,
+                    ProductPropertiesRuleItem.REQUIRED,
+                }
+
+                if original in protected_types and val == ProductPropertiesRuleItem.OPTIONAL:
+                    logger.info(f"Skipping downgrade of type from {original} to OPTIONAL for {self.instance}")
+                    continue
+
+            if isinstance(field, ManyToManyField):
+                current_val_ids = list(getattr(self.instance, key).values_list('id', flat=True))
+                new_val_ids = list(val.values_list('id', flat=True))
+
+                if set(current_val_ids) != set(new_val_ids):
+                    getattr(self.instance, key).set(val)
+                    logger.debug(f"Updated many-to-many field '{key}': {current_val_ids} -> {new_val_ids}")
+            else:
+                current_val = getattr(self.instance, key, None)
+                if current_val != val:
+                    setattr(self.instance, key, val)
+                    to_save = True
+                    logger.debug(f"Updated field '{key}': {current_val} -> {val}")
+
+        if to_save:
+            self.instance.save()
+            logger.info(f"Local instance updated: {self.instance}")
 
 class ProductPropertyImport(ImportOperationMixin):
     get_identifiers = ['product', 'property']

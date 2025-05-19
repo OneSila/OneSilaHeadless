@@ -2,6 +2,8 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib import messages
 from django.http import HttpResponseForbidden
+
+from core.views import EmptyTemplateView
 from .models import IntegrationTaskQueue
 
 @login_required
@@ -15,3 +17,6 @@ def retry_integration_task(request, task_id):
         return HttpResponseForbidden("Invalid request method.")
 
     return redirect(request.META.get('HTTP_REFERER', '/'))
+
+class IntegrationListView(EmptyTemplateView):
+    pass

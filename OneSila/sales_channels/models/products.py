@@ -1,3 +1,4 @@
+from django.db.models import UniqueConstraint, Q
 from model_bakery.recipe import related
 
 from core import models
@@ -13,7 +14,7 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
 
     local_instance = models.ForeignKey('products.Product', on_delete=models.SET_NULL, null=True, db_index=True, help_text="The local Product instance associated with this remote product.")
-    remote_sku = models.CharField(max_length=255, help_text="The SKU of the product in the remote system.")
+    remote_sku = models.CharField(max_length=255, help_text="The SKU of the product in the remote system.", null=True, blank=True)
     is_variation = models.BooleanField(default=False, help_text="Indicates if this product is a variation.")
     remote_parent_product = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, help_text="The remote parent product for variations.")
     syncing_current_percentage = models.PositiveSmallIntegerField(
@@ -23,7 +24,14 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
     )
 
     class Meta:
-        unique_together = (('sales_channel', 'local_instance', 'remote_parent_product'), ('sales_channel', 'remote_sku'),)
+        unique_together = (('sales_channel', 'local_instance', 'remote_parent_product'),)
+        constraints = [
+            UniqueConstraint(
+                fields=['sales_channel', 'remote_sku'],
+                condition=Q(remote_sku__isnull=False),
+                name='unique_remote_sku_per_channel_if_present'
+            ),
+        ]
         verbose_name = 'Remote Product'
         verbose_name_plural = 'Remote Products'
 
@@ -36,6 +44,7 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         """
         if not (0 <= new_percentage <= 100):
             raise ValueError("Sync percentage must be between 0 and 100.")
+
         self.syncing_current_percentage = new_percentage
         self.save(update_fields=['syncing_current_percentage'])
 
@@ -169,10 +178,10 @@ class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Mode
         help_text="The remote product associated with this configurator."
     )
 
-    remote_properties = models.ManyToManyField(
-        'sales_channels.RemoteProperty',
+    properties = models.ManyToManyField(
+        'properties.Property',
         related_name='configurators',
-        help_text="The remote properties associated with this configurator."
+        help_text="Local properties used for configurator logic."
     )
 
     objects = RemoteProductConfiguratorManager()
@@ -186,100 +195,92 @@ class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Mode
     def frontend_name(self):
         return (_(f"Configurator for {self.remote_product.local_instance.name}"))
 
+    @property
+    def remote_properties(self):
+        from sales_channels.models import RemoteProperty
+
+        return RemoteProperty.objects.filter(
+            local_instance__in=self.properties.all(),
+            sales_channel=self.remote_product.sales_channel
+        )
+
     def __str__(self):
         return f"Configurator for {self.remote_product}"
 
     @classmethod
-    def _get_all_remote_properties(cls, local_product, sales_channel, rule=None, variations=None):
+    def _get_all_properties(cls, local_product, sales_channel, rule=None, variations=None):
         """
-        Helper method to get all remote properties needed for the configurator.
-        Returns a list of RemoteProperty instances.
+        Helper method to get all local properties (Property instances) needed for the configurator.
+        These are properties that must be mirrored to remote channels.
         """
-        from properties.models import ProductPropertiesRuleItem, ProductProperty
-        from sales_channels.models import RemoteProperty
+        from properties.models import ProductPropertiesRuleItem, ProductProperty, Property
         from django.db.models import Count
 
-        # Get the product rule if not provided
         if rule is None:
             rule = local_product.get_product_rule()
 
         if rule is None:
             raise ValueError(f"No product properties rule found for {local_product.name}")
 
-        # Get required and optional properties for configurator
         configurator_properties = local_product.get_configurator_properties(product_rule=rule)
 
-        # Separate required and optional in-configurator properties
-        required_props_ids = configurator_properties.filter(
+        required_ids = configurator_properties.filter(
             type=ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR
         ).values_list('property_id', flat=True)
 
-        optional_props_ids = configurator_properties.filter(
+        optional_ids = configurator_properties.filter(
             type=ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
         ).values_list('property_id', flat=True)
 
-        # Fetch RemoteProperty instances for required properties
-        remote_required_props = list(RemoteProperty.objects.filter(
-            local_instance_id__in=required_props_ids,
-            sales_channel=sales_channel
-        ))
-
-        # For optional properties, check if variations have different values
-        remote_optional_props = []
-        if optional_props_ids:
+        # For optional properties, determine which vary
+        varying_optional_ids = []
+        if optional_ids:
             if variations is None:
-                # Fetch variations if not provided
                 variations = local_product.get_configurable_variations(active_only=True)
 
             variation_ids = variations.values_list('id', flat=True)
 
-            # Fetch property values for variations
             prop_values = ProductProperty.objects.filter(
                 product_id__in=variation_ids,
-                property_id__in=optional_props_ids
+                property_id__in=optional_ids
             ).values('property_id').annotate(
                 distinct_values=Count('value_select', distinct=True)
             )
 
-            # Include properties where the count of distinct values is greater than 1
-            varying_props_ids = [
+            varying_optional_ids = [
                 pv['property_id'] for pv in prop_values if pv['distinct_values'] > 1
             ]
 
-            # Fetch RemoteProperty instances for these varying optional properties
-            if varying_props_ids:
-                remote_optional_props = list(RemoteProperty.objects.filter(
-                    local_instance_id__in=varying_props_ids,
-                    sales_channel=sales_channel
-                ))
+        all_ids = list(required_ids) + varying_optional_ids
 
-        # Combine required and optional RemoteProperties
-        all_remote_props = remote_required_props + remote_optional_props
-
-        return all_remote_props
+        return list(Property.objects.filter(id__in=all_ids))
 
     def update_if_needed(self, rule=None, variations=None, send_sync_signal=True):
         """
-        Updates the remote_properties if there are changes based on the current rule and variations.
+        Updates the `properties` (local Property instances) if there are changes based on the current rule and variations.
         """
         local_product = self.remote_product.local_instance
         sales_channel = self.remote_product.sales_channel
 
-        # Use the helper method to get all remote properties
-        all_remote_props = self._get_all_remote_properties(
-            local_product, sales_channel, rule=rule, variations=variations
+        all_props = self._get_all_properties(
+            local_product,
+            sales_channel,
+            rule=rule,
+            variations=variations
         )
 
-        # Update the configurator's remote_properties if needed
-        existing_remote_props_ids = set(self.remote_properties.values_list('id', flat=True))
-        new_remote_props_ids = set(rp.id for rp in all_remote_props)
+        existing_prop_ids = set(self.properties.values_list('id', flat=True))
+        new_prop_ids = set(p.id for p in all_props)
 
-        if existing_remote_props_ids != new_remote_props_ids:
-            self.remote_properties.set(all_remote_props)
+        if existing_prop_ids != new_prop_ids:
+            self.properties.set(all_props)
             self.save()
 
             if send_sync_signal:
-                sync_remote_product.send(sender=self.remote_product.local_instance.__class__, instance=self.remote_product.local_instance.product)
+                sync_remote_product.send(
+                    sender=self.remote_product.local_instance.__class__,
+                    instance=self.remote_product.local_instance.product
+                )
 
 
 class RemoteImage(PolymorphicModel, RemoteObjectMixin, models.Model):
