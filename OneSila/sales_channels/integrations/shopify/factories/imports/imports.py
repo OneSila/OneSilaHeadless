@@ -30,6 +30,8 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         self.initial_sales_channel_status = sales_channel.active
         self.api = self.get_api()
 
+        self.repair_sku_map = {}
+        self.max_repair_batch_size = 250
 
 
     def prepare_import_process(self):
@@ -42,8 +44,7 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
 
 
     def get_total_instances(self):
-        # we need to get the total number of products using graphql total
-        return 21
+        return self.api.Product.count()
 
     def get_properties_data(self):
         return []
@@ -53,6 +54,71 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
 
     def get_rules_data(self):
         return []
+
+    def repair_remote_sku_if_needed(self, import_instance: ImportProductInstance):
+        remote_product = import_instance.remote_instance
+        local_sku = import_instance.instance.sku
+
+        if not remote_product.default_variant_id or not local_sku:
+            return
+
+        if remote_product.is_variation:
+            parent = remote_product.remote_parent_product
+
+            if not parent or not parent.remote_id:
+                return
+
+            product_id = parent.remote_id
+        else:
+            if not remote_product.remote_id:
+                return
+
+            product_id = remote_product.remote_id
+
+        gql = self.api.GraphQL()
+
+        mutation = """
+        mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+          productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+            product {
+              id
+            }
+            productVariants {
+              id
+              sku
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+        """
+
+        variables = {
+            "productId": product_id,
+            "variants": [
+                {
+                    "id": remote_product.default_variant_id,
+                    "inventoryItem": {"sku": local_sku}
+                }
+            ]
+        }
+
+        response = gql.execute(mutation, variables=variables)
+        data = json.loads(response)
+
+        import pprint
+        pprint.pprint(data)
+
+        user_errors = data.get("data", {}).get("productVariantsBulkUpdate", {}).get("userErrors", [])
+        if user_errors:
+            logger.warning(f"Failed to repair SKU for {remote_product.remote_id}: {user_errors}")
+            return
+
+        remote_product.remote_sku = local_sku
+        remote_product.save()
+        logger.info(f"Repaired remote_sku for product {remote_product.remote_id} using default_variant_id")
 
     def create_log_instance(self, import_instance: ImportProductInstance, structured_data: dict):
 
@@ -255,6 +321,8 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
 
                 if remote_sku:
                     remote_product.remote_sku = remote_sku
+                else:
+                    self.repair_remote_sku_if_needed(import_instance)
 
         remote_product.save()
 
@@ -340,12 +408,6 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
 
         metafield_edges = product.get("metafields", {}).get("edges", [])
         selected_options = product.get("selectedOptions", [])
-
-        print('------------------------------------------------------ METAFIELDS')
-        print(metafield_edges)
-
-        print('------------------------------------------------------ SELECT OPTIIONS')
-        print(selected_options)
 
         for edge in metafield_edges:
             node = edge["node"]
@@ -447,11 +509,6 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
                     "value": value,
                     "remote_id": None,
                 }
-
-        print('------------------------------------------------------ ATTRIBUTES')
-        print(attributes)
-        print(configurator_select_values)
-        print('----------------------------------------------------------------------------------------------------')
 
         return attributes, configurator_select_values or [], mirror_map
 

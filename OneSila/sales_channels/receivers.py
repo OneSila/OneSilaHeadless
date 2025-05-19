@@ -31,7 +31,7 @@ from properties.models import Property, PropertyTranslation, PropertySelectValue
     ProductPropertyTextTranslation
 
 @receiver(post_update, sender=SalesChannelImport)
-def import_process_post_create_receiver(sender, instance: SalesChannelImport, **kwargs):
+def import_process_post_update_fist_import_complete_receiver(sender, instance: SalesChannelImport, **kwargs):
 
     sales_channel = instance.sales_channel
     if not sales_channel.first_import_complete:
@@ -51,6 +51,18 @@ def import_process_avoid_duplicate_pre_create_receiver(sender, instance: SalesCh
     sales_channel = instance.sales_channel
     if sales_channel.is_importing and not instance.pk:
         raise OverflowError(_("There is another import that is already happening. Please wait for it to finish first."))
+
+@receiver(post_create, sender=SalesChannelImport)
+def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelImport, **kwargs):
+    from sales_channels.integrations.shopify.models.sales_channels import ShopifySalesChannel
+    from sales_channels.integrations.shopify.tasks import shopify_import_db_task
+
+    sales_channel = instance.sales_channel.get_real_instance()
+    if isinstance(sales_channel, ShopifySalesChannel):
+        refresh_subscription_receiver(sales_channel)
+
+        shopify_import_db_task(import_process=instance, sales_channel=sales_channel)
+
 
 @receiver(post_update, sender=SalesChannelImport)
 @trigger_signal_for_dirty_fields('status')

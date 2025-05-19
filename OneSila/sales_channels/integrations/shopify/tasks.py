@@ -388,8 +388,11 @@ def delete_shopify_product_db_task(task_queue_item_id, sales_channel_id, remote_
 
 @remote_task(priority=LOW_PRIORITY)
 @db_task()
-def shopify_import_db_task(import_process, sales_channel_id):
-    pass
+def shopify_import_db_task(import_process, sales_channel):
+    from sales_channels.integrations.shopify.factories.imports import ShopifyImportProcessor
+
+    fac = ShopifyImportProcessor(import_process=import_process, sales_channel=sales_channel)
+    fac.run()
 
 
 @periodic_task(crontab(minute=0, hour=2))

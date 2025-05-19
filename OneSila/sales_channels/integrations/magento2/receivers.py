@@ -4,7 +4,7 @@ from django.dispatch import receiver
 from properties.signals import product_properties_rule_created, product_properties_rule_updated, product_properties_rule_rename
 from sales_channels.flows.default import run_generic_sales_channel_task_flow, run_delete_generic_sales_channel_task_flow, \
     run_product_specific_sales_channel_task_flow, run_delete_product_specific_generic_sales_channel_task_flow
-from sales_channels.integrations.magento2.models import MagentoProperty
+from sales_channels.integrations.magento2.models import MagentoProperty, MagentoSalesChannel
 from sales_channels.signals import create_remote_property, update_remote_property, delete_remote_property, \
     create_remote_property_select_value, \
     update_remote_property_select_value, delete_remote_property_select_value, refresh_website_pull_models, \
@@ -84,6 +84,9 @@ def sales_channels__magento__property_select_value__delete(sender, instance, **k
 def sales_channels__magento__handle_pull_magento_sales_chjannel_views(sender, instance, **kwargs):
     from sales_channels.integrations.magento2.factories.sales_channels.views import MagentoSalesChannelViewPullFactory
     from sales_channels.integrations.magento2.factories.sales_channels.languages import MagentoRemoteLanguagePullFactory
+
+    if not isinstance(instance.get_real_instance(), MagentoSalesChannel):
+        return
 
     views_factory = MagentoSalesChannelViewPullFactory(sales_channel=instance)
     views_factory.run()
@@ -350,6 +353,10 @@ def sales_channels__magento__product__create(sender, instance, **kwargs):
     product = instance.product
     sales_channel = instance.sales_channel
 
+    if not isinstance(sales_channel, MagentoSalesChannel):
+        return
+
+
     if product.type == CONFIGURABLE:
         number_of_remote_requests = 1 + product.get_configurable_variations().count()
     else:
@@ -370,6 +377,9 @@ def sales_channels__magento__product__delete_from_assign(sender, instance, **kwa
 
     product = instance.product
     sales_channel = instance.sales_channel
+
+    if not isinstance(sales_channel, MagentoSalesChannel):
+        return
 
     run_delete_generic_sales_channel_task_flow(
         task_func=delete_magento_product_db_task,
