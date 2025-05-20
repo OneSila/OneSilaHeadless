@@ -15,6 +15,10 @@ class WoocommerceProductTypeMixin:
     - is_woocommerce_variant_product
     """
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.set_woocomerce_product_types()
+
     def run(self, *args, **kwargs):
         self.set_woocomerce_product_types()
         super().run(*args, **kwargs)
