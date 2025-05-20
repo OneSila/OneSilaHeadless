@@ -456,6 +456,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.add_field_in_payload('price', self.price)
             self.add_field_in_payload('discount', self.discount)
 
+        logger.debug(f"Set price for {self.local_instance.name}: {self.price}")
+
     def set_variation_price(self):
         """Sets the price for variations, allowing for overrides."""
         pass
@@ -481,6 +483,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
                 setter_method()
             else:
                 logger.warning(f"Setter method set_{field} not found.")
+
+        logger.debug(f"Build payload inspection for {self.local_instance.name}: {self.payload}")
 
     def set_variation_allow_backorder(self):
         """

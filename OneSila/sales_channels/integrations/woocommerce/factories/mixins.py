@@ -24,7 +24,7 @@ class WoocommerceProductTypeMixin:
 
     def remote_product_is_variation(self):
         try:
-            return self.remote_product.is_variation
+            return self.is_variation
         except AttributeError:
             return False
 
@@ -32,18 +32,16 @@ class WoocommerceProductTypeMixin:
         product = self.get_local_product()
         is_variation = self.remote_product_is_variation()
 
+        self.is_woocommerce_simple_product = False
+        self.is_woocommerce_configurable_product = False
+        self.is_woocommerce_variant_product = False
+
         if product.is_configurable():
-            self.is_woocommerce_simple_product = False
             self.is_woocommerce_configurable_product = True
-            self.is_woocommerce_variant_product = False
         elif product.is_simple():
             if is_variation:
-                self.is_woocommerce_simple_product = True
-                self.is_woocommerce_configurable_product = False
-                self.is_woocommerce_variant_product = False
-            else:
-                self.is_woocommerce_simple_product = False
-                self.is_woocommerce_configurable_product = False
                 self.is_woocommerce_variant_product = True
+            else:
+                self.is_woocommerce_simple_product = True
         else:
             raise ValueError(f"Product {product} is not configurable or simple. Configure other types.")

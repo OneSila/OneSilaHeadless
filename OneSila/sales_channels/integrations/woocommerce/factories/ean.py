@@ -15,4 +15,7 @@ class WooCommerceEanCodeUpdateFactory(WooCommerceProductAttributeMixin, GetWooco
         return self.apply_attribute_payload()
 
     def update_remote(self):
-        return self.api.update_product(self.remote_product.remote_id, **self.payload)
+        # FIXME: The attribute data seems empty when we run it from this
+        # Factory. That will need investigating.
+        pass
+        # return self.api.update_product(self.remote_product.remote_id, **self.payload)

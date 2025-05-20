@@ -79,7 +79,8 @@ class WooCommerceProductMixin(WooCommerceMediaMixin, GetWoocommerceAPIMixin, Woo
         return self.payload
 
     def process_content_translation(self, short_description, description, url_key, remote_language):
-        # No translations are supported in woocommerce.
+        # Probably this method should be triggering a translation update.
+        # FIXME Translation or not.  Content must be updated.
         pass
 
 
@@ -129,16 +130,10 @@ class WooCommerceProductCreateFactory(RemoteProductCreateFactory, WooCommercePro
         Creates a remote product in WooCommerce.
         """
         if self.is_woocommerce_variant_product:
-            logger.debug(f"remote variation instance payload for create: {self.remote_instance.remote_parent_product.__dict__}")
             resp = self.api.create_product_variation(self.remote_instance.remote_parent_product.remote_id, **self.payload)
-            logger.debug(f"remote variation instance payload for create response: {resp}")
-            return resp
-
         else:
-            logger.debug(f"remote product instance payload for create: {self.remote_instance.__dict__}")
             resp = self.api.create_product(**self.payload)
-            logger.debug(f"remote product instance payload for create response: {resp}")
-            return resp
+        return resp
 
     def fetch_existing_remote_data(self):
         """
@@ -157,17 +152,6 @@ class WooCommerceProductCreateFactory(RemoteProductCreateFactory, WooCommercePro
 
 
 class WooCommerceProductUpdateFactory(RemoteProductUpdateFactory, WooCommerceProductSyncFactory, WoocommerceProductTypeMixin):
-    # field_mapping = {
-    #     'sku': 'sku',
-    #     # The price fields are not really fields
-    #     # but "magic" and get set during the payload build.
-    #     'price': 'regular_price',
-    #     'discount': 'sale_price',
-    #     'name': 'name',
-    #     'description': 'description',
-    #     'short_description': 'short_description',
-    # }
-
     create_factory_class = WooCommerceProductCreateFactory
 
     def perform_remote_action(self):
@@ -192,12 +176,16 @@ class WooCommerceProductDeleteFactory(WooCommerceProductMixin, RemoteProductDele
 
 
 class WooCommerceProductVariationAddFactory(WooCommerceProductMixin, RemoteProductVariationAddFactory):
-    def update(self, *args, **kwargs):
-        raise NotImplementedError("WooCommerceProductVariationAddFactory is not implemented")
-        return self.api.create_product_variation(self.remote_instance.remote_id, **self.payload)
+    """
+    After a variation is created, this factory will assign that variation to the configurable product.
+    However, in Woocommerce this is not relevant. So we override update_remote to do nothing.
+    """
+    create_factory_class = WooCommerceProductCreateFactory
+
+    def update_remote(self, *args, **kwargs):
+        return {}
 
 
 class WooCommerceProductVariationDeleteFactory(WooCommerceProductMixin, RemoteProductVariationDeleteFactory):
     def delete_remote_instance_process(self, *args, **kwargs):
-        raise NotImplementedError("WooCommerceProductVariationAddFactory is not implemented")
         return self.api.delete_product_variation(self.remote_instance.remote_id, self.remote_instance.remote_parent_product.remote_id)

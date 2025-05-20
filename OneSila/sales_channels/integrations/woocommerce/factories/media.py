@@ -64,11 +64,20 @@ class WooCommerceMediaProductThroughMixin(WooCommerceMediaMixin, SerialiserMixin
     remote_model_class = WoocommerceMediaThroughProduct
     remote_id_map = 'id'
     # Key is the local field, value is the remote field
-    field_mapping = {}
+    field_mapping = {
+        'sku': 'sku',
+        # The price fields are not really fields
+        # but "magic" and get set during the payload build.
+        'price': 'regular_price',
+        'discount': 'sale_price',
+        'name': 'name',
+        'description': 'description',
+        'short_description': 'short_description',
+    }
 
     def preflight_process(self):
-        # FIXME: Temporary override to allow testing
-        return True
+        # # FIXME: Temporary override to allow testing
+        # return True
 
         if not self.local_instance.media.type == Media.IMAGE:
             logger.warning("Local instance is not an image for WooCommerceMediaProductThroughMixin")

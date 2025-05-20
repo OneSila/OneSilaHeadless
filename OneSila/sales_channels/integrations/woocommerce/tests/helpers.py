@@ -6,7 +6,8 @@ from currencies.models import Currency
 from sales_channels.integrations.woocommerce.factories.pulling import WoocommerceRemoteCurrencyPullFactory, \
     WoocommerceSalesChannelViewPullFactory, WoocommerceLanguagePullFactory
 from sales_channels.integrations.woocommerce.factories.properties import WooCommerceGlobalAttributeCreateFactory
-from sales_channels.integrations.woocommerce.models import WoocommerceCurrency, WoocommerceProduct, WoocommerceSalesChannel
+from sales_channels.integrations.woocommerce.models import WoocommerceCurrency, WoocommerceProduct, WoocommerceSalesChannel, \
+    WoocommerceGlobalAttribute
 from sales_channels.models import SalesChannelView, SalesChannelViewAssign
 
 import logging
@@ -40,12 +41,17 @@ class CreateTestProductMixin:
         remote_currency.save()
 
     def tearDown(self):
-        from sales_channels.integrations.woocommerce.exceptions import FailedToDeleteProductError
         for product in WoocommerceProduct.objects.filter(remote_id__isnull=False):
             try:
                 self.api.delete_product(product.remote_id)
-            except FailedToDeleteProductError as e:
-                logger.error(f"Error deleting product {product.remote_id}: {e}")
+            except Exception as e:
+                pass
+
+        for attr in WoocommerceGlobalAttribute.objects.filter(remote_id__isnull=False):
+            try:
+                self.api.delete_attribute(attr.remote_id)
+            except Exception:
+                pass
 
     def create_property(self, name, is_product_type=False, type=Property.TYPES.SELECT):
         prop = Property.objects.create(

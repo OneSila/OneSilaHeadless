@@ -288,6 +288,14 @@ class WoocommerceApiWrapper:
         Create a product variation in WooCommerce.
         """
         fields_to_convert_to_string = ['regular_price', 'sale_price']
+
+        for k, v in deepcopy(payload).items():
+            if v is None:
+                del payload[k]
+
+        if 'regular_price' not in payload:
+            raise ValueError("regular_price is required and currently not presented in the payload")
+
         for key in payload.keys():
             if key in fields_to_convert_to_string:
                 payload[key] = self._convert_price_to_string(payload[key])
@@ -314,6 +322,14 @@ class WoocommerceApiWrapper:
     def update_product(self, product_id, **payload):
         fields_to_update = ['name', 'type', 'sku', 'status', 'catalog_visibility', 'regular_price',
             'sale_price', 'description', 'short_description', 'categories', 'images', 'attributes']
+
+        # Check if any attribute has an empty options list
+        attributes = payload.get('attributes', [])
+        for attribute in attributes:
+            options = attribute.get('options', [])
+            if not options:
+                raise ValueError(f"empty options... {attributes}")
+
         for key in payload.keys():
             if key not in fields_to_update:
                 raise ValueError(f"Field {key} is not updateable")

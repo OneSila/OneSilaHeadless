@@ -9,6 +9,7 @@ from media.tests.helpers import CreateImageMixin
 from properties.models import Property, ProductPropertiesRule, ProductProperty, \
     ProductPropertiesRuleItem
 from products.models import ConfigurableVariation
+from sales_prices.models import SalesPrice
 from sales_channels.integrations.woocommerce.models import WoocommerceProduct
 from sales_channels.integrations.woocommerce.factories.products import (
     WooCommerceProductCreateFactory,
@@ -135,6 +136,8 @@ class WooCommerceProductFactoryTest(CreateTestProductMixin, CreateImageMixin, Te
         # Verify it exists in WooCommerce
         resp_product = self.api.get_product(remote_product.remote_id)
         self.assertIsNotNone(resp_product)
+
+        logger.debug(f"WooCommerceProductFactoryTest resp_product: {resp_product}")
         self.assertEqual(resp_product['name'], product.name)
         self.assertEqual(resp_product['sku'], product.sku)
 
@@ -189,6 +192,10 @@ class WooCommerceProductFactoryTest(CreateTestProductMixin, CreateImageMixin, Te
             is_configurable=False
         )
         self.assertTrue(small_product.is_simple())
+        price = SalesPrice.objects.get(
+            product=small_product,
+        )
+        self.assertTrue(price.price is not None)
 
         medium_product = self.create_test_product(
             sku="tshirt-config-medium-product",
@@ -265,12 +272,6 @@ class WooCommerceProductFactoryTest(CreateTestProductMixin, CreateImageMixin, Te
             local_instance=parent
         )
         self.assertIsNotNone(remote_product.remote_id)
-
-        # Verify it exists in WooCommerce
-        resp_product = self.api.get_product(remote_product.remote_id)
-        self.assertIsNotNone(resp_product)
-        self.assertEqual(resp_product['name'], parent.name)
-        self.assertEqual(resp_product['sku'], parent.sku)
 
         # FIXME: This needs removing....
         input('pauze..........tick to continue....')

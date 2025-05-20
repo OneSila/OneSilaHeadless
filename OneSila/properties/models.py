@@ -157,7 +157,7 @@ class ProductProperty(TranslatedModelMixin, models.Model):
     def __str__(self):
         return f"{self.product} {self.property} > {self.get_value()}"
 
-    def get_value(self):
+    def get_value(self, language=None):
         """
         Converts the various values and returns you the right type/value for the given property.
         """
@@ -166,9 +166,10 @@ class ProductProperty(TranslatedModelMixin, models.Model):
         if type == Property.TYPES.MULTISELECT:
             type = 'multi_select'
 
-        return getattr(self, 'get_value_{}'.format(type.lower()))()
+        method = getattr(self, 'get_value_{}'.format(type.lower()))
+        return method(language)
 
-    def get_serialised_value(self):
+    def get_serialised_value(self, language=None):
         value = self.get_value()
 
         if self.property.type == Property.TYPES.MULTISELECT:
@@ -178,10 +179,10 @@ class ProductProperty(TranslatedModelMixin, models.Model):
 
         return value
 
-    def get_value_int(self):
+    def get_value_int(self, language=None):
         return self.value_int
 
-    def get_value_float(self):
+    def get_value_float(self, language=None):
         return self.value_float
 
     def get_value_text(self, language=None):
@@ -190,19 +191,19 @@ class ProductProperty(TranslatedModelMixin, models.Model):
     def get_value_description(self, language=None):
         return self._get_translated_value(field_name='value_description', related_name='productpropertytexttranslation_set', language=language)
 
-    def get_value_boolean(self):
+    def get_value_boolean(self, language=None):
         return self.value_boolean
 
-    def get_value_date(self):
+    def get_value_date(self, language=None):
         return self.value_date
 
-    def get_value_datetime(self):
+    def get_value_datetime(self, language=None):
         return self.value_datetime
 
-    def get_value_select(self):
+    def get_value_select(self, language=None):
         return self.value_select
 
-    def get_value_multi_select(self):
+    def get_value_multi_select(self, language=None):
         return self.value_multi_select
 
     class Meta:
