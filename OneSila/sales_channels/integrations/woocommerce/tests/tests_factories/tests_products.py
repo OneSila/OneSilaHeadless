@@ -273,9 +273,6 @@ class WooCommerceProductFactoryTest(CreateTestProductMixin, CreateImageMixin, Te
         )
         self.assertIsNotNone(remote_product.remote_id)
 
-        # FIXME: This needs removing....
-        input('pauze..........tick to continue....')
-
     def test_create_update_delete_product(self):
         """Test that WooCommerceProductCreateFactory properly creates a remote product"""
         product = self.create_test_product(
