@@ -1,6 +1,6 @@
 from products.models import Product, ProductTranslation
 from properties.models import Property, PropertySelectValue, PropertySelectValueTranslation, \
-    ProductPropertiesRule, ProductProperty
+    ProductPropertiesRule, ProductProperty, PropertyTranslation
 from sales_prices.models import SalesPrice
 from currencies.models import Currency
 from sales_channels.integrations.woocommerce.factories.pulling import WoocommerceRemoteCurrencyPullFactory, \
@@ -8,6 +8,9 @@ from sales_channels.integrations.woocommerce.factories.pulling import Woocommerc
 from sales_channels.integrations.woocommerce.factories.properties import WooCommerceGlobalAttributeCreateFactory
 from sales_channels.integrations.woocommerce.models import WoocommerceCurrency, WoocommerceProduct, WoocommerceSalesChannel
 from sales_channels.models import SalesChannelView, SalesChannelViewAssign
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class CreateTestProductMixin:
@@ -37,14 +40,72 @@ class CreateTestProductMixin:
         remote_currency.save()
 
     def tearDown(self):
+        from sales_channels.integrations.woocommerce.exceptions import FailedToDeleteProductError
         for product in WoocommerceProduct.objects.filter(remote_id__isnull=False):
-            self.api.delete_product(product.remote_id)
+            try:
+                self.api.delete_product(product.remote_id)
+            except FailedToDeleteProductError as e:
+                logger.error(f"Error deleting product {product.remote_id}: {e}")
 
-    def create_test_product(self, sku, name, assign_to_sales_channel=False):
+    def create_property(self, name, is_product_type=False, type=Property.TYPES.SELECT):
+        prop = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            is_product_type=is_product_type,
+            type=type,
+            is_public_information=True,
+            add_to_filters=True,
+        )
+
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=prop,
+            language=self.multi_tenant_company.language,
+            name=name
+        )
+
+        return prop
+
+    def create_property_value(self, name, prop):
+        property_value = PropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=prop,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=property_value,
+            language=self.multi_tenant_company.language,
+            value=name
+        )
+        return property_value
+
+    def create_product_type_value(self, name):
+        product_type_prop = Property.objects.get(
+            multi_tenant_company=self.multi_tenant_company,
+            is_product_type=True,
+        )
+        value = PropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=product_type_prop,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=product_type_prop,
+            language=self.multi_tenant_company.language,
+            value=name
+        )
+
+        return value
+
+    def create_test_product(self, sku, name, assign_to_sales_channel=False, rule=None, is_configurable=False):
+        if is_configurable:
+            ptype = Product.CONFIGURABLE
+        else:
+            ptype = Product.SIMPLE
+
         product, created = Product.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             sku=sku,
-            type=Product.SIMPLE
+            type=ptype
         )
 
         if not created:
@@ -54,7 +115,9 @@ class CreateTestProductMixin:
             multi_tenant_company=self.multi_tenant_company,
             product=product,
             language=self.multi_tenant_company.language,
-            name=name
+            name=name,
+            short_description="<b>Short Description</b>",
+            description="<b>Description</b>",
         )
         # Create a property for product type
         product_type_property = Property.objects.get(
@@ -75,10 +138,13 @@ class CreateTestProductMixin:
                 value="Sales Channel Test"
             )
 
-        property_rule, _ = ProductPropertiesRule.objects.get_or_create(
-            multi_tenant_company=self.multi_tenant_company,
-            product_type=test_type_value,
-        )
+        if rule is None:
+            property_rule, _ = ProductPropertiesRule.objects.get_or_create(
+                multi_tenant_company=self.multi_tenant_company,
+                product_type=test_type_value,
+            )
+        else:
+            property_rule = rule
 
         self.currency = Currency.objects.get(
             multi_tenant_company=self.multi_tenant_company,

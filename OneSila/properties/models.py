@@ -1,7 +1,8 @@
 from core import models
 from django.utils.translation import gettext_lazy as _
 
-from properties.managers import PropertyManager, ProductPropertiesRuleManager, PropertySelectValueManager
+from properties.managers import PropertyManager, ProductPropertiesRuleManager, \
+    PropertySelectValueManager, ProductPropertyManager
 from translations.models import TranslationFieldsMixin, TranslatedModelMixin
 from builtins import property as django_property  # in this file we will use property as django property because we have fields named property
 from django.db.models import Q
@@ -150,6 +151,8 @@ class ProductProperty(TranslatedModelMixin, models.Model):
     value_datetime = models.DateTimeField(null=True, blank=True)
     value_select = models.ForeignKey(PropertySelectValue, on_delete=models.PROTECT, related_name='value_select_set', null=True, blank=True)
     value_multi_select = models.ManyToManyField(PropertySelectValue, related_name='value_multi_select_set', blank=True)
+
+    objects = ProductPropertyManager()
 
     def __str__(self):
         return f"{self.product} {self.property} > {self.get_value()}"

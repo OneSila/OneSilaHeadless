@@ -392,7 +392,6 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
                     require_update = True
                 else:
                     raise e
-
             self.set_remote_id(response_data)
             self.modify_remote_instance(response_data)
 

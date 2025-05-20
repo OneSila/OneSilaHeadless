@@ -156,7 +156,9 @@ class WoocommerceApiWrapper:
             'has_archives': has_archives
         }
         try:
-            return self.remove_attribute_slug_prefix(self.post('products/attributes', data=payload))
+            resp = self.remove_attribute_slug_prefix(self.post('products/attributes', data=payload))
+            logger.debug(f"Created woocommerce attribute: {resp}")
+            return resp
         except FailedToGetError as e:
             raise FailedToCreateAttributeError(e, response=e.response) from e
 
@@ -280,6 +282,34 @@ class WoocommerceApiWrapper:
                 pass
 
             raise FailedToCreateProductError(e, response=e.response) from e
+
+    def create_product_variation(self, product_id, **payload):
+        """
+        Create a product variation in WooCommerce.
+        """
+        fields_to_convert_to_string = ['regular_price', 'sale_price']
+        for key in payload.keys():
+            if key in fields_to_convert_to_string:
+                payload[key] = self._convert_price_to_string(payload[key])
+
+        logger.debug(f"Create Product Variation Payload: {payload}")
+        return self.post(f'products/{product_id}/variations', data=payload)
+
+    def update_product_variation(self, product_id, variation_id, **payload):
+        """
+        Update a product variation in WooCommerce.
+        """
+        fields_to_convert_to_string = ['regular_price', 'sale_price']
+        for key in payload.keys():
+            if key in fields_to_convert_to_string:
+                payload[key] = self._convert_price_to_string(payload[key])
+        return self.put(f'products/{product_id}/variations/{variation_id}', data=payload)
+
+    def delete_product_variation(self, product_id, variation_id):
+        """
+        Delete a product variation in WooCommerce.
+        """
+        return self.delete(f'products/{product_id}/variations/{variation_id}')
 
     def update_product(self, product_id, **payload):
         fields_to_update = ['name', 'type', 'sku', 'status', 'catalog_visibility', 'regular_price',

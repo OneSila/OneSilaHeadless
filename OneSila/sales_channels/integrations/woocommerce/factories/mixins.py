@@ -5,3 +5,45 @@ class SerialiserMixin:
 
     def serialize_response(self, response):
         return response
+
+
+class WoocommerceProductTypeMixin:
+    """
+    This mixin will give you access to:
+    - is_woocommerce_simple_product
+    - is_woocommerce_configurable_product
+    - is_woocommerce_variant_product
+    """
+
+    def run(self, *args, **kwargs):
+        self.set_woocomerce_product_types()
+        super().run(*args, **kwargs)
+
+    def get_local_product(self):
+        return self.remote_product.local_instance
+
+    def remote_product_is_variation(self):
+        try:
+            return self.remote_product.is_variation
+        except AttributeError:
+            return False
+
+    def set_woocomerce_product_types(self):
+        product = self.get_local_product()
+        is_variation = self.remote_product_is_variation()
+
+        if product.is_configurable():
+            self.is_woocommerce_simple_product = False
+            self.is_woocommerce_configurable_product = True
+            self.is_woocommerce_variant_product = False
+        elif product.is_simple():
+            if is_variation:
+                self.is_woocommerce_simple_product = True
+                self.is_woocommerce_configurable_product = False
+                self.is_woocommerce_variant_product = False
+            else:
+                self.is_woocommerce_simple_product = False
+                self.is_woocommerce_configurable_product = False
+                self.is_woocommerce_variant_product = True
+        else:
+            raise ValueError(f"Product {product} is not configurable or simple. Configure other types.")

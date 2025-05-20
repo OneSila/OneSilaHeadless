@@ -16,13 +16,12 @@ from sales_channels.factories.properties.properties import (
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceProductProperty, \
     WoocommerceGlobalAttribute, WoocommerceGlobalAttributeValue
-from .mixins import SerialiserMixin
+from .mixins import SerialiserMixin, WoocommerceProductTypeMixin
 from ..exceptions import DuplicateError
 from sales_channels.integrations.woocommerce.constants import API_ATTRIBUTE_PREFIX
 from properties.models import ProductProperty, Property
 from django.db.models import Q, Count
 from django.utils.functional import cached_property
-from collections.abc import Iterable
 
 import logging
 logger = logging.getLogger(__name__)
@@ -71,11 +70,11 @@ class WoocommerceRemoteValueConversionMixin:
 
     def get_select_value(self, value):
         """Handles select and multiselect values."""
-        return value
+        return value.value
 
     def get_multi_select_value(self, value):
         """Handles multi-select values."""
-        return value
+        return [v.value for v in value]
 
     def get_text_value(self, value):
         """Handles text values."""
@@ -105,7 +104,7 @@ class WoocommerceRemoteValueConversionMixin:
     #         return datetime_value.strftime('%d-%m-%Y %H:%M:%S')
 
 
-class WooCommerceProductAttributeMixin(SerialiserMixin):
+class WooCommerceProductAttributeMixin(WoocommerceProductTypeMixin, SerialiserMixin, WoocommerceRemoteValueConversionMixin):
     """
     This is the class used to populate all of the
     attriubtes on the products.
@@ -122,17 +121,18 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
     remote_id_map = 'id'
     global_attribute_model_class = WoocommerceGlobalAttribute
 
+    def get_global_attribute_create_factory(self):
+        from sales_channels.integrations.woocommerce.factories.properties import WooCommerceGlobalAttributeCreateFactory
+
+        try:
+            global_attribute_create_factory = self.global_attribute_create_factory
+        except AttributeError:
+            global_attribute_create_factory = WooCommerceGlobalAttributeCreateFactory
+
+        return global_attribute_create_factory
+
     def slugified_internal_name(self, property):
         return f"{API_ATTRIBUTE_PREFIX}{property.internal_name}"
-
-    def get_local_product(self):
-        return self.remote_product.local_instance
-
-    def remote_product_is_variation(self):
-        try:
-            return self.remote_product.is_variation
-        except AttributeError:
-            return False
 
     def set_configurator_properties(self):
         product = self.get_local_product()
@@ -145,14 +145,13 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
         self.configurator_properties = product.get_configurator_properties(product_rule=product_rule)
         self.configurator_property_ids = self.configurator_properties.values_list('id', flat=True)
 
-    def get_configurator_property_values(self, prop):
+    def get_configurator_property_values(self, prod_prop):
         """
         Get all unique property values for the configurator properties across all variations.
         Returns a dictionary mapping property IDs to lists of their values.
         """
-        if not hasattr(self, 'configurator_properties'):
-            self.set_configurator_properties()
-
+        # FIXME: These values should be translated into the store language.
+        prop = prod_prop.property
         product = self.get_local_product()
         variations = product.get_configurable_variations(active_only=True)
 
@@ -168,8 +167,8 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
             )
 
             # For select properties, get the selected value
-            if prop.type == Property.SELECT:
-                property_values.add(product_property.get_value())
+            if prop.type == Property.TYPES.SELECT:
+                property_values.add(product_property.get_serialised_value())
 
         logger.debug(f"Collected configurator property values: {property_values}")
         return list(property_values)
@@ -190,7 +189,91 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
         product = self.get_local_product()
         self.product_rule = product.get_product_rule()
 
+    def get_configurable_product_attributes(self):
+        product = self.get_local_product()
+        return product.get_configurator_properties(public_information_only=False)
+
+    def get_global_attribute(self, prod_prop):
+        # We only get a global attribute if the property has add_to_filters set to True.
+        prop = prod_prop.property
+        if not prop.add_to_filters:
+            return None
+
+        try:
+            ga = self.global_attribute_model_class.objects.get(
+                local_instance=prop,
+                sales_channel=self.sales_channel
+            )
+        except self.global_attribute_model_class.DoesNotExist:
+            f = self.get_global_attribute_create_factory()(
+                sales_channel=self.sales_channel,
+                local_instance=prop
+            )
+            f.run()
+            ga = f.remote_instance
+
+        return ga
+
+    def get_common_properties(self):
+        product = self.get_local_product()
+        variations = product.get_configurable_variations(active_only=True)
+        configurator_properties = product.get_configurator_properties()
+
+        common_product_properties = ProductProperty.objects.\
+            filter(
+                product__in=variations,
+            ).\
+            exclude(
+                property__in=configurator_properties.values('id'),
+            )
+        return common_product_properties
+
+    # def get_product_property_values(self, prop):
+    #     # FIXME: These need to be translated into the store language.
+    #     properties = ProductProperty.objects.filter(
+    #         product=self.get_local_product(),
+    #         property=prop
+    #     )
+    #     return list(set([i.get_serialised_value() for i in properties]))
+
+    def get_product_property_values(self, prod_prod):
+        prop = prod_prod.property
+        product = self.get_local_product()
+        variations = product.get_configurable_variations(active_only=True)
+
+        # FIXME: These need to be translated into the store language.
+        properties = ProductProperty.objects.filter(
+            product__in=variations,
+            property=prop
+        )
+        return list(set([i.get_serialised_value() for i in properties]))
+
+    def uniqueify_payload(self, payload):
+        seen = []
+        unique_payload = []
+        for item in payload:
+            if item not in seen:
+                seen.append(item)
+                unique_payload.append(item)
+        return unique_payload
+
     def apply_attribute_payload(self):
+        """
+        The payload for the attributes is different for simple, configurable and variant products.
+        if you check out the tests_api.py file in the tests folder you will find a full exmaple
+        of a working product.
+
+        The main concideration is that the attribute payload is
+        using singular vs plural form and
+        global vs local attributes.
+
+        As for attribute assignment. In OneSila we assign everything on the simple products.
+        In Woocommerce all common attributes are assigned on the configurable products.
+        Simple products only support the configurable differences.
+        If you have attributes that are only used on simple product they most likely be ignored.
+
+        Once you get that, the rest should be easy enough to understand.
+        """
         # Woocom only supports select values for attributes
         # they are multi-select by default and to be treated
         # as such.
@@ -212,78 +295,22 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
         # currently they are just the default values.
 
         product = self.get_local_product()
-        is_variation = self.remote_product_is_variation()
         ean_code = product.eancode_set.last()
+
         self.set_product_rule()
         self.set_product_properties_to_apply_payload()
         self.set_filterable_property_ids()
 
         # What is this product about?  How does it relate and what are the types?
-        if product.is_configurable():
-            is_woocommerce_simple_product = False
-            is_woocommerce_configurable_product = True
-            is_woocommerce_variant_product = False
-        elif product.is_simple():
-            if is_variation:
-                is_woocommerce_simple_product = True
-                is_woocommerce_configurable_product = False
-                is_woocommerce_variant_product = False
-            else:
-                is_woocommerce_simple_product = False
-                is_woocommerce_configurable_product = False
-                is_woocommerce_variant_product = True
-        else:
-            raise ValueError(f"Product {product} is not configurable or simple. Configure other types.")
-
         attribute_payload = []
 
-        # There are 3 distinct ways of adding attributes on the payload it seems.
-        # So let's just run through the cases and apply the correct format.
-        if is_woocommerce_simple_product or is_woocommerce_configurable_product:
-            # Variable (configurable) or Simple (non-configurable) products
-            # use plurar form.
-            if ean_code:
-                attribute_payload.append({
-                    'name': 'EAN Code',
-                    'visible': True,
-                    'variation': False,
-                    'options': [ean_code.ean_code]
-                })
-
-            # Now we want to add all of the properties.
-            # if they are a product-type or a filterable property they will
-            # already exists as a global attributes.
-            # else - a custom one.
-            for prop in self.product_properties.iterator():
-                try:
-                    ga = self.global_attribute_model_class.objects.get(local_instance=prop.property)
-                    value = prop.get_serialised_value()
-
-                    # WooCommerce expects a list of values for all global attributes.
-                    if not isinstance(value, Iterable):
-                        value = [value]
-
-                    attribute_payload.append({
-                        'id': ga.remote_id,
-                        'name': prop.property.name,
-                        'options': value
-                    })
-                except self.global_attribute_model_class.DoesNotExist:
-                    attribute_payload.append({
-                        'name': prop.property.name,
-                        'options': [prop.get_serialised_value()]
-                    })
-
-                if is_woocommerce_configurable_product:
-                    for prop in self.configurator_properties.iterator():
-                        ga = self.global_attribute_model_class.objects.get(local_instance=prop)
-                        values = self.get_configurator_property_values(prop)
-                        attribute_payload.append({
-                            "id": ga.remote_id,
-                            "options": values,
-                        })
-        elif is_woocommerce_variant_product:
+        if self.is_woocommerce_variant_product:
             # Simple Variations (variation) use a singular form.
+            # This is the attribute payload for the variation itelf.
+
+            # Firstly let's add the EAN Code.
+            # FIXME: This is the wrong implementation. There seems to be
+            # a direct field on the product admin pages with title: GTIN, UPC, EAN, or ISBN
             if ean_code:
                 attribute_payload.append({
                     'name': 'EAN Code',
@@ -291,23 +318,98 @@ class WooCommerceProductAttributeMixin(SerialiserMixin):
                     'option': [ean_code.ean_code]
                 })
 
-            for prop in self.product_properties.iterator():
-                try:
-                    ga = self.global_attribute_model_class.objects.get(local_instance=prop.property)
+            # It would seem that woocommerce doesnt have a problem with
+            # Assigning too many attributes to a product. Even variations.
+            # So let's just go ahead and do that.
+            configurator_prod_props = product.productproperty_set.filter_for_configurator()
+            for prod_prop in configurator_prod_props.iterator():
+                ga = self.get_global_attribute(prod_prop)
+                if ga:
                     attribute_payload.append({
                         'id': ga.remote_id,
-                        'option': prop.get_serialised_value(),
+                        'option': prod_prop.get_serialised_value(),
                     })
-                except self.global_attribute_model_class.DoesNotExist:
+                else:
+                    # FIXME: This does not support multi-values.
+                    # Frankly it's really unclear how woocommerce even handles this.
+                    # As this is technically not possible on a variation.
+                    attribute_payload.append({
+                        'name': prod_prop.property.name,
+                        'visible': True,
+                        'option': prod_prop.get_serialised_value()
+                    })
+
+        if self.is_woocommerce_simple_product or self.is_woocommerce_configurable_product:
+            # Simple products use a plural form. So do configurable products.
+            # This is the attribute payload then the simple product has been
+            # directly assigned to the sales channel.
+            # So we just go ahead and assign everything in one go.
+
+            # Why do we also assign the configuraable properties here?
+            # Because they actually only have the base product type, which
+            # is also needed.  So to avoid writin it twice....
+            product_properties = product.productproperty_set.all()
+            for prop in product_properties.iterator():
+                ga = self.get_global_attribute(prop)
+                if ga:
+                    values = self.get_product_property_values(prop)
+                    remote_id = int(ga.remote_id)
+                    attribute_payload.append({
+                        "id": remote_id,
+                        "options": values,
+                    })
+                else:
                     # FIXME: This does not support mulit-values.
+                    # Frankly it's really unclear how woocommerce even handles this.
+                    # As this is technically not possible on a variation.
                     attribute_payload.append({
                         'name': prop.property.name,
                         'visible': True,
-                        'option': prop.get_serialised_value()
+                        'options': prop.get_serialised_value()
                     })
 
-        self.payload['attributes'] = attribute_payload
-        logger.debug(f"Attribute payload applied: {self.payload}")
+        if self.is_woocommerce_configurable_product:
+            # The final case is a configurable product.
+            # The individual property has already been assigned in an
+            # earlier case. Now we find all of the common and uncommen properties
+            # compile the list and add them to the payload.
+
+            # Configurable products have no EAN code.. Skip that all together.
+
+            # First step, get all of the variations possibilities.
+            configurator_attributes = self.get_configurable_product_attributes()
+            for prod_prop in configurator_attributes.iterator():
+                ga = self.get_global_attribute(prop)
+                values = self.get_configurator_property_values(prod_prop)
+                remote_id = int(ga.remote_id)
+                attribute_payload.append({
+                    "id": remote_id,
+                    "options": values,
+                    "variation": True,
+                })
+
+            # Secondly populate all of the common properties.
+            commont_properties = self.get_common_properties()
+            for prop in commont_properties.iterator():
+                ga = self.get_global_attribute(prop)
+                if ga:
+                    values = self.get_product_property_values(prop)
+                    remote_id = int(ga.remote_id)
+                    attribute_payload.append({
+                        "id": remote_id,
+                        "options": values,
+                    })
+                else:
+                    # FIXME: This does not support mulit-values.
+                    # Frankly it's really unclear how woocommerce even handles this.
+                    # As this is technically not possible on a variation.
+                    attribute_payload.append({
+                        'name': prop.property.name,
+                        'visible': True,
+                        'options': prop.get_serialised_value()
+                    })
+
+        self.payload['attributes'] = self.uniqueify_payload(attribute_payload)
         return self.payload
 
 
@@ -406,6 +508,10 @@ class WoocommerceGlobalAttributeValueCreateFactory(WoocommerceGlobalAttributeVal
         return self.api.create_attribute_term(
             self.remote_instance.remote_property.remote_id, **self.payload)
 
+    def run(self):
+        super().run()
+        logger.debug(f"WooCommerceGlobalAttributeValueCreateFactory Remote instance: {self.remote_instance.__dict__}")
+
 
 class WoocommerceGlobalAttributeValueUpdateFactory(WoocommerceGlobalAttributeValueMixin, GetWoocommerceAPIMixin, RemotePropertySelectValueUpdateFactory):
     create_factory_class = WoocommerceGlobalAttributeValueCreateFactory
@@ -441,6 +547,7 @@ class WooCommerceProductPropertyMixin(WooCommerceProductAttributeMixin, Serialis
     update_factory_class = "WooCommerceProductPropertyUpdateFactory"
 
     field_mapping = {
+        # 'remote_id': 'id',
         'name': 'name',
         'is_public_information': 'visible',
     }
@@ -456,13 +563,33 @@ class WooCommerceProductPropertyCreateFactory(WooCommerceProductPropertyMixin, G
         # They are part of the product create.
         self.remote_value = self.get_remote_value()
         logger.debug(f"WooCommerceProductPropertyCreateFactory Remote value: {self.remote_value}")
+
         if self.get_value_only:
             self.remote_instance.remote_value = str(self.remote_value)
             logger.debug(f"WooCommerceProductPropertyCreateFactory Remote value id: {self.remote_instance.id}")
             self.remote_instance.save()
-            return  # if we ony get the value we don't need to cotninue
+            # if we ony get the value we don't need to return anything.
+            return
 
         raise NotImplementedError("WooCommerceProductPropertyCreateFactory should be triggering a product-update after applying the attribute payload.")
+
+    # def customize_remote_instance_data(self):
+    #     self.remote_instance_data['remote_product'] = self.remote_product
+    #     return self.remote_instance_data
+
+    # def run(self):
+
+    #     if not self.preflight_check():
+    #         return
+
+    #     self.set_api()
+    #     self.preflight_process()
+    #     self.build_payload()
+    #     self.customize_payload()
+    #     self.build_remote_instance_data()
+    #     self.customize_remote_instance_data()
+    #     self.initialize_remote_instance()
+    #     self.create()
 
 
 class WooCommerceProductPropertyUpdateFactory(WooCommerceProductPropertyMixin, GetWoocommerceAPIMixin, RemoteProductPropertyUpdateFactory):
