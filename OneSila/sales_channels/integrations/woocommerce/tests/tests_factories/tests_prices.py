@@ -1,5 +1,3 @@
-
-
 from .mixins import TestCaseWoocommerceMixin
 from django.conf import settings
 from django.db import transaction
