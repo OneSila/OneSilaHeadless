@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext as _
 from sales_channels.models import SalesChannel, SalesChannelView, \
-    RemoteProduct, RemoteEanCode, RemoteCurrency, RemoteLanguage
+    RemoteProduct, RemoteEanCode, RemoteCurrency, RemoteLanguage, RemotePrice
 from sales_channels.models.properties import RemoteProperty, \
     RemotePropertySelectValue, RemoteProductProperty
 from sales_channels.models.products import RemoteImageProductAssociation
@@ -97,5 +97,12 @@ class WoocommerceCurrency(RemoteCurrency):
 class WoocommerceRemoteLanguage(RemoteLanguage):
     """
     Woocommerce remote language model
+    """
+    pass
+
+
+class WoocommercePrice(RemotePrice):
+    """
+    Woocommerce price model
     """
     pass

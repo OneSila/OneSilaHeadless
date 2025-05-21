@@ -12,7 +12,7 @@ from sales_channels.factories.products.variations import (
 
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceProduct, \
-    WoocommerceProductProperty, WoocommerceProductProperty
+    WoocommerceProductProperty, WoocommerceProductProperty, WoocommercePrice
 from .mixins import SerialiserMixin, WoocommerceProductTypeMixin
 from .properties import WooCommerceProductPropertyCreateFactory, \
     WooCommerceProductPropertyUpdateFactory, WooCommerceProductPropertyDeleteFactory
@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 class WooCommerceProductMixin(WooCommerceMediaMixin, GetWoocommerceAPIMixin, WooCommerceProductAttributeMixin, WoocommerceProductTypeMixin, SerialiserMixin):
     remote_model_class = WoocommerceProduct
     remote_product_property_class = WoocommerceProductProperty
+    remote_price_class = WoocommercePrice
+
     remote_id_map = 'id'
     # Key is the local field, value is the remote field
     field_mapping = {
@@ -86,6 +88,8 @@ class WooCommerceProductMixin(WooCommerceMediaMixin, GetWoocommerceAPIMixin, Woo
 
 class WooCommerceProductSyncFactory(WooCommerceProductMixin, RemoteProductSyncFactory):
     remote_model_class = WoocommerceProduct
+    remote_price_class = WoocommercePrice
+
     remote_product_property_class = WoocommerceProductProperty
     remote_product_property_create_factory = WooCommerceProductPropertyCreateFactory
     remote_product_property_update_factory = WooCommerceProductPropertyUpdateFactory
@@ -124,6 +128,7 @@ class WooCommerceProductCreateFactory(RemoteProductCreateFactory, WooCommercePro
     enable_fetch_and_update = True
     update_if_not_exists = True
     update_factory_class = "WooCommerceProductUpdateFactory"
+    remote_price_class = WoocommercePrice
 
     def perform_non_subclassed_remote_action(self):
         """

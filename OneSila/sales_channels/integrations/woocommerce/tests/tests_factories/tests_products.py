@@ -22,7 +22,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class WooCommerceProductFactoryTest(CreateTestProductMixin, CreateImageMixin, TestCaseWoocommerceMixin):
+class WooCommerceProductFactoryTestMixin(CreateTestProductMixin, CreateImageMixin, TestCaseWoocommerceMixin):
     def setUp(self):
         super().setUp()
         # Setup a bunch of properties to create
@@ -80,6 +80,8 @@ class WooCommerceProductFactoryTest(CreateTestProductMixin, CreateImageMixin, Te
             multi_tenant_company=self.multi_tenant_company,
         )
 
+
+class WooCommerceProductFactoryTest(WooCommerceProductFactoryTestMixin):
     def test_attribute_create(self):
         factory = WooCommerceGlobalAttributeCreateFactory(
             sales_channel=self.sales_channel,
@@ -127,6 +129,8 @@ class WooCommerceProductFactoryTest(CreateTestProductMixin, CreateImageMixin, Te
         )
         factory.run()
 
+        self.assertEqual(factory.payload['sku'], product.sku)
+
         remote_product = WoocommerceProduct.objects.get(
             sales_channel=self.sales_channel,
             local_instance=product
@@ -137,10 +141,9 @@ class WooCommerceProductFactoryTest(CreateTestProductMixin, CreateImageMixin, Te
         resp_product = self.api.get_product(remote_product.remote_id)
         self.assertIsNotNone(resp_product)
 
-        logger.debug(f"WooCommerceProductFactoryTest resp_product: {resp_product}")
         self.assertEqual(resp_product['name'], product.name)
         self.assertEqual(resp_product['sku'], product.sku)
-
+        self.assertEqual(resp_product['type'], 'simple')
         product.active = False
         product.save()
 

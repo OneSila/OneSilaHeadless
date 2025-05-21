@@ -9,6 +9,9 @@ from sales_channels.integrations.woocommerce.exceptions import (
 )
 from sales_channels.integrations.woocommerce.exceptions import DuplicateError
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class WoocommerceApiWrapperTestCase(TestCase):
     """
@@ -167,7 +170,8 @@ class WoocommerceApiWrapperTestCase(TestCase):
         }
         result = self.api_wrapper.create_product(**kwargs)
         self.assertIsInstance(result, dict)
-        self.assertEqual(result['name'], 'Test Product')
+        self.assertEqual(result['name'], kwargs['name'])
+        self.assertEqual(result['sku'], kwargs['sku'])
 
         result = self.api_wrapper.delete_product(result['id'])
         self.assertTrue(result)

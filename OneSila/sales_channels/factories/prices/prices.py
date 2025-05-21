@@ -1,6 +1,9 @@
 from products.models import Product
 from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = Product
@@ -20,10 +23,13 @@ class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFacto
 
         if not self.skip_checks:
             if not self.sales_channel.sync_prices:
+                logger.warning(f"Sales channel {self.sales_channel.name} does not sync prices")
                 return False
             if not self.remote_product:
+                logger.warning(f"Remote product not found for sales channel {self.sales_channel.name}")
                 return False
             if not self.assigned_to_website():
+                logger.warning(f"Product {self.local_instance.name} is not assigned to website {self.sales_channel.website.name}")
                 return False
 
         try:

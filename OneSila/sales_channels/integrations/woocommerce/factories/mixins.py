@@ -1,3 +1,6 @@
+from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
+
+
 class SerialiserMixin:
     """
     Mixin providing common serialization methods for the woocommerce integration.
