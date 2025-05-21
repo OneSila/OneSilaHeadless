@@ -54,6 +54,15 @@ class VariationManager(ProductManager):
         return VariationQuerySet(self.model, using=self._db)
 
 
+class AliasProductQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+    pass
+
+
+class AliasProductManager(ProductManager):
+    def get_queryset(self):
+
+        return AliasProductQuerySet(self.model, using=self._db)
+
 class BundleQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
     def get_all_item_products(self, product):
         from .models import Product, BundleVariation

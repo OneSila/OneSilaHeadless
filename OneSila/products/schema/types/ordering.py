@@ -3,7 +3,8 @@ from core.schema.core.types.types import auto
 
 from products.models import Product, BundleProduct, ConfigurableProduct, \
     SimpleProduct, ProductTranslation, ConfigurableVariation, \
-    BundleVariation
+    BundleVariation, AliasProduct
+
 
 @order(Product)
 class ProductOrder:
@@ -24,6 +25,10 @@ class ConfigurableProductOrder:
     id: auto
     sku: auto
 
+@order(AliasProduct)
+class AliasProductOrder:
+    id: auto
+    sku: auto
 
 @order(SimpleProduct)
 class SimpleProductOrder:

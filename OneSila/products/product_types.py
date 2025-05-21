@@ -4,16 +4,19 @@ SIMPLE = 'SIMPLE'
 BUNDLE = 'BUNDLE'
 UMBRELLA = 'UMBRELLA'
 CONFIGURABLE = 'CONFIGURABLE'
+ALIAS = 'ALIAS'
 
 PRODUCT_TYPE_CHOICES = (
     (BUNDLE, _('Bundle Product')),
     (CONFIGURABLE, _('Configurable Product')),
     (SIMPLE, _('Simple Product')),
+    (ALIAS, _('Alias Product')),
 )
 
 HAS_PRICES_TYPES = [
     SIMPLE,
     BUNDLE,
+    ALIAS
 ]
 
 

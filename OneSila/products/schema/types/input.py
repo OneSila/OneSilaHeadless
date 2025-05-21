@@ -5,6 +5,8 @@ from products.models import Product, BundleProduct, ConfigurableProduct, SimpleP
 @input(Product, fields="__all__")
 class ProductInput:
     name: str
+    alias_copy_images: bool
+    alias_copy_product_properties: bool
 
 
 @partial(Product, fields="__all__")

@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Q, Value
+from django.db.models import Q, Value, CheckConstraint
 from django.utils.text import slugify
 
 from core import models
@@ -7,7 +7,7 @@ from django.db import IntegrityError, transaction
 from django.utils.translation import gettext_lazy as _
 from translations.models import TranslationFieldsMixin, TranslatedModelMixin
 from taxes.models import VatRate
-from .managers import ProductManager, ConfigurableManager, BundleManager, VariationManager
+from .managers import ProductManager, ConfigurableManager, BundleManager, VariationManager, AliasProductManager
 import shortuuid
 from hashlib import shake_256
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Product(TranslatedModelMixin, models.Model):
-    from products.product_types import CONFIGURABLE, BUNDLE, SIMPLE,  PRODUCT_TYPE_CHOICES, HAS_PRICES_TYPES
+    from products.product_types import CONFIGURABLE, BUNDLE, SIMPLE,  PRODUCT_TYPE_CHOICES, ALIAS
 
     # Mandatory
     sku = models.CharField(max_length=256, db_index=True, blank=True, null=True)
@@ -27,6 +27,13 @@ class Product(TranslatedModelMixin, models.Model):
 
     # for simple and dropshipping products, meaning allow product to be sold even when no physical stock is present.
     allow_backorder = models.BooleanField(default=False)
+    alias_parent_product = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='alias_products'
+    )
 
     configurable_variations = models.ManyToManyField('self',
         through='ConfigurableVariation',
@@ -78,23 +85,34 @@ class Product(TranslatedModelMixin, models.Model):
         self.active = False
         self.save()
 
+    def get_effective_type(self):
+        if self.is_alias() and self.alias_parent_product:
+            return self.alias_parent_product.get_effective_type()
+        return self.type
+
     def is_configurable(self):
-        return self.type == self.CONFIGURABLE
+        return self.get_effective_type() == self.CONFIGURABLE
 
     def is_not_configurable(self):
-        return self.type != self.CONFIGURABLE
+        return self.get_effective_type() != self.CONFIGURABLE
 
     def is_bundle(self):
-        return self.type == self.BUNDLE
+        return self.get_effective_type() == self.BUNDLE
 
     def is_not_bundle(self):
-        return self.type != self.BUNDLE
+        return self.get_effective_type() != self.BUNDLE
 
     def is_simple(self):
-        return self.type == self.SIMPLE
+        return self.get_effective_type() == self.SIMPLE
 
     def is_not_variations(self):
-        return self.type != self.SIMPLE
+        return self.get_effective_type() != self.SIMPLE
+
+    def is_alias(self):
+        return self.type == self.ALIAS
+
+    def is_not_alias(self):
+        return self.type != self.ALIAS
 
     def deflate_bundle(self):
         """Return all BundleVariation items"""
@@ -342,14 +360,24 @@ class Product(TranslatedModelMixin, models.Model):
         self.sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
 
     def save(self, *args, **kwargs):
+
         if not self.sku:
             self._generate_sku()
+
+        if self.is_alias() and self.alias_parent_product and self.alias_parent_product.is_alias():
+            raise ValueError(_("An alias product cannot point to another alias product."))
 
         super().save(*args, **kwargs)
 
     class Meta:
         search_terms = ['sku', 'translations__name']
         unique_together = ('sku', 'multi_tenant_company')
+        constraints = [
+            CheckConstraint(
+                check=Q(type='ALIAS', alias_parent_product__isnull=False) | ~Q(type='ALIAS'),
+                name='alias_requires_parent'
+            )
+        ]
 
 
 class BundleProduct(Product):
@@ -384,6 +412,15 @@ class SimpleProduct(Product):
         proxy = True
         search_terms = ['sku']
 
+class AliasProduct(Product):
+    from .product_types import ALIAS
+
+    objects = AliasProductManager()
+    proxy_filter_fields = {'type': ALIAS}
+
+    class Meta:
+        proxy = True
+        search_terms = ['sku']
 
 class ConfigurableVariation(models.Model):
     parent = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="configurablevariation_through_parents")
