@@ -8,12 +8,15 @@ from typing import List, Optional
 
 from media.models import Media
 from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
-    ProductTranslation, ConfigurableVariation, BundleVariation
+    ProductTranslation, ConfigurableVariation, BundleVariation, AliasProduct
+from properties.models import ProductProperty
+from properties.schema.types.types import ProductPropertyType
 from taxes.schema.types.types import VatRateType
 from .filters import ProductFilter, BundleProductFilter, ConfigurableProductFilter, \
-    SimpleProductFilter, ProductTranslationFilter, ConfigurableVariationFilter, BundleVariationFilter
+    SimpleProductFilter, ProductTranslationFilter, ConfigurableVariationFilter, BundleVariationFilter, \
+    AliasProductFilter
 from .ordering import ProductOrder, BundleProductOrder, ConfigurableProductOrder, \
-    SimpleProductOrder, ProductTranslationOrder, ConfigurableVariationOrder, BundleVariationOrder
+    SimpleProductOrder, ProductTranslationOrder, ConfigurableVariationOrder, BundleVariationOrder, AliasProductOrder
 
 
 @type(Product, filters=ProductFilter, order=ProductOrder, pagination=True, fields="__all__")
@@ -21,6 +24,11 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
     vat_rate: Optional[VatRateType]
     inspector: Optional[Annotated['InspectorType', lazy('products_inspector.schema.types.types')]]
     saleschannelviewassign_set: List[Annotated['SalesChannelViewAssignType', lazy("sales_channels.schema.types.types")]]
+    productproperty_set: List[Annotated['ProductPropertyType', lazy("properties.schema.types.types")]]
+    salesprice_set: List[Annotated['SalesPriceType', lazy("sales_prices.schema.types.types")]]
+    alias_products: List[Annotated['ProductType', lazy("products.schema.types.types")]]
+    alias_parent_product: Optional[Annotated['ProductType', lazy("products.schema.types.types")]]
+
 
     @field()
     def proxy_id(self, info) -> str:
@@ -101,3 +109,10 @@ class ConfigurableVariationType(relay.Node, GetQuerysetMultiTenantMixin):
 class BundleVariationType(relay.Node, GetQuerysetMultiTenantMixin):
     parent: Optional[ProductType]
     variation: Optional[ProductType]
+
+@type(AliasProduct, filters=AliasProductFilter, order=AliasProductOrder, pagination=True, fields="__all__")
+class AliasProductType(relay.Node, GetQuerysetMultiTenantMixin):
+
+    @field()
+    def name(self, info) -> str | None:
+        return self.name

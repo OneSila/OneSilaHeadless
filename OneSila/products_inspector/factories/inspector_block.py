@@ -247,7 +247,7 @@ class MissingProductTypeInspectorBlockFactory(InspectorBlockFactory):
 
     def _check(self):
         from properties.models import ProductProperty
-
+        print('------------------------------------------------------ ???')
         if not ProductProperty.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product, property__is_product_type=True).exists():
             raise InspectorBlockFailed("Product is missing a required product type property.")
 

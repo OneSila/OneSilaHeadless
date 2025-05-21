@@ -1,6 +1,8 @@
 from core import models
 from products.models import Product
 from django.utils.translation import gettext_lazy as _
+
+from products.product_types import ALIAS
 from products_inspector.managers import InspectorBlockHasImagesManager, InspectorBlockMissingPricesManager, \
     MissingVariationInspectorBlockManager, MissingBundleItemsInspectorBlockManager, \
     InactiveBundleItemsInspectorBlockManager, MissingEanCodeInspectorBlockManager, \
@@ -66,7 +68,10 @@ class InspectorBlock(models.Model):
             CONFIGURABLE: 'configurable_product_applicability',
         }
 
-        return product_type_map.get(self.inspector.product.type)
+        if self.inspector.product.type == ALIAS:
+            return product_type_map.get(self.inspector.product.alias_parent_product.type)
+        else:
+            return product_type_map.get(self.inspector.product.type)
 
     def __str__(self):
         return f"{self.get_error_code_display()} for {self.inspector.product.sku} ({self.successfully_checked})"

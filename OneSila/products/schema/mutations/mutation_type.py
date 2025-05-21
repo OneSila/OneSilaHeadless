@@ -50,7 +50,7 @@ class ProductsMutation:
     delete_configurable_variations: List[ConfigurableVariationType] = delete()
 
     create_bundle_variation: BundleVariationType = create(BundleVariationInput)
-    create_bundle_variations: List[BundleVariationType] = create(BundleVariationInput)
+    create_bundle_variations: List[BundleVariationType] = create(List[BundleVariationInput])
     update_bundle_variation: BundleVariationType = update(BundleVariationPartialInput)
     delete_bundle_variation: BundleVariationType = delete()
     delete_bundle_variations: List[BundleVariationType] = delete()
