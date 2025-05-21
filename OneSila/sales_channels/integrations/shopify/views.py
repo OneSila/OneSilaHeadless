@@ -29,7 +29,7 @@ def shopify_auth_start(request):
 
     # Build the redirect URI dynamically
     redirect_uri = request.build_absolute_uri(reverse('shopify:shopify_oauth_callback'))
-    if settings.DEBUG:
+    if settings.TESTING:
         redirect_uri = settings.SHOPIFY_TEST_REDIRECT_URI
 
     # Create permission URL
