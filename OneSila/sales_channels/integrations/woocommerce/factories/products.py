@@ -12,7 +12,8 @@ from sales_channels.factories.products.variations import (
 
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceProduct, \
-    WoocommerceProductProperty, WoocommerceProductProperty, WoocommercePrice
+    WoocommerceProductProperty, WoocommerceProductProperty, WoocommercePrice, \
+    WoocommerceProductContent, WoocommerceEanCode
 from .mixins import SerialiserMixin, WoocommerceProductTypeMixin
 from .properties import WooCommerceProductPropertyCreateFactory, \
     WooCommerceProductPropertyUpdateFactory, WooCommerceProductPropertyDeleteFactory
@@ -29,8 +30,11 @@ logger = logging.getLogger(__name__)
 
 class WooCommerceProductMixin(WooCommerceMediaMixin, GetWoocommerceAPIMixin, WooCommerceProductAttributeMixin, WoocommerceProductTypeMixin, SerialiserMixin):
     remote_model_class = WoocommerceProduct
-    remote_product_property_class = WoocommerceProductProperty
     remote_price_class = WoocommercePrice
+
+    remote_product_property_class = WoocommerceProductProperty
+    remote_product_content_class = WoocommerceProductContent
+    remote_product_eancode_class = WoocommerceEanCode
 
     remote_id_map = 'id'
     # Key is the local field, value is the remote field
@@ -43,6 +47,7 @@ class WooCommerceProductMixin(WooCommerceMediaMixin, GetWoocommerceAPIMixin, Woo
         'name': 'name',
         'description': 'description',
         'short_description': 'short_description',
+        "content": "content",
     }
 
     already_exists_exception = DuplicateError
@@ -128,7 +133,10 @@ class WooCommerceProductCreateFactory(RemoteProductCreateFactory, WooCommercePro
     enable_fetch_and_update = True
     update_if_not_exists = True
     update_factory_class = "WooCommerceProductUpdateFactory"
+
     remote_price_class = WoocommercePrice
+    remote_product_content_class = WoocommerceProductContent
+    remote_product_eancode_class = WoocommerceEanCode
 
     def perform_non_subclassed_remote_action(self):
         """

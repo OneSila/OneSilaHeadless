@@ -1,6 +1,11 @@
 from products.models import Product
 from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
 
+
+import logging
+logger = logging.getLogger(__name__)
+
+
 class RemoteProductContentUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = Product
     local_product_map = 'local_instance'
@@ -14,7 +19,6 @@ class RemoteProductContentUpdateFactory(ProductAssignmentMixin, RemoteInstanceUp
 
         self.skip_checks = skip_checks
         self.language = language
-
 
     def preflight_check(self):
         """

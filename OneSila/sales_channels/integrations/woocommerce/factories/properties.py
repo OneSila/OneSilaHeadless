@@ -16,7 +16,8 @@ from sales_channels.factories.properties.properties import (
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceProductProperty, \
     WoocommerceGlobalAttribute, WoocommerceGlobalAttributeValue, WoocommerceRemoteLanguage
-from .mixins import SerialiserMixin, WoocommerceProductTypeMixin
+from .mixins import SerialiserMixin, WoocommerceProductTypeMixin, \
+    WoocommerceSalesChannelLanguageMixin
 from ..exceptions import DuplicateError
 from sales_channels.integrations.woocommerce.constants import API_ATTRIBUTE_PREFIX
 from properties.models import ProductProperty, Property
@@ -104,7 +105,7 @@ class WoocommerceRemoteValueConversionMixin:
     #         return datetime_value.strftime('%d-%m-%Y %H:%M:%S')
 
 
-class WooCommerceProductAttributeMixin(WoocommerceProductTypeMixin, SerialiserMixin, WoocommerceRemoteValueConversionMixin):
+class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, WoocommerceProductTypeMixin, SerialiserMixin, WoocommerceRemoteValueConversionMixin):
     """
     This is the class used to populate all of the
     attriubtes on the products.
@@ -120,13 +121,6 @@ class WooCommerceProductAttributeMixin(WoocommerceProductTypeMixin, SerialiserMi
     """
     remote_id_map = 'id'
     global_attribute_model_class = WoocommerceGlobalAttribute
-
-    @property
-    def sales_channel_assign_language(self):
-        """self.language doesnt seem to be available everywhere. So let's fetch it here."""
-        language = WoocommerceRemoteLanguage.objects.get(
-            sales_channel=self.remote_instance.sales_channel)
-        return language.local_instance
 
     def get_global_attribute_create_factory(self):
         from sales_channels.integrations.woocommerce.factories.properties import WooCommerceGlobalAttributeCreateFactory
@@ -309,7 +303,6 @@ class WooCommerceProductAttributeMixin(WoocommerceProductTypeMixin, SerialiserMi
         product = self.get_local_product()
         logger.debug(f"Applying attribute payload for product: {product}")
         ean_code = product.eancode_set.last()
-
         self.set_product_rule()
         self.set_product_properties_to_apply_payload()
         self.set_filterable_property_ids()
@@ -378,6 +371,9 @@ class WooCommerceProductAttributeMixin(WoocommerceProductTypeMixin, SerialiserMi
                 elif self.is_woocommerce_configurable_product:
                     values = self.get_variation_product_property_values(prod_prop)
 
+                if not isinstance(values, list):
+                    values = [values]
+
                 if ga:
                     remote_id = int(ga.remote_id)
                     simple_or_config_payload.append({
@@ -407,6 +403,10 @@ class WooCommerceProductAttributeMixin(WoocommerceProductTypeMixin, SerialiserMi
             for prod_prop in configurator_attributes.iterator():
                 ga = self.get_global_attribute(prod_prop)
                 values = self.get_configurator_property_values(prod_prop)
+
+                if not isinstance(values, list):
+                    values = [values]
+
                 remote_id = int(ga.remote_id)
                 config_payload.append({
                     "id": remote_id,
@@ -421,6 +421,10 @@ class WooCommerceProductAttributeMixin(WoocommerceProductTypeMixin, SerialiserMi
             for prod_prop in common_properties.iterator():
                 ga = self.get_global_attribute(prod_prop)
                 values = self.get_variation_product_property_values(prod_prop)
+
+                if not isinstance(values, list):
+                    values = [values]
+
                 if ga:
                     remote_id = int(ga.remote_id)
                     common_payload.append({

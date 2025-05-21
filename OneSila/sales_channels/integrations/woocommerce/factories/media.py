@@ -40,6 +40,16 @@ class WooCommerceMediaMixin(SerialiserMixin):
     def get_local_product(self):
         return self.remote_product.local_instance
 
+    def get_sku(self):
+        """Sets the SKU for the product or variation in the payload."""
+        if self.remote_product.is_variation:
+            sku = f"{self.parent_local_instance.sku}-{self.local_instance.sku}"
+        else:
+            product = self.get_local_product()
+            sku = product.sku
+
+        return sku
+
     def apply_media_payload(self):
         # Woocom requires a full media payload for each product.
         # {
@@ -48,6 +58,10 @@ class WooCommerceMediaMixin(SerialiserMixin):
         #     ]
         # }
         product = self.get_local_product()
+        # It seems that omitting the sku from the payload when
+        # only images are updated can remove the sku from the product.
+        # enforce the sku to ensure it is here at all times.
+        self.payload['sku'] = self.get_sku()
 
         image_throughs = product.mediaproductthrough_set.filter(media__type=Media.IMAGE)
         logger.debug(f"apply_media_payload Found {image_throughs.count()} image_throughs for {product=}")

@@ -129,6 +129,8 @@ class WooCommerceProductFactoryTest(WooCommerceProductFactoryTestMixin):
         )
         factory.run()
 
+        logger.debug(f"WooCommerceProductFactoryTest factory.payload: {factory.payload}")
+
         self.assertEqual(factory.payload['sku'], product.sku)
 
         remote_product = WoocommerceProduct.objects.get(

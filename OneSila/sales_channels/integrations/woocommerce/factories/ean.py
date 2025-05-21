@@ -15,7 +15,11 @@ class WooCommerceEanCodeUpdateFactory(WooCommerceProductAttributeMixin, GetWooco
         return self.apply_attribute_payload()
 
     def update_remote(self):
-        # FIXME: The attribute data seems empty when we run it from this
-        # Factory. That will need investigating.
-        pass
-        # return self.api.update_product(self.remote_product.remote_id, **self.payload)
+        return {}
+        # NOTE: # Strangly enough this factory is called even if there is no eancode assigned.
+        if self.is_woocommerce_variant_product:
+            return self.api.update_variant(self.remote_product.remote_parent_id, self.remote_product.remote_id, **self.payload)
+        elif self.is_woocommerce_simple_product or self.is_woocommerce_configurable_product:
+            return self.api.update_product(self.remote_product.remote_id, **self.payload)
+        else:
+            raise NotImplementedError("Invalid product type")

@@ -41,11 +41,15 @@ class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFacto
         # because the price_data here will override the inherited currency one and if this happen that one will be skipped
         if self.currency:
             reset_currency = Currency.objects.filter(inherits_from=self.currency, multi_tenant_company=self.sales_channel.multi_tenant_company).exists()
+
             if reset_currency:
                 self.currency = None
 
         existing_price_data = self.remote_instance.price_data or {}
         all_remote_currencies = RemoteCurrency.objects.filter(sales_channel=self.sales_channel)
+
+        logger.debug(f"{self.__class__.__name__} all remote currencies: {all_remote_currencies}")
+
         for remote_currency in all_remote_currencies:
             local_currency = remote_currency.local_instance
 

@@ -24,21 +24,24 @@ class WooCommercePriceUpdateFactoryTest(WooCommerceProductFactoryTestMixin):
         factory.run()
 
         translation = product.translations.get(
-            language=self.company.language
+            language=self.multi_tenant_company.language
         )
 
         translation.name = "Test Content Update name update"
-        translation.description = "Test Content Update description update"
+        translation.description = "<p>Test Content Update description update</p>"
+        translation.short_description = "<p>Test Content Update short description update</p>"
         translation.save()
 
         factory = WoocommerceProductContentUpdateFactory(
             sales_channel=self.sales_channel,
-            local_instance=translation,
-            local_product=product,
+            local_instance=product,
             remote_product=factory.remote_instance
         )
         factory.run()
 
-        resp_product = self.api.get_product(factory.remote_instance.remote_id)
+        self.assertTrue(factory.preflight_check())
+
+        resp_product = self.api.get_product_by_sku(product.sku)
         self.assertEqual(resp_product['name'], translation.name)
-        self.assertEqual(resp_product['description'], translation.description)
+        self.assertEqual(resp_product['description'].strip(), translation.description.strip())
+        self.assertEqual(resp_product['short_description'].strip(), translation.short_description.strip())

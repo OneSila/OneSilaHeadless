@@ -1,4 +1,5 @@
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
+from sales_channels.integrations.woocommerce.models import WoocommerceRemoteLanguage
 
 
 class SerialiserMixin:
@@ -8,6 +9,16 @@ class SerialiserMixin:
 
     def serialize_response(self, response):
         return response
+
+
+class WoocommerceSalesChannelLanguageMixin:
+    """expose the language of the sales channel"""
+    @property
+    def sales_channel_assign_language(self):
+        """self.language doesnt seem to be available everywhere. So let's fetch it here."""
+        language = WoocommerceRemoteLanguage.objects.get(
+            sales_channel=self.remote_instance.sales_channel)
+        return language.local_instance
 
 
 class WoocommerceProductTypeMixin:

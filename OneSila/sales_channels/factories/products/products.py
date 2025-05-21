@@ -1118,6 +1118,8 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
                 multi_tenant_company=self.sales_channel.multi_tenant_company
             )
             logger.debug(f"Created RemoteProductContent for {self.remote_instance}")
+        else:
+            raise NotImplementedError("No remote_product_content_class found in {self.__class__.__name__}")
 
     def set_ean_code(self):
         super().set_ean_code()

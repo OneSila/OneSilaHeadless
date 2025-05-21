@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 
 class WooCommercePriceUpdateFactoryTest(WooCommerceProductFactoryTestMixin):
-
     def test_woocom_simple_product_price_update(self):
         product = self.create_test_product(
             sku="tshirt-simple-product",
@@ -70,17 +69,15 @@ class WooCommercePriceUpdateFactoryTest(WooCommerceProductFactoryTestMixin):
         # Update remote product instance and run it
         factory = WoocommercePriceUpdateFactory(
             sales_channel=self.sales_channel,
-            local_instance=price,
+            local_instance=product,
             remote_product=remote_product,
             currency=currency,
-            skip_checks=True
+            # skip_checks=True
         )
         factory.run()
 
         # Verify the remote property was updated in database
         resp_product = self.api.get_product(remote_product.remote_id)
 
-        self.assertEqual(float(resp_product['price']), price.rrp)
+        self.assertEqual(float(resp_product['regular_price']), price.rrp)
         self.assertEqual(float(resp_product['sale_price']), price.price)
-
-        input("Press Enter to continue...")

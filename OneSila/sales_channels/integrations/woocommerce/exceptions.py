@@ -186,3 +186,10 @@ class FailedToGetStoreLanguageError(FailedToGetError):
     Exception raised when the store languages are not retrieved from the WooCommerce API.
     """
     pass
+
+
+class ProductNotFoundError(FailedToUpdateProductError):
+    """
+    Exception raised when the product is not found on the WooCommerce API.
+    """
+    pass

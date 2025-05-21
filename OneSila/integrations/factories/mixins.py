@@ -523,6 +523,8 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
             self.remote_instance.delete()
             self.create_remote_instance()
             self.successfully_updated = False
+        else:
+            logger.debug(f"Integration instance found for {self.local_instance} in {self.__class__.__name__}")
 
     def create_remote_instance(self):
         """
