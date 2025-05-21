@@ -230,14 +230,6 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
             distinct()
         return common_product_properties
 
-    # def get_product_property_values(self, prop):
-    #     # FIXME: These need to be translated into the store language.
-    #     properties = ProductProperty.objects.filter(
-    #         product=self.get_local_product(),
-    #         property=prop
-    #     )
-    #     return list(set([i.get_serialised_value() for i in properties]))
-
     def get_variation_product_property_values(self, prod_prop):
         """
         This is specific behaviour for woocommerce
@@ -297,9 +289,6 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
         #         }
         #     ]
         # }
-        # FIXME: The properties names and values should be loaded dynamically based on the language.
-        # currently they are just the default values.
-
         product = self.get_local_product()
         logger.debug(f"Applying attribute payload for product: {product}")
         ean_code = product.eancode_set.last()
@@ -561,8 +550,6 @@ class WoocommerceGlobalAttributeValueDeleteFactory(WoocommerceGlobalAttributeVal
 class WooCommerceProductPropertyMixin(WooCommerceProductAttributeMixin, SerialiserMixin, WoocommerceRemoteValueConversionMixin):
     remote_model_class = WoocommerceProductProperty
     remote_id_map = 'id'
-    # FIXME: remote_property_factory and remote_property_select_value_factory should be
-    # renamed to as remote_property_create_factory and remote_property_select_value_create_factory
     remote_property_factory = WooCommerceGlobalAttributeCreateFactory
     remote_property_select_value_factory = WoocommerceGlobalAttributeValueCreateFactory
     enable_fetch_and_update = True

@@ -90,9 +90,6 @@ class WooCommerceMediaProductThroughMixin(WooCommerceMediaMixin, SerialiserMixin
     }
 
     def preflight_process(self):
-        # # FIXME: Temporary override to allow testing
-        # return True
-
         if not self.local_instance.media.type == Media.IMAGE:
             logger.warning("Local instance is not an image for WooCommerceMediaProductThroughMixin")
             return False

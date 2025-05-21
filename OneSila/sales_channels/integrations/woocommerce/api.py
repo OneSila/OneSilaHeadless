@@ -393,6 +393,13 @@ class WoocommerceApiWrapper:
         # GET https://example.com/wp-json/wp/v2/settings
         # and look for a language
 
+        # However, since getting more keys is a rather clumbsy way of
+        # getting store access, it felt better to just take the easy way
+        # out for the time being.  Should prolly be revisited?
+
+        # Perhaps with a real woocommerce plugin that takes care of all the
+        # woocom access and lanagues issues?
+
         key = 'woocommerce_default_country'
         try:
             value = self.get_from_settings(key)
