@@ -47,6 +47,13 @@ class MagentoImportProcessor(SalesChannelImportMixin, GetMagentoAPIMixin):
         self.remote_local_property_map = {}
 
     def prepare_import_process(self):
+        """
+        This method starts off with gathering the configuration from the frontend
+        wizard and collecting the pieces in order to do the import cleanly.
+
+        There is also a bunch of magento currency and multi-langual preperation done
+        in order to structer the data correctly during the import.
+        """
         super().prepare_import_process()
         # get properties
         self.properties = ImportProperty.objects.filter(import_process=self.import_process)
@@ -274,23 +281,6 @@ class MagentoImportProcessor(SalesChannelImportMixin, GetMagentoAPIMixin):
                 "remote_property": remote_property
             }
         )
-
-    def update_select_value_log_instance(self, log_instance: ImportPropertySelectValue,
-                                         import_instance: ImportPropertySelectValueInstance):
-        mirror_property_select_value = import_instance.remote_instance
-
-        log_instance.successfully_imported = True
-        log_instance.content_type = ContentType.objects.get_for_model(import_instance.instance)
-        log_instance.object_id = import_instance.instance.pk
-
-        if mirror_property_select_value:
-            log_instance.remote_property_value = mirror_property_select_value
-
-        log_instance.save()
-
-        if mirror_property_select_value and not mirror_property_select_value.remote_id:
-            mirror_property_select_value.remote_id = log_instance.raw_data['value']
-            mirror_property_select_value.save()
 
     def import_rules_process(self):
         for rule_data in self.rules:
@@ -869,6 +859,8 @@ class MagentoImportProcessor(SalesChannelImportMixin, GetMagentoAPIMixin):
                     rule=rule,
                 )
 
+                # This is creating the remote_id and is actually
+                # your "import_instance".
                 product_import_instance.prepare_mirror_model_class(
                     mirror_model_class=MagentoProduct,
                     sales_channel=self.sales_channel,

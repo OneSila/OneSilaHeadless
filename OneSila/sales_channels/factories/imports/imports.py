@@ -4,6 +4,8 @@ from core.helpers import clean_json_data
 from imports_exports.factories.products import ImportProductInstance
 from sales_channels.models import ImportProduct
 from django.contrib.contenttypes.models import ContentType
+from imports_exports.factories.properties import ImportPropertySelectValueInstance
+from sales_channels.models import ImportPropertySelectValue
 
 import logging
 logger = logging.getLogger(__name__)
@@ -35,6 +37,49 @@ class SalesChannelImportMixin(ImportMixin):
     If you do not need some of these handlers.  Either:
     - override the handle_xxx method and leave it empty.
     - override the import_products_process method and remove the handlers you do not need.
+
+
+    What does the handl_xxx do?
+    - it is used to convert the importinstance thing into mirror model data.  So it needs to be the
+    same as the push model data that is used later on in the integration itself.
+
+
+    What does all of the get_xxx do?
+    It will convert the original (product) data and convert it into it's own block that goes
+    into the universal json format:
+
+        data = {
+            "name": "Ultimate Product",
+            "sku": "ALL001",
+            "type": Product.SIMPLE,
+            "product_type": "Chair",
+            "ean_code": "111222333",
+            "vat_rate": 19,
+            "active": True,
+            "allow_backorder": False,
+            "translations": [
+                {
+                    "short_description": "All features",
+                    "description": "This product has everything.",
+                    "url_key": "ultimate-product"
+                }
+            ],
+            "attributes": [
+                { "property_data": { "name": "Material", "type": "SELECT" }, "value": "Red" },
+                { "property_data": { "name": "Style", "type": "SELECT" }, "value": "Elegant" }
+            ],
+            "images": [
+                { "image_url": "https://2.img-dpreview.com/files/p/E~C1000x0S4000x4000T1200x1200~articles/3925134721/0266554465.jpeg" },
+                { "image_url": "https://vgl.ucdavis.edu/sites/g/files/dgvnsk15116/files/styles/sf_landscape_4x3/public/images/marketing_highlight/Sample-Collection-Box-Cat-640px.jpg", "is_main_image": True }
+            ],
+            "prices": [
+                { "price": 29.99, "currency": "EUR" },
+                { "rrp": 34.99, "currency": "USD" }
+            ],
+        }
+
+    so get_prices, will compile the data['prices'] block.
+
     """
 
     import_properties = True
@@ -94,6 +139,23 @@ class SalesChannelImportMixin(ImportMixin):
 
         log_instance.content_type = ContentType.objects.get_for_model(import_instance.instance)
         log_instance.object_id = import_instance.instance.pk
+
+    def update_select_value_log_instance(self, log_instance: ImportPropertySelectValue,
+                                         import_instance: ImportPropertySelectValueInstance):
+        mirror_property_select_value = import_instance.remote_instance
+
+        log_instance.successfully_imported = True
+        log_instance.content_type = ContentType.objects.get_for_model(import_instance.instance)
+        log_instance.object_id = import_instance.instance.pk
+
+        if mirror_property_select_value:
+            log_instance.remote_property_value = mirror_property_select_value
+
+        log_instance.save()
+
+        if mirror_property_select_value and not mirror_property_select_value.remote_id:
+            mirror_property_select_value.remote_id = log_instance.raw_data['value']
+            mirror_property_select_value.save()
 
     def handle_ean_code(self, import_instance: ImportProductInstance):
         EanCodeClass = self.get_remote_model_class('remote_ean_code_class')
@@ -173,4 +235,4 @@ class SalesChannelImportMixin(ImportMixin):
     def process_completed(self):
         self.sales_channel.active = self.initial_sales_channel_status
         self.sales_channel.is_importing = False
-        self.sales_channel.save()
+        self.sales_channel.save()I
