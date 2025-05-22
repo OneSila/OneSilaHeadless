@@ -5,7 +5,7 @@ from imports_exports.factories.products import ImportProductInstance, ImportProd
     ImportSalesPriceInstance
 from imports_exports.models import Import
 from media.models import MediaProductThrough
-from products.models import Product, ProductTranslation, ConfigurableVariation
+from products.models import Product, ProductTranslation, ConfigurableVariation, BundleVariation
 from properties.models import ProductPropertiesRuleItem, ProductPropertiesRule, PropertySelectValue, \
     PropertySelectValueTranslation, Property, ProductProperty
 from sales_prices.models import SalesPrice
@@ -51,7 +51,7 @@ class ImportProductInstanceValidateTest(TestCase):
     def test_invalid_type_raises_error(self):
         data = {
             "name": "Invalid Type Product",
-            "type": "BUNDLE"
+            "type": "SOMETYPE"
         }
 
         with self.assertRaises(ValueError) as cm:
@@ -496,6 +496,220 @@ class ImportProductInstanceProcessTest(TestCase):
         self.assertEqual(variations.count(), 1)
         self.assertEqual(variations.first().variation.name, "Red Variant")
 
+    def test_create_bundle_with_manual_variations_and_quantity(self):
+        data = {
+            "name": "Bundle Desk Set",
+            "sku": "BND-SET",
+            "type": Product.BUNDLE,
+            "product_type": "Desk Set",
+            "attributes": [
+                {"property_data": {"name": "Size", "type": "SELECT"}, "value": "Large"}
+            ],
+            "bundle_variations": [
+                {
+                    "variation_data": {
+                        "name": "Chair - Large"
+                    },
+                    "quantity": 2
+                },
+                {
+                    "variation_data": {
+                        "name": "Table - Large"
+                    },
+                    "quantity": 1
+                }
+            ]
+        }
+
+        instance = ImportProductInstance(data, self.import_process)
+        instance.process()
+
+        bundle_product = instance.instance
+        variations = BundleVariation.objects.filter(parent=bundle_product)
+
+        self.assertEqual(bundle_product.type, Product.BUNDLE)
+        self.assertEqual(variations.count(), 2)
+
+        quantities = sorted([v.quantity for v in variations])
+        self.assertEqual(quantities, [1, 2])
+        self.assertSetEqual(set(v.variation.name for v in variations), {"Chair - Large", "Table - Large"})
+
+    def test_update_bundle_variation_quantity(self):
+        # Step 1: Create initial bundle with variation
+        initial_data = {
+            "name": "Bundle Monitor Set",
+            "sku": "BND-MONITOR",
+            "type": Product.BUNDLE,
+            "product_type": "Monitor Setup",
+            "bundle_variations": [
+                {
+                    "variation_data": {
+                        "name": "HD Monitor",
+                        "sku": "HD-MONITOR"
+                    },
+                    "quantity": 1
+                }
+            ]
+        }
+
+        instance = ImportProductInstance(initial_data, self.import_process)
+        instance.process()
+
+        bundle_product = instance.instance
+        variation = bundle_product.bundlevariation_through_parents.get(variation__sku="HD-MONITOR")
+
+        self.assertEqual(variation.quantity, 1)
+
+        # Step 2: Re-import with updated quantity
+        update_data = {
+            "name": "Bundle Monitor Set",
+            "sku": "BND-MONITOR",
+            "type": Product.BUNDLE,
+            "product_type": "Monitor Setup",
+            "bundle_variations": [
+                {
+                    "variation_data": {
+                        "name": "HD Monitor",
+                        "sku": "HD-MONITOR"
+                    },
+                    "quantity": 3
+                }
+            ]
+        }
+
+        update_instance = ImportProductInstance(update_data, self.import_process)
+        update_instance.process()
+
+        variation.refresh_from_db()
+        self.assertEqual(variation.quantity, 3)
+
+    def test_create_product_with_alias_variation(self):
+        data = {
+            "name": "Main Lamp Product",
+            "sku": "LMP-MAIN",
+            "type": Product.SIMPLE,
+            "product_type": "Lamp",
+            "alias_variations": [
+                {
+                    "variation_data": {
+                        "name": "Lamp - Alias",
+                        "sku": "LMP-ALIAS"
+                    }
+                }
+            ]
+        }
+
+        instance = ImportProductInstance(data, self.import_process)
+        instance.process()
+
+        main = instance.instance
+        alias = Product.objects.get(sku="LMP-ALIAS")
+
+        self.assertEqual(alias.type, Product.ALIAS)
+        self.assertEqual(alias.alias_parent_product, main)
+
+    def test_create_alias_variation_with_images_copy(self):
+
+        parent_data = {
+            "name": "Chair - Original",
+            "sku": "CHAIR-ORIGINAL",
+            "type": Product.SIMPLE,
+            "product_type": "Chair",
+            "images": [
+                {
+                    "image_url": "https://2.img-dpreview.com/files/p/E~C1000x0S4000x4000T1200x1200~articles/3925134721/0266554465.jpeg",
+                    "is_main_image": True
+                }
+            ],
+            "alias_variations": [
+                {
+                    "variation_data": {
+                        "name": "Chair - Alias",
+                        "sku": "CHAIR-ALIAS"
+                    },
+                    "alias_copy_images": True
+                }
+            ]
+        }
+
+        instance = ImportProductInstance(parent_data, self.import_process)
+        instance.process()
+
+        alias = Product.objects.get(sku="CHAIR-ALIAS")
+
+        self.assertEqual(alias.type, Product.ALIAS)
+        self.assertEqual(alias.alias_parent_product.sku, "CHAIR-ORIGINAL")
+        self.assertEqual(alias.mediaproductthrough_set.count(), 1)
+
+        media = alias.mediaproductthrough_set.first()
+        self.assertTrue(media.is_main_image)
+
+    def test_create_alias_variation_with_property_copy(self):
+        data = {
+            "name": "Table - Parent",
+            "sku": "TABLE-BASE",
+            "type": Product.SIMPLE,
+            "product_type": "Table",
+            "attributes": [
+                {"property_data": {"name": "Material", "type": "SELECT"}, "value": "Wood"},
+                {"property_data": {"name": "Shape", "type": "SELECT"}, "value": "Round"},
+            ],
+            "alias_variations": [
+                {
+                    "variation_data": {
+                        "name": "Table - Alias",
+                        "sku": "TABLE-ALIAS"
+                    },
+                    "alias_copy_product_properties": True
+                }
+            ]
+        }
+
+        instance = ImportProductInstance(data, self.import_process)
+        instance.process()
+
+        alias = Product.objects.get(sku="TABLE-ALIAS")
+        props = ProductProperty.objects.filter(product=alias, property__is_product_type=False)
+
+        self.assertEqual(alias.type, Product.ALIAS)
+        self.assertEqual(alias.alias_parent_product.sku, "TABLE-BASE")
+        self.assertEqual(props.count(), 2)
+
+        prop_names = set(p.property.name for p in props)
+        self.assertSetEqual(prop_names, {"Material", "Shape"})
+
+    def test_alias_variation_with_images_and_properties_copied(self):
+        data = {
+            "name": "Bed - Base",
+            "sku": "BED-BASE",
+            "type": Product.SIMPLE,
+            "product_type": "Bed",
+            "attributes": [
+                {"property_data": {"name": "Style", "type": "SELECT"}, "value": "Modern"},
+            ],
+            "images": [
+                {"image_url": "https://2.img-dpreview.com/files/p/E~C1000x0S4000x4000T1200x1200~articles/3925134721/0266554465.jpeg", "is_main_image": True}
+            ],
+            "alias_variations": [
+                {
+                    "variation_data": {
+                        "name": "Bed - Alias",
+                        "sku": "BED-ALIAS"
+                    },
+                    "alias_copy_images": True,
+                    "alias_copy_product_properties": True
+                }
+            ]
+        }
+
+        instance = ImportProductInstance(data, self.import_process)
+        instance.process()
+
+        alias = Product.objects.get(sku="BED-ALIAS")
+
+        self.assertEqual(alias.alias_parent_product.sku, "BED-BASE")
+        self.assertEqual(alias.mediaproductthrough_set.count(), 1)
+        self.assertEqual(ProductProperty.objects.filter(product=alias).exclude(property__is_product_type=True).count(), 1)
 
     def test_full_example(self):
 
@@ -550,3 +764,90 @@ class ImportProductInstanceProcessTest(TestCase):
         self.assertTrue(ConfigurableVariation.objects.filter(parent=instance.instance).exists())
         self.assertTrue(ProductPropertiesRuleItem.objects.filter(rule=instance.rule).count() >= 2)
         self.assertTrue(ProductProperty.objects.filter(product=instance.instance).count() >= 1)
+
+
+class ImportProductInstanceParentLinkingTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+        self.product_type_property, _ = Property.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            is_product_type=True,
+        )
+
+        self.product_type_value = PropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.product_type_property
+        )
+
+        PropertySelectValueTranslation.objects.create(
+            propertyselectvalue=self.product_type_value,
+            multi_tenant_company=self.multi_tenant_company,
+            value="Chair"
+        )
+
+    def test_link_simple_to_configurable_parent(self):
+        parent_data = {
+            "name": "Configurable Product",
+            "sku": "CFG-001",
+            "type": Product.CONFIGURABLE,
+            "product_type": "Chair",
+        }
+        ImportProductInstance(parent_data, self.import_process).process()
+
+        child_data = {
+            "name": "Variant A",
+            "sku": "VAR-001",
+            "type": Product.SIMPLE,
+            "product_type": "Chair",
+            "configurable_parent_sku": "CFG-001"
+        }
+        ImportProductInstance(child_data, self.import_process).process()
+
+        link = ConfigurableVariation.objects.filter(parent__sku="CFG-001", variation__sku="VAR-001").first()
+        self.assertIsNotNone(link)
+
+    def test_link_simple_to_bundle_parent(self):
+        parent_data = {
+            "name": "Bundle Base",
+            "sku": "BND-001",
+            "type": Product.BUNDLE,
+            "product_type": "Chair",
+        }
+        ImportProductInstance(parent_data, self.import_process).process()
+
+        child_data = {
+            "name": "Bundle Item",
+            "sku": "ITM-001",
+            "type": Product.SIMPLE,
+            "product_type": "Chair",
+            "bundle_parent_sku": "BND-001"
+        }
+        ImportProductInstance(child_data, self.import_process).process()
+
+        link = BundleVariation.objects.filter(parent__sku="BND-001", variation__sku="ITM-001").first()
+        self.assertIsNotNone(link)
+        self.assertEqual(link.quantity, 1)
+
+    def test_link_alias_to_parent_using_sku(self):
+        parent_data = {
+            "name": "Main Product",
+            "sku": "MAIN-001",
+            "type": Product.SIMPLE,
+            "product_type": "Chair",
+        }
+        ImportProductInstance(parent_data, self.import_process).process()
+
+        alias_data = {
+            "name": "Alias Product",
+            "sku": "ALIAS-001",
+            "type": Product.ALIAS,
+            "product_type": "Chair",
+            "alias_parent_sku": "MAIN-001"
+        }
+        ImportProductInstance(alias_data, self.import_process).process()
+
+        alias = Product.objects.get(sku="ALIAS-001")
+        self.assertIsNotNone(alias.alias_parent_product)
+        self.assertEqual(alias.alias_parent_product.sku, "MAIN-001")

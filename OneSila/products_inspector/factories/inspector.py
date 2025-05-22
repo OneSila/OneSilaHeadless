@@ -19,8 +19,6 @@ class SaveInspectorMixin:
             'configurable_product_applicability',
         ]
 
-        print('--------------------------------------------------- TEST')
-
         # Construct the Q object for required fields
         required_q = Q()
         for field in applicability_fields:
