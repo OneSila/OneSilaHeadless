@@ -24,6 +24,7 @@ class SalesChannelImportMixin(ImportMixin):
     - remote_ean_code_class
     - remote_product_content_class
     - remote_imageproductassociation_class
+    - remote_price_class
 
     Expected get_xxx methods:
     - get_total_instances
@@ -134,6 +135,40 @@ class SalesChannelImportMixin(ImportMixin):
                 if remote_id and not image_association.remote_id:
                     image_association.remote_id = remote_id
                     image_association.save()
+
+    def handle_prices(self, import_instance: ImportProductInstance):
+        RemotePriceClass = self.get_remote_model_class('remote_price_class')
+
+        if not hasattr(import_instance, 'prices'):
+            return
+
+        remote_product = import_instance.remote_instance
+
+        instance, _ = RemotePriceClass.objects.get_or_create(
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_product=remote_product,
+        )
+
+        price_data = {}
+
+        for price_entry in import_instance.prices:
+            currency = price_entry.get("currency")
+            price = price_entry.get("price")
+            rrp = price_entry.get("rrp")
+
+            data = {}
+            if rrp is not None:
+                data["price"] = float(rrp)
+            if price is not None:
+                data["discount_price"] = float(price)
+
+            if data:
+                price_data[currency] = data
+
+        if price_data:
+            instance.price_data = price_data
+            instance.save()
 
     def process_completed(self):
         self.sales_channel.active = self.initial_sales_channel_status

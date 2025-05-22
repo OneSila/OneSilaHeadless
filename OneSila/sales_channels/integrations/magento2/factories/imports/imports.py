@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 class MagentoImportProcessor(SalesChannelImportMixin, GetMagentoAPIMixin):
     remote_ean_code_class = MagentoEanCode
     remote_imageproductassociation_class = MagentoImageProductAssociation
+    remote_price_class = MagentoPrice
 
     def __init__(self, import_process, sales_channel, language=None):
         super().__init__(import_process, sales_channel, language)
@@ -709,27 +710,6 @@ class MagentoImportProcessor(SalesChannelImportMixin, GetMagentoAPIMixin):
                 if not remote_product_property.remote_value:
                     remote_product_property.remote_value = remote_value
                     remote_product_property.save()
-
-    def handle_prices(self, import_instance: ImportProductInstance):
-        if hasattr(import_instance, 'prices'):
-
-            full_price, discounted_price = import_instance.instance.get_price_for_sales_channel(self.sales_channel)
-
-            if full_price is not None:
-                full_price = Decimal(full_price)
-            if discounted_price is not None:
-                discounted_price = Decimal(discounted_price)
-
-            for price in import_instance.prices:
-                magento_price, _ = MagentoPrice.objects.get_or_create(
-                    multi_tenant_company=self.import_process.multi_tenant_company,
-                    sales_channel=self.sales_channel,
-                    remote_product=import_instance.remote_instance,
-                )
-
-                magento_price.price = full_price
-                magento_price.discount_price = discounted_price
-                magento_price.save()
 
     def handle_images(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, 'images'):

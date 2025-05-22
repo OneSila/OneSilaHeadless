@@ -22,6 +22,7 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
     remote_ean_code_class = ShopifyEanCode
     remote_product_content_class = ShopifyProductContent
     remote_imageproductassociation_class = ShopifyImageProductAssociation
+    remote_price_class = ShopifyPrice
 
     def __init__(self, import_process, sales_channel, language=None):
         super().__init__(import_process, sales_channel, language)
@@ -143,38 +144,6 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
 
                 if updated:
                     remote_product_property.save()
-
-    def handle_prices(self, import_instance: ImportProductInstance):
-        if not hasattr(import_instance, 'prices'):
-            return
-
-        remote_product = import_instance.remote_instance
-
-        shopify_price, _ = ShopifyPrice.objects.get_or_create(
-            multi_tenant_company=self.import_process.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            remote_product=remote_product,
-        )
-
-        price_data = {}
-
-        for price_entry in import_instance.prices:
-            currency = price_entry.get("currency")
-            price = price_entry.get("price")
-            rrp = price_entry.get("rrp")
-
-            data = {}
-            if rrp is not None:
-                data["price"] = float(rrp)
-            if price is not None:
-                data["discount_price"] = float(price)
-
-            if data:
-                price_data[currency] = data
-
-        if price_data:
-            shopify_price.price_data = price_data
-            shopify_price.save()
 
     def handle_variations(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, 'variations'):
