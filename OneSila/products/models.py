@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Product(TranslatedModelMixin, models.Model):
-    from products.product_types import CONFIGURABLE, BUNDLE, SIMPLE,  PRODUCT_TYPE_CHOICES, ALIAS
+    from products.product_types import CONFIGURABLE, BUNDLE, SIMPLE,  PRODUCT_TYPE_CHOICES, ALIAS, HAS_PRICES_TYPES
 
     # Mandatory
     sku = models.CharField(max_length=256, db_index=True, blank=True, null=True)
