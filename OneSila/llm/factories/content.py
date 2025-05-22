@@ -1,5 +1,4 @@
 from .mixins import ContentLLMMixin, AskGPTMixin
-import markdown
 
 
 class DescriptionGenLLM(ContentLLMMixin):
@@ -93,17 +92,17 @@ class DescriptionGenLLM(ContentLLMMixin):
 
         ---
 
-        ## 2. Markdown Output Structure & Formatting
+        ## 2. HTML Output Structure & Formatting
 
-        Your response must be formatted in clean basic markdown using the following tags:
+        Your response must be formatted in clean, structured HTML using the following tags:
 
         - **Engaging Introduction** (first sentence should highlight key qualities without mentioning the product name).
-        - **Key Features Section:**
-        - **Bullet Points for Features & Specs:**
+        - **Key Features Section:** `<h3>`
+        - **Bullet Points for Features & Specs:** `<ol><li data-list="bullet">`
         - **Text Emphasis for Clarity:**
-          - **Bold** for critical details
-          - *Italics * for descriptive emphasis
-          - __Underlined__ for key highlights
+          - **Bold (`<b>`)** for critical details
+          - *Italics (`<i>`)* for descriptive emphasis
+          - __Underlined (`<u>`)__ for key highlights
 
         ⚠️ **Do NOT** include `<html>`, `<head>`, or `<body>` tags.
 
@@ -157,17 +156,6 @@ class DescriptionGenLLM(ContentLLMMixin):
             """
         return prompt
 
-    def parse_response(self):
-        # Extensions suggested by chatgpt: https://chatgpt.com/share/682fa3ee-28e0-8002-aca1-cc3962f1a630
-        extensions = [
-            'extra',        # Enables several features: tables, fenced code blocks, etc.
-            'codehilite',   # Adds syntax highlighting to code blocks (requires Pygments)
-            'toc',          # Generates a table of contents (if needed)
-            'nl2br',        # Converts line breaks to <br> (useful if no double line breaks)
-            'sane_lists'    # Better list handling (especially nested lists)
-        ]
-        self.text_response = markdown.markdown(self.text_response, extensions=extensions)
-
 
 class ShortDescriptionLLM(DescriptionGenLLM):
     """
@@ -208,22 +196,22 @@ class ShortDescriptionLLM(DescriptionGenLLM):
         - **Language Compliance:** Generate the description in the language specified by `language_code`, ensuring proper grammar and clarity.
 
         ⚠️ **Output must be strictly one of the following formats:**
-        - **Flat text**
-        - **Basic Markdown (fully formatted, no plain text mixed in)**
+        - **Flat text (plain text, no markdown, no HTML tags at all)**
+        - **Basic HTML (fully formatted, no plain text mixed in)**
 
         ⚠️ **DO NOT mix flat text with HTML in the same response.**
         ⚠️ **DO NOT use markdown.**
 
         ---
 
-        ## **2. Markdown Formatting Rules**
+        ## **2. HTML Formatting Rules (if HTML is required)**
         - **Use proper structure and clean formatting:**
-          - **Key Features Section:**
-          - **Bullet Points for Features & Specs:**
+          - **Key Features Section:** `<h3>`
+          - **Bullet Points for Features & Specs:** `<ol><li data-list="bullet">`
           - **Text Emphasis for Clarity:**
-            - **Bold** for critical details
-            - *Italics* for descriptive emphasis
-            - __Underlined__ for key highlights
+            - **Bold (`<b>`)** for critical details
+            - *Italics (`<i>`)* for descriptive emphasis
+            - __Underlined (`<u>`)__ for key highlights
         - **Ensure compatibility with PIM integration** by maintaining a clean, structured output.
         - **Do NOT include** `<html>`, `<head>`, or `<body>` tags.
         - **Do NOT include markdown.
@@ -261,7 +249,7 @@ class ShortDescriptionLLM(DescriptionGenLLM):
 
         ## 6. Additional Processing Guidelines
 
-        ✅Follow the format required (Flat Text OR Markdown, never both).
+        ✅Follow the format required (Flat Text OR HTML, never both).
         ✅Ensure consistency and completeness: If any product details are missing, infer logically based on available data and image analysis.
         ✅Start with an engaging sentence that introduces benefits rather than the product name or title.
         ✅Ensure compatibility with PIM integration** by maintaining a **clean, structured, and well-written output**

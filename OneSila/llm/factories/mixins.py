@@ -302,8 +302,8 @@ class ContentLLMMixin(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
         self.response = self.ask_gpt()
         self.calculate_cost(self.response)
         self.text_response = self.get_text_response(self.response)
+        self.parse_response()
         self._create_transaction()
         self._create_ai_generate_process()
-        self.parse_response()
 
         return self.text_response
