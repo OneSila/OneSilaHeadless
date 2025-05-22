@@ -1,7 +1,8 @@
 import json
 import shopify
 from django.conf import settings
-from properties.models import Property
+from properties.models import Property, ProductPropertyTextTranslation
+
 
 class GetShopifyApiMixin:
     """
@@ -76,7 +77,7 @@ class RemoteValueMixin:
 
     def get_translated_values(self):
         # This can stay as-is unless Shopify wants language mappings (not usually needed)
-        default_translation = self.local_instance.text_translations.filter(language=self.language).first()
+        default_translation = ProductPropertyTextTranslation.objects.filter(product_property=self.local_instance).first()
         if default_translation:
             return (
                 default_translation.value_text if self.local_property.type == Property.TYPES.TEXT
