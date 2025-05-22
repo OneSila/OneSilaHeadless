@@ -42,6 +42,17 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
         """
         return self.api.get_products()
 
+    def get_tax_class(self, product_data):
+        remote_tax_class = product_data.get('tax_status')
+        raise NotImplementedError()
+
+    def get_variations(self, product_data):
+        """fetch variation ids and extend the data"""
+        variation_ids = product_data.get('variations')
+        parent_id = product_data.get('id')
+
+        raise NotImplementedError('expand on this.')
+
     def get_base_product_data(self, product_data) -> tuple[dict, bool]:
         """
         return a payload {} and is_variation bool that contains the root fields for the product data
@@ -67,18 +78,41 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
         else:
             raise NotImplementedError(f"Unknown woocommcerce product type: {ptype}")
 
+        active = product_data.get("status") == "publish" and product_data["catalog_visibility"] == "visible"
+
         payload = {
             'name': product_data.get('name'),
             'sku': product_data.get('sku'),
+            'active': active,
         }
 
         return payload, is_variation
+
+    def get_content(self, product_data):
+        """
+        return the product content / tranlsations
+        """
+        language = self.sales_channel.language
+        name = product_data.get('name')
+        short_description = product_data.get('short_description')
+        description = product_data.get('description')
+        url_key = product_data.get('slug')
+
+        return [{
+            'language': language,
+            'name': name,
+            'short_description': short_description,
+            'description': description,
+            'url_key': url_key,
+        }]
 
     def get_prices(self, product_data) -> dict:
         """
         get the price data
         { "price": 19.99,
         "currency": "GBP" }
+
+        or None if this is a configurable product.
         """
         currency = self.sales_channel.currency
         price = product_data.get('sales_price')
@@ -93,7 +127,9 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
         """
         Compile all of the different parts from the various "getters"
         """
+        remote_id = product_data.get('id')
         base_product_data, is_variation = self.get_base_product_data(product_data)
+        product_type = base_product_data.get('type')
         # A few notes about attribute data:
         # - Woocommerce contains the simple product properties on the parent.
         #  that means we need to store them and apply the on the variations later on.
@@ -105,22 +141,51 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
         # - but we can get what the product configurator data looks like base on the attributes
         #   and that variation data.
         attribute_data, configurable_attribute_data = self.get_attributes_for_product(product_data)
+        product_type = base_product_data.get('type')
         images = self.get_attributes_for_product(product_data)
         prices = self.get_prices(product_data)
+        tax = self.get_tax_class(product_data)
+
+        # Now that we have all of the data, let's build th actual payload.
+        payload = {
+            **base_product_data,
+            'images': images,
+            'attributes': attribute_data,
+            'tax': tax,
+            'variations': [
+            ],
+        }
+        if product_type != Product.CONFIGURABLE:
+            payload['prices'] = prices
+
+        # In every variation will also need to grab all of the above data.
+        for variation_id in product_data['variations']:
+            variation_data = self.api.get_product_variation(remote_id, variation_id)
+            base_product_data, _ = self.get_base_product_data(variation_data)
+            attribute_data, _ = self.get_attributes_for_product(variation_data, is_variation=True)
+            images = self.get_attributes_for_product(variation_data)
+            prices = self.get_prices(variation_data)
+            tax = self.get_tax_class(variation_data)
+            images = self.get_images(variation_data)
+
+            payload['variations'].append({
+                'variation_data': {
+                    **base_product_data,
+                    'attributes': attribute_data,
+                    'prices': prices,
+                    'tax': tax,
+                }
+            })
 
         raise NotImplemented('Attributes Read the NOTES!')
-
-        return {
-            "images": self.get_images(product_data),
-            "attributes": self.get_attributes_for_product(product_data),
-        }
+        return payload
 
     def get_images(self, remote_product: dict) -> list[dict]:
         """
         Convert images from the API to expected block which the ImportInstance will expect:
         [
             {
-                "image_url": "https://2.img-dpreview.com/files/p/E~C1000x0S4000x4000T1200x1200~articles/3925134721/0266554465.jpeg"
+                "image_url": "https://2./0266554465.jpeg"
                 "alt": '',
                 "sort_order": 0,
                 "is_main_image": True,
@@ -140,7 +205,7 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
             })
         return importer_images
 
-    def get_attributes_for_product(self, remote_product: dict) -> tuple[list, list]:
+    def get_attributes_for_product(self, remote_product: dict, is_variation=False) -> tuple[list, list]:
         """
         Convert attributes from the API to the Importer Structure.
 
@@ -177,14 +242,47 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
             }
         ]
 
-
+        remote_product['attributes'] will look something like:
+            [{
+            "id": 1,
+            "name": "Size",
+            "position": 0,
+            "visible": true,
+            "variation": true,
+            "options": [
+                "Small",
+                "Medium",
+                "Large"]
+            }]
 
         Make sure that you store all your remote_ids somehow because you need them later in your flow
         for all global attributes.
         """
 
-        attributes = remote_product.get("attributes", [])
-        for attribute in attributes:
+        remote_attributes = remote_product.get("attributes", [])
+        attributes = []
+        configurable_attributes = []
+
+        for ra in remote_attributes:
+            variation = ra.get('variation')
+            name = ra.get('name')
+            visible = ra.get('visible')
+            values = ra.get('options')
+            id = ra.get('id')
+
+            payload = {}
+
+            if id:
+                # This is a global attribute.
+                # Get all data values from it?
+                # or
+                # should we store it in the processor (self)
+                # for later (or earlier) use?
+                do_whatever()
+
+            if variation:
+                configurable_attributes.append(payload)
+
             yield ImportAttributeInstance(attribute)
 
     def get_properties_data(self):
