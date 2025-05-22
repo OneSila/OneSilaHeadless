@@ -63,7 +63,6 @@ class CreateTransactionMixin:
 
         return self.ai_process
 
-
     def _create_ai_import_process(self):
         self.ai_process = AiImportProcess.objects.create(
             transaction=self.transaction,
@@ -78,6 +77,7 @@ class CreateTransactionMixin:
             type=self.import_type
         )
         return self.ai_process
+
 
 class CalculateCostMixin:
 
@@ -160,7 +160,7 @@ class AskDalleMixin(OpenAIMixin):
     size = "1792x1024"
     max_tokens = 2000
     quality = "standard"
-    n = 1 
+    n = 1
 
     def __init__(self):
         self.openai = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -179,14 +179,14 @@ class AskDalleMixin(OpenAIMixin):
 
     def generate_response(self):
         return self.ask_dalle()
-        
+
 
 class ReplicateMixin:
     def __init__(self):
         client = replicate.Client(api_token=settings.REPLICATE_API_TOKEN)
 
 
-class ContentLLMMixin(AskGPTMixin,  CalculateCostMixin, CreateTransactionMixin):
+class ContentLLMMixin(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
     """
     The product should not be changed, only yield the html result at the end of the process.
     """
@@ -253,13 +253,13 @@ class ContentLLMMixin(AskGPTMixin,  CalculateCostMixin, CreateTransactionMixin):
 
     def _set_property_values(self):
         from collections import defaultdict
-        
+
         if self.is_configurable:
             property_values = defaultdict(list)
 
             for var in self.product.get_configurable_variations():
                 prop_d = get_product_properties_dict(var)
-                
+
                 for k, v in prop_d.items():
                     property_values[k].extend(v)
 
@@ -279,6 +279,14 @@ class ContentLLMMixin(AskGPTMixin,  CalculateCostMixin, CreateTransactionMixin):
     def prompt(self):
         raise Exception("Prompt not configured.")
 
+    def parse_response(self):
+        """
+        You can apply result parsing here.
+        eg convert markdown to html, etc.
+        by parsing self.response
+        """
+        pass
+
     def generate_response(self):
         self.validate_generation()
         self._set_translation()
@@ -296,5 +304,6 @@ class ContentLLMMixin(AskGPTMixin,  CalculateCostMixin, CreateTransactionMixin):
         self.text_response = self.get_text_response(self.response)
         self._create_transaction()
         self._create_ai_generate_process()
+        self.parse_response()
 
         return self.text_response
