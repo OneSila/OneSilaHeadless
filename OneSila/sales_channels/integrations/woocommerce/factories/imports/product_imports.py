@@ -1,29 +1,29 @@
-
-import json
-from decimal import Decimal
-from core.helpers import clean_json_data
 from sales_channels.factories.imports import SalesChannelImportMixin
 from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.properties import ImportPropertyInstance
 from products.models import Product
 from properties.models import Property
-from .exceptions import SanityCheckError
+
+from ..exceptions import SanityCheckError
+from ..mixins import GetWoocommerceAPIMixin
+from .temp_structure import ImportProcessorTempStructureMixin
+
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceProduct, \
     WoocommerceEanCode, WoocommerceProductProperty, \
-    WoocommerceProductContent, WoocommercePrice, \
-    WoocommerceMediaThroughProduct
+    WoocommerceProductContent, WoocommercePrice, WoocommerceCurrency, \
+    WoocommerceMediaThroughProduct, WoocommerceRemoteLanguage
 from sales_channels.models import ImportProduct, SalesChannelViewAssign
 from django.contrib.contenttypes.models import ContentType
 
 from imports_exports.factories.media import ImportImageInstance
-from typing import Generator
+from typing import Tuple, List, Set
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin):
+class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, SalesChannelImportMixin, GetWoocommerceAPIMixin):
     remote_imageproductassociation_class = WoocommerceMediaThroughProduct
     remote_price_class = WoocommercePrice
     remote_ean_code_class = WoocommerceEanCode
@@ -31,29 +31,30 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
     def __init__(self, import_process, sales_channel, language=None):
         super().__init__(import_process, sales_channel, language)
         self.repair_sku_map = {}
-        self.max_repair_batch_size = 250
+        self.api = self.get_api()
 
-    def get_total_instances(self):
+        self.language = WoocommerceRemoteLanguage.objects.get(
+            sales_channel=self.sales_channel,
+        ).local_instance
+        self.currency = WoocommerceCurrency.objects.get(
+            sales_channel=self.sales_channel,
+        ).local_instance
+
+    def get_total_instances(self) -> int:
         return len(self.api.get_products())
 
-    def get_products_data(self):
+    def get_products_data(self) -> List[dict]:
         """
         Fetch products from the API and return all of them.
         """
         return self.api.get_products()
 
-    def get_tax_class(self, product_data):
+    def get_tax_class(self, product_data: dict) -> dict:
         remote_tax_class = product_data.get('tax_status')
-        raise NotImplementedError()
+        # raise NotImplementedError()
+        return None
 
-    def get_variations(self, product_data):
-        """fetch variation ids and extend the data"""
-        variation_ids = product_data.get('variations')
-        parent_id = product_data.get('id')
-
-        raise NotImplementedError('expand on this.')
-
-    def get_base_product_data(self, product_data) -> tuple[dict, bool]:
+    def get_base_product_data(self, product_data: dict) -> Tuple[dict, bool]:
         """
         return a payload {} and is_variation bool that contains the root fields for the product data
         {
@@ -72,13 +73,18 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
         elif ptype == 'variable':
             local_type = Product.CONFIGURABLE
             is_variation = False
-        elif ptype == 'vaiation':
+        elif ptype == 'variation':
             local_type = Product.SIMPLE
             is_variation = True
         else:
             raise NotImplementedError(f"Unknown woocommcerce product type: {ptype}")
 
-        active = product_data.get("status") == "publish" and product_data["catalog_visibility"] == "visible"
+        try:
+            active = product_data["status"] == "publish" and product_data["catalog_visibility"] == "visible"
+        except KeyError:
+            # Most likely a variation we only use the status
+            # catalog_visibility seems to be missing.
+            active = product_data["status"] == "publish"
 
         payload = {
             'name': product_data.get('name'),
@@ -88,42 +94,40 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
 
         return payload, is_variation
 
-    def get_content(self, product_data):
+    def get_content(self, product_data: dict) -> List[dict]:
         """
         return the product content / tranlsations
         """
-        language = self.sales_channel.language
         name = product_data.get('name')
         short_description = product_data.get('short_description')
         description = product_data.get('description')
         url_key = product_data.get('slug')
 
         return [{
-            'language': language,
+            'language': self.language,
             'name': name,
             'short_description': short_description,
             'description': description,
             'url_key': url_key,
         }]
 
-    def get_prices(self, product_data) -> dict:
+    def get_prices(self, product_data: dict) -> dict:
         """
         get the price data
-        { "price": 19.99,
-        "currency": "GBP" }
+        [{ "price": 19.99,
+        "currency": "GBP" }]
 
         or None if this is a configurable product.
         """
-        currency = self.sales_channel.currency
         price = product_data.get('sales_price')
         rrp = product_data.get('regular_price')
-        return {
+        return [{
             "price": price,
             "rrp": rrp,
-            "currency": currency,
-        }
+            "currency": self.currency,
+        }]
 
-    def get_structured_product_data(self, product_data):
+    def get_structured_product_data(self, product_data: dict) -> dict:
         """
         Compile all of the different parts from the various "getters"
         """
@@ -140,9 +144,9 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
         # - we have no way to tell the a "product type".
         # - but we can get what the product configurator data looks like base on the attributes
         #   and that variation data.
-        attribute_data, configurable_attribute_data = self.get_attributes_for_product(product_data)
+        attribute_data = self.get_attributes_for_product(product_data)
         product_type = base_product_data.get('type')
-        images = self.get_attributes_for_product(product_data)
+        images = self.get_images(product_data)
         prices = self.get_prices(product_data)
         tax = self.get_tax_class(product_data)
 
@@ -162,11 +166,10 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
         for variation_id in product_data['variations']:
             variation_data = self.api.get_product_variation(remote_id, variation_id)
             base_product_data, _ = self.get_base_product_data(variation_data)
-            attribute_data, _ = self.get_attributes_for_product(variation_data, is_variation=True)
-            images = self.get_attributes_for_product(variation_data)
+            attribute_data, _ = self.get_attributes_for_product(variation_data, is_variation=True, parent_data=product_data)
+            images = self.get_images(variation_data)
             prices = self.get_prices(variation_data)
             tax = self.get_tax_class(variation_data)
-            images = self.get_images(variation_data)
 
             payload['variations'].append({
                 'variation_data': {
@@ -177,10 +180,9 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
                 }
             })
 
-        raise NotImplemented('Attributes Read the NOTES!')
         return payload
 
-    def get_images(self, remote_product: dict) -> list[dict]:
+    def get_images(self, remote_product: dict) -> List[dict]:
         """
         Convert images from the API to expected block which the ImportInstance will expect:
         [
@@ -205,15 +207,29 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
             })
         return importer_images
 
-    def get_attributes_for_product(self, remote_product: dict, is_variation=False) -> tuple[list, list]:
+    def get_attributes_for_product(self, product_data: dict, is_variation=False, parent_data: dict = None) -> Tuple[List[dict], List[dict]]:
         """
         Convert attributes from the API to the Importer Structure.
 
-        There are 2 types of attributes:
+        There are 2 types of attributes for configurable products and simple products
         - Global Attributes: These are attributes that are not specific to a product.
         - Product Attributes: These are attributes that are specific to a product.
 
-        We can also deduce configurator attributes based on the configurable product.
+        On variation products, we only have the configurator attributes present.
+
+        This means that:
+        - the configurator structure can be deduced from the product and parent (variation:True) together.
+        - all other attributes come from the partent.
+        - we still need to handle global vs product attributes for every attribute entry.
+
+        In order to ensure we have a clean payload, we will not keep the variaton data
+        from the parent in the get_producdt stuff.  Instead we will request the parent
+        attribute data for each variation (yes..a few extra calls) and create a clean
+        flow where we can also cleanly identify which attributes are used in the configurator.
+
+        The main challenge is....how do we handle this globally?
+        It seems like we must pull all products first. Compare all the product-data attribues in order
+        to decide which Property Types they are.  And limit ourselves to Select vs MultiSelect.
 
         will return both attribute data and configurable attribute data if relevant.
         But we have no way of creating a product-type for them. Which really sucks.
@@ -259,39 +275,42 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
         for all global attributes.
         """
 
-        remote_attributes = remote_product.get("attributes", [])
         attributes = []
-        configurable_attributes = []
 
-        for ra in remote_attributes:
-            variation = ra.get('variation')
-            name = ra.get('name')
-            visible = ra.get('visible')
-            values = ra.get('options')
-            id = ra.get('id')
+        if is_variation:
+            parent_attributes = parent_data.get('attributes', [])
+            variation_attributes = product_data.get('attributes', [])
 
-            payload = {}
+            for attribute in parent_attributes:
+                name = attribute.get('name')
+                options = attribute.get('options')
+                payload = self.create_payload_for_property(name, options)
+                attributes.append(payload)
 
-            if id:
-                # This is a global attribute.
-                # Get all data values from it?
-                # or
-                # should we store it in the processor (self)
-                # for later (or earlier) use?
-                do_whatever()
+            for attribute in variation_attributes:
+                name = attribute.get('name')
+                option = attribute.get('option')
+                payload = self.create_payload_for_property(name, option)
+                attributes.append(payload)
+        else:
+            remote_attributes = product_data.get("attributes", [])
+            for attribute in remote_attributes:
+                name = attribute.get('name')
+                options = attribute.get('options')
+                payload = self.create_payload_for_property(name, options)
+                attributes.append(payload)
 
-            if variation:
-                configurable_attributes.append(payload)
-
-            yield ImportAttributeInstance(attribute)
+        return attributes
 
     def get_properties_data(self):
         """We will get the Global Attributes and return them """
-        raise NotImplementedError("Not implemented")
+        # raise NotImplementedError("Not implemented")
+        return []
 
     def get_select_values_data(self):
         """Get the terms from the Global Attributes"""
-        raise NotImplementedError("Not implemented")
+        # raise NotImplementedError("Not implemented")
+        return []
 
     def get_rules_data(self):
         """Woocommerce does not support rules. Nothing to do here."""
@@ -327,43 +346,42 @@ class WoocommerceImportProcessor(SalesChannelImportMixin, GetWoocommerceAPIMixin
         logger.info(f"Repaired remote_sku for product {remote_product.remote_id} using default_variant_id")
 
     def import_products_process(self):
-        for product in self.api.get_products():
-            # self.get_product_data(product)
-            structured_data = self.get_structured_product_data(product)
+        for remote_product in self.api.get_products():
+            # The get_product_data creates the complate "importable dict"
+            # The variations will get fetched in here.....BUT I need the remote_ids
+            # structured_data = self.get_structured_product_data(remote_product)
+            # importer_instance = ImportInstance(structured_data=structured_data, self.import_process)
+            # Once converted the ddata and saved it localle, we want to create
+            # the mirror models to ensure the when data is pushed to the server again
+            # with changes, it doesnt end up with duplicates.
+            structured_data = self.get_structured_product_data(remote_product)
             self.update_percentage()
 
-            # Notes Below:
+            # The trick is here:
+            # A complate product is a compilation of all individial pieces:
+            # ean
+            # images
+            # direct fields
+            # This needs to be deconstructed again to handle them correctly remotely.
 
-            # for remote_product in self.get_products():
-            #     # The get_product_data creates the complate "importable dict"
-            #     # The variations will get fetched in here.....BUT I need the remote_ids
-            #     structured_data = self.get_structured_product_data(remote_product)
-            #     importer_instance = ImportInstance(structured_data=structured_data, self.import_process)
-            #     # Once converted the ddata and saved it localle, we want to create
-            #     # the mirror models to ensure the when data is pushed to the server again
-            #     # with changes, it doesnt end up with duplicates.
-
-            #     # The trick is here:
-            #     # A complate product is a compilation of all individial pieces:
-            #     # ean
-            #     # images
-            #     # direct fields
-            #     # This needs to be deconstructed again to handle them correctly remotely.
-
-            #     # first create your import instance and assign remote_product.
-            #     importer_instance.prepare_mirror_model_class(
-            #         mirror_model_class=WoocommerceProduct,
-            #         sales_channel=self.sales_channel,
-            #         mirror_model_map={
-            #             "local_instance": "*",  # * = self
-            #         },
-            #         mirror_model_defaults={
-            #             "remote_sku": remote_product.get('sku'),
-            #             "remote_id": remote_product.get('id'),
-            #         }
-            #     )
-
-            #     importer_instance.process()
+            # first create your import instance and assign remote_product.
+            importer_instance = ImportProductInstance(
+                data=structured_data,
+                import_process=self.import_process,
+            )
+            importer_instance.prepare_mirror_model_class(
+                mirror_model_class=WoocommerceProduct,
+                sales_channel=self.sales_channel,
+                mirror_model_map={
+                    "local_instance": "*",  # * = self
+                },
+                mirror_model_defaults={
+                    # Skus are not always present.
+                    # "remote_sku": structured_data.get('sku'),
+                    "remote_id": remote_product.get('id'),
+                }
+            )
+            importer_instance.process()
             #     # handle_remote_product will populate remote_instance inside of import_instance
             #     self.handle_ean_codes(importer_instance)
             #     self.handle_prices(importer_instance)

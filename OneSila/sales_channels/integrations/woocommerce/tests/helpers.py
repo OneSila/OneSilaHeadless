@@ -3,11 +3,7 @@ from properties.models import Property, PropertySelectValue, PropertySelectValue
     ProductPropertiesRule, ProductProperty, PropertyTranslation
 from sales_prices.models import SalesPrice
 from currencies.models import Currency
-from sales_channels.integrations.woocommerce.factories.pulling import WoocommerceRemoteCurrencyPullFactory, \
-    WoocommerceSalesChannelViewPullFactory, WoocommerceLanguagePullFactory
-from sales_channels.integrations.woocommerce.factories.properties import WooCommerceGlobalAttributeCreateFactory
-from sales_channels.integrations.woocommerce.models import WoocommerceCurrency, WoocommerceProduct, WoocommerceSalesChannel, \
-    WoocommerceGlobalAttribute
+from sales_channels.integrations.woocommerce.models import WoocommerceProduct, WoocommerceGlobalAttribute
 from sales_channels.models import SalesChannelView, SalesChannelViewAssign
 
 import logging
@@ -15,31 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class CreateTestProductMixin:
-    def setUp(self):
-        super().setUp()
-        pull_factory = WoocommerceRemoteCurrencyPullFactory(
-            sales_channel=self.sales_channel
-        )
-        pull_factory.run()
-
-        pull_factory = WoocommerceSalesChannelViewPullFactory(
-            sales_channel=self.sales_channel
-        )
-        pull_factory.run()
-
-        pull_factory = WoocommerceLanguagePullFactory(
-            sales_channel=self.sales_channel
-        )
-        pull_factory.run()
-
-        self.api = pull_factory.get_api()
-
-        remote_currency = WoocommerceCurrency.objects.get(
-            sales_channel=self.sales_channel,
-        )
-        remote_currency.local_instance = self.currency
-        remote_currency.save()
-
     def tearDown(self):
         for product in WoocommerceProduct.objects.filter(remote_id__isnull=False):
             try:

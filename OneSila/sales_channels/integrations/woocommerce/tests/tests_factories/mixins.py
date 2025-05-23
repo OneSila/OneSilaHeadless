@@ -1,4 +1,7 @@
-from core.tests import TestCase, TransactionTestCase
+from sales_channels.integrations.woocommerce.factories.pulling import WoocommerceRemoteCurrencyPullFactory, \
+    WoocommerceSalesChannelViewPullFactory, WoocommerceLanguagePullFactory
+from sales_channels.integrations.woocommerce.models import WoocommerceCurrency, WoocommerceSalesChannel
+from core.tests import TransactionTestCase
 from django.conf import settings
 
 from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
@@ -25,6 +28,28 @@ class TestCaseWoocommerceMixin(TransactionTestCase):
             active=True,
             multi_tenant_company=self.multi_tenant_company,
         )
+        pull_factory = WoocommerceRemoteCurrencyPullFactory(
+            sales_channel=self.sales_channel
+        )
+        pull_factory.run()
+
+        pull_factory = WoocommerceSalesChannelViewPullFactory(
+            sales_channel=self.sales_channel
+        )
+        pull_factory.run()
+
+        pull_factory = WoocommerceLanguagePullFactory(
+            sales_channel=self.sales_channel
+        )
+        pull_factory.run()
+
+        self.api = pull_factory.get_api()
+
+        remote_currency = WoocommerceCurrency.objects.get(
+            sales_channel=self.sales_channel,
+        )
+        remote_currency.local_instance = self.currency
+        remote_currency.save()
 
     def tearDown(self):
         try:
