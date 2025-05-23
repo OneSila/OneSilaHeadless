@@ -69,12 +69,18 @@ def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelI
 def import_process_post_update_receiver(sender, instance: SalesChannelImport, **kwargs):
     from sales_channels.integrations.magento2.models import MagentoSalesChannel
     from sales_channels.integrations.magento2.tasks import magento_import_db_task
+    from sales_channels.integrations.shopify.models.sales_channels import ShopifySalesChannel
+    from sales_channels.integrations.shopify.tasks import shopify_import_db_task
+
 
     sales_channel = instance.sales_channel.get_real_instance()
     if instance.status == SalesChannelImport.STATUS_PENDING:
 
         if isinstance(sales_channel, MagentoSalesChannel):
             magento_import_db_task(import_process=instance, sales_channel=sales_channel)
+
+        if isinstance(sales_channel, ShopifySalesChannel):
+            shopify_import_db_task(import_process=instance, sales_channel=sales_channel)
 
 
 @receiver(post_update, sender=SalesChannelImport)

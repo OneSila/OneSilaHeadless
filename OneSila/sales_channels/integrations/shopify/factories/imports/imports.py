@@ -358,16 +358,23 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
             url = None
 
             if media_type == "IMAGE":
+                image_obj = node.get("image") or {}
+                original_source = node.get("originalSource") or {}
+                preview_image = (node.get("preview") or {}).get("image") or {}
+
                 url = (
-                        node.get("image", {}).get("url") or
-                        node.get("originalSource", {}).get("url") or
-                        node.get("preview", {}).get("image", {}).get("url")
+                        image_obj.get("url") or
+                        original_source.get("url") or
+                        preview_image.get("url")
                 )
 
             elif media_type == "EXTERNAL_VIDEO":
+                preview_image = (node.get("preview") or {}).get("image") or {}
+                original_source = node.get("originalSource") or {}
+
                 url = (
-                        node.get("preview", {}).get("image", {}).get("url") or
-                        node.get("originalSource", {}).get("url")
+                        preview_image.get("url") or
+                        original_source.get("url")
                 )
 
             if not url:
