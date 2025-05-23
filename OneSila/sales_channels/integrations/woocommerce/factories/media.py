@@ -1,6 +1,6 @@
 from sales_channels.factories.products.images import RemoteMediaProductThroughCreateFactory, RemoteMediaProductThroughUpdateFactory, \
     RemoteMediaProductThroughDeleteFactory, RemoteImageDeleteFactory
-from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
+from .mixins import WoocommerceProductTypeMixin, GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceMediaThroughProduct
 from media.models import Media
 from .mixins import SerialiserMixin
@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class WooCommerceMediaMixin(SerialiserMixin):
+class WooCommerceMediaMixin(WoocommerceProductTypeMixin):
     """
     This is the class used to populate all of the
     media on the products.
@@ -42,7 +42,7 @@ class WooCommerceMediaMixin(SerialiserMixin):
 
     def get_sku(self):
         """Sets the SKU for the product or variation in the payload."""
-        if self.remote_product.is_variation:
+        if self.is_woocommerce_variant_product:
             sku = f"{self.parent_local_instance.sku}-{self.local_instance.sku}"
         else:
             product = self.get_local_product()
