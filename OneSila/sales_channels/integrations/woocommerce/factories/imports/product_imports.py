@@ -1,8 +1,7 @@
 from sales_channels.factories.imports import SalesChannelImportMixin
 from imports_exports.factories.products import ImportProductInstance
-from imports_exports.factories.properties import ImportPropertyInstance
 from products.models import Product
-from properties.models import Property
+from core.decorators import timeit_and_log
 
 from ..exceptions import SanityCheckError
 from ..mixins import GetWoocommerceAPIMixin
@@ -10,13 +9,8 @@ from .temp_structure import ImportProcessorTempStructureMixin
 
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceProduct, \
-    WoocommerceEanCode, WoocommerceProductProperty, \
-    WoocommerceProductContent, WoocommercePrice, WoocommerceCurrency, \
+    WoocommerceEanCode, WoocommercePrice, WoocommerceCurrency, \
     WoocommerceMediaThroughProduct, WoocommerceRemoteLanguage
-from sales_channels.models import ImportProduct, SalesChannelViewAssign
-from django.contrib.contenttypes.models import ContentType
-
-from imports_exports.factories.media import ImportImageInstance
 from typing import Tuple, List, Set
 
 import logging
@@ -39,10 +33,12 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         self.currency = WoocommerceCurrency.objects.get(
             sales_channel=self.sales_channel,
         ).local_instance
+        self.currency_iso_code = self.currency.iso_code
 
     def get_total_instances(self) -> int:
         return len(self.api.get_products())
 
+    @timeit_and_log(logger, "fetching products from the API")
     def get_products_data(self) -> List[dict]:
         """
         Fetch products from the API and return all of them.
@@ -119,13 +115,23 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
 
         or None if this is a configurable product.
         """
-        price = product_data.get('sales_price')
-        rrp = product_data.get('regular_price')
-        return [{
-            "price": price,
-            "rrp": rrp,
-            "currency": self.currency,
-        }]
+        price = product_data.get('sales_price', None)
+        rrp = product_data.get('regular_price', None)
+
+        payload = {}
+        if price:
+            payload['price'] = price
+
+        if rrp:
+            payload['rrp'] = rrp
+
+        # if there are no prices, no point adding a currency
+        if payload:
+            payload['currency'] = self.currency_iso_code
+
+        payload = [payload] if payload else []
+        logger.info(f"Prices payload: {payload}")
+        return payload
 
     def get_structured_product_data(self, product_data: dict) -> dict:
         """
@@ -166,7 +172,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         for variation_id in product_data['variations']:
             variation_data = self.api.get_product_variation(remote_id, variation_id)
             base_product_data, _ = self.get_base_product_data(variation_data)
-            attribute_data, _ = self.get_attributes_for_product(variation_data, is_variation=True, parent_data=product_data)
+            attribute_data = self.get_attributes_for_product(variation_data, is_variation=True, parent_data=product_data)
             images = self.get_images(variation_data)
             prices = self.get_prices(variation_data)
             tax = self.get_tax_class(variation_data)
@@ -345,6 +351,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         remote_product.save()
         logger.info(f"Repaired remote_sku for product {remote_product.remote_id} using default_variant_id")
 
+    @timeit_and_log(logger, "importing woocommerce products")
     def import_products_process(self):
         for remote_product in self.api.get_products():
             # The get_product_data creates the complate "importable dict"

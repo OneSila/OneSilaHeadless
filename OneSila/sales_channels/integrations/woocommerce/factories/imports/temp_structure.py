@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from properties.models import Property
 from typing import Set, List
+from core.decorators import timeit_and_log
+from django.utils import timezone
 
 from .exceptions import UnknownTempPropertyClass
 
@@ -20,7 +22,7 @@ class TempPropertyClass:
     @property
     def property_type(self) -> str:
         if len(self.options) > 1:
-            return Property.TYPES.MULTI_SELECT
+            return Property.TYPES.MULTISELECT
         else:
             return Property.TYPES.SELECT
 
@@ -88,40 +90,47 @@ class TempPropertyDataConstructer:
         self.api = api
         self.processed_attributes = {}
 
+    @timeit_and_log(logger, "fetching products from the API")
     def set_products(self) -> List[dict]:
         """
         Fetch all products from the API.
         """
         self.products = self.api.get_products()
+        logger.info(f"Product count: {len(self.products)}")
 
+    @timeit_and_log(logger, "fetching product attributes from the API")
     def set_product_attributes(self):
         """
         Fetch all attributes for all products from the API.
         """
-        # self.product_attributes = [i.get('attributes', []) for i in self.api.get_products()]
         self.product_attributes = [
             attr
-            for product in self.api.get_products()
+            for product in self.products
             for attr in product.get('attributes', [])
         ]
 
+    @timeit_and_log(logger, "fetching variation attributes from the API")
     def set_variations(self) -> List[dict]:
         """
         Fetch all variations_data for each product from get_products()
         and fetch the variation data for each product.
         """
-        self.variations = [self.api.get_product_variation(i.get('id'), v) for i in self.api.get_products() for v in i.get('variations', [])]
+        self.variations = [
+            variation
+            for product in self.products
+            for variation in self.api.get_product_variations(product.get('id'))
+        ]
+        logger.info(f"Variation count: {len(self.variations)}")
 
+    @timeit_and_log(logger, "fetching variation attributes from the API")
     def set_variation_attributes(self) -> List[dict]:
         """
         Fetch all attributes for every variation from all products.
         """
-        # self.variation_attributes = [self.api.get_product_variation(i.get('id'), v).get('attributes', []) for i in self.api.get_products() for v in i.get('variations', [])]
         self.variation_attributes = [
             attr
-            for product in self.api.get_products()
-            for variation_id in product.get('variations', [])
-            for attr in self.api.get_product_variation(product.get('id'), variation_id).get('attributes', [])
+            for variation in self.variations
+            for attr in variation.get('attributes', [])
         ]
 
     def process_single_attribute(self, attribute: dict):
@@ -150,13 +159,12 @@ class TempPropertyDataConstructer:
 
         return name, slug, id, options, variation
 
+    @timeit_and_log(logger, "processing attributes")
     def process_attributes(self, attributes: List[dict], variation_attribute: bool = False) -> None:
         """
         Process the attributes for all products and variations.
         """
-        while len(attributes) > 0:
-            prop = attributes.pop()
-
+        for prop in attributes:
             if variation_attribute:
                 name, slug, id, options, variation = self.process_single_variation_attribute(prop)
             else:
@@ -177,6 +185,7 @@ class TempPropertyDataConstructer:
             except KeyError:
                 self.processed_attributes[name] = TempPropertyClass(name=name, slug=slug, id=id, options=options, variation=variation)
 
+    @timeit_and_log(logger, "run() prepping attribute data for structure analysis.")
     def run(self) -> dict[str, TempPropertyClass]:
         self.set_products()
         self.set_product_attributes()
@@ -184,6 +193,10 @@ class TempPropertyDataConstructer:
         self.set_variation_attributes()
         self.process_attributes(self.product_attributes, variation_attribute=False)
         self.process_attributes(self.variation_attributes, variation_attribute=True)
+
+        logger.info(f"Total processed products: {len(self.products)}")
+        logger.info(f"Total processed properties: {len(self.processed_attributes)}")
+        logger.info(f"Properties: {self.processed_attributes}")
 
         return self.processed_attributes
 

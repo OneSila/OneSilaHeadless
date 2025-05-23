@@ -313,6 +313,9 @@ class WoocommerceApiWrapper:
     def get_product_variation(self, product_id, variation_id):
         return self.get(f'products/{product_id}/variations/{variation_id}')
 
+    def get_product_variations(self, product_id):
+        return self.get_paged_get(f'products/{product_id}/variations')
+
     def update_product_variation(self, product_id, variation_id, **payload):
         """
         Update a product variation in WooCommerce.
