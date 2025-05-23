@@ -6,6 +6,7 @@ from sales_channels.factories.products.images import RemoteMediaProductThroughCr
 from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin
 from sales_channels.integrations.magento2.models import MagentoImageProductAssociation
 
+
 class GetMagentoImageTypesMixin:
     def get_image_types(self):
         types = []
@@ -14,6 +15,7 @@ class GetMagentoImageTypesMixin:
             types = ["thumbnail", "image", "small_image"]
 
         return types
+
 
 class MagentoMediaProductThroughCreateFactory(GetMagentoAPIMixin, RemoteMediaProductThroughCreateFactory, GetMagentoImageTypesMixin):
     remote_model_class = MagentoImageProductAssociation
@@ -48,6 +50,7 @@ class MagentoMediaProductThroughCreateFactory(GetMagentoAPIMixin, RemoteMediaPro
 
     def post_action_payload_modify(self):
         self.payload['is_main_image'] = self.local_instance.is_main_image
+
 
 class MagentoMediaProductThroughUpdateFactory(GetMagentoAPIMixin, RemoteMediaProductThroughUpdateFactory, GetMagentoImageTypesMixin):
     remote_model_class = MagentoImageProductAssociation
@@ -84,6 +87,7 @@ class MagentoMediaProductThroughUpdateFactory(GetMagentoAPIMixin, RemoteMediaPro
 
         return self.remote_instance.payload != payload
 
+
 class MagentoMediaProductThroughDeleteFactory(GetMagentoAPIMixin, RemoteMediaProductThroughDeleteFactory):
     remote_model_class = MagentoImageProductAssociation
     delete_remote_instance = True
@@ -93,7 +97,7 @@ class MagentoMediaProductThroughDeleteFactory(GetMagentoAPIMixin, RemoteMediaPro
         try:
             magento_product = self.api.products.by_sku(self.remote_product.remote_sku)
         except InstanceGetFailed:
-            return True # if the product was deleted then is no need to delete the association
+            return True  # if the product was deleted then is no need to delete the association
 
         self.api.media_entries_product = magento_product
         magento_instance: MediaEntry = self.api.product_media_entries.by_id(self.remote_instance.remote_id)
@@ -102,6 +106,7 @@ class MagentoMediaProductThroughDeleteFactory(GetMagentoAPIMixin, RemoteMediaPro
 
     def serialize_response(self, response):
         return response
+
 
 class MagentoImageDeleteFactory(RemoteImageDeleteFactory):
     has_remote_media_instance = False

@@ -6,6 +6,7 @@ from django.http import HttpResponseForbidden
 from core.views import EmptyTemplateView
 from .models import IntegrationTaskQueue
 
+
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
 def retry_integration_task(request, task_id):
@@ -18,8 +19,10 @@ def retry_integration_task(request, task_id):
 
     return redirect(request.META.get('HTTP_REFERER', '/'))
 
+
 class IntegrationListView(EmptyTemplateView):
     pass
+
 
 class ShopifyIntegrationDetailView(EmptyTemplateView):
     pass

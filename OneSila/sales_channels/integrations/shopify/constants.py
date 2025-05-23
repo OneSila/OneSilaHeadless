@@ -65,6 +65,7 @@ fragment fieldsForMediaTypes on Media {
 }
 '''
 
+
 def get_metafields(max):
     return f'''
     metafields(first: {max}) {{

@@ -26,6 +26,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='remoteproduct',
-            constraint=models.UniqueConstraint(condition=models.Q(('remote_sku__isnull', False)), fields=('sales_channel', 'remote_sku'), name='unique_remote_sku_per_channel_if_present'),
+            constraint=models.UniqueConstraint(condition=models.Q(('remote_sku__isnull', False)), fields=(
+                'sales_channel', 'remote_sku'), name='unique_remote_sku_per_channel_if_present'),
         ),
     ]

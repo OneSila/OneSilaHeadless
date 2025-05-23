@@ -4,6 +4,7 @@ from integrations.models import IntegrationTaskQueue
 
 logger = logging.getLogger(__name__)
 
+
 class BaseRemoteTask:
     def __init__(self, task_queue_item_id):
         self.task_queue_item_id = task_queue_item_id

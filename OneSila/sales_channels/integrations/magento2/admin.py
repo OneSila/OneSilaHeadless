@@ -9,6 +9,7 @@ from .models.sales_channels import MagentoRemoteLanguage
 from .models.taxes import MagentoCurrency, MagentoTaxClass
 from ...models import SalesChannelViewAssign
 
+
 @admin.register(MagentoSalesChannel)
 class MagentoSalesChannelAdmin(PolymorphicChildModelAdmin):
     base_model = MagentoSalesChannel
@@ -31,53 +32,66 @@ class MagentoSalesChannelAdmin(PolymorphicChildModelAdmin):
 class MagentoPropertyAdmin(admin.ModelAdmin):
     pass
 
+
 @admin.register(MagentoPropertySelectValue)
 class MagentoPropertySelectValueAdmin(admin.ModelAdmin):
     pass
+
 
 @admin.register(MagentoProductProperty)
 class MagentoProductPropertyAdmin(admin.ModelAdmin):
     pass
 
+
 @admin.register(MagentoSalesChannelView)
 class MagentoSalesChannelViewAdmin(admin.ModelAdmin):
     pass
+
 
 @admin.register(SalesChannelViewAssign)
 class SalesChannelViewAssignAdmin(admin.ModelAdmin):
     pass
 
+
 @admin.register(MagentoRemoteLanguage)
 class MagentoRemoteLanguageAdmin(admin.ModelAdmin):
     pass
+
 
 @admin.register(MagentoCurrency)
 class MagentoCurrencyAdmin(admin.ModelAdmin):
     pass
 
+
 @admin.register(MagentoAttributeSet)
 class MagentoAttributeSetAdmin(admin.ModelAdmin):
     pass
+
 
 @admin.register(MagentoAttributeSetAttribute)
 class MagentoAttributeSetAttributeAdmin(admin.ModelAdmin):
     pass
 
+
 @admin.register(MagentoOrder)
 class MagentoOrderAdmin(admin.ModelAdmin):
     pass
+
 
 @admin.register(MagentoOrderItem)
 class MagentoOrderAdmin(admin.ModelAdmin):
     pass
 
+
 @admin.register(MagentoProduct)
 class MagentoProductAdmin(admin.ModelAdmin):
     pass
 
+
 @admin.register(MagentoProductContent)
 class MagentoProductContentAdmin(admin.ModelAdmin):
     pass
+
 
 @admin.register(MagentoPrice)
 class MagentoPriceAdmin(admin.ModelAdmin):
@@ -88,9 +102,11 @@ class MagentoPriceAdmin(admin.ModelAdmin):
 class MagentoEanCodeAdmin(admin.ModelAdmin):
     pass
 
+
 @admin.register(MagentoImageProductAssociation)
 class MagentoImageProductAssociationAdmin(admin.ModelAdmin):
     pass
+
 
 @admin.register(MagentoTaxClass)
 class MagentoTaxClassAdmin(admin.ModelAdmin):

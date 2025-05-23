@@ -21,6 +21,7 @@ class MagentoAttributeSetImport(ImportableModel):
     def __str__(self):
         return f"Import process for {self.remote_attribute_set}"
 
+
 class MagentoAttributeSetAttributeImport(ImportableModel):
     """
     Model representing the import process for attributes within a Magento Attribute Set.

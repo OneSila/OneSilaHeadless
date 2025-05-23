@@ -9,7 +9,7 @@ class Order(models.SetStatusMixin, models.Model):
     reference = models.CharField(max_length=100, blank=True, null=True)
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
     price_incl_vat = models.BooleanField(default=True)
-    source = models.ForeignKey('integrations.Integration', on_delete=models.PROTECT, null=True,  blank=True) # we can have manual orders
+    source = models.ForeignKey('integrations.Integration', on_delete=models.PROTECT, null=True, blank=True)  # we can have manual orders
 
     objects = OrderManager()
 
@@ -49,7 +49,6 @@ class Order(models.SetStatusMixin, models.Model):
         pdf = printer.pdf
         return filename, pdf
 
-
     def total_value_custom_currency(self, currency_symbol):
         '''return the total_value in the given currency'''
         if self.currency.iso_code != currency_symbol:  # FIXME: Detect default currency instead
@@ -60,7 +59,6 @@ class Order(models.SetStatusMixin, models.Model):
                 return c.convert(self.total_value, self.currency.iso_code, currency_symbol)
         else:
             return self.total_value
-
 
     class Meta:
         ordering = ('-created_at',)

@@ -33,7 +33,6 @@ class PropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
     productpropertiesrule_set: List[Annotated['ProductPropertiesRuleType', lazy("properties.schema.types.types")]]
     propertyselectvaluetranslation_set: List[Annotated['PropertySelectValueTranslationType', lazy("properties.schema.types.types")]]
 
-
     @field()
     def value(self, info) -> str | None:
         return self.value
@@ -41,7 +40,6 @@ class PropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def full_value_name(self, info) -> str | None:
         return f"{self.property.name} > {self.value}"
-
 
     @field()
     def thumbnail_url(self, info) -> str | None:

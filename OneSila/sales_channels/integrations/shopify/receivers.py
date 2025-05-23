@@ -164,6 +164,7 @@ def shopify__product_property__create(sender, instance, **kwargs):
         product_property_id=instance.id,
     )
 
+
 @receiver(update_remote_product_property, sender='properties.ProductProperty')
 def shopify__product_property__update(sender, instance, **kwargs):
     run_product_specific_sales_channel_task_flow(
@@ -173,6 +174,7 @@ def shopify__product_property__update(sender, instance, **kwargs):
         sales_channel_class=ShopifySalesChannel,
         product_property_id=instance.id,
     )
+
 
 @receiver(delete_remote_product_property, sender='properties.ProductProperty')
 def shopify__product_property__delete(sender, instance, **kwargs):
@@ -249,6 +251,7 @@ def shopify__variation__add(sender, parent_product, variation_product, **kwargs)
         variation_product_id=variation_product.id,
     )
 
+
 @receiver(remove_remote_product_variation, sender='products.ConfigurableVariation')
 def shopify__variation__remove(sender, parent_product, variation_product, **kwargs):
     run_generic_sales_channel_task_flow(
@@ -273,6 +276,7 @@ def shopify__image_assoc__create(sender, instance, **kwargs):
         media_product_through_id=instance.id,
     )
 
+
 @receiver(update_remote_image_association, sender='media.MediaProductThrough')
 def shopify__image_assoc__update(sender, instance, **kwargs):
     run_product_specific_sales_channel_task_flow(
@@ -282,6 +286,7 @@ def shopify__image_assoc__update(sender, instance, **kwargs):
         sales_channel_class=ShopifySalesChannel,
         media_product_through_id=instance.id,
     )
+
 
 @receiver(delete_remote_image_association, sender='media.MediaProductThrough')
 def shopify__image_assoc__delete(sender, instance, **kwargs):
@@ -306,6 +311,7 @@ def shopify__image__delete(sender, instance, **kwargs):
         sales_channel_class=ShopifySalesChannel,
         image_id=instance.id,
     )
+
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
 @receiver(refresh_website_pull_models, sender='shopify.ShopifySalesChannel')

@@ -11,12 +11,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class IntegrationInstanceOperationMixin:
     """
     Mixin providing common operations for remote instance factories.
     Includes methods for API interaction, response handling, logging, and error management.
     """
-    integration_key = 'integration' # the name of the main integration key ex sales_channel / remote_account
+    integration_key = 'integration'  # the name of the main integration key ex sales_channel / remote_account
 
     def get_api(self):
         """
@@ -48,9 +49,7 @@ class IntegrationInstanceOperationMixin:
         if fixing_caller and fixing_class:
             fixing_identifier = f"{fixing_class.__name__}:{fixing_caller}"
 
-
         return f"{class_name}:{caller}", fixing_identifier
-
 
     def log_action_for_instance(self, remote_instance, action, response_data, payload, identifier):
         if not remote_instance:
@@ -162,13 +161,13 @@ class IntegrationInstanceOperationMixin:
         """
         raise NotImplementedError("Subclasses should implement this method to get the remote product.")
 
-
     def post_action_payload_modify(self):
         """
         A method where we can modify the payload after is used so it is saved with new data used to then be compared
         in needs update
         """
         pass
+
 
 class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
     local_model_class = None  # The Sila Model
@@ -186,7 +185,6 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
     already_exists_exception = None  # Set to a custom exception type if applicable, or None
     update_factory_class = None  # Update factory to use if remote already exists
     update_if_not_exists = False  # Whether to trigger an update flow if the remote instance is already present
-
 
     def __init__(self, integration, local_instance=None, api=None):
         self.local_instance = local_instance  # Instance of the local model
@@ -242,7 +240,6 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
         """
         return self.remote_instance_data
 
-
     def initialize_remote_instance(self):
         """
         Initialize the remote instance based on the remote instance data & save so we can add logs to it
@@ -292,7 +289,6 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
 
         # Call the API method with the payload
         return api_method(**self.payload)
-
 
     def post_create_process(self):
         """
@@ -382,7 +378,6 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
             self.remote_instance.save()
             logger.debug(f"Finished create process with success status: {self.successfully_created}")
 
-
         # After creation, if configured to trigger an update flow for an existing instance,
         # do so only if successfully_created is True.
         if self.enable_fetch_and_update and self.update_if_not_exists and self.update_factory_class and self.successfully_created and require_update:
@@ -409,7 +404,7 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
     remote_model_class = None  # The Mirror Model
     field_mapping = {}  # Mapping of local fields to remote fields, should be overridden in subclasses
     updatable_fields = []  # Fields that are allowed to be updated
-    local_product_map = 'local_instance__product' # the way we go to the local product from the current instance (if possible)
+    local_product_map = 'local_instance__product'  # the way we go to the local product from the current instance (if possible)
 
     # Configurable API details
     api_package_name = None  # The package name (e.g., 'properties')
@@ -418,7 +413,6 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
     # Configurable Create Factory for recreating instances if needed
     create_factory_class = None  # Should be overridden in subclasses with the specific Create Factory
     create_if_not_exists = False  # Configurable parameter to create the instance if not found
-
 
     def __init__(self, integration, local_instance=None, api=None, remote_instance=None, **kwargs):
         self.local_instance = local_instance  # Instance of the local model
@@ -542,7 +536,6 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
         # Call the API method with the payload
         return api_method(**self.payload)
 
-
     def needs_update(self):
         """
         Method that check if something was changed from last update / create. Can be overrided.
@@ -618,7 +611,7 @@ class IntegrationInstanceDeleteFactory(IntegrationInstanceOperationMixin):
     local_model_class = None  # The Sila Model
     remote_model_class = None  # The Mirror Model
     delete_field_mapping = {}  # Default mapping for deletion payload
-    local_product_map = 'local_instance__product' # the way we go to the local product from the current instance (if possible)
+    local_product_map = 'local_instance__product'  # the way we go to the local product from the current instance (if possible)
     delete_remote_instance = True
 
     # Configurable API details
@@ -739,4 +732,3 @@ class IntegrationInstanceDeleteFactory(IntegrationInstanceOperationMixin):
         self.preflight_process()
         self.delete()
         self.delete_remote_instance_process()
-

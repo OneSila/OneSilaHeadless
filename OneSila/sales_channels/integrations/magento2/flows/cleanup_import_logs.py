@@ -4,6 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def cleanup_import_logs_flow():
     from sales_channels.models import (
         ImportProperty,

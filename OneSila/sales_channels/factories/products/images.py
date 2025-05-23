@@ -29,6 +29,7 @@ class RemoteImageDeleteFactory(RemoteInstanceDeleteFactory):
                 delete_factory = self.delete_media_assign_factory(media_product_through, self.sales_channel)
                 delete_factory.run()
 
+
 class RemoteMediaProductThroughCreateFactory(ProductAssignmentMixin, RemoteInstanceCreateFactory):
     local_model_class = MediaProductThrough
     has_remote_media_instance = False
@@ -79,6 +80,7 @@ class RemoteMediaProductThroughCreateFactory(ProductAssignmentMixin, RemoteInsta
 
         return self.remote_instance_data
 
+
 class RemoteMediaProductThroughUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = MediaProductThrough
 
@@ -104,6 +106,7 @@ class RemoteMediaProductThroughUpdateFactory(ProductAssignmentMixin, RemoteInsta
             return False
 
         return True
+
 
 class RemoteMediaProductThroughDeleteFactory(ProductAssignmentMixin, RemoteInstanceDeleteFactory):
     local_model_class = MediaProductThrough

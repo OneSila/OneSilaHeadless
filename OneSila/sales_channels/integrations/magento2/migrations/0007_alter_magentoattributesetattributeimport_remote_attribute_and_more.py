@@ -14,11 +14,13 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='magentoattributesetattributeimport',
             name='remote_attribute',
-            field=models.ForeignKey(blank=True, help_text='The remote attribute associated with this import process.', null=True, on_delete=django.db.models.deletion.CASCADE, to='magento2.magentoattributesetattribute'),
+            field=models.ForeignKey(blank=True, help_text='The remote attribute associated with this import process.', null=True,
+                                    on_delete=django.db.models.deletion.CASCADE, to='magento2.magentoattributesetattribute'),
         ),
         migrations.AlterField(
             model_name='magentoattributesetimport',
             name='remote_attribute_set',
-            field=models.ForeignKey(blank=True, help_text='The remote attribute set associated with this import process.', null=True, on_delete=django.db.models.deletion.CASCADE, to='magento2.magentoattributeset'),
+            field=models.ForeignKey(blank=True, help_text='The remote attribute set associated with this import process.',
+                                    null=True, on_delete=django.db.models.deletion.CASCADE, to='magento2.magentoattributeset'),
         ),
     ]

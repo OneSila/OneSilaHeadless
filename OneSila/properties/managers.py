@@ -65,9 +65,11 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
 
         return super().delete(*args, **kwargs)
 
+
 class PropertySelectValueManager(MultiTenantManager):
     def get_queryset(self):
         return PropertySelectValueQuerySet(self.model, using=self._db)
+
 
 class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
     def create_rule(self, multi_tenant_company, product_type, require_ean_code, items):

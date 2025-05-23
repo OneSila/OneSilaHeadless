@@ -29,7 +29,6 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
     alias_products: List[Annotated['ProductType', lazy("products.schema.types.types")]]
     alias_parent_product: Optional[Annotated['ProductType', lazy("products.schema.types.types")]]
 
-
     @field()
     def proxy_id(self, info) -> str:
         if self.is_simple():
@@ -109,6 +108,7 @@ class ConfigurableVariationType(relay.Node, GetQuerysetMultiTenantMixin):
 class BundleVariationType(relay.Node, GetQuerysetMultiTenantMixin):
     parent: Optional[ProductType]
     variation: Optional[ProductType]
+
 
 @type(AliasProduct, filters=AliasProductFilter, order=AliasProductOrder, pagination=True, fields="__all__")
 class AliasProductType(relay.Node, GetQuerysetMultiTenantMixin):

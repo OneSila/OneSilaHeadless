@@ -16,7 +16,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ShopifyCollection',
             fields=[
-                ('remotecategory_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='sales_channels.remotecategory')),
+                ('remotecategory_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE,
+                 parent_link=True, primary_key=True, serialize=False, to='sales_channels.remotecategory')),
             ],
             options={
                 'abstract': False,
@@ -27,7 +28,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ShopifyCurrency',
             fields=[
-                ('remotecurrency_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='sales_channels.remotecurrency')),
+                ('remotecurrency_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE,
+                 parent_link=True, primary_key=True, serialize=False, to='sales_channels.remotecurrency')),
                 ('currency_code', models.CharField(help_text="ISO code for the currency (e.g., 'USD', 'EUR').", max_length=10)),
                 ('is_default', models.BooleanField(default=False, help_text='Marks the primary currency for this Shopify store.')),
             ],
@@ -40,7 +42,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ShopifyEanCode',
             fields=[
-                ('remoteeancode_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteeancode')),
+                ('remoteeancode_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE,
+                 parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteeancode')),
             ],
             options={
                 'verbose_name': 'Shopify EAN Code',
@@ -51,7 +54,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ShopifyImageProductAssociation',
             fields=[
-                ('remoteimageproductassociation_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteimageproductassociation')),
+                ('remoteimageproductassociation_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE,
+                 parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteimageproductassociation')),
             ],
             options={
                 'abstract': False,
@@ -62,7 +66,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ShopifyOrder',
             fields=[
-                ('remoteorder_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteorder')),
+                ('remoteorder_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE,
+                 parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteorder')),
             ],
             options={
                 'abstract': False,
@@ -73,7 +78,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ShopifyOrderItem',
             fields=[
-                ('remoteorderitem_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteorderitem')),
+                ('remoteorderitem_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE,
+                 parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteorderitem')),
             ],
             options={
                 'abstract': False,
@@ -84,7 +90,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ShopifyPrice',
             fields=[
-                ('remoteprice_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteprice')),
+                ('remoteprice_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE,
+                 parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteprice')),
             ],
             options={
                 'abstract': False,
@@ -95,7 +102,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ShopifyProduct',
             fields=[
-                ('remoteproduct_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteproduct')),
+                ('remoteproduct_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE,
+                 parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteproduct')),
             ],
             options={
                 'abstract': False,
@@ -106,7 +114,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ShopifyProductContent',
             fields=[
-                ('remoteproductcontent_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteproductcontent')),
+                ('remoteproductcontent_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE,
+                 parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteproductcontent')),
             ],
             options={
                 'abstract': False,
@@ -117,7 +126,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ShopifyProductProperty',
             fields=[
-                ('remoteproductproperty_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteproductproperty')),
+                ('remoteproductproperty_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE,
+                 parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteproductproperty')),
             ],
             options={
                 'abstract': False,
@@ -128,7 +138,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ShopifyRemoteLanguage',
             fields=[
-                ('remotelanguage_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='sales_channels.remotelanguage')),
+                ('remotelanguage_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE,
+                 parent_link=True, primary_key=True, serialize=False, to='sales_channels.remotelanguage')),
             ],
             options={
                 'abstract': False,
@@ -139,7 +150,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ShopifySalesChannel',
             fields=[
-                ('saleschannel_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='sales_channels.saleschannel')),
+                ('saleschannel_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE,
+                 parent_link=True, primary_key=True, serialize=False, to='sales_channels.saleschannel')),
                 ('shop_url', models.URLField(help_text='The myshopify.com domain for this store.', max_length=255)),
                 ('api_version', models.CharField(default='2024-07', help_text='Shopify API version to use for requests.', max_length=32)),
                 ('access_token', models.CharField(help_text='OAuth access token for this Shopify store.', max_length=255)),
@@ -153,7 +165,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ShopifySalesChannelView',
             fields=[
-                ('saleschannelview_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='sales_channels.saleschannelview')),
+                ('saleschannelview_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE,
+                 parent_link=True, primary_key=True, serialize=False, to='sales_channels.saleschannelview')),
             ],
             options={
                 'abstract': False,

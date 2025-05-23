@@ -14,6 +14,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='remoteproductproperty',
             name='remote_property',
-            field=models.ForeignKey(help_text='The remote property associated with this product property.', null=True, on_delete=django.db.models.deletion.CASCADE, to='sales_channels.remoteproperty'),
+            field=models.ForeignKey(help_text='The remote property associated with this product property.', null=True,
+                                    on_delete=django.db.models.deletion.CASCADE, to='sales_channels.remoteproperty'),
         ),
     ]

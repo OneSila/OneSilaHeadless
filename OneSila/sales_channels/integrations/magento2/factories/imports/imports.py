@@ -35,6 +35,7 @@ from taxes.models import VatRate
 
 logger = logging.getLogger(__name__)
 
+
 class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
     import_properties = True
     import_select_values = True
@@ -49,7 +50,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         self.api = self.get_api()
 
         self.remote_local_property_map = {}
-
 
     def prepare_import_process(self):
 
@@ -73,7 +73,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
             field="attribute_code",
             value=properties_string,
             condition="in").all_in_memory()
-
 
         self.rules = self.api.product_attribute_set.all_in_memory()
         self.products_cnt = self.api.products.count()
@@ -148,7 +147,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                     except Exception as e:
                         logger.debug(f"Failed to fetch options for scope {store_code}: {e}")
                         continue
-
 
                     for option in scoped_options:
                         value_id = option.value
@@ -556,7 +554,7 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         return attributes, mirror_map
 
     def get_product_prices(self, product: MagentoApiProduct,
-                           currency_product_map = None):
+                           currency_product_map=None):
         """
         Returns a list of price entries.
 
@@ -715,16 +713,15 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
     def handle_ean_code(self, import_instance: ImportProductInstance):
 
         magento_ean_code, _ = MagentoEanCode.objects.get_or_create(
-                multi_tenant_company=self.import_process.multi_tenant_company,
-                sales_channel=self.sales_channel,
-                remote_product=import_instance.remote_instance,
-            )
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_product=import_instance.remote_instance,
+        )
 
         if hasattr(import_instance, 'ean_code'):
             if magento_ean_code.ean_code != import_instance.ean_code:
                 magento_ean_code.ean_code = import_instance.ean_code
                 magento_ean_code.save()
-
 
     def handle_attributes(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, 'attributes'):
@@ -753,7 +750,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                     remote_product_property.remote_value = remote_value
                     remote_product_property.save()
 
-
     def handle_prices(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, 'prices'):
 
@@ -774,7 +770,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 magento_price.price = full_price
                 magento_price.discount_price = discounted_price
                 magento_price.save()
-
 
     def handle_translations(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, 'translations'):
@@ -802,7 +797,7 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                     magento_image_association.remote_id = remote_id
                     magento_image_association.save()
 
-                index+= 1
+                index += 1
 
     def handle_variations(self, import_instance: ImportProductInstance, rule: ProductPropertiesRule):
         if hasattr(import_instance, 'variations'):
@@ -829,7 +824,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                     magento_product.remote_id = remote_id
                     magento_product.save()
 
-
             if hasattr(remote_product, 'configurator'):
                 configurator = remote_product.configurator
                 configurator.update_if_needed(rule=rule, variations=variations, send_sync_signal=False)
@@ -839,7 +833,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                     rule=rule,
                     variations=variations,
                 )
-
 
     def handle_sales_channels_views(self, import_instance: ImportProductInstance, product: MagentoApiProduct):
         sales_channel_views = MagentoSalesChannelView.objects.filter(
@@ -856,7 +849,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 remote_product=import_instance.remote_instance,
                 sales_channel=self.sales_channel,
             )
-
 
     def update_remote_product(self, import_instance: ImportProductInstance, product: MagentoApiProduct, is_variation: bool):
         remote_product = import_instance.remote_instance
@@ -888,7 +880,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
         return is_variation
 
-
     def set_taxes_map(self):
         self.tax_map = {}
 
@@ -908,8 +899,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 )
 
                 self.tax_map[tax_class.class_id] = tax_class.class_name
-
-
 
     def import_products_process(self):
         self.set_taxes_map()
@@ -979,7 +968,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 product_batch = products_api.next()
             except ValueError:
                 break
-
 
     def process_completed(self):
         self.sales_channel.active = self.initial_sales_channel_status

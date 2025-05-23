@@ -79,6 +79,7 @@ class RemoteLogOrder:
 class RemoteOrderOrder:
     id: auto
 
+
 @order(RemoteProduct)
 class RemoteProductOrder:
     id: auto
@@ -123,11 +124,12 @@ class SalesChannelIntegrationPricelistOrder:
 class SalesChannelViewOrder:
     id: auto
 
+
 @order(RemoteLanguage)
 class RemoteLanguageOrder:
     id: auto
 
+
 @order(SalesChannelViewAssign)
 class SalesChannelViewAssignOrder:
     id: auto
-

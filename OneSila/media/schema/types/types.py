@@ -60,7 +60,6 @@ class MediaProductThroughType(relay.Node, GetQuerysetMultiTenantMixin):
     media: MediaType
     product: Optional[Annotated['ProductType', lazy("products.schema.types.types")]]
 
-
     @field()
     def product_id(self, info) -> str:
         from products.schema.types.types import ProductType

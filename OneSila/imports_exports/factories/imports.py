@@ -5,12 +5,12 @@ from imports_exports.models import Import
 import traceback
 import math
 
+
 class ImportMixin:
     import_properties = False
     import_select_values = False
     import_rules = False
     import_products = False
-
 
     def __init__(self, import_process, language=None):
         self.import_process = import_process
@@ -20,7 +20,6 @@ class ImportMixin:
         self.total_imported_instances = 0
         self.current_percent = 0
         self._threshold_chunk = 1
-
 
     def calculate_percentage(self):
         self.total_import_instances_cnt = self.get_total_instances()
@@ -42,12 +41,10 @@ class ImportMixin:
                 self.import_process.percentage = self.current_percent
                 self.import_process.save()
 
-
     def strat_process(self):
         self.import_process.status = Import.STATUS_PROCESSING
         self.import_process.percentage = 0
         self.import_process.save()
-
 
     def mark_success(self):
         self.import_process.status = Import.STATUS_SUCCESS
@@ -56,7 +53,6 @@ class ImportMixin:
 
         self.on_success()
 
-
     def mark_failure(self):
         self.import_process.status = Import.STATUS_FAILED
         self.import_process.percentage = 100
@@ -64,7 +60,6 @@ class ImportMixin:
         self.import_process.save()
 
         self.on_fail()
-
 
     def on_success(self):
         pass
@@ -175,7 +170,8 @@ class ImportMixin:
     def import_select_values_process(self):
         for value_data in self.get_select_values_data():
             log_instance = self.get_structured_select_value_data(value_data)
-            import_instance = ImportPropertySelectValueInstance(self.get_final_select_value_data_from_log(log_instance), self.import_process, property=self.get_select_value_property_instance(log_instance, value_data))
+            import_instance = ImportPropertySelectValueInstance(self.get_final_select_value_data_from_log(
+                log_instance), self.import_process, property=self.get_select_value_property_instance(log_instance, value_data))
             self.update_property_select_value_import_instance(import_instance, value_data)
             import_instance.process()
             self.update_percentage()

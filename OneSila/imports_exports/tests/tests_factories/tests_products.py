@@ -117,7 +117,6 @@ class ImportProductInstanceValidateTest(TestCase):
         self.assertEqual(len(instance.configurator_select_values), 2)
 
 
-
 class ImportProductTranslationAndSalesPriceValidateTest(TestCase):
     def setUp(self):
         super().setUp()
@@ -170,7 +169,7 @@ class ImportProductTranslationAndSalesPriceValidateTest(TestCase):
 
     def test_translation_missing_name_raises(self):
         data = {
-            "product_data": { "name": "Something" }
+            "product_data": {"name": "Something"}
         }
         with self.assertRaises(ValueError) as cm:
             ImportProductTranslationInstance(data, self.import_process)
@@ -236,7 +235,7 @@ class ImportProductTranslationAndSalesPriceValidateTest(TestCase):
         data = {
             "rrp": 100,
             "currency": "EUR",
-            "product_data": { "name": "RRP Product" }
+            "product_data": {"name": "RRP Product"}
         }
         instance = ImportSalesPriceInstance(data, self.import_process)
         instance.pre_process_logic()
@@ -248,7 +247,7 @@ class ImportProductTranslationAndSalesPriceValidateTest(TestCase):
             "rrp": 80,
             "price": 100,
             "currency": "EUR",
-            "product_data": { "name": "Swapped Product" }
+            "product_data": {"name": "Swapped Product"}
         }
         instance = ImportSalesPriceInstance(data, self.import_process)
         instance.pre_process_logic()
@@ -259,7 +258,7 @@ class ImportProductTranslationAndSalesPriceValidateTest(TestCase):
         data = {
             "price": 10,
             "currency": "XXX",
-            "product_data": { "name": "Invalid Currency" }
+            "product_data": {"name": "Invalid Currency"}
         }
 
         with self.assertRaises(ValueError) as cm:
@@ -394,8 +393,8 @@ class ImportProductInstanceProcessTest(TestCase):
             "name": "Image Product",
             "sku": "IMG001",
             "images": [
-                { "image_url": "https://2.img-dpreview.com/files/p/E~C1000x0S4000x4000T1200x1200~articles/3925134721/0266554465.jpeg" },
-                { "image_url": "https://vgl.ucdavis.edu/sites/g/files/dgvnsk15116/files/styles/sf_landscape_4x3/public/images/marketing_highlight/Sample-Collection-Box-Cat-640px.jpg", "is_main_image": True }
+                {"image_url": "https://2.img-dpreview.com/files/p/E~C1000x0S4000x4000T1200x1200~articles/3925134721/0266554465.jpeg"},
+                {"image_url": "https://vgl.ucdavis.edu/sites/g/files/dgvnsk15116/files/styles/sf_landscape_4x3/public/images/marketing_highlight/Sample-Collection-Box-Cat-640px.jpg", "is_main_image": True}
             ]
         }
 
@@ -435,8 +434,8 @@ class ImportProductInstanceProcessTest(TestCase):
             "sku": "ATTR123",
             "product_type": "Chair",
             "attributes": [
-                { "property_data": { "name": "Color", "type": "SELECT" }, "value": "Red" },
-                { "property_data": { "name": "Size", "type": "SELECT" }, "value": "M" },
+                {"property_data": {"name": "Color", "type": "SELECT"}, "value": "Red"},
+                {"property_data": {"name": "Size", "type": "SELECT"}, "value": "M"},
             ]
         }
 
@@ -468,7 +467,6 @@ class ImportProductInstanceProcessTest(TestCase):
         self.assertEqual(config_product.type, Product.CONFIGURABLE)
         self.assertEqual(variations.count(), 1)
         self.assertEqual(variations.first().variation.name, "Configurable Auto Variants (Red)")
-
 
     def test_create_configurable_with_manual_variations(self):
         data = {
@@ -730,19 +728,19 @@ class ImportProductInstanceProcessTest(TestCase):
                 }
             ],
             "attributes": [
-                { "property_data": { "name": "Material", "type": "SELECT" }, "value": "Red" },
-                { "property_data": { "name": "Style", "type": "SELECT" }, "value": "Elegant" }
+                {"property_data": {"name": "Material", "type": "SELECT"}, "value": "Red"},
+                {"property_data": {"name": "Style", "type": "SELECT"}, "value": "Elegant"}
             ],
             "images": [
-                { "image_url": "https://2.img-dpreview.com/files/p/E~C1000x0S4000x4000T1200x1200~articles/3925134721/0266554465.jpeg" },
-                { "image_url": "https://vgl.ucdavis.edu/sites/g/files/dgvnsk15116/files/styles/sf_landscape_4x3/public/images/marketing_highlight/Sample-Collection-Box-Cat-640px.jpg", "is_main_image": True }
+                {"image_url": "https://2.img-dpreview.com/files/p/E~C1000x0S4000x4000T1200x1200~articles/3925134721/0266554465.jpeg"},
+                {"image_url": "https://vgl.ucdavis.edu/sites/g/files/dgvnsk15116/files/styles/sf_landscape_4x3/public/images/marketing_highlight/Sample-Collection-Box-Cat-640px.jpg", "is_main_image": True}
             ],
             "prices": [
-                { "price": 29.99, "currency": "EUR" },
-                { "rrp": 34.99, "currency": "USD" }
+                {"price": 29.99, "currency": "EUR"},
+                {"rrp": 34.99, "currency": "USD"}
             ],
             "configurator_select_values": [
-                { "property_data": { "name": "Style", "type": "SELECT" }, "value": "Elegant" }
+                {"property_data": {"name": "Style", "type": "SELECT"}, "value": "Elegant"}
             ]
         }
         Currency.objects.get_or_create(

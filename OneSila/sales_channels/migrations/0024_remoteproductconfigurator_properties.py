@@ -14,6 +14,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='remoteproductconfigurator',
             name='properties',
-            field=models.ManyToManyField(help_text='Local properties used for configurator logic.', related_name='remote_product_configurators', to='properties.property'),
+            field=models.ManyToManyField(help_text='Local properties used for configurator logic.',
+                                         related_name='remote_product_configurators', to='properties.property'),
         ),
     ]

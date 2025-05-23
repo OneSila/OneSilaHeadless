@@ -9,4 +9,3 @@ urlpatterns = [
     path("/shopify/<str:id>/", ShopifyIntegrationDetailView.as_view(), name="shopify_integration_detail"),
 
 ]
-

@@ -160,6 +160,7 @@ class VariationsMissingMandatoryInformationManager(InspectorBlockManager):
     def get_queryset(self):
         return VariationsMissingMandatoryInformationQuerySet(self.model, using=self._db)
 
+
 class DuplicateVariationsQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
     pass
 

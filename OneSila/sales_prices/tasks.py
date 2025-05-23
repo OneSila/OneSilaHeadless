@@ -9,6 +9,7 @@ from .signals import price_changed
 
 logger = logging.getLogger(__name__)
 
+
 @run_task_after_commit
 @db_task()
 def salesprices__createupdate__task(sales_price):
@@ -63,6 +64,7 @@ def sales_price_list__salespricelistitem__update_prices_task(salespricelist):
 def salespricelistitem__update_prices_task(salespricelistitem):
     from sales_prices.flows import salespricelistitem__update_prices_flow
     salespricelistitem__update_prices_flow(salespricelistitem)
+
 
 @db_periodic_task(crontab(hour=2, minute=0))
 def salespricelistitem__check_price_changed_periodic_task():

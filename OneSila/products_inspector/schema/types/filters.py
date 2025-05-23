@@ -20,4 +20,4 @@ class InspectorBlockFilter:
     id: auto
     inspector: Optional[InspectorFilter]
     error_code: auto
-    successfully_checked:auto
+    successfully_checked: auto

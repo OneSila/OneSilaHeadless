@@ -4,20 +4,20 @@ from .mixins import AskGPTMixin
 class ProductResearchLLM(AskGPTMixin):
     """
     Translate a given string from_language_code to a to_language_code
-    The from_language_code is given for guardrails. 
+    The from_language_code is given for guardrails.
     """
 
     def __init__(self, product_name):
         super().__init__()
         self.product_name = product_name
 
-    @property    
+    @property
     def system_prompt(self):
         return """
         # **High-Quality Product Research Prompt (JSON Format)**
 
-        I need a **structured JSON response** with real, verifiable, and up-to-date product information sourced from **authoritative online sources**.  
-        🚫 **No generated or fabricated data. Only return what is available.**  
+        I need a **structured JSON response** with real, verifiable, and up-to-date product information sourced from **authoritative online sources**.
+        🚫 **No generated or fabricated data. Only return what is available.**
 
         ## **🔍 Data Requirements**
         - **Source data from reputable online platforms** (official manufacturer websites, major e-commerce platforms like Amazon, Walmart, Best Buy, etc.).
@@ -46,15 +46,15 @@ class ProductResearchLLM(AskGPTMixin):
 
         ## **📌 Data Extraction Guidelines**
         ### **1️⃣ Product Name**
-        - Extract the **exact name** from official sources or leading e-commerce platforms.  
+        - Extract the **exact name** from official sources or leading e-commerce platforms.
         - Do **not** modify or shorten the name.
 
         ### **2️⃣ Description**
-        - Use the **official** product description from the manufacturer or primary retailer.  
+        - Use the **official** product description from the manufacturer or primary retailer.
         - No summarization or generation—**maintain full accuracy.**
 
         ### **3️⃣ Images**
-        - Extract only **high-quality product images** from **official sources or trusted retailers**.  
+        - Extract only **high-quality product images** from **official sources or trusted retailers**.
         - Return **direct image URLs**; do not modify or generate images.
 
         ### **4️⃣ Attributes**
@@ -62,13 +62,12 @@ class ProductResearchLLM(AskGPTMixin):
         - Ensure **attributes match manufacturer or retailer listings.**
 
         ### **5️⃣ Data Integrity**
-        ✅ **Only use real, verified data.**  
-        🚫 **Do not fabricate or assume information.**  
-        🔄 **If data is unavailable, return `null` instead of guessing.**  
+        ✅ **Only use real, verified data.**
+        🚫 **Do not fabricate or assume information.**
+        🔄 **If data is unavailable, return `null` instead of guessing.**
 
         """
 
     @property
     def prompt(self):
         return f"{self.product_name}"
-

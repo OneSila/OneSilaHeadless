@@ -25,7 +25,7 @@ class GenerateEancodesInput:
 class AssignEancodeInput:
     product: ProductPartialInput
 
+
 @strawberry_input
 class BulkAssignEancodesInput:
     products: Optional[List[ProductPartialInput]] = None
-

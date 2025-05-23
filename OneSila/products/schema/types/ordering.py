@@ -25,10 +25,12 @@ class ConfigurableProductOrder:
     id: auto
     sku: auto
 
+
 @order(AliasProduct)
 class AliasProductOrder:
     id: auto
     sku: auto
+
 
 @order(SimpleProduct)
 class SimpleProductOrder:

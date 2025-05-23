@@ -17,6 +17,7 @@ def populate_local_properties(apps, schema_editor):
             configurator.properties.set(local_props)
             configurator.save()
 
+
 class Migration(migrations.Migration):
 
     dependencies = [

@@ -12,13 +12,12 @@ class RemoteInventoryUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateF
         self.stock = None
         self.remote_instance = None
 
-
     def preflight_check(self):
         """
         Checks that the RemoteProduct and associated SalesChannelViewAssign exist before proceeding.
         Also sets the remote_instance if conditions are met.
         """
-        return False # @TODO: Come back after we decide with inventory
+        return False  # @TODO: Come back after we decide with inventory
 
         if not self.remote_product:
             return False
@@ -49,4 +48,4 @@ class RemoteInventoryUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateF
         pass
 
     def needs_update(self):
-        return True # the actual check is done in preflight_check
+        return True  # the actual check is done in preflight_check

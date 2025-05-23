@@ -2,6 +2,7 @@ from sales_channels.integrations.magento2.models import MagentoSalesChannelView
 from sales_channels.models import RemoteCurrency, RemoteVat
 from core import models
 
+
 class MagentoCurrency(RemoteCurrency):
     """
     Magento-specific Remote Currency.

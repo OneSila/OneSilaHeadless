@@ -31,7 +31,6 @@ def get_translation_languages_with_default(info) -> TranslationLanguageWithDefau
     )
 
 
-
 @type(name="Query")
 class TranslationsQuery:
     translation_languages: TranslationLanguageWithDefaultType = field(resolver=get_translation_languages_with_default)

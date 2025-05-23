@@ -1,6 +1,7 @@
 from core import models
 from integrations.models import IntegrationObjectMixin
 
+
 class RemoteObjectMixin(IntegrationObjectMixin):
     """
     Mixin for objects that are tied to a specific sales_channel integration.

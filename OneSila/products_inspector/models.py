@@ -175,6 +175,7 @@ class MissingOptionalPropertiesInspectorBlock(InspectorBlock):
         proxy = True
         verbose_name = _("Inspector Block Missing Optional Properties")
 
+
 class MissingStockInspectorBlock(InspectorBlock):
     from .constants import missing_stock_block
 

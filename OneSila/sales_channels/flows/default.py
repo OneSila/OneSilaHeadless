@@ -35,6 +35,7 @@ def run_generic_sales_channel_task_flow(task_func, multi_tenant_company, number_
             number_of_remote_requests=number_of_remote_requests
         ))
 
+
 def run_product_specific_sales_channel_task_flow(
     task_func,
     multi_tenant_company,
@@ -70,7 +71,7 @@ def run_product_specific_sales_channel_task_flow(
     for sales_channel in sales_channel_class.objects.filter(**sales_channels_filter_kwargs):
 
         # Queue a task for each remote product
-        for remote_product in  RemoteProduct.objects.filter(local_instance=product,sales_channel=sales_channel).iterator():
+        for remote_product in RemoteProduct.objects.filter(local_instance=product, sales_channel=sales_channel).iterator():
             task_kwargs = {
                 'sales_channel_id': sales_channel.id,
                 'remote_product_id': remote_product.id,
@@ -184,24 +185,25 @@ def run_delete_product_specific_generic_sales_channel_task_flow(
     sales_channels = sales_channel_class.objects.filter(**sales_channels_filter_kwargs)
 
     for sales_channel in sales_channels:
-            for remote_product in RemoteProduct.objects.filter(local_instance=product, sales_channel=sales_channel).iterator():
-                try:
-                    remote_instance = remote_class.objects.get(local_instance_id=local_instance_id, sales_channel=sales_channel, remote_product_id=remote_product.id)
+        for remote_product in RemoteProduct.objects.filter(local_instance=product, sales_channel=sales_channel).iterator():
+            try:
+                remote_instance = remote_class.objects.get(local_instance_id=local_instance_id,
+                                                           sales_channel=sales_channel, remote_product_id=remote_product.id)
 
-                    task_kwargs = {
-                        'sales_channel_id': sales_channel.id,
-                        'remote_instance_id': remote_instance.id,
-                        'remote_product_id': remote_product.id
-                    }
+                task_kwargs = {
+                    'sales_channel_id': sales_channel.id,
+                    'remote_instance_id': remote_instance.id,
+                    'remote_product_id': remote_product.id
+                }
 
-                    transaction.on_commit(lambda: add_task_to_queue(
-                        integration_id=sales_channel.id,
-                        task_func_path=get_import_path(task_func),
-                        task_kwargs=task_kwargs,
-                        number_of_remote_requests=number_of_remote_requests,
-                        **kwargs
-                    ))
+                transaction.on_commit(lambda: add_task_to_queue(
+                    integration_id=sales_channel.id,
+                    task_func_path=get_import_path(task_func),
+                    task_kwargs=task_kwargs,
+                    number_of_remote_requests=number_of_remote_requests,
+                    **kwargs
+                ))
 
-                except remote_class.DoesNotExist:
-                    # If the remote instance does not exist for this sales channel, skip
-                    pass
+            except remote_class.DoesNotExist:
+                # If the remote instance does not exist for this sales channel, skip
+                pass

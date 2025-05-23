@@ -10,6 +10,7 @@ from properties.models import Property, PropertyTranslation, PropertySelectValue
 
 logger = logging.getLogger(__name__)
 
+
 class PropertyImportUsingInternalName(ImportOperationMixin):
     get_identifiers = ['internal_name', 'type']
 
@@ -80,8 +81,10 @@ class ProductPropertiesRuleItemImport(ImportOperationMixin):
             self.instance.save()
             logger.info(f"Local instance updated: {self.instance}")
 
+
 class ProductPropertyImport(ImportOperationMixin):
     get_identifiers = ['product', 'property']
+
 
 class TranslatedProductPropertyImport(ImportOperationMixin):
     get_using_translation = True
@@ -90,6 +93,7 @@ class TranslatedProductPropertyImport(ImportOperationMixin):
     translation_get_value = 'product_property'
     get_translation_identifiers = ['product_property__product', 'product_property__property']
     get_identifiers = ['product', 'property']
+
 
 class ImportPropertyInstance(AbstractImportInstance):
     """
@@ -208,7 +212,6 @@ class ImportPropertyInstance(AbstractImportInstance):
             raise ValueError(
                 f"Invalid property type: {prop_type}. Allowed types are: {self.ALLOWED_TYPES}")
 
-
     def pre_process_logic(self):
         # Decide which factory to use based on the data.
         if hasattr(self, 'internal_name'):
@@ -230,7 +233,6 @@ class ImportPropertyInstance(AbstractImportInstance):
         # - and no valid translations were passed
         if fac.created and not (hasattr(self, 'translations') and len(self.translations) > 0):
             self.create_translation()
-
 
     def create_translation(self):
 
@@ -270,7 +272,6 @@ class ImportPropertyInstance(AbstractImportInstance):
             if translation_object.name != name:
                 translation_object.name = name
                 translation_object.save()
-
 
 
 class ImportPropertySelectValueInstance(AbstractImportInstance):
@@ -314,7 +315,6 @@ class ImportPropertySelectValueInstance(AbstractImportInstance):
         if not getattr(self, 'property_data', None) and not self.property:
             raise ValueError("Either a 'property' or 'property_data' must be provided.")
 
-
     def _set_property_import_instance(self):
         if not self.property:
             self.property_import_instance = ImportPropertyInstance(self.property_data, self.import_process)
@@ -346,7 +346,6 @@ class ImportPropertySelectValueInstance(AbstractImportInstance):
         if fac.created and not (hasattr(self, 'translations') and len(self.translations) > 0):
             self.create_translation()
 
-
     def create_translation(self):
 
         self.translation = PropertySelectValueTranslation.objects.create(
@@ -355,7 +354,6 @@ class ImportPropertySelectValueInstance(AbstractImportInstance):
             propertyselectvalue=self.instance,
             value=self.value
         )
-
 
     def post_process_logic(self):
         """
@@ -393,6 +391,7 @@ class ImportProductPropertiesRuleInstance(AbstractImportInstance):
       - items: Optional the data for
 
     """
+
     def __init__(self, data: dict, import_process=None, product_type=None):
         super().__init__(data, import_process)
 
@@ -426,7 +425,6 @@ class ImportProductPropertiesRuleInstance(AbstractImportInstance):
         if hasattr(self, 'items') and not isinstance(self.items, list):
             raise ValueError("The 'items' field must be a list.")
 
-
     def _set_property_import_instance(self):
 
         # If the property is not provided, run the property import.
@@ -445,20 +443,17 @@ class ImportProductPropertiesRuleInstance(AbstractImportInstance):
             self.property_select_value_import_instance.process()
             self.product_type = self.property_select_value_import_instance.instance
 
-
     def process_logic(self):
         fac = ProductPropertiesRuleImport(self, self.import_process)
         fac.run()
 
         self.instance = fac.instance
 
-
     def before_process_item_logic(self, item_import_instance):
         pass
 
     def after_process_item_logic(self, instance, remote_instance):
         pass
-
 
     def post_process_logic(self):
 
@@ -483,6 +478,7 @@ class ImportProductPropertiesRuleItemInstance(AbstractImportInstance):
 
     Optionally, a 'rule' or a 'property' may be provided externally.
     """
+
     def __init__(self, data: dict, import_process=None, rule=None, property=None):
         super().__init__(data, import_process)
         self.rule = rule
@@ -503,7 +499,6 @@ class ImportProductPropertiesRuleItemInstance(AbstractImportInstance):
 
         # this will also do validation
         self._set_import_instances()
-
 
     @property
     def local_class(self):
@@ -544,12 +539,12 @@ class ImportProductPropertiesRuleItemInstance(AbstractImportInstance):
             self.rule_import_instance.process()
             self.rule = self.rule_import_instance.instance
 
-
     def process_logic(self):
         fac = ProductPropertiesRuleItemImport(self, self.import_process,)
         fac.run()
 
         self.instance = fac.instance
+
 
 class GetSelectValueMixin:
 
@@ -601,7 +596,6 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
 
         self.factory_class = ProductPropertyImport
 
-
     @property
     def local_class(self):
         return ProductProperty
@@ -628,7 +622,6 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
         if not getattr(self, 'product_data', None) and not self.product:
             raise ValueError("Either a 'property' or 'property_data' must be provided.")
 
-
     def _set_property_import_instance(self):
 
         if not self.property and hasattr(self, 'property_data'):
@@ -646,7 +639,6 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
             self.property_import_instance.process()
             self.property = self.property_import_instance.instance
 
-
         if not self.product:
             self.product_import_instance.process()
             self.product = self.product_import_instance.instance
@@ -657,13 +649,11 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
         self.product_property = SimpleNamespace(property=self.property, product=self.product)
         self.set_factory_class()
 
-
     def set_factory_class(self):
-        if self.property.type  in Property.TYPES.TRANSLATED:
+        if self.property.type in Property.TYPES.TRANSLATED:
             self.factory_class = TranslatedProductPropertyImport
         else:
             self.factory_class = ProductPropertyImport
-
 
     def set_value(self):
 
@@ -673,7 +663,7 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
             self.value_float = float(self.value)
         elif self.property.type == Property.TYPES.BOOLEAN:
             self.value_boolean = bool(self.value)
-        elif self.property.type  in [Property.TYPES.DATE, Property.TYPES.DATETIME]:
+        elif self.property.type in [Property.TYPES.DATE, Property.TYPES.DATETIME]:
 
             date_format = '%Y-%m-%d %H:%M:%S'
             parsed_datetime = datetime.strptime(self.value, date_format)
@@ -715,8 +705,6 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
 
                 self.value_multi_select = PropertySelectValue.objects.filter(id__in=ids)
 
-
-
     def process_logic(self):
         fac = self.factory_class(self, self.import_process)
         fac.run()
@@ -730,7 +718,6 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
         ):
             self.create_translation()
 
-
     def create_translation(self):
 
         self.translation = ProductPropertyTextTranslation.objects.create(
@@ -740,7 +727,6 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
             value_text=getattr(self, 'value_text', None),
             value_description=getattr(self, 'value_description', None)
         )
-
 
     def post_process_logic(self):
 

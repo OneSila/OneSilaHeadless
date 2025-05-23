@@ -7,6 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 @db_task()
 def add_task_to_queue(
     *,

@@ -2,6 +2,7 @@ from sales_channels.integrations.shopify.constants import DEFAULT_METAFIELD_NAME
 from sales_channels.models.properties import RemoteProductProperty
 from core import models
 
+
 class ShopifyProductProperty(RemoteProductProperty):
     """
     Shopify-specific model linking a product to a metafield value.

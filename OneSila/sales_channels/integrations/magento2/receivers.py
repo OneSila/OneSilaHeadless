@@ -27,6 +27,7 @@ def sales_channels__magento__property__create(sender, instance, **kwargs):
     task_kwargs = {'property_id': instance.id, 'language': language}
     run_generic_sales_channel_task_flow(create_magento_property_db_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
 
+
 @receiver(update_remote_property, sender='properties.Property')
 def sales_channels__magento__property__update(sender, instance, **kwargs):
     from .tasks import update_magento_property_db_task
@@ -77,6 +78,7 @@ def sales_channels__magento__property_select_value__delete(sender, instance, **k
         remote_class=MagentoPropertySelectValue,
     )
 
+
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
 @receiver(sales_channel_created, sender='sales_channels.SalesChannel')
 @receiver(refresh_website_pull_models, sender='magento2.MagentoSalesChannel')
@@ -100,14 +102,18 @@ def sales_channels__magento__attribute_set__create(sender, instance, **kwargs):
     from .tasks import create_magento_attribute_set_task
 
     task_kwargs = {'rule_id': instance.id}
-    run_generic_sales_channel_task_flow(create_magento_attribute_set_task, multi_tenant_company=instance.multi_tenant_company, number_of_remote_requests=instance.items.all().count() + 1, **task_kwargs)
+    run_generic_sales_channel_task_flow(create_magento_attribute_set_task, multi_tenant_company=instance.multi_tenant_company,
+                                        number_of_remote_requests=instance.items.all().count() + 1, **task_kwargs)
+
 
 @receiver(product_properties_rule_updated, sender='properties.ProductPropertiesRule')
 def sales_channels__magento__attribute_set__update(sender, instance, **kwargs):
     from .tasks import update_magento_attribute_set_task
 
     task_kwargs = {'rule_id': instance.id}
-    run_generic_sales_channel_task_flow(update_magento_attribute_set_task, multi_tenant_company=instance.multi_tenant_company, number_of_remote_requests=instance.items.all().count(), **task_kwargs)
+    run_generic_sales_channel_task_flow(update_magento_attribute_set_task, multi_tenant_company=instance.multi_tenant_company,
+                                        number_of_remote_requests=instance.items.all().count(), **task_kwargs)
+
 
 @receiver(product_properties_rule_rename, sender='properties.ProductPropertiesRule')
 def sales_channels__magento__attribute_set__rename(sender, instance, **kwargs):
@@ -124,6 +130,7 @@ def sales_channels__magento__attribute_set__rename(sender, instance, **kwargs):
         number_of_remote_requests=2,
         **task_kwargs
     )
+
 
 @receiver(pre_delete, sender='properties.ProductPropertiesRule')
 def sales_channels__magento__attribute_set__delete(sender, instance, **kwargs):
@@ -150,6 +157,7 @@ def sales_channels__magento__product_property__create(sender, instance, **kwargs
         product=instance.product,
         **task_kwargs)
 
+
 @receiver(update_remote_product_property, sender='properties.ProductProperty')
 def sales_channels__magento__product_property__update(sender, instance, **kwargs):
     from .tasks import update_magento_product_property_db_task
@@ -161,6 +169,7 @@ def sales_channels__magento__product_property__update(sender, instance, **kwargs
         multi_tenant_company=instance.multi_tenant_company,
         product=instance.product,
         **task_kwargs)
+
 
 @receiver(delete_remote_product_property, sender='properties.ProductProperty')
 def sales_channels__magento__product_property__delete(sender, instance, **kwargs):
@@ -185,6 +194,7 @@ def sales_channels__magento__product_property__delete(sender, instance, **kwargs
 #         product=instance,
 #         **task_kwargs)
 
+
 @receiver(update_remote_price, sender='products.Product')
 def sales_channels__magento__price__update(sender, instance, **kwargs):
     from .tasks import update_magento_price_db_task
@@ -196,6 +206,7 @@ def sales_channels__magento__price__update(sender, instance, **kwargs):
         multi_tenant_company=instance.multi_tenant_company,
         product=instance,
         **task_kwargs)
+
 
 @receiver(update_remote_product_content, sender='products.Product')
 def sales_channels__magento__product_content__update(sender, instance, **kwargs):
@@ -209,6 +220,7 @@ def sales_channels__magento__product_content__update(sender, instance, **kwargs)
         product=instance,
         **task_kwargs)
 
+
 @receiver(update_remote_product_eancode, sender='products.Product')
 def sales_channels__magento__product_eancode__update(sender, instance, **kwargs):
     from .tasks import update_magento_product_eancode_db_task
@@ -220,6 +232,7 @@ def sales_channels__magento__product_eancode__update(sender, instance, **kwargs)
         product=instance,
         **task_kwargs)
 
+
 @receiver(add_remote_product_variation, sender='products.ConfigurableVariation')
 def sales_channels__magento__product_variation__add(sender, parent_product, variation_product, **kwargs):
     from .tasks import add_magento_product_variation_db_task
@@ -229,6 +242,7 @@ def sales_channels__magento__product_variation__add(sender, parent_product, vari
         'variation_product_id': variation_product.id
     }
     run_generic_sales_channel_task_flow(add_magento_product_variation_db_task, multi_tenant_company=parent_product.multi_tenant_company, **task_kwargs)
+
 
 @receiver(remove_remote_product_variation, sender='products.ConfigurableVariation')
 def sales_channels__magento__product_variation__remove(sender, parent_product, variation_product, **kwargs):
@@ -243,6 +257,7 @@ def sales_channels__magento__product_variation__remove(sender, parent_product, v
     }
     run_generic_sales_channel_task_flow(remove_magento_product_variation_db_task, multi_tenant_company=parent_product.multi_tenant_company, **task_kwargs)
 
+
 @receiver(create_remote_image_association, sender='media.MediaProductThrough')
 def sales_channels__magento__media_product_through__create(sender, instance, **kwargs):
     from .tasks import create_magento_image_association_db_task
@@ -254,6 +269,7 @@ def sales_channels__magento__media_product_through__create(sender, instance, **k
         product=instance.product,
         **task_kwargs)
 
+
 @receiver(update_remote_image_association, sender='media.MediaProductThrough')
 def sales_channels__magento__media_product_through__update(sender, instance, **kwargs):
     from .tasks import update_magento_image_association_db_task
@@ -264,6 +280,7 @@ def sales_channels__magento__media_product_through__update(sender, instance, **k
         multi_tenant_company=instance.multi_tenant_company,
         product=instance.product,
         **task_kwargs)
+
 
 @receiver(delete_remote_image_association, sender='media.MediaProductThrough')
 def sales_channels__magento__media_product_through__delete(sender, instance, **kwargs):
@@ -286,6 +303,7 @@ def sales_channels__magento__image__delete(sender, instance, **kwargs):
     task_kwargs = {'image_id': instance.id}
     run_generic_sales_channel_task_flow(delete_magento_image_db_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
 
+
 @receiver(update_remote_product, sender='products.Product')
 def sales_channels__magento__product__update(sender, instance, **kwargs):
     from .tasks import update_magento_product_db_task
@@ -296,6 +314,7 @@ def sales_channels__magento__product__update(sender, instance, **kwargs):
         multi_tenant_company=instance.multi_tenant_company,
         product=instance,
         **task_kwargs)
+
 
 @receiver(sync_remote_product, sender='products.Product')
 def sales_channels__magento__product__sync(sender, instance, **kwargs):
@@ -314,6 +333,7 @@ def sales_channels__magento__product__sync(sender, instance, **kwargs):
         product=instance,
         number_of_remote_requests=number_of_remote_requests,
         **task_kwargs)
+
 
 @receiver(sync_remote_product, sender='sales_channels.RemoteProduct')
 @receiver(sync_remote_product, sender='magento2.MagentoProduct')
@@ -335,6 +355,7 @@ def sales_channels__magento__product__sync(sender, instance, **kwargs):
         number_of_remote_requests=number_of_remote_requests,
         **task_kwargs)
 
+
 @receiver(sales_view_assign_updated, sender='products.Product')
 def sales_channels__magento__assign__update(sender, instance, **kwargs):
     from .tasks import update_magento_sales_view_assign_db_task
@@ -346,6 +367,7 @@ def sales_channels__magento__assign__update(sender, instance, **kwargs):
                                   sales_channels_filter_kwargs={'id': sales_channel.id},
                                   **task_kwargs)
 
+
 @receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
 def sales_channels__magento__product__create(sender, instance, **kwargs):
     from .tasks import create_magento_product_db_task
@@ -355,7 +377,6 @@ def sales_channels__magento__product__create(sender, instance, **kwargs):
 
     if not isinstance(sales_channel, MagentoSalesChannel):
         return
-
 
     if product.type == CONFIGURABLE:
         number_of_remote_requests = 1 + product.get_configurable_variations().count()
@@ -369,6 +390,7 @@ def sales_channels__magento__product__create(sender, instance, **kwargs):
         number_of_remote_requests=number_of_remote_requests,
         sales_channels_filter_kwargs={'id': sales_channel.id},
         **task_kwargs)
+
 
 @receiver(delete_remote_product, sender='sales_channels.SalesChannelViewAssign')
 def sales_channels__magento__product__delete_from_assign(sender, instance, **kwargs):
@@ -404,6 +426,7 @@ def sales_channels__magento__product__delete_from_product(sender, instance, **kw
         is_multiple=True
     )
 
+
 @receiver(create_remote_vat_rate, sender='taxes.VatRate')
 def sales_channels__magento__vat_rate__create(sender, instance, **kwargs):
     from .tasks import create_magento_vat_rate_db_task
@@ -411,12 +434,14 @@ def sales_channels__magento__vat_rate__create(sender, instance, **kwargs):
     task_kwargs = {'vat_rate_id': instance.id}
     run_generic_sales_channel_task_flow(create_magento_vat_rate_db_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
 
+
 @receiver(update_remote_vat_rate, sender='taxes.VatRate')
 def sales_channels__magento__vat_rate__update(sender, instance, **kwargs):
     from .tasks import update_magento_vat_rate_db_task
 
     task_kwargs = {'vat_rate_id': instance.id}
     run_generic_sales_channel_task_flow(update_magento_vat_rate_db_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
+
 
 @receiver(pre_delete, sender='taxes.VatRate')
 def sales_channels__magento__vat_rate__delete(sender, instance, **kwargs):

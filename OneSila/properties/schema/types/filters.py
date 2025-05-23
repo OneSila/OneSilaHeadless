@@ -11,6 +11,7 @@ from products.schema.types.filters import ProductFilter
 from django.db.models import Q
 from strawberry import UNSET
 
+
 @filter(Property)
 class PropertyFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto

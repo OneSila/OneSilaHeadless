@@ -10,6 +10,7 @@ from .products import (
 from .properties import RemoteProperty, RemotePropertySelectValue
 from .taxes import RemoteVat, RemoteCurrency
 
+
 class SalesChannelImport(Import, models.Model):
     """
     Model representing an import process for various sales channel data.
@@ -30,6 +31,7 @@ class ImportProperty(ImportableModel):
     def __str__(self):
         return f"ImportProperty for {self.remote_property}"
 
+
 class ImportPropertySelectValue(ImportableModel):
     """
     Model representing the import process for property select values.
@@ -39,6 +41,7 @@ class ImportPropertySelectValue(ImportableModel):
 
     def __str__(self):
         return f"ImportPropertySelectValue for {self.remote_property_value}"
+
 
 class ImportProduct(ImportableModel):
     """

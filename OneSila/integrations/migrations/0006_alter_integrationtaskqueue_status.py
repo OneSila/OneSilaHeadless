@@ -13,6 +13,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='integrationtaskqueue',
             name='status',
-            field=models.CharField(choices=[('PENDING', 'Pending'), ('PROCESSING', 'Processing'), ('PROCESSED', 'Processed'), ('FAILED', 'Failed'), ('SKIPPED', 'Skipped')], default='PENDING', max_length=10),
+            field=models.CharField(choices=[('PENDING', 'Pending'), ('PROCESSING', 'Processing'), ('PROCESSED', 'Processed'),
+                                   ('FAILED', 'Failed'), ('SKIPPED', 'Skipped')], default='PENDING', max_length=10),
         ),
     ]

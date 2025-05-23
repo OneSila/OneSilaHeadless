@@ -107,7 +107,7 @@ def delete_shopify_product_property_db_task(
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def update_shopify_price_db_task(
-    task_queue_item_id, sales_channel_id, product_id, remote_product_id, currency_id=None):
+        task_queue_item_id, sales_channel_id, product_id, remote_product_id, currency_id=None):
     from .factories.prices import ShopifyPriceUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)

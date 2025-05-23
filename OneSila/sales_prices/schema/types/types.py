@@ -22,6 +22,7 @@ class SalesPriceType(relay.Node, GetQuerysetMultiTenantMixin):
     def real_id(self) -> float | None:
         return self.id
 
+
 @type(SalesPriceList, filters=SalesPriceListFilter, order=SalesPriceListOrder, pagination=True, fields="__all__")
 class SalesPriceListType(relay.Node, GetQuerysetMultiTenantMixin):
     currency: CurrencyType

@@ -77,7 +77,6 @@ class ImportInstanceValidateDataTest(TestCase):
 
         self.assertIn("Either 'internal_name' or 'name' must be provided", str(cm.exception))
 
-
     def test_invalid_boolean_field(self):
         data = {
             "internal_name": "color",
@@ -98,7 +97,6 @@ class ImportPropertyProcessTest(TestCase):
         super().setUp()
         self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
 
-
     def test_process_with_internal_name(self):
 
         properties_cnt = Property.objects.filter(multi_tenant_company=self.multi_tenant_company).count()
@@ -116,7 +114,6 @@ class ImportPropertyProcessTest(TestCase):
         properties_post_import_cnt = Property.objects.filter(multi_tenant_company=self.multi_tenant_company).count()
         self.assertEqual(properties_cnt + 1, properties_post_import_cnt)
 
-
     def test_process_with_name(self):
 
         properties_cnt = Property.objects.filter(multi_tenant_company=self.multi_tenant_company).count()
@@ -132,7 +129,6 @@ class ImportPropertyProcessTest(TestCase):
 
         properties_post_import_cnt = Property.objects.filter(multi_tenant_company=self.multi_tenant_company).count()
         self.assertEqual(properties_cnt + 1, properties_post_import_cnt)
-
 
     def test_edit_is_public_information_internal_name(self):
         data = {
@@ -157,7 +153,6 @@ class ImportPropertyProcessTest(TestCase):
         )
         properties_cnt = Property.objects.filter(multi_tenant_company=self.multi_tenant_company).count()
 
-
         instance = ImportPropertyInstance(data, self.import_process)
         instance.process()
 
@@ -166,7 +161,6 @@ class ImportPropertyProcessTest(TestCase):
 
         existent_property.refresh_from_db()
         self.assertFalse(existent_property.is_public_information)
-
 
     def test_edit_is_public_information_with_translation(self):
         data = {
@@ -188,7 +182,6 @@ class ImportPropertyProcessTest(TestCase):
             name=data.get("name"),
         )
         properties_cnt = Property.objects.filter(multi_tenant_company=self.multi_tenant_company).count()
-
 
         instance = ImportPropertyInstance(data, self.import_process)
         instance.process()
@@ -391,7 +384,6 @@ class ImportProductPropertiesRuleInstanceValidateTest(TestCase):
         # Create a dummy Import instance.
         self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
 
-
     def test_validate_with_value(self):
         """
         Test that valid data (providing a 'value' and a product type) passes validation.
@@ -409,7 +401,7 @@ class ImportProductPropertiesRuleInstanceValidateTest(TestCase):
         Test that if the 'value' key is missing, a ValueError is raised.
         """
         data = {
-           "wrong_key": "something"
+            "wrong_key": "something"
         }
         with self.assertRaises(ValueError) as cm:
             ImportProductPropertiesRuleInstance(data, self.import_process)
@@ -527,7 +519,6 @@ class ImportProductPropertiesRuleInstanceProcessTest(TestCase):
         self.assertEqual(rules_cnt + 1, post_process_rules_cnt)
         self.assertEqual(items_cnt, 2)
 
-
     def test_process_with_require_ean_code(self):
         """
         Provide data with require_ean_code True.
@@ -575,7 +566,7 @@ class ImportProductPropertiesRuleItemInstanceValidateTest(TestCase):
     def test_validate_with_external_rule_and_property(self):
         data = {
             "rule_data": {"dummy": "data"},   # dummy data; actual content not important for validation
-             "property_data": {"name": "Material", "type": "SELECT"}
+            "property_data": {"name": "Material", "type": "SELECT"}
         }
 
         # Providing external property (and rule) should validate.
@@ -620,7 +611,7 @@ class ImportProductPropertiesRuleItemInstanceValidateTest(TestCase):
             "type": "INVALID_TYPE",
             "sort_order": 2,
             "rule_data": {"dummy": "data"},
-             "property_data": {"name": "Material", "type": "SELECT"}
+            "property_data": {"name": "Material", "type": "SELECT"}
         }
 
         with self.assertRaises(ValueError) as cm:
@@ -722,7 +713,6 @@ class ImportProductPropertiesRuleItemInstanceProcessTest(TestCase):
         self.assertIsNotNone(rule.id, self.existing_rule.id)
         self.assertEqual(ProductPropertiesRuleItem.objects.filter(rule=rule).count(), 1)
 
-
     def test_edit_rule_item_using_existing_property_and_rule(self):
         """
         Create an initial rule item, then update its sort_order using rule_data.
@@ -747,7 +737,6 @@ class ImportProductPropertiesRuleItemInstanceProcessTest(TestCase):
         updated_item = instance.instance
         self.assertEqual(updated_item.sort_order, 5)
         self.assertEqual(initial_item_cnt, ProductPropertiesRuleItem.objects.filter(rule=self.existing_rule).count())
-
 
     def test_edit_rule_item_using_existing_property(self):
         """
@@ -857,7 +846,7 @@ class ImportProductPropertyInstanceProcessTest(TestCase):
     def _process_instance(self, prop, value):
         data = {
             "value": value,
-            "property_data": { "name": prop.name },
+            "property_data": {"name": prop.name},
         }
 
         instance = ImportProductPropertyInstance(data, self.import_process, property=prop, product=self.product)
@@ -907,7 +896,6 @@ class ImportProductPropertyInstanceProcessTest(TestCase):
         self.assertIn(select_s.id, values)
         self.assertIn(select_m.id, values)
         self.assertNotIn(select_l.id, values)
-
 
     def test_int_property(self):
         prop = self._create_property("Stock", Property.TYPES.INT)

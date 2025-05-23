@@ -20,12 +20,14 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='address',
             name='created_by_multi_tenant_user',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='%(class)s_created_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT,
+                                    related_name='%(class)s_created_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL),
         ),
         migrations.AddField(
             model_name='address',
             name='last_update_by_multi_tenant_user',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='%(class)s_last_update_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT,
+                                    related_name='%(class)s_last_update_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL),
         ),
         migrations.AddField(
             model_name='address',
@@ -83,7 +85,8 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='company',
             name='created_by_multi_tenant_user',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='%(class)s_created_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT,
+                                    related_name='%(class)s_created_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL),
         ),
         migrations.AddField(
             model_name='company',
@@ -93,7 +96,8 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='company',
             name='last_update_by_multi_tenant_user',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='%(class)s_last_update_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT,
+                                    related_name='%(class)s_last_update_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL),
         ),
         migrations.AddField(
             model_name='company',
@@ -158,12 +162,14 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='person',
             name='created_by_multi_tenant_user',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='%(class)s_created_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT,
+                                    related_name='%(class)s_created_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL),
         ),
         migrations.AddField(
             model_name='person',
             name='last_update_by_multi_tenant_user',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='%(class)s_last_update_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT,
+                                    related_name='%(class)s_last_update_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL),
         ),
         migrations.AddField(
             model_name='person',

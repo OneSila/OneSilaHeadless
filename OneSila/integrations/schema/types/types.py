@@ -28,6 +28,7 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
             return self.access_token is not None
 
         return False
+
     @field()
     def proxy_id(self, info) -> str:
         if isinstance(self, MagentoSalesChannel):

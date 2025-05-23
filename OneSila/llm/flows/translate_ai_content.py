@@ -46,7 +46,7 @@ class AITranslateContentFlow:
             to_translate=self.to_translate,
             from_language_code=self.from_language_code,
             to_language_code=self.to_language_code,
-             multi_tenant_company=self.multi_tenant_company)
+            multi_tenant_company=self.multi_tenant_company)
 
     def translate_content(self):
         translated_str = self.factory.translate()
@@ -162,7 +162,6 @@ class BulkAiTranslateContentFlow:
                     if not created and existing_value and not self.override_translation:
                         continue
 
-
                     setattr(translation, assign_field, flow.translated_content)
                     translation.save()
 
@@ -170,7 +169,6 @@ class BulkAiTranslateContentFlow:
 
                 except Exception:
                     pass
-
 
     def translate_properties(self):
 
@@ -183,7 +181,6 @@ class BulkAiTranslateContentFlow:
             assign_field='name'
         )
 
-
     def translate_values(self):
 
         self._translate_generic_entities(
@@ -194,7 +191,6 @@ class BulkAiTranslateContentFlow:
             get_or_create_field='propertyselectvalue',
             assign_field='value'
         )
-
 
     def run(self):
         self.translate_products()

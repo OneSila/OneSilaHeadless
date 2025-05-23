@@ -1,5 +1,6 @@
 from core import models
 
+
 class AbstractAiProcess(models.Model):
     transaction = models.ForeignKey('billing.AiPointTransaction', on_delete=models.CASCADE)
     prompt = models.TextField()
@@ -13,6 +14,7 @@ class AbstractAiProcess(models.Model):
     class Meta:
         abstract = True
 
+
 class AiGenerateProcess(AbstractAiProcess):
     product = models.ForeignKey('products.Product', on_delete=models.SET_NULL, null=True)
 
@@ -25,9 +27,9 @@ class AiTranslationProcess(AbstractAiProcess):
     from_language_code = models.CharField(max_length=10)
     to_language_code = models.CharField(max_length=10)
 
-
     def __str__(self):
         return f"Translation from {self.from_language_code} to {self.to_language_code} - Cost: {self.cost}"
+
 
 class AiImportProcess(AbstractAiProcess):
     PROPERTY_TYPE_DETECTOR = 'PROPERTY_TYPE_DETECTOR'

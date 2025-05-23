@@ -66,6 +66,7 @@ def delete_magento_property_db_task(task_queue_item_id, sales_channel_id, remote
     from .factories.properties.properties import MagentoPropertyDeleteFactory
 
     task = BaseRemoteTask(task_queue_item_id)
+
     def actual_task():
         sales_channel = MagentoSalesChannel.objects.get(id=sales_channel_id)
 
@@ -82,6 +83,7 @@ def create_magento_property_select_value_task(task_queue_item_id, sales_channel_
     from .factories.properties.properties import MagentoPropertySelectValueCreateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
+
     def actual_task():
         factory_kwargs = {}
         if language:
@@ -104,6 +106,7 @@ def update_magento_property_select_value_task(task_queue_item_id, sales_channel_
     from .factories.properties.properties import MagentoPropertySelectValueUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
+
     def actual_task():
         factory_kwargs = {}
         if language:
@@ -126,6 +129,7 @@ def delete_magento_property_select_value_task(task_queue_item_id, sales_channel_
     from .factories.properties.properties import MagentoPropertySelectValueDeleteFactory
 
     task = BaseRemoteTask(task_queue_item_id)
+
     def actual_task():
         sales_channel = MagentoSalesChannel.objects.get(id=sales_channel_id)
 
@@ -145,6 +149,7 @@ def pull_magento_sales_channel_views_task(task_queue_item_id, sales_channel_id):
     from .factories.sales_channels.views import MagentoSalesChannelViewPullFactory
 
     task = BaseRemoteTask(task_queue_item_id)
+
     def actual_task():
         sales_channel = MagentoSalesChannel.objects.get(id=sales_channel_id)
         factory = MagentoSalesChannelViewPullFactory(sales_channel=sales_channel)
@@ -152,7 +157,8 @@ def pull_magento_sales_channel_views_task(task_queue_item_id, sales_channel_id):
 
     task.execute(actual_task)
 
-@remote_task(priority=LOW_PRIORITY,number_of_remote_requests=2)
+
+@remote_task(priority=LOW_PRIORITY, number_of_remote_requests=2)
 @db_task()
 def pull_magento_languages_task(task_queue_item_id, sales_channel_id):
     """
@@ -161,6 +167,7 @@ def pull_magento_languages_task(task_queue_item_id, sales_channel_id):
     from .factories.sales_channels.languages import MagentoRemoteLanguagePullFactory
 
     task = BaseRemoteTask(task_queue_item_id)
+
     def actual_task():
         sales_channel = MagentoSalesChannel.objects.get(id=sales_channel_id)
         factory = MagentoRemoteLanguagePullFactory(sales_channel=sales_channel)
@@ -186,6 +193,7 @@ def create_magento_attribute_set_task(task_queue_item_id, sales_channel_id, rule
 
     task.execute(actual_task)
 
+
 @remote_task(priority=HIGH_PRIORITY)
 @db_task()
 def update_magento_attribute_set_task(task_queue_item_id, sales_channel_id, rule_id, update_name_only=False):
@@ -205,6 +213,7 @@ def update_magento_attribute_set_task(task_queue_item_id, sales_channel_id, rule
         )
 
     task.execute(actual_task)
+
 
 @remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=2)
 @db_task()
@@ -289,6 +298,7 @@ def update_magento_product_property_db_task(task_queue_item_id, sales_channel_id
 
     task.execute(actual_task)
 
+
 @remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=2)
 @db_task()
 def delete_magento_product_property_db_task(task_queue_item_id, sales_channel_id, remote_product_id, remote_instance_id):
@@ -309,6 +319,7 @@ def delete_magento_product_property_db_task(task_queue_item_id, sales_channel_id
         factory.run()
 
     task.execute(actual_task)
+
 
 @remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
 @db_task()
@@ -360,6 +371,7 @@ def update_magento_product_content_db_task(task_queue_item_id, sales_channel_id,
 
     task.execute(actual_task)
 
+
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def update_magento_product_eancode_db_task(task_queue_item_id, sales_channel_id, product_id, remote_product_id):
@@ -377,6 +389,7 @@ def update_magento_product_eancode_db_task(task_queue_item_id, sales_channel_id,
         )
 
     task.execute(actual_task)
+
 
 @remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=2)
 @db_task()
@@ -397,6 +410,7 @@ def add_magento_product_variation_db_task(task_queue_item_id, sales_channel_id, 
         )
 
     task.execute(actual_task)
+
 
 @remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
 @db_task()
@@ -437,6 +451,7 @@ def remove_magento_product_variation_db_task(task_queue_item_id, sales_channel_i
             pass
 
     task.execute(actual_task)
+
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
@@ -491,8 +506,8 @@ def delete_magento_image_association_db_task(task_queue_item_id, sales_channel_i
         remote_instance = MagentoImageProductAssociation.objects.get(id=remote_instance_id)
 
         factory_kwargs = {
-            'remote_instance':remote_instance,
-            'local_instance':remote_instance.local_instance,
+            'remote_instance': remote_instance,
+            'local_instance': remote_instance.local_instance,
             'sales_channel': sales_channel,
             'remote_product': MagentoProduct.objects.get(id=remote_product_id)
         }
@@ -500,6 +515,7 @@ def delete_magento_image_association_db_task(task_queue_item_id, sales_channel_i
         factory.run()
 
     task.execute(actual_task)
+
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
@@ -518,6 +534,7 @@ def delete_magento_image_db_task(task_queue_item_id, sales_channel_id, image_id)
         )
 
     task.execute(actual_task)
+
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
@@ -552,7 +569,6 @@ def sync_magento_product_db_task(task_queue_item_id, sales_channel_id, product_i
         )
         factory.run()
 
-
     task.execute(actual_task)
 
 
@@ -563,6 +579,7 @@ def update_magento_sales_view_assign_db_task(task_queue_item_id, sales_channel_i
     from products.models import Product
 
     task = BaseRemoteTask(task_queue_item_id)
+
     def actual_task():
         run_generic_sales_channel_factory(
             sales_channel_id=sales_channel_id,
@@ -572,6 +589,7 @@ def update_magento_sales_view_assign_db_task(task_queue_item_id, sales_channel_i
         )
 
     task.execute(actual_task)
+
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=2)
 @db_task()
@@ -588,6 +606,7 @@ def delete_magento_product_db_task(task_queue_item_id, sales_channel_id, remote_
         factory.run()
 
     task.execute(actual_task)
+
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
@@ -626,6 +645,7 @@ def update_magento_vat_rate_db_task(task_queue_item_id, sales_channel_id, vat_ra
 
     task.execute(actual_task)
 
+
 @db_task()
 def magento_import_db_task(import_process, sales_channel):
     from sales_channels.integrations.magento2.factories.imports import MagentoImportProcessor
@@ -633,11 +653,12 @@ def magento_import_db_task(import_process, sales_channel):
     fac = MagentoImportProcessor(import_process=import_process, sales_channel=sales_channel)
     fac.run()
 
+
 @periodic_task(crontab(minute=0, hour=2))
 def magento_pull_remote_orders_db_task():
     from sales_channels.flows.puill_orders import pull_generic_orders_flow
 
-    from  .factories.orders.orders import MagentoOrderPullFactory
+    from .factories.orders.orders import MagentoOrderPullFactory
     from .models.sales_channels import MagentoSalesChannel
 
     pull_generic_orders_flow(sales_channel_class=MagentoSalesChannel, factory=MagentoOrderPullFactory)

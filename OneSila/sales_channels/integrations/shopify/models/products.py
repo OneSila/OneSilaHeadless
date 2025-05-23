@@ -8,6 +8,7 @@ from sales_channels.models.products import (
     RemoteEanCode,
 )
 
+
 class ShopifyProduct(RemoteProduct):
     """
     Shopify-specific model for remote products, inheriting from the general RemoteProduct.

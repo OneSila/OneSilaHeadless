@@ -1,6 +1,7 @@
 from core.managers import MultiTenantManager, MultiTenantQuerySet
 from polymorphic.managers import PolymorphicManager, PolymorphicQuerySet
 
+
 class RemoteProductConfiguratorQuerySet(PolymorphicQuerySet, MultiTenantQuerySet):
     """
     QuerySet for RemoteProductConfigurator with multitenancy and polymorphic support.
@@ -33,6 +34,7 @@ class RemoteProductConfiguratorQuerySet(PolymorphicQuerySet, MultiTenantQuerySet
         configurator.save()
 
         return configurator
+
 
 class RemoteProductConfiguratorManager(PolymorphicManager, MultiTenantManager):
     """

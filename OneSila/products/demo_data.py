@@ -3,8 +3,7 @@ from pathlib import Path
 from core.demo_data import DemoDataLibrary, PrivateStructuredDataGenerator, fake, CreatePrivateDataRelationMixin
 from core.models import MultiTenantCompany, MultiTenantUser
 from media.models import MediaProductThrough, Media
-from products.models import (ProductTranslation, Product, BundleProduct, SimpleProduct,  BundleVariation
-, ConfigurableProduct, ConfigurableVariation)
+from products.models import (ProductTranslation, Product, BundleProduct, SimpleProduct, BundleVariation, ConfigurableProduct, ConfigurableVariation)
 from properties.models import Property, PropertySelectValue, ProductProperty
 from taxes.models import VatRate
 from units.models import Unit
@@ -221,7 +220,8 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
 
         # Assign Product Type
         product_type = self.get_product_type("Chair" if "CHAIR" in instance.sku else "Table" if "TABLE" in instance.sku else "Bed")
-        product_type_property = ProductProperty.objects.create(product=instance, property=product_type.property, value_select=product_type, multi_tenant_company=self.multi_tenant_company)
+        product_type_property = ProductProperty.objects.create(
+            product=instance, property=product_type.property, value_select=product_type, multi_tenant_company=self.multi_tenant_company)
 
         self.create_demo_data_relation(product_type_property)
 
@@ -234,7 +234,8 @@ class SimpleProductDataGenerator(PostDataTranslationMixin, ProductGetDataMixin, 
 
         for prop_name, value in properties.items():
             if value:
-                product_property = ProductProperty.objects.create(product=instance, property=value.property, value_select=value, multi_tenant_company=self.multi_tenant_company)
+                product_property = ProductProperty.objects.create(product=instance, property=value.property,
+                                                                  value_select=value, multi_tenant_company=self.multi_tenant_company)
                 self.create_demo_data_relation(product_property)
 
         # Assign Usage (Multi-Select Property)

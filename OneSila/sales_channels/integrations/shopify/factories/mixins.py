@@ -13,6 +13,7 @@ class GetShopifyApiMixin:
 
     def preflight_process(self):
         pass
+
     def get_api(self):
         # Configure your app credentials (once per process)
         shopify.Session.setup(
@@ -35,6 +36,7 @@ class GetShopifyApiMixin:
         """
         shopify.ShopifyResource.clear_session()
         self.api = None
+
 
 class RemoteValueMixin:
     def get_remote_value(self):
@@ -125,6 +127,7 @@ class ShopifyMetafieldMixin:
             value = str(raw_value)
 
         return namespace, key, value, shopify_type
+
 
 class ShopifyMediaPayloadMixin:
     def prepare_media_payload(self):

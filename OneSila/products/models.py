@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Product(TranslatedModelMixin, models.Model):
-    from products.product_types import CONFIGURABLE, BUNDLE, SIMPLE,  PRODUCT_TYPE_CHOICES, ALIAS, HAS_PRICES_TYPES
+    from products.product_types import CONFIGURABLE, BUNDLE, SIMPLE, PRODUCT_TYPE_CHOICES, ALIAS, HAS_PRICES_TYPES
 
     # Mandatory
     sku = models.CharField(max_length=256, db_index=True, blank=True, null=True)
@@ -412,6 +412,7 @@ class SimpleProduct(Product):
         proxy = True
         search_terms = ['sku']
 
+
 class AliasProduct(Product):
     from .product_types import ALIAS
 
@@ -421,6 +422,7 @@ class AliasProduct(Product):
     class Meta:
         proxy = True
         search_terms = ['sku']
+
 
 class ConfigurableVariation(models.Model):
     parent = models.ForeignKey('Product', on_delete=models.CASCADE, related_name="configurablevariation_through_parents")

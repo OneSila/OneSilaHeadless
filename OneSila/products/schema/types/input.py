@@ -2,6 +2,7 @@ from core.schema.core.types.input import NodeInput, input, partial
 from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
     ProductTranslation, ConfigurableVariation, BundleVariation
 
+
 @input(Product, fields="__all__")
 class ProductInput:
     name: str
@@ -12,6 +13,7 @@ class ProductInput:
 @partial(Product, fields="__all__")
 class ProductPartialInput(NodeInput):
     pass
+
 
 @input(BundleProduct, fields="__all__")
 class BundleProductInput:

@@ -11,10 +11,12 @@ class PropertyOrder:
     type: auto
     created_at: auto
 
+
 @order(PropertySelectValue)
 class PropertySelectValueOrder:
     id: auto
     created_at: auto
+
 
 @order(PropertySelectValueTranslation)
 class PropertySelectValueTranslationOrder:
@@ -45,6 +47,7 @@ class ProductPropertiesRuleOrder:
     id: auto
     product_type: auto
     created_at: auto
+
 
 @order(ProductPropertiesRuleItem)
 class ProductPropertiesRuleItemOrder:

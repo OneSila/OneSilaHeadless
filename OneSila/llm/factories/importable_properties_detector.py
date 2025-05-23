@@ -20,36 +20,36 @@ class DetectRealProductAttributesLLM(AskGPTMixin, CalculateCostMixin, CreateTran
     def system_prompt(self):
         return """
             You are an AI assistant for a Product Information Management (PIM) system.
-            
+
             You are given a list of product attributes. Each attribute has:
             - a `label` (string) — the name of the attribute
             - optional `extra_info` — a dictionary with additional metadata about the attribute
             - an `index` — the attribute’s position in the original list
-            
+
             Your task is to determine which of these attributes should be imported into the PIM system.
-            
+
             Only mark an attribute for import if it describes **real, customer-relevant, product-specific information**, such as:
-            
+
             - Physical characteristics (e.g. Width, Size, Seat Depth, Weight)
             - Visual characteristics (e.g. Color, Material, Design)
             - Origin and branding (e.g. Brand, Manufacturer, Country of Origin)
             - Functional or distinguishing traits (e.g. Organic, Expiration Date, Number of Seats)
-            
+
             Do **not** import:
             - System/internal attributes (e.g. IDs, SKUs, layout options, technical flags, product name)
             - Pricing and stock info (e.g. Price, Cost, Quantity, Enable/Disable)
             - Meta or SEO fields (e.g. Meta Title, URL Key)
             - Media/image-only fields (e.g. Base Image, Gallery, Thumbnail)
-            
+
             ### Output:
             GIVE ONLY THE IMPORTED TRUE ONES!!!
             Return a **JSON array** like this:
-            
+
             [
               {
                 "id": <id>,
                 "label": "<label>",
-                "imported": true | false 
+                "imported": true | false
               }
             ]
         """.strip()
