@@ -20,3 +20,6 @@ def retry_integration_task(request, task_id):
 
 class IntegrationListView(EmptyTemplateView):
     pass
+
+class ShopifyIntegrationDetailView(EmptyTemplateView):
+    pass

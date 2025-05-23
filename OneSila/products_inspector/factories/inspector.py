@@ -2,7 +2,7 @@ from django.db import transaction
 from django.db.models import Q
 from products_inspector.constants import blocks, REQUIRED, OPTIONAL, NONE
 from products_inspector.models import Inspector, InspectorBlock
-from products.product_types import SIMPLE, BUNDLE, CONFIGURABLE
+from products.product_types import SIMPLE, BUNDLE, CONFIGURABLE, ALIAS
 import logging
 
 from products_inspector.signals import inspector_missing_info_detected, inspector_missing_info_resolved, inspector_missing_optional_info_detected, \
@@ -72,6 +72,7 @@ class ResyncInspectorFactory(SaveInspectorMixin):
         self.inspector = inspector
         self.product = inspector.product
         self.blocks = self._get_ordered_blocks()
+
 
     def _get_ordered_blocks(self):
         """
@@ -155,7 +156,11 @@ class InspectorCreateOrUpdateFactory(SaveInspectorMixin):
             BUNDLE: 'bundle_product_applicability',
             CONFIGURABLE: 'configurable_product_applicability',
         }
-        return product_type_map.get(self.product.type)
+
+        if self.product.type == ALIAS:
+            return product_type_map.get(self.product.alias_parent_product.type)
+        else:
+            return product_type_map.get(self.product.type)
 
     def _clear_blocks(self):
 

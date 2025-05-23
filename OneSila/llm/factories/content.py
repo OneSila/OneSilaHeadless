@@ -4,7 +4,7 @@ from .mixins import ContentLLMMixin, AskGPTMixin
 class DescriptionGenLLM(ContentLLMMixin):
     """
     The product should not be changed, only yield the html result at the end of the process.
-    """    
+    """
     @property
     def description_example(self):
         # Make sure you respect the markdown code!
@@ -21,7 +21,7 @@ class DescriptionGenLLM(ContentLLMMixin):
             <br>On the inside, we've chosen a beautiful fleece-style terry cloth which is highly water absorbent for those rainy days when your doggy gets wet when walking. This carrier will absorb that water.  Trust us when we say that many dogs sleep in this bag instead of their beds.
             <br>
             <br><b>Adjustable shoulder straps.</b>
-            <br>To support you and your doggy during those long walks, we've made sure that you can carry the bag both on your shoulder and crossbody with the use of adjustable shoulder straps.  
+            <br>To support you and your doggy during those long walks, we've made sure that you can carry the bag both on your shoulder and crossbody with the use of adjustable shoulder straps.
             <br>
             <br><b>3 Core cushion for optimal support</b>
             <br>One of our carriers' most critical parts, which sets us apart from the competition, is our unique carrier-cushion. With its three layers, your doggy's back is kept straight with the rigid base. The core foam makes sure that the cushion doesn't become flat or soggy over time. And the final top layer is a super soft top for pure comfort.
@@ -37,7 +37,7 @@ class DescriptionGenLLM(ContentLLMMixin):
                 <li data-list="bullet">Yorkshire Terrier</li>
                 <li data-list="bullet">Chinese Crested</li>
             </ol>
-      
+
             <b>Medium - 15.75" x 10.0" x 11.25"</b><br>
             Dogs from 10 lbs to 20 lbs, eg:
             <ol>
@@ -47,7 +47,7 @@ class DescriptionGenLLM(ContentLLMMixin):
                 <li data-list="bullet">Pomeranian</li>
                 <li data-list="bullet">Shi Tzu</li>
             </ol>
-      
+
             <b>Large - 17.75" x 11.25" x 12.75"</b><br>
             Dogs like:
             <ol>
@@ -56,10 +56,10 @@ class DescriptionGenLLM(ContentLLMMixin):
                 <li data-list="bullet">Cocker Spaniel</li>
                 <li data-list="bullet">French Buldog</li>
             </ol>
-                
+
 
             <h3>Additional Product Information</h3>
-            <ol>    
+            <ol>
                 <li data-list="bullet"><b>Brand:</b> Suzy's</li>
                 <li data-list="bullet"><b>Product Type:</b> Dog Carrier</li>
                 <li data-list="bullet"><b>Adjustable straps:</b> True</li>
@@ -87,7 +87,7 @@ class DescriptionGenLLM(ContentLLMMixin):
         - **Image Analysis:** If images are provided, examine them for additional product details (e.g., color, design, materials, branding elements, key visual features).
         - **Language Compliance:** Generate the description in the language specified by `language_code`, ensuring proper grammar and clarity.
 
-        ⚠️ **Do NOT** start the text with the product name or a title. Instead, begin with an engaging introduction that naturally leads into the product details.  
+        ⚠️ **Do NOT** start the text with the product name or a title. Instead, begin with an engaging introduction that naturally leads into the product details.
         ⚠️ **Do NOT** include image URLs in the response under any conditions.
 
         ---
@@ -118,7 +118,7 @@ class DescriptionGenLLM(ContentLLMMixin):
 
         ## 4. Example Output (language_code = `"en"`)
         {self.description_example}
-        
+
         ---
 
         ## 5. Additional Processing Guidelines
@@ -138,10 +138,10 @@ class DescriptionGenLLM(ContentLLMMixin):
 
         ##Product name##
         {self.product_name}
-        
+
         ##Product attributes##
         {self.property_values}
-        
+
         ##Product Images##
         {self.images}
 
@@ -190,56 +190,56 @@ class ShortDescriptionLLM(DescriptionGenLLM):
 
         ---
 
-        ## **1. Input Considerations**  
-        - **Product Information & Attributes:** Carefully analyze all text-based input, including specifications, features, benefits, and selling points.  
-        - **Image Analysis:** If images are provided, examine them for additional product details (e.g., color, design, materials, branding elements, key visual features).  
-        - **Language Compliance:** Generate the description in the language specified by `language_code`, ensuring proper grammar and clarity.  
+        ## **1. Input Considerations**
+        - **Product Information & Attributes:** Carefully analyze all text-based input, including specifications, features, benefits, and selling points.
+        - **Image Analysis:** If images are provided, examine them for additional product details (e.g., color, design, materials, branding elements, key visual features).
+        - **Language Compliance:** Generate the description in the language specified by `language_code`, ensuring proper grammar and clarity.
 
-        ⚠️ **Output must be strictly one of the following formats:**  
+        ⚠️ **Output must be strictly one of the following formats:**
         - **Flat text (plain text, no markdown, no HTML tags at all)**
-        - **Basic HTML (fully formatted, no plain text mixed in)**  
+        - **Basic HTML (fully formatted, no plain text mixed in)**
 
-        ⚠️ **DO NOT mix flat text with HTML in the same response.**  
-        ⚠️ **DO NOT use markdown.**  
-
-        ---
-
-        ## **2. HTML Formatting Rules (if HTML is required)**  
-        - **Use proper structure and clean formatting:**  
-          - **Key Features Section:** `<h3>`  
-          - **Bullet Points for Features & Specs:** `<ol><li data-list="bullet">`  
-          - **Text Emphasis for Clarity:**  
-            - **Bold (`<b>`)** for critical details  
-            - *Italics (`<i>`)* for descriptive emphasis  
-            - __Underlined (`<u>`)__ for key highlights  
-        - **Ensure compatibility with PIM integration** by maintaining a clean, structured output.  
-        - **Do NOT include** `<html>`, `<head>`, or `<body>` tags.  
-        - **Do NOT include markdown.  
+        ⚠️ **DO NOT mix flat text with HTML in the same response.**
+        ⚠️ **DO NOT use markdown.**
 
         ---
 
-        ## **3. Flat Text Formatting Rules (if plain text is required)**  
-        - **Write in complete sentences.**  
-        - **Use bullet points or paragraph-based formatting, depending on the context.**  
-        - **DO NOT include any HTML tags or markdown** or special formatting.  
+        ## **2. HTML Formatting Rules (if HTML is required)**
+        - **Use proper structure and clean formatting:**
+          - **Key Features Section:** `<h3>`
+          - **Bullet Points for Features & Specs:** `<ol><li data-list="bullet">`
+          - **Text Emphasis for Clarity:**
+            - **Bold (`<b>`)** for critical details
+            - *Italics (`<i>`)* for descriptive emphasis
+            - __Underlined (`<u>`)__ for key highlights
+        - **Ensure compatibility with PIM integration** by maintaining a clean, structured output.
+        - **Do NOT include** `<html>`, `<head>`, or `<body>` tags.
+        - **Do NOT include markdown.
 
         ---
 
-        ## **4. Style & Tone**  
-        - **Engaging & Persuasive:** Highlight key benefits and competitive advantages.  
-        - **Concise yet Detailed:** Provide essential information in an easy-to-read format.  
-        - **Industry-Appropriate Tone:** Adjust language based on the product category (e.g., technical for electronics, lifestyle-focused for fashion).  
-        - **DO NOT start the description with the product name or a title.**  
+        ## **3. Flat Text Formatting Rules (if plain text is required)**
+        - **Write in complete sentences.**
+        - **Use bullet points or paragraph-based formatting, depending on the context.**
+        - **DO NOT include any HTML tags or markdown** or special formatting.
 
         ---
 
-        ## **5. Example Outputs**  
+        ## **4. Style & Tone**
+        - **Engaging & Persuasive:** Highlight key benefits and competitive advantages.
+        - **Concise yet Detailed:** Provide essential information in an easy-to-read format.
+        - **Industry-Appropriate Tone:** Adjust language based on the product category (e.g., technical for electronics, lifestyle-focused for fashion).
+        - **DO NOT start the description with the product name or a title.**
 
-        ### ✅ **Correct Flat Text Output** (if text format is required):  
+        ---
+
+        ## **5. Example Outputs**
+
+        ### ✅ **Correct Flat Text Output** (if text format is required):
         {self.description_example_flat}
         ---
 
-        ### ✅ **Correct HTML Output** (if HTML format is required):  
+        ### ✅ **Correct HTML Output** (if HTML format is required):
         {self.description_example_html}
         ---
         ### 🚫 Incorrect Output (Mixing Text & HTML):
@@ -250,10 +250,7 @@ class ShortDescriptionLLM(DescriptionGenLLM):
         ## 6. Additional Processing Guidelines
 
         ✅Follow the format required (Flat Text OR HTML, never both).
-        ✅Ensure consistency and completeness: If any product details are missing, infer logically based on available data and image analysis.  
+        ✅Ensure consistency and completeness: If any product details are missing, infer logically based on available data and image analysis.
         ✅Start with an engaging sentence that introduces benefits rather than the product name or title.
         ✅Ensure compatibility with PIM integration** by maintaining a **clean, structured, and well-written output**
         """
-
-
-

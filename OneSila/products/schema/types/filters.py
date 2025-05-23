@@ -8,7 +8,7 @@ from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin, lazy
 from strawberry_django import filter_field as custom_filter
 from products.models import Product, BundleProduct, ConfigurableProduct, \
-    SimpleProduct, ProductTranslation, ConfigurableVariation, BundleVariation
+    SimpleProduct, ProductTranslation, ConfigurableVariation, BundleVariation, AliasProduct
 from products_inspector.models import InspectorBlock
 from taxes.schema.types.filters import VatRateFilter
 from strawberry.relay import from_base64
@@ -67,6 +67,14 @@ class SimpleProductFilter(SearchFilterMixin):
     vat_rate: Optional[VatRateFilter]
 
 
+@filter(AliasProduct)
+class AliasProductFilter(SearchFilterMixin):
+    id: auto
+    sku: auto
+    vat_rate: Optional[VatRateFilter]
+    alias_parent_product: Optional[ProductFilter]
+
+
 @filter(ProductTranslation)
 class ProductTranslationFilter:
     id: auto
@@ -85,3 +93,4 @@ class ConfigurableVariationFilter:
 class BundleVariationFilter:
     id: auto
     parent: Optional[ProductFilter]
+    variation: Optional[ProductFilter]

@@ -3,7 +3,7 @@ import json
 
 from media.models import MediaProductThrough, Media
 from products.models import Product
-from properties.models import ProductProperty
+from properties.models import ProductProperty, Property
 from sales_channels.exceptions import SwitchedToCreateException, SwitchedToSyncException
 from sales_channels.factories.products.products import (
     RemoteProductSyncFactory,
@@ -74,6 +74,9 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         self.variant_payload['inventoryItem']['sku'] = self.local_instance.sku
         self.variant_payload['inventoryItem']['tracked'] = True
 
+    def set_variation_sku(self):
+        self.set_sku()
+
     def set_active(self):
         self.payload['status'] = ACTIVE_STATUS if self.local_instance.active else NON_ACTIVE_STATUS
 
@@ -108,7 +111,6 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         super().build_payload()
         self.set_price()
         self.set_active()
-        self.set_sku()
         self.set_allow_backorder()
         self.set_product_type()
         self.set_ean_code()
@@ -259,7 +261,13 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
             })
 
             if fac.local_instance.property.add_to_filters:
-                self.tags.append(fac.value)
+                if product_property.property.type == Property.TYPES.MULTISELECT:
+                    values = json.loads(fac.value) if isinstance(fac.value, str) else fac.value
+                    for v in values:
+                        self.tags.append(v)
+
+                else:
+                    self.tags.append(fac.value)
 
         try:
             remote_property = self.remote_product_property_class.objects.get(

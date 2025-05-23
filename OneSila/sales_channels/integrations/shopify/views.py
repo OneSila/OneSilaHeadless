@@ -6,7 +6,10 @@ from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
+from strawberry.relay import to_base64
+
 from sales_channels.integrations.shopify.models import ShopifySalesChannel, ShopifySalesChannelView
+from sales_channels.integrations.shopify.schema.types.types import ShopifySalesChannelType
 from sales_channels.signals import refresh_website_pull_models
 import logging
 import json
@@ -29,8 +32,8 @@ def shopify_auth_start(request):
 
     # Build the redirect URI dynamically
     redirect_uri = request.build_absolute_uri(reverse('shopify:shopify_oauth_callback'))
-    if settings.DEBUG:
-        redirect_uri = settings.SHOPIFY_TEST_REDIRECT_URI
+    # if settings.DEBUG:
+    #     redirect_uri = settings.SHOPIFY_TEST_REDIRECT_URI
 
     # Create permission URL
     session = shopify.Session(shop, settings.SHOPIFY_API_VERSION)
@@ -72,7 +75,8 @@ def shopify_auth_callback(request):
     shopify.ShopifyResource.activate_session(session)
     try:
         shop_info = shopify.Shop.current()
-        return redirect(reverse("integrations:integrations_list"))
+        id_encoded = to_base64(ShopifySalesChannelType, sales_channel.id)
+        return redirect(reverse("integrations:shopify_integration_detail", kwargs={"id": id_encoded}))
     finally:
         shopify.ShopifyResource.clear_session()
 

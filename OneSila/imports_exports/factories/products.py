@@ -10,7 +10,7 @@ from imports_exports.factories.media import ImportImageInstance
 from imports_exports.factories.mixins import AbstractImportInstance, ImportOperationMixin
 from imports_exports.factories.properties import ImportProductPropertiesRuleInstance, ImportProductPropertyInstance
 from media.models import Image, MediaProductThrough
-from products.models import Product, ProductTranslation
+from products.models import Product, ProductTranslation, ConfigurableVariation, BundleVariation
 from properties.models import Property, ProductPropertiesRuleItem, ProductProperty
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
@@ -19,6 +19,10 @@ from currencies.currencies import iso_list
 
 class ProductImport(ImportOperationMixin):
     get_identifiers = ['sku', 'type']
+
+
+class AliasProductImport(ImportOperationMixin):
+    get_identifiers = ['sku', 'type', 'alias_parent_product']
 
 
 class ProductTranslationImport(ImportOperationMixin):
@@ -50,6 +54,7 @@ class ImportProductInstance(AbstractImportInstance):
         self.set_field_if_exists('use_vat_rate_name')
         self.set_field_if_exists('ean_code')
         self.set_field_if_exists('allow_backorder')
+        self.set_field_if_exists('alias_parent_product')
 
         # it's the rule
         self.set_field_if_exists('product_type')
@@ -61,12 +66,25 @@ class ImportProductInstance(AbstractImportInstance):
         self.set_field_if_exists('prices')
 
         self.set_field_if_exists('variations')
+        self.set_field_if_exists('bundle_variations')
+        self.set_field_if_exists('alias_variations')
         self.set_field_if_exists('configurator_select_values')
 
         # used to help remote imports
         self.set_field_if_exists('__image_index_to_remote_id')
         self.set_field_if_exists('__mirror_product_properties_map')
         self.set_field_if_exists('__variation_sku_to_id_map')
+
+        if self.type == Product.ALIAS and not hasattr(self, 'alias_parent_product'):
+            alias_sku = self.data.get('alias_parent_sku')
+            if alias_sku:
+                alias_parent_product = Product.objects.filter(
+                    sku=alias_sku,
+                    multi_tenant_company=self.multi_tenant_company
+                ).first()
+
+                if alias_parent_product:
+                    self.alias_parent_product = alias_parent_product
 
         self.validate()
 
@@ -82,6 +100,8 @@ class ImportProductInstance(AbstractImportInstance):
         self.image_instances = Image.objects.none()
         self.images_associations_instances = MediaProductThrough.objects.none()
         self.variations_products_instances = Product.objects.none()
+        self.bundle_variations_instances = Product.objects.none()
+        self.alias_variations_instances = Product.objects.none()
 
     @property
     def local_class(self):
@@ -98,7 +118,7 @@ class ImportProductInstance(AbstractImportInstance):
         if not hasattr(self, 'name'):
             raise ValueError("The 'name' field is required.")
 
-        if hasattr(self, 'type') and self.type not in [Product.SIMPLE, Product.CONFIGURABLE]:
+        if hasattr(self, 'type') and self.type not in [Product.SIMPLE, Product.CONFIGURABLE, Product.BUNDLE, Product.ALIAS]:
             raise ValueError("Invalid 'type' value.")
 
     def _set_vat_rate(self):
@@ -223,7 +243,12 @@ class ImportProductInstance(AbstractImportInstance):
         self._set_translations()
 
     def process_logic(self):
-        fac = ProductImport(self, self.import_process)
+
+        if self.type == Product.ALIAS:
+            fac = AliasProductImport(self, self.import_process)
+        else:
+            fac = ProductImport(self, self.import_process)
+
         fac.run()
 
         # Save the created/updated instance.
@@ -321,8 +346,40 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.variations_products_instances = Product.objects.filter(id__in=variation_products_ids)
 
-    def set_rule_product_property(self):
+    def set_bundle_variations(self):
+        from .variations import ImportBundleVariationInstance
 
+        variation_products_ids = []
+
+        if hasattr(self, 'bundle_variations'):
+            for variation_data in self.bundle_variations:
+                variation_import = ImportBundleVariationInstance(
+                    variation_data,
+                    import_process=self.import_process,
+                    bundle_product=self.instance,
+                )
+                variation_import.process()
+                variation_products_ids.append(variation_import.instance.variation.id)
+
+        self.bundle_variations_instances = Product.objects.filter(id__in=variation_products_ids)
+
+    def set_alias_variations(self):
+        from .variations import ImportAliasVariationInstance
+
+        variation_products_ids = []
+        if hasattr(self, 'alias_variations'):
+            for variation_data in self.alias_variations:
+                variation_import = ImportAliasVariationInstance(
+                    variation_data,
+                    import_process=self.import_process,
+                    parent_product=self.instance,
+                )
+                variation_import.process()
+                variation_products_ids.append(variation_import.instance.id)
+
+        self.alias_variations_instances = Product.objects.filter(id__in=variation_products_ids)
+
+    def set_rule_product_property(self):
         rule_product_property, _ = ProductProperty.objects.get_or_create(
             multi_tenant_company=self.config_product.multi_tenant_company,
             product=self.instance,
@@ -333,8 +390,30 @@ class ImportProductInstance(AbstractImportInstance):
             rule_product_property.value_select = self.rule.product_type
             rule_product_property.save()
 
-    def post_process_logic(self):
+    def _handle_parent_sku_links(self):
+        parent_sku = self.data.get("configurable_parent_sku")
+        if parent_sku:
+            parent = Product.objects.filter(sku=parent_sku, multi_tenant_company=self.multi_tenant_company).first()
+            if parent and parent.is_configurable():
+                ConfigurableVariation.objects.get_or_create(
+                    parent=parent,
+                    variation=self.instance,
+                    multi_tenant_company=self.multi_tenant_company,
+                )
+                return
 
+        parent_sku = self.data.get("bundle_parent_sku")
+        if parent_sku:
+            parent = Product.objects.filter(sku=parent_sku, multi_tenant_company=self.multi_tenant_company).first()
+            if parent and parent.is_bundle():
+                BundleVariation.objects.get_or_create(
+                    parent=parent,
+                    variation=self.instance,
+                    multi_tenant_company=self.multi_tenant_company,
+                )
+                return
+
+    def post_process_logic(self):
         if self.type == Product.SIMPLE:
             self.update_ean_code()
 
@@ -352,6 +431,14 @@ class ImportProductInstance(AbstractImportInstance):
 
         if (hasattr(self, 'variations') or hasattr(self, 'configurator_select_values')) and self.type == Product.CONFIGURABLE:
             self.set_variations()
+
+        if self.type == Product.BUNDLE and hasattr(self, 'bundle_variations'):
+            self.set_bundle_variations()
+
+        if hasattr(self, 'alias_variations'):
+            self.set_alias_variations()
+
+        self._handle_parent_sku_links()
 
     def update_translations(self):
         translation_instance_ids = []
@@ -420,7 +507,6 @@ class ImportProductInstance(AbstractImportInstance):
 
 
 class ImportProductTranslationInstance(AbstractImportInstance):
-
     def __init__(self, data: dict, import_process=None, product=None):
         super().__init__(data, import_process)
         self.product = product
@@ -472,7 +558,6 @@ class ImportProductTranslationInstance(AbstractImportInstance):
 
 
 class ImportSalesPriceInstance(AbstractImportInstance):
-
     def __init__(self, data: dict, import_process=None, product=None, currency_object=None):
         super().__init__(data, import_process)
         self.product = product

@@ -235,4 +235,4 @@ class SalesChannelImportMixin(ImportMixin):
     def process_completed(self):
         self.sales_channel.active = self.initial_sales_channel_status
         self.sales_channel.is_importing = False
-        self.sales_channel.save()I
+        self.sales_channel.save()
