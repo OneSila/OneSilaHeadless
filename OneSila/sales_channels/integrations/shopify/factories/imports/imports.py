@@ -1,6 +1,9 @@
 import datetime
 import json
 from decimal import Decimal
+
+from mkdocs.config.config_options import Optional
+
 from core.helpers import clean_json_data
 from imports_exports.factories.imports import ImportMixin
 from imports_exports.factories.products import ImportProductInstance
@@ -30,9 +33,6 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         self.initial_sales_channel_status = sales_channel.active
         self.api = self.get_api()
 
-        self.repair_sku_map = {}
-        self.max_repair_batch_size = 250
-
 
     def prepare_import_process(self):
 
@@ -41,6 +41,19 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         self.sales_channel.active = False
         self.sales_channel.is_importing = True
         self.sales_channel.save()
+
+        property_tag_data = {
+            "name": "Shopify Tags",
+            "internal_name": "shopify_tags",
+            "type": Property.TYPES.MULTISELECT,
+            "is_public_information": True,
+            "add_to_filters": True,
+        }
+
+        import_instance = ImportPropertyInstance(property_tag_data, self.import_process)
+        import_instance.process()
+
+        self.tags_property = import_instance.instance
 
 
     def get_total_instances(self):
@@ -55,9 +68,8 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
     def get_rules_data(self):
         return []
 
-    def repair_remote_sku_if_needed(self, import_instance: ImportProductInstance):
-        remote_product = import_instance.remote_instance
-        local_sku = import_instance.instance.sku
+    def repair_remote_sku_if_needed(self, product, remote_product):
+        local_sku = product.sku
 
         if not remote_product.default_variant_id or not local_sku:
             return
@@ -108,17 +120,13 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         response = gql.execute(mutation, variables=variables)
         data = json.loads(response)
 
-        import pprint
-        pprint.pprint(data)
-
         user_errors = data.get("data", {}).get("productVariantsBulkUpdate", {}).get("userErrors", [])
         if user_errors:
             logger.warning(f"Failed to repair SKU for {remote_product.remote_id}: {user_errors}")
             return
 
-        remote_product.remote_sku = local_sku
-        remote_product.save()
         logger.info(f"Repaired remote_sku for product {remote_product.remote_id} using default_variant_id")
+        return local_sku
 
     def create_log_instance(self, import_instance: ImportProductInstance, structured_data: dict):
 
@@ -252,6 +260,7 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
             for index, product in enumerate(variations):
                 info_map = variation_id_map.get(str(index), {})  # Use string key to match original map
                 remote_id = info_map.get('id')
+                remote_sku = info_map.get('sku')
 
                 if remote_id:
                     shopify_product, _ = ShopifyProduct.objects.get_or_create(
@@ -263,6 +272,10 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
 
                     shopify_product.remote_id = remote_id
                     shopify_product.remote_parent_product = remote_product
+
+                    if not remote_sku:
+                        shopify_product.remote_sku = self.repair_remote_sku_if_needed(product, shopify_product)
+
                     shopify_product.save()
 
             # Handle configurator (same logic)
@@ -317,12 +330,13 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
                 default_variant_id = variant_node.get("id")
                 if default_variant_id:
                     remote_product.default_variant_id = default_variant_id
+
                 remote_sku = variant_node.get("sku") or None
 
                 if remote_sku:
                     remote_product.remote_sku = remote_sku
                 else:
-                    self.repair_remote_sku_if_needed(import_instance)
+                    remote_product.remote_sku = self.repair_remote_sku_if_needed(import_instance.instance, import_instance.remote_instance)
 
         remote_product.save()
 
@@ -415,7 +429,7 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
 
         return prop
 
-    def get_product_attributes(self, product: dict):
+    def get_product_attributes(self, product: dict, product_type: str):
         attributes = []
         configurator_select_values = []
         mirror_map = {}
@@ -484,6 +498,19 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
                 "value": product.get("vendor"),
                 "remote_id": None,
             }
+            
+        if self.tags_property and product_type != Product.CONFIGURABLE:
+            attributes.append({
+                "property": self.tags_property,
+                "value": product.get("tags"),
+            })
+
+            mirror_map[self.tags_property.id] = {
+                "key": "tags",
+                "namespace": DEFAULT_METAFIELD_NAMESPACE,
+                "value": product.get("tags"),
+                "remote_id": None,
+            }
 
         # Step 2: selectedOptions → configurator_select_values
         if selected_options:
@@ -492,8 +519,8 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
                 key = option.get("name")
                 value = option.get("value")
 
-                if key == "Title":
-                    continue  # Shopify default
+                if key == "Title" and (not value or value.strip().lower() == "default title"):
+                    continue
 
                 normalized_key = key.lower().replace(" ", "_").replace("-", "_")
 
@@ -576,7 +603,7 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
 
         return prices
 
-    def get_product_variations(self, product: dict, parent_active: bool = True):
+    def get_product_variations(self, product: dict, parent_active: bool = True, configurable_attributes: list | None = None, configurable_configurator_select_values: Optional[dict] = None):
         """
         For CONFIGURABLE products.
 
@@ -610,7 +637,14 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
             else:
                 name = parent_name
 
-            product = self.get_product_data(node, is_variation=True, variation_name=name, parent_product_type=product_type)
+            product = self.get_product_data(
+                node,
+                is_variation=True,
+                variation_name=name,
+                parent_product_type=product_type,
+                configurable_attributes=configurable_attributes,
+                configurable_configurator_select_values=configurable_configurator_select_values)
+
             variation_data = {
                 "name": name,
                 "type": Product.SIMPLE,
@@ -630,7 +664,7 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
 
         return variations, index_to_id_map
 
-    def get_product_data(self, product: dict, is_variation: bool = False, variation_name: str = None, parent_product_type: str = None):
+    def get_product_data(self, product: dict, is_variation: bool = False, variation_name: str = None, parent_product_type: str = None, configurable_attributes: list | None = None, configurable_configurator_select_values: Optional[dict] = None):
         variants = product.get("variants", {}).get("edges", [])
         is_configurable = len(variants) > 1
         product_type = Product.CONFIGURABLE if is_configurable else Product.SIMPLE
@@ -645,29 +679,67 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
             "product_type": rule_product_type,
         }
 
-        if product_type == Product.SIMPLE and variants:
-            first_variant = variants[0]["node"]
+        if 'sku' in product:
+            sku = product.get("sku")
+            inventory_policy = product.get("inventoryPolicy")
 
-            sku = first_variant.get("sku")
-
-            if sku:
-                structured_data["sku"] = sku
-
-            inventory_policy = first_variant.get("inventoryPolicy")
             structured_data["allow_backorder"] = inventory_policy == "CONTINUE"
-            structured_data["ean_code"] = first_variant.get("barcode")
+            structured_data["ean_code"] = product.get("barcode")
+            structured_data["sku"] = sku
+
+        else:
+
+            if product_type == Product.SIMPLE and variants:
+                first_variant = variants[0]["node"]
+
+                sku = first_variant.get("sku")
+
+                if sku:
+                    structured_data["sku"] = sku
+
+                inventory_policy = first_variant.get("inventoryPolicy")
+                structured_data["allow_backorder"] = inventory_policy == "CONTINUE"
+                structured_data["ean_code"] = first_variant.get("barcode")
 
 
         structured_data['translations'] = self.get_product_translations(product, variation_name)
         structured_data['images'], structured_data['__image_index_to_remote_id'] = self.get_product_images(product)
 
         if product_type == Product.SIMPLE:
-            structured_data['attributes'], structured_data['configurator_select_values'], structured_data['__mirror_product_properties_map'] = self.get_product_attributes(product)
             structured_data['prices'] = self.get_product_prices(product)
 
+        attributes, configurator_select_values, mirror_product_properties_map = self.get_product_attributes(product, product_type=product_type)
+
+        if product_type == Product.SIMPLE:
+            structured_data['attributes'] = attributes
+            structured_data['__mirror_product_properties_map'] = mirror_product_properties_map
+            structured_data['configurator_select_values'] = configurator_select_values
+
+        
+        if product_type == Product.CONFIGURABLE:
+            structured_data['configurator_select_values'] = configurator_select_values
+
+        if is_variation:
+
+            if configurable_attributes:
+                if 'attributes' in structured_data:
+                    structured_data['attributes'].extend(configurable_attributes)
+                else:
+                    structured_data['attributes'] = configurable_attributes
+
+            if configurable_configurator_select_values:
+                if '__mirror_product_properties_map' in structured_data:
+                    structured_data['__mirror_product_properties_map'].update(configurable_configurator_select_values)
+                else:
+                    structured_data['__mirror_product_properties_map'] = configurable_configurator_select_values
 
         if product_type == Product.CONFIGURABLE:
-            structured_data['variations'], structured_data['__variation_sku_to_id_map'] = self.get_product_variations(product, parent_active=active)
+            
+            structured_data['variations'], structured_data['__variation_sku_to_id_map'] = self.get_product_variations(
+                product, 
+                parent_active=active,
+                configurable_attributes=attributes,
+                configurable_configurator_select_values=configurable_configurator_select_values)
 
         import_instance = ImportProductInstance(
             data=structured_data,
