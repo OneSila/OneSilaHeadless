@@ -346,22 +346,29 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         media_edges = product.get("media", {}).get("edges", [])
 
         for index, edge in enumerate(media_edges):
-            node = edge.get("node", {})
+            node = edge.get("node")
+            if not isinstance(node, dict):
+                continue
+
             media_type = node.get("mediaContentType")
 
             if media_type not in ["IMAGE", "EXTERNAL_VIDEO"]:
-                continue  # We only handle images and videos for now
+                continue
 
             url = None
 
             if media_type == "IMAGE":
-                url = node.get("image", {}).get("url") or \
-                      node.get("originalSource", {}).get("url") or \
-                      node.get("preview", {}).get("image", {}).get("url")
+                url = (
+                        node.get("image", {}).get("url") or
+                        node.get("originalSource", {}).get("url") or
+                        node.get("preview", {}).get("image", {}).get("url")
+                )
 
             elif media_type == "EXTERNAL_VIDEO":
-                url = node.get("preview", {}).get("image", {}).get("url") or \
-                      node.get("originalSource", {}).get("url")
+                url = (
+                        node.get("preview", {}).get("image", {}).get("url") or
+                        node.get("originalSource", {}).get("url")
+                )
 
             if not url:
                 continue
