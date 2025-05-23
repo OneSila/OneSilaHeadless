@@ -81,7 +81,7 @@ def products_inspector__inspector__trigger_block_missing_prices_sales_price_chan
 def products_inspector__inspector__trigger_block_bom_change(sender, instance, **kwargs):
     from products_inspector.flows.inspector_block import recursively_check_components
 
-    error_codes = [ INACTIVE_BUNDLE_ITEMS_ERROR]
+    error_codes = [INACTIVE_BUNDLE_ITEMS_ERROR]
     recursively_check_components(instance.parent, add_recursive_bundle=True, add_recursive_bom=True, add_recursive_variations=False, error_codes=error_codes)
 
     inspector_block_refresh.send(sender=instance.parent.inspector.__class__, instance=instance.parent.inspector, error_code=MISSING_BUNDLE_ITEMS_ERROR,
@@ -129,6 +129,7 @@ def products_inspector__inspector__trigger_block_ean_product_change(sender, inst
         product = instance.product
         inspector_block_refresh.send(sender=product.inspector.__class__, instance=product.inspector, error_code=MISSING_EAN_CODE_ERROR, run_async=False)
 
+
 @receiver(post_delete, sender='eancodes.EanCode')
 def products_inspector__inspector__trigger_block_ean_product_change_on_delete(sender, instance, **kwargs):
     if instance.product is not None:
@@ -138,6 +139,7 @@ def products_inspector__inspector__trigger_block_ean_product_change_on_delete(se
 # MISSING_PRODUCT_TYPE_ERROR  ------------------------------------------------------
 # MISSING_REQUIRED_PROPERTIES_ERROR  -----------------------------------------------
 # MISSING_OPTIONAL_PROPERTIES_ERROR  -----------------------------------------------
+
 
 @receiver(post_delete, sender='properties.ProductProperty')
 @receiver(post_update, sender='properties.ProductProperty')
@@ -163,6 +165,7 @@ def products_inspector__inspector__trigger_block_product_properties_change(sende
                                  run_async=False)
 
 # MISSING_STOCK_ERROR  --------------------------------------------------
+
 
 @receiver(post_update, sender='products.Product')
 @receiver(post_update, sender='products.SimpleProduct')
@@ -280,7 +283,6 @@ def products_inspector__inspector__trigger_block_product_mismatch_variation_chan
                                  instance=instance.parent.inspector,
                                  error_code=VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR,
                                  run_async=False)
-
 
     inspector_block_refresh.send(sender=instance.parent.inspector.__class__,
                                  instance=instance.parent.inspector,

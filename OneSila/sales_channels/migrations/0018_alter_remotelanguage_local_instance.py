@@ -13,6 +13,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='remotelanguage',
             name='local_instance',
-            field=models.CharField(choices=[('nl', 'Nederlands'), ('en', 'English'), ('fr', 'French')], default='en', help_text='The local language code associated with this remote language.', max_length=7),
+            field=models.CharField(choices=[('nl', 'Nederlands'), ('en', 'English'), ('fr', 'French')], default='en',
+                                   help_text='The local language code associated with this remote language.', max_length=7),
         ),
     ]

@@ -23,10 +23,12 @@ class SupplierFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     name: auto
 
+
 @filter(Customer)
 class CustomerFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     name: auto
+
 
 @filter(Person)
 class PersonFilter(SearchFilterMixin):

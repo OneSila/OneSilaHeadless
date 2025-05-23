@@ -3,6 +3,7 @@ from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIM
 from sales_channels.integrations.magento2.models import MagentoProduct
 from sales_channels.models import SalesChannelViewAssign
 
+
 class MagentoSalesChannelViewAssignUpdateFactory(GetMagentoAPIMixin, RemoteSalesChannelViewAssignUpdateFactory):
     remote_model_class = MagentoProduct
 
@@ -19,7 +20,6 @@ class MagentoSalesChannelViewAssignUpdateFactory(GetMagentoAPIMixin, RemoteSales
             if assign.remote_product is None:
                 assign.remote_product = self.remote_instance
                 assign.save()
-
 
     def update_remote(self):
         self.fetch_sales_channels_assign()

@@ -37,7 +37,6 @@ class ImportVariationInstanceValidateTest(TestCase):
             property=property,
         )
 
-
     def test_configurable_variation_with_both_products(self):
         instance = ImportConfigurableVariationInstance(
             {},
@@ -70,7 +69,6 @@ class ImportVariationInstanceValidateTest(TestCase):
             ImportConfigurableVariationInstance(data, self.import_process)
         self.assertIn("variation_product", str(cm.exception))
 
-
     def test_configurator_variation_with_full_data(self):
         data = {
             "config_product_data": {
@@ -82,12 +80,12 @@ class ImportVariationInstanceValidateTest(TestCase):
                 "value": "T-Shirt",
                 "require_ean_code": True,
                 "items": [
-                    { "type": "REQUIRED", "property_data": { "name": "Size", "type": "SELECT" } }
+                    {"type": "REQUIRED", "property_data": {"name": "Size", "type": "SELECT"}}
                 ]
             },
             "values": [
-                { "property_data": { "name": "Color", "type": "SELECT" }, "value": "Red" },
-                { "property_data": { "name": "Size", "type": "SELECT" }, "value": "Large" }
+                {"property_data": {"name": "Color", "type": "SELECT"}, "value": "Red"},
+                {"property_data": {"name": "Size", "type": "SELECT"}, "value": "Large"}
             ]
         }
 
@@ -96,8 +94,8 @@ class ImportVariationInstanceValidateTest(TestCase):
 
     def test_configurator_variation_missing_config_product(self):
         data = {
-            "rule_data": { "value": "Shoes" },
-            "values": [{ "property_data": { "name": "Color" }, "value": "Blue" }]
+            "rule_data": {"value": "Shoes"},
+            "values": [{"property_data": {"name": "Color"}, "value": "Blue"}]
         }
         with self.assertRaises(ValueError) as cm:
             ImportConfiguratorVariationsInstance(data, self.import_process)
@@ -105,8 +103,8 @@ class ImportVariationInstanceValidateTest(TestCase):
 
     def test_configurator_variation_missing_rule(self):
         data = {
-            "config_product_data": { "name": "Shoes", "sku": "SKU-SHOES" },
-            "values": [{ "property_data": { "name": "Color" }, "value": "Blue" }]
+            "config_product_data": {"name": "Shoes", "sku": "SKU-SHOES"},
+            "values": [{"property_data": {"name": "Color"}, "value": "Blue"}]
         }
         with self.assertRaises(ValueError) as cm:
             ImportConfiguratorVariationsInstance(data, self.import_process)
@@ -114,8 +112,8 @@ class ImportVariationInstanceValidateTest(TestCase):
 
     def test_configurator_variation_missing_values(self):
         data = {
-            "config_product_data": { "name": "Shoes", "sku": "SKU-SHOES" },
-            "rule_data": { "value": "Shoes" }
+            "config_product_data": {"name": "Shoes", "sku": "SKU-SHOES"},
+            "rule_data": {"value": "Shoes"}
         }
         with self.assertRaises(ValueError) as cm:
             ImportConfiguratorVariationsInstance(data, self.import_process)

@@ -16,6 +16,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
+
 def shopify_auth_start(request):
     shop = request.GET.get("shop")
     state = request.GET.get("state")
@@ -86,6 +87,7 @@ def shopify_customer_data_request(request):
     logger.info("Received customers/data_request webhook")
     logger.debug(json.loads(request.body))
     return HttpResponse(status=200)
+
 
 @csrf_exempt
 def shopify_customer_redact(request):

@@ -73,7 +73,6 @@ class ResyncInspectorFactory(SaveInspectorMixin):
         self.product = inspector.product
         self.blocks = self._get_ordered_blocks()
 
-
     def _get_ordered_blocks(self):
         """
         Retrieve all blocks for the inspector, ordered by sort_order.

@@ -31,6 +31,7 @@ def retry_task_action(modeladmin, request, queryset):
     for task in queryset:
         task.retry_task(retry_now=True)
 
+
 @admin.register(IntegrationTaskQueue)
 class RemoteTaskQueueAdmin(admin.ModelAdmin):
     list_display = ['__str__', 'status', 'priority', 'sent_to_queue_at_display']
@@ -108,14 +109,12 @@ class RemoteTaskQueueAdmin(admin.ModelAdmin):
         'error_traceback', 'number_of_remote_requests', 'retry_button', 'history'
     ]
 
-
     def get_readonly_fields(self, request, obj=None):
 
         readonly = list(self.readonly_fields)
         if obj is not None:  # If editing an existing object
             return readonly
         return readonly
-
 
     def has_delete_permission(self, request, obj=None):
         # Allow deletion of tasks
@@ -130,8 +129,10 @@ class IntegrationLogAdmin(PolymorphicParentModelAdmin):
     list_filter = ('status', 'action', 'integration', PolymorphicChildModelFilter)
     search_fields = ('content_object__name', 'identifier')
     ordering = ('-created_at',)
-    fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type', 'object_id', 'related_object_str', 'integration', 'remote_product', 'action', 'status', 'identifier']
-    readonly_fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type', 'object_id', 'related_object_str', 'integration', 'action', 'status', 'identifier', 'remote_product']
+    fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type',
+        'object_id', 'related_object_str', 'integration', 'remote_product', 'action', 'status', 'identifier']
+    readonly_fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type',
+        'object_id', 'related_object_str', 'integration', 'action', 'status', 'identifier', 'remote_product']
 
     base_fieldsets = (
         (None, {

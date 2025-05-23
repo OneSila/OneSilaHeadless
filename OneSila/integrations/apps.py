@@ -7,5 +7,6 @@ class IntegrationsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'integrations'
 
+
 def ready(self):
-        from . import receivers
+    from . import receivers

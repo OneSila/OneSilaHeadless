@@ -42,7 +42,7 @@ class EanCode(models.Model):
     class Meta:
         unique_together = (
             ('product', 'ean_code'),
-            ('product', 'multi_tenant_company'), # a product can only have one ean code
+            ('product', 'multi_tenant_company'),  # a product can only have one ean code
         )
         constraints = [
             models.UniqueConstraint(

@@ -30,6 +30,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='product',
             name='type',
-            field=models.CharField(choices=[('BUNDLE', 'Bundle Product'), ('CONFIGURABLE', 'Configurable Product'), ('SIMPLE', 'Simple Product'), ('ALIAS', 'Alias Product')], max_length=15),
+            field=models.CharField(choices=[('BUNDLE', 'Bundle Product'), ('CONFIGURABLE', 'Configurable Product'),
+                                   ('SIMPLE', 'Simple Product'), ('ALIAS', 'Alias Product')], max_length=15),
         ),
     ]

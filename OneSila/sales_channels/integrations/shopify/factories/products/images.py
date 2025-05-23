@@ -10,6 +10,7 @@ from sales_channels.integrations.shopify.exceptions import ShopifyGraphqlExcepti
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin, ShopifyMediaPayloadMixin
 from sales_channels.integrations.shopify.models.products import ShopifyImageProductAssociation
 
+
 class ShopifyMediaProductThroughCreateFactory(GetShopifyApiMixin, ShopifyMediaPayloadMixin, RemoteMediaProductThroughCreateFactory):
     """
     Creates a new media entry on Shopify and assigns it to the product or variant.
@@ -130,6 +131,7 @@ class ShopifyMediaProductThroughCreateFactory(GetShopifyApiMixin, ShopifyMediaPa
     def serialize_response(self, response):
         return response
 
+
 class ShopifyMediaProductThroughUpdateFactory(
     GetShopifyApiMixin,
     ShopifyMediaPayloadMixin,
@@ -244,6 +246,7 @@ class ShopifyMediaProductThroughUpdateFactory(
     def needs_update(self):
         return True
 
+
 class ShopifyMediaProductThroughDeleteFactory(
     GetShopifyApiMixin,
     RemoteMediaProductThroughDeleteFactory
@@ -345,6 +348,7 @@ class ShopifyMediaProductThroughDeleteFactory(
 
     def serialize_response(self, response):
         return response
+
 
 class ShopifyImageDeleteFactory(RemoteImageDeleteFactory):
     """

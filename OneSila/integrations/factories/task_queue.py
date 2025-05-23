@@ -11,6 +11,7 @@ from integrations.models import IntegrationTaskQueue, Integration
 
 logger = logging.getLogger(__name__)
 
+
 class TaskQueueFactory:
     def __init__(self,
                  integration_id: str | int,
@@ -55,7 +56,8 @@ class TaskQueueFactory:
         """
         Determine and set the number of remote requests for the task.
         """
-        self.remote_requests = self.number_of_remote_requests if self.number_of_remote_requests is not None else getattr(self.task_func, 'number_of_remote_requests', 1)
+        self.remote_requests = self.number_of_remote_requests if self.number_of_remote_requests is not None else getattr(
+            self.task_func, 'number_of_remote_requests', 1)
 
     def set_active_requests(self):
         """

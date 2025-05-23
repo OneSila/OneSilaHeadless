@@ -8,12 +8,14 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from ..signals import sync_remote_product
 from django.utils.translation import gettext_lazy as _
 
+
 class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the remote mirror of a Product.
     """
 
-    local_instance = models.ForeignKey('products.Product', on_delete=models.SET_NULL, null=True, db_index=True, help_text="The local Product instance associated with this remote product.")
+    local_instance = models.ForeignKey('products.Product', on_delete=models.SET_NULL, null=True, db_index=True,
+                                       help_text="The local Product instance associated with this remote product.")
     remote_sku = models.CharField(max_length=255, help_text="The SKU of the product in the remote system.", null=True, blank=True)
     is_variation = models.BooleanField(default=False, help_text="Indicates if this product is a variation.")
     remote_parent_product = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, help_text="The remote parent product for variations.")
@@ -95,7 +97,8 @@ class RemoteInventory(PolymorphicModel, RemoteObjectMixin, models.Model):
     Polymorphic model representing the remote mirror of a product's inventory.
     """
 
-    remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='inventory', on_delete=models.CASCADE, help_text="The remote product associated with this inventory.")
+    remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='inventory',
+                                          on_delete=models.CASCADE, help_text="The remote product associated with this inventory.")
     quantity = models.IntegerField(help_text="The quantity of the product available in the remote system.", null=True, blank=True)
 
     class Meta:
@@ -112,7 +115,8 @@ class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
     Polymorphic model representing the remote mirror of a product's price.
     """
 
-    remote_product = models.OneToOneField('sales_channels.RemoteProduct',related_name='price', on_delete=models.CASCADE, help_text="The remote product associated with this price.")
+    remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='price', on_delete=models.CASCADE,
+                                          help_text="The remote product associated with this price.")
     price_data = models.JSONField(default=dict, blank=True, help_text="Multi-currency price and discount data.")
 
     class Meta:
@@ -149,7 +153,8 @@ class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
     Polymorphic model representing the synchronization state of a product's content with a remote system.
     """
 
-    remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='content', on_delete=models.CASCADE, help_text="The remote product associated with this content.")
+    remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='content', on_delete=models.CASCADE,
+                                          help_text="The remote product associated with this content.")
 
     class Meta:
         unique_together = ('remote_product',)
@@ -287,7 +292,8 @@ class RemoteImage(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the remote mirror of an image in the media library.
     """
-    local_instance = models.ForeignKey('media.Media', on_delete=models.SET_NULL, null=True, help_text="The local media instance associated with this remote image.")
+    local_instance = models.ForeignKey('media.Media', on_delete=models.SET_NULL, null=True,
+                                       help_text="The local media instance associated with this remote image.")
 
     class Meta:
         unique_together = ('local_instance', 'sales_channel',)
@@ -306,9 +312,12 @@ class RemoteImageProductAssociation(PolymorphicModel, RemoteObjectMixin, models.
     """
     Polymorphic model representing the association of a remote image with a remote product.
     """
-    local_instance = models.ForeignKey('media.MediaProductThrough', on_delete=models.SET_NULL, null=True, help_text="The local MediaProductThrough instance associated with this remote association.")
-    remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.CASCADE, help_text="The remote product associated with this image assignment.")
-    remote_image = models.ForeignKey(RemoteImage, on_delete=models.CASCADE, null=True, blank=True, help_text="The remote image being assigned to the remote product. Optional for direct links.")
+    local_instance = models.ForeignKey('media.MediaProductThrough', on_delete=models.SET_NULL, null=True,
+                                       help_text="The local MediaProductThrough instance associated with this remote association.")
+    remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.CASCADE,
+                                       help_text="The remote product associated with this image assignment.")
+    remote_image = models.ForeignKey(RemoteImage, on_delete=models.CASCADE, null=True, blank=True,
+                                     help_text="The remote image being assigned to the remote product. Optional for direct links.")
 
     class Meta:
         unique_together = ('local_instance', 'sales_channel', 'remote_product',)

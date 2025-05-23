@@ -13,6 +13,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='aiimportprocess',
             name='type',
-            field=models.CharField(choices=[('PROPERTY_TYPE_DETECTOR', 'Property Type Detector'), ('IMPORTABLE_PROPERTIES_DETECTOR', 'Detects Importable Properties')], default='PROPERTY_TYPE_DETECTOR', help_text='Type of AI import process.', max_length=50),
+            field=models.CharField(choices=[('PROPERTY_TYPE_DETECTOR', 'Property Type Detector'), ('IMPORTABLE_PROPERTIES_DETECTOR',
+                                   'Detects Importable Properties')], default='PROPERTY_TYPE_DETECTOR', help_text='Type of AI import process.', max_length=50),
         ),
     ]

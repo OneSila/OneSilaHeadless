@@ -25,6 +25,7 @@ class ProductQuerySet(MultiTenantQuerySet):
         product_ids = ProductProperty.objects.filter(value_select=product_type).values_list('product_id', flat=True)
         return self.filter_multi_tenant(multi_tenant_company=product_type.multi_tenant_company).filter(id__in=product_ids)
 
+
 class ProductManager(MultiTenantManager):
     def get_queryset(self):
         return ProductQuerySet(self.model, using=self._db)
@@ -108,9 +109,9 @@ class AliasProductManager(ProductManager):
     def get_queryset(self):
         return AliasProductQuerySet(self.model, using=self._db)
 
-
     def copy_from_parent(self, alias_product, **kwargs):
         return self.get_queryset().copy_from_parent(alias_product, **kwargs)
+
 
 class BundleQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
     def get_all_item_products(self, product):

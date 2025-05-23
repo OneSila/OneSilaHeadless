@@ -3,13 +3,13 @@ from sales_channels.integrations.magento2.models import MagentoSalesChannel
 from sales_channels.integrations.magento2.schema.types.filters import MagentoSalesChannelFilter
 from sales_channels.integrations.magento2.schema.types.ordering import MagentoSalesChannelOrder
 
+
 @type(MagentoSalesChannel, filters=MagentoSalesChannelFilter, order=MagentoSalesChannelOrder, pagination=True, fields="__all__")
 class MagentoSalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
 
     @field()
     def integration_ptr(self, info) -> str:
         return self.integration_ptr
-
 
     @field()
     def saleschannel_ptr(self, info) -> str:
@@ -22,6 +22,7 @@ class MagentoRemoteAttributeType:
     attribute_code: str
     name: str
     data: str
+
 
 @strawberry_type
 class MagentoRemoteAttributeSetType:

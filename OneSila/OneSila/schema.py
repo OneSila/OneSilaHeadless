@@ -44,14 +44,14 @@ class Query(CurrenciesQuery, CountryQuery, EanCodesQuery, IntegrationsQuery,
 
 
 @strawberry.type
-class Mutation(CurrenciesMutation, EanCodesMutation,MediaMutation, MultiTenantMutation, ShopifySalesChannelMutation,
+class Mutation(CurrenciesMutation, EanCodesMutation, MediaMutation, MultiTenantMutation, ShopifySalesChannelMutation,
        ProductsInspectorMutation, ProductsMutation, PropertiesMutation, IntegrationsMutation, LlmMutation,
        SalesPricesMutation, SalesChannelsMutation, MagentoSalesChannelMutation, TaxesMutation):
     pass
 
 
 @strawberry.type
-class Subscription(CurrenciesSubscription,EanCodesSubscription, MediaSubscription, MultiTenantSubscription,
+class Subscription(CurrenciesSubscription, EanCodesSubscription, MediaSubscription, MultiTenantSubscription,
         ProductsInspectorSubscription, ProductsSubscription, PropertiesSubscription, SalesPriceSubscription,
         MagentoSalesChannelsSubscription, SalesChannelsSubscription, TaxSubscription, ShopifySalesChannelsSubscription):
     pass

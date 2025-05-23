@@ -11,8 +11,8 @@ class ImportMagentoProductPropertiesRuleInstance(ImportProductPropertiesRuleInst
         self.sales_channel = sales_channel
         self.mirror_model_class = MagentoAttributeSet
         self.mirror_model_map = {
-                "local_instance": "*",
-            }
+            "local_instance": "*",
+        }
 
     def before_process_item_logic(self, item_import_instance: ImportProductPropertiesRuleItemInstance):
 
@@ -25,7 +25,7 @@ class ImportMagentoProductPropertiesRuleInstance(ImportProductPropertiesRuleInst
         item_import_instance.prepare_mirror_model_class(
             mirror_model_class=MagentoAttributeSetAttribute,
             sales_channel=self.sales_channel,
-            mirror_model_map= {
+            mirror_model_map={
                 "local_instance": "*",
             },
             mirror_model_defaults={

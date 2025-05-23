@@ -41,7 +41,6 @@ class DetectRealAttributesFlow:
 
         return attribute_input_data
 
-
     def _run_llm(self, attribute_input_data):
         extra_instructions = (
             "This is a Magento import. If `is_visible_on_front` is True, "

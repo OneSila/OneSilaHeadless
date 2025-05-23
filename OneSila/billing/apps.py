@@ -6,4 +6,4 @@ class BillingConfig(AppConfig):
     name = 'billing'
 
     def ready(self):
-            from . import receivers
+        from . import receivers

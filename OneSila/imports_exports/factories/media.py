@@ -7,6 +7,7 @@ from tempfile import NamedTemporaryFile
 from django.core.files import File
 from django.core.files.base import ContentFile
 
+
 class ImportImageInstance(AbstractImportInstance):
     """
     Import instance for Image.
@@ -42,7 +43,6 @@ class ImportImageInstance(AbstractImportInstance):
 
         self._set_product_import_instance()
 
-
     def validate(self):
         """
         Validates that at least one of 'image_url' or 'image_content' is provided.
@@ -50,19 +50,16 @@ class ImportImageInstance(AbstractImportInstance):
         if not (hasattr(self, 'image_url') or hasattr(self, 'image_content')):
             raise ValueError("Either 'image_url' or 'image_content' must be provided.")
 
-
     @property
     def updatable_fields(self):
         return ['sort_order', 'is_main_image']
 
-
     def _set_product_import_instance(self):
         from .products import ImportProductInstance
 
-        self.product_import_instance= None
+        self.product_import_instance = None
         if not self.product and hasattr(self, 'product_data'):
             self.product_import_instance = ImportProductInstance(self.product_data, self.import_process)
-
 
     def download_image_from_url(self):
         """
@@ -89,7 +86,6 @@ class ImportImageInstance(AbstractImportInstance):
             self.skip_create = True
             return None
 
-
     def pre_process_logic(self):
 
         self.kwargs = {
@@ -113,13 +109,11 @@ class ImportImageInstance(AbstractImportInstance):
         except Exception:
             self.skip_create = True
 
-
     def process_logic(self):
 
         self.instance = None
         if not self.skip_create:
             self.instance = Image.objects.create(**self.kwargs)
-
 
     def post_process_logic(self):
 

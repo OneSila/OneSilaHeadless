@@ -19,7 +19,7 @@ class SalesChannelsSubscription:
 
     @subscription
     async def sales_channel_integration_pricelist(self, info: Info, pk: str) -> AsyncGenerator[
-        SalesChannelIntegrationPricelistType, None]:
+            SalesChannelIntegrationPricelistType, None]:
         async for i in model_subscriber(info=info, pk=pk, model=SalesChannelIntegrationPricelist):
             yield i
 

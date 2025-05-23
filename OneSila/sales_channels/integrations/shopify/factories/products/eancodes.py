@@ -50,7 +50,6 @@ class ShopifyEanCodeUpdateFactory(GetShopifyApiMixin, RemoteEanCodeUpdateFactory
         response = gql.execute(query, variables=variables)
         data = json.loads(response)
 
-
         errors = data.get("data", {}).get("productVariantsBulkUpdate", {}).get("userErrors", [])
         if errors:
             raise ShopifyGraphqlException(f"productVariantsBulkUpdate (barcode) userErrors: {errors}")

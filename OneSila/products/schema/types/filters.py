@@ -13,6 +13,7 @@ from products_inspector.models import InspectorBlock
 from taxes.schema.types.filters import VatRateFilter
 from strawberry.relay import from_base64
 
+
 @filter(Product)
 class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto

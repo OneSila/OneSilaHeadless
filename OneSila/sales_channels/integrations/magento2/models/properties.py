@@ -27,6 +27,7 @@ class MagentoProperty(RemoteProperty):
         # @TODO: Find out how to add unique constrain with sales channel
         # https://stackoverflow.com/questions/28799949/django-polymorphic-models-with-unique-together
 
+
 class MagentoPropertySelectValue(RemotePropertySelectValue):
     """
     Magento-specific model for remote property select values.

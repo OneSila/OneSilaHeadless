@@ -218,7 +218,11 @@ class MissingBundleItemsInspectorBlockFactory(InspectorBlockFactory):
         from products.models import BundleVariation
         if not BundleVariation.objects.filter_multi_tenant(self.multi_tenant_company).filter(parent=self.product).exists():
             raise InspectorBlockFailed(f"Bundle Product have no items")
+
+
 8
+
+
 @InspectorBlockFactoryRegistry.register(MISSING_EAN_CODE_ERROR)
 class MissingEanCodeInspectorBlockFactory(InspectorBlockFactory):
     def __init__(self, block, save_inspector=True):
@@ -230,7 +234,7 @@ class MissingEanCodeInspectorBlockFactory(InspectorBlockFactory):
 
         rule = self.product.get_product_rule()
         if rule is None:
-            return # we cannot tell if this is necessary or not
+            return  # we cannot tell if this is necessary or not
 
         if not rule.require_ean_code:
             return  # if the rule doesn't require ean code we just skip

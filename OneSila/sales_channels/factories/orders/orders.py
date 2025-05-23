@@ -3,6 +3,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class RemoteOrderPullFactory(PullRemoteInstanceMixin):
     """
     Abstract base factory for pulling remote orders, intended to be extended by specific integrations.
@@ -13,14 +14,12 @@ class RemoteOrderPullFactory(PullRemoteInstanceMixin):
     allow_update = False
     allow_delete = False
 
-
     def get_order_default_fields(self):
         """Retrieve the fields with the values common to create all the orders"""
         return {
             'multi_tenant_company': self.sales_channel.multi_tenant_company,
             'source': self.sales_channel.integration_ptr,
         }
-
 
     def create_local_order(self, remote_data):
         """

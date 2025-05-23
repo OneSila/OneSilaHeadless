@@ -84,6 +84,7 @@ class ShopifyProductPropertyCreateFactory(
         super().post_create_process()
         self.remote_instance.key = self.key
 
+
 class ShopifyProductPropertyUpdateFactory(
     GetShopifyApiMixin,
     RemoteValueMixin,

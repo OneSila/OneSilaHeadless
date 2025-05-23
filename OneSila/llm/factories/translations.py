@@ -4,8 +4,9 @@ from .mixins import AskGPTMixin, CalculateCostMixin, CreateTransactionMixin
 class StringTranslationLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
     """
     Translate a given string from_language_code to a to_language_code
-    The from_language_code is given for guardrails. 
+    The from_language_code is given for guardrails.
     """
+
     def __init__(self, to_translate, from_language_code, to_language_code, multi_tenant_company=None):
         super().__init__()
         self.to_translate = to_translate
@@ -13,7 +14,7 @@ class StringTranslationLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMix
         self.to_language_code = to_language_code
         self.multi_tenant_company = multi_tenant_company
 
-    @property    
+    @property
     def system_prompt(self):
         return f"Translate from {self.from_language_code} to {self.to_language_code}.  Reply only with the translated text."
 

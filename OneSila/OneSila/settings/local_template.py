@@ -91,11 +91,11 @@ LOCAL_HOST = 'localhost:8080'
 # price per ai point
 AI_POINT_PRICE = 0
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-REPLICATE_API_TOKEN=""
+REPLICATE_API_TOKEN = ""
 
 ADMIN_ROUTE_SUFFIX = "_somethingSecure"
 
-SHOPIFY_API_KEY ="xxx"
+SHOPIFY_API_KEY = "xxx"
 SHOPIFY_API_SECRET = "xxx"
 SHOPIFY_SCOPES = ['read_products', 'write_products']
 SHOPIFY_API_VERSION = "2024-07"

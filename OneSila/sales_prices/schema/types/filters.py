@@ -10,6 +10,7 @@ from django.db.models import Q, F, QuerySet
 from strawberry_django import filter_field as custom_filter
 from strawberry import UNSET
 
+
 @filter(SalesPrice)
 class SalesPriceFilter(SearchFilterMixin):
     id: auto
@@ -29,7 +30,6 @@ class SalesPriceListFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     end_date: auto
     customers: Optional[CustomerFilter]
     salespricelistitem: Optional[lazy['SalesPriceListItemFilter', "sales_prices.schema.types.filters"]]
-
 
     @custom_filter
     def currency_match_with_customers(
@@ -51,6 +51,7 @@ class SalesPriceListFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
                 queryset = initial_queryset.exclude(id__in=queryset.values_list('id', flat=True))
 
         return queryset, Q()
+
 
 @filter(SalesPriceListItem)
 class SalesPriceListItemFilter(SearchFilterMixin):

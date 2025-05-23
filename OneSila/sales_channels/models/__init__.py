@@ -40,8 +40,9 @@ from .properties import (
 # Order and customer models
 from .orders import RemoteOrder, RemoteCustomer
 
-# Tax and currency models
-from .taxes import RemoteVat, RemoteCurrency
-
 # Logging models
 from .logs import RemoteLog
+from .products import RemoteProduct, RemoteImage, RemoteProductContent, RemotePrice, RemoteInventory, RemoteCategory, RemoteImageProductAssociation
+from .properties import RemoteProperty, RemotePropertySelectValue, RemoteProductProperty
+from .sales_channels import SalesChannel, SalesChannelView, SalesChannelIntegrationPricelist, SalesChannelViewAssign
+from .taxes import RemoteVat, RemoteCurrency

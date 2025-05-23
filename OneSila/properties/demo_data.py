@@ -129,5 +129,6 @@ def create_property_structure(multi_tenant_company):
             CreatePrivateDataRelationMixin.create_demo_data_relation(rule_item)
             registry.create_demo_data_relation(rule_item)
 
+
 create_property_structure.priority = 100
 registry.register_private_app(create_property_structure)

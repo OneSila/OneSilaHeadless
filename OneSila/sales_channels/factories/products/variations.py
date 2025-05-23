@@ -49,7 +49,6 @@ class RemoteProductVariationAddFactory(RemoteInstanceUpdateFactory):
         except RemoteProduct.DoesNotExist:
             return False
 
-
         # Check if the remote variation product itself exists in the sales channel
         try:
             self.remote_instance = RemoteProduct.objects.get(
@@ -81,7 +80,8 @@ class RemoteProductVariationAddFactory(RemoteInstanceUpdateFactory):
         return self.remote_instance
 
     def needs_update(self):
-        return True # the actual check is done in preflight_check
+        return True  # the actual check is done in preflight_check
+
 
 class RemoteProductVariationDeleteFactory(RemoteInstanceDeleteFactory):
     """

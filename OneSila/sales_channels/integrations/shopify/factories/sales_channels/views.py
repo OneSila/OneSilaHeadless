@@ -33,13 +33,11 @@ class ShopifySalesChannelViewPullFactory(GetShopifyApiMixin, PullRemoteInstanceM
         domain = getattr(shop, 'domain', None)
         url = f"https://{domain}" if domain else ''
         self.remote_instances = [{
-            'id':   shop.id,
+            'id': shop.id,
             'name': shop.name,
-            'url':  url,
-            'publication_id':  self.get_online_store_publication_id(),
+            'url': url,
+            'publication_id': self.get_online_store_publication_id(),
         }]
-
-
 
     def serialize_response(self, response):
         return response

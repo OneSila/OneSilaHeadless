@@ -9,7 +9,6 @@ def run_generic_sales_channel_factory(sales_channel_id, factory_class, local_ins
     if local_instance_class and local_instance_id:
         local_instance = local_instance_class.objects.get(id=local_instance_id)
 
-
     if factory_kwargs is None:
         factory_kwargs = {}
 
@@ -17,6 +16,7 @@ def run_generic_sales_channel_factory(sales_channel_id, factory_class, local_ins
 
     factory = factory_class(**factory_kwargs)
     factory.run()
+
 
 def run_remote_product_dependent_sales_channel_factory(
     sales_channel_id,

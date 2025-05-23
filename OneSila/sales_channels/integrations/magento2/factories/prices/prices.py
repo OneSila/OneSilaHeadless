@@ -29,6 +29,5 @@ class MagentoPriceUpdateFactory(GetMagentoAPIMixin, RemotePriceUpdateFactory):
             self.magento_product.special_price = discounted_price
             self.magento_product.save(scope=scope)
 
-
     def serialize_response(self, response):
         return {}

@@ -37,6 +37,7 @@ class RemoteCategoryInput:
 class RemoteCategoryPartialInput(NodeInput):
     pass
 
+
 @input(RemoteCurrency, fields="__all__")
 class RemoteCurrencyInput:
     pass
@@ -110,6 +111,7 @@ class RemoteOrderPartialInput(NodeInput):
 @partial(RemoteOrder, fields="__all__")
 class RemoteOrderPartialInput(NodeInput):
     pass
+
 
 @input(RemoteProduct, fields="__all__")
 class RemoteProductInput:

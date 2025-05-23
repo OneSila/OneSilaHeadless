@@ -23,6 +23,7 @@ from sales_channels.models import SalesChannelViewAssign, RemoteCurrency
 
 logger = logging.getLogger(__name__)
 
+
 class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
     remote_model_class = MagentoProduct
     remote_product_property_class = MagentoProductProperty
@@ -50,7 +51,6 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
     def get_add_variation_factory(self):
         from sales_channels.integrations.magento2.factories.products import MagentoProductVariationAddFactory
         return MagentoProductVariationAddFactory
-
 
     # Use the getter methods within the class where needed
     sync_product_factory = property(get_sync_product_factory)
@@ -114,7 +114,6 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
                 ).values_list('sales_channel_view__remote_id', flat=True))
             )
         self.add_field_in_payload('assigns', self.assigns)
-
 
     def set_variation_assigns(self):
         self.assigns = list(
@@ -196,7 +195,6 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
             local_instance=local_vat_rate
         ).first()
 
-
         if remote_vat_rate:
             self.vat_rate = remote_vat_rate.remote_id
             self.add_field_in_payload('vat_rate', self.vat_rate)
@@ -233,7 +231,7 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
         self.magento_product: MagentoApiProduct = self.api.products.by_sku(self.remote_instance.remote_sku)
 
         for key, value in self.payload.items():
-            if  value != getattr(self.magento_product, key):
+            if value != getattr(self.magento_product, key):
                 setattr(self.magento_product, key, value)
 
         self.magento_product.save(scope='all')
@@ -278,17 +276,20 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
             self.magento_product.discount_price = discount_price
             self.magento_product.save(scope=scope)
 
-
     def final_process(self):
-        translated_product_properties = ProductProperty.objects.filter(product=self.local_instance, property__is_public_information=True, property__type__in=Property.TYPES.TRANSLATED)
+        translated_product_properties = ProductProperty.objects.filter(
+            product=self.local_instance, property__is_public_information=True, property__type__in=Property.TYPES.TRANSLATED)
 
         # whe we update custom properties we only do it on main scope. The translated ones needs to be updated one by one in all languages
         for product_property in translated_product_properties:
-            fac = MagentoProductPropertyUpdateFactory(sales_channel=self.sales_channel, local_instance=product_property, remote_product=self.remote_instance, api=self.api, skip_checks=True)
+            fac = MagentoProductPropertyUpdateFactory(sales_channel=self.sales_channel, local_instance=product_property,
+                                                      remote_product=self.remote_instance, api=self.api, skip_checks=True)
             fac.run()
+
 
 class MagentoProductUpdateFactory(RemoteProductUpdateFactory, MagentoProductSyncFactory):
     fixing_identifier_class = MagentoProductSyncFactory
+
 
 class MagentoProductCreateFactory(RemoteProductCreateFactory, MagentoProductSyncFactory):
     remote_inventory_class = MagentoInventory
@@ -317,6 +318,7 @@ class MagentoProductCreateFactory(RemoteProductCreateFactory, MagentoProductSync
     def serialize_response(self, response):
         self.magento_product = response
         return response.to_dict()
+
 
 class MagentoProductDeleteFactory(GetMagentoAPIMixin, RemoteProductDeleteFactory):
     remote_model_class = MagentoProduct

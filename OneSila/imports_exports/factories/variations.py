@@ -11,6 +11,7 @@ class ConfigurableVariationImport(ImportOperationMixin):
     get_identifiers = ['parent', 'variation']
     allow_edit = False
 
+
 class BundleVariationImport(ImportOperationMixin):
     get_identifiers = ['parent', 'variation']
     allow_edit = True
@@ -297,7 +298,7 @@ class ImportAliasVariationInstance(AbstractImportInstance):
             self.parent_product = self.parent_product_import_instance.instance
 
         if not self.alias_product:
-            self.variation_data["alias_parent_product"]  = self.parent_product
+            self.variation_data["alias_parent_product"] = self.parent_product
             self.alias_product_import_instance = ImportProductInstance(self.variation_data, self.import_process)
             self.alias_product_import_instance.process()
             self.alias_product = self.alias_product_import_instance.instance

@@ -28,7 +28,6 @@ class ShopifyPriceUpdateFactory(GetShopifyApiMixin, RemotePriceUpdateFactory):
             variant_payload["price"] = str(price_info["price"])
             variant_payload["compareAtPrice"] = None
 
-
         query = """
         mutation UpdatePrice($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
           productVariantsBulkUpdate(productId: $productId, variants: $variants) {

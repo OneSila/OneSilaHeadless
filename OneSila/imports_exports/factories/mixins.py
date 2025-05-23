@@ -33,14 +33,13 @@ class AbstractImportInstance(abc.ABC):
         self.sales_channel = None
         self.remote_instance = None
 
-        if 'language'in data:
+        if 'language' in data:
             self.language = data['language']
         else:
             if self.multi_tenant_company:
                 self.language = self.multi_tenant_company.language
             else:
                 self.language = settings.LANGUAGE_CODE
-
 
     @property
     def local_class(self):
@@ -56,7 +55,7 @@ class AbstractImportInstance(abc.ABC):
 
     def set_language(self, language):
         self.language = language
-    
+
     def prepare_mirror_model_class(self, mirror_model_class, sales_channel, mirror_model_map, mirror_model_defaults=None):
         self.sales_channel = sales_channel
         self.mirror_model_class = mirror_model_class
@@ -127,7 +126,7 @@ class ImportOperationMixin:
     get_translation_identifiers = []
     get_using_translation = False
     translation_get_value = None
-    allow_edit = True # for some imports we don't have what to edit
+    allow_edit = True  # for some imports we don't have what to edit
     allow_translation_edit = False
 
     def __init__(self, import_instance, import_process):
@@ -189,7 +188,7 @@ class ImportOperationMixin:
         """
         if not self.instance:
 
-            if self.force_created :
+            if self.force_created:
                 self.instance = self.import_instance.local_class.objects.create(**self.get_kwargs)
                 self.created = True
             else:
@@ -309,7 +308,6 @@ class ImportOperationMixin:
 
     def _create_mirror_data_needed(self):
         return self.import_instance.mirror_model_class and self.import_instance.sales_channel
-
 
     def run(self):
         """

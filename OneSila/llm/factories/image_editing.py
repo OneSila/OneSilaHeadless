@@ -16,7 +16,7 @@ class CutBackgroundBirefnet(ReplicateMixin):
                 "resolution": ""
             }
         )
-    
+
     def save_image(self):
         with open(self.save_to_filepath, 'wb') as f:
             f.write(self.output.read())

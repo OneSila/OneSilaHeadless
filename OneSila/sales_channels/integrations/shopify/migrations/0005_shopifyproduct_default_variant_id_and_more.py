@@ -15,11 +15,13 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='shopifyproduct',
             name='default_variant_id',
-            field=models.CharField(blank=True, help_text='The ID of the default variant returned when the product is created on Shopify.', max_length=128, null=True),
+            field=models.CharField(blank=True, help_text='The ID of the default variant returned when the product is created on Shopify.',
+                                   max_length=128, null=True),
         ),
         migrations.AddField(
             model_name='shopifysaleschannel',
             name='vendor_property',
-            field=models.ForeignKey(blank=True, help_text='The product property that maps to Shopify vendor (brand).', null=True, on_delete=django.db.models.deletion.SET_NULL, to='properties.property'),
+            field=models.ForeignKey(blank=True, help_text='The product property that maps to Shopify vendor (brand).',
+                                    null=True, on_delete=django.db.models.deletion.SET_NULL, to='properties.property'),
         ),
     ]

@@ -13,7 +13,6 @@ class ResyncSalesChannelAssignMutation(UpdateMutation, GetCurrentUserMixin):
         if instance.remote_product.syncing_current_percentage != 100:
             raise ValidationError(_("You can't resync the product because is currently syncing."))
 
-
         sync_remote_product.send(sender=instance.remote_product.__class__, instance=instance.remote_product)
 
         return instance

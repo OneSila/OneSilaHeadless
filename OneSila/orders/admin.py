@@ -7,6 +7,7 @@ from orders.models import Order, OrderItem
 class OrderAdmin(admin.ModelAdmin):
     pass
 
+
 @admin.register(OrderItem)
 class OrderItemAdmin(admin.ModelAdmin):
     pass

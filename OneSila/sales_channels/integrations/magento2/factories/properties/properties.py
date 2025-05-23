@@ -304,6 +304,10 @@ class MagentoAttributeSetCreateFactory(GetMagentoAPIMixin, MagentoEntityNotFound
     api_package_name = 'product_attribute_set'
     api_method_name = 'create'
 
+    def get_update_attribute_set_factory(self):
+        from sales_channels.integrations.magento2.factories.properties import MagentoAttributeSetUpdateFactory
+        return MagentoAttributeSetUpdateFactory
+
     enable_fetch_and_update = True
     update_if_not_exists = True
     update_factory_class = "sales_channels.integrations.magento2.factories.properties.MagentoAttributeSetUpdateFactory"

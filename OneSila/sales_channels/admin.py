@@ -10,9 +10,11 @@ from .models.products import RemoteProductConfigurator
 class RemoteProductConfiguratorAdmin(admin.ModelAdmin):
     pass
 
+
 @admin.register(SalesChannel)
 class SalesChannelAdmin(PolymorphicChildModelAdmin):
     base_model = SalesChannel
+
 
 @admin.register(RemoteLog)
 class RemoteLogAdmin(PolymorphicChildModelAdmin):
@@ -21,7 +23,8 @@ class RemoteLogAdmin(PolymorphicChildModelAdmin):
     list_filter = ('status', 'action', 'integration')
     search_fields = ('content_object__name', 'identifier')
     ordering = ('-created_at',)
-    readonly_fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type', 'object_id', 'related_object_str', 'integration', 'action', 'status', 'identifier', 'fixing_identifier', 'remote_product']
+    readonly_fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type', 'object_id',
+        'related_object_str', 'integration', 'action', 'status', 'identifier', 'fixing_identifier', 'remote_product']
 
     fieldsets = (
         (None, {
@@ -34,6 +37,7 @@ class RemoteLogAdmin(PolymorphicChildModelAdmin):
             'fields': ('user_error', 'keep')
         }),
     )
+
 
 @admin.register(SalesChannelImport)
 class SalesChannelImportAdmin(admin.ModelAdmin):

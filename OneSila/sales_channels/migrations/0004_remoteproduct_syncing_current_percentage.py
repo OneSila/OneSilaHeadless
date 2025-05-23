@@ -14,6 +14,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='remoteproduct',
             name='syncing_current_percentage',
-            field=models.PositiveSmallIntegerField(default=0, help_text='Current sync progress percentage (0-100).', validators=[django.core.validators.MinValueValidator(0), django.core.validators.MaxValueValidator(100)]),
+            field=models.PositiveSmallIntegerField(default=0, help_text='Current sync progress percentage (0-100).',
+                                                   validators=[django.core.validators.MinValueValidator(0), django.core.validators.MaxValueValidator(100)]),
         ),
     ]

@@ -25,7 +25,7 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
 
     def fetch_remote_instances(self):
         """
-        Fetch remote instances using the Magento API's `all_in_memory` method, 
+        Fetch remote instances using the Magento API's `all_in_memory` method,
         which retrieves all relevant orders since the specified number of hours ago,
         with a fallback to the `sync_orders_after` date if it is more recent.
         """
@@ -34,7 +34,6 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
         self.remote_instances = self.api.orders.\
             add_criteria('status', MagentoApiOrder.STATUS_COMPLETE).\
             all_in_memory()
-
 
     def process_remote_instance(self, remote_data: MagentoApiOrder, remote_instance_mirror: MagentoOrder, created: bool):
         """
@@ -55,7 +54,6 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
         local_order = self.create_local_order(remote_data)
         self.assign_local_order(remote_instance_mirror, local_order)
         self.populate_items(local_order, remote_data, remote_instance_mirror)
-
 
     def set_sales_view(self, remote_data):
         """

@@ -37,6 +37,7 @@ gunicorn
 uvicorn
 WooCommerce
 markdown
+mkdocs
 
 strawberry-graphql==0.266.0
 strawberry-graphql-django==0.59.1

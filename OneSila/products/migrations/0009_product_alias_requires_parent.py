@@ -16,6 +16,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddConstraint(
             model_name='product',
-            constraint=models.CheckConstraint(condition=models.Q(models.Q(('alias_parent_product__isnull', False), ('type', 'ALIAS')), models.Q(('type', 'ALIAS'), _negated=True), _connector='OR'), name='alias_requires_parent'),
+            constraint=models.CheckConstraint(condition=models.Q(models.Q(('alias_parent_product__isnull', False), ('type', 'ALIAS')),
+                                              models.Q(('type', 'ALIAS'), _negated=True), _connector='OR'), name='alias_requires_parent'),
         ),
     ]

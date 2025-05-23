@@ -157,12 +157,12 @@ Handles the creation of a `ProductPropertiesRuleItem`, linking a `Property` to a
 ### 🔑 Required Fields
 
 One of:
-- `property`: an existing `Property` object  
+- `property`: an existing `Property` object
 **OR**
 - `property_data`: `dict` (used to import a Property)
 
 One of:
-- `rule`: an existing `ProductPropertiesRule` object  
+- `rule`: an existing `ProductPropertiesRule` object
 **OR**
 - `rule_data`: `dict` (used to import a ProductPropertiesRule)
 

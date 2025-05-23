@@ -3,6 +3,7 @@ from polymorphic.models import PolymorphicModel
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
+
 class Import(PolymorphicModel, models.Model):
     """
     Model representing an import process.
@@ -40,7 +41,6 @@ class Import(PolymorphicModel, models.Model):
 
     def __str__(self):
         return f"ImportProcess - {self.get_status_display()} ({self.percentage}%)"
-
 
     class Meta:
         ordering = ['-created_at']

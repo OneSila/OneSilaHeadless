@@ -35,7 +35,6 @@ class MagentoProductContentUpdateFactory(GetMagentoAPIMixin, RemoteProductConten
 
                 self.payload[remote_code] = content
 
-
     def update_remote(self):
         self.magento_product: Product = self.api.products.by_sku(self.remote_product.remote_sku)
 
@@ -44,7 +43,6 @@ class MagentoProductContentUpdateFactory(GetMagentoAPIMixin, RemoteProductConten
                 setattr(self.magento_product, key, value)
 
             self.magento_product.save(scope=remote_code)
-
 
     def serialize_response(self, response):
         return self.magento_product.to_dict()

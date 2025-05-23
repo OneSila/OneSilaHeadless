@@ -154,6 +154,8 @@ sales_channels/
    - Write a TESTS to instantiate your mixin and factories, call .run(), and verify your integration API sees your test data.
    - Add any admin registrations or serializers as needed.
    - Add the logins to a fake test-store to your local settings and set it up in github as well.
+   - Write a quick Django shell script to instantiate your mixin and factories, call .run(), and verify the Shopify API sees your test product.
+   - Add any admin registrations or serializers as needed.
 
 ## Checklist for New Integrations
 
@@ -173,3 +175,16 @@ Keep this README up-to-date as we refine our integration conventions! 🎉
 ## Help / Tips & Tricks
 
 - **Magic failure of factories?**: Ensure the products you're testing with are assigned to the a sales channel view.  Often the reason is silent failure of the pre-flight checks, which stops the factory from running without any feedback.
+
+## ✅ Checklist for New Integrations
+
+- [ ] `__init__.py` in `sales_channels/integrations/` exists
+- [ ] `app` folder created via `startapp`
+- [ ] Entry added to `INSTALLED_APPS`
+- [ ] `AppConfig` defined with correct `name` and `label`
+- [ ] `mixins.py` with API client setup
+- [ ] `models.py` mirror models created
+- [ ] `factories/` with layered Create/Update factories
+- [ ] Sample `.run()` script or test demonstrating a successful create
+
+Keep this README up-to-date as we refine our integration conventions! 🎉

@@ -63,10 +63,16 @@ class TestCaseWoocommerceMixin(TransactionTestCase):
                 product_ids = WoocommerceProduct.objects.filter(sales_channel=self.sales_channel).values_list('remote_id', flat=True)
 
                 for attribute_id in attribute_ids:
-                    self.api.delete_attribute(attribute_id)
+                    try:
+                        self.api.delete_attribute(attribute_id)
+                    except Exception as e:
+                        logger.warning(f"Error deleting attribute {attribute_id}: {e}")
 
                 for product_id in product_ids:
-                    self.api.delete_product(product_id)
+                    try:
+                        self.api.delete_product(product_id)
+                    except Exception as e:
+                        logger.warning(f"Error deleting product {product_id}: {e}")
 
             except AttributeError:
                 logger.warning("No api set. Cleanup is not possible.")

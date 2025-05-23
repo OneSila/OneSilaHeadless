@@ -6,7 +6,6 @@ app_name = 'integrations'
 
 urlpatterns = [
     path("", IntegrationListView.as_view(), name="integrations_list"),
-    path("shopify/<str:id>/", ShopifyIntegrationDetailView.as_view(), name="shopify_integration_detail"),
+    path("/shopify/<str:id>/", ShopifyIntegrationDetailView.as_view(), name="shopify_integration_detail"),
 
 ]
-

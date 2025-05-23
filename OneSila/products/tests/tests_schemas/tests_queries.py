@@ -22,7 +22,6 @@ class ProductQueryTestCase(TransactionTestCaseMixin, TransactionTestCase):
         )
         self.assertTrue(resp.errors is None)
 
-
     def test_exclude_demo_data_product(self):
         from .queries import PRODUCT_EXCLUDE_DEMO_DATA
 

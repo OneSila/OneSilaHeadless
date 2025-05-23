@@ -2,6 +2,7 @@
 
 from django.db import migrations
 
+
 def set_default_languages(apps, schema_editor):
     MultiTenantCompany = apps.get_model('core', 'MultiTenantCompany')
     default_languages = ['nl', 'en', 'fr']
@@ -9,6 +10,7 @@ def set_default_languages(apps, schema_editor):
     for company in MultiTenantCompany.objects.all():
         company.languages = default_languages
         company.save(update_fields=['languages'])
+
 
 class Migration(migrations.Migration):
 

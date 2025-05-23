@@ -27,7 +27,7 @@ class RequestLoginTokenMutation(CleanupDataMixin, DjangoCreateMutation):
     def create_token(self, *, user):
         fac = RequestLoginTokenFactory(user)
         fac.run()
-        
+
         return MultiTenantUserLoginToken.objects.get(id=fac.token.id)
 
     def create(self, data: dict[str, Any], *, info: Info):
@@ -58,7 +58,7 @@ class RecoveryTokenMutation(RequestLoginTokenMutation):
     def create_token(self, *, user):
         fac = RecoveryTokenFactory(user)
         fac.run()
-        
+
         return MultiTenantUserLoginToken.objects.get(id=fac.token.id)
 
 

@@ -2,6 +2,8 @@ from huey.contrib.djhuey import db_task
 from products.product_types import CONFIGURABLE
 
 # @TODO: Create factories for this tasks
+
+
 @db_task()
 def update_configurators_for_rule_db_task(rule):
     from products.models import Product
@@ -28,6 +30,7 @@ def update_configurators_for_rule_db_task(rule):
         except RemoteProduct.configurator.RelatedObjectDoesNotExist:
             pass
 
+
 @db_task()
 def update_configurators_for_parent_product_db_task(parent_product):
     from sales_channels.models import RemoteProduct
@@ -43,6 +46,7 @@ def update_configurators_for_parent_product_db_task(parent_product):
     for remote_product in remote_products.iterator():
         if hasattr(remote_product, 'configurator') and remote_product.configurator:
             remote_product.configurator.update_if_needed(send_sync_signal=True)
+
 
 @db_task()
 def update_configurators_for_product_property_db_task(parent_product_id, property_id):

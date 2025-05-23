@@ -49,10 +49,10 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
 
     remote_eancode_update_factory = ShopifyEanCodeUpdateFactory
 
-    sync_product_factory   = property(lambda self: ShopifyProductSyncFactory)
+    sync_product_factory = property(lambda self: ShopifyProductSyncFactory)
     create_product_factory = property(lambda self: ShopifyProductCreateFactory)
     delete_product_factory = property(lambda self: ShopifyProductDeleteFactory)
-    add_variation_factory  = property(lambda self: ShopifyProductSyncFactory)
+    add_variation_factory = property(lambda self: ShopifyProductSyncFactory)
 
     # Local field → Shopify REST API field mapping
     field_mapping = {
@@ -124,7 +124,6 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
             self.payload['metafields'] = self.metafields
 
         self.payload['tags'] = self.tags
-
 
     def get_saleschannel_remote_object(self, sku):
         gql = self.api.GraphQL()
@@ -556,7 +555,6 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
             if self.is_variation:
                 self.variant_payload['optionValues'] = self.get_option_values()
 
-
     def get_product_options(self):
         from collections import defaultdict
 
@@ -584,7 +582,6 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
 
         return product_options
 
-
     def get_option_values(self):
         props_qs = self.product_properties.filter(
             property_id__in=self.remote_parent_product.configurator.properties.values_list('id', flat=True)
@@ -597,7 +594,6 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
                 values.append({"name": value, "optionName": prop.property.name})
 
         return values
-
 
     def perform_remote_action(self):
         if self.is_variation:
@@ -708,10 +704,12 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         response = gql.execute(query, variables=variables)
         data = json.loads(response)
 
-
         errors = data.get("data", {}).get("productCreate", {}).get("userErrors", [])
         if errors:
             raise ShopifyGraphqlException(f"Shopify productCreate userErrors: {errors}")
+
+        if "data" not in data:
+            raise ShopifyGraphqlException(f"GraphQL error: {json.dumps(data, indent=2)}")
 
         self.product_data = data["data"]["productCreate"]["product"]
         variant_node = self.product_data["variants"]["edges"][0]["node"]
@@ -736,7 +734,7 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         gql = self.api.GraphQL()
         query = f"""
         {MEDIA_FRAGMENT}
-        
+
         mutation ProductVariantsCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {{
           productVariantsBulkCreate(productId: $productId, variants: $variants) {{
             productVariants {{
@@ -794,13 +792,11 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
             self._assign_image_remote_ids(variant, remote_variation)
             self._assign_metafield_remote_ids(variant, remote_variation)
 
-
     def create_or_update_children(self):
         super().create_or_update_children()
         self.create_variations()
 
         self.delete_default_variant()
-
 
     def create_child(self, variation):
         factory = self.create_product_factory(

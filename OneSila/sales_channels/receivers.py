@@ -30,6 +30,7 @@ from django.dispatch import receiver
 from properties.models import Property, PropertyTranslation, PropertySelectValueTranslation, PropertySelectValue, ProductProperty, \
     ProductPropertyTextTranslation
 
+
 @receiver(post_update, sender=SalesChannelImport)
 def import_process_post_update_fist_import_complete_receiver(sender, instance: SalesChannelImport, **kwargs):
 
@@ -44,6 +45,7 @@ def import_process_post_update_fist_import_complete_receiver(sender, instance: S
             sales_channel.first_import_complete = True
             sales_channel.save(update_fields=['first_import_complete'])
 
+
 @receiver(pre_save, sender=SalesChannelImport)
 def import_process_avoid_duplicate_pre_create_receiver(sender, instance: SalesChannelImport, **kwargs):
     from django.utils.translation import gettext_lazy as _
@@ -51,6 +53,7 @@ def import_process_avoid_duplicate_pre_create_receiver(sender, instance: SalesCh
     sales_channel = instance.sales_channel
     if sales_channel.is_importing and not instance.pk:
         raise OverflowError(_("There is another import that is already happening. Please wait for it to finish first."))
+
 
 @receiver(post_create, sender=SalesChannelImport)
 def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelImport, **kwargs):
@@ -69,12 +72,17 @@ def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelI
 def import_process_post_update_receiver(sender, instance: SalesChannelImport, **kwargs):
     from sales_channels.integrations.magento2.models import MagentoSalesChannel
     from sales_channels.integrations.magento2.tasks import magento_import_db_task
+    from sales_channels.integrations.shopify.models.sales_channels import ShopifySalesChannel
+    from sales_channels.integrations.shopify.tasks import shopify_import_db_task
 
     sales_channel = instance.sales_channel.get_real_instance()
     if instance.status == SalesChannelImport.STATUS_PENDING:
 
         if isinstance(sales_channel, MagentoSalesChannel):
             magento_import_db_task(import_process=instance, sales_channel=sales_channel)
+
+        if isinstance(sales_channel, ShopifySalesChannel):
+            shopify_import_db_task(import_process=instance, sales_channel=sales_channel)
 
 
 @receiver(post_update, sender=SalesChannelImport)
@@ -105,6 +113,7 @@ def sales_channels__assign__added_or_remove_receiver(sender, instance, **kwargs)
     refresh_subscription_receiver(instance.product)
 
 # ------------------------------------------------------------- SEND SIGNALS FOR PROPERTIES
+
 
 @receiver(post_update, sender='properties.Property')
 def sales_channels__property__post_update_receiver(sender, instance: Property, **kwargs):
@@ -176,6 +185,7 @@ def sales_channels__property_translation__post_delete_receiver(sender, instance:
 
 # ------------------------------------------------------------- SEND SIGNALS FOR PROPERTIES SELECT VALUE
 
+
 @receiver(post_create, sender='properties.PropertySelectValueTranslation')
 def sales_channels__property_select_value_translation__post_create_receiver(sender, instance: PropertySelectValueTranslation, **kwargs):
     """
@@ -191,10 +201,13 @@ def sales_channels__property_select_value_translation__post_create_receiver(send
 
         if translation_count == 1:
             # Send create signal only if this is the first translation
-            create_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__, instance=instance.propertyselectvalue, language=instance.language)
+            create_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__,
+                                                     instance=instance.propertyselectvalue, language=instance.language)
         else:
             # For additional translations, send an update signal
-            update_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__, instance=instance.propertyselectvalue, language=instance.language)
+            update_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__,
+                                                     instance=instance.propertyselectvalue, language=instance.language)
+
 
 @receiver(post_update, sender='properties.PropertySelectValueTranslation')
 def sales_channels__property_select_value_translation__post_update_receiver(sender, instance: PropertySelectValueTranslation, **kwargs):
@@ -203,7 +216,8 @@ def sales_channels__property_select_value_translation__post_update_receiver(send
     - Sends an update signal on any translation update if the property is public information.
     """
     if instance.propertyselectvalue.property.is_public_information:
-        update_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__, instance=instance.propertyselectvalue, language=instance.language)
+        update_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__,
+                                                 instance=instance.propertyselectvalue, language=instance.language)
 
 
 @receiver(pre_delete, sender='properties.PropertySelectValueTranslation')
@@ -234,6 +248,7 @@ def sales_channels__property_select_value__post_update_receiver(sender, instance
     if instance.property.is_public_information and instance.is_dirty_field('image'):
         update_remote_property_select_value.send(sender=instance.__class__, instance=instance)
 
+
 @receiver(pre_delete, sender='properties.PropertySelectValue')
 def sales_channels__property_select_value__pre_delete_receiver(sender, instance: PropertySelectValue, **kwargs):
     """
@@ -257,6 +272,7 @@ def sales_channels__product_property__post_create_receiver(sender, instance: Pro
     if instance.property.is_public_information and instance.property.type not in Property.TYPES.TRANSLATED:
         create_remote_product_property.send(sender=instance.__class__, instance=instance)
 
+
 @receiver(post_update, sender='properties.ProductProperty')
 def sales_channels__product_property__post_update_receiver(sender, instance: ProductProperty, **kwargs):
     from sales_channels.flows.update_configurator import update_configurator_if_needed_flow
@@ -269,6 +285,7 @@ def sales_channels__product_property__post_update_receiver(sender, instance: Pro
         update_remote_product_property.send(sender=instance.__class__, instance=instance)
 
         update_configurator_if_needed_flow(instance.product, instance.property)
+
 
 @receiver(mutation_update, sender='properties.ProductProperty')
 def sales_channels__product_property__post_update_multiselect_receiver(sender, instance: ProductProperty, **kwargs):
@@ -283,6 +300,7 @@ def sales_channels__product_property__post_update_multiselect_receiver(sender, i
 
         update_configurator_if_needed_flow(instance.product, instance.property)
 
+
 @receiver(pre_delete, sender='properties.ProductProperty')
 def sales_channels__product_property__pre_delete_receiver(sender, instance: ProductProperty, **kwargs):
 
@@ -293,17 +311,20 @@ def sales_channels__product_property__pre_delete_receiver(sender, instance: Prod
     if instance.property.is_public_information:
         delete_remote_product_property.send(sender=instance.__class__, instance=instance)
 
+
 @receiver(post_create, sender='properties.ProductPropertyTextTranslation')
 def sales_channels__product_property_text_translation__post_create_receiver(sender, instance: ProductPropertyTextTranslation, **kwargs):
 
     if instance.product_property.property.is_public_information:
         create_remote_product_property.send(sender=instance.product_property.__class__, instance=instance.product_property, language=instance.language)
 
+
 @receiver(post_update, sender='properties.ProductPropertyTextTranslation')
 def sales_channels__product_property_text_translation__post_update_receiver(sender, instance: ProductPropertyTextTranslation, **kwargs):
 
     if instance.product_property.property.is_public_information:
         update_remote_product_property.send(sender=instance.product_property.__class__, instance=instance.product_property, language=instance.language)
+
 
 @receiver(post_delete, sender='properties.ProductPropertyTextTranslation')
 def sales_channels__product_property_text_translation__pre_delete_receiver(sender, instance: ProductPropertyTextTranslation, **kwargs):
@@ -342,6 +363,7 @@ def sales_channels__sales_channel_integration_pricelist__post_create_receiver(se
     assigns = SalesChannelViewAssign.objects.filter(sales_channel=sales_channel, sales_channel__active=True)
     for assign in assigns:
         update_remote_price.send(sender=assign.product.__class__, instance=assign.product, currency=instance.price_list.currency)
+
 
 @receiver(post_delete, sender='sales_channels.SalesChannelIntegrationPricelist')
 def sales_channels__sales_channel_integration_pricelist__post_delete_receiver(sender, instance, **kwargs):
@@ -389,6 +411,7 @@ def sales_channels__sales_price__post_update_receiver(sender, instance, **kwargs
     """
     update_remote_price.send(sender=instance.product.__class__, instance=instance.product, currency=instance.currency)
 
+
 @receiver(price_changed, sender='products.Product')
 def sales_channels__price_changed__receiver(sender, instance, **kwargs):
     """
@@ -398,6 +421,7 @@ def sales_channels__price_changed__receiver(sender, instance, **kwargs):
     update_remote_price.send(sender=instance.__class__, instance=instance, currency=currency)
 
 # ------------------------------------------------------------- SEND SIGNALS FOR PRODUCT CONTENT
+
 
 @receiver(post_create, sender='products.ProductTranslation')
 @receiver(post_update, sender='products.ProductTranslation')
@@ -419,6 +443,7 @@ def sales_channels__product_translation__post_delete_receiver(sender, instance, 
 
 # ------------------------------------------------------------- SEND SIGNALS FOR VARIATIONS
 
+
 @receiver(post_create, sender='products.ConfigurableVariation')
 def sales_channels__configurable_variation__post_create_receiver(sender, instance, **kwargs):
     """
@@ -434,6 +459,7 @@ def sales_channels__configurable_variation__post_create_receiver(sender, instanc
     )
 
     update_configurators_for_parent_product_db_task(instance.parent)
+
 
 @receiver(post_delete, sender='products.ConfigurableVariation')
 def sales_channels__configurable_variation__post_delete_receiver(sender, instance, **kwargs):
@@ -463,6 +489,7 @@ def sales_channels__media_product_through__post_create_receiver(sender, instance
     if instance.media.type == Media.IMAGE:
         create_remote_image_association.send(sender=instance.__class__, instance=instance)
 
+
 @receiver(post_update, sender='media.MediaProductThrough')
 def sales_channels__media_product_through__post_update_receiver(sender, instance, **kwargs):
     """
@@ -473,6 +500,7 @@ def sales_channels__media_product_through__post_update_receiver(sender, instance
     if instance.media.type == Media.IMAGE and instance.is_any_field_dirty(['sort_order', 'is_main_image']):
         update_remote_image_association.send(sender=instance.__class__, instance=instance)
 
+
 @receiver(pre_delete, sender='media.MediaProductThrough')
 def sales_channels__media_product_through__post_delete_receiver(sender, instance, **kwargs):
     """
@@ -481,7 +509,8 @@ def sales_channels__media_product_through__post_delete_receiver(sender, instance
     """
     if instance.media.type == Media.IMAGE:
         delete_remote_image_association.send(sender=instance.__class__, instance=instance)
-        
+
+
 @receiver(post_delete, sender='media.Media')
 def sales_channels__media__post_delete_receiver(sender, instance, **kwargs):
     """
@@ -546,7 +575,6 @@ def sales_channel_view_assign__post_delete_receiver(sender, instance, **kwargs):
     except SalesChannel.DoesNotExist:
         return
 
-
     # Count the number of assignments related to the same product and sales channel
     product_assign_count = SalesChannelViewAssign.objects.filter(
         product=instance.product,
@@ -562,6 +590,7 @@ def sales_channel_view_assign__post_delete_receiver(sender, instance, **kwargs):
         # Otherwise, send sales_view_assign_updated signal
         sales_view_assign_updated.send(sender=instance.product.__class__, instance=instance.product, sales_channel=instance.sales_channel)
 
+
 @receiver(post_update, sender='products.Product')
 @receiver(post_update, sender='products.SimpleProduct')
 @receiver(post_update, sender='products.ConfigurableProduct')
@@ -576,6 +605,7 @@ def sales_channels__product__post_update_receiver(sender, instance, **kwargs):
         # Send update_remote_product signal
         update_remote_product.send(sender=instance.__class__, instance=instance)
 
+
 @receiver(pre_delete, sender='products.Product')
 @receiver(pre_delete, sender='products.SimpleProduct')
 @receiver(pre_delete, sender='products.ConfigurableProduct')
@@ -587,6 +617,7 @@ def sales_channels__product__pre_delete_receiver(sender, instance, **kwargs):
     """
     delete_remote_product.send(sender=instance.__class__, instance=instance)
 
+
 @receiver(post_update, sender='products_inspector.Inspector')
 def sales_channels__inspector__post_update_receiver(sender, instance, **kwargs):
     """
@@ -595,11 +626,12 @@ def sales_channels__inspector__post_update_receiver(sender, instance, **kwargs):
     """
     if instance.is_dirty_field('has_missing_information') and not instance.has_missing_information:
         sync_remote_product.send(sender=instance.product.__class__, instance=instance.product)
-        
+
+
 @receiver(product_properties_rule_configurator_updated, sender='properties.ProductPropertiesRule')
 def sales_channels__configurator_rule_changed_receiver(sender, instance, **kwargs):
     from .tasks import update_configurators_for_rule_db_task
-    
+
     update_configurators_for_rule_db_task(instance)
 
 
@@ -612,6 +644,7 @@ def sales_channels__ean_code_changed_receiver(sender, instance, **kwargs):
     product = instance.product
     if product:
         update_remote_product_eancode.send(sender=product.__class__, instance=product)
+
 
 @receiver(ean_code_released_for_product, sender='products.Product')
 @receiver(ean_code_released_for_product, sender='products.SimpleProduct')
@@ -626,6 +659,7 @@ def sales_channels__vat_rate__post_create_receiver(sender, instance, **kwargs):
     Handles the creation of VatRate instances.
     """
     create_remote_vat_rate.send(sender=instance.__class__, instance=instance)
+
 
 @receiver(post_update, sender='taxes.VatRate')
 def sales_channels__vat_rate__post_update_receiver(sender, instance, **kwargs):

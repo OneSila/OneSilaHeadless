@@ -25,41 +25,41 @@ class DetectPropertyTypeLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMi
 
     Below are guidelines and real-world examples for each type:
 
-    1. **INT:**  
-       Use this for properties that are whole numbers.  
+    1. **INT:**
+       Use this for properties that are whole numbers.
        *Example:* A property representing "Warranty Period" (number of years) should be INT.
 
-    2. **FLOAT:**  
-       Use this for properties that have decimal values.  
+    2. **FLOAT:**
+       Use this for properties that have decimal values.
        *Example:* A property representing "Weight" (which might be 1.5 or 2.75) should be FLOAT.
 
-    3. **TEXT:**  
+    3. **TEXT:**
        Use this for free-form, personalized text entries that are unique to the product and are not used for standard categorization.
        *Example:* A property like "Motto" or "Tagline"—a brief, unique phrase describing the product—should be TEXT.
        *Do NOT use TEXT for common product attributes such as material, model, or style.* This are SELECT when they can be common into multiple products.
 
-    4. **DESCRIPTION:**  
-       Use this for longer, detailed descriptions.  
+    4. **DESCRIPTION:**
+       Use this for longer, detailed descriptions.
        *Example:* A property representing "Product Description" that provides comprehensive details should be DESCRIPTION.
 
-    5. **BOOLEAN:**  
-       Use this for properties representing a yes/no value.  
+    5. **BOOLEAN:**
+       Use this for properties representing a yes/no value.
        *Example:* A property like "Is Organic" should be BOOLEAN.
 
-    6. **DATE:**  
-       Use this for properties that are simple dates.  
+    6. **DATE:**
+       Use this for properties that are simple dates.
        *Example:* A property like "Release Date" should be DATE.
 
-    7. **DATETIME:**  
-       Use this for properties that include both date and time.  
+    7. **DATETIME:**
+       Use this for properties that include both date and time.
        *Example:* A property like "Manufacture DateTime" should be DATETIME.
 
-    8. **SELECT:**  
-       Use this for properties that are single-choice selections. This is the most common type for product attributes.  
+    8. **SELECT:**
+       Use this for properties that are single-choice selections. This is the most common type for product attributes.
        *Example:* A property like "Color", "Material", "Size", or "Brand" should be SELECT.
 
-    9. **MULTISELECT:**  
-       Use this for properties that allow multiple selections from a predefined list.  
+    9. **MULTISELECT:**
+       Use this for properties that allow multiple selections from a predefined list.
        *Example:* A property like "Washing Instructions" should be MULTISELECT.
 
     Your response must be exactly one of these words (in uppercase) with no additional text or punctuation.

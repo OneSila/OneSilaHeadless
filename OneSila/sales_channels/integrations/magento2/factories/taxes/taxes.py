@@ -45,6 +45,7 @@ class MagentoTaxClassCreateFactory(GetMagentoAPIMixin, RemoteVatRateCreateFactor
 
         raise Exception(f'{self.local_instance.name} not found!')
 
+
 class MagentoTaxClassUpdateFactory(GetMagentoAPIMixin, RemoteVatRateUpdateFactory):
     remote_model_class = MagentoTaxClass
     create_factory_class = MagentoTaxClassCreateFactory
