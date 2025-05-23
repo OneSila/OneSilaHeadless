@@ -713,6 +713,9 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         if errors:
             raise ShopifyGraphqlException(f"Shopify productCreate userErrors: {errors}")
 
+        if "data" not in data:
+            raise ShopifyGraphqlException(f"GraphQL error: {json.dumps(data, indent=2)}")
+
         self.product_data = data["data"]["productCreate"]["product"]
         variant_node = self.product_data["variants"]["edges"][0]["node"]
 
