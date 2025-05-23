@@ -36,6 +36,7 @@ pydantic<2.0
 gunicorn
 uvicorn
 markdown
+mkdocs
 
 strawberry-graphql==0.266.0
 strawberry-graphql-django==0.59.1
