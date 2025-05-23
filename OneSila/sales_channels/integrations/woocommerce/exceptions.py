@@ -11,13 +11,15 @@ class WoocommerceError(Exception):
         self.response_message = None
         self.response_status_code = None
 
-        if self.response:
-            json = self.response.json()
+        try:
+            json = response.json()
             self.code = json.get('code')
             self.response_message = json.get('message', message)
             self.response_status_code = self.response.status_code
+        except AttributeError:
+            self.response_message = message
 
-        super().__init__(self.response_message if self.response_message else message)
+        super().__init__(self.response_message)
 
 
 class FailedToGetAttributesError(WoocommerceError):
@@ -192,4 +194,9 @@ class ProductNotFoundError(FailedToUpdateProductError):
     """
     Exception raised when the product is not found on the WooCommerce API.
     """
+    pass
+
+
+class InternalWoocomPostError(Exception):
+    """Used if woocom failed to post throught the actual package."""
     pass

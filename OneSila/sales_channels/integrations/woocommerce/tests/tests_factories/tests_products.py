@@ -172,7 +172,7 @@ class WooCommerceProductFactoryTest(WooCommerceProductFactoryTestMixin):
         # Prepare a config product that we will assign directly to the
         # sales channel
         parent = self.create_test_product(
-            sku="tshirt-configurable-product",
+            sku="test_config-product",
             name="Test Product",
             assign_to_sales_channel=True,
             rule=self.product_rule,
@@ -190,7 +190,7 @@ class WooCommerceProductFactoryTest(WooCommerceProductFactoryTestMixin):
 
         # Go and create the variations.
         small_product = self.create_test_product(
-            sku="tshirt-config-small-product",
+            sku="tshirt_config-small-product_child-small",
             name="Small Product",
             assign_to_sales_channel=True,
             rule=self.product_rule,
@@ -203,7 +203,7 @@ class WooCommerceProductFactoryTest(WooCommerceProductFactoryTestMixin):
         self.assertTrue(price.price is not None)
 
         medium_product = self.create_test_product(
-            sku="tshirt-config-medium-product",
+            sku="tshirt_config-small-product_child-medium",
             name="Medium Product",
             assign_to_sales_channel=True,
             rule=self.product_rule,
@@ -212,7 +212,7 @@ class WooCommerceProductFactoryTest(WooCommerceProductFactoryTestMixin):
         self.assertTrue(medium_product.is_simple())
 
         large_product = self.create_test_product(
-            sku="tshirt-config-large-product",
+            sku="tshirt_config-small-product_child-large",
             name="Large Product",
             assign_to_sales_channel=True,
             rule=self.product_rule,

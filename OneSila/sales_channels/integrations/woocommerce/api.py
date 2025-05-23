@@ -10,8 +10,10 @@ from .exceptions import FailedToGetAttributesError, FailedToGetError, \
     FailedToCreateAttributeTermError, FailedToDeleteAttributeTermError, FailedToUpdateAttributeTermError, \
     FailedToGetStoreCurrencyError, FailedToGetProductError, FailedToGetProductBySkuError, FailedToCreateProductError, \
     FailedToUpdateProductError, FailedToDeleteProductError, FailedToGetStoreConfigError, \
-    FailedToGetStoreLanguageError
+    FailedToGetStoreLanguageError, InternalWoocomPostError
 from .constants import API_ATTRIBUTE_PREFIX
+from .helpers import convert_fields_to_int, clearout_none_values, convert_fields_to_string, \
+    raise_for_required_fields
 import urllib3
 import requests
 from copy import deepcopy
@@ -93,13 +95,19 @@ class WoocommerceApiWrapper:
 
     def post(self, endpoint, data=None):
         logger.debug(f"POSTing to {endpoint} with data: {data}")
-        resp = self.woocom.post(endpoint, data=data)
+        try:
+            resp = self.woocom.post(endpoint, data=data)
+        except Exception as e:
+            raise InternalWoocomPostError(e) from e
+
         try:
             resp.raise_for_status()
             return resp.json()
         except Exception as e:
             if "already in use" in resp.text:
                 raise DuplicateError(e, response=resp) from e
+
+            logger.error(f"Failed to post to {endpoint} with data: {data} , response: {resp.text} and error: {e}")
             raise FailedToPostError(e, response=resp) from e
 
     def put(self, endpoint, data=None):
@@ -265,10 +273,8 @@ class WoocommerceApiWrapper:
             'images': images,
             'attributes': attributes,
         }
-        for k, v in deepcopy(payload).items():
-            if v is None or v == []:
-                del payload[k]
 
+        payload = clearout_none_values(payload)
         logger.debug(f"Create Product Payload: {payload}")
 
         try:
@@ -288,17 +294,18 @@ class WoocommerceApiWrapper:
         Create a product variation in WooCommerce.
         """
         fields_to_convert_to_string = ['regular_price', 'sale_price']
+        fields_to_convert_to_int = ['attribute__id']
+        required_fields = ['regular_price']
 
-        for k, v in deepcopy(payload).items():
-            if v is None:
-                del payload[k]
+        # Verify for required fields:
+        for i in required_fields:
+            if i not in payload:
+                raise ValueError(f"{i} is required and currently not presented in the payload")
 
-        if 'regular_price' not in payload:
-            raise ValueError("regular_price is required and currently not presented in the payload")
-
-        for key in payload.keys():
-            if key in fields_to_convert_to_string:
-                payload[key] = self._convert_price_to_string(payload[key])
+        payload = raise_for_required_fields(payload, required_fields)
+        payload = convert_fields_to_int(payload, fields_to_convert_to_int)
+        payload = clearout_none_values(payload)
+        payload = convert_fields_to_string(payload, fields_to_convert_to_string)
 
         logger.debug(f"Create Product Variation Payload: {payload}")
         return self.post(f'products/{product_id}/variations', data=payload)
