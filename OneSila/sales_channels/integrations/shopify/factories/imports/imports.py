@@ -589,7 +589,9 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
 
             structured_data["allow_backorder"] = inventory_policy == "CONTINUE"
             structured_data["ean_code"] = product.get("barcode")
-            structured_data["sku"] = sku
+
+            if sku:
+                structured_data["sku"] = sku
 
         else:
 
