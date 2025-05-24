@@ -15,6 +15,9 @@ class PublicCurrency(models.SharedModel):
     def __str__(self):
         return self.iso_code
 
+    class Meta:
+        verbose_name_plural = _('Public Currencies')
+
 
 class Currency(models.Model):
     '''
