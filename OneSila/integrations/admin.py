@@ -1,4 +1,5 @@
 from django.contrib import admin
+from core.admin import ModelAdmin
 from polymorphic.admin import PolymorphicChildModelFilter, PolymorphicParentModelAdmin
 
 from integrations.models import Integration, IntegrationTaskQueue, IntegrationLog
@@ -8,7 +9,6 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.contrib import messages
 import json
-from django.contrib import admin
 from pygments import highlight
 from pygments.lexers import JsonLexer
 from pygments.formatters import HtmlFormatter
@@ -33,7 +33,7 @@ def retry_task_action(modeladmin, request, queryset):
 
 
 @admin.register(IntegrationTaskQueue)
-class RemoteTaskQueueAdmin(admin.ModelAdmin):
+class RemoteTaskQueueAdmin(ModelAdmin):
     list_display = ['__str__', 'status', 'priority', 'sent_to_queue_at_display']
     list_filter = ['status', 'integration', 'task_name']
     actions = [retry_task_action]
