@@ -39,7 +39,8 @@ class MagentoProductProperty(RemoteProductProperty):
     """
     Magento-specific model for remote product properties.
     """
-    pass
+    class Meta:
+        verbose_name_plural = _('Magento Product Properties')
 
 
 class MagentoAttributeSet(RemoteObjectMixin, models.Model):
