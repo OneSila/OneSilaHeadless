@@ -38,8 +38,8 @@ uvicorn
 markdown
 mkdocs
 
-strawberry-graphql==0.266.0
-strawberry-graphql-django==0.59.1
+strawberry-graphql==0.270.1
+strawberry-graphql-django==0.60.0
 
 django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absolute_url.git@master
 
