@@ -1,3 +1,8 @@
 from django.contrib import admin
+from core.admin import ModelAdmin
+from eancodes.models import EanCode
 
-# Register your models here.
+
+@admin.register(EanCode)
+class EanCodeAdmin(ModelAdmin):
+    pass
