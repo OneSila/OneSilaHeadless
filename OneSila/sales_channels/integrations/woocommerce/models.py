@@ -6,6 +6,7 @@ from sales_channels.models import SalesChannel, SalesChannelView, \
 from sales_channels.models.properties import RemoteProperty, \
     RemotePropertySelectValue, RemoteProductProperty
 from sales_channels.models.products import RemoteImageProductAssociation
+from django.utils.translation import gettext_lazy as _
 
 
 class WoocommerceSalesChannel(SalesChannel):
@@ -50,7 +51,8 @@ class WoocommerceGlobalAttribute(RemoteProperty):
     """
     Woocommerce attribute model
     """
-    pass
+    class Meta:
+        verbose_name_plural = _('Woocommerce Product Properties')
 
 
 class WoocommerceGlobalAttributeValue(RemotePropertySelectValue):
@@ -92,7 +94,8 @@ class WoocommerceCurrency(RemoteCurrency):
     """
     Woocommerce currency model
     """
-    pass
+    class Meta:
+        verbose_name_plural = _('Woocommerce Currencies')
 
 
 class WoocommerceRemoteLanguage(RemoteLanguage):
