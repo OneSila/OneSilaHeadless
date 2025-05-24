@@ -484,16 +484,17 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
             }
 
         brand_attr = self.sales_channel.vendor_property
-        if brand_attr:
+        vendor_value = product.get("vendor", None)
+        if brand_attr and vendor_value is not None:
             attributes.append({
                 "property": brand_attr,
-                "value": product.get("vendor"),
+                "value": vendor_value,
             })
 
             mirror_map[brand_attr.id] = {
                 "key": "vendor",
                 "namespace": DEFAULT_METAFIELD_NAMESPACE,
-                "value": product.get("vendor"),
+                "value": vendor_value,
                 "remote_id": None,
             }
 
