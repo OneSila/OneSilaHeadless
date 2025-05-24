@@ -150,6 +150,18 @@ class ShopifyProductPropertyUpdateFactory(
     def serialize_response(self, response):
         return response
 
+    def create_remote_instance(self):
+
+        create_factory = ShopifyProductPropertyCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.local_instance,
+            remote_product=self.remote_product,
+            api=self.api,
+        )
+        create_factory.run()
+
+        self.remote_instance = create_factory.remote_instance
+
 
 class ShopifyProductPropertyDeleteFactory(
     GetShopifyApiMixin,
