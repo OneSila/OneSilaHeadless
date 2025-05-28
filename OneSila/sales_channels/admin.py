@@ -1,13 +1,13 @@
 from django.contrib import admin
 from polymorphic.admin import PolymorphicChildModelAdmin
 from pygments.lexers import JsonLexer
-
+from core.admin import ModelAdmin
 from .models import SalesChannel, RemoteLog, SalesChannelImport
 from .models.products import RemoteProductConfigurator
 
 
 @admin.register(RemoteProductConfigurator)
-class RemoteProductConfiguratorAdmin(admin.ModelAdmin):
+class RemoteProductConfiguratorAdmin(ModelAdmin):
     pass
 
 
@@ -40,5 +40,26 @@ class RemoteLogAdmin(PolymorphicChildModelAdmin):
 
 
 @admin.register(SalesChannelImport)
-class SalesChannelImportAdmin(admin.ModelAdmin):
-    pass
+class SalesChannelImportAdmin(ModelAdmin):
+    raw_id_fields = [
+        'sales_channel',
+        'multi_tenant_company',
+        'created_by_multi_tenant_user',
+    ]
+
+
+class SalesChannelRemoteAdmin(ModelAdmin):
+    raw_id_fields = [
+        'multi_tenant_company',
+        'created_by_multi_tenant_user',
+        'sales_channel',
+    ]
+
+
+class SalesChannelRemoteProductAdmin(ModelAdmin):
+    raw_id_fields = [
+        'multi_tenant_company',
+        'created_by_multi_tenant_user',
+        'sales_channel',
+        'local_instance',
+    ]
