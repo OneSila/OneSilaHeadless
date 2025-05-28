@@ -111,6 +111,16 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     @property
     def remote_url(self):
+        from sales_channels.integrations.shopify.models import  ShopifySalesChannel
+        from sales_channels.integrations.magento2.models import MagentoSalesChannel
+
+        sales_channel = self.sales_channel.get_real_instance()
+
+        if isinstance(sales_channel, ShopifySalesChannel):
+            return f"{self.sales_channel_view.url}/products/{self.product.url_key}"
+        elif isinstance(sales_channel, MagentoSalesChannel):
+            return f"{self.sales_channel_view.url}{self.product.url_key}.html"
+
         return f"{self.sales_channel_view.url}{self.product.url_key}.html"
 
 

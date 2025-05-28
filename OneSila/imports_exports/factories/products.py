@@ -34,8 +34,8 @@ class SalesPriceImport(ImportOperationMixin):
 
 class ImportProductInstance(AbstractImportInstance):
 
-    def __init__(self, data: dict, import_process=None, rule=None, translations=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, rule=None, translations=None, instance=None):
+        super().__init__(data, import_process, instance)
 
         if translations is None:
             translations = []
@@ -244,9 +244,9 @@ class ImportProductInstance(AbstractImportInstance):
     def process_logic(self):
 
         if self.type == Product.ALIAS:
-            fac = AliasProductImport(self, self.import_process)
+            fac = AliasProductImport(self, self.import_process, instance=self.instance)
         else:
-            fac = ProductImport(self, self.import_process)
+            fac = ProductImport(self, self.import_process, instance=self.instance)
 
         fac.run()
 
@@ -510,8 +510,8 @@ class ImportProductInstance(AbstractImportInstance):
 
 class ImportProductTranslationInstance(AbstractImportInstance):
 
-    def __init__(self, data: dict, import_process=None, product=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, product=None, instance=None):
+        super().__init__(data, import_process, instance)
         self.product = product
 
         self.set_field_if_exists('name')
@@ -554,7 +554,7 @@ class ImportProductTranslationInstance(AbstractImportInstance):
             self.product = self.product_import_instance.instance
 
     def process_logic(self):
-        fac = ProductTranslationImport(self, self.import_process)
+        fac = ProductTranslationImport(self, self.import_process, instance=self.instance)
         fac.run()
 
         self.instance = fac.instance
@@ -562,8 +562,8 @@ class ImportProductTranslationInstance(AbstractImportInstance):
 
 class ImportSalesPriceInstance(AbstractImportInstance):
 
-    def __init__(self, data: dict, import_process=None, product=None, currency_object=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, product=None, currency_object=None, instance=None):
+        super().__init__(data, import_process, instance)
         self.product = product
 
         self.set_field_if_exists('rrp')
@@ -669,5 +669,5 @@ class ImportSalesPriceInstance(AbstractImportInstance):
         if self.price == 0:
             return
 
-        fac = SalesPriceImport(self, self.import_process)
+        fac = SalesPriceImport(self, self.import_process, instance=self.instance)
         fac.run()
