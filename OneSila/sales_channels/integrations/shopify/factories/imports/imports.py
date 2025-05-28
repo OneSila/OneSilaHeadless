@@ -779,7 +779,9 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         self.handle_prices(import_instance)
         self.handle_images(import_instance)
         self.handle_variations(import_instance)
-        self.handle_sales_channels_views(import_instance, product)
+
+        if not is_variation:
+            self.handle_sales_channels_views(import_instance, product)
 
         return import_instance.instance
 

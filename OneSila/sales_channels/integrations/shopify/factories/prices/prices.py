@@ -47,8 +47,9 @@ class ShopifyPriceUpdateFactory(GetShopifyApiMixin, RemotePriceUpdateFactory):
         }
         """
 
+        parent_id = self.remote_product.remote_parent_product.remote_id if self.remote_product.is_variation else self.remote_product.remote_id
         variables = {
-            "productId": self.remote_product.remote_id,
+            "productId": parent_id,
             "variants": [variant_payload],
         }
 
