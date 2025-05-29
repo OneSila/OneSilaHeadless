@@ -32,9 +32,22 @@ class TestEANCodeValidator(TestCase):
 
     def test_valid_ean(self):
         validator = EANCodeValidator("5055988625672", fail_on_error=False)
-        self.assertEqual(validator.run(), [])
+        resp, errors = validator.run()
+        self.assertTrue(resp)
+        self.assertEqual(errors, None)
 
     def test_valid_ean_fail_on_error(self):
         validator = EANCodeValidator("5055988625672", fail_on_error=True)
         validator.run()
         self.assertEqual(validator.errors, [])
+
+    def test_messed_up_format(self):
+        validator = EANCodeValidator("5051090-002226", fail_on_error=False)
+        resp, errors = validator.run()
+        self.assertFalse(resp)
+        self.assertTrue(len(errors) > 0)
+
+    def test_messed_up_format_fail_on_error(self):
+        validator = EANCodeValidator("5051090-002226", fail_on_error=True)
+        with self.assertRaises(ValidationError):
+            validator.run()
