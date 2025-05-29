@@ -1,6 +1,9 @@
-from core.receivers import receiver
-from core.signals import post_create, post_update
+from django.dispatch import receiver
+from core.signals import post_create
+from imports_exports.models import MappedImport
+from imports_exports.tasks import run_mapped_import_task
 
-# @receiver(post_update, sender='app_name.Model')
-# def app_name__model__action__example(sender, instance, **kwargs):
-#     do_something()
+
+@receiver(post_create, sender=MappedImport)
+def imports_exports__run_mapped_import_on_create(sender, instance, **kwargs):
+    run_mapped_import_task(instance.id)
