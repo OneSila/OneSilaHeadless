@@ -505,7 +505,7 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
                 "remote_id": None,
             }
 
-        if self.tags_property and product_type != Product.CONFIGURABLE:
+        if self.tags_property:
             attributes.append({
                 "property": self.tags_property,
                 "value": product.get("tags"),
@@ -675,14 +675,16 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         is_configurable = len(variants) > 1
         product_type = Product.CONFIGURABLE if is_configurable else Product.SIMPLE
 
-        rule_product_type = product.get("productType") if parent_product_type is None else parent_product_type
         active = product.get("status") == "ACTIVE"
         structured_data = {
             "name": product.get("title"),
             "type": product_type,
             "active": active,
-            "product_type": rule_product_type,
         }
+
+        rule_product_type = product.get("productType") if parent_product_type is None else parent_product_type
+        if rule_product_type:
+            structured_data["product_type"] = rule_product_type
 
         if 'sku' in product:
             sku = product.get("sku")

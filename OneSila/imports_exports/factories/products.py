@@ -309,7 +309,9 @@ class ImportProductInstance(AbstractImportInstance):
             )
             image_import_instance.process()
 
-            images_instances_ids.append(image_import_instance.instance.id)
+            if image_import_instance.instance is not None:
+                images_instances_ids.append(image_import_instance.instance.id)
+
             if hasattr(image_import_instance, 'media_assign'):
                 images_instances_associations_ids.append(image_import_instance.media_assign.id)
 
