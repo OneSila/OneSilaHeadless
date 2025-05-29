@@ -30,6 +30,27 @@ class ShopifySalesChannel(SalesChannel):
         help_text="The product property that maps to Shopify vendor (brand)."
     )
 
+
+    # for when is_external_install is True
+    hmac = models.CharField(
+        max_length=512,
+        null=True, blank=True,
+        help_text="HMAC received during external install for validation."
+    )
+
+    host = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Shopify host parameter used for HMAC validation and redirect context."
+    )
+
+    timestamp = models.CharField(
+        max_length=64,
+        null=True, blank=True,
+        help_text="Timestamp received during external install for validation."
+    )
+
     class Meta:
         verbose_name = 'Shopify Sales Channel'
         verbose_name_plural = 'Shopify Sales Channels'

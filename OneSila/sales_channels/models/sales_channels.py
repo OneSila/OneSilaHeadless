@@ -26,6 +26,11 @@ class SalesChannel(Integration, models.Model):
     is_importing = models.BooleanField(default=False, help_text=_("True while an import process is running."))
     mark_for_delete = models.BooleanField(default=False, help_text="Set to True when shop is scheduled for deletion (e.g. from shopify/shop_redact).")
 
+    is_external_install = models.BooleanField(
+        default=False,
+        help_text="True if the installation was initiated from the Shopify App Store or other stores."
+    )
+
     class Meta:
         verbose_name = 'Sales Channel'
         verbose_name_plural = 'Sales Channels'
