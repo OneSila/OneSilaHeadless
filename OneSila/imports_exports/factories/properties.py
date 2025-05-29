@@ -143,8 +143,8 @@ class ImportPropertyInstance(AbstractImportInstance):
     """
     ALLOWED_TYPES = [choice[0] for choice in Property.TYPES.ALL]
 
-    def __init__(self, data: dict, import_process=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, instance=None):
+        super().__init__(data, import_process, instance)
 
         # make sure we only use the needed values
         self.set_field_if_exists('name')
@@ -222,7 +222,7 @@ class ImportPropertyInstance(AbstractImportInstance):
     def process_logic(self):
 
         # Instantiate the factory, providing the mandatory import_process.
-        fac = self.factory_class(self, self.import_process)
+        fac = self.factory_class(self, self.import_process, instance=self.instance)
         fac.run()
 
         # Save the created/updated instance.
@@ -286,8 +286,8 @@ class ImportPropertySelectValueInstance(AbstractImportInstance):
     Optionally, if the property already exists, the data may contain a 'property' key.
     """
 
-    def __init__(self, data: dict, import_process=None, property=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, property=None, instance=None):
+        super().__init__(data, import_process, instance)
         self.property = property
 
         self.set_field_if_exists('value')
@@ -337,7 +337,7 @@ class ImportPropertySelectValueInstance(AbstractImportInstance):
         - Otherwise, import the Property using 'property_data' via ImportPropertyInstance.
         - Then, create or update the PropertySelectValue using the provided 'value'.
         """
-        fac = PropertySelectValueImport(self, self.import_process)
+        fac = PropertySelectValueImport(self, self.import_process, instance=self.instance)
         fac.run()
 
         # Save the created/updated instance.
@@ -392,8 +392,8 @@ class ImportProductPropertiesRuleInstance(AbstractImportInstance):
 
     """
 
-    def __init__(self, data: dict, import_process=None, product_type=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, product_type=None, instance=None):
+        super().__init__(data, import_process, instance)
 
         # an existing Property instance, if provided
         self.product_type = product_type
@@ -444,7 +444,7 @@ class ImportProductPropertiesRuleInstance(AbstractImportInstance):
             self.product_type = self.property_select_value_import_instance.instance
 
     def process_logic(self):
-        fac = ProductPropertiesRuleImport(self, self.import_process)
+        fac = ProductPropertiesRuleImport(self, self.import_process, instance=self.instance)
         fac.run()
 
         self.instance = fac.instance
@@ -479,8 +479,8 @@ class ImportProductPropertiesRuleItemInstance(AbstractImportInstance):
     Optionally, a 'rule' or a 'property' may be provided externally.
     """
 
-    def __init__(self, data: dict, import_process=None, rule=None, property=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, rule=None, property=None, instance=None):
+        super().__init__(data, import_process, instance)
         self.rule = rule
         self.property = property
 
@@ -540,7 +540,7 @@ class ImportProductPropertiesRuleItemInstance(AbstractImportInstance):
             self.rule = self.rule_import_instance.instance
 
     def process_logic(self):
-        fac = ProductPropertiesRuleItemImport(self, self.import_process,)
+        fac = ProductPropertiesRuleItemImport(self, self.import_process, instance=self.instance)
         fac.run()
 
         self.instance = fac.instance
@@ -576,8 +576,8 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
     Optionally, if the property already exists, the data may contain a 'property' key.
     """
 
-    def __init__(self, data: dict, import_process=None, property=None, product=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, property=None, product=None, instance=None):
+        super().__init__(data, import_process, instance)
         self.property = property
         self.product = product
 
@@ -708,7 +708,7 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
                 self.value_multi_select = PropertySelectValue.objects.filter(id__in=ids)
 
     def process_logic(self):
-        fac = self.factory_class(self, self.import_process)
+        fac = self.factory_class(self, self.import_process, instance=self.instance)
         fac.run()
 
         self.instance = fac.instance

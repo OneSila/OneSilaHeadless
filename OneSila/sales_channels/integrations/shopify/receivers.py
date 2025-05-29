@@ -1,4 +1,8 @@
+from django.db.models.signals import post_delete
 from django.dispatch import receiver
+
+from core.signals import post_update, mutation_update
+from sales_channels.integrations.shopify.constants import SHOPIFY_TAGS
 from sales_channels.integrations.shopify.tasks import create_shopify_product_db_task, \
     create_shopify_product_property_db_task, update_shopify_product_property_db_task, \
     delete_shopify_product_property_db_task, update_shopify_price_db_task, update_shopify_product_content_db_task, \
@@ -174,6 +178,23 @@ def shopify__product_property__update(sender, instance, **kwargs):
         sales_channel_class=ShopifySalesChannel,
         product_property_id=instance.id,
     )
+
+
+@receiver(post_update, sender='properties.ProductProperty')
+@receiver(mutation_update, sender='properties.ProductProperty')
+@receiver(post_delete, sender='properties.ProductProperty')
+def shopify__product_property__tags__update(sender, instance, **kwargs):
+    product = instance.product
+
+    if instance.property.internal_name == SHOPIFY_TAGS:
+
+        run_product_specific_sales_channel_task_flow(
+            task_func=sync_shopify_product_db_task,
+            multi_tenant_company=product.multi_tenant_company,
+            product=product,
+            sales_channel_class=ShopifySalesChannel,
+            product_id=product.id,
+        )
 
 
 @receiver(delete_remote_product_property, sender='properties.ProductProperty')

@@ -23,8 +23,8 @@ class ImportImageInstance(AbstractImportInstance):
     Either image_url or image_content must be provided.
     """
 
-    def __init__(self, data: dict, import_process=None, product=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, product=None, instance=None):
+        super().__init__(data, import_process, instance)
         self.product = product
 
         self.set_field_if_exists('image_url')

@@ -26,8 +26,8 @@ class ImportConfigurableVariationInstance(AbstractImportInstance):
         - `variation_data` or `variation_product`
     """
 
-    def __init__(self, data: dict, import_process=None, config_product=None, variation_product=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, config_product=None, variation_product=None, instance=None):
+        super().__init__(data, import_process, instance)
         self.config_product = config_product
         self.variation_product = variation_product
 
@@ -70,7 +70,7 @@ class ImportConfigurableVariationInstance(AbstractImportInstance):
         self.parent = self.config_product
         self.variation = self.variation_product
 
-        fac = ConfigurableVariationImport(self, self.import_process)
+        fac = ConfigurableVariationImport(self, self.import_process, instance=self.instance)
         fac.run()
 
         self.instance = fac.instance
@@ -113,8 +113,8 @@ class ImportConfiguratorVariationsInstance(AbstractImportInstance, GetSelectValu
     }
     """
 
-    def __init__(self, data: dict, import_process=None, config_product=None, rule=None, select_values=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, config_product=None, rule=None, select_values=None, instance=None):
+        super().__init__(data, import_process, instance)
         self.config_product = config_product
         self.rule = rule
         self.select_values = select_values
@@ -194,8 +194,8 @@ class ImportBundleVariationInstance(AbstractImportInstance):
         - `quantity`
     """
 
-    def __init__(self, data: dict, import_process=None, bundle_product=None, variation_product=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, bundle_product=None, variation_product=None, instance=None):
+        super().__init__(data, import_process, instance)
         self.bundle_product = bundle_product
         self.variation_product = variation_product
 
@@ -241,7 +241,7 @@ class ImportBundleVariationInstance(AbstractImportInstance):
         self.parent = self.bundle_product
         self.variation = self.variation_product
 
-        fac = BundleVariationImport(self, self.import_process)
+        fac = BundleVariationImport(self, self.import_process, instance=self.instance)
         fac.run()
 
         # Add quantity manually (not handled by BundleVariationImport)
@@ -261,8 +261,8 @@ class ImportAliasVariationInstance(AbstractImportInstance):
         - `alias_copy_product_properties` (bool)
     """
 
-    def __init__(self, data: dict, import_process=None, parent_product=None, alias_product=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, parent_product=None, alias_product=None, instance=None):
+        super().__init__(data, import_process, instance)
         self.parent_product = parent_product
         self.alias_product = alias_product
 
@@ -305,7 +305,6 @@ class ImportAliasVariationInstance(AbstractImportInstance):
 
     def process_logic(self):
 
-        # Optionally copy data from parent
         if self.alias_copy_images or self.alias_copy_product_properties:
             AliasProduct.objects.copy_from_parent(
                 self.alias_product,

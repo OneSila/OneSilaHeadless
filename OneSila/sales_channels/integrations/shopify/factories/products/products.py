@@ -12,7 +12,7 @@ from sales_channels.factories.products.products import (
     RemoteProductDeleteFactory,
 )
 from sales_channels.integrations.shopify.constants import ACTIVE_STATUS, NON_ACTIVE_STATUS, \
-    ALLOW_BACKORDER_CONTINUE, ALLOW_BACKORDER_DENY, MEDIA_FRAGMENT, get_metafields
+    ALLOW_BACKORDER_CONTINUE, ALLOW_BACKORDER_DENY, MEDIA_FRAGMENT, get_metafields, SHOPIFY_TAGS
 from sales_channels.integrations.shopify.exceptions import ShopifyGraphqlException
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin
 from sales_channels.integrations.shopify.models import ShopifyProductProperty, ShopifySalesChannelView
@@ -62,12 +62,15 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         'content': 'content',
     }
 
-    variant_payload = {
-        'inventoryItem': {}
-    }
-    metafields = []
-    tags = []
-    medias = []
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.variant_payload = {
+            'inventoryItem': {}
+        }
+        self.metafields = []
+        self.tags = []
+        self.medias = []
 
     def set_sku(self):
         self.sku = self.local_instance.sku
@@ -85,6 +88,11 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
 
     def set_vendor(self):
         if self.sales_channel.vendor_property:
+
+            # the update method does not fetch the product_properties
+            if not hasattr(self, 'product_properties'):
+                self.set_product_properties()
+
             vendor_product_property = self.product_properties.filter(property=self.sales_channel.vendor_property).first()
 
             if vendor_product_property:
@@ -106,6 +114,20 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         super().set_ean_code()
         self.variant_payload['barcode'] = self.ean_code if self.ean_code else ''
 
+    def set_tags(self):
+        tags_product_property = ProductProperty.objects.filter(
+            product=self.local_instance,
+            property__internal_name=SHOPIFY_TAGS
+        ).first()
+
+        tags = []
+        if tags_product_property:
+            for select_value in tags_product_property.value_multi_select.all():
+                v = select_value.value
+                tags.append(v)
+
+        self.payload['tags'] = tags
+
     def build_payload(self):
         self.set_sku()
         super().build_payload()
@@ -117,13 +139,12 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
 
     def customize_payload(self):
         self.set_vendor()
+        self.set_tags()
 
         if self.is_variation:
             self.variant_payload['metafields'] = self.metafields
         else:
             self.payload['metafields'] = self.metafields
-
-        self.payload['tags'] = self.tags
 
     def get_saleschannel_remote_object(self, sku):
         gql = self.api.GraphQL()
@@ -259,15 +280,6 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
                 "type": fac.metafield_type,
             })
 
-            if fac.local_instance.property.add_to_filters:
-                if product_property.property.type == Property.TYPES.MULTISELECT:
-                    values = json.loads(fac.value) if isinstance(fac.value, str) else fac.value
-                    for v in values:
-                        self.tags.append(v)
-
-                else:
-                    self.tags.append(fac.value)
-
         try:
             remote_property = self.remote_product_property_class.objects.get(
                 local_instance=product_property,
@@ -290,9 +302,10 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
             if remote_property.needs_update(update_factory.remote_value):
                 remote_property.remote_value = update_factory.remote_value
                 remote_property.save()
-                self.remote_product_properties.append(remote_property)
-                add_to_metafields(update_factory)
-                return remote_property.id
+
+            self.remote_product_properties.append(remote_property)
+            add_to_metafields(update_factory)
+            return remote_property.id
 
         except self.remote_product_property_class.DoesNotExist:
             create_factory = ShopifyProductPropertyCreateFactory(

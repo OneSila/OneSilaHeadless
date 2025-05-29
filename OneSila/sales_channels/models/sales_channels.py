@@ -26,6 +26,11 @@ class SalesChannel(Integration, models.Model):
     is_importing = models.BooleanField(default=False, help_text=_("True while an import process is running."))
     mark_for_delete = models.BooleanField(default=False, help_text="Set to True when shop is scheduled for deletion (e.g. from shopify/shop_redact).")
 
+    is_external_install = models.BooleanField(
+        default=False,
+        help_text="True if the installation was initiated from the Shopify App Store or other stores."
+    )
+
     class Meta:
         verbose_name = 'Sales Channel'
         verbose_name_plural = 'Sales Channels'
@@ -111,6 +116,16 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     @property
     def remote_url(self):
+        from sales_channels.integrations.shopify.models import ShopifySalesChannel
+        from sales_channels.integrations.magento2.models import MagentoSalesChannel
+
+        sales_channel = self.sales_channel.get_real_instance()
+
+        if isinstance(sales_channel, ShopifySalesChannel):
+            return f"{self.sales_channel_view.url}/products/{self.product.url_key}"
+        elif isinstance(sales_channel, MagentoSalesChannel):
+            return f"{self.sales_channel_view.url}{self.product.url_key}.html"
+
         return f"{self.sales_channel_view.url}{self.product.url_key}.html"
 
 
