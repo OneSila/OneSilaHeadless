@@ -515,7 +515,6 @@ class ImportProductInstance(AbstractImportInstance):
 
 
 class ImportProductTranslationInstance(AbstractImportInstance):
-
     def __init__(self, data: dict, import_process=None, product=None, instance=None):
         super().__init__(data, import_process, instance)
         self.product = product
@@ -567,7 +566,6 @@ class ImportProductTranslationInstance(AbstractImportInstance):
 
 
 class ImportSalesPriceInstance(AbstractImportInstance):
-
     def __init__(self, data: dict, import_process=None, product=None, currency_object=None, instance=None):
         super().__init__(data, import_process, instance)
         self.product = product

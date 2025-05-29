@@ -57,17 +57,21 @@ class EANCodeValidator:
         check_val = self.ean[:-1]
 
         # Gather Odd and Even Bits
-        for index, num in enumerate(check_val):
-            if index % 2 == 0:
-                even += int(num)
-            else:
-                odd += int(num)
+        try:
+            for index, num in enumerate(check_val):
+                if index % 2 == 0:
+                    even += int(num)
+                else:
+                    odd += int(num)
+        except ValueError:
+            msg = "EAN contains non-numeric characters"
+            return False, msg
 
         # Check if the algorithm 3 * odd parity + even parity + check bit matches
         bits_match = ((3 * odd) + even + int(check_bit)) % 10 == 0
 
         if not bits_match:
-            msg = "Invalid checksum"
+            msg = "Invalid checksum. Non existing code"
             return False, msg
 
         return True, None
@@ -77,12 +81,8 @@ class EANCodeValidator:
         self.is_valid_length()
         self.validate_country_code()
         self.validate_checksum()
-        return self.errors
 
+        if self.errors:
+            return False, self.errors
 
-def gtin_is_valid(ean):
-    # Verify the correctness of an ean13 / gtin code
-    # https://stackoverflow.com/a/51836010/5731101
-
-    logger.debug(f"Rejecting gtin. Bits match is {bits_match} and Valid Start digits are {valid_start_digits}.")
-    return False
+        return True, None
