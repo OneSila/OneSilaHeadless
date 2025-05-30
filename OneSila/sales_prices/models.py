@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from .managers import SalesPriceManager, SalesPriceListItemManager, SalesPriceListManager
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 
 class SalesPrice(models.Model):
@@ -45,16 +45,17 @@ class SalesPrice(models.Model):
         ]
 
     def get_real_price(self):
-        """Which is applicable?  RRP or Price?"""
+        """Which is applicable? RRP or Price?"""
         prices = []
 
-        if self.rrp:
-            prices.append(self.rrp)
+        for field in [self.rrp, self.price]:
+            if field:
+                try:
+                    prices.append(Decimal(field))
+                except (InvalidOperation, TypeError):
+                    continue
 
-        if self.price:
-            prices.append(self.price)
-
-        return min(prices)
+        return min(prices) if prices else None
 
     def __str__(self):
         return '{} {}'.format(self.get_real_price(), self.currency)

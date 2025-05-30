@@ -49,7 +49,6 @@ class GetShopifyRedirectUrlFactory:
             raise ValueError(_("Invalid Shopify authentication. Please try again."))
 
     def get_redirect_url(self):
-
         redirect_uri = f"{generate_absolute_url(trailing_slash=False)}{reverse('integrations:shopify_oauth_callback')}"
 
         session = shopify.Session(self.sales_channel.hostname, settings.SHOPIFY_API_VERSION)
@@ -65,7 +64,6 @@ class GetShopifyRedirectUrlFactory:
 
 
 class ValidateShopifyAuthFactory(GetShopifyApiMixin):
-
     def __init__(self, sales_channel: ShopifySalesChannel, shop: str, code: str, hmac: str, timestamp: str, host: str):
         self.sales_channel = sales_channel
         self.shop = shop

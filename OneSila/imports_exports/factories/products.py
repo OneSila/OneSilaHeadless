@@ -260,35 +260,40 @@ class ImportProductInstance(AbstractImportInstance):
 
     def set_product_properties(self):
 
-        product_type_property = Property.objects.get(
-            multi_tenant_company=self.multi_tenant_company,
-            is_product_type=True
-        )
+        if self.rule:
+            product_type_property = Property.objects.get(
+                multi_tenant_company=self.multi_tenant_company,
+                is_product_type=True
+            )
 
-        value_data = {
-            'value': self.rule.product_type.id,
-            'value_is_id': True
-        }
+            value_data = {
+                'value': self.rule.product_type.id,
+                'value_is_id': True
+            }
 
-        product_property_import_instance = ImportProductPropertyInstance(
-            value_data,
-            self.import_process,
-            product=self.instance,
-            property=product_type_property
-        )
-        product_property_import_instance.process()
+            product_property_import_instance = ImportProductPropertyInstance(
+                value_data,
+                self.import_process,
+                product=self.instance,
+                property=product_type_property
+            )
+            product_property_import_instance.process()
 
         product_property_ids = []
-        if self.type == Product.SIMPLE and hasattr(self, 'attributes'):
+        if self.type in [Product.SIMPLE, Product.BUNDLE, Product.ALIAS] and hasattr(self, 'attributes'):
 
             for attribute in self.attributes:
-                product_property_import_instance = ImportProductPropertyInstance(
-                    attribute,
-                    self.import_process,
-                    product=self.instance)
+                try:
+                    product_property_import_instance = ImportProductPropertyInstance(
+                        attribute,
+                        self.import_process,
+                        product=self.instance)
 
-                product_property_import_instance.process()
-                product_property_ids.append(product_property_import_instance.instance.id)
+                    product_property_import_instance.process()
+                    product_property_ids.append(product_property_import_instance.instance.id)
+                except Exception as e:
+                    # @TODO: Come hare later and remove this except
+                    pass
 
         self.product_property_instances = ProductProperty.objects.filter(id__in=product_property_ids)
 
@@ -305,7 +310,9 @@ class ImportProductInstance(AbstractImportInstance):
             )
             image_import_instance.process()
 
-            images_instances_ids.append(image_import_instance.instance.id)
+            if image_import_instance.instance is not None:
+                images_instances_ids.append(image_import_instance.instance.id)
+
             if hasattr(image_import_instance, 'media_assign'):
                 images_instances_associations_ids.append(image_import_instance.media_assign.id)
 
@@ -420,8 +427,7 @@ class ImportProductInstance(AbstractImportInstance):
         if hasattr(self, 'translations') and not self.created:
             self.update_translations()
 
-        if self.rule:
-            self.set_product_properties()
+        self.set_product_properties()
 
         if hasattr(self, 'images'):
             self.set_images()

@@ -12,6 +12,16 @@ class ShopifyValidateAuthInput:
     timestamp: str
 
 
+@strawberry_input
+class ShopifyValidateAuthInput:
+    shop: str
+    code: str
+    state: str
+    hmac: str
+    host: str
+    timestamp: str
+
+
 @input(ShopifySalesChannel, exclude=['integration_ptr', 'saleschannel_ptr'])
 class ShopifySalesChannelInput:
     pass

@@ -7,7 +7,6 @@ psycopg2-binary>=2.9.7
 model_bakery>=1.15.0
 huey==2.4.5
 django-redis>=5.3.0
-django-select2==8.1.2
 django-model-utils>=4.3.1
 xlsxwriter==3.0.2
 broadcaster
