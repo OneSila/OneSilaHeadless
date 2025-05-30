@@ -1,4 +1,4 @@
-from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, type
+from core.schema.core.queries import node, connection, DjangoListConnection, type
 from typing import List
 
 from .types.types import ProductType, BundleProductType, ConfigurableProductType, \
@@ -9,22 +9,22 @@ from .types.types import ProductType, BundleProductType, ConfigurableProductType
 @type(name="Query")
 class ProductsQuery:
     product: ProductType = node()
-    products: ListConnectionWithTotalCount[ProductType] = connection()
+    products: DjangoListConnection[ProductType] = connection()
 
     bundle_product: BundleProductType = node()
-    bundle_products: ListConnectionWithTotalCount[BundleProductType] = connection()
+    bundle_products: DjangoListConnection[BundleProductType] = connection()
 
     configurable_product: ConfigurableProductType = node()
-    configurable_products: ListConnectionWithTotalCount[ConfigurableProductType] = connection()
+    configurable_products: DjangoListConnection[ConfigurableProductType] = connection()
 
     simple_product: SimpleProductType = node()
-    simple_products: ListConnectionWithTotalCount[SimpleProductType] = connection()
+    simple_products: DjangoListConnection[SimpleProductType] = connection()
 
     product_translation: ProductTranslationType = node()
-    product_translations: ListConnectionWithTotalCount[ProductTranslationType] = connection()
+    product_translations: DjangoListConnection[ProductTranslationType] = connection()
 
     configurable_variation: ConfigurableVariationType = node()
-    configurable_variations: ListConnectionWithTotalCount[ConfigurableVariationType] = connection()
+    configurable_variations: DjangoListConnection[ConfigurableVariationType] = connection()
 
     bundle_variation: BundleVariationType = node()
-    bundle_variations: ListConnectionWithTotalCount[BundleVariationType] = connection()
+    bundle_variations: DjangoListConnection[BundleVariationType] = connection()

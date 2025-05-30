@@ -1,13 +1,13 @@
 from django.contrib import admin
-
+from core.admin import ModelAdmin
 from media.models import Media, MediaProductThrough
 
 
 @admin.register(Media)
-class MediaAdmin(admin.ModelAdmin):
+class MediaAdmin(ModelAdmin):
     pass
 
 
 @admin.register(MediaProductThrough)
-class MediaProductThroughAdmin(admin.ModelAdmin):
+class MediaProductThroughAdmin(ModelAdmin):
     pass

@@ -7,6 +7,7 @@ from sales_channels.models.sales_channels import (
 from core import models
 from django.utils.translation import gettext_lazy as _
 
+
 class MagentoSalesChannel(SalesChannel):
     """
     Magento-specific Sales Channel model with additional fields for authentication and configuration.
@@ -71,4 +72,3 @@ class MagentoRemoteLanguage(RemoteLanguage):
         help_text="The sales channel view associated with this remote language."
     )
     store_view_code = models.CharField(max_length=126, help_text="The language code store view (will be used as scope).")
-

@@ -7,6 +7,7 @@ class MagentoOrder(RemoteOrder):
     """
     pass
 
+
 class MagentoOrderItem(RemoteOrderItem):
     """
     Magento-specific model for remote order items, inheriting from the general RemoteOrderItem.

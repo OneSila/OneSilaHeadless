@@ -9,6 +9,7 @@ class RemotePropertyCreateFactory(RemoteInstanceCreateFactory):
         self.language = language
         super().__init__(local_instance=local_instance, sales_channel=sales_channel, api=api)
 
+
 class RemotePropertyUpdateFactory(RemoteInstanceUpdateFactory):
     local_model_class = Property
     create_if_not_exists = True
@@ -17,8 +18,10 @@ class RemotePropertyUpdateFactory(RemoteInstanceUpdateFactory):
         self.language = language
         super().__init__(local_instance=local_instance, sales_channel=sales_channel, api=api, remote_instance=remote_instance)
 
+
 class RemotePropertyDeleteFactory(RemoteInstanceDeleteFactory):
     local_model_class = Property
+
 
 class RemotePropertySelectValueCreateFactory(RemotePropertyEnsureMixin, RemoteInstanceCreateFactory):
     local_model_class = PropertySelectValue
@@ -33,6 +36,7 @@ class RemotePropertySelectValueCreateFactory(RemotePropertyEnsureMixin, RemoteIn
         self.remote_instance_data['remote_property'] = self.remote_property
         return self.remote_instance_data
 
+
 class RemotePropertySelectValueUpdateFactory(RemoteInstanceUpdateFactory):
     local_model_class = PropertySelectValue
     create_if_not_exists = True
@@ -40,6 +44,7 @@ class RemotePropertySelectValueUpdateFactory(RemoteInstanceUpdateFactory):
     def __init__(self, sales_channel, local_instance, api=None, remote_instance=None, language=None):
         self.language = language
         super().__init__(local_instance=local_instance, sales_channel=sales_channel, api=api, remote_instance=remote_instance)
+
 
 class RemotePropertySelectValueDeleteFactory(RemoteInstanceDeleteFactory):
     local_model_class = PropertySelectValue
@@ -66,7 +71,6 @@ class RemoteProductPropertyCreateFactory(ProductAssignmentMixin, RemotePropertyE
 
         self.skip_checks = skip_checks
 
-
     def preflight_check(self):
         """
         Checks that the RemoteProduct exists before proceeding.
@@ -87,13 +91,14 @@ class RemoteProductPropertyCreateFactory(ProductAssignmentMixin, RemotePropertyE
         super().preflight_process()
         self.get_select_values()
 
-    def set_remote_id(self, response_data):
+    def post_create_process(self):
         self.remote_instance.remote_value = str(self.remote_value)
 
     def customize_remote_instance_data(self):
         self.remote_instance_data['remote_product'] = self.remote_product
         self.remote_instance_data['remote_property'] = self.remote_property
         return self.remote_instance_data
+
 
 class RemoteProductPropertyUpdateFactory(RemotePropertyEnsureMixin, ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = ProductProperty
@@ -127,6 +132,9 @@ class RemoteProductPropertyUpdateFactory(RemotePropertyEnsureMixin, ProductAssig
 
         # we got the value we stop de process so everything is resolved
         if self.get_value_only:
+            prop = self.local_instance.property
+            self.namespace, self.key, self.value, self.metafield_type = self.prepare_metafield_payload(self.remote_value, prop)
+
             self.remote_instance.remote_value = str(self.remote_value)
             self.remote_instance.save()
             return False

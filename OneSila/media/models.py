@@ -85,6 +85,11 @@ class Media(models.Model):
 
     @property
     def image_web_url(self):
+        # from django.conf import settings
+        #
+        # if settings.DEBUG:
+        #     return 'https://images.pexels.com/photos/45201/kitty-cat-kitten-pet-45201.jpeg'
+
         if self.image:
             return f"{generate_absolute_url(trailing_slash=False)}{self.image_web.url}"
 
@@ -154,7 +159,7 @@ class MediaProductThrough(models.Model):
 
     @property
     def sales_channels_sort_order(self):
-        return self.sort_order + 1 # because for some integration 0 can be a position
+        return self.sort_order + 1  # because for some integration 0 can be a position
 
     class Meta:
         ordering = ('sort_order',)

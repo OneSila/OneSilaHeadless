@@ -118,6 +118,7 @@ class RemoteInventoryType(relay.Node, GetQuerysetMultiTenantMixin):
 class RemoteOrderType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
 
+
 @type(RemoteProductContent, filters=RemoteProductContentFilter, order=RemoteProductContentOrder, pagination=True, fields='__all__')
 class RemoteProductContentType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
@@ -170,6 +171,7 @@ class RemoteLanguageType(relay.Node, GetQuerysetMultiTenantMixin):
 
         return name
 
+
 @type(RemoteLog, filters=RemoteLogFilter, order=RemoteLogOrder, pagination=True, fields='__all__')
 class RemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
@@ -194,6 +196,7 @@ class RemoteProductType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def has_errors(self, info) -> bool | None:
         return self.has_errors
+
 
 @type(SalesChannelViewAssign, filters=SalesChannelViewAssignFilter, order=SalesChannelViewAssignOrder, pagination=True, fields='__all__')
 class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):

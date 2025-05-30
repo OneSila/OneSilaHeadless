@@ -1,4 +1,4 @@
-Django>=5
+Django>=5,<5.3
 django-imagekit>=4.1.0
 Pillow>=10.0.0
 CurrencyConverter
@@ -7,7 +7,6 @@ psycopg2-binary>=2.9.7
 model_bakery>=1.15.0
 huey==2.4.5
 django-redis>=5.3.0
-django-select2==8.1.2
 django-model-utils>=4.3.1
 xlsxwriter==3.0.2
 broadcaster
@@ -35,9 +34,11 @@ replicate
 pydantic<2.0
 gunicorn
 uvicorn
+markdown
+mkdocs
 
-strawberry-graphql==0.261.0
-strawberry-graphql-django==0.56.0
+strawberry-graphql==0.266.0
+strawberry-graphql-django==0.59.1
 
 django_get_absolute_url @ git+https://git@github.com/TweaveTech/django_get_absolute_url.git@master
 
@@ -48,3 +49,4 @@ starlette
 
 git+https://github.com/jazzband/django-polymorphic.git@v4.0.0a#egg=django-polymorphic
 git+https://github.com/OneSila/OneSilaMagento2Api.git@v1.0.28
+shopifyapi

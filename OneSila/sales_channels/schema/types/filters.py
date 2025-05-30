@@ -67,6 +67,7 @@ class RemoteInventoryFilter(SearchFilterMixin):
 class RemoteOrderFilter(SearchFilterMixin):
     pass
 
+
 @filter(RemoteProduct)
 class RemoteProductFilter(SearchFilterMixin):
     id: auto
@@ -103,7 +104,6 @@ class RemoteLogFilter(SearchFilterMixin):
     remote_product: Optional[RemoteProductFilter]
 
 
-
 @filter(SalesChannel)
 class SalesChannelFilter(SearchFilterMixin):
     id: auto
@@ -114,20 +114,24 @@ class SalesChannelFilter(SearchFilterMixin):
 class SalesChannelIntegrationPricelistFilter(SearchFilterMixin):
     id: auto
 
+
 @filter(RemoteCurrency)
 class RemoteCurrencyFilter(SearchFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
+
 
 @filter(SalesChannelImport)
 class SalesChannelImportFilter(SearchFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
 
+
 @filter(SalesChannelView)
 class SalesChannelViewFilter(SearchFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
+
 
 @filter(RemoteLanguage)
 class RemoteLanguageFilter(SearchFilterMixin):
@@ -141,4 +145,3 @@ class SalesChannelViewAssignFilter(SearchFilterMixin):
     sales_channel: Optional[SalesChannelFilter]
     sales_channel_view: Optional[SalesChannelViewFilter]
     product: Optional[ProductFilter]
-

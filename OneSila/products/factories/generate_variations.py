@@ -19,14 +19,12 @@ class GenerateProductVariations:
             else:
                 self.language = settings.LANGUAGE_CODE
 
-
     def set_configurator_rule_items(self):
 
         self.rule_items = ProductPropertiesRuleItem.objects.filter(
             rule=self.rule,
             type__in=[ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR, ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR]
         )
-
 
     def group_select_values(self):
         self.grouped_values = []
@@ -41,7 +39,6 @@ class GenerateProductVariations:
                 'values': values,
             }
             self.grouped_values.append(property_grouped_values)
-
 
     def _get_value_combinations(self):
         from itertools import product

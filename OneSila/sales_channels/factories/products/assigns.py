@@ -13,14 +13,13 @@ class RemoteSalesChannelViewAssignUpdateFactory(ProductAssignmentMixin, RemoteIn
 
         self.remote_instance = self.get_remote_instance()
 
-        super().__init__(sales_channel, local_instance, api=api, remote_product= self.remote_instance, remote_instance= self.remote_instance)
-
+        super().__init__(sales_channel, local_instance, api=api, remote_product=self.remote_instance, remote_instance=self.remote_instance)
 
     def get_remote_instance(self):
         return self.remote_model_class.objects.get(
             sales_channel=self.sales_channel,
             local_instance=self.local_instance,
-            is_variation=False, # variations don't have direct sales channel assigned
+            is_variation=False,  # variations don't have direct sales channel assigned
         )
 
     def needs_update(self):

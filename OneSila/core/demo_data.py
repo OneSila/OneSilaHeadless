@@ -81,7 +81,6 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
             'priority': priority
         }
 
-
     def register_public_app(self, method):
         method_name = self.method_name(method)
 
@@ -144,7 +143,6 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
         self.load_apps()
         self.populate_db(multi_tenant_company=multi_tenant_company)
 
-
     def delete_traversed_content_object(self, content_object):
 
         try:
@@ -160,7 +158,6 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
             except ProtectedError as e2:
                 for protected_instance in e2.protected_objects:
                     self.delete_traversed_content_object(protected_instance)
-
 
         except ValidationError as e:
             if 'removed directly' in str(e):

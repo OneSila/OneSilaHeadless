@@ -74,6 +74,7 @@ def trigger_signal_for_dirty_fields(*fields):
         return wrapper
     return decorator
 
+
 def run_task_after_commit(task_func):
     """
     Decorator to wrap any @db_task() to ensure it runs only after the outer transaction commits.

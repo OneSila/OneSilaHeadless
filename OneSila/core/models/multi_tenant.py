@@ -46,7 +46,6 @@ class MultiTenantCompany(models.Model):
 
     ai_points = models.IntegerField(default=20, help_text="Points allocated for AI processes.")
 
-
     def __str__(self):
         return self.name
 

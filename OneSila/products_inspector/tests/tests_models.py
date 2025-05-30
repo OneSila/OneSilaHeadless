@@ -76,7 +76,6 @@ class InspectorBlockMissingPricesTestCase(TestCase):
         # Step 5: Recheck the inspector block's successfully_checked field - it should now be False (since no price exists)
         self.assertFalse(inspector_block.successfully_checked)
 
-
     def test_inspector_block_for_price_create_and_delete(self):
         # Step 1: Create a required product (e.g., SimpleProduct)
         product = SimpleProduct.objects.create(
@@ -296,7 +295,6 @@ class InspectorBlockMissingComponentsTest(TestCase):
         self.assertTrue(inspector_block.successfully_checked)
 
 
-
 class InspectorBlockMissingSupplierProductsTest(TestCase):
 
     def setUp(self):
@@ -350,9 +348,7 @@ class InspectorBlockMissingEanCodeTest(TestCase):
             value_select=self.product_type_value
         )
 
-
         self.ean_code = "1234567890123"
-
 
     def test_inspector_block_for_ean_code_creation_with_product(self):
         # Step 1: Create an EAN code associated with the product
@@ -371,7 +367,6 @@ class InspectorBlockMissingEanCodeTest(TestCase):
 
         # Step 3: Check the inspector block's successfully_checked field - it should be True
         self.assertTrue(inspector_block.successfully_checked)
-
 
     def test_inspector_block_for_ean_code_update_with_product(self):
         # Step 1: Create an EAN code associated with the product

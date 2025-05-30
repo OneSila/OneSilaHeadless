@@ -26,13 +26,21 @@ class Migration(migrations.Migration):
                 ('ean_code', models.CharField(blank=True, max_length=14, null=True)),
                 ('internal', models.BooleanField(default=True, help_text='Generated from the prefix')),
                 ('already_used', models.BooleanField(default=False)),
-                ('created_by_multi_tenant_user', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='%(class)s_created_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL)),
-                ('last_update_by_multi_tenant_user', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='%(class)s_last_update_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL)),
+                ('created_by_multi_tenant_user', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT,
+                 related_name='%(class)s_created_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL)),
+                ('last_update_by_multi_tenant_user', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT,
+                 related_name='%(class)s_last_update_by_multi_tenant_user_set', to=settings.AUTH_USER_MODEL)),
                 ('multi_tenant_company', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='core.multitenantcompany')),
                 ('product', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='products.product')),
             ],
+
             options={
-                'constraints': [models.UniqueConstraint(condition=models.Q(('ean_code__isnull', False)), fields=('multi_tenant_company', 'ean_code'), name='unique_ean_code_per_tenant', violation_error_message='Ean code already exists'), models.CheckConstraint(condition=models.Q(('ean_code__isnull', False), ('product__isnull', False), _connector='OR'), name='ean_code_or_product_to_not_null')],
+                'constraints': [models.UniqueConstraint(condition=models.Q(('ean_code__isnull', False)), fields=('multi_tenant_company', 'ean_code'), name='unique_ean_code_per_tenant', violation_error_message='Ean code already exists'),
+                                models.CheckConstraint(
+                                    check=models.Q(ean_code__isnull=False) | models.Q(product__isnull=False),
+                                    name='ean_code_or_product_to_not_null'
+                )
+                ],
                 'unique_together': {('product', 'ean_code'), ('product', 'multi_tenant_company')},
             },
             bases=(dirtyfields.dirtyfields.DirtyFieldsMixin, models.Model),

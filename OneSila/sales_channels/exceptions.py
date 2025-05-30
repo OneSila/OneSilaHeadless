@@ -3,6 +3,7 @@ class SwitchedToCreateException(Exception):
     so creation should be triggered instead."""
     pass
 
+
 class SwitchedToSyncException(Exception):
     """Indicates that a create operation encountered an already-existing remote instance
     and should switch to a sync/update flow."""

@@ -10,6 +10,7 @@ from core.schema.core.mutations import type
 from core.schema.core.helpers import get_multi_tenant_company
 from products.models import Product
 
+
 @type(name="Mutation")
 class LlmMutation:
 
@@ -26,7 +27,6 @@ class LlmMutation:
         content_generator.flow()
 
         return AiContent(content=content_generator.generated_content, points=content_generator.used_points)
-
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def generate_ai_translation(self, instance: AITranslationInput, info: Info) -> AiContent:
@@ -48,7 +48,6 @@ class LlmMutation:
         content_generator.flow()
 
         return AiContent(content=content_generator.translated_content, points=content_generator.used_points)
-
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def bulk_translate_ai_content(self, instance: AIBulkTranslationInput, info: Info) -> AiTaskResponse:

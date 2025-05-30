@@ -107,6 +107,7 @@ def get_nested_attr(instance, attr_path):
     except AttributeError:
         return None
 
+
 def clean_json_data(data):
     """
     Recursively cleans the data to remove or transform non-serializable objects.
@@ -117,6 +118,7 @@ def clean_json_data(data):
         return [clean_json_data(item) for item in data]
     else:
         return data if is_json_serializable(data) else str(data)
+
 
 def is_json_serializable(value):
     """

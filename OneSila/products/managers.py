@@ -25,6 +25,7 @@ class ProductQuerySet(MultiTenantQuerySet):
         product_ids = ProductProperty.objects.filter(value_select=product_type).values_list('product_id', flat=True)
         return self.filter_multi_tenant(multi_tenant_company=product_type.multi_tenant_company).filter(id__in=product_ids)
 
+
 class ProductManager(MultiTenantManager):
     def get_queryset(self):
         return ProductQuerySet(self.model, using=self._db)
@@ -52,6 +53,64 @@ class VariationQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
 class VariationManager(ProductManager):
     def get_queryset(self):
         return VariationQuerySet(self.model, using=self._db)
+
+
+class AliasProductQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
+
+    def copy_from_parent(self, alias_product, *, copy_images=False, copy_properties=False):
+        from media.models import MediaProductThrough
+        from properties.models import ProductProperty, Property, ProductPropertyTextTranslation
+
+        parent = alias_product.alias_parent_product
+        if not parent:
+            raise ValueError("Alias product must have an alias_parent_product set.")
+
+        if copy_images:
+            parent_images = parent.mediaproductthrough_set.all()
+            MediaProductThrough.objects.bulk_create([
+                MediaProductThrough(
+                    media=img.media,
+                    product=alias_product,
+                    sort_order=img.sort_order,
+                    is_main_image=img.is_main_image,
+                    multi_tenant_company=parent.multi_tenant_company
+                ) for img in parent_images
+            ])
+
+        if copy_properties:
+            parent_props = ProductProperty.objects.filter(product=parent).select_related('property')
+            for pp in parent_props:
+                new_pp = ProductProperty.objects.create(
+                    product=alias_product,
+                    property=pp.property,
+                    value_boolean=pp.value_boolean,
+                    value_int=pp.value_int,
+                    value_float=pp.value_float,
+                    value_date=pp.value_date,
+                    value_datetime=pp.value_datetime,
+                    value_select=pp.value_select,
+                    multi_tenant_company=parent.multi_tenant_company
+                )
+
+                if pp.property.type in Property.TYPES.TRANSLATED:
+                    text_translations = ProductPropertyTextTranslation.objects.filter(product_property=pp)
+                    for trans in text_translations:
+                        ProductPropertyTextTranslation.objects.create(
+                            product_property=new_pp,
+                            language=trans.language,
+                            value_text=trans.value_text,
+                            value_description=trans.value_description,
+                            multi_tenant_company=parent.multi_tenant_company
+                        )
+
+
+class AliasProductManager(ProductManager):
+
+    def get_queryset(self):
+        return AliasProductQuerySet(self.model, using=self._db)
+
+    def copy_from_parent(self, alias_product, **kwargs):
+        return self.get_queryset().copy_from_parent(alias_product, **kwargs)
 
 
 class BundleQuerySet(QuerySetProxyModelMixin, ProductQuerySet):

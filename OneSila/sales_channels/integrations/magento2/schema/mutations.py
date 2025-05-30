@@ -8,6 +8,7 @@ from core.schema.core.extensions import default_extensions
 from core.schema.core.helpers import get_multi_tenant_company
 from strawberry import Info
 
+
 @type(name="Mutation")
 class MagentoSalesChannelMutation:
     create_magento_sales_channel: MagentoSalesChannelType = create(MagentoSalesChannelInput)

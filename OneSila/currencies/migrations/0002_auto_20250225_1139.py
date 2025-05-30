@@ -2,6 +2,7 @@
 
 from django.db import migrations
 
+
 def populate_currencies(apps, schema_editor):
     PublicCurrency = apps.get_model('currencies', 'PublicCurrency')
 
@@ -37,6 +38,7 @@ def populate_currencies(apps, schema_editor):
         if iso not in seen:
             PublicCurrency.objects.create(**data)
             seen.add(iso)
+
 
 class Migration(migrations.Migration):
 

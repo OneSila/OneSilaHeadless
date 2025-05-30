@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin as django_admin
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
@@ -6,7 +6,7 @@ from .models import MultiTenantCompany, MultiTenantUser
 from .models.multi_tenant import MultiTenantUserLoginToken
 
 
-@admin.register(MultiTenantUser)
+@django_admin.register(MultiTenantUser)
 class MultiTenantUserAdmin(BaseUserAdmin):
     fieldsets = (
         (None, {'fields': ('username', 'email', 'password')}),
@@ -31,11 +31,23 @@ class MultiTenantUserAdmin(BaseUserAdmin):
     search_fields = ('first_name', 'last_name', 'email')
 
 
-@admin.register(MultiTenantCompany)
-class MultiTenantCompanyAdmin(admin.ModelAdmin):
+@django_admin.register(MultiTenantCompany)
+class MultiTenantCompanyAdmin(django_admin.ModelAdmin):
     pass
 
 
-@admin.register(MultiTenantUserLoginToken)
-class MultiTenantUserLoginTokenAdmin(admin.ModelAdmin):
+@django_admin.register(MultiTenantUserLoginToken)
+class MultiTenantUserLoginTokenAdmin(django_admin.ModelAdmin):
+    pass
+
+
+class ModelAdmin(django_admin.ModelAdmin):
+    raw_id_fields = [
+        'multi_tenant_company',
+        'created_by_multi_tenant_user',
+        # 'last_updated_by_multi_tenant_user',
+    ]
+
+
+class SharedModelAdmin(django_admin.ModelAdmin):
     pass

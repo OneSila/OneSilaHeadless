@@ -18,6 +18,7 @@ from .extensions import default_extensions
 from ...signals import mutation_update, mutation_create
 from strawberry_django.permissions import get_with_perms
 
+
 class BulkDjangoDeleteMutation(DjangoDeleteMutation):
     """
     Enhanced Delete Mutation to support both single and bulk deletions.
@@ -74,6 +75,7 @@ class BulkDjangoDeleteMutation(DjangoDeleteMutation):
             info, instance, resolvers.parse_input(info, vdata, key_attr=self.key_attr)
         )
 
+
 class CreateMutation(GetMultiTenantCompanyMixin, GetCurrentUserMixin, DjangoCreateMutation):
     """
     Every create needs to include the company a user is assigned to.
@@ -124,7 +126,7 @@ def update(input_type):
     return UpdateMutation(input_type, extensions=extensions)
 
 
-def delete(is_bulk = False):
+def delete(is_bulk=False):
 
     input_type = List[strawberry_django.NodeInput] if is_bulk else strawberry_django.NodeInput
     extensions = default_extensions

@@ -25,6 +25,7 @@ class MinimalMultiTenantUserType(relay.Node, GetQuerysetMultiTenantMixin):
     def full_name(self, info) -> str | None:
         return self.full_name
 
+
 @type(MultiTenantUser, filters=MultiTenantUserFilter, order=MultiTenantUserOrder, pagination=True, fields='__all__')
 class MultiTenantUserType(relay.Node):
     avatar_resized: DjangoImageType | None
@@ -46,6 +47,7 @@ class MultiTenantCompanyType(relay.Node):
     @field()
     def full_address(self, info) -> str:
         return self.full_address
+
 
 @type(MultiTenantUserLoginToken, exclude=['token'])
 class MultiTenantUserLoginTokenType(relay.Node):

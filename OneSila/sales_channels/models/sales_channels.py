@@ -11,23 +11,29 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class  SalesChannel(Integration, models.Model):
+
+class SalesChannel(Integration, models.Model):
     """
     Polymorphic model representing a sales channel, such as a website or marketplace.
     """
 
-    use_configurable_name = models.BooleanField(default=False,verbose_name=_('Always use Configurable name over child'))
+    use_configurable_name = models.BooleanField(default=False, verbose_name=_('Always use Configurable name over child'))
     sync_contents = models.BooleanField(default=True, verbose_name=_('Sync Contents'))
     sync_ean_codes = models.BooleanField(default=True, verbose_name=_('Sync EAN Codes'))
     sync_prices = models.BooleanField(default=True, verbose_name=_('Sync Prices'))
     import_orders = models.BooleanField(default=True, verbose_name=_('Import Orders'))
     first_import_complete = models.BooleanField(default=False, help_text="Set to True once the first import has been completed.")
     is_importing = models.BooleanField(default=False, help_text=_("True while an import process is running."))
+    mark_for_delete = models.BooleanField(default=False, help_text="Set to True when shop is scheduled for deletion (e.g. from shopify/shop_redact).")
+
+    is_external_install = models.BooleanField(
+        default=False,
+        help_text="True if the installation was initiated from the Shopify App Store or other stores."
+    )
 
     class Meta:
         verbose_name = 'Sales Channel'
         verbose_name_plural = 'Sales Channels'
-
 
     def save(self, *args, **kwargs):
 
@@ -53,6 +59,7 @@ class  SalesChannel(Integration, models.Model):
     def __str__(self):
         return f"{self.hostname } @ {self.multi_tenant_company}"
 
+
 class SalesChannelIntegrationPricelist(models.Model):
     """
     Through model to handle the association between a SalesChannel and a PriceList.
@@ -70,6 +77,7 @@ class SalesChannelIntegrationPricelist(models.Model):
     def __str__(self):
         return f"{self.sales_channel} - {self.price_list}"
 
+
 class SalesChannelView(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Model representing a specific view of a sales channel
@@ -86,13 +94,15 @@ class SalesChannelView(PolymorphicModel, RemoteObjectMixin, models.Model):
     def __str__(self):
         return str(self.name)
 
+
 class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Model representing the assignment of a product to a specific sales channel view.
     """
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE, db_index=True)
     sales_channel_view = models.ForeignKey('SalesChannelView', on_delete=models.CASCADE, db_index=True)
-    remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.SET_NULL, null=True, blank=True, help_text="The remote product associated with this assign.")
+    remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.SET_NULL, null=True,
+                                       blank=True, help_text="The remote product associated with this assign.")
     needs_resync = models.BooleanField(default=False, help_text="Indicates if a resync is needed.")
 
     class Meta:
@@ -106,7 +116,18 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     @property
     def remote_url(self):
+        from sales_channels.integrations.shopify.models import ShopifySalesChannel
+        from sales_channels.integrations.magento2.models import MagentoSalesChannel
+
+        sales_channel = self.sales_channel.get_real_instance()
+
+        if isinstance(sales_channel, ShopifySalesChannel):
+            return f"{self.sales_channel_view.url}/products/{self.product.url_key}"
+        elif isinstance(sales_channel, MagentoSalesChannel):
+            return f"{self.sales_channel_view.url}{self.product.url_key}.html"
+
         return f"{self.sales_channel_view.url}{self.product.url_key}.html"
+
 
 class RemoteLanguage(PolymorphicModel, RemoteObjectMixin, models.Model):
     """

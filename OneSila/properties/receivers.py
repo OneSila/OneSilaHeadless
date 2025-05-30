@@ -26,6 +26,7 @@ def properties__property_translation__post_save(sender, instance, **kwargs):
         instance.property.internal_name = slugify(instance.name).replace('-', '_')
         instance.property.save(update_fields=['internal_name'])
 
+
 @receiver(post_update, sender=PropertySelectValueTranslation)
 def properties__property_select_value_translation__rename_rule(sender, instance, **kwargs):
 
@@ -41,6 +42,7 @@ def properties__property_select_value_translation__rename_rule(sender, instance,
         except ProductPropertiesRule.DoesNotExist:
             pass
 
+
 @receiver(post_create, sender=PropertySelectValue)
 def properties__property_select_value__create_rule(sender, instance, **kwargs):
     """
@@ -53,6 +55,7 @@ def properties__property_select_value__create_rule(sender, instance, **kwargs):
             multi_tenant_company=instance.multi_tenant_company
         )
         product_properties_rule_created.send(sender=rule.__class__, instance=rule)
+
 
 @receiver(post_delete, sender=ProductPropertiesRule)
 def delete_product_type_property_select_value(sender, instance, **kwargs):

@@ -5,6 +5,7 @@ from hashlib import sha256
 from django.core.files.base import ContentFile
 from django.db import transaction
 
+
 class MediaQuerySet(MultiTenantQuerySet):
     pass
 

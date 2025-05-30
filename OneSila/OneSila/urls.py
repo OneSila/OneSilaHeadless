@@ -37,6 +37,8 @@ urlpatterns = [
     path('taxes/', include('taxes.urls')),
     path('units/', include('units.urls')),
     path('sales_channels/', include('sales_channels.urls')),
+    path('direct/integrations/shopify/', include('sales_channels.integrations.shopify.urls')),
+    path('integrations', include('integrations.urls')),
     path('graphql/',
         AsyncGraphQLView.as_view(
             schema=schema,

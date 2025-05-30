@@ -5,11 +5,11 @@ from core.tests import TestCase
 from products.models import ConfigurableProduct, \
     SimpleProduct, BundleProduct, BundleVariation
 
+
 class ProductModelTest(TestCase):
     def setUp(self):
         super().setUp()
         self.supplier = Supplier.objects.create(name="Supplier Company", multi_tenant_company=self.multi_tenant_company)
-
 
     def test_other_product_types_without_supplier_and_sku(self):
         # Should allow creating without supplier and sku
@@ -28,13 +28,11 @@ class ProductModelTest(TestCase):
         )
         self.assertIsNotNone(bundle_product.sku)
 
-
     def test_get_parent_products_in_depth(self):
         # A supplier product is expected to retun itself.
         # A supplier with parent simple is expected to return the
         # simple(s)
         simple_product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-
 
         # A simple with bundle parent is supposed to return the bundle(s)
         bundle_product = BundleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)

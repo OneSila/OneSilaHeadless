@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from strawberry.schema import BaseSchema
 
 # TEMPORARY SOLUTION UNTIL IT'S FIXED
+
+
 class AuthGraphQLProtocolTypeRouter(ProtocolTypeRouter):
     """Convenience class to set up GraphQL on both HTTP and Websocket.
 

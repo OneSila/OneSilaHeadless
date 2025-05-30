@@ -40,7 +40,7 @@
 - **Signal**: `update_remote_property_select_value`
 
 ### 3. Deleting a Remote Property Select Value
-- **Trigger**: 
+- **Trigger**:
   - `PropertySelectValue` is deleted.
   - Associated `Property` is set to `is_public_information = False`.
 - **Signal**: `delete_remote_property_select_value`
@@ -65,13 +65,13 @@
 - **Signal**: `update_remote_product_property`
 
 ### 3. Deleting a Remote Product Property
-- **Trigger**: 
+- **Trigger**:
   - `ProductProperty` is deleted.
   - The associated `Property` is set to `is_public_information = False`.
 - **Signal**: `delete_remote_product_property`
 
 ## Key Points
-- **Dependencies**: 
+- **Dependencies**:
   - Before creating a `RemoteProductProperty`, ensure both `RemoteProduct` and `RemoteProperty` exist. Use a preflight process to create these dependencies if they do not exist.
   - For `select` and `multi_select` properties, ensure the related `RemotePropertySelectValue` exists before proceeding.
 - **Pre-Delete Handling**: Use the `pre_delete` phase to handle deletions, ensuring that cascading deletes are managed correctly and that remote deletions occur before local cascade actions.

@@ -8,7 +8,8 @@ class RemoteProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
     Model representing the remote mirror of a local Property.
     This model tracks the remote property associated with a local Property.
     """
-    local_instance = models.ForeignKey('properties.Property', on_delete=models.SET_NULL, null=True, help_text="The local property associated with this remote property.")
+    local_instance = models.ForeignKey('properties.Property', on_delete=models.SET_NULL, null=True,
+                                       help_text="The local property associated with this remote property.")
 
     class Meta:
         unique_together = ('sales_channel', 'local_instance')
@@ -21,16 +22,16 @@ class RemoteProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
         except AttributeError:
             return self.safe_str
 
+
 class RemotePropertySelectValue(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the remote mirror of a PropertySelectValue.
     """
     local_instance = models.ForeignKey('properties.PropertySelectValue',
-                                              on_delete=models.SET_NULL,
-                                              null=True,
-                                              help_text="The local PropertySelectValue associated with this remote value.")
+                                       on_delete=models.SET_NULL,
+                                       null=True,
+                                       help_text="The local PropertySelectValue associated with this remote value.")
     remote_property = models.ForeignKey(RemoteProperty, on_delete=models.CASCADE, help_text="The remote property associated with this remote value.")
-
 
     class Meta:
         unique_together = ('sales_channel', 'local_instance')
@@ -47,10 +48,12 @@ class RemoteProductProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the remote mirror of a ProductProperty.
     """
-    local_instance = models.ForeignKey('properties.ProductProperty', on_delete=models.SET_NULL, null=True, help_text="The local ProductProperty instance associated with this remote property.")
+    local_instance = models.ForeignKey('properties.ProductProperty', on_delete=models.SET_NULL, null=True,
+                                       help_text="The local ProductProperty instance associated with this remote property.")
     remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.CASCADE, help_text="The remote product associated with this property.")
-    remote_property = models.ForeignKey('sales_channels.RemoteProperty', on_delete=models.CASCADE, help_text="The remote property associated with this product property.")
-    remote_value = models.TextField(null=True, blank=True,  help_text="The value of this property in the remote system, stored as a string.")
+    remote_property = models.ForeignKey('sales_channels.RemoteProperty', on_delete=models.CASCADE, null=True,
+                                        help_text="The remote property associated with this product property.")
+    remote_value = models.TextField(null=True, blank=True, help_text="The value of this property in the remote system, stored as a string.")
 
     class Meta:
         unique_together = ('remote_product', 'local_instance')

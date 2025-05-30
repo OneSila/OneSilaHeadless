@@ -1,3 +1,6 @@
 from django.contrib import admin
+from imports_exports.models import MappedImport
 
-# Register your models here.
+@admin.register(MappedImport)
+class MappedImportAdmin(admin.ModelAdmin):
+    pass

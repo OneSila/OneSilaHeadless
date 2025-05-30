@@ -1,6 +1,7 @@
 from products.models import Product
 from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin, EanCodeValueMixin
 
+
 class RemoteEanCodeUpdateFactory(ProductAssignmentMixin, EanCodeValueMixin, RemoteInstanceUpdateFactory):
     """
     Generic factory for updating a remote EAN code.

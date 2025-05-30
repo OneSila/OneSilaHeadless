@@ -1,21 +1,16 @@
-import strawberry
-from asgiref.sync import sync_to_async
-from strawberry.relay import from_base64
-
-from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, type
+from core.schema.core.queries import node, connection, DjangoListConnection, type
 from typing import List
 
-from .types.types import InventoryType, InventoryLocationType, InventoryMovementType, PickingLocationType
-
+from .types.types import InventoryType, InventoryLocationType, InventoryMovementType
 
 
 @type(name="Query")
 class InventoryQuery:
     inventory: InventoryType = node()
-    inventories: ListConnectionWithTotalCount[InventoryType] = connection()
+    inventories: DjangoListConnection[InventoryType] = connection()
 
     inventory_location: InventoryLocationType = node()
-    inventory_locations: ListConnectionWithTotalCount[InventoryLocationType] = connection()
+    inventory_locations: DjangoListConnection[InventoryLocationType] = connection()
 
     inventory_movement: InventoryMovementType = node()
-    inventory_movements: ListConnectionWithTotalCount[InventoryMovementType] = connection()
+    inventory_movements: DjangoListConnection[InventoryMovementType] = connection()

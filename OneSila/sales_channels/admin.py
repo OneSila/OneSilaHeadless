@@ -1,18 +1,20 @@
 from django.contrib import admin
 from polymorphic.admin import PolymorphicChildModelAdmin
 from pygments.lexers import JsonLexer
-
+from core.admin import ModelAdmin
 from .models import SalesChannel, RemoteLog, SalesChannelImport
 from .models.products import RemoteProductConfigurator
 
 
 @admin.register(RemoteProductConfigurator)
-class RemoteProductConfiguratorAdmin(admin.ModelAdmin):
+class RemoteProductConfiguratorAdmin(ModelAdmin):
     pass
+
 
 @admin.register(SalesChannel)
 class SalesChannelAdmin(PolymorphicChildModelAdmin):
     base_model = SalesChannel
+
 
 @admin.register(RemoteLog)
 class RemoteLogAdmin(PolymorphicChildModelAdmin):
@@ -21,7 +23,8 @@ class RemoteLogAdmin(PolymorphicChildModelAdmin):
     list_filter = ('status', 'action', 'integration')
     search_fields = ('content_object__name', 'identifier')
     ordering = ('-created_at',)
-    readonly_fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type', 'object_id', 'related_object_str', 'integration', 'action', 'status', 'identifier', 'fixing_identifier', 'remote_product']
+    readonly_fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type', 'object_id',
+        'related_object_str', 'integration', 'action', 'status', 'identifier', 'fixing_identifier', 'remote_product']
 
     fieldsets = (
         (None, {
@@ -35,6 +38,28 @@ class RemoteLogAdmin(PolymorphicChildModelAdmin):
         }),
     )
 
+
 @admin.register(SalesChannelImport)
-class SalesChannelImportAdmin(admin.ModelAdmin):
-    pass
+class SalesChannelImportAdmin(ModelAdmin):
+    raw_id_fields = [
+        'sales_channel',
+        'multi_tenant_company',
+        'created_by_multi_tenant_user',
+    ]
+
+
+class SalesChannelRemoteAdmin(ModelAdmin):
+    raw_id_fields = [
+        'multi_tenant_company',
+        'created_by_multi_tenant_user',
+        'sales_channel',
+    ]
+
+
+class SalesChannelRemoteProductAdmin(ModelAdmin):
+    raw_id_fields = [
+        'multi_tenant_company',
+        'created_by_multi_tenant_user',
+        'sales_channel',
+        'local_instance',
+    ]

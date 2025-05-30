@@ -9,6 +9,7 @@ from eancodes.models import EanCode
 
 logger = logging.getLogger(__name__)
 
+
 class RemoteInstanceCreateFactory(IntegrationInstanceCreateFactory):
     integration_key = 'sales_channel'
     fixing_identifier_class = None
@@ -23,6 +24,7 @@ class RemoteInstanceUpdateFactory(IntegrationInstanceUpdateFactory):
 
     def __init__(self, sales_channel, local_instance=None, api=None, remote_instance=None, **kwargs):
         super().__init__(integration=sales_channel, local_instance=local_instance, api=api, remote_instance=remote_instance, **kwargs)
+
 
 class RemoteInstanceDeleteFactory(IntegrationInstanceDeleteFactory):
     integration_key = 'sales_channel'
@@ -92,9 +94,8 @@ class RemotePropertyEnsureMixin:
         self.remote_select_values = []
         # For select or multi-select properties, ensure RemotePropertySelectValue exists
         if self.local_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
-            self.local_instance.refresh_from_db()
-            select_values = self.local_instance.value_multi_select.all() if self.local_property.type == Property.TYPES.MULTISELECT else [self.local_instance.value_select]
-            logger.debug(f"Available select values: {select_values}")
+            select_values = self.local_instance.value_multi_select.all() if self.local_property.type == Property.TYPES.MULTISELECT else [
+                self.local_instance.value_select]
 
             for value in select_values:
                 try:
@@ -121,7 +122,7 @@ class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
     update_field_mapping = {}  # Sometime we want to update only certain fields not all that been created
     api_package_name = None  # The package name (e.g., 'properties')
     api_method_name = None  # The method name (e.g., 'fetch')
-    api_method_is_property = False # for some integrations this can be a property / field not a method
+    api_method_is_property = False  # for some integrations this can be a property / field not a method
     get_or_create_fields = []  # Fields used by get_or_create operations
 
     allow_create = True  # Allow creation of new instances
@@ -275,8 +276,8 @@ class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
         Override to implement custom comparison logic.
         """
         for local_field, remote_field in self.update_field_mapping.items():
-                if getattr(remote_instance_mirror, local_field) != self.get_remote_field_value(remote_data, remote_field):
-                    return True
+            if getattr(remote_instance_mirror, local_field) != self.get_remote_field_value(remote_data, remote_field):
+                return True
         return False
 
     def process_remote_instance(self, remote_data, remote_instance_mirror, created):
@@ -296,7 +297,6 @@ class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
                 remote_instance_mirror.delete()
                 logger.debug(f"Deleted remote instance mirror: {remote_instance_mirror}")
 
-
     def run(self):
         """
         Orchestrates the pull process including fetching, processing, and managing mirror instances.
@@ -308,6 +308,7 @@ class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
         self.build_payload()
         self.fetch_remote_instances()
         self.process_remote_instances()
+
 
 class EanCodeValueMixin:
     def get_ean_code_value(self) -> Optional[str]:
@@ -351,11 +352,9 @@ class SyncProgressMixin:
         self.remote_instance.set_new_sync_percentage(self.current_progress)
         logger.debug(f"Updated sync progress to {self.current_progress}%.")
 
-
     def finalize_progress(self):
 
         if self.remote_instance is None:
             return
 
         self.remote_instance.set_new_sync_percentage(100)
-

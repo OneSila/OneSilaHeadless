@@ -18,7 +18,6 @@ def llm__ai_translate__run_bulk_ai_translation_flow(
     from properties.models import Property, PropertySelectValue
     from core.models import MultiTenantCompany
 
-
     multi_tenant_company = MultiTenantCompany.objects.get(id=multi_tenant_company_id)
     products = Product.objects.filter(id__in=product_ids, multi_tenant_company=multi_tenant_company)
     properties = Property.objects.filter(id__in=property_ids, multi_tenant_company=multi_tenant_company)
@@ -34,4 +33,3 @@ def llm__ai_translate__run_bulk_ai_translation_flow(
         override_translation=override_translation,
     )
     flow.run()
-

@@ -51,6 +51,7 @@ class MultiTenantUserStatusInput:
 class MeMultiTenantUserPartialInput:
     pass
 
+
 @partial(MultiTenantUser, fields=['multi_tenant_company', 'id', 'first_name', 'last_name', 'email', 'is_active'])
 class MultiTenantUserPartialInput(NodeInput):
     pass
@@ -73,7 +74,10 @@ class MultiTenantLoginLinkInput:
 class MultiTenantUserLoginTokenInput:
     username: str
 
+
 1
+
+
 @strawberry_input
 class UpdateOnboardingStatusInput:
     onboarding_status: str

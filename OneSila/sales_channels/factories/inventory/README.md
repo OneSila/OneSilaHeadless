@@ -38,7 +38,7 @@
 
 ### RemoteProductVariationUpdateFactory
 - **Purpose**: Adds variations to the parent product in the remote system.
-- **Checks**: 
+- **Checks**:
   - `RemoteProduct` for parent and variation.
   - Required assignments in `SalesChannelViewAssign`.
 

@@ -13,10 +13,12 @@ class ContentAiGenerateType(Enum):
     SHORT_DESCRIPTION = "short_description"
     NAME = "name"
 
+
 @partial(Product, fields="__all__")
 class ProductAiContentInput(NodeInput):
     language_code: str
     content_ai_generate_type: ContentAiGenerateType
+
 
 @strawberry_input
 class AITranslationInput:
@@ -25,6 +27,7 @@ class AITranslationInput:
     to_language_code: str
     product: Optional[ProductPartialInput] = None
     product_content_type: Optional[ContentAiGenerateType] = None
+
 
 @strawberry_input
 class AIBulkTranslationInput:

@@ -10,7 +10,7 @@ class MagentoInventoryUpdateFactory(GetMagentoAPIMixin, RemoteInventoryUpdateFac
     remote_model_class = MagentoInventory
 
     def update_remote(self):
-        return # @TODO: Come back after we decide with inventory
+        return  # @TODO: Come back after we decide with inventory
 
         self.magento_product: Product = self.api.products.by_sku(self.remote_product.remote_sku)
         self.magento_product.stock = self.stock

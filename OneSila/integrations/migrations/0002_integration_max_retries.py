@@ -14,6 +14,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='integration',
             name='max_retries',
-            field=models.PositiveIntegerField(default=3, help_text='Maximum number of task retries (between 1 and 20)', validators=[django.core.validators.MinValueValidator(1), django.core.validators.MaxValueValidator(20)]),
+            field=models.PositiveIntegerField(default=3, help_text='Maximum number of task retries (between 1 and 20)', validators=[
+                                              django.core.validators.MinValueValidator(1), django.core.validators.MaxValueValidator(20)]),
         ),
     ]

@@ -30,6 +30,6 @@ jobs:
             cd OneSila
             ./manage.py migrate
             ./manage.py collectstatic --noinput
-            echo "Reload Gunicorn for 0-downtime" 
+            echo "Reload Gunicorn for 0-downtime"
             /home/${{ secrets.DEVELOPMENT_USERNAME }}/./reload_gunicorn.sh
             sudo supervisorctl restart huey
