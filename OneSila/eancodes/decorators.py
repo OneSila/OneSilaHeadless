@@ -29,7 +29,7 @@ def validation_method(func):
         if self.fail_on_error:
             raise ValidationError(msg)
         else:
-            self.errors.append(msg)
+            self.errors.add(msg)
             return result, msg
 
     return wrapper
