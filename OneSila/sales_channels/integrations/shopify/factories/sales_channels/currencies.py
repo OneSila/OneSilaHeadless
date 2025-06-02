@@ -1,3 +1,5 @@
+import json
+
 from sales_channels.factories.mixins import PullRemoteInstanceMixin
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin
 from sales_channels.integrations.shopify.models import ShopifyCurrency
@@ -21,9 +23,21 @@ class ShopifyRemoteCurrencyPullFactory(GetShopifyApiMixin, PullRemoteInstanceMix
     is_model_response = False
 
     def fetch_remote_instances(self):
-        shop = self.api.Shop.current()
-        primary = shop.attributes.get('currency')
-        presentment = shop.attributes.get('enabled_presentment_currencies', [])
+        gql = self.api.GraphQL()
+        query = """
+        {
+          shop {
+            currencyCode
+            enabledPresentmentCurrencies
+          }
+        }
+        """
+        response = gql.execute(query)
+        data = json.loads(response)
+        shop_data = data["data"]["shop"]
+
+        primary = shop_data["currencyCode"]
+        presentment = shop_data.get("enabledPresentmentCurrencies", [])
 
         self.remote_instances = []
         for code in presentment:

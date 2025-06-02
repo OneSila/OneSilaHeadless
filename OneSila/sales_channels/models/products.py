@@ -29,7 +29,7 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         unique_together = (('sales_channel', 'local_instance', 'remote_parent_product'),)
         constraints = [
             UniqueConstraint(
-                fields=['sales_channel', 'remote_sku'],
+                fields=['sales_channel', 'remote_sku', 'is_variation'],
                 condition=Q(remote_sku__isnull=False),
                 name='unique_remote_sku_per_channel_if_present'
             ),
