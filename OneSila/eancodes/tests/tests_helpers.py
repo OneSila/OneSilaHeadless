@@ -4,6 +4,18 @@ from eancodes.exceptions import ValidationError
 
 
 class TestEANCodeValidator(TestCase):
+    def test_empty_full_run(self):
+        validator = EANCodeValidator("", fail_on_error=False)
+        resp, errors = validator.run()
+        self.assertFalse(resp)
+        self.assertTrue(len(errors) > 0)
+
+    def test_none_full_run(self):
+        validator = EANCodeValidator(None, fail_on_error=False)
+        resp, errors = validator.run()
+        self.assertFalse(resp)
+        self.assertTrue(len(errors) > 0)
+
     def test_has_value(self):
         validator = EANCodeValidator("", fail_on_error=False)
         self.assertEqual(validator.has_value()[0], False)
@@ -34,12 +46,13 @@ class TestEANCodeValidator(TestCase):
         validator = EANCodeValidator("5055988625672", fail_on_error=False)
         resp, errors = validator.run()
         self.assertTrue(resp)
-        self.assertEqual(errors, None)
+        self.assertEqual(errors, [])
 
     def test_valid_ean_fail_on_error(self):
         validator = EANCodeValidator("5055988625672", fail_on_error=True)
-        validator.run()
-        self.assertEqual(validator.errors, [])
+        resp, errors = validator.run()
+        self.assertTrue(resp)
+        self.assertEqual(errors, [])
 
     def test_messed_up_format(self):
         validator = EANCodeValidator("5051090-002226", fail_on_error=False)
