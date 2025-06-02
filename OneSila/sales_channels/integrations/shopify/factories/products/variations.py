@@ -17,3 +17,12 @@ class ShopifyProductVariationAddFactory(GetShopifyApiMixin, RemoteProductVariati
     def create_factory_class(self):
         from sales_channels.integrations.shopify.factories.products.products import ShopifyProductCreateFactory
         return ShopifyProductCreateFactory
+
+    def update_remote(self):
+        pass
+
+    def serialize_response(self, response):
+        return {}
+
+    def needs_update(self):
+        return True

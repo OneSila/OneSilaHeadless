@@ -80,6 +80,9 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
     def set_variation_sku(self):
         self.set_sku()
 
+    def get_variation_sku(self):
+        return self.local_instance.sku
+
     def set_active(self):
         self.payload['status'] = ACTIVE_STATUS if self.local_instance.active else NON_ACTIVE_STATUS
 
@@ -749,8 +752,16 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         query = f"""
         {MEDIA_FRAGMENT}
 
-        mutation ProductVariantsCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {{
-          productVariantsBulkCreate(productId: $productId, variants: $variants) {{
+        mutation ProductVariantsCreate(
+            $productId: ID!,
+            $variants: [ProductVariantsBulkInput!]!,
+            $strategy: ProductVariantsBulkCreateStrategy = REMOVE_STANDALONE_VARIANT
+        ) {{
+          productVariantsBulkCreate(
+            productId: $productId,
+            variants: $variants,
+            strategy: $strategy
+          ) {{
             productVariants {{
               id
               title
@@ -759,7 +770,7 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
                 name
                 value
               }}
-            media(first: {len(self.medias)}) {{
+              media(first: {len(self.medias)}) {{
                 edges {{
                   node {{
                     ...fieldsForMediaTypes
@@ -779,6 +790,7 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         variables = {
             "productId": self.remote_instance.remote_id,
             "variants": self.variations_payload,
+            "strategy": "REMOVE_STANDALONE_VARIANT"
         }
 
         response = gql.execute(query, variables=variables)
@@ -794,8 +806,10 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         for variant in created_variants:
             sku = variant.get("sku")
             remote_id = variant.get("id")
+
             if not sku or not remote_id:
                 continue
+
             remote_variation = self.sku_variations_map.get(sku)
 
             if remote_variation:
@@ -810,7 +824,7 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
         super().create_or_update_children()
         self.create_variations()
 
-        self.delete_default_variant()
+        # self.delete_default_variant()
 
     def create_child(self, variation):
         factory = self.create_product_factory(

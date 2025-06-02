@@ -8,8 +8,8 @@ app_name = 'integrations'
 
 urlpatterns = [
     path("", IntegrationListView.as_view(), name="integrations_list"),
-    path("/shopify/<str:id>/", ShopifyIntegrationDetailView.as_view(), name="shopify_integration_detail"),
-    path("/shopify/installed", ShopifyInstalledView.as_view(), name="shopify_oauth_callback"),
-    path("/shopify/entry", ShopifyEntryView.as_view(), name="shopify_oauth_entry"),
+    path("shopify/<str:id>/", ShopifyIntegrationDetailView.as_view(), name="shopify_integration_detail"),
+    path("shopify/installed", ShopifyInstalledView.as_view(), name="shopify_oauth_callback"),
+    path("shopify/entry", ShopifyEntryView.as_view(), name="shopify_oauth_entry"),
 
 ]

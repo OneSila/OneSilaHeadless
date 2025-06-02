@@ -95,3 +95,10 @@ class ProductPropertiesRuleInput:
 @partial(ProductPropertiesRule, fields="__all__")
 class ProductPropertiesRulePartialInput(NodeInput):
     items: Optional[List[CustomProductPropertiesRuleItemInput]]
+
+@strawberry.input
+class BulkProductPropertyInput:
+    product_property: ProductPropertyInput
+    language_code: Optional[str] = None
+    translated_value: Optional[str] = None
+    override_if_exists: Optional[bool] = False
