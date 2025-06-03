@@ -1,7 +1,7 @@
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
-
 from core.views import EmptyTemplateView
+from sales_channels.integrations.shopify.helpers import verify_shopify_webhook_hmac
 from sales_channels.integrations.shopify.models import ShopifySalesChannelView
 import logging
 import json
@@ -16,6 +16,10 @@ class ShopifyEntryView(EmptyTemplateView):
 
 @csrf_exempt
 def shopify_customer_data_request(request):
+
+    if not verify_shopify_webhook_hmac(request):
+        return HttpResponse(status=401)
+
     logger.info("Received customers/data_request webhook")
     logger.debug(json.loads(request.body))
     return HttpResponse(status=200)
@@ -23,6 +27,10 @@ def shopify_customer_data_request(request):
 
 @csrf_exempt
 def shopify_customer_redact(request):
+
+    if not verify_shopify_webhook_hmac(request):
+        return HttpResponse(status=401)
+
     logger.info("Received customers/redact webhook")
     logger.debug(json.loads(request.body))
     return HttpResponse(status=200)
@@ -30,6 +38,10 @@ def shopify_customer_redact(request):
 
 @csrf_exempt
 def shopify_shop_redact(request):
+
+    if not verify_shopify_webhook_hmac(request):
+        return HttpResponse(status=401)
+
     try:
         payload = json.loads(request.body)
         shop_id = str(payload.get("shop_id"))
