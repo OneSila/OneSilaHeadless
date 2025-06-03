@@ -173,7 +173,7 @@ class ProductProperty(TranslatedModelMixin, models.Model):
         value = self.get_value()
 
         if self.property.type == Property.TYPES.MULTISELECT:
-            return [v.id for v in value]
+            return [v.value for v in value]
         elif self.property.type == Property.TYPES.SELECT:
             return value.value
 

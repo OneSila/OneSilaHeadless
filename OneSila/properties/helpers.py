@@ -1,10 +1,20 @@
-def get_product_properties_dict(product):
+def get_product_properties_dict(product) -> dict[str, list[str]]:
     """
     Fetch all properties and their values for a given product.
 
     :param product: product instance
     :return: Dictionary of properties and their values
+
+    The return value looks like:
+    {
+        "property_name": [
+            "value1",
+            "value2",
+            "valueN"
+        ]
+    }
     """
+    # TODO: This should really support languages.
     from properties.models import ProductProperty, Property
 
     properties = (

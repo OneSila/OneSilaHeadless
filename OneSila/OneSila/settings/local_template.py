@@ -97,6 +97,4 @@ ADMIN_ROUTE_SUFFIX = "_somethingSecure"
 
 SHOPIFY_API_KEY = "xxx"
 SHOPIFY_API_SECRET = "xxx"
-SHOPIFY_SCOPES = ['read_products', 'write_products']
-SHOPIFY_API_VERSION = "2024-07"
 SHOPIFY_TEST_REDIRECT_URI = "https://dcfa-79-118-110-129.ngrok-free.app/integrations/shopify/oauth/callback"
