@@ -1,5 +1,9 @@
-from properties.schema.mutations.mutation_classes import CompleteCreateProductPropertiesRule, CompleteUpdateProductPropertiesRule
-from properties.schema.types.input import PropertyInput, PropertySelectValueInput, ProductPropertiesRuleInput, ProductPropertiesRulePartialInput
+from typing import List
+
+from properties.schema.mutations.mutation_classes import CompleteCreateProductPropertiesRule, \
+    CompleteUpdateProductPropertiesRule, BulkCreateProductProperties
+from properties.schema.types.input import PropertyInput, PropertySelectValueInput, ProductPropertiesRuleInput, \
+    ProductPropertiesRulePartialInput, BulkProductPropertyInput
 from properties.models import PropertyTranslation, PropertySelectValueTranslation
 from translations.schema.mutations import TranslatableCreateMutation
 
@@ -30,3 +34,8 @@ def complete_create_product_properties_rule():
 def complete_update_product_properties_rule():
     extensions = []
     return CompleteUpdateProductPropertiesRule(ProductPropertiesRulePartialInput, extensions=extensions)
+
+
+def bulk_create_product_properties():
+    extensions = []
+    return BulkCreateProductProperties(List[BulkProductPropertyInput], extensions=extensions)

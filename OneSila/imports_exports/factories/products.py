@@ -34,8 +34,8 @@ class SalesPriceImport(ImportOperationMixin):
 
 class ImportProductInstance(AbstractImportInstance):
 
-    def __init__(self, data: dict, import_process=None, rule=None, translations=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, rule=None, translations=None, instance=None):
+        super().__init__(data, import_process, instance)
 
         if translations is None:
             translations = []
@@ -244,9 +244,9 @@ class ImportProductInstance(AbstractImportInstance):
     def process_logic(self):
 
         if self.type == Product.ALIAS:
-            fac = AliasProductImport(self, self.import_process)
+            fac = AliasProductImport(self, self.import_process, instance=self.instance)
         else:
-            fac = ProductImport(self, self.import_process)
+            fac = ProductImport(self, self.import_process, instance=self.instance)
 
         fac.run()
 
@@ -259,35 +259,40 @@ class ImportProductInstance(AbstractImportInstance):
 
     def set_product_properties(self):
 
-        product_type_property = Property.objects.get(
-            multi_tenant_company=self.multi_tenant_company,
-            is_product_type=True
-        )
+        if self.rule:
+            product_type_property = Property.objects.get(
+                multi_tenant_company=self.multi_tenant_company,
+                is_product_type=True
+            )
 
-        value_data = {
-            'value': self.rule.product_type.id,
-            'value_is_id': True
-        }
+            value_data = {
+                'value': self.rule.product_type.id,
+                'value_is_id': True
+            }
 
-        product_property_import_instance = ImportProductPropertyInstance(
-            value_data,
-            self.import_process,
-            product=self.instance,
-            property=product_type_property
-        )
-        product_property_import_instance.process()
+            product_property_import_instance = ImportProductPropertyInstance(
+                value_data,
+                self.import_process,
+                product=self.instance,
+                property=product_type_property
+            )
+            product_property_import_instance.process()
 
         product_property_ids = []
-        if self.type == Product.SIMPLE and hasattr(self, 'attributes'):
+        if self.type in [Product.SIMPLE, Product.BUNDLE, Product.ALIAS] and hasattr(self, 'attributes'):
 
             for attribute in self.attributes:
-                product_property_import_instance = ImportProductPropertyInstance(
-                    attribute,
-                    self.import_process,
-                    product=self.instance)
+                try:
+                    product_property_import_instance = ImportProductPropertyInstance(
+                        attribute,
+                        self.import_process,
+                        product=self.instance)
 
-                product_property_import_instance.process()
-                product_property_ids.append(product_property_import_instance.instance.id)
+                    product_property_import_instance.process()
+                    product_property_ids.append(product_property_import_instance.instance.id)
+                except Exception as e:
+                    # @TODO: Come hare later and remove this except
+                    pass
 
         self.product_property_instances = ProductProperty.objects.filter(id__in=product_property_ids)
 
@@ -304,7 +309,9 @@ class ImportProductInstance(AbstractImportInstance):
             )
             image_import_instance.process()
 
-            images_instances_ids.append(image_import_instance.instance.id)
+            if image_import_instance.instance is not None:
+                images_instances_ids.append(image_import_instance.instance.id)
+
             if hasattr(image_import_instance, 'media_assign'):
                 images_instances_associations_ids.append(image_import_instance.media_assign.id)
 
@@ -422,8 +429,7 @@ class ImportProductInstance(AbstractImportInstance):
         if hasattr(self, 'translations') and not self.created:
             self.update_translations()
 
-        if self.rule:
-            self.set_product_properties()
+        self.set_product_properties()
 
         if hasattr(self, 'images'):
             self.set_images()
@@ -509,9 +515,8 @@ class ImportProductInstance(AbstractImportInstance):
 
 
 class ImportProductTranslationInstance(AbstractImportInstance):
-
-    def __init__(self, data: dict, import_process=None, product=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, product=None, instance=None):
+        super().__init__(data, import_process, instance)
         self.product = product
 
         self.set_field_if_exists('name')
@@ -554,16 +559,15 @@ class ImportProductTranslationInstance(AbstractImportInstance):
             self.product = self.product_import_instance.instance
 
     def process_logic(self):
-        fac = ProductTranslationImport(self, self.import_process)
+        fac = ProductTranslationImport(self, self.import_process, instance=self.instance)
         fac.run()
 
         self.instance = fac.instance
 
 
 class ImportSalesPriceInstance(AbstractImportInstance):
-
-    def __init__(self, data: dict, import_process=None, product=None, currency_object=None):
-        super().__init__(data, import_process)
+    def __init__(self, data: dict, import_process=None, product=None, currency_object=None, instance=None):
+        super().__init__(data, import_process, instance)
         self.product = product
 
         self.set_field_if_exists('rrp')
@@ -669,5 +673,5 @@ class ImportSalesPriceInstance(AbstractImportInstance):
         if self.price == 0:
             return
 
-        fac = SalesPriceImport(self, self.import_process)
+        fac = SalesPriceImport(self, self.import_process, instance=self.instance)
         fac.run()

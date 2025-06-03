@@ -6,3 +6,4 @@ from sales_channels.integrations.shopify.models import ShopifySalesChannel
 @filter(ShopifySalesChannel)
 class ShopifySalesChannelFilter(SearchFilterMixin):
     active: auto
+    hostname: auto

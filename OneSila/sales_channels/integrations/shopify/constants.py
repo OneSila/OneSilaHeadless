@@ -5,6 +5,7 @@ NON_ACTIVE_STATUS = 'DRAFT'
 ALLOW_BACKORDER_CONTINUE = 'CONTINUE'
 ALLOW_BACKORDER_DENY = 'DENY'
 
+SHOPIFY_TAGS = 'shopify_tags'
 
 MEDIA_FRAGMENT = '''
 fragment fieldsForMediaTypes on Media {

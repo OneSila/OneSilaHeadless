@@ -338,6 +338,7 @@ def update_shopify_product_db_task(
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
+
         factory = ShopifyProductUpdateFactory(
             sales_channel=ShopifySalesChannel.objects.get(id=sales_channel_id),
             local_instance=Product.objects.get(id=product_id),

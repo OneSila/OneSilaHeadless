@@ -21,12 +21,12 @@ class AbstractImportInstance(abc.ABC):
       - Requires concrete implementations to implement validate() and process(import_instance).
     """
 
-    def __init__(self, data: dict, import_process=None):
+    def __init__(self, data: dict, import_process=None, instance=None):
         self.import_process = import_process
+        self.instance = instance
         self.multi_tenant_company = import_process.multi_tenant_company if import_process else None
         self.data = data.copy()
 
-        self.instance = None
         self.mirror_model_class = None
         self.mirror_model_map = {}
         self.mirror_model_defaults = {}
@@ -129,7 +129,7 @@ class ImportOperationMixin:
     allow_edit = True  # for some imports we don't have what to edit
     allow_translation_edit = False
 
-    def __init__(self, import_instance, import_process):
+    def __init__(self, import_instance, import_process, instance=None):
         """
         :param import_process: The import model instance (which must have a multi_tenant_company attribute)
         :param import_instance: The processed data (currently a dict) used for the import
@@ -137,9 +137,9 @@ class ImportOperationMixin:
         self.import_process = import_process
         self.import_instance = import_instance
         self.multi_tenant_company = import_process.multi_tenant_company
+        self.instance = instance
 
         # This will hold the local instance (e.g., Property) once retrieved or created.
-        self.instance = None
         self.created = False
 
         self.get_kwargs = {}
@@ -317,11 +317,13 @@ class ImportOperationMixin:
           3. Update the local instance with the structured data.
           4. Optionally create mirror data for a sales channel.
         """
-        self.build_kwargs()
-        if self.get_using_translation:
-            self.get_translation()
+        if self.instance is None:
 
-        self.get_or_create_instance()
+            self.build_kwargs()
+            if self.get_using_translation:
+                self.get_translation()
+
+            self.get_or_create_instance()
 
         if self.allow_edit:
             self.update_instance()

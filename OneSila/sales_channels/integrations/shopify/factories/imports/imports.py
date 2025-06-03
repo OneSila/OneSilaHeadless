@@ -10,7 +10,7 @@ from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.properties import ImportPropertyInstance
 from products.models import Product
 from properties.models import Property
-from sales_channels.integrations.shopify.constants import MEDIA_FRAGMENT, DEFAULT_METAFIELD_NAMESPACE
+from sales_channels.integrations.shopify.constants import MEDIA_FRAGMENT, DEFAULT_METAFIELD_NAMESPACE, SHOPIFY_TAGS
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin
 from sales_channels.integrations.shopify.models import ShopifyProduct, ShopifyEanCode, ShopifyProductProperty, \
     ShopifyProductContent, ShopifyImageProductAssociation, ShopifyPrice
@@ -44,10 +44,10 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
 
         property_tag_data = {
             "name": "Shopify Tags",
-            "internal_name": "shopify_tags",
+            "internal_name": SHOPIFY_TAGS,
             "type": Property.TYPES.MULTISELECT,
-            "is_public_information": True,
-            "add_to_filters": True,
+            "is_public_information": False,
+            "add_to_filters": False,
         }
 
         import_instance = ImportPropertyInstance(property_tag_data, self.import_process)
@@ -56,7 +56,20 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         self.tags_property = import_instance.instance
 
     def get_total_instances(self):
-        return self.api.Product.count()
+
+        gql = self.api.GraphQL()
+        query = """
+        {
+        productsCount {
+            count
+          }
+        }
+        """
+
+        response = gql.execute(query)
+        data = json.loads(response)
+
+        return data["data"]["productsCount"]["count"]
 
     def get_properties_data(self):
         return []
@@ -175,12 +188,19 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
                     sales_channel=self.sales_channel,
                     local_instance=product_property,
                     remote_product=remote_product,
-                    key=key,
-                    namespace=namespace,
                 )
 
                 # Save value and Shopify metafield ID
                 updated = False
+
+                if not remote_product_property.key:
+                    remote_product_property.key = key
+                    updated = True
+
+                if not remote_product_property.namespace:
+                    remote_product_property.namespace = namespace
+                    updated = True
+
                 if not remote_product_property.remote_value:
                     remote_product_property.remote_value = value
                     updated = True
@@ -498,7 +518,7 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
                 "remote_id": None,
             }
 
-        if self.tags_property and product_type != Product.CONFIGURABLE:
+        if self.tags_property:
             attributes.append({
                 "property": self.tags_property,
                 "value": product.get("tags"),
@@ -668,14 +688,16 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         is_configurable = len(variants) > 1
         product_type = Product.CONFIGURABLE if is_configurable else Product.SIMPLE
 
-        rule_product_type = product.get("productType") if parent_product_type is None else parent_product_type
         active = product.get("status") == "ACTIVE"
         structured_data = {
             "name": product.get("title"),
             "type": product_type,
             "active": active,
-            "product_type": rule_product_type,
         }
+
+        rule_product_type = product.get("productType") if parent_product_type is None else parent_product_type
+        if rule_product_type:
+            structured_data["product_type"] = rule_product_type
 
         if 'sku' in product:
             sku = product.get("sku")
@@ -720,6 +742,7 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         if is_variation:
 
             if configurable_attributes:
+
                 if 'attributes' in structured_data:
                     structured_data['attributes'].extend(configurable_attributes)
                 else:
@@ -739,9 +762,20 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
                 configurable_attributes=attributes,
                 configurable_configurator_select_values=configurable_configurator_select_values)
 
+        remote_instance = ShopifyProduct.objects.filter(
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id=product.get("id")
+        ).first()
+
+        instance = None
+        if remote_instance:
+            instance = remote_instance.local_instance
+
         import_instance = ImportProductInstance(
             data=structured_data,
-            import_process=self.import_process
+            import_process=self.import_process,
+            instance=instance
         )
 
         import_instance.prepare_mirror_model_class(
@@ -761,7 +795,9 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         self.handle_prices(import_instance)
         self.handle_images(import_instance)
         self.handle_variations(import_instance)
-        self.handle_sales_channels_views(import_instance, product)
+
+        if not is_variation:
+            self.handle_sales_channels_views(import_instance, product)
 
         return import_instance.instance
 
@@ -790,6 +826,7 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
                     productType
                     tags
                     vendor
+                    descriptionHtml
                     variants(first: 100) {{
                       edges {{
                         node {{
