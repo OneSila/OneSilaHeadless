@@ -1,4 +1,9 @@
 from core.views import EmptyTemplateView
 
-# class SomeModelView(EmptyTemplateView):
-#    pass
+
+class AmazonInstalledView(EmptyTemplateView):
+    pass
+
+
+class AmazonEntryView(EmptyTemplateView):
+    pass
