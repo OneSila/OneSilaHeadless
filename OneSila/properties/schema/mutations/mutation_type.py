@@ -1,7 +1,7 @@
 from core.schema.core.mutations import type
 from core.schema.core.mutations import create, update, delete, type, List
-from .fields import create_property, create_property_select_value
-from .fields import complete_create_product_properties_rule, complete_update_product_properties_rule
+from .fields import complete_create_product_properties_rule, complete_update_product_properties_rule, \
+                     bulk_create_product_properties, create_property, create_property_select_value
 from ..types.types import PropertyType, PropertyTranslationType, PropertySelectValueType, ProductPropertyType, ProductPropertyTextTranslationType, \
     PropertySelectValueTranslationType, ProductPropertiesRuleType, ProductPropertiesRuleItemType
 from ..types.input import PropertyInput, PropertyTranslationInput, PropertySelectValueInput, ProductPropertyInput, \
@@ -32,6 +32,7 @@ class PropertiesMutation:
 
     create_product_property: ProductPropertyType = create(ProductPropertyInput)
     create_product_properties: List[ProductPropertyType] = create(ProductPropertyInput)
+    bulk_create_product_properties: List[ProductPropertyType] = bulk_create_product_properties()
     update_product_property: ProductPropertyType = update(ProductPropertyPartialInput)
     delete_product_property: ProductPropertyType = delete()
     delete_product_properties: List[ProductPropertyType] = delete()

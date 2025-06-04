@@ -60,6 +60,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.payload = {}
         self.remote_product_properties = []
         self.local_type = self.local_instance.type
+        self.is_create = False
 
     def set_local_assigns(self):
         to_assign = SalesChannelViewAssign.objects.filter(product=self.local_instance, sales_channel=self.sales_channel, remote_product__isnull=True)
@@ -274,9 +275,12 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         self.add_field_in_payload('sku', self.sku)
 
+    def get_variation_sku(self):
+        return f"{self.parent_local_instance.sku}-{self.local_instance.sku}"
+
     def set_variation_sku(self):
         """Sets the SKU for variations, defaulting to parent_sku-child_sku."""
-        self.sku = f"{self.parent_local_instance.sku}-{self.local_instance.sku}"
+        self.sku = self.get_variation_sku()
 
     def set_visibility(self):
         """Sets the visibility for the product or variation in the payload."""
@@ -1000,6 +1004,10 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
     sync_product_factory = None
     action_log = RemoteLog.ACTION_CREATE
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.is_create = True
+
     def initialize_remote_product(self):
         """
         Initializes the RemoteProduct instance.
@@ -1011,7 +1019,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
         """
         remote_sku = self.local_instance.sku
         if self.is_variation:
-            remote_sku = f"{self.parent_local_instance.sku}-{self.local_instance.sku}"
+            remote_sku = self.get_variation_sku()
             if self.remote_parent_product is None:
                 self.remote_parent_product = self.remote_model_class.objects.get(
                     local_instance=self.parent_local_instance,

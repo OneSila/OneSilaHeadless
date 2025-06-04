@@ -25,16 +25,27 @@ class ShopifySalesChannelViewPullFactory(GetShopifyApiMixin, PullRemoteInstanceM
     is_model_response = False
 
     def fetch_remote_instances(self):
+        gql = self.api.GraphQL()
+        query = """
+        {
+          shop {
+            id
+            name
+            primaryDomain {
+              url
+            }
+          }
+        }
         """
-        Override to fetch the single shop as the one view.
-        """
-        shop = self.api.Shop.current()
+        response = gql.execute(query)
+        data = json.loads(response)
+        shop_data = data["data"]["shop"]
 
-        domain = getattr(shop, 'domain', None)
-        url = f"https://{domain}" if domain else ''
+        url = shop_data.get("primaryDomain", {}).get("url", "")
+
         self.remote_instances = [{
-            'id': shop.id,
-            'name': shop.name,
+            'id': shop_data["id"].split("/")[-1],
+            'name': shop_data["name"],
             'url': url,
             'publication_id': self.get_online_store_publication_id(),
         }]

@@ -47,7 +47,20 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
         self.tags_property = import_instance.instance
 
     def get_total_instances(self):
-        return self.api.Product.count()
+
+        gql = self.api.GraphQL()
+        query = """
+        {
+        productsCount {
+            count
+          }
+        }
+        """
+
+        response = gql.execute(query)
+        data = json.loads(response)
+
+        return data["data"]["productsCount"]["count"]
 
     def get_properties_data(self):
         return []
@@ -636,6 +649,7 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
         if is_variation:
 
             if configurable_attributes:
+
                 if 'attributes' in structured_data:
                     structured_data['attributes'].extend(configurable_attributes)
                 else:
