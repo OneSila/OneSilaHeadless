@@ -1,7 +1,12 @@
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field
+from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, strawberry_type
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
 from sales_channels.integrations.amazon.schema.types.filters import AmazonSalesChannelFilter
 from sales_channels.integrations.amazon.schema.types.ordering import AmazonSalesChannelOrder
+
+
+@strawberry_type
+class AmazonRedirectUrlType:
+    redirect_url: str
 
 
 @type(AmazonSalesChannel, filters=AmazonSalesChannelFilter, order=AmazonSalesChannelOrder, pagination=True, fields="__all__")

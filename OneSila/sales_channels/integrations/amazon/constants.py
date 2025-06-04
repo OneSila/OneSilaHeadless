@@ -1,0 +1,27 @@
+SELLER_CENTRAL_URLS = {
+    "CA": "https://sellercentral.amazon.ca",
+    "US": "https://sellercentral.amazon.com",
+    "MX": "https://sellercentral.amazon.com.mx",
+    "BR": "https://sellercentral.amazon.com.br",
+    "IE": "https://sellercentral.amazon.ie",
+    "ES": "https://sellercentral-europe.amazon.com",
+    "GB": "https://sellercentral-europe.amazon.com",
+    "FR": "https://sellercentral-europe.amazon.com",
+    "BE": "https://sellercentral.amazon.com.be",
+    "NL": "https://sellercentral.amazon.nl",
+    "DE": "https://sellercentral-europe.amazon.com",
+    "IT": "https://sellercentral-europe.amazon.com",
+    "SE": "https://sellercentral.amazon.se",
+    "ZA": "https://sellercentral.amazon.co.za",
+    "PL": "https://sellercentral.amazon.pl",
+    "EG": "https://sellercentral.amazon.eg",
+    "TR": "https://sellercentral.amazon.com.tr",
+    "SA": "https://sellercentral.amazon.sa",
+    "AE": "https://sellercentral.amazon.ae",
+    "IN": "https://sellercentral.amazon.in",
+    "SG": "https://sellercentral.amazon.sg",
+    "AU": "https://sellercentral.amazon.com.au",
+    "JP": "https://sellercentral.amazon.co.jp",
+}
+
+AMAZON_OAUTH_TOKEN_URL = "https://api.amazon.com/auth/o2/token"

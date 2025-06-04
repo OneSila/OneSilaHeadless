@@ -1,6 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 from core import models
 from sales_channels.models.sales_channels import SalesChannel, SalesChannelView, RemoteLanguage
+import uuid
 
 
 class AmazonSalesChannel(SalesChannel):
@@ -29,6 +30,19 @@ class AmazonSalesChannel(SalesChannel):
         null=True, blank=True,
         help_text="Expiration datetime of the access token."
     )
+    state = models.CharField(
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="Unique state used for OAuth verification",
+    )
+    country = models.CharField(
+        max_length=2,
+        null=True,
+        blank=True,
+        help_text="Country code for Seller Central domain.",
+    )
     region = models.CharField(
         max_length=2,
         choices=REGION_CHOICES,
@@ -46,6 +60,11 @@ class AmazonSalesChannel(SalesChannel):
 
     def connect(self):
         pass
+
+    def save(self, *args, **kwargs):
+        if not self.access_token and not self.state:
+            self.state = uuid.uuid4().hex
+        super().save(*args, **kwargs)
 
 
 class AmazonSalesChannelView(SalesChannelView):
