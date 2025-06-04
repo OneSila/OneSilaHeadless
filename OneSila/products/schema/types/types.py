@@ -9,8 +9,7 @@ from typing import List, Optional
 from media.models import Media
 from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
     ProductTranslation, ConfigurableVariation, BundleVariation, AliasProduct
-from properties.models import ProductProperty
-from properties.schema.types.types import ProductPropertyType
+
 from taxes.schema.types.types import VatRateType
 from .filters import ProductFilter, BundleProductFilter, ConfigurableProductFilter, \
     SimpleProductFilter, ProductTranslationFilter, ConfigurableVariationFilter, BundleVariationFilter, \
@@ -64,12 +63,14 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
         1 - Orange: No missing information but missing optional information.
         2 - Red: Missing information (regardless of optional information).
         """
+        from products_inspector.constants import RED, ORANGE, GREEN
+
         if self.inspector.has_missing_information:
-            return 3  # Red
+            return RED
         elif self.inspector.has_missing_optional_information:
-            return 2  # Orange
+            return ORANGE
         else:
-            return 1  # Green
+            return GREEN
 
     @field()
     def has_parents(self, info) -> bool:

@@ -1,5 +1,11 @@
 from django.utils.translation import gettext_lazy as _
 
+# Inspector status choices for
+# the frontend.  Mainly used in graphql.
+RED = 3
+ORANGE = 2
+GREEN = 1
+
 # APPLICABILITY SECTION
 REQUIRED = 'REQUIRED'
 OPTIONAL = 'OPTIONAL'

@@ -173,9 +173,9 @@ class ProductProperty(TranslatedModelMixin, models.Model):
         value = self.get_value()
 
         if self.property.type == Property.TYPES.MULTISELECT:
-            return [v.value for v in value]
+            value = list({value.value for value in self.value_multi_select.all()})
         elif self.property.type == Property.TYPES.SELECT:
-            return value.value
+            value = value.value
 
         return value
 
