@@ -8,6 +8,8 @@ from sales_channels.integrations.magento2.models import MagentoSalesChannel
 from sales_channels.integrations.magento2.schema.types.types import MagentoSalesChannelType
 from sales_channels.integrations.shopify.models import ShopifySalesChannel
 from sales_channels.integrations.shopify.schema.types.types import ShopifySalesChannelType
+from sales_channels.integrations.amazon.models import AmazonSalesChannel
+from sales_channels.integrations.amazon.schema.types.types import AmazonSalesChannelType
 from sales_channels.schema.types.types import SalesChannelType
 
 
@@ -27,6 +29,9 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
         elif isinstance(self, ShopifySalesChannel):
             return self.access_token is not None
 
+        elif isinstance(self, AmazonSalesChannel):
+            return self.access_token is not None
+
         return False
 
     @field()
@@ -35,6 +40,8 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
             graphql_type = MagentoSalesChannelType
         elif isinstance(self, ShopifySalesChannel):
             graphql_type = ShopifySalesChannelType
+        elif isinstance(self, AmazonSalesChannel):
+            graphql_type = AmazonSalesChannelType
         else:
             graphql_type = SalesChannelType
 
