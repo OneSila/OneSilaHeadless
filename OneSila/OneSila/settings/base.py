@@ -332,8 +332,40 @@ HUEY = {
     },
 }
 
-ADMIN_ROUTE_SUFFIX = ""
-MAGENTO_LOG_DIR_PATH = '/var/log/OneSilaHeadless/magento'
+
+#
+# Admin url suffix.
+#
+
+ADMIN_ROUTE_SUFFIX = os.getenv('ADMIN_ROUTE_SUFFIX', "")
+
+#
+# Magento integration settings (sales_channels.integrations.magento2)
+#
+
+MAGENTO_LOG_DIR_PATH = os.getenv('MAGENTO_LOG_DIR_PATH', '/var/log/OneSilaHeadless/magento')
+
+
+#
+# Shopify integration Settings (sales_channels.integrations.shopify)
+#
 
 SHOPIFY_SCOPES = ['read_products', 'write_products', 'read_markets_home', 'read_orders', 'read_publications', 'write_publications']
 SHOPIFY_API_VERSION = "2025-04"
+SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
+SHOPIFY_API_SECRET = os.getenv('SHOPIFY_API_SECRET')
+SHOPIFY_TEST_REDIRECT_URI = os.getenv('SHOPIFY_TEST_REDIRECT_URI')
+
+#
+# OpenAI settings. (llm)
+#
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+REPLICATE_API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
+AI_POINT_PRICE = os.getenv('AI_POINT_PRICE', 0.1)
+
+#
+# Telegram settings. (notifications)
+#
+
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
