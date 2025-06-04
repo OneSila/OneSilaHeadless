@@ -244,7 +244,27 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
             product__in=variations,
             property=prop
         )
-        return list(set([i.get_serialised_value(language=self.sales_channel_assign_language) for i in properties]))
+
+        # Workaround to ensure all values are unique becase you cannot
+        # set() on a nested list. Instead convert into tuples.
+        from itertools import chain
+
+        raw_values = [i.get_serialised_value(language=self.sales_channel_assign_language) for i in properties]
+
+        # Flatten all nested lists one level
+        flattened = list(chain.from_iterable(
+            v if isinstance(v, list) else [v] for v in raw_values
+        ))
+
+        # Remove duplicates while preserving order
+        seen = set()
+        final_values = []
+        for item in flattened:
+            if item not in seen:
+                seen.add(item)
+                final_values.append(item)
+
+        return final_values
 
     def remove_duplicates(self, payload):
         seen = []

@@ -6,8 +6,9 @@ from sales_channels.integrations.woocommerce.tests.helpers import CreateTestProd
 from media.tests.helpers import CreateImageMixin
 from properties.models import Property, ProductPropertiesRule, ProductProperty, \
     ProductPropertiesRuleItem
-from products.models import ConfigurableVariation
-from sales_prices.models import SalesPrice
+from products.models import Product
+from products.demo_data import CONFIGURABLE_CHAIR_SKU
+from core.tests import TestCaseDemoDataMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceProduct
 from sales_channels.integrations.woocommerce.factories.products import (
     WooCommerceProductCreateFactory,
@@ -79,7 +80,7 @@ class WooCommerceProductFactoryTestMixin(CreateTestProductMixin, CreateImageMixi
         )
 
 
-class WooCommerceProductFactoryTest(WooCommerceProductFactoryTestMixin):
+class WooCommerceProductFactoryTest(TestCaseDemoDataMixin, WooCommerceProductFactoryTestMixin):
     def test_attribute_create(self):
         factory = WooCommerceGlobalAttributeCreateFactory(
             sales_channel=self.sales_channel,
@@ -169,99 +170,12 @@ class WooCommerceProductFactoryTest(WooCommerceProductFactoryTestMixin):
     def test_woocom_configurable_product(self):
         # Prepare a config product that we will assign directly to the
         # sales channel
-        parent = self.create_test_product(
-            sku="test_config-product",
-            name="Test Product",
-            assign_to_sales_channel=True,
-            rule=self.product_rule,
-            is_configurable=True
-        )
-        self.assertTrue(parent.is_configurable())
 
-        image = self.create_and_attach_image(parent, fname='red.png')
-        ProductProperty.objects.get_or_create(
+        parent = Product.objects.get(
             multi_tenant_company=self.multi_tenant_company,
-            product=parent,
-            property=self.type_property,
-            value_select=self.tshirt_type
+            sku=CONFIGURABLE_CHAIR_SKU
         )
-
-        # Go and create the variations.
-        small_product = self.create_test_product(
-            sku="tshirt_config-small-product_child-small",
-            name="Small Product",
-            assign_to_sales_channel=True,
-            rule=self.product_rule,
-            is_configurable=False
-        )
-        self.assertTrue(small_product.is_simple())
-        price = SalesPrice.objects.get(
-            product=small_product,
-        )
-        self.assertTrue(price.price is not None)
-
-        medium_product = self.create_test_product(
-            sku="tshirt_config-small-product_child-medium",
-            name="Medium Product",
-            assign_to_sales_channel=True,
-            rule=self.product_rule,
-            is_configurable=False
-        )
-        self.assertTrue(medium_product.is_simple())
-
-        large_product = self.create_test_product(
-            sku="tshirt_config-small-product_child-large",
-            name="Large Product",
-            assign_to_sales_channel=True,
-            rule=self.product_rule,
-            is_configurable=False
-        )
-        self.assertTrue(large_product.is_simple())
-        # Start assigngin the properties to the variations.
-        variations = [small_product, medium_product, large_product]
-
-        # Assign the properties to all variations.
-        the_same_properties = [(self.brand_property, self.brand_property_value),
-         (self.type_property, self.tshirt_type)]
-
-        for product in variations:
-            for t, v in the_same_properties:
-                ProductProperty.objects.get_or_create(
-                    multi_tenant_company=self.multi_tenant_company,
-                    product=small_product,
-                    property=t,
-                    value_select=v
-                )
-
-        # Assing the sizes:
-        ProductProperty.objects.get_or_create(
-            multi_tenant_company=self.multi_tenant_company,
-            product=small_product,
-            property=self.size_property,
-            value_select=self.size_property_value_small
-        )
-
-        ProductProperty.objects.get_or_create(
-            multi_tenant_company=self.multi_tenant_company,
-            product=medium_product,
-            property=self.size_property,
-            value_select=self.size_property_value_medium
-        )
-
-        ProductProperty.objects.get_or_create(
-            multi_tenant_company=self.multi_tenant_company,
-            product=large_product,
-            property=self.size_property,
-            value_select=self.size_property_value_large
-        )
-
-        # Assign the variations to the configurable product.
-        for v in variations:
-            ConfigurableVariation.objects.create(
-                parent=parent,
-                variation=v,
-                multi_tenant_company=self.multi_tenant_company
-            )
+        self.assign_product_to_sales_channel(parent)
 
         # Push the product remotely.
         factory = WooCommerceProductCreateFactory(

@@ -11,6 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 class CreateTestProductMixin:
+    def assign_product_to_sales_channel(self, product):
+        self.sales_channel_view = SalesChannelView.objects.get(
+            # multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+        )
+        self.sales_channel_view_assign = SalesChannelViewAssign.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel_view=self.sales_channel_view,
+            sales_channel=self.sales_channel,
+            product=product,
+        )
+        return self.sales_channel_view_assign
+
     def tearDown(self):
         for product in WoocommerceProduct.objects.filter(remote_id__isnull=False):
             try:

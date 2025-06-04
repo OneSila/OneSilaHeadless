@@ -146,6 +146,7 @@ class WooCommerceProductCreateFactory(RemoteProductCreateFactory, WooCommercePro
             resp = self.api.create_product_variation(self.remote_instance.remote_parent_product.remote_id, **self.payload)
         else:
             resp = self.api.create_product(**self.payload)
+
         return resp
 
     def fetch_existing_remote_data(self):
@@ -172,10 +173,12 @@ class WooCommerceProductUpdateFactory(RemoteProductUpdateFactory, WooCommercePro
         Updates a remote product in WooCommerce.
         """
         if self.is_woocommerce_variant_product:
-            resp = self.api.update_product_variation(self.remote_instance.remote_parent_product.remote_id, self.remote_instance.remote_id, **self.payload)
-            return resp
+            parent_id = self.remote_instance.remote_parent_product.remote_id
+            variant_id = self.remote_instance.remote_id
+            return self.api.update_product_variation(parent_id, variant_id, **self.payload)
         else:
-            return self.api.update_product(self.remote_instance.remote_id, **self.payload)
+            product_id = self.remote_instance.remote_id
+            return self.api.update_product(product_id, **self.payload)
 
 
 class WooCommerceProductDeleteFactory(WooCommerceProductMixin, RemoteProductDeleteFactory):

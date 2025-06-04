@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class WooCommerceEanCodeUpdateFactory(WooCommerceProductAttributeMixin, GetWoocommerceAPIMixin, RemoteEanCodeUpdateFactory):
+class WooCommerceEanCodeUpdateFactory(WooCommerceProductAttributeMixin, GetWoocommerceAPIMixin, RemoteEanCodeUpdateFactory, WoocommerceProductTypeMixin):
     # Eans are not stored remotely per se.
     # they are part of the product attribute payload as an option
     remote_model_class = WoocommerceEanCode
@@ -29,10 +29,9 @@ class WooCommerceEanCodeUpdateFactory(WooCommerceProductAttributeMixin, GetWooco
 
     def update_remote(self):
         if self.is_woocommerce_variant_product:
-            logger.info(f"Updating variant {self.remote_product.remote_id} with payload {self.payload}")
-            return self.api.update_variant(self.remote_product.remote_parent_id, self.remote_product.remote_id, **self.payload)
-        elif self.is_woocommerce_simple_product or self.is_woocommerce_configurable_product:
-            logger.info(f"Updating product {self.remote_product.remote_id} with payload {self.payload}")
-            return self.api.update_product(self.remote_product.remote_id, **self.payload)
+            parent_id = self.remote_product.remote_parent_id
+            variant_id = self.remote_product.remote_id
+            return self.api.update_variant(parent_id, variant_id, **self.payload)
         else:
-            raise NotImplementedError("Invalid product type")
+            product_id = self.remote_product.remote_id
+            return self.api.update_product(product_id, **self.payload)

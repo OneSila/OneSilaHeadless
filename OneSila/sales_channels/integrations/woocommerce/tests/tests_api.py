@@ -6,8 +6,9 @@ from sales_channels.integrations.woocommerce.exceptions import (
     FailedToGetError,
     FailedToGetAttributeError,
     FailedToGetAttributeTermsError,
+    NoneValueNotAllowedError,
+    DuplicateError
 )
-from sales_channels.integrations.woocommerce.exceptions import DuplicateError
 
 import logging
 logger = logging.getLogger(__name__)
@@ -31,6 +32,13 @@ class WoocommerceApiWrapperTestCase(TestCase):
             verify_ssl=self.test_store_settings.get('verify_ssl', False),
             timeout=self.test_store_settings.get('timeout', 10)
         )
+
+    def test_get_none_value_not_allowed_error(self):
+        """
+        Test that get_none_value_not_allowed_error raises the correct exception when the argument is None.
+        """
+        with self.assertRaises(NoneValueNotAllowedError):
+            self.api_wrapper.get_product(None)
 
     def test_get_attributes(self):
         """

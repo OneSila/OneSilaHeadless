@@ -73,7 +73,7 @@ class WooCommerceMediaMixin(WoocommerceProductTypeMixin):
         return self.payload
 
 
-class WooCommerceMediaProductThroughMixin(WooCommerceMediaMixin, SerialiserMixin):
+class WooCommerceMediaProductThroughMixin(WooCommerceMediaMixin, SerialiserMixin, WoocommerceProductTypeMixin):
     # We dont need to store images remotely.
     remote_model_class = WoocommerceMediaThroughProduct
     remote_id_map = 'id'
@@ -101,7 +101,13 @@ class WooCommerceMediaProductThroughMixin(WooCommerceMediaMixin, SerialiserMixin
         return self.apply_media_payload()
 
     def create_or_update_images(self):
-        return self.api.update_product(self.remote_product.remote_id, **self.payload)
+        if self.is_woocommerce_variant_product:
+            parent_id = self.remote_product.remote_parent_id
+            variant_id = self.remote_product.remote_id
+            return self.api.update_product_variation(parent_id, variant_id, **self.payload)
+        else:
+            product_id = self.remote_product.remote_id
+            return self.api.update_product(product_id, **self.payload)
 
 
 class WooCommerceMediaProductThroughCreateFactory(WooCommerceMediaProductThroughMixin, GetWoocommerceAPIMixin, RemoteMediaProductThroughCreateFactory):

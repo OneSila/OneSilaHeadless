@@ -14,6 +14,7 @@ from .exceptions import FailedToGetAttributesError, FailedToGetError, \
 from .constants import API_ATTRIBUTE_PREFIX
 from .helpers import convert_fields_to_int, clearout_none_values, convert_fields_to_string, \
     raise_for_required_fields
+from .decorators import raise_for_none
 import urllib3
 import requests
 from copy import deepcopy
@@ -238,12 +239,14 @@ class WoocommerceApiWrapper:
         except FailedToGetError as e:
             raise FailedToGetProductsError(e, response=e.response) from e
 
+    @raise_for_none(arg_name='product_id')
     def get_product(self, product_id):
         try:
             return self.get(f'products/{product_id}')
         except FailedToGetError as e:
             raise FailedToGetProductError(e, response=e.response) from e
 
+    @raise_for_none(arg_name='sku')
     def get_product_by_sku(self, sku):
         try:
             return self.get(f'products?sku={sku}')[0]
@@ -310,12 +313,17 @@ class WoocommerceApiWrapper:
         logger.debug(f"Create Product Variation Payload: {payload}")
         return self.post(f'products/{product_id}/variations', data=payload)
 
+    @raise_for_none(arg_name='product_id')
+    @raise_for_none(arg_name='variation_id')
     def get_product_variation(self, product_id, variation_id):
         return self.get(f'products/{product_id}/variations/{variation_id}')
 
+    @raise_for_none(arg_name='product_id')
     def get_product_variations(self, product_id):
         return self.get_paged_get(f'products/{product_id}/variations')
 
+    @raise_for_none(arg_name='product_id')
+    @raise_for_none(arg_name='variation_id')
     def update_product_variation(self, product_id, variation_id, **payload):
         """
         Update a product variation in WooCommerce.
@@ -326,12 +334,15 @@ class WoocommerceApiWrapper:
                 payload[key] = self._convert_price_to_string(payload[key])
         return self.put(f'products/{product_id}/variations/{variation_id}', data=payload)
 
+    @raise_for_none(arg_name='product_id')
+    @raise_for_none(arg_name='variation_id')
     def delete_product_variation(self, product_id, variation_id):
         """
         Delete a product variation in WooCommerce.
         """
         return self.delete(f'products/{product_id}/variations/{variation_id}')
 
+    @raise_for_none(arg_name='product_id')
     def update_product(self, product_id, **payload):
         fields_to_update = ['name', 'type', 'sku', 'status', 'catalog_visibility', 'regular_price',
             'sale_price', 'description', 'short_description', 'categories', 'images', 'attributes',
@@ -358,6 +369,7 @@ class WoocommerceApiWrapper:
         except FailedToPutError as e:
             raise FailedToUpdateProductError(e, response=e.response) from e
 
+    @raise_for_none(arg_name='product_id')
     def delete_product(self, product_id):
         try:
             return self.delete(f'products/{product_id}')

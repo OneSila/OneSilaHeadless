@@ -200,3 +200,10 @@ class ProductNotFoundError(FailedToUpdateProductError):
 class InternalWoocomPostError(Exception):
     """Used if woocom failed to post throught the actual package."""
     pass
+
+
+class NoneValueNotAllowedError(Exception):
+    """
+    Exception raised when a None value is not allowed.
+    """
+    pass
