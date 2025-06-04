@@ -13,8 +13,8 @@ def get_languages():
 
 
 def is_or_create_folder(path):
-    if not os.path.isdir(path):
-        os.mkdir(path)
+    """Ensure that the directory at ``path`` exists."""
+    os.makedirs(path, exist_ok=True)
 
 
 def save_test_file(filename, file_contents):
