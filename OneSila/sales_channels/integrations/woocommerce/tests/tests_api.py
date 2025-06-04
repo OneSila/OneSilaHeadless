@@ -169,11 +169,19 @@ class WoocommerceApiWrapperTestCase(TestCase):
             'sale_price': '0.8',
         }
         result = self.api_wrapper.create_product(**kwargs)
+        product_id = result['id']
         self.assertIsInstance(result, dict)
         self.assertEqual(result['name'], kwargs['name'])
         self.assertEqual(result['sku'], kwargs['sku'])
 
-        result = self.api_wrapper.delete_product(result['id'])
+        # now go and add an ean-code
+        result = self.api_wrapper.update_product(product_id, global_unique_id='1234567890123')
+        self.assertTrue(result)
+
+        resp = self.api_wrapper.get_product(product_id)
+        self.assertEqual(resp['global_unique_id'], '1234567890123')
+
+        result = self.api_wrapper.delete_product(product_id)
         self.assertTrue(result)
 
     def test_create_duplicate_product_woocommerce(self):
@@ -376,6 +384,13 @@ class WoocommerceApiWrapperTestCase(TestCase):
         variations_large_result = self.api_wrapper.create_product_variation(config_product_result_id, **variations_large)
         self.assertIsInstance(variations_large_result, dict)
         self.assertEqual(variations_large_result['name'], variations_large['name'])
+
+        # now go and add an ean-code
+        result = self.api_wrapper.update_product_variation(config_product_result_id, variations_small_result['id'], global_unique_id='1234567890123')
+        self.assertTrue(result)
+
+        resp = self.api_wrapper.get_product_variation(config_product_result_id, variations_small_result['id'])
+        self.assertEqual(resp['global_unique_id'], '1234567890123')
 
         # Delete the attribute and products.
         result = self.api_wrapper.delete_attribute(size_attribute_id)

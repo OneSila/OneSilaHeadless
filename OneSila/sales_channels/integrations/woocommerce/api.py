@@ -334,7 +334,8 @@ class WoocommerceApiWrapper:
 
     def update_product(self, product_id, **payload):
         fields_to_update = ['name', 'type', 'sku', 'status', 'catalog_visibility', 'regular_price',
-            'sale_price', 'description', 'short_description', 'categories', 'images', 'attributes']
+            'sale_price', 'description', 'short_description', 'categories', 'images', 'attributes',
+            'global_unique_id']
 
         # Check if any attribute has an empty options list
         attributes = payload.get('attributes', [])

@@ -291,7 +291,7 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
         # }
         product = self.get_local_product()
         logger.debug(f"Applying attribute payload for product: {product}")
-        ean_code = product.eancode_set.last()
+        # ean_code = product.eancode_set.last()
         self.set_product_rule()
         self.set_product_properties_to_apply_payload()
         self.set_filterable_property_ids()
@@ -303,15 +303,15 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
             # Simple Variations (variation) use a singular form.
             # This is the attribute payload for the variation itelf.
 
-            # Firstly let's add the EAN Code.
-            # FIXME: This is the wrong implementation. There seems to be
-            # a direct field on the product admin pages with title: GTIN, UPC, EAN, or ISBN
-            if ean_code:
-                attribute_payload.append({
-                    'name': 'EAN Code',
-                    'visible': True,
-                    'option': [ean_code.ean_code]
-                })
+            # # Firstly let's add the EAN Code.
+            # # FIXME: This is the wrong implementation. There seems to be
+            # # a direct field on the product admin pages with title: GTIN, UPC, EAN, or ISBN
+            # if ean_code:
+            #     attribute_payload.append({
+            #         'name': 'EAN Code',
+            #         'visible': True,
+            #         'option': [ean_code.ean_code]
+            #     })
 
             # It would seem that woocommerce doesnt have a problem with
             # Assigning too many attributes to a product. Even variations.
