@@ -1,7 +1,8 @@
-from core.schema.core.queries import type
+from core.schema.core.queries import node, connection, DjangoListConnection, type
+from sales_channels.integrations.woocommerce.schema.types.types import WoocommerceSalesChannelType
 
 
 @type(name="Query")
 class WoocommerceSalesChannelsQuery:
-    """Placeholder queries for WooCommerce sales channels."""
-    pass
+    woocommerce_channel: WoocommerceSalesChannelType = node()
+    woocommerce_channels: DjangoListConnection[WoocommerceSalesChannelType] = connection()
