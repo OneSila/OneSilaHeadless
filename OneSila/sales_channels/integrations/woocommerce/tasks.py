@@ -388,8 +388,15 @@ def delete_woocommerce_product_db_task(task_queue_item_id, sales_channel_id, rem
 
 @remote_task(priority=LOW_PRIORITY)
 @db_task()
-def woocommerce_import_db_task(import_process, sales_channel_id):
-    pass
+def woocommerce_import_db_task(import_process, sales_channel):
+    """Run the WooCommerce import process for the given sales channel."""
+    from .factories.imports import WoocommerceProductImportProcessor
+
+    fac = WoocommerceProductImportProcessor(
+        import_process=import_process,
+        sales_channel=sales_channel,
+    )
+    fac.run()
 
 
 @periodic_task(crontab(minute=0, hour=2))

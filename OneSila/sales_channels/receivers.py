@@ -59,12 +59,16 @@ def import_process_avoid_duplicate_pre_create_receiver(sender, instance: SalesCh
 def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelImport, **kwargs):
     from sales_channels.integrations.shopify.models.sales_channels import ShopifySalesChannel
     from sales_channels.integrations.shopify.tasks import shopify_import_db_task
+    from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
+    from sales_channels.integrations.woocommerce.tasks import woocommerce_import_db_task
 
     sales_channel = instance.sales_channel.get_real_instance()
     if isinstance(sales_channel, ShopifySalesChannel):
         refresh_subscription_receiver(sales_channel)
-
         shopify_import_db_task(import_process=instance, sales_channel=sales_channel)
+    elif isinstance(sales_channel, WoocommerceSalesChannel):
+        refresh_subscription_receiver(sales_channel)
+        woocommerce_import_db_task(import_process=instance, sales_channel=sales_channel)
 
 
 @receiver(post_update, sender=SalesChannelImport)
@@ -74,6 +78,8 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
     from sales_channels.integrations.magento2.tasks import magento_import_db_task
     from sales_channels.integrations.shopify.models.sales_channels import ShopifySalesChannel
     from sales_channels.integrations.shopify.tasks import shopify_import_db_task
+    from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
+    from sales_channels.integrations.woocommerce.tasks import woocommerce_import_db_task
 
     sales_channel = instance.sales_channel.get_real_instance()
     if instance.status == SalesChannelImport.STATUS_PENDING:
@@ -82,6 +88,8 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
             magento_import_db_task(import_process=instance, sales_channel=sales_channel)
         elif isinstance(sales_channel, ShopifySalesChannel):
             shopify_import_db_task(import_process=instance, sales_channel=sales_channel)
+        elif isinstance(sales_channel, WoocommerceSalesChannel):
+            woocommerce_import_db_task(import_process=instance, sales_channel=sales_channel)
         else:
             raise NotImplementedError(f"Sales channel {type(sales_channel)} is not supported")
 
