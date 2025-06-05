@@ -25,7 +25,8 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
             return self.access_token is not None
         elif isinstance(self, WoocommerceSalesChannel):
             return bool(self.api_key and self.api_secret)
-        return False
+
+        raise NotImplementedError(f"Integration type {self.__class__} not implemented")
 
     @field()
     def proxy_id(self, info) -> str:
@@ -45,5 +46,6 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
             graphql_type = WoocommerceSalesChannelType
         else:
             graphql_type = SalesChannelType
+            raise NotImplementedError(f"Integration type {self.__class__} not implemented")
 
         return to_base64(graphql_type, self.pk)
