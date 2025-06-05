@@ -5,7 +5,6 @@ from sales_channels.integrations.woocommerce.schema.types.types import Woocommer
 
 @type(name='Subscription')
 class WoocommerceSalesChannelsSubscription:
-
     @subscription
     async def woocommerce_channel(self, info: Info, pk: str) -> AsyncGenerator[WoocommerceSalesChannelType, None]:
         async for i in model_subscriber(info=info, pk=pk, model=WoocommerceSalesChannel):
