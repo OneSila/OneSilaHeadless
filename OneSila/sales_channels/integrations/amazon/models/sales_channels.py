@@ -110,5 +110,4 @@ class AmazonSalesChannelView(SalesChannelView):
 
 class AmazonRemoteLanguage(RemoteLanguage):
     """Amazon remote language placeholder."""
-
     pass

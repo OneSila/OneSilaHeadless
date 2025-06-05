@@ -4,11 +4,7 @@ from core import models
 
 class AmazonCurrency(RemoteCurrency):
     """Amazon remote currency."""
-    is_default = models.BooleanField(
-        default=False,
-        help_text="Marks the primary currency for this Amazon store."
-    )
-
+    pass
 
 class AmazonVat(RemoteVat):
     """Amazon remote VAT."""

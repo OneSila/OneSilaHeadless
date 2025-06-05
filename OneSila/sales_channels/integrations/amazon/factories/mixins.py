@@ -23,3 +23,6 @@ class GetAmazonAPIMixin:
             return response.payload
         except SellingApiException as e:
             raise Exception(f"SP-API failed: {e}")
+
+    def get_api(self):
+        return None # for now return None and use methods directly
