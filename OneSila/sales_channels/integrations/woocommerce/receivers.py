@@ -32,7 +32,10 @@ from sales_channels.flows.default import (
 )
 
 from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel, WoocommerceProductProperty, \
-    WoocommerceImageProductAssociation, WoocommerceProduct
+    WoocommerceMediaThroughProduct, WoocommerceProduct
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 #
@@ -285,7 +288,7 @@ def woocommerce__image_assoc__delete(sender, instance, **kwargs):
     run_delete_product_specific_generic_sales_channel_task_flow(
         task_func=delete_woocommerce_image_association_db_task,
         multi_tenant_company=instance.multi_tenant_company,
-        remote_class=WoocommerceImageProductAssociation,
+        remote_class=WoocommerceMediaThroughProduct,
         local_instance_id=instance.id,
         product=instance.product,
         sales_channel_class=WoocommerceSalesChannel,
@@ -308,17 +311,16 @@ def woocommerce__image__delete(sender, instance, **kwargs):
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
 @receiver(refresh_website_pull_models, sender='woocommerce.WoocommerceSalesChannel')
 def sales_channels__woocommerce__handle_pull_woocommerce_sales_channel_views(sender, instance, **kwargs):
-    from sales_channels.integrations.woocommerce.factories.sales_channels import WoocommerceSalesChannelViewPullFactory
-    from sales_channels.integrations.woocommerce.factories.sales_channels import WoocommerceRemoteLanguagePullFactory
-    from sales_channels.integrations.woocommerce.factories.sales_channels import WoocommerceRemoteCurrencyPullFactory
-
-    if instance.access_token is None:
-        return
+    from sales_channels.integrations.woocommerce.factories.pulling import (
+        WoocommerceSalesChannelViewPullFactory,
+        WoocommerceRemoteCurrencyPullFactory,
+        WoocommerceLanguagePullFactory
+    )
 
     views_factory = WoocommerceSalesChannelViewPullFactory(sales_channel=instance)
     views_factory.run()
 
-    languages_factory = WoocommerceRemoteLanguagePullFactory(sales_channel=instance)
+    languages_factory = WoocommerceLanguagePullFactory(sales_channel=instance)
     languages_factory.run()
 
     currencies_factory = WoocommerceRemoteCurrencyPullFactory(sales_channel=instance)

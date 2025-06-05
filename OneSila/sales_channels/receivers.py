@@ -80,9 +80,10 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
 
         if isinstance(sales_channel, MagentoSalesChannel):
             magento_import_db_task(import_process=instance, sales_channel=sales_channel)
-
-        if isinstance(sales_channel, ShopifySalesChannel):
+        elif isinstance(sales_channel, ShopifySalesChannel):
             shopify_import_db_task(import_process=instance, sales_channel=sales_channel)
+        else:
+            raise NotImplementedError(f"Sales channel {type(sales_channel)} is not supported")
 
 
 @receiver(post_update, sender=SalesChannelImport)
