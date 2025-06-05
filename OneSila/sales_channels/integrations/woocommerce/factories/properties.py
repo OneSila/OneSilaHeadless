@@ -343,6 +343,7 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
                 if ga:
                     attribute_payload.append({
                         'id': ga.remote_id,
+                        'visible': True,
                         'option': prod_prop.get_serialised_value(language=self.sales_channel_assign_language),
                     })
                 else:
