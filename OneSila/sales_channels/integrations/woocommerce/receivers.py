@@ -307,7 +307,7 @@ def woocommerce__image__delete(sender, instance, **kwargs):
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
 @receiver(refresh_website_pull_models, sender='woocommerce.WoocommerceSalesChannel')
-def sales_channels__woocommerce__handle_pull_magento_sales_channel_views(sender, instance, **kwargs):
+def sales_channels__woocommerce__handle_pull_woocommerce_sales_channel_views(sender, instance, **kwargs):
     from sales_channels.integrations.woocommerce.factories.sales_channels import WoocommerceSalesChannelViewPullFactory
     from sales_channels.integrations.woocommerce.factories.sales_channels import WoocommerceRemoteLanguagePullFactory
     from sales_channels.integrations.woocommerce.factories.sales_channels import WoocommerceRemoteCurrencyPullFactory
