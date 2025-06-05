@@ -8,8 +8,8 @@ from .models import WoocommerceSalesChannel, \
 @admin.register(WoocommerceSalesChannel)
 class WoocommerceSalesChannelAdmin(PolymorphicChildModelAdmin):
     base_model = WoocommerceSalesChannel
-    list_display = ('hostname', 'api_url', 'active')
-    search_fields = ('hostname', 'api_url')
+    list_display = ('hostname', 'active')
+    search_fields = ('hostname',)
     list_filter = ('active',)
 
     fieldsets = (
@@ -17,7 +17,7 @@ class WoocommerceSalesChannelAdmin(PolymorphicChildModelAdmin):
             'fields': ('hostname', 'active', 'verify_ssl', 'multi_tenant_company')
         }),
         ('WooCommerce API Settings', {
-            'fields': ('api_url', 'api_key', 'api_secret', 'api_version')
+            'fields': ('api_key', 'api_secret', 'api_version')
         }),
         ('Synchronization Settings', {
             'fields': ('use_configurable_name', 'sync_contents', 'sync_ean_codes',

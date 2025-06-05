@@ -18,11 +18,10 @@ class WoocommerceSalesChannel(SalesChannel):
         (API_VERSION_3, 'Woocommerce API v3'),
     ]
 
-    api_url = models.URLField(help_text="Woocommerce API URL")
     api_key = models.CharField(max_length=255, help_text="Woocommerce API Key")
     api_secret = models.CharField(max_length=255, help_text="Woocommerce API Secret")
     api_version = models.CharField(max_length=5, help_text="Woocommerce API Version",
-        choices=API_VERSION_CHOICES)
+        choices=API_VERSION_CHOICES, default=API_VERSION_3)
     timeout = models.IntegerField(default=10, help_text="Woocommerce API Timeout")
 
     def connect(self):
