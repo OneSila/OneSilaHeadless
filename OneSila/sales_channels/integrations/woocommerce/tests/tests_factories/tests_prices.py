@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class WooCommercePriceUpdateFactoryTest(WooCommerceProductFactoryTestMixin):
-    def test_woocom_simple_product_price_update(self):
+    def test_woocom_price_update_for_simple_product(self):
         product = self.create_test_product(
             sku="tshirt-simple-product",
             name="Test Product",

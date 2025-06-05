@@ -7,7 +7,12 @@ from media.tests.helpers import CreateImageMixin
 from properties.models import Property, ProductPropertiesRule, ProductProperty, \
     ProductPropertiesRuleItem
 from products.models import Product
-from products.demo_data import CONFIGURABLE_CHAIR_SKU
+from products.demo_data import (
+    CONFIGURABLE_CHAIR_SKU,
+    SIMPLE_TABLE_GLASS_SKU,
+    SIMPLE_BED_QUEEN_SKU,
+)
+from sales_prices.models import SalesPrice
 from core.tests import TestCaseDemoDataMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceProduct
 from sales_channels.integrations.woocommerce.factories.products import (
@@ -15,6 +20,7 @@ from sales_channels.integrations.woocommerce.factories.products import (
     WooCommerceProductUpdateFactory,
     WooCommerceProductDeleteFactory,
 )
+from sales_channels.integrations.woocommerce.exceptions import FailedToGetProductBySkuError
 from sales_channels.integrations.woocommerce.factories.properties import WooCommerceGlobalAttributeCreateFactory
 
 import logging
@@ -81,6 +87,10 @@ class WooCommerceProductFactoryTestMixin(CreateTestProductMixin, CreateImageMixi
 
 
 class WooCommerceProductFactoryTest(TestCaseDemoDataMixin, WooCommerceProductFactoryTestMixin):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.hard_remove_all_woocommerce_products_on_teardown = True
+
     def test_attribute_create(self):
         factory = WooCommerceGlobalAttributeCreateFactory(
             sales_channel=self.sales_channel,
@@ -91,35 +101,20 @@ class WooCommerceProductFactoryTest(TestCaseDemoDataMixin, WooCommerceProductFac
     def test_woocom_simple_product(self):
         # Prepere a simple product that we will assign directly to the
         # sales channel
-        product = self.create_test_product(
-            sku="tshirt-simple-product",
-            name="Test Product",
-            assign_to_sales_channel=True,
-            rule=self.product_rule
-        )
+        sku = SIMPLE_TABLE_GLASS_SKU
+        # first verify if the product is already created in woocomemrce
+        # remove if yes
+        try:
+            remote_product = self.api.get_product_by_sku(sku)
+            self.api.delete_product(remote_product['id'])
+        except FailedToGetProductBySkuError:
+            pass
 
-        image = self.create_and_attach_image(product, fname='yellow.png')
-
-        ProductProperty.objects.get_or_create(
+        product = Product.objects.get(
             multi_tenant_company=self.multi_tenant_company,
-            product=product,
-            property=self.brand_property,
-            value_select=self.brand_property_value
+            sku=sku,
         )
-
-        ProductProperty.objects.get_or_create(
-            multi_tenant_company=self.multi_tenant_company,
-            product=product,
-            property=self.size_property,
-            value_select=self.size_property_value_small
-        )
-
-        ProductProperty.objects.get_or_create(
-            multi_tenant_company=self.multi_tenant_company,
-            product=product,
-            property=self.type_property,
-            value_select=self.tshirt_type
-        )
+        self.assign_product_to_sales_channel(product)
 
         # Push the product remotely.
         factory = WooCommerceProductCreateFactory(
@@ -148,10 +143,15 @@ class WooCommerceProductFactoryTest(TestCaseDemoDataMixin, WooCommerceProductFac
         product.active = False
         product.save()
 
-        with transaction.atomic():
-            self.price.rrp = 2912
-            self.price.price = 812
-            self.price.save()
+        price = SalesPrice.objects.get(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            currency=self.currency,
+        )
+
+        price.rrp = 2912
+        price.price = 812
+        price.save()
 
         # Update remote product instance and run it
         factory = WooCommerceProductUpdateFactory(
@@ -163,21 +163,33 @@ class WooCommerceProductFactoryTest(TestCaseDemoDataMixin, WooCommerceProductFac
         # Verify the remote property was updated in database
         resp_product = self.api.get_product(remote_product.remote_id)
 
-        self.assertEqual(float(resp_product['price']), 812.00)
+        self.assertEqual(float(resp_product['price']), price.price)
+        self.assertEqual(float(resp_product['regular_price']), price.rrp)
         self.assertEqual(resp_product['catalog_visibility'], 'hidden')
         self.assertEqual(resp_product['status'], 'draft')
 
     def test_woocom_configurable_product(self):
         # Prepare a config product that we will assign directly to the
         # sales channel
+        sku = CONFIGURABLE_CHAIR_SKU
+        # first verify if the product is already created in woocomemrce
+        # remove if yes
+        try:
+            remote_product = self.api.get_product_by_sku(sku)
+            self.api.delete_product(remote_product['id'])
+        except FailedToGetProductBySkuError:
+            pass
 
         parent = Product.objects.get(
             multi_tenant_company=self.multi_tenant_company,
-            sku=CONFIGURABLE_CHAIR_SKU
+            sku=sku
         )
+        self.assertTrue(parent.configurable_variations.exists())
         self.assign_product_to_sales_channel(parent)
 
-        # Push the product remotely.
+        for variation in parent.configurable_variations.all():
+            self.assertEqual(variation.type, Product.SIMPLE)
+
         factory = WooCommerceProductCreateFactory(
             sales_channel=self.sales_channel,
             local_instance=parent
@@ -190,12 +202,17 @@ class WooCommerceProductFactoryTest(TestCaseDemoDataMixin, WooCommerceProductFac
         )
         self.assertIsNotNone(remote_product.remote_id)
 
+        # cleanup or other tests will fail.
+        resp = self.api.get_product_by_sku(sku)
+        self.api.delete_product(resp['id'])
+
     def test_create_update_delete_product(self):
         """Test that WooCommerceProductCreateFactory properly creates a remote product"""
-        product = self.create_test_product(
-            sku="TEST-SKU-create-delete",
-            name="Test Product",
-            assign_to_sales_channel=True)
+        product = Product.objects.get(
+            multi_tenant_company=self.multi_tenant_company,
+            sku=SIMPLE_BED_QUEEN_SKU,
+        )
+        self.assign_product_to_sales_channel(product)
 
         # Find product-type properties for this product
         product_type_properties = Property.objects.filter(
@@ -236,10 +253,15 @@ class WooCommerceProductFactoryTest(TestCaseDemoDataMixin, WooCommerceProductFac
         product.active = False
         product.save()
 
-        with transaction.atomic():
-            self.price.rrp = 2912
-            self.price.price = 812
-            self.price.save()
+        price = SalesPrice.objects.get(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            currency=self.currency,
+        )
+
+        price.rrp = 1000
+        price.price = 100
+        price.save()
 
         # Update remote product instance and run it
         factory = WooCommerceProductUpdateFactory(
@@ -251,7 +273,8 @@ class WooCommerceProductFactoryTest(TestCaseDemoDataMixin, WooCommerceProductFac
         # Verify the remote property was updated in database
         resp_product = self.api.get_product(remote_product.remote_id)
 
-        self.assertEqual(float(resp_product['price']), 812.00)
+        self.assertEqual(float(resp_product['price']), price.price)
+        self.assertEqual(float(resp_product['regular_price']), price.rrp)
         self.assertEqual(resp_product['catalog_visibility'], 'hidden')
         self.assertEqual(resp_product['status'], 'draft')
 

@@ -4,7 +4,7 @@ from sales_channels.integrations.woocommerce.factories.products import (
 )
 from sales_channels.integrations.woocommerce.factories.content import WoocommerceProductContentUpdateFactory
 from sales_channels.integrations.woocommerce.factories.ean import WooCommerceEanCodeUpdateFactory
-
+from sales_channels.integrations.woocommerce.exceptions import FailedToGetProductBySkuError
 from core.tests import TestCaseDemoDataMixin
 
 from products.demo_data import SIMPLE_TABLE_GLASS_SKU, CONFIGURABLE_CHAIR_SKU
@@ -20,9 +20,18 @@ class WooCommerceEanCodeFactoryTestCase(TestCaseDemoDataMixin, WooCommerceProduc
         super().__init__(*args, **kwargs)
 
     def test_woocommerce_ean_code_factory(self):
+        sku = SIMPLE_TABLE_GLASS_SKU
+        # first verify if the product is already created in woocomemrce
+        # remove if yes
+        try:
+            remote_product = self.api.get_product_by_sku(sku)
+            self.api.delete_product(remote_product['id'])
+        except FailedToGetProductBySkuError:
+            pass
+
         product = Product.objects.get(
             multi_tenant_company=self.multi_tenant_company,
-            sku=SIMPLE_TABLE_GLASS_SKU
+            sku=sku
         )
 
         self.assign_product_to_sales_channel(product)
@@ -48,9 +57,18 @@ class WooCommerceEanCodeFactoryTestCase(TestCaseDemoDataMixin, WooCommerceProduc
         self.assertEqual(resp['global_unique_id'], ean_code.ean_code)
 
     def test_woocommerce_ean_code_factory_config_variation(self):
+        sku = CONFIGURABLE_CHAIR_SKU
+        # first verify if the product is already created in woocomemrce
+        # remove if yes
+        try:
+            remote_product = self.api.get_product_by_sku(sku)
+            self.api.delete_product(remote_product['id'])
+        except FailedToGetProductBySkuError:
+            pass
+
         product = Product.objects.get(
             multi_tenant_company=self.multi_tenant_company,
-            sku=CONFIGURABLE_CHAIR_SKU
+            sku=sku
         )
         child = product.configurable_variations.first()
 
@@ -80,3 +98,6 @@ class WooCommerceEanCodeFactoryTestCase(TestCaseDemoDataMixin, WooCommerceProduc
 
         resp = self.api.get_product(remote_instance.remote_id)
         self.assertEqual(resp['global_unique_id'], ean_code.ean_code)
+
+        # cleanup or other tests will fail.
+        self.api.delete_product(resp['id'])

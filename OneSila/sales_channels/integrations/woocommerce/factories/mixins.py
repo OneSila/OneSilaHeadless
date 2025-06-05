@@ -1,6 +1,9 @@
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceRemoteLanguage
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class SerialiserMixin:
     """
@@ -43,7 +46,12 @@ class WoocommerceProductTypeMixin:
     def remote_product_is_variation(self):
         try:
             return self.is_variation
-        except AttributeError:
+        except AttributeError as e:
+            try:
+                return self.remote_product.is_variation
+            except AttributeError as e:
+                logger.error(f"self.is_variation should exist. {e=}")
+
             return False
 
     def set_woocomerce_product_types(self):

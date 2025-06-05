@@ -42,13 +42,8 @@ class WooCommerceMediaMixin(WoocommerceProductTypeMixin):
 
     def get_sku(self):
         """Sets the SKU for the product or variation in the payload."""
-        if self.is_woocommerce_variant_product:
-            sku = f"{self.parent_local_instance.sku}-{self.local_instance.sku}"
-        else:
-            product = self.get_local_product()
-            sku = product.sku
-
-        return sku
+        product = self.get_local_product()
+        return product.sku
 
     def apply_media_payload(self):
         # Woocom requires a full media payload for each product.
@@ -101,8 +96,13 @@ class WooCommerceMediaProductThroughMixin(WooCommerceMediaMixin, SerialiserMixin
         return self.apply_media_payload()
 
     def create_or_update_images(self):
+        self.set_woocomerce_product_types()
+        logger.info(f"{self.__class__.__name__} create_or_update_images: {self.remote_product=}, {self.remote_product.__dict__=}")
+        logger.info(f"{self.__class__.__name__} create_or_update_images: {self.local_instance=}")
+        logger.info(f"{self.__class__.__name__} create_or_update_images: {self.is_woocommerce_variant_product=}")
+
         if self.is_woocommerce_variant_product:
-            parent_id = self.remote_product.remote_parent_id
+            parent_id = self.remote_product.remote_parent_product.remote_id
             variant_id = self.remote_product.remote_id
             return self.api.update_product_variation(parent_id, variant_id, **self.payload)
         else:

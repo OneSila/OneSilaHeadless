@@ -29,9 +29,9 @@ class WooCommerceEanCodeUpdateFactory(WooCommerceProductAttributeMixin, GetWooco
 
     def update_remote(self):
         if self.is_woocommerce_variant_product:
-            parent_id = self.remote_product.remote_parent_id
+            parent_id = self.remote_product.remote_parent_product.remote_id
             variant_id = self.remote_product.remote_id
-            return self.api.update_variant(parent_id, variant_id, **self.payload)
+            return self.api.update_product_variation(parent_id, variant_id, **self.payload)
         else:
             product_id = self.remote_product.remote_id
             return self.api.update_product(product_id, **self.payload)

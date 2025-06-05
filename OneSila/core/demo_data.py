@@ -219,6 +219,9 @@ class DemoDataGeneratorMixin:
         return baker_kwargs
 
     def create_instance(self, **kwargs):
+
+        logger.info(f"{self.__class__.__name__} create_instance: {kwargs=}")
+
         Model = self.get_model()
 
         if not self.use_baker:
@@ -253,6 +256,7 @@ class PrivateDataGenerator(DemoDataGeneratorMixin, CreatePrivateDataRelationMixi
         return kwargs
 
     def create_instance(self, **kwargs):
+        logger.info(f"{self.__class__.__name__} create_instance: {kwargs=}")
         instance = super().create_instance(**kwargs)
         self.create_demo_data_relation(instance)
         return instance
@@ -278,6 +282,9 @@ class PrivateStructuredDataGenerator(PrivateDataGenerator):
         structure = self.get_structure()
         for i in structure:
             pre_kwargs = i['instance_data']
+
+            logger.info(f"{self.__class__.__name__} pre_kwargs: {pre_kwargs}")
+
             pre_kwargs.setdefault('multi_tenant_company', self.multi_tenant_company)
 
             if not self.preflight_check(pre_kwargs):

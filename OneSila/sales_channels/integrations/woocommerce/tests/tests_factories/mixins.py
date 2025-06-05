@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class TestCaseWoocommerceMixin(TransactionTestCase):
     remove_woocommerce_mirror_and_remote_on_teardown = True
+    hard_remove_all_woocommerce_products_on_teardown = False
 
     def setUp(self):
         """
@@ -77,3 +78,11 @@ class TestCaseWoocommerceMixin(TransactionTestCase):
             except AttributeError:
                 logger.warning("No api set. Cleanup is not possible.")
                 pass
+
+        if self.hard_remove_all_woocommerce_products_on_teardown:
+            product_ids = self.api.get_products()
+            for product_id in product_ids:
+                try:
+                    self.api.delete_product(product_id)
+                except Exception as e:
+                    logger.warning(f"Error deleting product {product_id}: {e}")

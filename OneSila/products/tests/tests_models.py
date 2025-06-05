@@ -3,7 +3,22 @@ from django.db import IntegrityError
 from contacts.models import Supplier
 from core.tests import TestCase
 from products.models import ConfigurableProduct, \
-    SimpleProduct, BundleProduct, BundleVariation
+    SimpleProduct, BundleProduct, BundleVariation, \
+    AliasProduct
+
+
+class AlasProductTestCase(TestCase):
+    def test_alias_product_constraint(self):
+        simple_product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company
+        )
+        self.assertIsNotNone(simple_product.sku)
+
+        alias_product = AliasProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            alias_parent_product=simple_product
+        )
+        self.assertIsNotNone(alias_product.sku)
 
 
 class ProductModelTest(TestCase):
