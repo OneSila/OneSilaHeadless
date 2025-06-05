@@ -17,9 +17,43 @@ class AmazonSalesChannel(SalesChannel):
         (FAR_EAST, _("Far East")),
     )
 
+    COUNTRY_CHOICES = (
+        ("CA", "Canada"),
+        ("US", "United States"),
+        ("MX", "Mexico"),
+        ("BR", "Brazil"),
+
+        ("IE", "Ireland"),
+        ("ES", "Spain"),
+        ("GB", "United Kingdom"),
+        ("FR", "France"),
+        ("BE", "Belgium"),
+        ("NL", "Netherlands"),
+        ("DE", "Germany"),
+        ("IT", "Italy"),
+        ("SE", "Sweden"),
+        ("ZA", "South Africa"),
+        ("PL", "Poland"),
+        ("EG", "Egypt"),
+        ("TR", "Turkey"),
+        ("SA", "Saudi Arabia"),
+        ("AE", "United Arab Emirates"),
+        ("IN", "India"),
+
+        ("SG", "Singapore"),
+        ("AU", "Australia"),
+        ("JP", "Japan"),
+    )
+
+
     refresh_token = models.CharField(
-        max_length=512,
+        max_length=512, null=True, blank=True,
         help_text="Refresh token used to generate new access tokens."
+    )
+    refresh_token_expiration = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the refresh token will expire (typically 1 year)."
     )
     access_token = models.CharField(
         max_length=512,
@@ -39,10 +73,12 @@ class AmazonSalesChannel(SalesChannel):
     )
     country = models.CharField(
         max_length=2,
+        choices=COUNTRY_CHOICES,
         null=True,
         blank=True,
         help_text="Country code for Seller Central domain.",
     )
+
     region = models.CharField(
         max_length=2,
         choices=REGION_CHOICES,

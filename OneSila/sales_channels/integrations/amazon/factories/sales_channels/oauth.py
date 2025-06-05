@@ -60,6 +60,8 @@ class ValidateAmazonAuthFactory:
 
         self.sales_channel.refresh_token = payload.get("refresh_token")
         self.sales_channel.access_token = payload.get("access_token")
+        self.sales_channel.remote_id = self.selling_partner_id
+        self.sales_channel.refresh_token_expiration = now() + timedelta(days=365)
         expires_in = payload.get("expires_in")
         if expires_in:
             self.sales_channel.expiration_date = now() + timedelta(seconds=int(expires_in))

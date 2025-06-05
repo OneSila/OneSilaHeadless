@@ -104,3 +104,4 @@ SHOPIFY_TEST_REDIRECT_URI = "https://dcfa-79-118-110-129.ngrok-free.app/integrat
 
 AMAZON_CLIENT_ID = None
 AMAZON_CLIENT_SECRET = None
+AMAZON_APP_ID = None

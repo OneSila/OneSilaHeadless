@@ -1,7 +1,19 @@
 from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, strawberry_type
-from sales_channels.integrations.amazon.models import AmazonSalesChannel
-from sales_channels.integrations.amazon.schema.types.filters import AmazonSalesChannelFilter
-from sales_channels.integrations.amazon.schema.types.ordering import AmazonSalesChannelOrder
+from sales_channels.integrations.amazon.models import (
+    AmazonSalesChannel,
+    AmazonProperty,
+    AmazonPropertySelectValue,
+)
+from sales_channels.integrations.amazon.schema.types.filters import (
+    AmazonSalesChannelFilter,
+    AmazonPropertyFilter,
+    AmazonPropertySelectValueFilter,
+)
+from sales_channels.integrations.amazon.schema.types.ordering import (
+    AmazonSalesChannelOrder,
+    AmazonPropertyOrder,
+    AmazonPropertySelectValueOrder,
+)
 
 
 @strawberry_type
@@ -19,3 +31,25 @@ class AmazonSalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def saleschannel_ptr(self, info) -> str:
         return self.saleschannel_ptr
+
+
+@type(
+    AmazonProperty,
+    filters=AmazonPropertyFilter,
+    order=AmazonPropertyOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
+    pass
+
+
+@type(
+    AmazonPropertySelectValue,
+    filters=AmazonPropertySelectValueFilter,
+    order=AmazonPropertySelectValueOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
+    pass

@@ -1,3 +1,18 @@
+from django.core.exceptions import ValidationError
+
+from sales_channels.integrations.amazon.schema.types.input import (
+    AmazonSalesChannelInput,
+    AmazonSalesChannelPartialInput,
+    AmazonPropertyInput,
+    AmazonPropertyPartialInput,
+    AmazonPropertySelectValueInput,
+    AmazonPropertySelectValuePartialInput,
+)
+from sales_channels.integrations.amazon.schema.types.types import (
+    AmazonSalesChannelType,
+    AmazonPropertyType,
+    AmazonPropertySelectValueType,
+)
 from sales_channels.integrations.amazon.schema.types.input import (
     AmazonSalesChannelInput,
     AmazonSalesChannelPartialInput,
@@ -12,7 +27,7 @@ from strawberry import Info
 import strawberry_django
 from core.schema.core.extensions import default_extensions
 from core.schema.core.helpers import get_multi_tenant_company
-
+from django.utils.translation import gettext_lazy as _
 
 @type(name="Mutation")
 class AmazonSalesChannelMutation:
@@ -43,10 +58,13 @@ class AmazonSalesChannelMutation:
         from sales_channels.integrations.amazon.factories.sales_channels.oauth import ValidateAmazonAuthFactory
 
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        sales_channel = AmazonSalesChannel.objects.get(
-            state=instance.state,
-            multi_tenant_company=multi_tenant_company
-        )
+        try:
+            sales_channel = AmazonSalesChannel.objects.get(
+                state=instance.state,
+                multi_tenant_company=multi_tenant_company
+            )
+        except AmazonSalesChannel.DoesNotExist:
+            raise ValidationError(_("Could not find Amazon integration. Please restart the authorization process."))
 
         factory = ValidateAmazonAuthFactory(
             sales_channel=sales_channel,
@@ -56,3 +74,11 @@ class AmazonSalesChannelMutation:
         factory.run()
 
         return sales_channel
+
+    create_amazon_property: AmazonPropertyType = create(AmazonPropertyInput)
+    create_amazon_properties: List[AmazonPropertyType] = create(AmazonPropertyInput)
+    update_amazon_property: AmazonPropertyType = update(AmazonPropertyPartialInput)
+
+    create_amazon_property_select_value: AmazonPropertySelectValueType = create(AmazonPropertySelectValueInput)
+    create_amazon_property_select_values: List[AmazonPropertySelectValueType] = create(AmazonPropertySelectValueInput)
+    update_amazon_property_select_value: AmazonPropertySelectValueType = update(AmazonPropertySelectValuePartialInput)
