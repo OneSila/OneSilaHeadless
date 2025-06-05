@@ -109,5 +109,13 @@ class AmazonSalesChannelView(SalesChannelView):
 
 
 class AmazonRemoteLanguage(RemoteLanguage):
-    """Amazon remote language placeholder."""
-    pass
+    """Amazon remote language linked to a marketplace."""
+
+    sales_channel_view = models.ForeignKey(
+        AmazonSalesChannelView,
+        on_delete=models.CASCADE,
+        related_name='remote_languages',
+        null=True,
+        blank=True,
+        help_text="The marketplace associated with this remote language.",
+    )
