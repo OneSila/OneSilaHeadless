@@ -32,7 +32,6 @@ class {class_name}SalesChannel(SalesChannel):
     {class_name} sales channel model
     Add {class_name}-specific fields here
     """
-    api_url = models.URLField(help_text="{class_name} API URL")
     api_key = models.CharField(max_length=255, help_text="{class_name} API Key")
     api_secret = models.CharField(max_length=255, help_text="{class_name} API Secret")
 
@@ -59,8 +58,8 @@ from .models import {class_name}SalesChannel, {class_name}Product
 
 @admin.register({class_name}SalesChannel)
 class {class_name}SalesChannelAdmin(admin.ModelAdmin):
-    list_display = ('name', 'api_url', 'is_active')
-    search_fields = ('name', 'api_url')
+    list_display = ('name', 'hostname', 'is_active')
+    search_fields = ('name', 'hostname')
     list_filter = ('is_active',)
 
 
@@ -85,7 +84,7 @@ class {class_name}ProductAdmin(admin.ModelAdmin):
         # Example implementation (replace with actual code):
         # from some_package import {class_name}Client
         # return {class_name}Client(
-        #     api_url=self.sales_channel.api_url,
+        #     hostname=self.sales_channel.hostname,
         #     api_key=self.sales_channel.api_key,
         #     api_secret=self.sales_channel.api_secret
         # )
