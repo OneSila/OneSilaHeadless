@@ -27,7 +27,7 @@ class WoocommerceSalesChannel(SalesChannel):
     def connect(self):
         from sales_channels.integrations.woocommerce.factories.sales_channels import TryConnection
 
-        required_fields = {'api_url', 'api_key', 'api_secret', 'api_version'}
+        required_fields = {'hostname', 'api_key', 'api_secret', 'api_version'}
 
         if required_fields.intersection(self.get_dirty_fields().keys()):
             try:
