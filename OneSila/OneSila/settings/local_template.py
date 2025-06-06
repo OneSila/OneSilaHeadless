@@ -87,3 +87,21 @@ HUEY['immediate'] = DEBUG
 
 # This will make absolute path to work
 LOCAL_HOST = 'localhost:8080'
+
+# price per ai point
+AI_POINT_PRICE = 0
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+REPLICATE_API_TOKEN = ""
+
+ADMIN_ROUTE_SUFFIX = "_somethingSecure"
+
+SHOPIFY_API_KEY = None
+SHOPIFY_API_SECRET = None
+SHOPIFY_SCOPES = ['read_products', 'write_products']
+SHOPIFY_API_VERSION = "2025-04"
+SHOPIFY_TEST_REDIRECT_URI = "https://dcfa-79-118-110-129.ngrok-free.app/integrations/shopify/oauth/callback"
+
+
+AMAZON_CLIENT_ID = None
+AMAZON_CLIENT_SECRET = None
+AMAZON_APP_ID = None
