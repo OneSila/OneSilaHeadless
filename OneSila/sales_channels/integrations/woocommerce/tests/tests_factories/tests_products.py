@@ -208,9 +208,19 @@ class WooCommerceProductFactoryTest(TestCaseDemoDataMixin, WooCommerceProductFac
 
     def test_create_update_delete_product(self):
         """Test that WooCommerceProductCreateFactory properly creates a remote product"""
+        sku = SIMPLE_BED_QUEEN_SKU
+
+        # first verify if the product is already created in woocomemrce
+        # remove if yes
+        try:
+            remote_product = self.api.get_product_by_sku(sku)
+            self.api.delete_product(remote_product['id'])
+        except FailedToGetProductBySkuError:
+            pass
+
         product = Product.objects.get(
             multi_tenant_company=self.multi_tenant_company,
-            sku=SIMPLE_BED_QUEEN_SKU,
+            sku=sku,
         )
         self.assign_product_to_sales_channel(product)
 

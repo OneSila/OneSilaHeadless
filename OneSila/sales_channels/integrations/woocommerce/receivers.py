@@ -43,13 +43,12 @@ logger = logging.getLogger(__name__)
 #
 @receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
 def woocommerce__product__create_from_assign(sender, instance, **kwargs):
-    from sales_channels.integrations.woocommerce.factories.products import WoocommerceProductCreateFactory
-    from django.db import transaction
+    from sales_channels.integrations.woocommerce.factories.products import WooCommerceProductCreateFactory
 
     product = instance.product
     sc = instance.sales_channel
 
-    fac = WoocommerceProductCreateFactory(sales_channel=sc, local_instance=product)
+    fac = WooCommerceProductCreateFactory(sales_channel=sc, local_instance=product)
     fac.run()
 
     # count = 1 + (product.get_configurable_variations().count() if hasattr(product, 'get_configurable_variations') else 0)

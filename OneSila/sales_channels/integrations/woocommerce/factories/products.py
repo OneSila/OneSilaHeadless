@@ -133,6 +133,7 @@ class WooCommerceProductCreateFactory(RemoteProductCreateFactory, WooCommercePro
     enable_fetch_and_update = True
     update_if_not_exists = True
     update_factory_class = "WooCommerceProductUpdateFactory"
+    sync_product_factory = WooCommerceProductSyncFactory
 
     remote_price_class = WoocommercePrice
     remote_product_content_class = WoocommerceProductContent

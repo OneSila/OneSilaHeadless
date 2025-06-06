@@ -19,14 +19,14 @@ from orders.models import Order, OrderItem
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def create_woocommerce_product_db_task(task_queue_item_id, sales_channel_id, product_id):
-    from .factories.products import WoocommerceProductCreateFactory
+    from .factories.products import WooCommerceProductCreateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
         run_generic_sales_channel_factory(
             sales_channel_id=sales_channel_id,
-            factory_class=WoocommerceProductCreateFactory,
+            factory_class=WooCommerceProductCreateFactory,
             local_instance_id=product_id,
             local_instance_class=Product,
             sales_channel_class=WoocommerceSalesChannel,
@@ -40,14 +40,14 @@ def create_woocommerce_product_db_task(task_queue_item_id, sales_channel_id, pro
 def create_woocommerce_product_property_db_task(
     task_queue_item_id, sales_channel_id, product_property_id, remote_product_id
 ):
-    from .factories.properties import WoocommerceProductPropertyCreateFactory
+    from .factories.properties import WooCommerceProductPropertyCreateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
         run_remote_product_dependent_sales_channel_factory(
             sales_channel_id=sales_channel_id,
-            factory_class=WoocommerceProductPropertyCreateFactory,
+            factory_class=WooCommerceProductPropertyCreateFactory,
             local_instance_id=product_property_id,
             local_instance_class=ProductProperty,
             remote_product_id=remote_product_id,
@@ -62,14 +62,14 @@ def create_woocommerce_product_property_db_task(
 def update_woocommerce_product_property_db_task(
     task_queue_item_id, sales_channel_id, product_property_id, remote_product_id
 ):
-    from .factories.properties import WoocommerceProductPropertyUpdateFactory
+    from .factories.properties import WooCommerceProductPropertyUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
         run_remote_product_dependent_sales_channel_factory(
             sales_channel_id=sales_channel_id,
-            factory_class=WoocommerceProductPropertyUpdateFactory,
+            factory_class=WooCommerceProductPropertyUpdateFactory,
             local_instance_id=product_property_id,
             local_instance_class=ProductProperty,
             remote_product_id=remote_product_id,
@@ -84,7 +84,7 @@ def update_woocommerce_product_property_db_task(
 def delete_woocommerce_product_property_db_task(
     task_queue_item_id, sales_channel_id, remote_product_id, remote_instance_id
 ):
-    from .factories.properties import WoocommerceProductPropertyDeleteFactory
+    from .factories.properties import WooCommerceProductPropertyDeleteFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
@@ -98,7 +98,7 @@ def delete_woocommerce_product_property_db_task(
             'sales_channel': sales_channel,
             'remote_product': WoocommerceProduct.objects.get(id=remote_product_id)
         }
-        factory = WoocommerceProductPropertyDeleteFactory(**factory_kwargs)
+        factory = WooCommerceProductPropertyDeleteFactory(**factory_kwargs)
         factory.run()
 
     task.execute(actual_task)
@@ -135,7 +135,7 @@ def update_woocommerce_price_db_task(
 def update_woocommerce_product_content_db_task(
     task_queue_item_id, sales_channel_id, product_id, remote_product_id, language=None
 ):
-    from .factories.products import WoocommerceProductContentUpdateFactory
+    from .factories.content import WoocommerceProductContentUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
@@ -165,7 +165,7 @@ def update_woocommerce_product_content_db_task(
 def update_woocommerce_product_eancode_db_task(
     task_queue_item_id, sales_channel_id, product_id, remote_product_id
 ):
-    from .factories.products import WoocommerceEanCodeUpdateFactory
+    from .factories.ean import WooCommerceEanCodeUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
@@ -173,7 +173,7 @@ def update_woocommerce_product_eancode_db_task(
 
         run_remote_product_dependent_sales_channel_factory(
             sales_channel_id=sales_channel_id,
-            factory_class=WoocommerceEanCodeUpdateFactory,
+            factory_class=WooCommerceEanCodeUpdateFactory,
             local_instance_id=product_id,
             local_instance_class=Product,
             remote_product_id=remote_product_id,
@@ -188,7 +188,7 @@ def update_woocommerce_product_eancode_db_task(
 def add_woocommerce_product_variation_db_task(
     task_queue_item_id, sales_channel_id, parent_product_id, variation_product_id
 ):
-    from .factories.products import WoocommerceProductVariationAddFactory
+    from .factories.products import WooCommerceProductVariationAddFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
@@ -196,7 +196,7 @@ def add_woocommerce_product_variation_db_task(
         parent = Product.objects.get(id=parent_product_id)
         run_generic_sales_channel_factory(
             sales_channel_id=sales_channel_id,
-            factory_class=WoocommerceProductVariationAddFactory,
+            factory_class=WooCommerceProductVariationAddFactory,
             local_instance_id=variation_product_id,
             local_instance_class=Product,
             factory_kwargs={'parent_product': parent},
@@ -212,7 +212,7 @@ def remove_woocommerce_product_variation_db_task(
     task_queue_item_id, sales_channel_id, parent_product_id, variation_product_id
 ):
     from sales_channels.models import RemoteProduct
-    from .factories.products import WoocommerceProductDeleteFactory
+    from .factories.products import WooCommerceProductDeleteFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
@@ -231,7 +231,7 @@ def remove_woocommerce_product_variation_db_task(
             sales_channel=sales_channel
         )
 
-        factory = WoocommerceProductDeleteFactory(
+        factory = WooCommerceProductDeleteFactory(
             sales_channel=sales_channel,
             remote_instance=variant_remote
         )
@@ -245,14 +245,14 @@ def remove_woocommerce_product_variation_db_task(
 def create_woocommerce_image_association_db_task(
     task_queue_item_id, sales_channel_id, media_product_through_id, remote_product_id
 ):
-    from .factories.products import WoocommerceMediaProductThroughCreateFactory
+    from .factories.media import WooCommerceMediaProductThroughCreateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
         run_remote_product_dependent_sales_channel_factory(
             sales_channel_id=sales_channel_id,
-            factory_class=WoocommerceMediaProductThroughCreateFactory,
+            factory_class=WooCommerceMediaProductThroughCreateFactory,
             local_instance_id=media_product_through_id,
             local_instance_class=MediaProductThrough,
             remote_product_id=remote_product_id,
@@ -267,14 +267,14 @@ def create_woocommerce_image_association_db_task(
 def update_woocommerce_image_association_db_task(
     task_queue_item_id, sales_channel_id, media_product_through_id, remote_product_id
 ):
-    from .factories.products import WoocommerceMediaProductThroughUpdateFactory
+    from .factories.media import WooCommerceMediaProductThroughUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
         run_remote_product_dependent_sales_channel_factory(
             sales_channel_id=sales_channel_id,
-            factory_class=WoocommerceMediaProductThroughUpdateFactory,
+            factory_class=WooCommerceMediaProductThroughUpdateFactory,
             local_instance_id=media_product_through_id,
             local_instance_class=MediaProductThrough,
             remote_product_id=remote_product_id,
@@ -289,7 +289,7 @@ def update_woocommerce_image_association_db_task(
 def delete_woocommerce_image_association_db_task(
     task_queue_item_id, sales_channel_id, remote_instance_id, remote_product_id
 ):
-    from .factories.products import WoocommerceMediaProductThroughDeleteFactory
+    from .factories.media import WooCommerceImageDeleteFactory
     from sales_channels.models import RemoteImageProductAssociation
     from sales_channels.integrations.woocommerce.models import WoocommerceProduct
 
@@ -298,7 +298,7 @@ def delete_woocommerce_image_association_db_task(
     def actual_task():
         sales_channel = WoocommerceSalesChannel.objects.get(id=sales_channel_id)
         remote_inst = RemoteImageProductAssociation.objects.get(id=remote_instance_id)
-        factory = WoocommerceMediaProductThroughDeleteFactory(
+        factory = WooCommerceImageDeleteFactory(
             sales_channel=sales_channel,
             local_instance=remote_inst.local_instance,
             remote_product=WoocommerceProduct.objects.get(id=remote_product_id),
@@ -312,14 +312,14 @@ def delete_woocommerce_image_association_db_task(
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def delete_woocommerce_image_db_task(task_queue_item_id, sales_channel_id, image_id):
-    from .factories.products import WoocommerceImageDeleteFactory
+    from .factories.media import WooCommerceImageDeleteFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
         run_generic_sales_channel_factory(
             sales_channel_id=sales_channel_id,
-            factory_class=WoocommerceImageDeleteFactory,
+            factory_class=WooCommerceImageDeleteFactory,
             local_instance_id=image_id,
             local_instance_class=Media,
             sales_channel_class=WoocommerceSalesChannel,
@@ -333,12 +333,12 @@ def delete_woocommerce_image_db_task(task_queue_item_id, sales_channel_id, image
 def update_woocommerce_product_db_task(
     task_queue_item_id, sales_channel_id, product_id, remote_product_id
 ):
-    from .factories.products import WoocommerceProductUpdateFactory
+    from .factories.products import WooCommerceProductUpdateFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
-        factory = WoocommerceProductUpdateFactory(
+        factory = WooCommerceProductUpdateFactory(
             sales_channel=WoocommerceSalesChannel.objects.get(id=sales_channel_id),
             local_instance=Product.objects.get(id=product_id),
             remote_instance=RemoteProduct.objects.get(id=remote_product_id),
@@ -353,12 +353,12 @@ def update_woocommerce_product_db_task(
 def sync_woocommerce_product_db_task(
     task_queue_item_id, sales_channel_id, product_id, remote_product_id
 ):
-    from .factories.products import WoocommerceProductSyncFactory
+    from .factories.products import WooCommerceProductSyncFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
-        factory = WoocommerceProductSyncFactory(
+        factory = WooCommerceProductSyncFactory(
             sales_channel=WoocommerceSalesChannel.objects.get(id=sales_channel_id),
             local_instance=Product.objects.get(id=product_id),
             remote_instance=RemoteProduct.objects.get(id=remote_product_id),
@@ -371,13 +371,13 @@ def sync_woocommerce_product_db_task(
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def delete_woocommerce_product_db_task(task_queue_item_id, sales_channel_id, remote_instance):
-    from .factories.products import WoocommerceProductDeleteFactory
+    from .factories.products import WooCommerceProductDeleteFactory
 
     task = BaseRemoteTask(task_queue_item_id)
 
     def actual_task():
         sales_channel = WoocommerceSalesChannel.objects.get(id=sales_channel_id)
-        factory = WoocommerceProductDeleteFactory(
+        factory = WooCommerceProductDeleteFactory(
             sales_channel=sales_channel,
             remote_instance=remote_instance
         )
@@ -397,19 +397,3 @@ def woocommerce_import_db_task(import_process, sales_channel):
         sales_channel=sales_channel,
     )
     fac.run()
-
-
-@periodic_task(crontab(minute=0, hour=2))
-def woocommerce_pull_remote_orders_db_task():
-    from sales_channels.flows.puill_orders import pull_generic_orders_flow
-    from .factories.orders import WoocommerceOrderPullFactory
-
-    pull_generic_orders_flow(
-        sales_channel_class=WoocommerceSalesChannel,
-        factory=WoocommerceOrderPullFactory,
-    )
-
-
-@periodic_task(crontab(minute=0, hour=3))
-def cleanup_woocommerce_old_import_data():
-    pass
