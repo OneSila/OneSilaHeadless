@@ -1,7 +1,7 @@
 import strawberry
 from django.contrib.auth import get_user_model
 
-from core.schema.core.types.types import type, relay, auto, lazy, Annotated, field
+from core.schema.core.types.types import type, relay, auto, lazy, Annotated, field, strawberry_type
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 
 from core.schema.multi_tenant.types.ordering import MultiTenantUserOrder
@@ -57,3 +57,8 @@ class MultiTenantUserLoginTokenType(relay.Node):
 @strawberry.type
 class HasDemoDataType:
     has_demo_data: bool
+
+@strawberry_type
+class UserCredentialsType:
+    username: str
+    password: str

@@ -244,6 +244,9 @@ class Command(BaseCommand):
             apps = options["app_names"]
 
         for app_name in apps:
+            print('---------------------------')
+            print(os.path.exists(app_name))
+            print(app_name)
             if not os.path.exists(app_name):
                 self.stdout.write(
                     self.style.ERROR(f"No such app: {app_name}")
