@@ -25,11 +25,11 @@ class AmazonRemoteLanguagePullFactory(GetAmazonAPIMixin, PullRemoteInstanceMixin
         marketplaces = self.get_marketplaces()
         self.remote_instances = [
             {
-                'code': mp['marketplace']['default_language_code'],
-                'view_remote_id': mp['marketplace']['id'],
+                'code': mp.marketplace.default_language_code,
+                'view_remote_id': mp.marketplace.id,
             }
             for mp in marketplaces
-            if mp.get('participation', {}).get('is_participating')
+            if mp.participation.is_participating
         ]
 
     def update_get_or_create_lookup(self, lookup, remote_data):

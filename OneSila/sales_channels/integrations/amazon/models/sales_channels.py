@@ -45,6 +45,13 @@ class AmazonSalesChannel(SalesChannel):
         ("JP", "Japan"),
     )
 
+    remote_id = models.CharField(
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="Selling Partner ID (merchant ID) for Amazon SP-API.",
+    )
 
     refresh_token = models.CharField(
         max_length=512, null=True, blank=True,
@@ -105,7 +112,7 @@ class AmazonSalesChannel(SalesChannel):
 
 class AmazonSalesChannelView(SalesChannelView):
     """Amazon marketplace representation."""
-
+    pass
 
 
 class AmazonRemoteLanguage(RemoteLanguage):
