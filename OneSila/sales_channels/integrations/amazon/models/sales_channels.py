@@ -93,6 +93,11 @@ class AmazonSalesChannel(SalesChannel):
         blank=True,
         help_text="Amazon region of this store."
     )
+    connection_error = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Stores the last OAuth connection failure traceback."
+    )
 
     class Meta:
         verbose_name = 'Amazon Sales Channel'

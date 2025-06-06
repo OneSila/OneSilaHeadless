@@ -12,6 +12,7 @@ from get_absolute_url.helpers import generate_absolute_url
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
 from sales_channels.integrations.amazon.constants import SELLER_CENTRAL_URLS, AMAZON_OAUTH_TOKEN_URL
 from sales_channels.signals import refresh_website_pull_models
+import traceback
 
 
 class GetAmazonRedirectUrlFactory:
@@ -43,20 +44,29 @@ class ValidateAmazonAuthFactory:
         self.selling_partner_id = selling_partner_id
 
     def exchange_token(self):
-        redirect_uri = f"{generate_absolute_url(trailing_slash=False)}{reverse('integrations:amazon_oauth_callback')}"
         data = parse.urlencode({
             "grant_type": "authorization_code",
             "code": self.code,
             "client_id": settings.AMAZON_CLIENT_ID,
             "client_secret": settings.AMAZON_CLIENT_SECRET,
-            "redirect_uri": redirect_uri,
         }).encode()
         req = request.Request(AMAZON_OAUTH_TOKEN_URL, data=data)
+
         try:
             with request.urlopen(req) as resp:
                 payload = json.loads(resp.read())
         except Exception:
-            raise ValueError(_("Token exchange failed. Please try again or contact support."))
+            # Capture the full traceback as a string
+            tb = traceback.format_exc()
+
+            # Store it on the model and save
+            self.sales_channel.connection_error = tb
+            self.sales_channel.save(update_fields=["connection_error"])
+
+            # Re-raise a user-friendly error
+            raise ValueError(
+                _("Token exchange failed. Please try again or contact support.")
+            )
 
         self.sales_channel.refresh_token = payload.get("refresh_token")
         self.sales_channel.access_token = payload.get("access_token")
