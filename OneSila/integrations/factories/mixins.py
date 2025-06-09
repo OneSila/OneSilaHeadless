@@ -276,7 +276,7 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
         """
         # Retrieve remote_id using the get_mapped_field utility function
         logger.debug(f"{self.__class__.__name__}: Trying to find remote id for {response_data=} with {self.local_instance=}")
-        if not response_data:
+        if response_data is None:
             raise ValueError(f"No response data provided for {self.local_instance}")
 
         try:

@@ -75,7 +75,7 @@ class WoocommerceRemoteValueConversionMixin:
 
     def get_multi_select_value(self, value):
         """Handles multi-select values."""
-        return [v.value for v in value]
+        return list({v.value for v in value.all()})
 
     def get_text_value(self, value):
         """Handles text values."""

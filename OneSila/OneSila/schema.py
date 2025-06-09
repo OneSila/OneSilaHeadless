@@ -27,6 +27,8 @@ from sales_channels.integrations.shopify.schema import ShopifySalesChannelMutati
     ShopifySalesChannelsSubscription
 from sales_channels.integrations.woocommerce.schema import WoocommerceSalesChannelMutation, WoocommerceSalesChannelsQuery, \
     WoocommerceSalesChannelsSubscription
+from sales_channels.integrations.amazon.schema import AmazonSalesChannelMutation, AmazonSalesChannelsQuery, \
+    AmazonSalesChannelsSubscription
 from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
 from translations.schema import TranslationsQuery
 from integrations.schema import IntegrationsQuery, IntegrationsMutation
@@ -39,6 +41,7 @@ from llm.schema import LlmMutation
 
 @strawberry.type
 class Query(
+        AmazonSalesChannelsQuery,
         CurrenciesQuery,
         CountryQuery,
         EanCodesQuery,
@@ -63,6 +66,7 @@ class Query(
 
 @strawberry.type
 class Mutation(
+        AmazonSalesChannelMutation,
         CurrenciesMutation,
         EanCodesMutation,
         MediaMutation,
@@ -84,6 +88,7 @@ class Mutation(
 
 @strawberry.type
 class Subscription(
+        AmazonSalesChannelsSubscription,
         CurrenciesSubscription,
         EanCodesSubscription,
         MediaSubscription,

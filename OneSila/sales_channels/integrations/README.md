@@ -99,16 +99,23 @@ sales_channels/
    ]
    ```
 
-4. **Define AppConfig**
-   In `sales_channels/integrations/<integration_name>/apps.py`:
-   ```python
-   from django.apps import AppConfig
+   4. **Define AppConfig**
+      In `sales_channels/integrations/<integration_name>/apps.py`:
+      ```python
+      from django.apps import AppConfig
 
-   class <IntegrationName>Config(AppConfig):
-       name = 'sales_channels.integrations.<integration_name>'
-       default_auto_field = 'django.db.models.BigAutoField'
-       verbose_name = '<Integration Name> Integration'
-   ```
+      class <IntegrationName>Config(AppConfig):
+          name = 'sales_channels.integrations.<integration_name>'
+          default_auto_field = 'django.db.models.BigAutoField'
+          verbose_name = '<Integration Name> Integration'
+      ```
+
+Create skeleton for integration:
+ ```bash
+./manage.py create_skeleton sales_channels/integrations/<integration_name>
+ ```
+
++ Make sure in the app.py file the ready method was correctly added
 
 5. **Create subfolders**
    Mirror the Magento/Shopify pattern:

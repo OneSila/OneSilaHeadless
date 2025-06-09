@@ -357,7 +357,11 @@ class Product(TranslatedModelMixin, models.Model):
         return variations
 
     def _generate_sku(self, save=False):
-        self.sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
+        from .helpers import generate_sku
+        self.sku = generate_sku()
+
+        if save:
+            self.save()
 
     def save(self, *args, **kwargs):
 

@@ -4,7 +4,7 @@ from sales_channels.integrations.woocommerce.models import WoocommerceCurrency, 
     WoocommerceRemoteLanguage
 from sales_channels.factories.mixins import PullRemoteInstanceMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannelView
-
+from sales_channels.integrations.woocommerce.exceptions import FailedToGetStoreConfigError
 import logging
 logger = logging.getLogger(__name__)
 
@@ -76,9 +76,22 @@ class WoocommerceSalesChannelViewPullFactory(GetWoocommerceAPIMixin, PullRemoteI
         """
         there is no such concept as a view in woocommerce.
         """
-        store_config = self.api.get_store_config()
+        try:
+            store_config = self.api.get_store_config()
+            name = store_config['name']
+            url = store_config['url']
+
+            self.remote_instances = [{
+                # 'id':   store_id,
+                'name': store_config['name'],
+                'url': store_config['url'],
+            }]
+        except FailedToGetStoreConfigError:
+            logger.warning("Failed to get store config, falling back to defaults.")
+            name = 'WooCommerce'
+            url = self.api.hostname
+
         self.remote_instances = [{
-            # 'id':   store_id,
-            'name': store_config['name'],
-            'url': store_config['url'],
+            'name': name,
+            'url': url,
         }]

@@ -26,3 +26,7 @@ class IntegrationListView(EmptyTemplateView):
 
 class ShopifyIntegrationDetailView(EmptyTemplateView):
     pass
+
+
+class AmazonIntegrationDetailView(EmptyTemplateView):
+    pass

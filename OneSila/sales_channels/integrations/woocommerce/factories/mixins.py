@@ -11,10 +11,7 @@ class SerialiserMixin:
     """
 
     def serialize_response(self, response):
-        if not response:
-            raise ValueError("Response is empty. This should not happen.")
-
-        return response
+        return response or {}
 
 
 class WoocommerceSalesChannelLanguageMixin:
