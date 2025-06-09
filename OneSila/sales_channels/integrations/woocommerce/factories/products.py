@@ -121,9 +121,6 @@ class WooCommerceProductSyncFactory(WooCommerceProductMixin, RemoteProductSyncFa
         from sales_channels.integrations.woocommerce.factories.products import WooCommerceProductVariationAddFactory
         return WooCommerceProductVariationAddFactory
 
-    def perform_remote_action(self):
-        raise NotImplementedError("WooCommerceProductSyncFactory does not perform remote actions")
-
     # Use the getter methods within the class where needed
     sync_product_factory = property(get_sync_product_factory)
     create_product_factory = property(get_create_product_factory)
@@ -132,7 +129,7 @@ class WooCommerceProductSyncFactory(WooCommerceProductMixin, RemoteProductSyncFa
     add_variation_factory = property(get_add_variation_factory)
 
 
-class WooCommerceProductCreateFactory(RemoteProductCreateFactory, WooCommerceProductSyncFactory, WoocommerceProductTypeMixin):
+class WooCommerceProductCreateFactory(WooCommerceProductSyncFactory, WoocommerceProductTypeMixin, RemoteProductCreateFactory):
     enable_fetch_and_update = True
     update_if_not_exists = True
     update_factory_class = "WooCommerceProductUpdateFactory"
@@ -150,6 +147,13 @@ class WooCommerceProductCreateFactory(RemoteProductCreateFactory, WooCommercePro
             resp = self.api.create_product_variation(self.remote_instance.remote_parent_product.remote_id, **self.payload)
         else:
             resp = self.api.create_product(**self.payload)
+
+        self.set_remote_id(resp)
+        # Extract remote_id and remote_sku from the response
+        self.remote_instance.remote_sku = self.sku
+
+        # Save the RemoteProduct instance with updated remote_id and remote_sku
+        self.remote_instance.save()
 
         return resp
 
