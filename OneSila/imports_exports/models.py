@@ -144,6 +144,10 @@ class TypedImport(Import):
         blank=True,
         help_text="Language context for imported records (e.g., en, de, fr)."
     )
+    create_only = models.BooleanField(
+        default=False,
+        help_text="If True, existing objects fetched during the import will not be updated.",
+    )
 
     def should_run(self) -> bool:
         if not self.is_periodic or not self.interval_hours:
