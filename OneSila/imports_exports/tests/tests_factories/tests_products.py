@@ -69,7 +69,7 @@ class ImportProductInstanceValidateTest(TestCase):
             "ean_code": "1234567890123",
             "allow_backorder": False,
             "product_type": "Chair",
-            "attributes": [
+            "properties": [
                 {"property_data": {"name": "Color", "type": "SELECT"}, "value": "Red"},
                 {"property_data": {"name": "Material", "type": "SELECT", "value": "Metal"}},
             ],
@@ -110,7 +110,7 @@ class ImportProductInstanceValidateTest(TestCase):
         self.assertFalse(instance.allow_backorder)
         self.assertEqual(instance.vat_rate, 19)  # raw value, will be converted in pre_process
         self.assertEqual(instance.ean_code, "1234567890123")
-        self.assertEqual(len(instance.attributes), 2)
+        self.assertEqual(len(instance.properties), 2)
         self.assertEqual(len(instance.images), 2)
         self.assertEqual(len(instance.prices), 2)
         self.assertEqual(len(instance.variations), 2)
@@ -431,7 +431,7 @@ class ImportProductInstanceProcessTest(TestCase):
             "name": "Attr Product",
             "sku": "ATTR123",
             "product_type": "Chair",
-            "attributes": [
+            "properties": [
                 {"property_data": {"name": "Color", "type": "SELECT"}, "value": "Red"},
                 {"property_data": {"name": "Size", "type": "SELECT"}, "value": "M"},
             ]
@@ -448,7 +448,7 @@ class ImportProductInstanceProcessTest(TestCase):
             "sku": "CFG-AUTO",
             "type": Product.CONFIGURABLE,
             "product_type": "Chair",
-            "attributes": [
+            "properties": [
                 {"property_data": {"name": "Color", "type": "SELECT"}, "value": "Red"}
             ],
             "configurator_select_values": [
@@ -472,7 +472,7 @@ class ImportProductInstanceProcessTest(TestCase):
             "sku": "CFG-MANUAL",
             "type": Product.CONFIGURABLE,
             "product_type": "Chair",
-            "attributes": [
+            "properties": [
                 {"property_data": {"name": "Color", "type": "SELECT"}, "value": "Red"}
             ],
             "variations": [
@@ -498,7 +498,7 @@ class ImportProductInstanceProcessTest(TestCase):
             "sku": "BND-SET",
             "type": Product.BUNDLE,
             "product_type": "Desk Set",
-            "attributes": [
+            "properties": [
                 {"property_data": {"name": "Size", "type": "SELECT"}, "value": "Large"}
             ],
             "bundle_variations": [
@@ -646,7 +646,7 @@ class ImportProductInstanceProcessTest(TestCase):
             "sku": "TABLE-BASE",
             "type": Product.SIMPLE,
             "product_type": "Table",
-            "attributes": [
+            "properties": [
                 {"property_data": {"name": "Material", "type": "SELECT"}, "value": "Wood"},
                 {"property_data": {"name": "Shape", "type": "SELECT"}, "value": "Round"},
             ],
@@ -680,7 +680,7 @@ class ImportProductInstanceProcessTest(TestCase):
             "sku": "BED-BASE",
             "type": Product.SIMPLE,
             "product_type": "Bed",
-            "attributes": [
+            "properties": [
                 {"property_data": {"name": "Style", "type": "SELECT"}, "value": "Modern"},
             ],
             "images": [
@@ -725,7 +725,7 @@ class ImportProductInstanceProcessTest(TestCase):
                     "url_key": "ultimate-product"
                 }
             ],
-            "attributes": [
+            "properties": [
                 {"property_data": {"name": "Material", "type": "SELECT"}, "value": "Red"},
                 {"property_data": {"name": "Style", "type": "SELECT"}, "value": "Elegant"}
             ],

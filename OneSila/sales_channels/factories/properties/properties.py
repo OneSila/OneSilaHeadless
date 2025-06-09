@@ -132,11 +132,9 @@ class RemoteProductPropertyUpdateFactory(RemotePropertyEnsureMixin, ProductAssig
 
         # we got the value we stop de process so everything is resolved
         if self.get_value_only:
-            prop = self.local_instance.property
-            self.namespace, self.key, self.value, self.metafield_type = self.prepare_metafield_payload(self.remote_value, prop)
-
             self.remote_instance.remote_value = str(self.remote_value)
             self.remote_instance.save()
+
             return False
 
         return self.remote_instance.needs_update(self.remote_value)

@@ -162,6 +162,24 @@ class ShopifyProductPropertyUpdateFactory(
 
         self.remote_instance = create_factory.remote_instance
 
+    def additional_update_check(self):
+        self.local_property = self.local_instance.property
+        self.remote_product = self.remote_instance.remote_product
+        self.remote_property = self.remote_instance.remote_property
+
+        self.remote_value = self.get_remote_value()
+
+        # we got the value we stop de process so everything is resolved
+        if self.get_value_only:
+            prop = self.local_instance.property
+            self.namespace, self.key, self.value, self.metafield_type = self.prepare_metafield_payload(self.remote_value, prop)
+
+            self.remote_instance.remote_value = str(self.remote_value)
+            self.remote_instance.save()
+            return False
+
+        return self.remote_instance.needs_update(self.remote_value)
+
 
 class ShopifyProductPropertyDeleteFactory(
     GetShopifyApiMixin,

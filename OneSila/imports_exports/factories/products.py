@@ -58,7 +58,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         # it's the rule
         self.set_field_if_exists('product_type')
-        self.set_field_if_exists('attributes')
+        self.set_field_if_exists('properties')
 
         self.set_field_if_exists('translations')
 
@@ -204,19 +204,19 @@ class ImportProductInstance(AbstractImportInstance):
                         required_names.add(prop.name)
 
             items = []
-            if hasattr(self, 'attributes'):
-                for attribute in self.attributes:
-                    if 'property_data' in attribute or 'property' in attribute:
-                        if 'property_data' in attribute:
-                            name = attribute['property_data'].get("name")
+            if hasattr(self, 'properties'):
+                for property in self.properties:
+                    if 'property_data' in property or 'property' in property:
+                        if 'property_data' in property:
+                            name = property['property_data'].get("name")
                             item_data = {
-                                'property_data': attribute['property_data'],
+                                'property_data': property['property_data'],
                                 'type': ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if name in required_names else ProductPropertiesRuleItem.OPTIONAL
                             }
                         else:
-                            name = attribute['property'].name
+                            name = property['property'].name
                             item_data = {
-                                'property': attribute['property'],
+                                'property': property['property'],
                                 'type': ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if name in required_names else ProductPropertiesRuleItem.OPTIONAL
                             }
 
@@ -280,12 +280,12 @@ class ImportProductInstance(AbstractImportInstance):
             product_property_import_instance.process()
 
         product_property_ids = []
-        if self.type in [Product.SIMPLE, Product.BUNDLE, Product.ALIAS] and hasattr(self, 'attributes'):
+        if self.type in [Product.SIMPLE, Product.BUNDLE, Product.ALIAS] and hasattr(self, 'properties'):
 
-            for attribute in self.attributes:
+            for property in self.properties:
                 try:
                     product_property_import_instance = ImportProductPropertyInstance(
-                        attribute,
+                        property,
                         self.import_process,
                         product=self.instance)
 

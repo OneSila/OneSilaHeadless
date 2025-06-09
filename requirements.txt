@@ -52,3 +52,7 @@ git+https://github.com/jazzband/django-polymorphic.git@v4.0.0a#egg=django-polymo
 git+https://github.com/OneSila/OneSilaMagento2Api.git@v1.0.28
 shopifyapi
 amzn-sp-api
+<<<<<<< HEAD
+=======
+python-amazon-sp-api
+>>>>>>> development

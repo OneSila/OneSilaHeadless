@@ -8,8 +8,8 @@ from core.schema.core.types.input import input, partial, strawberry_input, NodeI
 class MultiTenantCompanyMyInput:
     name: auto
     country: auto
-    phone_number: auto
-    language: auto
+    phone_number: str | None
+    language: str | None
 
 
 @input(MultiTenantCompany, fields="__all__")
@@ -73,9 +73,6 @@ class MultiTenantLoginLinkInput:
 @strawberry_input
 class MultiTenantUserLoginTokenInput:
     username: str
-
-
-1
 
 
 @strawberry_input
