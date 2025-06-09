@@ -849,3 +849,46 @@ class ImportProductInstanceParentLinkingTest(TestCase):
         alias = Product.objects.get(sku="ALIAS-001")
         self.assertIsNotNone(alias.alias_parent_product)
         self.assertEqual(alias.alias_parent_product.sku, "MAIN-001")
+
+class ImportProductInstanceCreateOnlyTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.initial_import = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+        self.create_only_import = Import.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            create_only=True,
+        )
+
+    def test_existing_product_not_updated_when_create_only(self):
+        import base64
+
+        first_data = {
+            "name": "Original Product",
+            "sku": "CO-001",
+            "images": [
+                {"image_content": base64.b64encode(b"img1").decode("utf-8"), "is_main_image": True}
+            ],
+        }
+        instance1 = ImportProductInstance(first_data, self.initial_import)
+        instance1.process()
+        product = instance1.instance
+        self.assertEqual(product.name, "Original Product")
+        initial_images = MediaProductThrough.objects.filter(product=product).count()
+
+        second_data = {
+            "name": "Updated Product",
+            "sku": "CO-001",
+            "images": [
+                {"image_content": base64.b64encode(b"img2").decode("utf-8")}
+            ],
+        }
+        instance2 = ImportProductInstance(second_data, self.create_only_import)
+        instance2.process()
+
+        product.refresh_from_db()
+        self.assertEqual(product.name, "Original Product")
+        self.assertEqual(
+            MediaProductThrough.objects.filter(product=product).count(),
+            initial_images,
+        )
+
