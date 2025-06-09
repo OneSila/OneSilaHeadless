@@ -892,3 +892,42 @@ class ImportProductInstanceCreateOnlyTest(TestCase):
             initial_images,
         )
 
+    def test_existing_product_updated_when_not_create_only(self):
+        import base64
+
+        first_data = {
+            "name": "Original Product",
+            "sku": "CO-001",
+            "images": [
+                {"image_content": base64.b64encode(b"img1").decode("utf-8"), "is_main_image": True}
+            ],
+        }
+        instance1 = ImportProductInstance(first_data, self.initial_import)
+        instance1.process()
+        product = instance1.instance
+        self.assertEqual(product.name, "Original Product")
+        initial_images = MediaProductThrough.objects.filter(product=product).count()
+
+        second_data = {
+            "name": "Updated Product",
+            "sku": "CO-001",
+            "images": [
+                {"image_content": base64.b64encode(b"img2").decode("utf-8")}
+            ],
+        }
+        # create_only=False import
+        update_import = Import.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            create_only=False,
+        )
+        instance2 = ImportProductInstance(second_data, update_import)
+        instance2.process()
+
+        product.refresh_from_db()
+        self.assertEqual(product.name, "Updated Product")
+        self.assertEqual(
+            MediaProductThrough.objects.filter(product=product).count(),
+            initial_images + 1,
+        )
+
+
