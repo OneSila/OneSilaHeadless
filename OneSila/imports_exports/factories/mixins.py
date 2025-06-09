@@ -27,6 +27,8 @@ class AbstractImportInstance(abc.ABC):
         self.multi_tenant_company = import_process.multi_tenant_company if import_process else None
         self.data = data.copy()
 
+        self.create_only = getattr(import_process, 'create_only', False)
+
         self.mirror_model_class = None
         self.mirror_model_map = {}
         self.mirror_model_defaults = {}
@@ -107,7 +109,8 @@ class AbstractImportInstance(abc.ABC):
 
         self.pre_process_logic()
         self.process_logic()
-        self.post_process_logic()
+        if not (self.create_only and hasattr(self, 'created') and not self.created):
+            self.post_process_logic()
 
     def __repr__(self):
         return f"<{self.__class__.__name__} data={self.data}>"
@@ -325,11 +328,12 @@ class ImportOperationMixin:
 
             self.get_or_create_instance()
 
-        if self.allow_edit:
-            self.update_instance()
+        if not (self.import_instance.create_only and not self.created):
+            if self.allow_edit:
+                self.update_instance()
 
-        if self.allow_translation_edit:
-            self.update_translation_instance()
+            if self.allow_translation_edit:
+                self.update_translation_instance()
 
-        if self._create_mirror_data_needed():
-            self._get_or_create_mirror_data()
+            if self._create_mirror_data_needed():
+                self._get_or_create_mirror_data()
