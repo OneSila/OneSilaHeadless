@@ -30,3 +30,17 @@ def raise_for_none(arg_name):
             return func(*args, **kwargs)
         return wrapper
     return decorator
+
+
+def raise_for_none_response(func):
+    """
+    Decorator that checks if the response from a function is None.
+    Raises NoneValueNotAllowedError if the response is None.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        response = func(*args, **kwargs)
+        if response is None:
+            raise NoneValueNotAllowedError(f"Response from {func.__name__} cannot be None")
+        return response
+    return wrapper

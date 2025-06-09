@@ -14,7 +14,7 @@ from .exceptions import FailedToGetAttributesError, FailedToGetError, \
 from .constants import API_ATTRIBUTE_PREFIX
 from .helpers import convert_fields_to_int, clearout_none_values, convert_fields_to_string, \
     raise_for_required_fields
-from .decorators import raise_for_none
+from .decorators import raise_for_none, raise_for_none_response
 import urllib3
 import requests
 from copy import deepcopy
@@ -83,6 +83,7 @@ class WoocommerceApiWrapper:
 
         return data
 
+    @raise_for_none_response
     def get(self, endpoint, params=None, return_json=True):
         resp = self.woocom.get(endpoint, params=params)
         try:
@@ -94,6 +95,7 @@ class WoocommerceApiWrapper:
         except Exception as e:
             raise FailedToGetError(e, response=resp) from e
 
+    @raise_for_none_response
     def post(self, endpoint, data=None):
         logger.debug(f"POSTing to {endpoint} with data: {data}")
         try:
@@ -111,6 +113,7 @@ class WoocommerceApiWrapper:
             logger.error(f"Failed to post to {endpoint} with data: {data} , response: {resp.text} and error: {e}")
             raise FailedToPostError(e, response=resp) from e
 
+    @raise_for_none_response
     def put(self, endpoint, data=None):
         resp = self.woocom.put(endpoint, data=data)
         try:

@@ -51,15 +51,7 @@ class WoocommerceGlobalAttributeValueAdmin(admin.ModelAdmin):
 
 @admin.register(WoocommerceProduct)
 class WoocommerceProductAdmin(admin.ModelAdmin):
-    list_display = ('get_name', 'get_sku')
-    search_fields = ('get_name', 'get_sku')
     list_filter = ('sales_channel',)
-
-    def get_name(self, obj):
-        return obj.local_instance.name
-
-    def get_sku(self, obj):
-        return obj.local_instance.sku
 
 
 @admin.register(WoocommerceMediaThroughProduct)

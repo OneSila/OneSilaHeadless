@@ -7,6 +7,7 @@ from ..exceptions import SanityCheckError
 from ..mixins import GetWoocommerceAPIMixin
 from .temp_structure import ImportProcessorTempStructureMixin
 
+from sales_channels.models import SalesChannelViewAssign
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceProduct, \
     WoocommerceEanCode, WoocommercePrice, WoocommerceCurrency, \
@@ -50,7 +51,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         # raise NotImplementedError()
         return None
 
-    def get_base_product_data(self, product_data: dict) -> Tuple[dict, bool]:
+    def get_base_product_data(self, product_data: dict, parent_sku=None) -> Tuple[dict, bool]:
         """
         return a payload {} and is_variation bool that contains the root fields for the product data
         {
@@ -84,9 +85,15 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
 
         payload = {
             'name': product_data.get('name'),
-            'sku': product_data.get('sku'),
             'active': active,
+            'type': local_type,
         }
+
+        # Woocommerce is not consistent with the sku field.
+        # variations seems to get the parent sku.
+        sku = product_data.get('sku')
+        if sku != parent_sku:
+            payload['sku'] = sku
 
         return payload, is_variation
 
@@ -155,13 +162,14 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         images = self.get_images(product_data)
         prices = self.get_prices(product_data)
         tax = self.get_tax_class(product_data)
+        parent_sku = product_data.get('sku')
 
         # Now that we have all of the data, let's build th actual payload.
         payload = {
             **base_product_data,
             'images': images,
             'attributes': attribute_data,
-            'tax': tax,
+            'vat_rate': tax,
             'variations': [
             ],
         }
@@ -169,9 +177,22 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
             payload['prices'] = prices
 
         # In every variation will also need to grab all of the above data.
+
+        logger.debug(f"Payload for variations in source: {product_data['variations']=}")
+
         for variation_id in product_data['variations']:
             variation_data = self.api.get_product_variation(remote_id, variation_id)
-            base_product_data, _ = self.get_base_product_data(variation_data)
+
+            logger.debug(f"Variation data looks like: {variation_data=}")
+
+            variations_sku = variation_data.get('sku')
+            # Check manually in woocomemrce if the variation DOES have an sku
+            # that it is handled correctly.
+            if variations_sku == parent_sku:
+                variation_sku = generate_sku()
+                self.api.update_product_variation(remote_id, variation_id, sku=variation_sku)
+
+            base_product_data, _ = self.get_base_product_data(variation_data, parent_sku=parent_sku)
             attribute_data = self.get_attributes_for_product(variation_data, is_variation=True, parent_data=product_data)
             images = self.get_images(variation_data)
             prices = self.get_prices(variation_data)
@@ -182,11 +203,13 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
                     **base_product_data,
                     'attributes': attribute_data,
                     'prices': prices,
-                    'tax': tax,
+                    'vat_rate': tax,
                 }
             })
 
-        return payload
+            logger.debug(f"Payload for variations: {payload['variations']=}")
+
+        return payload, is_variation
 
     def get_images(self, remote_product: dict) -> List[dict]:
         """
@@ -351,6 +374,28 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         remote_product.save()
         logger.info(f"Repaired remote_sku for product {remote_product.remote_id} using default_variant_id")
 
+    def assign_to_saleschannelview(self, importer_instance: ImportProductInstance):
+        """
+        Assign the product to the sales channel view.
+        """
+        sales_channel_view = self.sales_channel.saleschannelview_set.get(
+            multi_tenant_company=self.import_process.multi_tenant_company
+        )
+
+        assign, created = SalesChannelViewAssign.objects.get_or_create(
+            product=importer_instance.instance,
+            sales_channel_view=sales_channel_view,
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            remote_product=importer_instance.remote_instance,
+            sales_channel=self.sales_channel,
+        )
+        return assign, created
+
+    def update_remote_product_sync_percentage(self, import_instance: ImportProductInstance, product: dict, is_variation: bool):
+        remote_product = import_instance.remote_instance
+        remote_product.syncing_current_percentage = 100
+        remote_product.save()
+
     @timeit_and_log(logger, "importing woocommerce products")
     def import_products_process(self):
         for remote_product in self.api.get_products():
@@ -361,7 +406,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
             # Once converted the ddata and saved it localle, we want to create
             # the mirror models to ensure the when data is pushed to the server again
             # with changes, it doesnt end up with duplicates.
-            structured_data = self.get_structured_product_data(remote_product)
+            structured_data, is_variation = self.get_structured_product_data(remote_product)
             self.update_percentage()
 
             # The trick is here:
@@ -372,11 +417,11 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
             # This needs to be deconstructed again to handle them correctly remotely.
 
             # first create your import instance and assign remote_product.
-            importer_instance = ImportProductInstance(
+            parent_importer_instance = ImportProductInstance(
                 data=structured_data,
                 import_process=self.import_process,
             )
-            importer_instance.prepare_mirror_model_class(
+            parent_importer_instance.prepare_mirror_model_class(
                 mirror_model_class=WoocommerceProduct,
                 sales_channel=self.sales_channel,
                 mirror_model_map={
@@ -386,9 +431,19 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
                     # Skus are not always present.
                     # "remote_sku": structured_data.get('sku'),
                     "remote_id": remote_product.get('id'),
-                }
+                    "is_variation": is_variation,
+                },
             )
-            importer_instance.process()
+            parent_importer_instance.process()
+
+            # We need to remove the variation data from the structured data
+            # and call a variation import process for each variations
+            # because we need to controle the mirror_model_class + remote_id + parent_id stuff....
+
+            # Once done.... you must set the "remote_parent_product" on the freshly created mirror
+            # variationimporter_instance.remote_instance.remote_parent_product = parent_importer_instance.remote_instance
+            raise NotImplementedError("Not implemented")
+
             #     # handle_remote_product will populate remote_instance inside of import_instance
             #     self.handle_ean_codes(importer_instance)
             #     self.handle_prices(importer_instance)
@@ -404,3 +459,9 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
             #     # self.set_field_if_exists('__image_index_to_remote_id')
             #     # self.set_field_if_exists('__mirror_product_properties_map')
             #     # self.set_field_if_exists('__variation_sku_to_id_map')
+            self.assign_to_saleschannelview(importer_instance)
+            # Ensure you give the "remote dict", not the "structured data" as this
+            # is used to compare to the remote data in future updates/syncs.
+            self.update_remote_product_sync_percentage(importer_instance,
+                product=remote_product, is_variation=is_variation)
+            self.repair_remote_sku_if_needed(importer_instance)

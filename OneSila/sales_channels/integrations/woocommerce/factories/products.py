@@ -121,6 +121,9 @@ class WooCommerceProductSyncFactory(WooCommerceProductMixin, RemoteProductSyncFa
         from sales_channels.integrations.woocommerce.factories.products import WooCommerceProductVariationAddFactory
         return WooCommerceProductVariationAddFactory
 
+    def perform_remote_action(self):
+        raise NotImplementedError("WooCommerceProductSyncFactory does not perform remote actions")
+
     # Use the getter methods within the class where needed
     sync_product_factory = property(get_sync_product_factory)
     create_product_factory = property(get_create_product_factory)
@@ -155,15 +158,6 @@ class WooCommerceProductCreateFactory(RemoteProductCreateFactory, WooCommercePro
         Attempts to fetch an existing product by SKU.
         """
         return self.api.get_product_by_sku(self.local_instance.sku)
-
-    def process_product_properties(self):
-        """
-        Processes each property retrieved from the product and performs the necessary actions,
-        such as adding to payload, creating or updating remote instances, etc.
-        """
-        # Surely we shouldn't just "skip" this factory action?
-        # Or does it not matter since the product properties don't really exist?
-        pass
 
 
 class WooCommerceProductUpdateFactory(RemoteProductUpdateFactory, WooCommerceProductSyncFactory, WoocommerceProductTypeMixin):
