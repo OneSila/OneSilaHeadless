@@ -17,7 +17,7 @@ from taxes.models import VatRate
 
 
 class ProductImport(ImportOperationMixin):
-    get_identifiers = ['sku', 'type']
+    get_identifiers = ['sku']
 
 
 class AliasProductImport(ImportOperationMixin):
