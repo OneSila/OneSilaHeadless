@@ -5,7 +5,7 @@ from .products import (
     AmazonCategory, AmazonEanCode
 )
 from .properties import (
-    AmazonProperty, AmazonPropertySelectValue, AmazonProductProperty
+    AmazonProperty, AmazonPropertySelectValue, AmazonProductProperty, AmazonProductType, AmazonProductTypeItem
 )
 from .sales_channels import (
     AmazonSalesChannel, AmazonSalesChannelView, AmazonRemoteLanguage
