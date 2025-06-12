@@ -427,7 +427,7 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
             # Reuse from translation map if available
             reused_translation = None
-            if store_code in self.magento_translation_store_code_map:
+            if hasattr(self, 'self.translation_product_map') and store_code in self.magento_translation_store_code_map:
                 language = self.magento_translation_store_code_map[store_code]
                 reused_translation = self.translation_product_map.get(language)
 
