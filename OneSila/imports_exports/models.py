@@ -202,7 +202,6 @@ class MappedImport(TypedImport):
         Execute the mapped import using the proper runner.
         """
         from imports_exports.factories.importers import MappedImportRunner
-
         runner = MappedImportRunner(self)
         runner.run()
 
