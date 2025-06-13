@@ -1,4 +1,6 @@
-from properties.models import ProductPropertiesRule, ProductPropertiesRuleItem
+from django.db.models import JSONField
+
+from properties.models import ProductPropertiesRule, ProductPropertiesRuleItem, Property
 from sales_channels.models.mixins import RemoteObjectMixin
 from sales_channels.models.properties import (
     RemoteProperty,
@@ -7,6 +9,73 @@ from sales_channels.models.properties import (
 )
 from core import models
 from django.utils.translation import gettext_lazy as _
+from datetime import timedelta
+from django.utils import timezone
+
+class AmazonPublicDefinition(models.SharedModel):
+    """
+    Canonical, tenant-agnostic description of *one attribute key* of ONE
+    product-type *in one Amazon API region*.
+
+    Examples
+    --------
+    - api_region_code = "EU_DE"   product_type_code = "AIR_PURIFIER"
+      code = "color"                          (simple)
+    - api_region_code = "EU_FR"   product_type_code = "AIR_PURIFIER"
+      code = "battery__cell_composition"      (composite, level-2)
+    """
+
+    # ------------- identity -------------
+    api_region_code   = models.CharField(max_length=8)          # "EU_DE"
+    product_type_code = models.CharField(max_length=64)         # "AIR_PURIFIER"
+    code              = models.CharField(max_length=128)        # "color"  or "battery__cell_composition"
+
+    # ------------- display -------------
+    name  = models.CharField(max_length=255)
+    raw_schema = JSONField()        # the slice of Amazon schema for this property
+    type  = models.CharField(       # map onto local Property.TYPES
+        max_length=16, choices=Property.TYPES.ALL, default=Property.TYPES.TEXT
+    )
+
+    # ------------- rendering / encoding -------------
+    usage_definition   = models.TextField(
+        help_text=(
+            "Template for rendering this attribute into SP-API payload.\n"
+            "Tokens: %value%, %unit:weight%, %key:battery__cell_composition%, "
+            "%marketplace_id%, %language_tag%"
+        )
+    )
+    export_definition  = JSONField()
+
+    allows_unmapped_values = models.BooleanField(default=False)
+    unmapped_value_key     = models.CharField(
+        max_length=64, blank=True, default="value",
+        help_text="If allows_unmapped_values == True, which JSON key gets free-text?"
+    )
+
+    last_fetched = models.DateTimeField(null=True, blank=True)
+
+    is_required = models.BooleanField(default=False)
+    is_internal = models.BooleanField(default=False)
+
+    def should_refresh(self):
+        if not self.last_fetched:
+            return True
+        return timezone.now() - self.last_fetched > timedelta(days=180)
+
+    class Meta:
+        verbose_name = _("Amazon Public Definition")
+        verbose_name_plural = _("Amazon Public Definitions")
+        unique_together = (
+            "api_region_code", "product_type_code", "code",
+        )
+        indexes = [
+            models.Index(fields=["api_region_code"]),
+            models.Index(fields=["product_type_code"]),
+        ]
+
+    def __str__(self):
+        return f"[{self.api_region_code}] {self.product_type_code} :: {self.code}"
 
 
 class AmazonProperty(RemoteProperty):
