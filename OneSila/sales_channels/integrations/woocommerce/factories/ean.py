@@ -2,6 +2,7 @@ from sales_channels.factories.products.eancodes import RemoteEanCodeUpdateFactor
 from sales_channels.integrations.woocommerce.models import WoocommerceEanCode
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.factories.mixins import WoocommerceProductTypeMixin
+from sales_channels.integrations.woocommerce.constants import EAN_CODE_WOOCOMMERCE_FIELD_NAME
 
 from .mixins import SerialiserMixin
 from .properties import WooCommerceProductAttributeMixin
@@ -20,10 +21,10 @@ class WooCommerceEanCodeUpdateFactory(WooCommerceProductAttributeMixin, GetWooco
         ean_code = product.eancode_set.last()
 
         try:
-            self.payload['global_unique_id'] = ean_code.ean_code
+            self.payload[EAN_CODE_WOOCOMMERCE_FIELD_NAME] = ean_code.ean_code
         except AttributeError:
             # No EanCode, send empty payload
-            self.payload['global_unique_id'] = ''
+            self.payload[EAN_CODE_WOOCOMMERCE_FIELD_NAME] = ''
 
         return self.payload
 

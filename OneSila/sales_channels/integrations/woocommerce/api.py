@@ -49,6 +49,15 @@ class WoocommerceApiWrapper:
             user_agent=self.user_agent
         )
 
+    def cleanup_product_attribute_payload(self, payload):
+        """
+        Remove the attribute prefix from the attribute slug and return the attribute
+        """
+        attribute_payload = payload['attributes']
+        for attribute in attribute_payload:
+            attribute['slug'] = attribute['slug'].replace(self.attribute_prefix, '')
+        return attribute_payload
+
     def remove_attribute_slug_prefix(self, attribute):
         """remove the attribute prefix from the attribute slug and return the attribute"""
         new_slug = attribute['slug'].replace(self.attribute_prefix, '')
@@ -238,21 +247,28 @@ class WoocommerceApiWrapper:
 
     def get_products(self):
         try:
-            return self.get_paged_get('products')
+            products = self.get_paged_get('products')
+            for product in products:
+                product['attributes'] = self.cleanup_product_attribute_payload(product)
+            return products
         except FailedToGetError as e:
             raise FailedToGetProductsError(e, response=e.response) from e
 
     @raise_for_none(arg_name='product_id')
     def get_product(self, product_id):
         try:
-            return self.get(f'products/{product_id}')
+            product = self.get(f'products/{product_id}')
+            product['attributes'] = self.cleanup_product_attribute_payload(product)
+            return product
         except FailedToGetError as e:
             raise FailedToGetProductError(e, response=e.response) from e
 
     @raise_for_none(arg_name='sku')
     def get_product_by_sku(self, sku):
         try:
-            return self.get(f'products?sku={sku}')[0]
+            product = self.get(f'products?sku={sku}')[0]
+            product['attributes'] = self.cleanup_product_attribute_payload(product)
+            return product
         except IndexError as e:
             raise FailedToGetProductBySkuError(e) from e
 
@@ -319,11 +335,16 @@ class WoocommerceApiWrapper:
     @raise_for_none(arg_name='product_id')
     @raise_for_none(arg_name='variation_id')
     def get_product_variation(self, product_id, variation_id):
-        return self.get(f'products/{product_id}/variations/{variation_id}')
+        variation = self.get(f'products/{product_id}/variations/{variation_id}')
+        variation['attributes'] = self.cleanup_product_attribute_payload(variation)
+        return variation
 
     @raise_for_none(arg_name='product_id')
     def get_product_variations(self, product_id):
-        return self.get_paged_get(f'products/{product_id}/variations')
+        variations = self.get_paged_get(f'products/{product_id}/variations')
+        for variation in variations:
+            variation['attributes'] = self.cleanup_product_attribute_payload(variation)
+        return variations
 
     @raise_for_none(arg_name='product_id')
     @raise_for_none(arg_name='variation_id')

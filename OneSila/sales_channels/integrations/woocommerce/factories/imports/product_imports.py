@@ -6,6 +6,7 @@ from core.decorators import timeit_and_log
 from ..exceptions import SanityCheckError
 from ..mixins import GetWoocommerceAPIMixin
 from .temp_structure import ImportProcessorTempStructureMixin
+from sales_channels.integrations.woocommerce.constants import EAN_CODE_WOOCOMMERCE_FIELD_NAME
 
 from sales_channels.models import SalesChannelViewAssign
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
@@ -26,6 +27,13 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
 
     def __init__(self, import_process, sales_channel, language=None):
         super().__init__(import_process, sales_channel, language)
+
+        logger.debug(
+            f"Initializing WoocommerceProductImportProcessor for sales channel: {sales_channel}. "
+            f"Import process: {import_process}, {type(import_process)} "
+            f"id: {import_process.id=}. "
+        )
+
         self.repair_sku_map = {}
         self.api = self.get_api()
 
@@ -64,6 +72,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         """
         # Note, no such thing as a product-type in woocommerce.
         ptype = product_data.get('type')
+        is_configurable = False
 
         if ptype == 'simple':
             local_type = Product.SIMPLE
@@ -71,6 +80,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         elif ptype == 'variable':
             local_type = Product.CONFIGURABLE
             is_variation = False
+            is_configurable = True
         elif ptype == 'variation':
             local_type = Product.SIMPLE
             is_variation = True
@@ -88,6 +98,9 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
             'name': product_data.get('name'),
             'active': active,
             'type': local_type,
+            # We're adding a default type to ensure users get to see their data.
+            # and we don't have unexpected sync issues due to missing product_type.
+            'product_type': "DefaultWoocommerceProductType",
         }
 
         # Woocommerce is not consistent with the sku field.
@@ -95,6 +108,10 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         sku = product_data.get('sku')
         if sku != parent_sku:
             payload['sku'] = sku
+
+        ean_code = product_data.get(EAN_CODE_WOOCOMMERCE_FIELD_NAME)
+        if not is_configurable and ean_code:
+            payload['ean_code'] = ean_code
 
         return payload, is_variation
 
@@ -158,7 +175,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         # - we have no way to tell the a "product type".
         # - but we can get what the product configurator data looks like base on the attributes
         #   and that variation data.
-        attribute_data = self.get_attributes_for_product(product_data)
+        properties_data = self.get_properties_data_for_product(product_data)
         product_type = base_product_data.get('type')
         images = self.get_images(product_data)
         prices = self.get_prices(product_data)
@@ -169,11 +186,16 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         payload = {
             **base_product_data,
             'images': images,
-            'attributes': attribute_data,
-            'vat_rate': tax,
+            'properties': properties_data,
         }
+
+        if tax:
+            payload['vat_rate'] = tax
+
         if product_type != Product.CONFIGURABLE:
             payload['prices'] = prices
+
+        logger.debug(f"Structured product data: {payload}")
 
         return payload, is_variation
 
@@ -202,7 +224,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
             })
         return importer_images
 
-    def get_attributes_for_product(self, product_data: dict, is_variation=False, parent_data: dict = None) -> Tuple[List[dict], List[dict]]:
+    def get_properties_data_for_product(self, product_data: dict, is_variation=False, parent_data: dict = None) -> Tuple[List[dict], List[dict]]:
         """
         Convert attributes from the API to the Importer Structure.
 
@@ -218,7 +240,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         - we still need to handle global vs product attributes for every attribute entry.
 
         In order to ensure we have a clean payload, we will not keep the variaton data
-        from the parent in the get_producdt stuff.  Instead we will request the parent
+        from the parent in the get_product_data stuff.  Instead we will request the parent
         attribute data for each variation (yes..a few extra calls) and create a clean
         flow where we can also cleanly identify which attributes are used in the configurator.
 
@@ -272,6 +294,9 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
 
         attributes = []
 
+        # Configurable products hold no properties in OneSila.
+        # Don't force them.  Just return an empty list and leave
+        # the propety stuff for simples/bundles/aliases.
         if is_variation:
             parent_attributes = parent_data.get('attributes', [])
             variation_attributes = product_data.get('attributes', [])
@@ -362,7 +387,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         remote_product.syncing_current_percentage = 100
         remote_product.save()
 
-    def parent_process_product(self, remote_product: dict):
+    def process_parent_product(self, remote_product: dict):
         """
         Process a single product.
         """
@@ -374,6 +399,11 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         # the mirror models to ensure the when data is pushed to the server again
         # with changes, it doesnt end up with duplicates.
         structured_data, is_variation = self.get_structured_product_data(remote_product)
+
+        property_data = structured_data.get('properties', [])
+        if not property_data:
+            raise ValueError(f"No property data found for product {remote_product.get('id')}")
+
         # The trick is here:
         # A complate product is a compilation of all individial pieces:
         # ean
@@ -381,12 +411,14 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         # direct fields
         # This needs to be deconstructed again to handle them correctly remotely.
         parent_sku = structured_data.get('sku')
+        remote_id = remote_product.get('id')
         # Check manually in woocomemrce if the variation DOES have an sku
         # if not, we must set it in advance or later efforts become
         # to complicated to inject skus after import
         if not parent_sku:
             parent_sku = generate_sku()
             structured_data['sku'] = parent_sku
+            self.api.update_product(remote_id, sku=parent_sku)
 
         # first create your import instance and assign remote_product.
         parent_importer_instance = ImportProductInstance(
@@ -409,9 +441,11 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         parent_importer_instance.process()
 
         # For completeness, let's set the sku on the mirror model.
-        remote_product = parent_importer_instance.remote_instance
-        remote_product.remote_sku = parent_sku
-        remote_product.save()
+        # FIXME: Setting the sku on the remote-product seems to fail the import process
+        # in a silent way.
+        # remote_instance = parent_importer_instance.remote_instance
+        # remote_instance.remote_sku = parent_sku
+        # remote_instance.save()
         return parent_importer_instance
 
     def process_variation(self, variation_id: str, parent_importer_instance: ImportProductInstance, parent_data: dict):
@@ -444,17 +478,18 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
             variation_data['sku'] = variation_sku
 
         base_product_data, _ = self.get_base_product_data(variation_data, parent_sku=parent_sku)
-        attribute_data = self.get_attributes_for_product(variation_data, is_variation=True, parent_data=parent_data)
+        properties_data = self.get_properties_data_for_product(variation_data, is_variation=True, parent_data=parent_data)
         images = self.get_images(variation_data)
         prices = self.get_prices(variation_data)
         tax = self.get_tax_class(variation_data)
 
         payload = {
             **base_product_data,
-            'attributes': attribute_data,
+            'properties': properties_data,
             'prices': prices,
             'vat_rate': tax,
-            'parent_id': parent_importer_instance.remote_instance.remote_id,
+            'images': images,
+            'configurable_parent_sku': parent_sku,
         }
 
         variation_importer_instance = ImportProductInstance(
@@ -476,16 +511,18 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         variation_importer_instance.process()
 
         # For completeness, let's set the sku on the mirror model.
-        remote_product = variation_importer_instance.remote_instance
-        remote_product.remote_sku = variation_sku
-        remote_product.save()
+        # FIXME: Setting the sku on the remote-product seems to fail the import process
+        # in a silent way.
+        # remote_product = variation_importer_instance.remote_instance
+        # remote_product.remote_sku = variation_sku
+        # remote_product.save()
         return variation_importer_instance
 
     @timeit_and_log(logger, "importing woocommerce products")
     def import_products_process(self):
         for remote_product in self.api.get_products():
             parent_data = remote_product
-            parent_importer_instance = self.parent_process_product(parent_data)
+            parent_importer_instance = self.process_parent_product(parent_data)
             self.assign_to_saleschannelview(parent_importer_instance)
             self.update_remote_product_sync_percentage(parent_importer_instance,
                 product=remote_product, is_variation=False)
