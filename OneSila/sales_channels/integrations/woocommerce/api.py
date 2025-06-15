@@ -97,8 +97,23 @@ class WoocommerceApiWrapper:
         resp = self.woocom.get(endpoint, params=params)
         try:
             resp.raise_for_status()
+            # It seems that a response can be OK and still contain an error.
+            # eg products/991_fake_id will yield 200 but with a code and message in the
+            # reponse.
+            json_resp = resp.json()
+            try:
+                code = json_resp.get('code')
+                if code:
+                    raise FailedToGetError(f"Failed to get {endpoint} with reponse: {json_resp}", response=resp)
+            except AttributeError as e:
+                # Keeping in mind that a listing GET would not be able to
+                # inspect the "code" as it's a list. Not a dict.
+                # that's OK and desired.
+                pass
+
+            # If the response is OK, return desired response format.
             if return_json:
-                return resp.json()
+                return json_resp
             else:
                 return resp
         except Exception as e:

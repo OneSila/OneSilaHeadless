@@ -15,6 +15,7 @@ from properties.models import Property, ProductPropertiesRuleItem, ProductProper
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
 from currencies.currencies import iso_list
+from core.exceptions import ValidationError
 
 
 class ProductImport(ImportOperationMixin):
@@ -592,13 +593,19 @@ class ImportSalesPriceInstance(AbstractImportInstance):
         return ['rrp', 'price']
 
     def validate_currency(self):
-        if self.data['currency'] not in iso_list:
-            raise ValueError(f"The price use unsupported currency in data dict: {self.data['currency']}")
+        currency = self.data.get('currency')
+        if not currency:
+            raise ValidationError("Currency is required.")
+
+        if currency not in iso_list:
+            raise ValidationError(f"Currency {currency} is not supported.")
 
     def validate(self):
         """
         Validate that the 'value' key exists
         """
+        # FIXME: This should really populate a SalesPrice Instance and
+        # run full_clean() instead of replicating the logic.  Very fragile.
         if not hasattr(self, 'rrp') and not hasattr(self, 'price'):
             raise ValueError("Both 'rrp' and 'price' cannot be None.")
 
@@ -612,21 +619,22 @@ class ImportSalesPriceInstance(AbstractImportInstance):
             raise ValueError("Both 'currency' cannot be None.")
 
     def _set_public_currency(self):
-
-        if hasattr(self, 'currency'):
-            self.public_currency, _ = PublicCurrency.objects.get_or_create(iso_code=self.currency)
-
-            if self.public_currency is None:
-                raise ValueError("The price use unsupported currency.")
+        try:
+            self.public_currency = PublicCurrency.objects.get(iso_code=self.currency)
+        except AttributeError:
+            # Currency is optional in this validation.
+            # It falls back to the company currency at a later stage should
+            # it be missing.
+            pass
+        except PublicCurrency.DoesNotExist:
+            raise ValidationError(f"Currency {self.currency} is unknown in the public currency list.")
 
     def _set_currency(self):
-
         if not hasattr(self, 'currency'):
             self.currency, _ = Currency.objects.get_or_create(multi_tenant_company=self.multi_tenant_company, is_default_currency=True)
             return
 
         if hasattr(self, 'currency') and hasattr(self, 'public_currency'):
-
             self.currency, _ = Currency.objects.get_or_create(
                 multi_tenant_company=self.multi_tenant_company,
                 iso_code=self.public_currency.iso_code,
@@ -637,7 +645,6 @@ class ImportSalesPriceInstance(AbstractImportInstance):
         raise ValueError("There is no way to receive the currency.")
 
     def _set_product_import_instance(self):
-
         if not self.product:
             self.product_import_instance = ImportProductInstance(self.product_data, self.import_process)
 

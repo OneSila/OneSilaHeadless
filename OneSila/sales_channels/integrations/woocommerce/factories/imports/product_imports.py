@@ -3,6 +3,8 @@ from imports_exports.factories.products import ImportProductInstance
 from products.models import Product
 from core.decorators import timeit_and_log
 
+from properties.models import Property
+
 from ..exceptions import SanityCheckError
 from ..mixins import GetWoocommerceAPIMixin
 from .temp_structure import ImportProcessorTempStructureMixin
@@ -15,6 +17,8 @@ from sales_channels.integrations.woocommerce.models import WoocommerceProduct, \
     WoocommerceMediaThroughProduct, WoocommerceRemoteLanguage
 from products.helpers import generate_sku
 from typing import Tuple, List, Set
+from django.db.utils import IntegrityError
+from decimal import Decimal
 
 import logging
 logger = logging.getLogger(__name__)
@@ -113,7 +117,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         if not is_configurable and ean_code:
             payload['ean_code'] = ean_code
 
-        return payload, is_variation
+        return payload, is_variation, is_configurable
 
     def get_content(self, product_data: dict) -> List[dict]:
         """
@@ -140,17 +144,19 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
 
         or None if this is a configurable product.
         """
-        price = product_data.get('sales_price', None)
+        price = product_data.get('sale_price', None)
         rrp = product_data.get('regular_price', None)
 
         payload = {}
         if price:
-            payload['price'] = price
+            payload['price'] = Decimal(price)
 
         if rrp:
-            payload['rrp'] = rrp
+            payload['rrp'] = Decimal(rrp)
 
         # if there are no prices, no point adding a currency
+        # In case you're wondering...yes...woocommerce can have
+        # products WITHOUT prices.
         if payload:
             payload['currency'] = self.currency_iso_code
 
@@ -162,9 +168,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         """
         Compile all of the different parts from the various "getters"
         """
-        remote_id = product_data.get('id')
-        base_product_data, is_variation = self.get_base_product_data(product_data)
-        product_type = base_product_data.get('type')
+        base_product_data, is_variation, is_configurable = self.get_base_product_data(product_data)
         # A few notes about attribute data:
         # - Woocommerce contains the simple product properties on the parent.
         #  that means we need to store them and apply the on the variations later on.
@@ -176,11 +180,9 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         # - but we can get what the product configurator data looks like base on the attributes
         #   and that variation data.
         properties_data = self.get_properties_data_for_product(product_data)
-        product_type = base_product_data.get('type')
         images = self.get_images(product_data)
         prices = self.get_prices(product_data)
         tax = self.get_tax_class(product_data)
-        parent_sku = product_data.get('sku')
 
         # Now that we have all of the data, let's build th actual payload.
         payload = {
@@ -192,7 +194,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         if tax:
             payload['vat_rate'] = tax
 
-        if product_type != Product.CONFIGURABLE:
+        if not is_configurable:
             payload['prices'] = prices
 
         logger.debug(f"Structured product data: {payload}")
@@ -369,17 +371,34 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         """
         Assign the product to the sales channel view.
         """
+
         sales_channel_view = self.sales_channel.saleschannelview_set.get(
             multi_tenant_company=self.import_process.multi_tenant_company
         )
 
-        assign, created = SalesChannelViewAssign.objects.get_or_create(
-            product=importer_instance.instance,
-            sales_channel_view=sales_channel_view,
-            multi_tenant_company=self.import_process.multi_tenant_company,
-            remote_product=importer_instance.remote_instance,
-            sales_channel=self.sales_channel,
-        )
+        try:
+            assign, created = SalesChannelViewAssign.objects.get_or_create(
+                product=importer_instance.instance,
+                sales_channel_view=sales_channel_view,
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                remote_product=importer_instance.remote_instance,
+                sales_channel=self.sales_channel,
+            )
+        except IntegrityError as e:
+            # Somehow it can happen that an assign will alrady exist - but perhaps
+            # with anothe remote product.  In that case, just remove it and
+            # re-run thi method.
+            logger.warning(
+                f"SalesChannelViewAssign seems to exist for another remote product. (Product: {importer_instance.instance}). Removing and re-creating.")
+            assign = SalesChannelViewAssign.objects.get(
+                product=importer_instance.instance,
+                sales_channel_view=sales_channel_view,
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+            )
+            assign.delete()
+            return self.assign_to_saleschannelview(importer_instance)
+
         return assign, created
 
     def update_remote_product_sync_percentage(self, import_instance: ImportProductInstance, product: dict, is_variation: bool):
@@ -477,7 +496,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
             self.api.update_product_variation(parent_remote_id, variation_id, sku=variation_sku)
             variation_data['sku'] = variation_sku
 
-        base_product_data, _ = self.get_base_product_data(variation_data, parent_sku=parent_sku)
+        base_product_data, *_ = self.get_base_product_data(variation_data, parent_sku=parent_sku)
         properties_data = self.get_properties_data_for_product(variation_data, is_variation=True, parent_data=parent_data)
         images = self.get_images(variation_data)
         prices = self.get_prices(variation_data)

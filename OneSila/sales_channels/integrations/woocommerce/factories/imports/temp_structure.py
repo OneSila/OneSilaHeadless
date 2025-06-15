@@ -21,10 +21,10 @@ class TempPropertyClass:
 
     @property
     def property_type(self) -> str:
-        if len(self.options) > 1:
-            return Property.TYPES.MULTISELECT
-        else:
+        if self.used_for_configurator or len(self.options) <= 1:
             return Property.TYPES.SELECT
+        else:
+            return Property.TYPES.MULTISELECT
 
     @property
     def used_for_configurator(self) -> bool:
@@ -234,15 +234,40 @@ class ImportProcessorTempStructureMixin:
         """
         ptype = temp_property.property_type
         identifier, value = temp_property.identifier_for_payload()
+        prop_payload_data = temp_property.property_attributes()
+        used_in_configurator = temp_property.used_for_configurator
 
-        return {
+        original_prop_type = ptype
+        try:
+            local_property = Property.objects.get(
+                internal_name=identifier,
+                multi_tenant_company=self.import_process.multi_tenant_company,
+            )
+            new_prop_type = local_property.type
+            ptype = new_prop_type
+        except Property.DoesNotExist:
+            # Doesnt exist locally. Allow woocom logic
+            # from the dataclass do its thing.
+            new_prop_type = original_prop_type
+
+        if ptype == Property.TYPES.SELECT and isinstance(options, list):
+            options = ', '.join(options)
+
+        payload = {
             "property_data": {
-                **temp_property.property_attributes(),
+                **prop_payload_data,
                 identifier: value,
                 "type": ptype
             },
             "value": options
         }
+
+        if used_in_configurator:
+            payload['property_data']['add_to_filters'] = True
+            payload['property_data']['is_public_information'] = True
+            raise NotImplementedError("Configurator rule property needs to be added.")
+
+        return payload
 
     def create_payload_for_property(self, name: str, options: List[str] | str) -> dict:
         """

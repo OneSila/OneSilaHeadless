@@ -14,3 +14,7 @@ class NotDemoDataGeneratorError(Exception):
 
 class SanityCheckError(Exception):
     pass
+
+
+class ValidationError(Exception):
+    pass
