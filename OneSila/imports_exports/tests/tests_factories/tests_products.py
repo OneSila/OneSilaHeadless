@@ -931,3 +931,33 @@ class ImportProductInstanceCreateOnlyTest(TestCase):
         )
 
 
+class ImportProductWithSameSkuAndDifferentTypeTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.import_instance = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+    def test_fallback_applies_when_type_is_wrong(self):
+        first_data = {
+            "name": "First",
+            "sku": "FALLBACK-001",
+            "type": "SIMPLE"
+        }
+        instance1 = ImportProductInstance(first_data, self.import_instance)
+        instance1.process()
+        product = instance1.instance
+
+        # Second time with wrong type
+        second_data = {
+            "name": "Second Attempt",
+            "sku": "FALLBACK-001",
+            "type": "BUNDLE"
+        }
+
+        instance2 = ImportProductInstance(second_data, self.import_instance)
+        instance2.process()
+
+        self.assertEqual(instance2.instance.id, product.id)
+        self.assertEqual(instance2.created, False)
+        self.assertEqual(instance2.instance.type, product.type)
+        self.assertEqual(instance2.instance.type, "SIMPLE")
+

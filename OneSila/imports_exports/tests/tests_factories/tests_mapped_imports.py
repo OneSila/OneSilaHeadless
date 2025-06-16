@@ -29,7 +29,7 @@ class MappedImportSkipBrokenRecordsTest(TestCase):
     def test_import_fails_without_skip_broken_records(self):
         product_data = [
             {"sku": "P001", "name": "Duplicate Product", "type": "SIMPLE"},
-            {"sku": "P001", "name": "Duplicate Product", "type": "BUNDLE"},
+            {"sku": "P001", "name": "Duplicate Product", "type": "NON_EXISTING_TYPE"},
         ]
         file_content = self.create_import_file(product_data)
         mapped_import = self.create_mapped_import(skip_broken=False, file_content=file_content)
@@ -44,7 +44,7 @@ class MappedImportSkipBrokenRecordsTest(TestCase):
     def test_import_skips_errors_when_flag_enabled(self):
         product_data = [
             {"sku": "P001", "name": "Duplicate Product", "type": "SIMPLE"},
-            {"sku": "P001", "name": "Duplicate Product", "type": "BUNDLE"},
+            {"sku": "P001", "name": "Duplicate Product", "type": "NON_EXISTING_TYPE"},
         ]
         file_content = self.create_import_file(product_data)
         mapped_import = self.create_mapped_import(skip_broken=True, file_content=file_content)
