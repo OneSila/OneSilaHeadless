@@ -220,6 +220,7 @@ class ImportProcessorTempStructureMixin:
     import process.
     """
 
+    @timeit_and_log(logger, "preparing import process")
     def prepare_import_process(self):
         super().prepare_import_process()
         self.temp_property_data_constructer = TempPropertyDataConstructer(self.api)

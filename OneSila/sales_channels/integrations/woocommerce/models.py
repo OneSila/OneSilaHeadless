@@ -31,7 +31,8 @@ class WoocommerceSalesChannel(SalesChannel):
 
         if required_fields.intersection(self.get_dirty_fields().keys()):
             try:
-                TryConnection(sales_channel=self)
+                conn = TryConnection(sales_channel=self)
+                conn.try_connection()
             except Exception:
                 raise Exception(
                     _("Could not connect to the Woocommerce server. Make sure all the details are correctly completed.")

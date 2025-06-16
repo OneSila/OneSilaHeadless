@@ -105,3 +105,20 @@ def log_wrapper(method):
         logger.debug(f"Called: {method.__qualname__}({args[1:]}, {kwargs})")
         return method(*args, **kwargs)
     return wrapped
+
+
+def soft_fail():
+    """
+    Decorator that catches any exceptions, logs them to the error log,
+    and returns None instead of raising the exception.
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except Exception as e:
+                logger.error(f"Error in {f.__name__}: {str(e)}", exc_info=True)
+                return None
+        return wrapper
+    return decorator

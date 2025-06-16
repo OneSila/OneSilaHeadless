@@ -51,15 +51,16 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
 
     def get_total_instances(self) -> int:
         attribute_work = 1  # it's A lot more then 1. But what else to do??
-        product_work = len(self.api.get_products())
-        return sum(attribute_work, product_work)
+        get_product_data_work = 1
+        product_work = self.api.get_product_count()
+        return sum([attribute_work, get_product_data_work, product_work])
 
     @timeit_and_log(logger, "fetching products from the API")
-    def get_products_data(self) -> List[dict]:
+    def set_product_data(self) -> List[dict]:
         """
         Fetch products from the API and return all of them.
         """
-        return self.api.get_products()
+        self.product_data = self.api.get_products()
 
     def get_tax_class(self, product_data: dict) -> dict:
         remote_tax_class = product_data.get('tax_status')
@@ -427,10 +428,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         # the mirror models to ensure the when data is pushed to the server again
         # with changes, it doesnt end up with duplicates.
         structured_data, is_variation = self.get_structured_product_data(remote_product)
-
         property_data = structured_data.get('properties', [])
-        if not property_data:
-            raise ValueError(f"No property data found for product {remote_product.get('id')}")
 
         # The trick is here:
         # A complete product is a compilation of all individial pieces:
@@ -554,41 +552,28 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         )
         product_rule_import_instance.process()
 
-    @timeit_and_log(logger, "importing woocommerce products")
+    @timeit_and_log(logger, "importing woocommerce product")
+    def process_full_product(self, remote_product: dict):
+        # First we to the top level product and assign it to the sales channel view.
+        parent_data = remote_product
+        parent_importer_instance = self.process_parent_product(parent_data)
+        self.assign_to_saleschannelview(parent_importer_instance)
+        self.update_remote_product_sync_percentage(parent_importer_instance,
+            product=remote_product, is_variation=False)
+
+        # One the top level product is done, we go ahead with the varitions.
+        for variation_id in remote_product['variations']:
+            variation_import_instance = self.process_variation(variation_id, parent_importer_instance, parent_data)
+        # Dont forget about the counter.
+        self.update_percentage()
+
+    @timeit_and_log(logger, "importing all woocommerce products")
     def import_products_process(self):
+        self.set_product_data()
+        self.update_percentage()
+
         self.process_product_rule()
         self.update_percentage()
 
-        for remote_product in self.api.get_products():
-            parent_data = remote_product
-            parent_importer_instance = self.process_parent_product(parent_data)
-            self.assign_to_saleschannelview(parent_importer_instance)
-            self.update_remote_product_sync_percentage(parent_importer_instance,
-                product=remote_product, is_variation=False)
-
-            # Now we need to process the variations externally
-            # due to limiations with remote_ids.  They are excluded
-            # from the parent payload.
-            for variation_id in remote_product['variations']:
-                variation_import_instance = self.process_variation(variation_id, parent_importer_instance, parent_data)
-
-            self.update_percentage()
-
-            #     # handle_remote_product will populate remote_instance inside of import_instance
-            #     self.handle_ean_codes(importer_instance)
-            #     self.handle_prices(importer_instance)
-            #     self.handle_attributes(importer_instance)
-            #     self.handle_translations(importer_instance)
-            #     self.handle_images(importer_instance)
-            #     # There I will have no remote_ids for the variations.
-            #     self.handle_variations(importer_instance)
-
-            #     #and if not a variations
-            #     self.handle_assign(importer_instance)
-
-            #     # self.set_field_if_exists('__image_index_to_remote_id')
-            #     # self.set_field_if_exists('__mirror_product_properties_map')
-            #     # self.set_field_if_exists('__variation_sku_to_id_map')
-
-            # Ensure you give the "remote dict", not the "structured data" as this
-            # is used to compare to the remote data in future updates/syncs.
+        for remote_product in self.product_data:
+            self.process_full_product(remote_product)

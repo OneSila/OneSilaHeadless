@@ -1,5 +1,4 @@
-from huey import crontab
-from huey.contrib.djhuey import db_task, periodic_task
+from huey.contrib.djhuey import db_task
 from core.huey import HIGH_PRIORITY, MEDIUM_PRIORITY, LOW_PRIORITY
 from currencies.models import Currency
 from products.models import Product
@@ -13,7 +12,6 @@ from sales_channels.helpers import (
 )
 from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel, WoocommerceProduct, WoocommerceProductProperty
 from sales_channels.models import RemoteProduct
-from orders.models import Order, OrderItem
 
 
 @remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)

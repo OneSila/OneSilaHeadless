@@ -158,6 +158,10 @@ class WoocommerceApiWrapper:
         except Exception as e:
             raise FailedToDeleteError(e, response=resp) from e
 
+    def try_connection(self):
+        # To connect to woocom, let's get a single product page.
+        return self.get('products')
+
     def get_attributes(self):
         try:
             return [self.remove_attribute_slug_prefix(attribute) for attribute in self.get_paged_get('products/attributes')]
@@ -266,6 +270,13 @@ class WoocommerceApiWrapper:
             for product in products:
                 product['attributes'] = self.cleanup_product_attribute_payload(product)
             return products
+        except FailedToGetError as e:
+            raise FailedToGetProductsError(e, response=e.response) from e
+
+    def get_product_count(self):
+        try:
+            product_page = self.get('products', return_json=False)
+            return int(product_page.headers.get('X-WP-Total', 0))
         except FailedToGetError as e:
             raise FailedToGetProductsError(e, response=e.response) from e
 

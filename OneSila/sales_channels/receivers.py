@@ -559,6 +559,7 @@ def sales_channels__media__post_delete_receiver(sender, instance, **kwargs):
 
 @receiver(post_create, sender='sales_channels.SalesChannel')
 @receiver(post_create, sender='magento2.MagentoSalesChannel')
+@receiver(post_create, sender='woocommerce.WoocommerceSalesChannel')
 def sales_channels__sales_channel__post_create_receiver(sender, instance, **kwargs):
     """
     Handles the creation of SalesChannel instances.
