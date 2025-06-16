@@ -190,12 +190,6 @@ class WooCommerceProductFactoryTest(TestCaseDemoDataMixin, WooCommerceProductFac
         for variation in parent.configurable_variations.all():
             self.assertEqual(variation.type, Product.SIMPLE)
 
-        factory = WooCommerceProductCreateFactory(
-            sales_channel=self.sales_channel,
-            local_instance=parent
-        )
-        factory.run()
-
         remote_product = WoocommerceProduct.objects.get(
             sales_channel=self.sales_channel,
             local_instance=parent
@@ -240,12 +234,6 @@ class WooCommerceProductFactoryTest(TestCaseDemoDataMixin, WooCommerceProductFac
             )
             attribute_factory.run()
 
-        # Create factory instance and run it
-        factory = WooCommerceProductCreateFactory(
-            sales_channel=self.sales_channel,
-            local_instance=product
-        )
-        factory.run()
 
         # Verify the remote property was created in database
         remote_product = WoocommerceProduct.objects.get(

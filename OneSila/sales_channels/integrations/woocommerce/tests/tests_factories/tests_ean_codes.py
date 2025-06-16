@@ -11,6 +11,9 @@ from products.demo_data import SIMPLE_TABLE_GLASS_SKU, CONFIGURABLE_CHAIR_SKU
 from products.models import Product
 
 import logging
+
+from ...models import WoocommerceProduct
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,18 +41,13 @@ class WooCommerceEanCodeFactoryTestCase(TestCaseDemoDataMixin, WooCommerceProduc
         self.assertEqual(product.eancode_set.exists(), True)
         ean_code = product.eancode_set.first()
 
-        factory = WooCommerceProductCreateFactory(
-            sales_channel=self.sales_channel,
-            local_instance=product
-        )
-        factory.run()
-        remote_instance = factory.remote_instance
+        remote_instance = WoocommerceProduct.objects.get(local_instance=product)
         self.assertTrue(remote_instance.remote_id is not None)
 
         factory = WooCommerceEanCodeUpdateFactory(
             sales_channel=self.sales_channel,
             local_instance=product,
-            remote_product=factory.remote_instance
+            remote_product=remote_instance
         )
         factory.run()
 
@@ -82,17 +80,12 @@ class WooCommerceEanCodeFactoryTestCase(TestCaseDemoDataMixin, WooCommerceProduc
         # Assign the product to the sales channel
         self.assign_product_to_sales_channel(child)
 
-        factory = WooCommerceProductCreateFactory(
-            sales_channel=self.sales_channel,
-            local_instance=child
-        )
-        factory.run()
-        remote_instance = factory.remote_instance
 
+        remote_instance = WoocommerceProduct.objects.get(local_instance=child)
         factory = WooCommerceEanCodeUpdateFactory(
             sales_channel=self.sales_channel,
             local_instance=child,
-            remote_product=factory.remote_instance
+            remote_product=remote_instance
         )
         factory.run()
 

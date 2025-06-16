@@ -52,7 +52,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
     def get_total_instances(self) -> int:
         attribute_work = 1  # it's A lot more then 1. But what else to do??
         product_work = len(self.api.get_products())
-        return sum(attribute_work, product_work)
+        return sum([attribute_work, product_work])
 
     @timeit_and_log(logger, "fetching products from the API")
     def get_products_data(self) -> List[dict]:
