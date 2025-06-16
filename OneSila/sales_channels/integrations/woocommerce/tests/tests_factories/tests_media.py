@@ -10,6 +10,9 @@ from media.tests.helpers import CreateImageMixin
 
 
 import logging
+
+from ...models import WoocommerceProduct
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,29 +28,25 @@ class WooCommerceMediaProductThroughFactoryTestCase(CreateTestProductMixin, Crea
         local_image_count = MediaProductThrough.objects.filter(product=self.product).count()
         logger.debug(f"Product has {local_image_count} images pre-woocommerce product create")
 
-        product_create_factory = WooCommerceProductCreateFactory(
-            sales_channel=self.sales_channel,
-            local_instance=self.product,
-        )
-        product_create_factory.run()
+        remote_instance = WoocommerceProduct.objects.get(local_instance=self.product)
 
         image, media_product_through = self.create_and_attach_image(self.product, fname='red.png')
         logger.debug(f"Created image: {image}")
         logger.debug(f"Product has {self.product.mediaproductthrough_set.count()} image_throughs")
-        self.assertEqual(self.product.id, product_create_factory.remote_product.local_instance.id)
+        self.assertEqual(self.product.id, remote_instance.local_instance.id)
         self.assertEqual(self.product.mediaproductthrough_set.count(), 2)
 
         media_create_factory = WooCommerceMediaProductThroughCreateFactory(
             sales_channel=self.sales_channel,
             local_instance=media_product_through,
-            remote_product=product_create_factory.remote_product,
+            remote_product=remote_instance,
         )
         media_create_factory.run()
 
         self.assertTrue(media_create_factory.payload.get('images') != None)
         self.assertEqual(len(media_create_factory.payload['images']), 2)
 
-        remote_repsonse = self.api.get_product(product_create_factory.remote_product.remote_id)['images']
+        remote_repsonse = self.api.get_product(remote_instance.remote_id)['images']
         logger.debug(f"Remote response: {remote_repsonse}")
         remote_image_count = len(remote_repsonse)
         local_image_count = MediaProductThrough.objects.filter(product=self.product).count()

@@ -121,6 +121,23 @@ class WooCommerceProductSyncFactory(WooCommerceProductMixin, RemoteProductSyncFa
         from sales_channels.integrations.woocommerce.factories.products import WooCommerceProductVariationAddFactory
         return WooCommerceProductVariationAddFactory
 
+    def perform_remote_action(self):
+        """
+        Updates a remote product in WooCommerce.
+        """
+
+        if self.is_create:
+            super().perform_remote_action()
+            return
+
+        if self.is_woocommerce_variant_product:
+            parent_id = self.remote_instance.remote_parent_product.remote_id
+            variant_id = self.remote_instance.remote_id
+            return self.api.update_product_variation(parent_id, variant_id, **self.payload)
+        else:
+            product_id = self.remote_instance.remote_id
+            return self.api.update_product(product_id, **self.payload)
+
     # Use the getter methods within the class where needed
     sync_product_factory = property(get_sync_product_factory)
     create_product_factory = property(get_create_product_factory)
@@ -166,18 +183,6 @@ class WooCommerceProductCreateFactory(WooCommerceProductSyncFactory, Woocommerce
 
 class WooCommerceProductUpdateFactory(RemoteProductUpdateFactory, WooCommerceProductSyncFactory, WoocommerceProductTypeMixin):
     create_factory_class = WooCommerceProductCreateFactory
-
-    def perform_remote_action(self):
-        """
-        Updates a remote product in WooCommerce.
-        """
-        if self.is_woocommerce_variant_product:
-            parent_id = self.remote_instance.remote_parent_product.remote_id
-            variant_id = self.remote_instance.remote_id
-            return self.api.update_product_variation(parent_id, variant_id, **self.payload)
-        else:
-            product_id = self.remote_instance.remote_id
-            return self.api.update_product(product_id, **self.payload)
 
 
 class WooCommerceProductDeleteFactory(WooCommerceProductMixin, RemoteProductDeleteFactory):

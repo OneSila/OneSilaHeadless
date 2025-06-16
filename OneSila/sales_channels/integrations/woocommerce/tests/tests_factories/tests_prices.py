@@ -30,15 +30,6 @@ class WooCommercePriceUpdateFactoryTest(WooCommerceProductFactoryTestMixin):
             rule=self.product_rule
         )
 
-        # Push the product remotely.
-        factory = WooCommerceProductCreateFactory(
-            sales_channel=self.sales_channel,
-            local_instance=product
-        )
-        factory.run()
-
-        self.assertEqual(factory.payload['sku'], product.sku)
-
         remote_product = WoocommerceProduct.objects.get(
             sales_channel=self.sales_channel,
             local_instance=product

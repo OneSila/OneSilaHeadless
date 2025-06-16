@@ -6,22 +6,19 @@ from sales_channels.integrations.woocommerce.factories.content import Woocommerc
 
 
 import logging
+
+from ...models import WoocommerceProduct
+
 logger = logging.getLogger(__name__)
 
 
-class WooCommercePriceUpdateFactoryTest(WooCommerceProductFactoryTestMixin):
+class WooCommerceContentUpdateFactoryTest(WooCommerceProductFactoryTestMixin):
     def test_woocommerce_content_update(self):
         product = self.create_test_product(
             sku="test_content_update",
             name="Test Content Update Product",
             assign_to_sales_channel=True,
         )
-
-        factory = WooCommerceProductCreateFactory(
-            sales_channel=self.sales_channel,
-            local_instance=product
-        )
-        factory.run()
 
         translation = product.translations.get(
             language=self.multi_tenant_company.language
@@ -32,10 +29,12 @@ class WooCommercePriceUpdateFactoryTest(WooCommerceProductFactoryTestMixin):
         translation.short_description = "<p>Test Content Update short description update</p>"
         translation.save()
 
+        remote_instance = WoocommerceProduct.objects.get(local_instance=product)
+
         factory = WoocommerceProductContentUpdateFactory(
             sales_channel=self.sales_channel,
             local_instance=product,
-            remote_product=factory.remote_instance
+            remote_product=remote_instance
         )
         factory.run()
 
