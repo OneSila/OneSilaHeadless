@@ -151,6 +151,7 @@ class AmazonFullSchemaPullFactory(GetAmazonAPIMixin, PullAmazonMixin, PullRemote
                     # OR
                     # the first public definition like "battery" will have export_definitions as an array with all the needed things that needs created
                     # but we still need to create the public definitions for all of that as well.
+                    # if schema is_internal we will not do the export_definition and ussage_definition
 
     def sync_public_definitions(self, schema_definition, product_type_obj):
         """
@@ -184,56 +185,60 @@ class ExportDefinitionFactory:
     def __init__(self, public_definition: AmazonPublicDefinition):
         self.public_definition = public_definition
         self.results = []  # final flat list of export definitions
-        self.current_path = []  # tracks keys like battery > weight > value
+        self.current_path = [self.public_definition.code]  # tracks keys like battery > weight > value
         self.allow_not_mapped_keys = {"standardized_values", "other_than_listed"}
 
     def run(self):
-        schema = self.public_definition.raw
+        schema = self.public_definition.raw_schema
         self._walk(schema)
         return self.results
 
-    def _walk(self, node, parent_key=None):
+    def _walk(self, node):
         if not isinstance(node, dict):
             return
 
-        # Dive into "items" if it exists
+        # Dive into "items" first
         if "items" in node:
-            return self._walk(node["items"], parent_key)
+            self._walk(node["items"])
+            return
 
         properties = node.get("properties", {})
         for key, value in properties.items():
             self.current_path.append(key)
 
             # Skip helper/meta keys
-            if key in {"language_tag", "marketplace_id"}:
+            if key in {"language_tag", "marketplace_id", "unit"}:
                 self.current_path.pop()
                 continue
 
-            # Units
-            if key == "unit":
-                # handled by usage_definition, skip here
+            # Skip only other_than_listed for walk
+            if key.endswith("other_than_listed"):
                 self.current_path.pop()
                 continue
 
-            # Detect terminal value key
-            if key == "value":
+            # If terminal value
+            is_leaf = not isinstance(value, dict) or (
+                        "type" in value and "items" not in value and "properties" not in value)
+
+            if is_leaf:
                 attr_code = self._compose_attr_code()
-                self._add_export(attr_code, value)
+                parent_key = self.current_path[-2] if len(self.current_path) >= 2 else ""
+                allow_not_mapped = any(k in parent_key for k in self.allow_not_mapped_keys)
+                self._add_export(attr_code, value, allow_not_mapped)
                 self.current_path.pop()
                 continue
 
-            # Skip 'standardized_values' and 'other_than_listed'
-            if any(k in key for k in self.allow_not_mapped_keys):
-                self.current_path.pop()
-                continue
-
-            # Otherwise, recurse deeper
-            self._walk(value, key)
+            # Recurse deeper
+            self._walk(value)
             self.current_path.pop()
 
     def _compose_attr_code(self):
-        # Ignore "value" and helper keys
-        keys = [k for k in self.current_path if k not in {"value", "unit"} and not any(ignore in k for ignore in self.allow_not_mapped_keys)]
+        # Filter out unwanted helper/meta keys from current_path
+        keys = [
+            k for k in self.current_path
+            if k not in {"value", "unit", "language_tag", "marketplace_id"}
+               and not any(ignore in k for ignore in self.allow_not_mapped_keys)
+        ]
         return "__".join(keys)
 
     def map_amazon_type_to_property_type(self, value_schema: dict) -> str:
@@ -245,6 +250,22 @@ class ExportDefinitionFactory:
         any_of = value_schema.get("anyOf", [])
         one_of = value_schema.get("oneOf", [])
         enums = value_schema.get("enum")
+
+        if value_type == "array" and isinstance(value_schema.get("items"), dict):
+            item_schema = value_schema["items"]
+            max_items = value_schema.get("maxItems", 1)
+
+            if "enum" in item_schema or self._any_of_has_enum(item_schema.get("anyOf", [])):
+                return Property.TYPES.MULTISELECT if max_items > 1 else Property.TYPES.SELECT
+
+            # Fallback to basic string or int check inside array
+            item_type = item_schema.get("type")
+            if item_type == "string":
+                return Property.TYPES.MULTISELECT if max_items > 1 else Property.TYPES.TEXT
+            elif item_type == "number":
+                return Property.TYPES.FLOAT
+            elif item_type == "integer":
+                return Property.TYPES.INT
 
         # Handle boolean
         if value_type == "boolean":
@@ -265,14 +286,8 @@ class ExportDefinitionFactory:
                 return Property.TYPES.MULTISELECT
             return Property.TYPES.SELECT
 
-        # Handle text vs description
-        if value_type == "string":
-            if max_length is not None and max_length > 1000:
-                return Property.TYPES.DESCRIPTION
-            return Property.TYPES.TEXT
-
         # Handle DATE or DATETIME
-        if one_of:
+        if one_of and value_type == "string":
             formats = [entry.get("format") for entry in one_of]
             if "date" in formats and "date-time" in formats:
                 return Property.TYPES.DATE
@@ -281,6 +296,12 @@ class ExportDefinitionFactory:
             elif "date-time" in formats:
                 return Property.TYPES.DATETIME
 
+        # Handle text vs description
+        if value_type == "string":
+            if max_length is not None and max_length > 1000:
+                return Property.TYPES.DESCRIPTION
+            return Property.TYPES.TEXT
+
         return Property.TYPES.TEXT  # default fallback
 
     def allows_not_mapped_values(self, value_schema: dict) -> bool:
@@ -288,7 +309,7 @@ class ExportDefinitionFactory:
         Detect if this schema allows values outside of enum.
         True if:
         - anyOf has both enum and plain string (no enum)
-        - OR the current path contains any of the allow_not_mapped_keys
+        - OR schema contains a related *_other_than_listed field
         """
         any_of = value_schema.get("anyOf")
         has_anyof_fallback = any(
@@ -296,22 +317,56 @@ class ExportDefinitionFactory:
             for option in any_of or []
         )
 
-        in_allowed_path = any(
-            key in self.current_path[-1] for key in self.allow_not_mapped_keys
-        ) if self.current_path else False
+        # Step 1: Get the last meaningful key from the current path
+        last_key = next(
+            (k for k in reversed(self.current_path)
+             if k not in {"value", "language_tag", "marketplace_id", "unit"}),
+            None
+        )
+        if not last_key:
+            return has_anyof_fallback
 
-        return has_anyof_fallback or in_allowed_path
+        # Step 2: Recursively check the raw schema for a *_other_than_listed that matches this key
+        def has_matching_other_than_listed(node):
+            if not isinstance(node, dict):
+                return False
+
+            # Always dive into `items` if it exists
+            if "items" in node and isinstance(node["items"], dict):
+                if has_matching_other_than_listed(node["items"]):
+                    return True
+
+            props = node.get("properties", {})
+            for key, val in props.items():
+                if key.endswith("_other_than_listed"):
+                    base = key.replace("_other_than_listed", "")
+                    if base == last_key:
+                        return True
+
+                # Recurse into deeper properties
+                if isinstance(val, dict):
+                    if has_matching_other_than_listed(val):
+                        return True
+
+            return False
+
+        has_related_fallback_field = has_matching_other_than_listed(self.public_definition.raw_schema)
+
+        return has_anyof_fallback or has_related_fallback_field
 
     def _any_of_has_enum(self, any_of_list: list) -> bool:
         return any("enum" in option for option in any_of_list if isinstance(option, dict))
 
     def extract_enum_values(self, value_schema: dict) -> list:
         """
-        Extracts enum values from a value_schema in the format:
-        [{"value": ..., "name": ...}]
-        Handles both direct enums and anyOf fallback structures.
+        Extracts enum values from schema, including inside arrays and anyOf.
+        Returns format: [{"value": ..., "name": ...}]
         """
         enums, enum_names = [], []
+
+        # Handle array wrapper
+        if value_schema.get("type") == "array" and isinstance(value_schema.get("items"), dict):
+            value_schema = value_schema["items"]
 
         # Direct enum
         if "enum" in value_schema:
@@ -327,19 +382,53 @@ class ExportDefinitionFactory:
 
         return [{"value": val, "name": name} for val, name in zip(enums, enum_names)]
 
-    def _add_export(self, attr_code, value_schema):
+    def _add_export(self, attr_code, value_schema, force_allow_not_mapped=False):
+
+        # Always preserve the title from the original value_schema
+        original_title = value_schema.get("title") or attr_code.replace("__", " ").title()
+
+        # Check if there's a sibling standardized_values
+        parent_schema = self._get_parent_schema()
+        sibling_enum_schema = parent_schema.get("standardized_values") if isinstance(parent_schema, dict) else None
+        if sibling_enum_schema:
+            # override value_schema for enum-related logic
+            value_schema = sibling_enum_schema
+            force_allow_not_mapped = True
+
         export = {
             "attribute_code": attr_code,
-            "name": value_schema.get("title") or attr_code.replace("__", " ").title(),
+            "name": original_title,
             "type": self.map_amazon_type_to_property_type(value_schema),
             "values": self.extract_enum_values(value_schema),
         }
 
-        if self.allows_not_mapped_values(value_schema):
+        if force_allow_not_mapped or self.allows_not_mapped_values(value_schema):
             export["allow_not_mapped_values"] = True
 
         self.results.append(export)
 
+    def _get_parent_schema(self):
+        """
+        Returns the parent-level `properties` schema based on the current path.
+        Special handling when the path is at root level (just the attribute name).
+        """
+        schema = self.public_definition.raw_schema
+        path = self.current_path[:-1]  # exclude current key (usually 'value' or similar)
+
+        if len(path) == 1 and path[0] == self.public_definition.code:
+            # Root-level attribute schema
+            return schema.get("items", {}).get("properties", {})
+
+        try:
+            for key in path:
+                schema = schema[key]
+                if "items" in schema:
+                    schema = schema["items"]
+                if "properties" in schema:
+                    schema = schema["properties"]
+            return schema if isinstance(schema, dict) else {}
+        except Exception:
+            return {}
 
 
 class UsageDefinitionFactory:

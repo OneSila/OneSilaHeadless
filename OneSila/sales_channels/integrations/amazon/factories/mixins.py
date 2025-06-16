@@ -4,6 +4,7 @@ from spapi import SellersApi, SPAPIConfig, SPAPIClient, DefinitionsApi, Listings
 
 import logging
 
+from sales_channels.integrations.amazon.decorators import throttle_safe
 
 # Mute sp-api logs
 logging.getLogger("sp_api").setLevel(logging.WARNING)

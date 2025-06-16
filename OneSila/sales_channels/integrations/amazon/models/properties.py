@@ -32,7 +32,7 @@ class AmazonPublicDefinition(models.SharedModel):
 
     # ------------- display -------------
     name  = models.CharField(max_length=255)
-    raw_schema = JSONField()        # the slice of Amazon schema for this property
+    raw_schema = models.JSONField(blank=True, null=True)        # the slice of Amazon schema for this property
     type  = models.CharField(       # map onto local Property.TYPES
         max_length=16, choices=Property.TYPES.ALL, default=Property.TYPES.TEXT
     )
@@ -45,7 +45,7 @@ class AmazonPublicDefinition(models.SharedModel):
             "%marketplace_id%, %language_tag%"
         )
     )
-    export_definition  = JSONField()
+    export_definition  = models.JSONField(blank=True, null=True)
 
     allows_unmapped_values = models.BooleanField(default=False)
     unmapped_value_key     = models.CharField(
