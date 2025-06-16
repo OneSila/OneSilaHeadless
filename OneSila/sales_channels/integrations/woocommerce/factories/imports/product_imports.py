@@ -1,14 +1,14 @@
 from sales_channels.factories.imports import SalesChannelImportMixin
 from imports_exports.factories.products import ImportProductInstance
+from imports_exports.factories.properties import ImportProductPropertiesRuleInstance
 from products.models import Product
 from core.decorators import timeit_and_log
-
-from properties.models import Property
 
 from ..exceptions import SanityCheckError
 from ..mixins import GetWoocommerceAPIMixin
 from .temp_structure import ImportProcessorTempStructureMixin
-from sales_channels.integrations.woocommerce.constants import EAN_CODE_WOOCOMMERCE_FIELD_NAME
+from sales_channels.integrations.woocommerce.constants import EAN_CODE_WOOCOMMERCE_FIELD_NAME, \
+    DEFAULT_PRODUCT_TYPE
 
 from sales_channels.models import SalesChannelViewAssign
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
@@ -50,7 +50,9 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         self.currency_iso_code = self.currency.iso_code
 
     def get_total_instances(self) -> int:
-        return len(self.api.get_products())
+        attribute_work = 1  # it's A lot more then 1. But what else to do??
+        product_work = len(self.api.get_products())
+        return sum(attribute_work, product_work)
 
     @timeit_and_log(logger, "fetching products from the API")
     def get_products_data(self) -> List[dict]:
@@ -104,7 +106,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
             'type': local_type,
             # We're adding a default type to ensure users get to see their data.
             # and we don't have unexpected sync issues due to missing product_type.
-            'product_type': "DefaultWoocommerceProductType",
+            'product_type': DEFAULT_PRODUCT_TYPE,
         }
 
         # Woocommerce is not consistent with the sku field.
@@ -136,7 +138,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
             'url_key': url_key,
         }]
 
-    def get_prices(self, product_data: dict) -> dict:
+    def get_prices(self, product_data: dict, is_variation: bool = False, parent_data: dict = None) -> dict:
         """
         get the price data
         [{ "price": 19.99,
@@ -146,6 +148,12 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         """
         price = product_data.get('sale_price', None)
         rrp = product_data.get('regular_price', None)
+
+        # it is likely that a variation does not have a direct price, but instead it
+        # uses the parent price in woocommerce.  Let's account for that.
+        if is_variation and not (price or rrp):
+            price = parent_data.get('sale_price', None)
+            rrp = parent_data.get('regular_price', None)
 
         payload = {}
         if price:
@@ -408,13 +416,14 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
 
     def process_parent_product(self, remote_product: dict):
         """
-        Process a single product.
+        Process a single product being a Configurable or Simple product.
+        Variations are process elsewhere through process_variation().
         """
         # The get_product_data creates the complate "importable dict"
         # The variations will get fetched in here.....BUT I need the remote_ids
         # structured_data = self.get_structured_product_data(remote_product)
         # importer_instance = ImportInstance(structured_data=structured_data, self.import_process)
-        # Once converted the ddata and saved it localle, we want to create
+        # Once converted the ddata and saved it locally, we want to create
         # the mirror models to ensure the when data is pushed to the server again
         # with changes, it doesnt end up with duplicates.
         structured_data, is_variation = self.get_structured_product_data(remote_product)
@@ -424,7 +433,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
             raise ValueError(f"No property data found for product {remote_product.get('id')}")
 
         # The trick is here:
-        # A complate product is a compilation of all individial pieces:
+        # A complete product is a compilation of all individial pieces:
         # ean
         # images
         # direct fields
@@ -499,7 +508,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         base_product_data, *_ = self.get_base_product_data(variation_data, parent_sku=parent_sku)
         properties_data = self.get_properties_data_for_product(variation_data, is_variation=True, parent_data=parent_data)
         images = self.get_images(variation_data)
-        prices = self.get_prices(variation_data)
+        prices = self.get_prices(variation_data, is_variation=True, parent_data=parent_data)
         tax = self.get_tax_class(variation_data)
 
         payload = {
@@ -537,8 +546,19 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         # remote_product.save()
         return variation_importer_instance
 
+    def process_product_rule(self):
+        product_rule_payload = self.create_product_rule_payload()
+        product_rule_import_instance = ImportProductPropertiesRuleInstance(
+            data=product_rule_payload,
+            import_process=self.import_process,
+        )
+        product_rule_import_instance.process()
+
     @timeit_and_log(logger, "importing woocommerce products")
     def import_products_process(self):
+        self.process_product_rule()
+        self.update_percentage()
+
         for remote_product in self.api.get_products():
             parent_data = remote_product
             parent_importer_instance = self.process_parent_product(parent_data)

@@ -1,8 +1,11 @@
+import re
 from dataclasses import dataclass, field
 from properties.models import Property
 from typing import Set, List
 from core.decorators import timeit_and_log
 from django.utils import timezone
+from properties.models import ProductPropertiesRuleItem
+from sales_channels.integrations.woocommerce.constants import DEFAULT_PRODUCT_TYPE
 
 from .exceptions import UnknownTempPropertyClass
 
@@ -32,9 +35,18 @@ class TempPropertyClass:
 
     def identifier_for_payload(self) -> str:
         if self.slug:
-            return 'internal_name', self.slug
+            identifier_type = 'internal_name'
+            identifier = self.slug
         else:
-            return 'name', self.name
+            identifier_type = 'name'
+            identifier = self.name
+
+        # Ensure the identifier is clean from all kinds of
+        # shenanigans.
+        identifier = re.sub(r'[^a-zA-Z0-9]', '_', identifier)
+        identifier = identifier.lower()
+
+        return identifier_type, identifier.lower()
 
     def property_attributes(self) -> dict:
         attributes = {
@@ -204,6 +216,8 @@ class TempPropertyDataConstructer:
 class ImportProcessorTempStructureMixin:
     """
     This mixin will be used to add the temp structure to the import processor.
+    It will ensure that the properties / attributes are available in the product
+    import process.
     """
 
     def prepare_import_process(self):
@@ -233,14 +247,13 @@ class ImportProcessorTempStructureMixin:
         }
         """
         ptype = temp_property.property_type
-        identifier, value = temp_property.identifier_for_payload()
+        field_name, internal_name = temp_property.identifier_for_payload()
         prop_payload_data = temp_property.property_attributes()
-        used_in_configurator = temp_property.used_for_configurator
 
         original_prop_type = ptype
         try:
             local_property = Property.objects.get(
-                internal_name=identifier,
+                internal_name=internal_name,
                 multi_tenant_company=self.import_process.multi_tenant_company,
             )
             new_prop_type = local_property.type
@@ -256,16 +269,11 @@ class ImportProcessorTempStructureMixin:
         payload = {
             "property_data": {
                 **prop_payload_data,
-                identifier: value,
+                field_name: internal_name,
                 "type": ptype
             },
             "value": options
         }
-
-        if used_in_configurator:
-            payload['property_data']['add_to_filters'] = True
-            payload['property_data']['is_public_information'] = True
-            raise NotImplementedError("Configurator rule property needs to be added.")
 
         return payload
 
@@ -275,4 +283,29 @@ class ImportProcessorTempStructureMixin:
         """
         temp_property = self.find_temp_property_for_name(name)
         payload = self.create_payload_for_temp_property(temp_property, options)
+        return payload
+
+    def create_product_rule_payload(self) -> dict:
+        """
+        Get the product rule payload based on the temporary property structure.
+        """
+        # Without adding this manually, the importer seems to create
+        # a product-type and add all kinds of properties to it as "optional".
+        # This payload:
+        # 1. Ensure that configurator items are required.
+        # 2. Everything else is optional. Even EAN Codes.
+        property_items = []
+        for _, temp_property in self.temp_property_data.items():
+            rule_type = ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if temp_property.used_for_configurator else ProductPropertiesRuleItem.OPTIONAL
+            _, internal_name = temp_property.identifier_for_payload()
+            property_items.append({
+                "type": rule_type,
+                "property_data": {"internal_name": internal_name}
+            })
+
+        payload = {
+            "value": DEFAULT_PRODUCT_TYPE,
+            "require_ean_code": False,
+            "items": property_items,
+        }
         return payload

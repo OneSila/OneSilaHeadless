@@ -390,6 +390,14 @@ class ImportProductPropertiesRuleInstance(AbstractImportInstance):
       - require_ean_code: Optional boolean indicating whether an EAN code is required.
       - items: Optional the data for
 
+    Example data structure:
+      {
+        "value": "T-Shirt",
+        "require_ean_code": false,
+        "items": [
+          { "type": "REQUIRED", "property_data": { "internal_name": "size" } }
+        ]
+      }
     """
 
     def __init__(self, data: dict, import_process=None, product_type=None, instance=None):

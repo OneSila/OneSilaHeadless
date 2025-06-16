@@ -56,6 +56,7 @@ class Property(TranslatedModelMixin, models.Model):
     )
     # the name that will be used in integration. Consider making it a foreign key with integrations in the future. for now is enough
     # it will be the snake case version of the name in default language "Product Type" => "product_type"
+    # This internal name is auto-populated via siganls once the tranlsation is saved.
     internal_name = models.CharField(max_length=255, null=True, blank=True, verbose_name=_('Internal Name'))
 
     objects = PropertyManager()
