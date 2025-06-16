@@ -46,6 +46,10 @@ class Import(PolymorphicModel, models.Model):
         blank=True,
         help_text="Stores the error traceback if the import fails."
     )
+    create_only = models.BooleanField(
+        default=False,
+        help_text="If True, existing objects fetched during the import will not be updated.",
+    )
 
     def __str__(self):
         return f"ImportProcess - {self.get_status_display()} ({self.percentage}%)"
