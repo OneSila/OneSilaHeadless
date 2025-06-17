@@ -3,16 +3,19 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
     AmazonPropertySelectValue,
+    AmazonProductType,
 )
 from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelFilter,
     AmazonPropertyFilter,
     AmazonPropertySelectValueFilter,
+    AmazonProductTypeFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
     AmazonPropertyOrder,
     AmazonPropertySelectValueOrder,
+    AmazonProductTypeOrder,
 )
 
 
@@ -52,4 +55,15 @@ class AmazonPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
     fields="__all__",
 )
 class AmazonPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
+    pass
+
+
+@type(
+    AmazonProductType,
+    filters=AmazonProductTypeFilter,
+    order=AmazonProductTypeOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonProductTypeType(relay.Node, GetQuerysetMultiTenantMixin):
     pass

@@ -4,6 +4,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
     AmazonPropertySelectValue,
+    AmazonProductType,
 )
 
 
@@ -20,4 +21,9 @@ class AmazonPropertyFilter(SearchFilterMixin):
 
 @filter(AmazonPropertySelectValue)
 class AmazonPropertySelectValueFilter(SearchFilterMixin):
+    pass
+
+
+@filter(AmazonProductType)
+class AmazonProductTypeFilter(SearchFilterMixin):
     pass
