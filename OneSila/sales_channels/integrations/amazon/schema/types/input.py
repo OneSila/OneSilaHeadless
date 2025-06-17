@@ -3,6 +3,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
     AmazonPropertySelectValue,
+    AmazonProductType,
 )
 
 
@@ -41,3 +42,13 @@ class AmazonValidateAuthInput:
     spapi_oauth_code: str
     selling_partner_id: str
     state: str
+
+
+@input(AmazonProductType, fields="__all__")
+class AmazonProductTypeInput:
+    pass
+
+
+@partial(AmazonProductType, fields="__all__")
+class AmazonProductTypePartialInput(NodeInput):
+    pass

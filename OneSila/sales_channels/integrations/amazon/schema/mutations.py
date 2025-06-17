@@ -7,19 +7,15 @@ from sales_channels.integrations.amazon.schema.types.input import (
     AmazonPropertyPartialInput,
     AmazonPropertySelectValueInput,
     AmazonPropertySelectValuePartialInput,
+    AmazonProductTypeInput,
+    AmazonProductTypePartialInput,
+    AmazonValidateAuthInput,
 )
 from sales_channels.integrations.amazon.schema.types.types import (
     AmazonSalesChannelType,
     AmazonPropertyType,
     AmazonPropertySelectValueType,
-)
-from sales_channels.integrations.amazon.schema.types.input import (
-    AmazonSalesChannelInput,
-    AmazonSalesChannelPartialInput,
-    AmazonValidateAuthInput,
-)
-from sales_channels.integrations.amazon.schema.types.types import (
-    AmazonSalesChannelType,
+    AmazonProductTypeType,
     AmazonRedirectUrlType,
 )
 from core.schema.core.mutations import create, type, List, update
@@ -82,3 +78,7 @@ class AmazonSalesChannelMutation:
     create_amazon_property_select_value: AmazonPropertySelectValueType = create(AmazonPropertySelectValueInput)
     create_amazon_property_select_values: List[AmazonPropertySelectValueType] = create(AmazonPropertySelectValueInput)
     update_amazon_property_select_value: AmazonPropertySelectValueType = update(AmazonPropertySelectValuePartialInput)
+
+    create_amazon_product_type: AmazonProductTypeType = create(AmazonProductTypeInput)
+    create_amazon_product_types: List[AmazonProductTypeType] = create(AmazonProductTypeInput)
+    update_amazon_product_type: AmazonProductTypeType = update(AmazonProductTypePartialInput)
