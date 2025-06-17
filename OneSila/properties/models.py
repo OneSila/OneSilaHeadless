@@ -225,6 +225,10 @@ class ProductPropertiesRule(models.Model):
     def __str__(self):
         return f"{self.product_type} <{self.multi_tenant_company}>"
 
+    @property
+    def value(self):
+        return self.product_type.value
+
     def save(self, *args, **kwargs):
 
         if not self.product_type.property.is_product_type:

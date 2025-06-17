@@ -127,4 +127,3 @@ class AmazonProductTypeType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def mapped_remotely(self, info) -> bool:
         return self.mapped_remotely
-

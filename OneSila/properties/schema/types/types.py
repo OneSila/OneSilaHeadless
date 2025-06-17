@@ -74,6 +74,10 @@ class ProductPropertiesRuleType(relay.Node, GetQuerysetMultiTenantMixin):
     product_type: PropertySelectValueType
     items: List[Annotated['ProductPropertiesRuleItemType', lazy("properties.schema.types.types")]]
 
+    @field()
+    def value(self, info) -> str:
+        return self.value
+
 
 @type(ProductPropertiesRuleItem, filters=ProductPropertiesRuleItemFilter, order=ProductPropertiesRuleItemOrder, pagination=True, fields="__all__")
 class ProductPropertiesRuleItemType(relay.Node, GetQuerysetMultiTenantMixin):
