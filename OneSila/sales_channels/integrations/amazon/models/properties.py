@@ -12,6 +12,7 @@ from sales_channels.integrations.amazon.managers import (
     AmazonPropertySelectValueManager,
     AmazonProductTypeManager,
 )
+from django.core.exceptions import ValidationError
 from core import models
 from django.utils.translation import gettext_lazy as _
 from datetime import timedelta
@@ -96,6 +97,20 @@ class AmazonProperty(RemoteProperty):
     type = models.CharField(max_length=16, choices=Property.TYPES.ALL, default=Property.TYPES.TEXT)
 
     objects = AmazonPropertyManager()
+
+    def save(self, *args, **kwargs):
+        if self.local_instance and self.local_instance.type != self.type:
+            raise ValidationError(
+                _(
+                    "Amazon property type %(remote)s must match local property type %(local)s."
+                )
+                % {
+                    "remote": self.get_type_display(),
+                    "local": self.local_instance.get_type_display(),
+                }
+            )
+
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = 'Amazon Property'
