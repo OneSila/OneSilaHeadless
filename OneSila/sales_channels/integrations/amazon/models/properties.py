@@ -17,6 +17,7 @@ from django.utils.translation import gettext_lazy as _
 from datetime import timedelta
 from django.utils import timezone
 
+
 class AmazonPublicDefinition(models.SharedModel):
     """
     Canonical, tenant-agnostic description of *one attribute key* of ONE
@@ -31,23 +32,23 @@ class AmazonPublicDefinition(models.SharedModel):
     """
 
     # ------------- identity -------------
-    api_region_code   = models.CharField(max_length=8)          # "EU_DE"
+    api_region_code = models.CharField(max_length=8)          # "EU_DE"
     product_type_code = models.CharField(max_length=64)         # "AIR_PURIFIER"
-    code              = models.CharField(max_length=128)        # "color"  or "battery__cell_composition"
+    code = models.CharField(max_length=128)        # "color"  or "battery__cell_composition"
 
     # ------------- display -------------
-    name  = models.CharField(max_length=255)
+    name = models.CharField(max_length=255)
     raw_schema = models.JSONField(blank=True, null=True)        # the slice of Amazon schema for this property
 
     # ------------- rendering / encoding -------------
-    usage_definition   = models.TextField(
+    usage_definition = models.TextField(
         help_text=(
             "Template for rendering this attribute into SP-API payload.\n"
             "Tokens: %value%, %unit:weight%, %key:battery__cell_composition%, "
             "%marketplace_id%, %language_tag%"
         )
     )
-    export_definition  = models.JSONField(blank=True, null=True)
+    export_definition = models.JSONField(blank=True, null=True)
 
     last_fetched = models.DateTimeField(null=True, blank=True)
 
@@ -92,13 +93,14 @@ class AmazonProperty(RemoteProperty):
     )
 
     allows_unmapped_values = models.BooleanField(default=False)
-    type  = models.CharField(max_length=16, choices=Property.TYPES.ALL, default=Property.TYPES.TEXT)
+    type = models.CharField(max_length=16, choices=Property.TYPES.ALL, default=Property.TYPES.TEXT)
 
     objects = AmazonPropertyManager()
 
     class Meta:
         verbose_name = 'Amazon Property'
         verbose_name_plural = 'Amazon Properties'
+        search_terms = ['name', 'code']
 
 
 class AmazonPropertySelectValue(RemoteObjectMixin, models.Model):
@@ -137,10 +139,15 @@ class AmazonPropertySelectValue(RemoteObjectMixin, models.Model):
 
     class Meta:
         unique_together = ('amazon_property', 'marketplace', 'remote_value')
+        search_terms = [
+            'remote_name',
+            'remote_value',
+            'amazon_property__name',
+            'amazon_property__code',
+        ]
 
     def __str__(self):
         return f"{self.remote_name or self.remote_value} ({self.marketplace})"
-
 
 
 class AmazonProductProperty(RemoteProductProperty):
@@ -181,6 +188,7 @@ class AmazonProductType(RemoteObjectMixin, models.Model):
         unique_together = ('local_instance', 'sales_channel')
         verbose_name = 'Amazon Product Type'
         verbose_name_plural = 'Amazon Product Types'
+        search_terms = ['name', 'product_type_code']
 
     def __str__(self):
         try:
