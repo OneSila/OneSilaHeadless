@@ -1,3 +1,5 @@
+from typing import Optional
+
 from core.schema.core.types.filters import filter, SearchFilterMixin
 from strawberry_django import filter_field as custom_filter
 from django.db.models import Q
@@ -10,6 +12,15 @@ from sales_channels.integrations.amazon.models import (
     AmazonPropertySelectValue,
     AmazonProductType,
 )
+from properties.schema.types.filters import (
+    PropertyFilter,
+    PropertySelectValueFilter,
+    ProductPropertiesRuleFilter,
+)
+from sales_channels.schema.types.filters import (
+    SalesChannelFilter,
+    SalesChannelViewFilter,
+)
 
 
 @filter(AmazonSalesChannel)
@@ -20,6 +31,11 @@ class AmazonSalesChannelFilter(SearchFilterMixin):
 
 @filter(AmazonProperty)
 class AmazonPropertyFilter(SearchFilterMixin):
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: Optional[PropertyFilter]
+    allows_unmapped_values: auto
+    type: auto
+
     @custom_filter
     def mapped_locally(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
         if value not in (None, UNSET):
@@ -35,6 +51,11 @@ class AmazonPropertyFilter(SearchFilterMixin):
 
 @filter(AmazonPropertySelectValue)
 class AmazonPropertySelectValueFilter(SearchFilterMixin):
+    sales_channel: Optional[SalesChannelFilter]
+    amazon_property: Optional[AmazonPropertyFilter]
+    local_instance: Optional[PropertySelectValueFilter]
+    marketplace: Optional[SalesChannelViewFilter]
+
     @custom_filter
     def mapped_locally(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
         if value not in (None, UNSET):
@@ -50,6 +71,9 @@ class AmazonPropertySelectValueFilter(SearchFilterMixin):
 
 @filter(AmazonProductType)
 class AmazonProductTypeFilter(SearchFilterMixin):
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: Optional[ProductPropertiesRuleFilter]
+
     @custom_filter
     def mapped_locally(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
         if value not in (None, UNSET):
@@ -61,4 +85,3 @@ class AmazonProductTypeFilter(SearchFilterMixin):
         if value not in (None, UNSET):
             queryset = queryset.filter_mapped_remotely(value)
         return queryset, Q()
-
