@@ -7,6 +7,11 @@ from sales_channels.models.properties import (
     RemotePropertySelectValue,
     RemoteProductProperty,
 )
+from sales_channels.integrations.amazon.managers import (
+    AmazonPropertyManager,
+    AmazonPropertySelectValueManager,
+    AmazonProductTypeManager,
+)
 from core import models
 from django.utils.translation import gettext_lazy as _
 from datetime import timedelta
@@ -89,6 +94,8 @@ class AmazonProperty(RemoteProperty):
     allows_unmapped_values = models.BooleanField(default=False)
     type  = models.CharField(max_length=16, choices=Property.TYPES.ALL, default=Property.TYPES.TEXT)
 
+    objects = AmazonPropertyManager()
+
     class Meta:
         verbose_name = 'Amazon Property'
         verbose_name_plural = 'Amazon Properties'
@@ -125,6 +132,8 @@ class AmazonPropertySelectValue(RemoteObjectMixin, models.Model):
         on_delete=models.SET_NULL,
         help_text="Optional link to local PropertySelectValue."
     )
+
+    objects = AmazonPropertySelectValueManager()
 
     class Meta:
         unique_together = ('amazon_property', 'marketplace', 'remote_value')
@@ -165,6 +174,8 @@ class AmazonProductType(RemoteObjectMixin, models.Model):
         help_text="Display name for the Amazon product type (e.g., 'Toys & Games').",
         verbose_name="Remote Name"
     )
+
+    objects = AmazonProductTypeManager()
 
     class Meta:
         unique_together = ('local_instance', 'sales_channel')

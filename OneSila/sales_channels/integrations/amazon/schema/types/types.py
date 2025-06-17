@@ -44,7 +44,13 @@ class AmazonSalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
     fields="__all__",
 )
 class AmazonPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
-    pass
+    @field()
+    def mapped_locally(self, info) -> bool:
+        return self.mapped_locally
+
+    @field()
+    def mapped_remotely(self, info) -> bool:
+        return self.mapped_remotely
 
 
 @type(
@@ -55,7 +61,13 @@ class AmazonPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
     fields="__all__",
 )
 class AmazonPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
-    pass
+    @field()
+    def mapped_locally(self, info) -> bool:
+        return self.mapped_locally
+
+    @field()
+    def mapped_remotely(self, info) -> bool:
+        return self.mapped_remotely
 
 
 @type(
@@ -66,4 +78,11 @@ class AmazonPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
     fields="__all__",
 )
 class AmazonProductTypeType(relay.Node, GetQuerysetMultiTenantMixin):
-    pass
+    @field()
+    def mapped_locally(self, info) -> bool:
+        return self.mapped_locally
+
+    @field()
+    def mapped_remotely(self, info) -> bool:
+        return self.mapped_remotely
+
