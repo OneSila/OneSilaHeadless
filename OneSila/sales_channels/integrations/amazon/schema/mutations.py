@@ -71,14 +71,6 @@ class AmazonSalesChannelMutation:
 
         return sales_channel
 
-    create_amazon_property: AmazonPropertyType = create(AmazonPropertyInput)
-    create_amazon_properties: List[AmazonPropertyType] = create(AmazonPropertyInput)
     update_amazon_property: AmazonPropertyType = update(AmazonPropertyPartialInput)
-
-    create_amazon_property_select_value: AmazonPropertySelectValueType = create(AmazonPropertySelectValueInput)
-    create_amazon_property_select_values: List[AmazonPropertySelectValueType] = create(AmazonPropertySelectValueInput)
     update_amazon_property_select_value: AmazonPropertySelectValueType = update(AmazonPropertySelectValuePartialInput)
-
-    create_amazon_product_type: AmazonProductTypeType = create(AmazonProductTypeInput)
-    create_amazon_product_types: List[AmazonProductTypeType] = create(AmazonProductTypeInput)
     update_amazon_product_type: AmazonProductTypeType = update(AmazonProductTypePartialInput)
