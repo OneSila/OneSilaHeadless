@@ -1,4 +1,13 @@
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, strawberry_type
+from core.schema.core.types.types import (
+    relay,
+    type,
+    GetQuerysetMultiTenantMixin,
+    field,
+    strawberry_type,
+    Annotated,
+    lazy,
+)
+from typing import Optional, List
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
@@ -44,6 +53,18 @@ class AmazonSalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
     fields="__all__",
 )
 class AmazonPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'PropertyType',
+        lazy("properties.schema.types.types")
+    ]]
+    select_values: List[Annotated[
+        'AmazonPropertySelectValueType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]]
     @field()
     def mapped_locally(self, info) -> bool:
         return self.mapped_locally
@@ -61,6 +82,19 @@ class AmazonPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
     fields="__all__",
 )
 class AmazonPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    amazon_property: AmazonPropertyType
+    marketplace: Annotated[
+        'SalesChannelViewType',
+        lazy("sales_channels.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'PropertySelectValueType',
+        lazy("properties.schema.types.types")
+    ]]
     @field()
     def mapped_locally(self, info) -> bool:
         return self.mapped_locally
@@ -78,6 +112,14 @@ class AmazonPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
     fields="__all__",
 )
 class AmazonProductTypeType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'ProductPropertiesRuleType',
+        lazy("properties.schema.types.types")
+    ]]
     @field()
     def mapped_locally(self, info) -> bool:
         return self.mapped_locally
