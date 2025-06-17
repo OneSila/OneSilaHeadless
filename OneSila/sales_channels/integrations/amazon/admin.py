@@ -20,6 +20,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonImageProductAssociation,
     AmazonVat,
 )
+from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
 from sales_channels.models import SalesChannelViewAssign
 
 @admin.register(AmazonSalesChannel)
@@ -102,3 +103,27 @@ class AmazonImageProductAssociationAdmin(SalesChannelRemoteAdmin):
 @admin.register(AmazonVat)
 class AmazonVatAdmin(SalesChannelRemoteAdmin):
     pass
+
+@admin.register(AmazonPublicDefinition)
+class AmazonPublicDefinitionAdmin(admin.ModelAdmin):
+    list_display = ("api_region_code", "product_type_code", "code", "name", "is_required", "is_internal", "last_fetched")
+    search_fields = ("code", "name", "product_type_code", "api_region_code")
+    list_filter = ("api_region_code", "product_type_code", "is_required", "is_internal")
+    readonly_fields = ("last_fetched",)
+    ordering = ("api_region_code", "product_type_code", "code")
+    fieldsets = (
+        (None, {
+            "fields": (
+                "api_region_code",
+                "product_type_code",
+                "code",
+                "name",
+                "raw_schema",
+                "export_definition",
+                "usage_definition",
+                "is_required",
+                "is_internal",
+                "last_fetched",
+            )
+        }),
+    )

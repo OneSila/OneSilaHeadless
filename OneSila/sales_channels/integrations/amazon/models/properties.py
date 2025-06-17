@@ -33,9 +33,6 @@ class AmazonPublicDefinition(models.SharedModel):
     # ------------- display -------------
     name  = models.CharField(max_length=255)
     raw_schema = models.JSONField(blank=True, null=True)        # the slice of Amazon schema for this property
-    type  = models.CharField(       # map onto local Property.TYPES
-        max_length=16, choices=Property.TYPES.ALL, default=Property.TYPES.TEXT
-    )
 
     # ------------- rendering / encoding -------------
     usage_definition   = models.TextField(
@@ -46,12 +43,6 @@ class AmazonPublicDefinition(models.SharedModel):
         )
     )
     export_definition  = models.JSONField(blank=True, null=True)
-
-    allows_unmapped_values = models.BooleanField(default=False)
-    unmapped_value_key     = models.CharField(
-        max_length=64, blank=True, default="value",
-        help_text="If allows_unmapped_values == True, which JSON key gets free-text?"
-    )
 
     last_fetched = models.DateTimeField(null=True, blank=True)
 
@@ -81,18 +72,22 @@ class AmazonPublicDefinition(models.SharedModel):
 class AmazonProperty(RemoteProperty):
     """Amazon specific remote property."""
 
-    attribute_code = models.CharField(
+    code = models.CharField(
         max_length=255,
         help_text="The attribute code used in Amazon for this property.",
         verbose_name="Attribute Code",
     )
-    remote_name = models.CharField(
+
+    name = models.CharField(
         max_length=255,
         help_text="The display label for the remote value (e.g., 'Red').",
         verbose_name="Remote Name",
         null=True,
         blank=True,
     )
+
+    allows_unmapped_values = models.BooleanField(default=False)
+    type  = models.CharField(max_length=16, choices=Property.TYPES.ALL, default=Property.TYPES.TEXT)
 
     class Meta:
         verbose_name = 'Amazon Property'
@@ -157,13 +152,13 @@ class AmazonProductType(RemoteObjectMixin, models.Model):
         null=True,
         help_text="The local ProductPropertiesRule associated with this Amazon product type."
     )
-    category_code = models.CharField(
+    product_type_code = models.CharField(
         _('Category Code'),
         max_length=256,
         null=True,
         help_text="The Amazon product type code (e.g., TOYS_AND_GAMES, CLOTHING)."
     )
-    remote_name = models.CharField(
+    name = models.CharField(
         max_length=255,
         null=True,
         blank=True,
@@ -178,9 +173,9 @@ class AmazonProductType(RemoteObjectMixin, models.Model):
 
     def __str__(self):
         try:
-            return f"Amazon product type for {self.local_instance.product_type} ({self.category_code}) @ {self.sales_channel}"
+            return f"Amazon product type for {self.local_instance.product_type} ({self.product_type_code}) @ {self.sales_channel}"
         except AttributeError:
-            return f"{self.category_code} @ {self.sales_channel}"
+            return f"{self.product_type_code} @ {self.sales_channel}"
 
 
 class AmazonProductTypeItem(RemoteObjectMixin, models.Model):

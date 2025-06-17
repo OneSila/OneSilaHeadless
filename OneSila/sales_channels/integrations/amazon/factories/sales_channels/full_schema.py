@@ -4,7 +4,8 @@ from sales_channels.factories.mixins import PullRemoteInstanceMixin
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin, PullAmazonMixin
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
-from sales_channels.integrations.amazon.models.properties import AmazonProductType, AmazonPublicDefinition
+from sales_channels.integrations.amazon.models.properties import AmazonProductType, AmazonPublicDefinition, \
+    AmazonProperty, AmazonPropertySelectValue, AmazonProductTypeItem
 import requests
 
 from properties.models import ProductPropertiesRuleItem, Property
@@ -20,10 +21,10 @@ class AmazonFullSchemaPullFactory(GetAmazonAPIMixin, PullAmazonMixin, PullRemote
 
     remote_model_class = AmazonProductType
     field_mapping = {
-        'category_code': 'product_type',
+        'product_type_code': 'product_type_code',
     }
     update_field_mapping = field_mapping
-    get_or_create_fields = ['category_code', 'sales_channel']
+    get_or_create_fields = ['product_type_code', 'sales_channel']
 
     allow_create = True
     allow_update = True
@@ -37,7 +38,7 @@ class AmazonFullSchemaPullFactory(GetAmazonAPIMixin, PullAmazonMixin, PullRemote
         product_types = self.get_product_types()
         self.remote_instances = [
             {
-                'product_type': pt,
+                'product_type_code': pt,
             }
             for pt in product_types
         ]
@@ -74,76 +75,34 @@ class AmazonFullSchemaPullFactory(GetAmazonAPIMixin, PullAmazonMixin, PullRemote
 
         return schema_data
 
-    def get_product_type_definition(self, category_code):
-        """
-        Fetch full definition of a product type from Amazon SP-API and return
-        a normalized structure with required/optional fields and enum values.
-        """
-        sales_channel_views = AmazonSalesChannelView.objects.filter(sales_channel=self.sales_channel)
-        marketplace_schemas = {}
-        default_schema = None
-
-        # Step 1: Get schemas for all marketplaces
-        for view in sales_channel_views:
-            lang = view.remote_languages.first()
-            is_default = lang and self.sales_channel.country and self.sales_channel.country in lang.remote_code
-
-            schema_data = self._get_schema_for_marketplace(view, category_code, is_default_marketplace=is_default)
-            marketplace_schemas[view.remote_id] = schema_data
-
-            if is_default:
-                default_schema = schema_data
-
-        if not default_schema:
-            raise Exception("No valid default schema found (based on country match).")
-
-        default_required_keys = default_schema.get("required", [])
-        default_properties = default_schema.get("properties", {})
-        category_name = default_schema.get("title", category_code)
-
-        final_items = {}
-
-        # Step 2: Loop through all schemas and gather all properties (with enums)
-        for marketplace_id, schema in marketplace_schemas.items():
-            properties = schema.get("properties", {})
-            required_keys = schema.get("required", [])
-
-            for attr_code, prop in properties.items():
-              public_property = self.get_property_definition() # get by region code and property type or create it
-              final_items[attr_code] = {
-                  "type": ProductPropertiesRuleItem.REQUIRED if public_property.is_required else ProductPropertiesRuleItem.OPTIONAL,
-                  "property": public_property.export_defintion
-              }
-
-        return {
-            "name": category_name,
-            "category_code": category_code,
-            "items": list(final_items.values())
-        }
-
 
     def post_pull_action(self):
         """
         After pulling the product types, resolve their attributes via schema fetch + public def sync.
         """
         sales_channel_views = AmazonSalesChannelView.objects.filter(sales_channel=self.sales_channel)
+        product_types = AmazonProductType.objects.filter(
+            sales_channel=self.sales_channel,
+            product_type_code__in=[pt['product_type_code'] for pt in self.remote_instances]
+        )
 
-        for instance in self.remote_instances:
+        for product_type in product_types:
 
             # Step 1: Get schemas for all marketplaces
             for view in sales_channel_views:
                 lang = view.remote_languages.first()
                 is_default = lang and self.sales_channel.country and self.sales_channel.country in lang.remote_code
 
-                schema_data = self._get_schema_for_marketplace(view, instance['product_type'], is_default_marketplace=is_default)
+                schema_data = self._get_schema_for_marketplace(view, product_type.product_type_code, is_default_marketplace=is_default)
+                required_properties = schema_data["required"]
 
                 if is_default:
                     # create AmazonProductType the schema_data will have a title
-                    pass
+                    product_type.name = schema_data['title']
+                    product_type.save()
 
                 properties = schema_data.get("properties", {})
-                for prop in properties:
-                    pass
+                for code, schema in properties.items():
                     # create AmazonPublicDefinition we will have the thing from the view or instead we can just use the amazon domain thing like Amazon.nl or something that comes from the schema
                     # public_definition = self.get_or_create_public_definition(...)
                     # enrich public_definition with export_definition and ussage_definition
@@ -152,34 +111,90 @@ class AmazonFullSchemaPullFactory(GetAmazonAPIMixin, PullAmazonMixin, PullRemote
                     # the first public definition like "battery" will have export_definitions as an array with all the needed things that needs created
                     # but we still need to create the public definitions for all of that as well.
                     # if schema is_internal we will not do the export_definition and ussage_definition
+                    public_definition = self.sync_public_definitions(code, schema, required_properties, product_type, view)
 
-    def sync_public_definitions(self, schema_definition, product_type_obj):
+                    if public_definition.is_internal:
+                        continue
+
+                    self.create_remote_properties(public_definition, product_type, view)
+
+    def sync_public_definitions(self, attr_code, schema_definition, required_properties, product_type_obj, view):
         """
         Go over the parsed schema_definition and sync AmazonPublicDefinition models.
         """
 
-        for item in schema_definition['items']:
-            attr_code = item["property"]["attribute_code"]
-            export_definition = item["property"]
-            required_type = item["type"]
+        public_def, created = AmazonPublicDefinition.objects.get_or_create(
+            product_type_code=product_type_obj.product_type_code,
+            api_region_code=view.api_region_code,
+            code=attr_code,
+        )
 
-            public_def, created = AmazonPublicDefinition.objects.get_or_create(
-                category_code=product_type_obj.category_code,
+        public_def.name = schema_definition["title"] if "title" in schema_definition else f"{attr_code} {view.api_region_code}"
+        public_def.raw_schema = schema_definition
+        public_def.is_required = attr_code in required_properties
+        public_def.is_internal = attr_code in AMAZON_INTERNAL_PROPERTIES
+        public_def.save()
+
+
+        if public_def.should_refresh() and not public_def.is_internal:
+
+            # These factories will handle smart fallback logic (for now: pass)
+            export_definition_fac = ExportDefinitionFactory(public_def)
+            export_definition_fac.run()
+
+            # UsageDefinitionFactory(public_def).run()
+            public_def.export_definition = export_definition_fac.results
+            public_def.last_fetched = timezone.now()
+            public_def.save()
+
+        return public_def
+
+    def create_remote_properties(self, public_definition, product_type, view):
+
+        for property_data in public_definition.export_definition:
+
+            remote_property, created = AmazonProperty.objects.get_or_create(
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
                 sales_channel=self.sales_channel,
-                attribute_code=attr_code,
-                defaults={
-                    "export_definition": export_definition,
-                    "type": required_type,
-                },
+                code=property_data['code'],
+                type=property_data['type'],
             )
 
-            if not created and public_def.should_refresh():
-                # These factories will handle smart fallback logic (for now: pass)
-                ExportDefinitionFactory(public_def).run()
-                UsageDefinitionFactory(public_def).run()
+            if created:
+                allows_unmapped_values = property_data.get('allows_unmapped_values', False)
+                remote_property.name = property_data['name']
+                remote_property.allows_unmapped_values = allows_unmapped_values
+                remote_property.save()
 
-                public_def.last_fetched = timezone.now()
-                public_def.save()
+            if remote_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
+                for value in property_data['values']:
+                    remote_select_value, _ = AmazonPropertySelectValue.objects.get_or_create(
+                        multi_tenant_company=self.sales_channel.multi_tenant_company,
+                        sales_channel=self.sales_channel,
+                        marketplace=view,
+                        amazon_property=remote_property,
+                        remote_value=value['value'],
+                    )
+
+                    remote_select_value.remote_name = value['name']
+                    remote_select_value.save()
+
+                remote_rule_item, _ = AmazonProductTypeItem.objects.get_or_create(
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    amazon_rule=product_type,
+                    remote_property=remote_property
+                )
+
+                remote_rule_item.remote_type = ProductPropertiesRuleItem.REQUIRED if public_definition.is_required else ProductPropertiesRuleItem.OPTIONAL
+                remote_rule_item.save()
+
+
+
+
+    def create_remote_rule_item(self, remote_property, public_definition):
+        pass
+
 
 class ExportDefinitionFactory:
     def __init__(self, public_definition: AmazonPublicDefinition):
@@ -396,7 +411,7 @@ class ExportDefinitionFactory:
             force_allow_not_mapped = True
 
         export = {
-            "attribute_code": attr_code,
+            "code": attr_code,
             "name": original_title,
             "type": self.map_amazon_type_to_property_type(value_schema),
             "values": self.extract_enum_values(value_schema),
