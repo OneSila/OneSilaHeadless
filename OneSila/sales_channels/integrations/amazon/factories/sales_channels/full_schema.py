@@ -116,7 +116,7 @@ class AmazonFullSchemaPullFactory(GetAmazonAPIMixin, PullAmazonMixin, PullRemote
                     if public_definition.is_internal:
                         continue
 
-                    self.create_remote_properties(public_definition, product_type, view)
+                    self.create_remote_properties(public_definition, product_type, view, is_default)
 
     def sync_public_definitions(self, attr_code, schema_definition, required_properties, product_type_obj, view):
         """
@@ -149,7 +149,7 @@ class AmazonFullSchemaPullFactory(GetAmazonAPIMixin, PullAmazonMixin, PullRemote
 
         return public_def
 
-    def create_remote_properties(self, public_definition, product_type, view):
+    def create_remote_properties(self, public_definition, product_type, view, is_default):
 
         for property_data in public_definition.export_definition:
 
@@ -164,6 +164,10 @@ class AmazonFullSchemaPullFactory(GetAmazonAPIMixin, PullAmazonMixin, PullRemote
                 allows_unmapped_values = property_data.get('allows_unmapped_values', False)
                 remote_property.name = property_data['name']
                 remote_property.allows_unmapped_values = allows_unmapped_values
+                remote_property.save()
+
+            if is_default:
+                remote_property.name = property_data['name']
                 remote_property.save()
 
             if remote_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:

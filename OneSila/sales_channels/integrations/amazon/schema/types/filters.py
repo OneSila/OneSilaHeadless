@@ -25,12 +25,14 @@ from sales_channels.schema.types.filters import (
 
 @filter(AmazonSalesChannel)
 class AmazonSalesChannelFilter(SearchFilterMixin):
+    id: auto
     active: auto
     hostname: auto
 
 
 @filter(AmazonProperty)
 class AmazonPropertyFilter(SearchFilterMixin):
+    id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
     allows_unmapped_values: auto
@@ -51,6 +53,7 @@ class AmazonPropertyFilter(SearchFilterMixin):
 
 @filter(AmazonPropertySelectValue)
 class AmazonPropertySelectValueFilter(SearchFilterMixin):
+    id: auto
     sales_channel: Optional[SalesChannelFilter]
     amazon_property: Optional[AmazonPropertyFilter]
     local_instance: Optional[PropertySelectValueFilter]
@@ -71,6 +74,7 @@ class AmazonPropertySelectValueFilter(SearchFilterMixin):
 
 @filter(AmazonProductType)
 class AmazonProductTypeFilter(SearchFilterMixin):
+    id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[ProductPropertiesRuleFilter]
 
