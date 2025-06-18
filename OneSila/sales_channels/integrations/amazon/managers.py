@@ -35,6 +35,19 @@ class AmazonPropertyQuerySet(_MappingQuerySetMixin, PolymorphicQuerySet, MultiTe
 class AmazonPropertySelectValueQuerySet(_MappingQuerySetMixin, MultiTenantQuerySet):
     mapped_field = "remote_value"
 
+    def annotate_mapping(self):
+        base = super().annotate_mapping()
+        return base.annotate(
+            amazon_property_mapped_locally=Case(
+                When(amazon_property__local_instance__isnull=False, then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
+        )
+
+    def filter_amazon_property_mapped_locally(self, value: bool = True):
+        return self.annotate_mapping().filter(amazon_property_mapped_locally=value)
+
 
 class AmazonProductTypeQuerySet(_MappingQuerySetMixin, MultiTenantQuerySet):
     mapped_field = "product_type_code"

@@ -6,6 +6,7 @@ from django.db.models import Q
 from strawberry import UNSET
 from core.managers import QuerySet
 from core.schema.core.types.types import auto
+from sales_channels.integrations.amazon.managers import AmazonPropertyQuerySet, AmazonPropertySelectValueQuerySet
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
@@ -40,8 +41,15 @@ class AmazonPropertyFilter(SearchFilterMixin):
 
     @custom_filter
     def mapped_locally(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
+
         if value not in (None, UNSET):
-            queryset = queryset.filter_mapped_locally(value)
+            if isinstance(queryset, AmazonPropertyQuerySet):
+                queryset = queryset.filter_mapped_locally(value)
+            elif isinstance(queryset, AmazonPropertySelectValueQuerySet):
+                queryset = queryset.filter_amazon_property_mapped_locally(value)
+            else:
+                raise Exception(f"Unexpected queryset class: {type(queryset)}")
+
         return queryset, Q()
 
     @custom_filter
