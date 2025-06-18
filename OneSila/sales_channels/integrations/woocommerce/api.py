@@ -303,7 +303,9 @@ class WoocommerceApiWrapper:
             return None
         return str(price)
 
-    def create_product(self, name, type, sku, status, catalog_visibility, regular_price, sale_price=None, description='', short_description='', categories=[], images=[], attributes=[]):
+    def create_product(self, name, type, sku, status, catalog_visibility, regular_price,
+            sale_price=None, description='', short_description='', categories=[],
+            images=[], attributes=[], global_unique_id=None):
         """
         Create a product in WooCommerce.
         """
@@ -320,6 +322,7 @@ class WoocommerceApiWrapper:
             'categories': categories,
             'images': images,
             'attributes': attributes,
+            'global_unique_id': global_unique_id,
         }
 
         payload = clearout_none_values(payload)
@@ -417,7 +420,8 @@ class WoocommerceApiWrapper:
         try:
             return self.put(f'products/{product_id}', data=payload)
         except FailedToPutError as e:
-            raise FailedToUpdateProductError(e, response=e.response) from e
+            extra_msg = f"product_id: {product_id}"
+            raise FailedToUpdateProductError(e, response=e.response, extra_msg=extra_msg) from e
 
     @raise_for_none(arg_name='product_id')
     def delete_product(self, product_id):
@@ -425,6 +429,10 @@ class WoocommerceApiWrapper:
             return self.delete(f'products/{product_id}')
         except FailedToDeleteError as e:
             raise FailedToDeleteProductError(e, response=e.response) from e
+
+    def delete_product_by_sku(self, sku):
+        product = self.get_product_by_sku(sku)
+        return self.delete_product(product['id'])
 
     def get_from_settings(self, key):
         """

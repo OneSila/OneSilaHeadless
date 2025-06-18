@@ -1,41 +1,34 @@
 from products.models import Product
 from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
+from core.exceptions import SanityCheckError
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
-    local_model_class = Product
-    local_product_map = 'local_instance'
+class ToUpdateCurrenciesMixin:
+    """Mixin to give populate all currencies that need updating.
 
-    def __init__(self, sales_channel, local_instance, remote_product, api=None, currency=None, skip_checks=False):
-        super().__init__(sales_channel, local_instance, api=api, remote_product=remote_product)
-        self.currency = currency  # Currency model instance (optional)
-        self.skip_checks = skip_checks
+    Remember:
+    - self.currency is expected to exist as a RemoteCurrency instance.
+    - self.currency_iso_code is expected to exist as a string.
+    - self.get_product
+    """
+
+    def __init__(self, *args, **kwargs):
         self.to_update_currencies = []
-        self.remote_instance = None
         self.price_data = {}
+        super().__init__(*args, **kwargs)
 
-    def preflight_check(self):
+    def sanity_check(self):
+        if not self.currency:
+            raise SanityCheckError("self.currency is not set")
+        if not self.currency_iso_code:
+            raise SanityCheckError("self.currency_iso_code is not set")
+
+    def set_to_update_currencies(self):
         from sales_channels.models import RemoteCurrency
         from currencies.models import Currency
-
-        if not self.skip_checks:
-            if not self.sales_channel.sync_prices:
-                logger.warning(f"Sales channel {self.sales_channel.name} does not sync prices")
-                return False
-            if not self.remote_product:
-                logger.warning(f"Remote product not found for sales channel {self.sales_channel.name}")
-                return False
-            if not self.assigned_to_website():
-                logger.warning(f"Product {self.local_instance.name} is not assigned to website {self.sales_channel.website.name}")
-                return False
-
-        try:
-            self.remote_instance = self.remote_model_class.objects.get(remote_product=self.remote_product)
-        except self.remote_model_class.DoesNotExist:
-            return False
 
         # we do that so if the currency inherit other currencies we make sure the updates goes for all
         # because the price_data here will override the inherited currency one and if this happen that one will be skipped
@@ -45,7 +38,11 @@ class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFacto
             if reset_currency:
                 self.currency = None
 
-        existing_price_data = self.remote_instance.price_data or {}
+        try:
+            existing_price_data = self.remote_instance.price_data or {}
+        except AttributeError:
+            existing_price_data = {}
+
         all_remote_currencies = RemoteCurrency.objects.filter(sales_channel=self.sales_channel)
 
         logger.debug(f"{self.__class__.__name__} all remote currencies: {all_remote_currencies}")
@@ -56,7 +53,8 @@ class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFacto
             if not local_currency:
                 continue
 
-            full_price, discount_price = self.local_instance.get_price_for_sales_channel(
+            local_product = self.get_local_product()
+            full_price, discount_price = local_product.get_price_for_sales_channel(
                 self.sales_channel, currency=local_currency
             )
 
@@ -74,6 +72,43 @@ class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFacto
                 if current.get("price", None) != price or current.get("discount_price", None) != discount:
                     self.to_update_currencies.append(local_currency.iso_code)
 
+    def post_update_process(self):
+        self.remote_instance.price_data = self.price_data
+        self.remote_instance.save()
+        super().post_update_process()
+
+    def run(self):
+        self.set_to_update_currencies()
+        return super().run()
+
+
+class RemotePriceUpdateFactory(ToUpdateCurrenciesMixin, ProductAssignmentMixin, RemoteInstanceUpdateFactory):
+    local_model_class = Product
+    local_product_map = 'local_instance'
+
+    def __init__(self, sales_channel, local_instance, remote_product, api=None, currency=None, skip_checks=False):
+        super().__init__(sales_channel, local_instance, api=api, remote_product=remote_product)
+        self.currency = currency  # Currency model instance (optional)
+        self.skip_checks = skip_checks
+        self.remote_instance = None
+
+    def preflight_check(self):
+        if not self.skip_checks:
+            if not self.sales_channel.sync_prices:
+                logger.warning(f"Sales channel {self.sales_channel.name} does not sync prices")
+                return False
+            if not self.remote_product:
+                logger.warning(f"Remote product not found for sales channel {self.sales_channel.name}")
+                return False
+            if not self.assigned_to_website():
+                logger.warning(f"Product {self.local_instance.name} is not assigned to website {self.sales_channel.website.name}")
+                return False
+
+        try:
+            self.remote_instance = self.remote_model_class.objects.get(remote_product=self.remote_product)
+        except self.remote_model_class.DoesNotExist:
+            return False
+
         return bool(self.to_update_currencies)
 
     def needs_update(self):
@@ -82,7 +117,3 @@ class RemotePriceUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFacto
     def get_remote_instance(self):
         # Already resolved in preflight_check
         pass
-
-    def post_update_process(self):
-        self.remote_instance.price_data = self.price_data
-        self.remote_instance.save()

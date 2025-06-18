@@ -15,3 +15,10 @@ class ConfigurationMissingError(Exception):
     Exception raised when a configuration is missing.
     """
     pass
+
+
+class PreFlightCheckError(Exception):
+    """
+    Exception raised when a pre-flight check fails.
+    """
+    pass

@@ -29,9 +29,11 @@ class RemoteProductContentUpdateFactory(ProductAssignmentMixin, RemoteInstanceUp
             return True
 
         if not self.remote_product:
+            logger.error(f"{self.__class__.__name__} remote product is missing.")
             return False
 
         if not self.assigned_to_website():
+            logger.error(f"{self.__class__.__name__} product is not assigned to a website.")
             return False
 
         # Set the remote_instance for the factory based on existing data
@@ -40,6 +42,7 @@ class RemoteProductContentUpdateFactory(ProductAssignmentMixin, RemoteInstanceUp
                 remote_product=self.remote_product
             )
         except self.remote_model_class.DoesNotExist:
+            logger.error(f"{self.__class__.__name__} remote instance does not exist.")
             return False
 
         return True

@@ -13,22 +13,20 @@ from sales_channels.factories.products.variations import (
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceProduct, \
     WoocommerceProductProperty, WoocommerceProductProperty, WoocommercePrice, \
-    WoocommerceProductContent, WoocommerceEanCode
-from .mixins import SerialiserMixin, WoocommerceProductTypeMixin
+    WoocommerceProductContent, WoocommerceEanCode, WoocommerceCurrency
+from .mixins import WooCommerceUpdateRemoteProductMixin, WoocommerceProductTypeMixin, WooCommercePayloadMixin
 from .properties import WooCommerceProductPropertyCreateFactory, \
     WooCommerceProductPropertyUpdateFactory, WooCommerceProductPropertyDeleteFactory
 from .media import WooCommerceMediaProductThroughCreateFactory, \
     WooCommerceMediaProductThroughUpdateFactory, WooCommerceMediaProductThroughDeleteFactory
 from .ean import WooCommerceEanCodeUpdateFactory
 from ..exceptions import DuplicateError
-from .properties import WooCommerceProductAttributeMixin
-from .media import WooCommerceMediaMixin
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class WooCommerceProductMixin(WooCommerceMediaMixin, GetWoocommerceAPIMixin, WooCommerceProductAttributeMixin, WoocommerceProductTypeMixin, SerialiserMixin):
+class WooCommerceProductMixin(WooCommerceUpdateRemoteProductMixin, WooCommercePayloadMixin):
     remote_model_class = WoocommerceProduct
     remote_price_class = WoocommercePrice
 
@@ -36,54 +34,10 @@ class WooCommerceProductMixin(WooCommerceMediaMixin, GetWoocommerceAPIMixin, Woo
     remote_product_content_class = WoocommerceProductContent
     remote_product_eancode_class = WoocommerceEanCode
 
-    remote_id_map = 'id'
-    # Key is the local field, value is the remote field
-    field_mapping = {
-        'sku': 'sku',
-        # The price fields are not really fields
-        # but "magic" and get set during the payload build.
-        'price': 'regular_price',
-        'discount': 'sale_price',
-        'name': 'name',
-        'description': 'description',
-        'short_description': 'short_description',
-        "content": "content",
-    }
-
     already_exists_exception = DuplicateError
 
     def get_local_product(self):
         return self.local_instance
-
-    def customize_payload(self):
-        """
-        Customizes the payload for WooCommerce products
-        """
-        # Products must be created and updated with the attributes
-        # included in the product payload.
-        self.apply_attribute_payload()
-        self.apply_media_payload()
-
-        if self.local_instance.active:
-            self.payload['status'] = 'publish'
-            self.payload['catalog_visibility'] = 'visible'
-        else:
-            self.payload['status'] = 'draft'
-            self.payload['catalog_visibility'] = 'hidden'
-
-        if self.is_woocommerce_configurable_product:
-            # This also needs the variations to be created.
-            self.payload['type'] = 'variable'
-
-        if self.is_woocommerce_simple_product:
-            self.payload['type'] = 'simple'
-
-        if self.is_woocommerce_variant_product:
-            # No type is passed. Woocom takes care of it.
-            pass
-            # self.payload['type'] = 'variation'
-
-        return self.payload
 
     def process_content_translation(self, short_description, description, url_key, remote_language):
         # Probably this method should be triggering a translation update.
@@ -130,13 +84,14 @@ class WooCommerceProductSyncFactory(WooCommerceProductMixin, RemoteProductSyncFa
             super().perform_remote_action()
             return
 
-        if self.is_woocommerce_variant_product:
-            parent_id = self.remote_instance.remote_parent_product.remote_id
-            variant_id = self.remote_instance.remote_id
-            return self.api.update_product_variation(parent_id, variant_id, **self.payload)
-        else:
-            product_id = self.remote_instance.remote_id
-            return self.api.update_product(product_id, **self.payload)
+        return self.update_remote_product()
+        # if self.is_woocommerce_variant_product:
+        #     parent_id = self.remote_instance.remote_parent_product.remote_id
+        #     variant_id = self.remote_instance.remote_id
+        #     return self.api.update_product_variation(parent_id, variant_id, **self.payload)
+        # else:
+        #     product_id = self.remote_instance.remote_id
+        #     return self.api.update_product(product_id, **self.payload)
 
     # Use the getter methods within the class where needed
     sync_product_factory = property(get_sync_product_factory)
@@ -181,12 +136,15 @@ class WooCommerceProductCreateFactory(WooCommerceProductSyncFactory, Woocommerce
         return self.api.get_product_by_sku(self.local_instance.sku)
 
 
-class WooCommerceProductUpdateFactory(RemoteProductUpdateFactory, WooCommerceProductSyncFactory, WoocommerceProductTypeMixin):
+class WooCommerceProductUpdateFactory(WooCommerceProductSyncFactory, WoocommerceProductTypeMixin, RemoteProductUpdateFactory):
     create_factory_class = WooCommerceProductCreateFactory
 
 
 class WooCommerceProductDeleteFactory(WooCommerceProductMixin, RemoteProductDeleteFactory):
     delete_remote_instance = True
+
+    def get_local_product(self):
+        return self.remote_instance.local_instance
 
     def delete_remote(self):
         """
@@ -198,12 +156,12 @@ class WooCommerceProductDeleteFactory(WooCommerceProductMixin, RemoteProductDele
 class WooCommerceProductVariationAddFactory(WooCommerceProductMixin, RemoteProductVariationAddFactory):
     """
     After a variation is created, this factory will assign that variation to the configurable product.
-    However, in Woocommerce this is not relevant. So we override update_remote to do nothing.
+    However, in Woocommerce this is not relevant. So we override update_remote trigger a new product update.
     """
     create_factory_class = WooCommerceProductCreateFactory
 
     def update_remote(self, *args, **kwargs):
-        return {}
+        return self.update_remote_product()
 
 
 class WooCommerceProductVariationDeleteFactory(WooCommerceProductMixin, RemoteProductVariationDeleteFactory):

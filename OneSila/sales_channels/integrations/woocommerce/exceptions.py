@@ -4,12 +4,13 @@ class WoocommerceError(Exception):
     Handles JSON error responses from the WooCommerce API.
     """
 
-    def __init__(self, message=None, response=None):
+    def __init__(self, message=None, response=None, extra_msg=None):
         self.response = response
         self.code = None
         self.message = message
         self.response_message = None
         self.response_status_code = None
+        self.extra_msg = extra_msg
 
         try:
             json = response.json()
@@ -18,6 +19,9 @@ class WoocommerceError(Exception):
             self.response_status_code = self.response.status_code
         except AttributeError:
             self.response_message = message
+
+        if self.extra_msg:
+            self.response_message += f" {self.extra_msg}"
 
         super().__init__(self.response_message)
 

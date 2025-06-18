@@ -6,6 +6,7 @@ from ..models.sales_channels import SalesChannelViewAssign
 from ..models.logs import RemoteLog
 import logging
 from eancodes.models import EanCode
+from ..exceptions import PreFlightCheckError
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,7 @@ class RemotePropertyEnsureMixin:
                 local_instance=self.local_property,
                 sales_channel=self.sales_channel,
             )
+            logger.info(f"{self.__class__.__name__} preflight_process found and existing remote_property")
         except self.remote_property_factory.remote_model_class.DoesNotExist:
             # If the RemoteProperty does not exist, create it using the provided factory
             property_create_factory = self.remote_property_factory(
@@ -89,8 +91,14 @@ class RemotePropertyEnsureMixin:
                 api=self.api
             )
             property_create_factory.run()
+            logger.info(f"{self.__class__.__name__} preflight_process tried to create a remote_property")
 
             self.remote_property = property_create_factory.remote_instance
+
+        if not hasattr(self, 'remote_property') or not self.remote_property:
+            # A remote factory should always have a remote_property.
+            # If it does not, then most it seem stuff is broken.
+            raise PreFlightCheckError(f"Failed to create remote property for {self.local_property}")
 
     def get_select_values(self):
         self.remote_select_values = []
