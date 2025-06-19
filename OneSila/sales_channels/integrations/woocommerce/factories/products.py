@@ -14,7 +14,8 @@ from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixi
 from sales_channels.integrations.woocommerce.models import WoocommerceProduct, \
     WoocommerceProductProperty, WoocommerceProductProperty, WoocommercePrice, \
     WoocommerceProductContent, WoocommerceEanCode, WoocommerceCurrency
-from .mixins import WooCommerceUpdateRemoteProductMixin, WoocommerceProductTypeMixin, WooCommercePayloadMixin
+from .mixins import WooCommerceUpdateRemoteProductMixin, WoocommerceProductTypeMixin, \
+    WooCommercePayloadMixin, SerialiserMixin, GetWoocommerceAPIMixin
 from .properties import WooCommerceProductPropertyCreateFactory, \
     WooCommerceProductPropertyUpdateFactory, WooCommerceProductPropertyDeleteFactory
 from .media import WooCommerceMediaProductThroughCreateFactory, \
@@ -100,6 +101,9 @@ class WooCommerceProductSyncFactory(WooCommerceProductMixin, RemoteProductSyncFa
 
     add_variation_factory = property(get_add_variation_factory)
 
+    def get_variation_sku(self):
+        return self.local_instance.sku
+
 
 class WooCommerceProductCreateFactory(WooCommerceProductSyncFactory, WoocommerceProductTypeMixin, RemoteProductCreateFactory):
     enable_fetch_and_update = True
@@ -140,8 +144,9 @@ class WooCommerceProductUpdateFactory(WooCommerceProductSyncFactory, Woocommerce
     create_factory_class = WooCommerceProductCreateFactory
 
 
-class WooCommerceProductDeleteFactory(WooCommerceProductMixin, RemoteProductDeleteFactory):
+class WooCommerceProductDeleteFactory(SerialiserMixin, GetWoocommerceAPIMixin, RemoteProductDeleteFactory):
     delete_remote_instance = True
+    remote_model_class = WoocommerceProduct
 
     def get_local_product(self):
         return self.remote_instance.local_instance
@@ -161,9 +166,14 @@ class WooCommerceProductVariationAddFactory(WooCommerceProductMixin, RemoteProdu
     create_factory_class = WooCommerceProductCreateFactory
 
     def update_remote(self, *args, **kwargs):
-        return self.update_remote_product()
+        # Woocommerce doesnt need assinging a variation.
+        # This happens by default thorugh the create_factory_class.
+        # Do nothing is the right course of action.
+        pass
 
 
-class WooCommerceProductVariationDeleteFactory(WooCommerceProductMixin, RemoteProductVariationDeleteFactory):
+class WooCommerceProductVariationDeleteFactory(SerialiserMixin, GetWoocommerceAPIMixin, RemoteProductVariationDeleteFactory):
+    remote_model_class = WoocommerceProduct
+
     def delete_remote_instance_process(self, *args, **kwargs):
         return self.api.delete_product_variation(self.remote_instance.remote_id, self.remote_instance.remote_parent_product.remote_id)

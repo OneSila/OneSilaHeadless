@@ -54,14 +54,14 @@ class WoocommerceProductTypeMixin:
 
     def remote_product_is_variation(self):
         try:
-            return self.is_variation
-        except AttributeError as e:
             try:
-                return self.remote_product.is_variation
+                is_variation = self.is_variation
+                return is_variation
             except AttributeError as e:
-                logger.error(f"self.is_variation should exist. {e=}")
-
-            return False
+                is_variation = self.remote_product.is_variation
+                return is_variation
+        except Exception as e:
+            raise ValueError(f"Could not determine if remote product is a variation.") from e
 
     def set_woocomerce_product_types(self):
         product = self.get_local_product()
@@ -149,17 +149,6 @@ class WoocommerceRemoteValueConversionMixin:
     def get_datetime_value(self, value):
         """Handles datetime values."""
         return value
-
-    # def format_date(self, date_value):
-    #     """Formats date values to include time as '00:00:00' in Magento compatible format."""
-    #     if date_value:
-    #         # Formatting date to include time as 00:00:00
-    #         return date_value.strftime('%d-%m-%Y 00:00:00')
-
-    # def format_datetime(self, datetime_value):
-    #     """Formats datetime values to Magento compatible string format."""
-    #     if datetime_value:
-    #         return datetime_value.strftime('%d-%m-%Y %H:%M:%S')
 
 
 class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, WoocommerceProductTypeMixin, SerialiserMixin, WoocommerceRemoteValueConversionMixin):

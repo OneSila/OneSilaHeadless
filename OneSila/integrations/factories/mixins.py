@@ -671,10 +671,14 @@ class IntegrationInstanceDeleteFactory(IntegrationInstanceOperationMixin):
 
         setattr(self, self.integration_key, self.integration.get_real_instance())
 
+        if not self.remote_model_class:
+            raise ValueError("You must set the remote_model_class to point at your remote product class mirror model.")
+
         if isinstance(remote_instance, self.remote_model_class):
             self.remote_instance = remote_instance
             self.remote_instance_id = remote_instance.id
         else:
+            # Order matters. get_remote_instance() will use self.remote_instance_id
             self.remote_instance_id = remote_instance
             self.remote_instance = self.get_remote_instance()
 

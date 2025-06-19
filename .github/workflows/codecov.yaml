@@ -34,6 +34,7 @@ jobs:
       run: pip install -r requirements.txt
     - name: Run tests and collect coverage
       env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         POSTGRES_HOST: localhost
         POSTGRES_USER: fake
         POSTGRES_PASSWORD: fake

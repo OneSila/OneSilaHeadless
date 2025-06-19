@@ -64,7 +64,6 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
 
     def get_tax_class(self, product_data: dict) -> dict:
         remote_tax_class = product_data.get('tax_status')
-        # raise NotImplementedError()
         return None
 
     def get_base_product_data(self, product_data: dict, parent_sku=None) -> Tuple[dict, bool]:
@@ -335,12 +334,10 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
 
     def get_properties_data(self):
         """We will get the Global Attributes and return them """
-        # raise NotImplementedError("Not implemented")
         return []
 
     def get_select_values_data(self):
         """Get the terms from the Global Attributes"""
-        # raise NotImplementedError("Not implemented")
         return []
 
     def get_rules_data(self):
