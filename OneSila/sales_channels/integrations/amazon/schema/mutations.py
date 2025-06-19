@@ -9,6 +9,8 @@ from sales_channels.integrations.amazon.schema.types.input import (
     AmazonPropertySelectValuePartialInput,
     AmazonProductTypeInput,
     AmazonProductTypePartialInput,
+    AmazonSalesChannelImportInput,
+    AmazonSalesChannelImportPartialInput,
     AmazonValidateAuthInput,
 )
 from sales_channels.integrations.amazon.schema.types.types import (
@@ -17,13 +19,15 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonPropertySelectValueType,
     AmazonProductTypeType,
     AmazonRedirectUrlType,
+    AmazonSalesChannelImportType,
 )
-from core.schema.core.mutations import create, type, List, update
+from core.schema.core.mutations import create, type, List, update, delete
 from strawberry import Info
 import strawberry_django
 from core.schema.core.extensions import default_extensions
 from core.schema.core.helpers import get_multi_tenant_company
 from django.utils.translation import gettext_lazy as _
+
 
 @type(name="Mutation")
 class AmazonSalesChannelMutation:
@@ -74,3 +78,9 @@ class AmazonSalesChannelMutation:
     update_amazon_property: AmazonPropertyType = update(AmazonPropertyPartialInput)
     update_amazon_property_select_value: AmazonPropertySelectValueType = update(AmazonPropertySelectValuePartialInput)
     update_amazon_product_type: AmazonProductTypeType = update(AmazonProductTypePartialInput)
+
+    create_amazon_import_process: AmazonSalesChannelImportType = create(AmazonSalesChannelImportInput)
+    create_amazon_import_processes: List[AmazonSalesChannelImportType] = create(AmazonSalesChannelImportInput)
+    update_amazon_import_process: AmazonSalesChannelImportType = update(AmazonSalesChannelImportPartialInput)
+    delete_amazon_import_process: AmazonSalesChannelImportType = delete()
+    delete_amazon_import_processes: List[AmazonSalesChannelImportType] = delete()

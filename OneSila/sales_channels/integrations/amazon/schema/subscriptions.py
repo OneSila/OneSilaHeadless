@@ -3,11 +3,13 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
     AmazonPropertySelectValue,
+    AmazonSalesChannelImport,
 )
 from sales_channels.integrations.amazon.schema.types.types import (
     AmazonSalesChannelType,
     AmazonPropertyType,
     AmazonPropertySelectValueType,
+    AmazonSalesChannelImportType,
 )
 
 
@@ -27,4 +29,9 @@ class AmazonSalesChannelsSubscription:
     @subscription
     async def amazon_property_select_value(self, info: Info, pk: str) -> AsyncGenerator[AmazonPropertySelectValueType, None]:
         async for i in model_subscriber(info=info, pk=pk, model=AmazonPropertySelectValue):
+            yield i
+
+    @subscription
+    async def amazon_import_process(self, info: Info, pk: str) -> AsyncGenerator[AmazonSalesChannelImportType, None]:
+        async for i in model_subscriber(info=info, pk=pk, model=AmazonSalesChannelImport):
             yield i
