@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class WooCommerceMediaProductThroughMixin(WooCommerceUpdateRemoteProductMixin, WooCommercePayloadMixin, SerialiserMixin):
+class WooCommerceMediaProductThroughMixin(WooCommercePayloadMixin, WooCommerceUpdateRemoteProductMixin, SerialiserMixin):
     # We dont store images remotely.
     # Instead we need up do full product updates on every change
     # to avoid unexpected nullification of random fields.

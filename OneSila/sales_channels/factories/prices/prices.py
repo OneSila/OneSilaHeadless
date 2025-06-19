@@ -95,18 +95,21 @@ class RemotePriceUpdateFactory(ToUpdateCurrenciesMixin, ProductAssignmentMixin, 
     def preflight_check(self):
         if not self.skip_checks:
             if not self.sales_channel.sync_prices:
-                logger.warning(f"Sales channel {self.sales_channel.name} does not sync prices")
+                logger.warning(f"{self.__class__.__name__} Preflight check: Sales channel {self.sales_channel.name} does not sync prices")
                 return False
             if not self.remote_product:
-                logger.warning(f"Remote product not found for sales channel {self.sales_channel.name}")
+                logger.warning(f"{self.__class__.__name__} Preflight check: Remote product not found for sales channel {self.sales_channel.name}")
                 return False
             if not self.assigned_to_website():
-                logger.warning(f"Product {self.local_instance.name} is not assigned to website {self.sales_channel.website.name}")
+                logger.warning(f"{self.__class__.__name__} Preflight check: Product {self.local_instance.name} is not assigned to website {self.sales_channel.website.name}")
                 return False
 
         try:
+            # If you have this failing, then it means that the ProductCreateFactory did not create
+            # the remote Price object.
             self.remote_instance = self.remote_model_class.objects.get(remote_product=self.remote_product)
         except self.remote_model_class.DoesNotExist:
+            logger.error(f"{self.__class__.__name__} Preflight check: Remote instance {self.remote_model_class.__name__} not found for sales channel {self.sales_channel} and product {self.local_instance}")
             return False
 
         return bool(self.to_update_currencies)

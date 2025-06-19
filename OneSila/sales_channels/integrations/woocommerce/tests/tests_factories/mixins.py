@@ -66,13 +66,13 @@ class TestCaseWoocommerceMixin(TransactionTestCase):
                     try:
                         self.api.delete_attribute(attribute_id)
                     except Exception as e:
-                        logger.warning(f"Error deleting attribute {attribute_id}: {e}")
+                        pass
 
                 for product_id in product_ids:
                     try:
                         self.api.delete_product(product_id)
                     except Exception as e:
-                        logger.warning(f"Error deleting product {product_id}: {e}")
+                        pass
 
             except AttributeError:
                 logger.warning("No api set. Cleanup is not possible.")
@@ -84,4 +84,4 @@ class TestCaseWoocommerceMixin(TransactionTestCase):
                 try:
                     self.api.delete_product(product_id)
                 except Exception as e:
-                    logger.warning(f"Error deleting product {product_id}: {e}")
+                    pass

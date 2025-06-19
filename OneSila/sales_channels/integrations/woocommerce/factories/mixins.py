@@ -522,19 +522,13 @@ class WooCommerceUpdateRemoteProductMixin(SerialiserMixin, GetWoocommerceAPIMixi
     """
 
     def update_remote_product(self):
-        if self.is_woocommerce_simple_product:
-            return self.api.update_product(
-                self.remote_product.remote_id,
-                **self.payload
-            )
-        elif self.is_woocommerce_variable_product:
-            return self.api.update_variable_product(
-                self.remote_product.remote_parent_id,
-                self.remote_product.remote_id,
-                **self.payload
-            )
+        if self.is_woocommerce_variant_product:
+            parent_id = self.remote_product.remote_parent_product.remote_id
+            variant_id = self.remote_product.remote_id
+            return self.api.update_product_variation(parent_id, variant_id, **self.payload)
         else:
-            raise NotImplementedError("Unknown product type configuration.")
+            product_id = self.remote_product.remote_id
+            return self.api.update_product(product_id, **self.payload)
 
 
 class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSalesChannelLanguageMixin, WoocommerceProductTypeMixin, ToUpdateCurrenciesMixin):
@@ -546,10 +540,13 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
         # but "magic" and get set during the payload build.
         # 'price': 'regular_price',
         # 'discount': 'sale_price',
-        'name': 'name',
-        'description': 'description',
-        'short_description': 'short_description',
+        # 'name': 'name',
+        # 'description': 'description',
+        # 'short_description': 'short_description',
     }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def get_local_product(self):
         return self.remote_product.local_instance
@@ -560,6 +557,16 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
                 sales_channel=self.sales_channel,
             ).local_instance
             self.currency_iso_code = self.currency.iso_code
+
+    def apply_content_payload(self):
+        # FIXME: This approach ignores the sales-channel setting that variations
+        # should have the configurable name.  This needs fixing.
+        product = self.get_local_product()
+        translation = product.translations.get(language=self.sales_channel_assign_language)
+        self.payload['name'] = translation.name
+        self.payload['description'] = translation.description
+        self.payload['short_description'] = translation.short_description
+        return self.payload
 
     def apply_ean_code_payload(self):
         product = self.get_local_product()
@@ -605,21 +612,13 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
         #     ]
         # }
         product = self.get_local_product()
-        # It seems that omitting the sku from the payload when
-        # only images are updated can remove the sku from the product.
-        # enforce the sku to ensure it is here at all times.
-        self.payload['sku'] = self.get_sku()
-
         image_throughs = product.mediaproductthrough_set.filter(media__type=Media.IMAGE)
-        logger.debug(f"apply_media_payload Found {image_throughs.count()} image_throughs for {product=}")
-
         payload = [{"src": self.get_image_url(i.media)} for i in image_throughs]
         self.payload['images'] = payload
-
-        logger.debug(f"Media payload applied: {self.payload}")
         return self.payload
 
     def apply_price_payload(self):
+        from sales_channels.integrations.woocommerce.models import WoocommercePrice, WoocommerceProduct
         # Concidering that woocommerce only supports a single currency
         # then grabbing the currency in a static way is perfectly acceptable.
         currency_code = WoocommerceCurrency.objects.get(
@@ -627,6 +626,18 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
         price_info = self.price_data.get(currency_code, {})
         self.payload['regular_price'] = price_info.get('price', None)
         self.payload['sale_price'] = price_info.get('discount_price', None)
+
+        product = self.get_local_product()
+        remote_product = WoocommerceProduct.objects.get(
+            local_instance=product,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+        )
+        WoocommercePrice.objects.get_or_create(
+            remote_product=remote_product,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+        )
         return self.payload
 
     def apply_base_product_payload(self):
@@ -670,21 +681,9 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
         self.apply_media_payload()
         self.apply_price_payload()
         self.apply_attribute_payload()
+        self.apply_content_payload()
         return self.payload
 
     def run(self):
         self.set_currency()
         return super().run()
-
-    # def apply_content_payload(self):
-    #     # We need to build a manual payload. For that we need:
-    #     language = self.sales_channel_assign_language
-    #     product = self.get_local_product()
-    #     translation = product.translations.get(language=language)
-
-    #     self.payload['name'] = translation.name
-    #     self.payload['description'] = translation.description
-    #     self.payload['short_description'] = translation.short_description
-
-    #     logger.debug(f"{self.__class__.__name__} payload: {self.payload}")
-    #     return self.payload

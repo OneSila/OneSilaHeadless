@@ -17,6 +17,9 @@ from taxes.models import VatRate
 from currencies.currencies import iso_list
 from core.exceptions import ValidationError
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class ProductImport(ImportOperationMixin):
     get_identifiers = ['sku', 'type']

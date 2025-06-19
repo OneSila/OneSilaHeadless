@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class WoocommercePriceUpdateFactory(WooCommerceUpdateRemoteProductMixin, WooCommercePayloadMixin, RemotePriceUpdateFactory):
+class WoocommercePriceUpdateFactory(WooCommercePayloadMixin, WooCommerceUpdateRemoteProductMixin, RemotePriceUpdateFactory):
     remote_model_class = WoocommercePrice
 
     def update_remote(self):

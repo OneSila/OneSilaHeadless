@@ -38,9 +38,10 @@ class RemoteProductContentUpdateFactory(ProductAssignmentMixin, RemoteInstanceUp
 
         # Set the remote_instance for the factory based on existing data
         try:
-            self.remote_instance = self.remote_model_class.objects.get(
-                remote_product=self.remote_product
-            )
+            if not self.remote_instance:
+                self.remote_instance = self.remote_model_class.objects.get(
+                    remote_product=self.remote_product
+                )
         except self.remote_model_class.DoesNotExist:
             logger.error(f"{self.__class__.__name__} remote instance does not exist.")
             return False

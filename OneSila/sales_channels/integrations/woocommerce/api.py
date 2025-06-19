@@ -421,7 +421,7 @@ class WoocommerceApiWrapper:
             return self.put(f'products/{product_id}', data=payload)
         except FailedToPutError as e:
             extra_msg = f"product_id: {product_id}"
-            raise FailedToUpdateProductError(e, response=e.response, extra_msg=extra_msg) from e
+            raise FailedToUpdateProductError(e, response=e.response, extra_msg=extra_msg, data=payload) from e
 
     @raise_for_none(arg_name='product_id')
     def delete_product(self, product_id):

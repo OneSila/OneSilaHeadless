@@ -59,8 +59,7 @@ class WooCommerceEanCodeFactoryTestCase(TestCaseDemoDataMixin, WooCommerceProduc
         # first verify if the product is already created in woocomemrce
         # remove if yes
         try:
-            remote_product = self.api.get_product_by_sku(sku)
-            self.api.delete_product(remote_product['id'])
+            self.api.delete_product_by_sku(sku)
         except FailedToGetProductBySkuError:
             pass
 
@@ -79,7 +78,6 @@ class WooCommerceEanCodeFactoryTestCase(TestCaseDemoDataMixin, WooCommerceProduc
 
         # Assign the product to the sales channel
         self.assign_product_to_sales_channel(child)
-
 
         remote_instance = WoocommerceProduct.objects.get(local_instance=child)
         factory = WooCommerceEanCodeUpdateFactory(

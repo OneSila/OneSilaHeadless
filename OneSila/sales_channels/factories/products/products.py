@@ -1162,7 +1162,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
 
         if self.remote_price_class:
             # Get or create the RemotePrice object
-            remote_price_obj, created = self.remote_price_class.objects.get_or_create(
+            remote_price_obj, _ = self.remote_price_class.objects.get_or_create(
                 remote_product=self.remote_instance,
                 sales_channel=self.sales_channel,
                 multi_tenant_company=self.sales_channel.multi_tenant_company,
@@ -1174,7 +1174,9 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
                 remote_price_obj.save(update_fields=["price_data"])
                 logger.debug(f"Updated price_data for {self.remote_instance} → {self.prices_data}")
         else:
-            logger.warning(f"No remote_price_class found in {self.__class__.__name__}")
+            msg = f"No remote_price_class found in {self.__class__.__name__}"
+            logger.error(msg)
+            raise AttributeError(msg)
 
     def perform_non_subclassed_remote_action(self):
         """

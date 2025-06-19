@@ -106,8 +106,8 @@ class CreateTestProductMixin:
             product=product,
             language=self.multi_tenant_company.language,
             name=name,
-            short_description="<b>Short Description</b>",
-            description="<b>Description</b>",
+            short_description="<p><b>Short Description</b></p>",
+            description="<p><b>Description</b></p>",
         )
         # Create a property for product type
         product_type_property = Property.objects.get(
