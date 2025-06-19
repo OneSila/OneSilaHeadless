@@ -10,6 +10,7 @@ from properties.models import ProductPropertiesRuleItem, ProductPropertiesRule, 
     PropertySelectValueTranslation, Property, ProductProperty
 from sales_prices.models import SalesPrice
 from currencies.currencies import currencies
+from core.exceptions import ValidationError
 
 
 class ImportProductInstanceValidateTest(TestCase):
@@ -259,10 +260,10 @@ class ImportProductTranslationAndSalesPriceValidateTest(TestCase):
             "product_data": {"name": "Invalid Currency"}
         }
 
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(ValidationError) as cm:
             ImportSalesPriceInstance(data, self.import_process)
 
-        self.assertIn("The price use unsupported currency", str(cm.exception))
+        self.assertIn("unknown in the public currency list", str(cm.exception))
 
 
 class ImportProductInstanceProcessTest(TestCase):
@@ -848,6 +849,7 @@ class ImportProductInstanceParentLinkingTest(TestCase):
         self.assertIsNotNone(alias.alias_parent_product)
         self.assertEqual(alias.alias_parent_product.sku, "MAIN-001")
 
+
 class ImportProductInstanceCreateOnlyTest(TestCase):
     def setUp(self):
         super().setUp()
@@ -927,5 +929,3 @@ class ImportProductInstanceCreateOnlyTest(TestCase):
             MediaProductThrough.objects.filter(product=product).count(),
             initial_images + 1,
         )
-
-
