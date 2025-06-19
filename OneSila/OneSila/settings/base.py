@@ -320,7 +320,7 @@ MAGENTO_LOG_DIR_PATH = os.getenv('MAGENTO_LOG_DIR_PATH', '/var/log/OneSilaHeadle
 # Shopify integration Settings (sales_channels.integrations.shopify)
 #
 
-SHOPIFY_SCOPES = ['read_products', 'write_products', 'read_markets_home', 'read_orders', 'read_publications', 'write_publications']
+SHOPIFY_SCOPES = ['read_products', 'write_products', 'read_locales', 'read_orders', 'read_publications', 'write_publications']
 SHOPIFY_API_VERSION = "2025-04"
 SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
 SHOPIFY_API_SECRET = os.getenv('SHOPIFY_API_SECRET')

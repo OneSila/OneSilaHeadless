@@ -427,7 +427,7 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
             # Reuse from translation map if available
             reused_translation = None
-            if store_code in self.magento_translation_store_code_map:
+            if hasattr(self, 'self.translation_product_map') and store_code in self.magento_translation_store_code_map:
                 language = self.magento_translation_store_code_map[store_code]
                 reused_translation = self.translation_product_map.get(language)
 
@@ -684,7 +684,7 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
         structured_data['images'], structured_data['__image_index_to_remote_id'] = self.get_product_images(product)
 
         if product_type == Product.SIMPLE:
-            structured_data['attributes'], structured_data['__mirror_product_properties_map'] = self.get_product_attributes(custom_attributes, translation_map)
+            structured_data['properties'], structured_data['__mirror_product_properties_map'] = self.get_product_attributes(custom_attributes, translation_map)
             structured_data['prices'] = self.get_product_prices(product, currency_map)
 
         elif product_type == Product.CONFIGURABLE:
@@ -724,7 +724,7 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 magento_ean_code.save()
 
     def handle_attributes(self, import_instance: ImportProductInstance):
-        if hasattr(import_instance, 'attributes'):
+        if hasattr(import_instance, 'properties'):
             product_properties = import_instance.product_property_instances
             remote_product = import_instance.remote_instance
             mirror_map = import_instance.data.get('__mirror_product_properties_map', {})
