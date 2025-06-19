@@ -109,6 +109,9 @@ class ModelInstanceSubscribePublisher:
         resp = await self.channel_layer.group_add(self.group, self.ws.channel_name)
         logger.debug(f"Subscribed to group {self.group} with resp {resp}")
 
+    async def unsubscribe(self):
+        await self.channel_layer.group_discard(self.group, self.ws.channel_name)
+
     async def send_message(self):
         await self.channel_layer.group_send(group=self.group, message=self.msg)
         logger.debug(f"Sent message {self.msg} to group {self.group}")
@@ -131,4 +134,4 @@ class ModelInstanceSubscribePublisher:
                     yield await self.refresh_instance()
         finally:
             with contextlib.suppress(Exception):
-                await self.channel_layer.group_discard(self.group, self.ws.channel_name)
+                await self.unsubscribe()

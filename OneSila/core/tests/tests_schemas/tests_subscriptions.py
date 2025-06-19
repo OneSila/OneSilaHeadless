@@ -5,10 +5,11 @@ from asgiref.sync import async_to_sync
 from channels.layers import InMemoryChannelLayer
 from model_bakery import baker
 
-from core.tests import TestCase
+from core.tests import TransactionTestCase
 from core.models import MultiTenantCompany, MultiTenantUser
 from core.schema.core.subscriptions.publishers import ModelInstanceSubscribePublisher
 from core.schema.core.subscriptions.helpers import create_global_id
+from products.models import Product
 
 
 class FakeWS:
@@ -33,27 +34,28 @@ class FakeWS:
                 await self.channel_layer.group_discard(group, self.channel_name)
 
 
-class ModelInstanceSubscribePublisherTests(TestCase):
+class ModelInstanceSubscribePublisherTests(TransactionTestCase):
     def test_group_removed_after_disconnect(self):
         channel_layer = InMemoryChannelLayer()
         ws = FakeWS(channel_layer=channel_layer)
 
         company = baker.make(MultiTenantCompany)
         user = baker.make(MultiTenantUser, multi_tenant_company=company)
+        product = baker.make(Product, multi_tenant_company=company, type=Product.SIMPLE)
 
         info = SimpleNamespace(
             context={
                 "ws": ws,
                 "request": SimpleNamespace(user=user),
             },
-            return_type=SimpleNamespace(__name__="MultiTenantCompanyType"),
+            return_type=SimpleNamespace(__name__="ProductType"),
         )
 
-        pk = create_global_id(company)
+        pk = create_global_id(product)
         publisher = ModelInstanceSubscribePublisher(
             info=info,
             pk=pk,
-            model=MultiTenantCompany,
+            model=Product,
         )
 
         async def run_pub():
@@ -61,11 +63,10 @@ class ModelInstanceSubscribePublisherTests(TestCase):
             await gen.__anext__()
             self.assertIn(
                 ws.channel_name,
-                channel_layer.groups.get("MultiTenantCompany", {}),
+                channel_layer.groups.get("Product", {}),
             )
             await gen.aclose()
 
         async_to_sync(run_pub)()
 
-        self.assertNotIn("MultiTenantCompany", channel_layer.groups)
-
+        self.assertNotIn("Product", channel_layer.groups)
