@@ -80,7 +80,3 @@ class AmazonSalesChannelMutation:
     update_amazon_product_type: AmazonProductTypeType = update(AmazonProductTypePartialInput)
 
     create_amazon_import_process: AmazonSalesChannelImportType = create(AmazonSalesChannelImportInput)
-    create_amazon_import_processes: List[AmazonSalesChannelImportType] = create(AmazonSalesChannelImportInput)
-    update_amazon_import_process: AmazonSalesChannelImportType = update(AmazonSalesChannelImportPartialInput)
-    delete_amazon_import_process: AmazonSalesChannelImportType = delete()
-    delete_amazon_import_processes: List[AmazonSalesChannelImportType] = delete()

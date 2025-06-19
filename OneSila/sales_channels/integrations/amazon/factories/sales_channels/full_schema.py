@@ -183,21 +183,26 @@ class AmazonFullSchemaPullFactory(GetAmazonAPIMixin, PullAmazonMixin, PullRemote
                     remote_select_value.remote_name = value['name']
                     remote_select_value.save()
 
-                remote_rule_item, _ = AmazonProductTypeItem.objects.get_or_create(
+                remote_rule_item, created_item = AmazonProductTypeItem.objects.get_or_create(
                     multi_tenant_company=self.sales_channel.multi_tenant_company,
                     sales_channel=self.sales_channel,
                     amazon_rule=product_type,
                     remote_property=remote_property
                 )
 
-                remote_rule_item.remote_type = ProductPropertiesRuleItem.REQUIRED if public_definition.is_required else ProductPropertiesRuleItem.OPTIONAL
-                remote_rule_item.save()
+                new_type = (
+                    ProductPropertiesRuleItem.REQUIRED
+                    if public_definition.is_required
+                    else ProductPropertiesRuleItem.OPTIONAL
+                )
 
+                if (
+                    created or
+                    (remote_rule_item.remote_type == ProductPropertiesRuleItem.OPTIONAL and new_type == ProductPropertiesRuleItem.REQUIRED)
+                ):
+                    remote_rule_item.remote_type = new_type
+                    remote_rule_item.save()
 
-
-
-    def create_remote_rule_item(self, remote_property, public_definition):
-        pass
 
 
 class ExportDefinitionFactory:

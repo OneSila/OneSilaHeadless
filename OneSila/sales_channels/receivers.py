@@ -9,6 +9,7 @@ from media.models import Media
 from properties.signals import product_properties_rule_configurator_updated
 from sales_prices.models import SalesPriceListItem
 from sales_prices.signals import price_changed
+from .integrations.amazon.models import AmazonSalesChannel
 from .integrations.magento2.models import MagentoProduct
 from .models import SalesChannelImport
 # from .models import ImportProcess
@@ -59,12 +60,16 @@ def import_process_avoid_duplicate_pre_create_receiver(sender, instance: SalesCh
 def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelImport, **kwargs):
     from sales_channels.integrations.shopify.models.sales_channels import ShopifySalesChannel
     from sales_channels.integrations.shopify.tasks import shopify_import_db_task
+    from sales_channels.integrations.amazon.tasks import amazon_import_db_task
 
     sales_channel = instance.sales_channel.get_real_instance()
     if isinstance(sales_channel, ShopifySalesChannel):
         refresh_subscription_receiver(sales_channel)
-
         shopify_import_db_task(import_process=instance, sales_channel=sales_channel)
+
+    if isinstance(sales_channel, AmazonSalesChannel):
+        refresh_subscription_receiver(sales_channel)
+        amazon_import_db_task(import_process=instance, sales_channel=sales_channel)
 
 
 @receiver(post_update, sender=SalesChannelImport)
@@ -74,6 +79,7 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
     from sales_channels.integrations.magento2.tasks import magento_import_db_task
     from sales_channels.integrations.shopify.models.sales_channels import ShopifySalesChannel
     from sales_channels.integrations.shopify.tasks import shopify_import_db_task
+    from sales_channels.integrations.amazon.tasks import amazon_import_db_task
 
     sales_channel = instance.sales_channel.get_real_instance()
     if instance.status == SalesChannelImport.STATUS_PENDING:
@@ -83,6 +89,9 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
 
         if isinstance(sales_channel, ShopifySalesChannel):
             shopify_import_db_task(import_process=instance, sales_channel=sales_channel)
+
+        if isinstance(sales_channel, AmazonSalesChannel):
+            amazon_import_db_task(import_process=instance, sales_channel=sales_channel)
 
 
 @receiver(post_update, sender=SalesChannelImport)
