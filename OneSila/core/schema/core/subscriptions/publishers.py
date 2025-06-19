@@ -1,6 +1,7 @@
 from strawberry_django.auth.utils import get_current_user
 from strawberry.relay.utils import from_base64
 from asgiref.sync import sync_to_async
+import contextlib
 
 from .typing import Info, GlobalID, Model
 
@@ -108,6 +109,9 @@ class ModelInstanceSubscribePublisher:
         resp = await self.channel_layer.group_add(self.group, self.ws.channel_name)
         logger.debug(f"Subscribed to group {self.group} with resp {resp}")
 
+    async def unsubscribe(self):
+        await self.channel_layer.group_discard(self.group, self.ws.channel_name)
+
     async def send_message(self):
         await self.channel_layer.group_send(group=self.group, message=self.msg)
         logger.debug(f"Sent message {self.msg} to group {self.group}")
@@ -123,7 +127,11 @@ class ModelInstanceSubscribePublisher:
         await self.subscribe()
         await self.send_initial_message()
 
-        async with self.ws.listen_to_channel(type=self.msg_type, groups=[self.group]) as messages:
-            async for msg in messages:
-                logger.info(f"Found wake-up: {msg}")
-                yield await self.refresh_instance()
+        try:
+            async with self.ws.listen_to_channel(type=self.msg_type, groups=[self.group]) as messages:
+                async for msg in messages:
+                    logger.info(f"Found wake-up: {msg}")
+                    yield await self.refresh_instance()
+        finally:
+            with contextlib.suppress(Exception):
+                await self.unsubscribe()
