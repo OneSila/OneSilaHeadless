@@ -4,6 +4,7 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonPropertyType,
     AmazonPropertySelectValueType,
     AmazonProductTypeType,
+    AmazonSalesChannelImportType,
 )
 
 
@@ -20,3 +21,6 @@ class AmazonSalesChannelsQuery:
 
     amazon_product_type: AmazonProductTypeType = node()
     amazon_product_types: DjangoListConnection[AmazonProductTypeType] = connection()
+
+    amazon_import_process: AmazonSalesChannelImportType = node()
+    amazon_import_processes: DjangoListConnection[AmazonSalesChannelImportType] = connection()

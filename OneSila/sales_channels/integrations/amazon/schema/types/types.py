@@ -8,23 +8,28 @@ from core.schema.core.types.types import (
     lazy,
 )
 from typing import Optional, List
+from strawberry.relay import to_base64
+from imports_exports.schema.queries import ImportType
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonProductType,
+    AmazonSalesChannelImport,
 )
 from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelFilter,
     AmazonPropertyFilter,
     AmazonPropertySelectValueFilter,
     AmazonProductTypeFilter,
+    AmazonSalesChannelImportFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
     AmazonPropertyOrder,
     AmazonPropertySelectValueOrder,
     AmazonProductTypeOrder,
+    AmazonSalesChannelImportOrder,
 )
 
 
@@ -65,6 +70,7 @@ class AmazonPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
         'AmazonPropertySelectValueType',
         lazy("sales_channels.integrations.amazon.schema.types.types")
     ]]
+
     @field()
     def mapped_locally(self, info) -> bool:
         return self.mapped_locally
@@ -95,6 +101,7 @@ class AmazonPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
         'PropertySelectValueType',
         lazy("properties.schema.types.types")
     ]]
+
     @field()
     def mapped_locally(self, info) -> bool:
         return self.mapped_locally
@@ -120,6 +127,7 @@ class AmazonProductTypeType(relay.Node, GetQuerysetMultiTenantMixin):
         'ProductPropertiesRuleType',
         lazy("properties.schema.types.types")
     ]]
+
     @field()
     def mapped_locally(self, info) -> bool:
         return self.mapped_locally
@@ -127,3 +135,21 @@ class AmazonProductTypeType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def mapped_remotely(self, info) -> bool:
         return self.mapped_remotely
+
+
+@type(
+    AmazonSalesChannelImport,
+    filters=AmazonSalesChannelImportFilter,
+    order=AmazonSalesChannelImportOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonSalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+
+    @field()
+    def import_id(self, info) -> str:
+        return to_base64(ImportType, self.pk)

@@ -5,6 +5,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonProductType,
+    AmazonSalesChannelImport,
 )
 
 
@@ -25,4 +26,9 @@ class AmazonPropertySelectValueOrder:
 
 @order(AmazonProductType)
 class AmazonProductTypeOrder:
+    id: auto
+
+
+@order(AmazonSalesChannelImport)
+class AmazonSalesChannelImportOrder:
     id: auto

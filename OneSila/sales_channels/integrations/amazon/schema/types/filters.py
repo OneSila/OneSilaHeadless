@@ -12,6 +12,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonProductType,
+    AmazonSalesChannelImport,
 )
 from properties.schema.types.filters import (
     PropertyFilter,
@@ -97,3 +98,9 @@ class AmazonProductTypeFilter(SearchFilterMixin):
         if value not in (None, UNSET):
             queryset = queryset.filter_mapped_remotely(value)
         return queryset, Q()
+
+
+@filter(AmazonSalesChannelImport)
+class AmazonSalesChannelImportFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
