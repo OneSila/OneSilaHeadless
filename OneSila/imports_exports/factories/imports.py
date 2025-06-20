@@ -3,6 +3,7 @@ from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.properties import ImportProductPropertiesRuleInstance, ImportPropertySelectValueInstance, \
     ImportPropertyInstance
 from imports_exports.models import Import
+from notifications.factories.email import SendImportReportEmailFactory
 import traceback
 import math
 
@@ -237,10 +238,43 @@ class ImportMixin:
         pass
     
     def set_broken_records(self):
-        
+
         if len(self._broken_records) > 0:
             self.import_process.broken_records = self._broken_records
             self.import_process.save(update_fields=['broken_records'])
+
+    def send_reports(self):
+        reports = getattr(self.import_process, "reports", None)
+        if not reports:
+            return
+
+        reports = reports.all()
+        if not reports:
+            return
+
+        context_base = {
+            "import_obj": self.import_process,
+        }
+
+        if self.import_process.skip_broken_records:
+            errors = extract_clean_errors(self.import_process)
+            context_base["errors"] = errors
+
+        company_lang = getattr(self.import_process.multi_tenant_company, "language", "en")
+
+        for report in reports:
+            recipient_emails = list(report.users.values_list("username", flat=True))
+            recipient_emails.extend(report.external_emails or [])
+
+            for email in recipient_emails:
+                language = company_lang
+                user_qs = report.users.filter(username=email)
+                if user_qs.exists():
+                    language = user_qs.first().language
+
+                context = context_base.copy()
+                fac = SendImportReportEmailFactory(email=email, language=language, context=context)
+                fac.run()
 
     def run(self):
         self.prepare_import_process()
@@ -273,84 +307,81 @@ class ImportMixin:
             if self.import_process.skip_broken_records:
                 self.set_broken_records()
 
-# CLEAN REPORT FOR EMAIL
-# def extract_clean_errors(import_obj):
-#     import re
-#     from django.core.exceptions import ObjectDoesNotExist
-#     from products.models import Product
-#
-#     cleaned_errors = []
-#     broken_records = import_obj.broken_records
-#     company = import_obj.multi_tenant_company
-#
-#     # Patterns for your custom save errors (using startswith and keywords)
-#     custom_error_starts = [
-#         "Parent product must be of type CONFIGURABLE.",
-#         "Variation product must be of type SIMPLE or BUNDLE or ALIAS.",
-#         "Parent product must be of type BUNDLE.",
-#     ]
-#
-#     def matches_custom_save_error(msg):
-#         return any(msg.strip().startswith(pattern) for pattern in custom_error_starts)
-#
-#     def find_sku_and_type(data, target_sku):
-#         if data.get("sku") == target_sku:
-#             return data.get("type"), data.get("alias_parent_sku")
-#         for key in ["variations", "bundle_variations", "alias_variations"]:
-#             for var in data.get(key, []):
-#                 var_data = var.get("variation_data", {})
-#                 if var_data.get("sku") == target_sku:
-#                     return var_data.get("type"), var_data.get("alias_parent_sku")
-#         return None, None
-#
-#     for record in broken_records:
-#         error_msg = record.get("error", "")
-#         data = record.get("data", {})
-#
-#         # If it's a known custom save error, add as is and do not append unknown
-#         if matches_custom_save_error(error_msg):
-#             cleaned_errors.append(error_msg)
-#             continue
-#
-#         # 1. ALIAS PARENT ERROR
-#         match_alias_detail = re.search(
-#             r'Failing row contains\s*\((.*?)\)', error_msg, re.DOTALL
-#         )
-#         if match_alias_detail:
-#             row = match_alias_detail.group(1)
-#             parts = [p.strip() for p in row.split(',')]
-#             if len(parts) >= 4:
-#                 sku = parts[3]
-#                 feed_type, alias_parent_sku = find_sku_and_type(data, sku)
-#                 if alias_parent_sku:
-#                     cleaned_errors.append(
-#                         f"Alias product for SKU {sku} is linked to the product with SKU: {alias_parent_sku} that doesn't exist."
-#                     )
-#                 else:
-#                     cleaned_errors.append(
-#                         f"Alias product for SKU {sku} is linked to a product that doesn't exist (could not find alias_parent_sku in data)."
-#                     )
-#                 continue
-#
-#         # 2. TYPE MISMATCH ERROR
-#         match_duplicate = re.search(
-#             r'Key \(sku, multi_tenant_company_id\)=\(([^,\n]+),', error_msg
-#         )
-#         if match_duplicate:
-#             sku = match_duplicate.group(1).strip()
-#             feed_type, _ = find_sku_and_type(data, sku)
-#             try:
-#                 local_product_type = Product.objects.get(multi_tenant_company=company, sku=sku).type
-#             except ObjectDoesNotExist:
-#                 local_product_type = "NOT FOUND"
-#
-#             cleaned_errors.append(
-#                 f"SKU {sku} has wrong product type in data feed ({feed_type}). In OneSila this is marked as {local_product_type}"
-#             )
-#             continue
-#
-#         # Only append unknown error if it's not a custom save error
-#         if not matches_custom_save_error(error_msg):
-#             cleaned_errors.append("Unknown error format")
-#
-#     return cleaned_errors
+            self.send_reports()
+
+
+def extract_clean_errors(import_obj):
+    import re
+    from django.core.exceptions import ObjectDoesNotExist
+    from products.models import Product
+
+    cleaned_errors = []
+    broken_records = import_obj.broken_records
+    company = import_obj.multi_tenant_company
+
+    custom_error_starts = [
+        "Parent product must be of type CONFIGURABLE.",
+        "Variation product must be of type SIMPLE or BUNDLE or ALIAS.",
+        "Parent product must be of type BUNDLE.",
+    ]
+
+    def matches_custom_save_error(msg):
+        return any(msg.strip().startswith(pattern) for pattern in custom_error_starts)
+
+    def find_sku_and_type(data, target_sku):
+        if data.get("sku") == target_sku:
+            return data.get("type"), data.get("alias_parent_sku")
+        for key in ["variations", "bundle_variations", "alias_variations"]:
+            for var in data.get(key, []):
+                var_data = var.get("variation_data", {})
+                if var_data.get("sku") == target_sku:
+                    return var_data.get("type"), var_data.get("alias_parent_sku")
+        return None, None
+
+    for record in broken_records:
+        error_msg = record.get("error", "")
+        data = record.get("data", {})
+
+        if matches_custom_save_error(error_msg):
+            cleaned_errors.append(error_msg)
+            continue
+
+        match_alias_detail = re.search(
+            r'Failing row contains\s*\((.*?)\)', error_msg, re.DOTALL
+        )
+        if match_alias_detail:
+            row = match_alias_detail.group(1)
+            parts = [p.strip() for p in row.split(',')]
+            if len(parts) >= 4:
+                sku = parts[3]
+                feed_type, alias_parent_sku = find_sku_and_type(data, sku)
+                if alias_parent_sku:
+                    cleaned_errors.append(
+                        f"Alias product for SKU {sku} is linked to the product with SKU: {alias_parent_sku} that doesn't exist."
+                    )
+                else:
+                    cleaned_errors.append(
+                        f"Alias product for SKU {sku} is linked to a product that doesn't exist (could not find alias_parent_sku in data)."
+                    )
+                continue
+
+        match_duplicate = re.search(
+            r'Key \(sku, multi_tenant_company_id\)=\(([^,\n]+),', error_msg
+        )
+        if match_duplicate:
+            sku = match_duplicate.group(1).strip()
+            feed_type, _ = find_sku_and_type(data, sku)
+            try:
+                local_product_type = Product.objects.get(multi_tenant_company=company, sku=sku).type
+            except ObjectDoesNotExist:
+                local_product_type = "NOT FOUND"
+
+            cleaned_errors.append(
+                f"SKU {sku} has wrong product type in data feed ({feed_type}). In OneSila this is marked as {local_product_type}"
+            )
+            continue
+
+        if not matches_custom_save_error(error_msg):
+            cleaned_errors.append("Unknown error format")
+
+    return cleaned_errors

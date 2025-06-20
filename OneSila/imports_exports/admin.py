@@ -1,5 +1,5 @@
 from django.contrib import admin
-from imports_exports.models import MappedImport
+from imports_exports.models import MappedImport, ImportReport
 from django.utils.safestring import mark_safe
 import json
 from pygments import highlight
@@ -24,3 +24,9 @@ class MappedImportAdmin(admin.ModelAdmin):
         return mark_safe(style + highlighted.replace('\\n', '<br/>'))
 
     formatted_broken_records.short_description = 'Broken Records'
+
+
+@admin.register(ImportReport)
+class ImportReportAdmin(admin.ModelAdmin):
+    pass
+

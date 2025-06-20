@@ -207,3 +207,37 @@ class MappedImport(TypedImport):
 
         if self.is_periodic:
             self.mark_as_run()
+
+
+class ImportReport(models.Model):
+    """Stores email report information for an :class:`Import`."""
+
+    import_process = models.ForeignKey(
+        Import,
+        on_delete=models.CASCADE,
+        related_name="reports",
+    )
+    users = models.ManyToManyField(
+        'core.MultiTenantUser',
+        blank=True,
+        help_text="Internal users that will receive a report.",
+    )
+    external_emails = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of external emails that will receive a report.",
+    )
+
+    def clean(self):
+        super().clean()
+        company = self.import_process.multi_tenant_company
+        invalid = self.users.exclude(multi_tenant_company=company)
+        if invalid.exists():
+            raise ValidationError(
+                "All users must belong to the same company as the import process."
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
