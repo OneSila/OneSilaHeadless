@@ -1,0 +1,22 @@
+{% extends 'notifications/email/base_email.html' %}
+{% load i18n %}
+{% block content %}
+{% if import_obj.skip_broken_records %}
+{% translate "Hi" %},
+<br><br>
+{% translate "Your import finished with the following issues:" %}
+<br><br>
+{% for error in errors %}
+- {{ error }}<br>
+{% endfor %}
+{% else %}
+{% translate "Hi" %},
+<br><br>
+{% translate "The import created at" %} {{ import_obj.created_at }} {% translate "failed." %}
+{% if import_obj.json_file %}
+<br>{% translate "File:" %} {{ import_obj.json_file.name }}
+{% elif import_obj.json_url %}
+<br>{% translate "URL:" %} {{ import_obj.json_url }}
+{% endif %}
+{% endif %}
+{% endblock %}
