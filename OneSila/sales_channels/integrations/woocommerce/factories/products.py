@@ -155,7 +155,10 @@ class WooCommerceProductDeleteFactory(SerialiserMixin, GetWoocommerceAPIMixin, R
         """
         Deletes a remote product in WooCommerce.
         """
-        return self.api.delete_product(self.remote_instance.remote_id)
+        if self.remote_instance.is_variation:
+            return self.api.delete_product_variation(self.remote_instance.remote_id, self.remote_instance.remote_parent_product.remote_id)
+        else:
+            return self.api.delete_product(self.remote_instance.remote_id)
 
 
 class WooCommerceProductVariationAddFactory(WooCommerceProductMixin, RemoteProductVariationAddFactory):

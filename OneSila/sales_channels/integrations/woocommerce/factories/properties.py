@@ -129,7 +129,7 @@ class WoocommerceGlobalAttributeValueDeleteFactory(WoocommerceGlobalAttributeVal
         return self.api.delete_attribute_term(self.remote_instance.remote_property.remote_id, self.remote_instance.remote_id)
 
 
-class WooCommerceProductPropertyMixin(SerialiserMixin, WoocommerceRemoteValueConversionMixin):
+class WooCommerceProductPropertyMixin(WoocommerceRemoteValueConversionMixin):
     remote_model_class = WoocommerceProductProperty
     remote_id_map = 'id'
     remote_property_factory = WooCommerceGlobalAttributeCreateFactory
@@ -138,23 +138,23 @@ class WooCommerceProductPropertyMixin(SerialiserMixin, WoocommerceRemoteValueCon
     update_if_not_exists = True
     update_factory_class = "WooCommerceProductPropertyUpdateFactory"
 
-    field_mapping = {
-        'name': 'name',
-        'is_public_information': 'visible',
-    }
+    # field_mapping = {
+    #     'name': 'name',
+    #     'is_public_information': 'visible',
+    # }
 
-    # def get_local_product(self):
-    #     return self.local_instance.product
+    def get_local_product(self):
+        return self.local_instance.product
 
 
-class WooCommerceProductPropertyCreateFactory(WooCommerceProductPropertyMixin, GetWoocommerceAPIMixin, RemoteProductPropertyCreateFactory, WoocommerceRemoteValueConversionMixin):
+class WooCommerceProductPropertyCreateFactory(WooCommerceProductPropertyMixin, WooCommercePayloadMixin, RemoteProductPropertyCreateFactory, WoocommerceRemoteValueConversionMixin):
     def create_remote(self):
         """To assign a property to a product we need to concider that woocommerce looks at things as follows:
         - Global Attributes need to be created first but are part of the product properties but must include the slug.
         - Local (Custom) Attributes are just supplied.
         """
         # The attributes are not actually assigned on the product.
-        # They are part of the product create.
+        # They are part of the product itself.
         self.remote_value = self.get_remote_value()
 
         if self.get_value_only:
@@ -163,19 +163,18 @@ class WooCommerceProductPropertyCreateFactory(WooCommerceProductPropertyMixin, G
             # if we ony get the value we don't need to return anything.
             return
 
-        raise NotImplementedError("WooCommerceProductPropertyCreateFactory should be triggering a product-update after applying the attribute payload.")
+        self.update_remote_product()
 
 
-class WooCommerceProductPropertyUpdateFactory(WooCommerceProductPropertyMixin, GetWoocommerceAPIMixin, RemoteProductPropertyUpdateFactory):
+class WooCommerceProductPropertyUpdateFactory(WooCommerceProductPropertyMixin, WooCommercePayloadMixin, RemoteProductPropertyUpdateFactory):
     def update_remote(self):
         # The attributes are not actually updated on the product.
         # They are set as part of the product. However we do need to update things.
+        self.update_remote_product()
 
-        raise NotImplementedError("WooCommerceProductPropertyUpdateFactory should be triggering a product-update after applying the attribute payload.")
 
-
-class WooCommerceProductPropertyDeleteFactory(WooCommerceProductPropertyMixin, GetWoocommerceAPIMixin, RemoteProductPropertyDeleteFactory):
+class WooCommerceProductPropertyDeleteFactory(WooCommerceProductPropertyMixin, WooCommercePayloadMixin, RemoteProductPropertyDeleteFactory):
     def delete_remote(self):
         # The attributes are not actually updated on the product.
         # They are set as part of the product
-        raise NotImplementedError("WooCommerceProductPropertyDeleteFactory should be triggering a product-update after applying the attribute payload.")
+        self.update_remote_product()
