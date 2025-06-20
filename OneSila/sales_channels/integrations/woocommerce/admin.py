@@ -52,6 +52,7 @@ class WoocommerceGlobalAttributeValueAdmin(admin.ModelAdmin):
 @admin.register(WoocommerceProduct)
 class WoocommerceProductAdmin(admin.ModelAdmin):
     list_filter = ('sales_channel',)
+    list_display = ('local_instance', 'local_instance__sku', 'remote_id', 'is_variation')
 
 
 @admin.register(WoocommerceMediaThroughProduct)

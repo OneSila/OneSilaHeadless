@@ -466,6 +466,9 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
 
         setattr(self, self.integration_key, self.integration.get_real_instance())
 
+        if not self.remote_model_class:
+            raise ValueError(f"{self.__class__.__name__} must have remote_model_class to point at your remote product class mirror model.")
+
         # we can give both the remote_instance as an id (from tasks) or the real instance
         if isinstance(remote_instance, self.remote_model_class):
             self.remote_instance = remote_instance

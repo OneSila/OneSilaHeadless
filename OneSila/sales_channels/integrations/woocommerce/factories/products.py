@@ -160,11 +160,12 @@ class WooCommerceProductDeleteFactory(SerialiserMixin, GetWoocommerceAPIMixin, R
             return self.api.delete_product(self.remote_instance.remote_id)
 
 
-class WooCommerceProductVariationAddFactory(WooCommerceProductMixin, RemoteProductVariationAddFactory):
+class WooCommerceProductVariationAddFactory(SerialiserMixin, GetWoocommerceAPIMixin, RemoteProductVariationAddFactory):
     """
     After a variation is created, this factory will assign that variation to the configurable product.
     However, in Woocommerce this is not relevant. So we override update_remote trigger a new product update.
     """
+    remote_model_class = WoocommerceProduct
     create_factory_class = WooCommerceProductCreateFactory
 
     def update_remote(self, *args, **kwargs):
