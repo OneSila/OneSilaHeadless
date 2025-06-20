@@ -430,10 +430,22 @@ class ConfigurableVariation(models.Model):
 
     def save(self, *args, **kwargs):
         if self.parent.is_not_configurable():
-            raise IntegrityError(_("parent needs to a product of type CONFIGURABLE. Not %s" % (self.parent.type)))
+            raise IntegrityError(
+                _(
+                    f"Parent product must be of type CONFIGURABLE. "
+                    f"Parent SKU: {self.parent.sku}, type: {self.parent.type}; "
+                    f"Variation SKU: {self.variation.sku}, type: {self.variation.type}."
+                )
+            )
 
         if self.variation.is_configurable():
-            raise IntegrityError(_("variation needs to a product of type BUNDLE or SIMPLE. Not %s" % (self.parent.type)))
+            raise IntegrityError(
+                _(
+                    f"Variation product must be of type SIMPLE or BUNDLE or ALIAS. "
+                    f"Variation SKU: {self.variation.sku}, type: {self.variation.type}; "
+                    f"Parent SKU: {self.parent.sku}, type: {self.parent.type}."
+                )
+            )
 
         super().save(*args, **kwargs)
 
@@ -454,10 +466,22 @@ class BundleVariation(models.Model):
 
     def save(self, *args, **kwargs):
         if self.parent.is_not_bundle():
-            raise IntegrityError(_("parent needs to a product of type BUNDLE. Not %s" % (self.parent.type)))
+            raise IntegrityError(
+                _(
+                    f"Parent product must be of type BUNDLE. "
+                    f"Parent SKU: {self.parent.sku}, type: {self.parent.type}; "
+                    f"Variation SKU: {self.variation.sku}, type: {self.variation.type}."
+                )
+            )
 
         if self.variation.is_configurable():
-            raise IntegrityError(_("variation needs to a product of type BUNDLE or SIMPLE. Not %s" % (self.parent.type)))
+            raise IntegrityError(
+                _(
+                    f"Variation product must be of type SIMPLE or BUNDLE or ALIAS. "
+                    f"Variation SKU: {self.variation.sku}, type: {self.variation.type}; "
+                    f"Parent SKU: {self.parent.sku}, type: {self.parent.type}."
+                )
+            )
 
         super().save(*args, **kwargs)
 
