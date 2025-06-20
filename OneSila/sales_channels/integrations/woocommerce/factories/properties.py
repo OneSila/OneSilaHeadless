@@ -157,6 +157,7 @@ class WooCommerceProductPropertyCreateFactory(WooCommerceProductPropertyMixin, W
         # They are part of the product itself.
         self.remote_value = self.get_remote_value()
 
+        # NOTE What is this about?
         if self.get_value_only:
             self.remote_instance.remote_value = str(self.remote_value)
             self.remote_instance.save()
