@@ -155,14 +155,15 @@ class InviteUserFactory(RequestLoginTokenFactory):
         self.send_signal()
 
 
-class ResendInviteFactory:
+class ResendInviteFactory(RequestLoginTokenFactory):
     def __init__(self, user):
         self.user = user
 
     def send_signal(self):
-        invited.send(sender=self.user.__class__, instance=self.user)
+        invited.send(sender=self.token.__class__, instance=self.token)
 
     def run(self):
+        self.create_token()
         self.send_signal()
 
 
