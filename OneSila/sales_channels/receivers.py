@@ -9,7 +9,7 @@ from media.models import Media
 from properties.signals import product_properties_rule_configurator_updated
 from sales_prices.models import SalesPriceListItem
 from sales_prices.signals import price_changed
-from .integrations.amazon.models import AmazonSalesChannel
+from .integrations.amazon.models import AmazonSalesChannel, AmazonSalesChannelImport
 from .integrations.magento2.models import MagentoProduct
 from .models import SalesChannelImport
 # from .models import ImportProcess
@@ -33,6 +33,7 @@ from properties.models import Property, PropertyTranslation, PropertySelectValue
 
 
 @receiver(post_update, sender=SalesChannelImport)
+@receiver(post_update, sender=AmazonSalesChannelImport)
 def import_process_post_update_fist_import_complete_receiver(sender, instance: SalesChannelImport, **kwargs):
 
     sales_channel = instance.sales_channel
@@ -48,6 +49,7 @@ def import_process_post_update_fist_import_complete_receiver(sender, instance: S
 
 
 @receiver(pre_save, sender=SalesChannelImport)
+@receiver(pre_save, sender=AmazonSalesChannelImport)
 def import_process_avoid_duplicate_pre_create_receiver(sender, instance: SalesChannelImport, **kwargs):
     from django.utils.translation import gettext_lazy as _
 
@@ -57,6 +59,7 @@ def import_process_avoid_duplicate_pre_create_receiver(sender, instance: SalesCh
 
 
 @receiver(post_create, sender=SalesChannelImport)
+@receiver(post_create, sender=AmazonSalesChannelImport)
 def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelImport, **kwargs):
     from sales_channels.integrations.shopify.models.sales_channels import ShopifySalesChannel
     from sales_channels.integrations.shopify.tasks import shopify_import_db_task
@@ -73,6 +76,7 @@ def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelI
 
 
 @receiver(post_update, sender=SalesChannelImport)
+@receiver(post_update, sender=AmazonSalesChannelImport)
 @trigger_signal_for_dirty_fields('status')
 def import_process_post_update_receiver(sender, instance: SalesChannelImport, **kwargs):
     from sales_channels.integrations.magento2.models import MagentoSalesChannel
@@ -95,6 +99,7 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
 
 
 @receiver(post_update, sender=SalesChannelImport)
+@receiver(post_update, sender=AmazonSalesChannelImport)
 def syncing_current_import_percentage_real_time_sync__post_update_receiver(sender, instance, **kwargs):
     """
     Update real time percentage when is changed to the sales channe.

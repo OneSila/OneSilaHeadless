@@ -1,1 +1,1 @@
-from .imports import ShopifyImportProcessor
+from .schema_imports import AmazonSchemaImportProcessor

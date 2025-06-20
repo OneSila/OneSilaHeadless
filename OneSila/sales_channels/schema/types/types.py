@@ -27,12 +27,17 @@ from .ordering import ImportCurrencyOrder, ImportImageOrder, SalesChannelImportO
     RemoteOrderOrder, RemoteProductOrder, RemoteProductContentOrder, RemoteProductPropertyOrder, \
     RemotePropertyOrder, RemotePropertySelectValueOrder, RemoteVatOrder, SalesChannelOrder, \
     SalesChannelIntegrationPricelistOrder, SalesChannelViewOrder, SalesChannelViewAssignOrder, RemoteLanguageOrder
+from ...integrations.amazon.models import AmazonSalesChannelImport
 from ...models.sales_channels import RemoteLanguage
 
 
 @type(SalesChannel, filters=SalesChannelFilter, order=SalesChannelOrder, pagination=True, fields='__all__')
 class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
     saleschannelimport_set: List[Annotated['SalesChannelImportType', lazy("sales_channels.schema.types.types")]]
+
+    @field()
+    def amazon_imports(self) -> List[Annotated['AmazonSalesChannelImportType', lazy("sales_channels.integrations.amazon.schema.types.types")]]:
+        return AmazonSalesChannelImport.objects.filter(sales_channel=self)
 
 
 @type(ImportCurrency, filters=ImportCurrencyFilter, order=ImportCurrencyOrder, pagination=True, fields='__all__')

@@ -104,3 +104,5 @@ class AmazonProductTypeFilter(SearchFilterMixin):
 class AmazonSalesChannelImportFilter(SearchFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
+    status: auto
+    type: auto

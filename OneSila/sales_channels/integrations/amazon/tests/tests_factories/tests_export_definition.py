@@ -28,10 +28,10 @@ class ExportDefinitionFactoryTest(TestCase):
             "battery__weight"
         }
 
-        parsed_codes = {entry["attribute_code"] for entry in results}
+        parsed_codes = {entry["code"] for entry in results}
         self.assertTrue(expected_codes.issubset(parsed_codes))
 
-        cell_composition = next((x for x in results if x["attribute_code"] == "battery__cell_composition"), None)
+        cell_composition = next((x for x in results if x["code"] == "battery__cell_composition"), None)
         self.assertIsNotNone(cell_composition)
         self.assertEqual(cell_composition["type"], "SELECT")
         self.assertTrue(cell_composition.get("allow_not_mapped_values"))
@@ -52,11 +52,11 @@ class ExportDefinitionFactoryTest(TestCase):
             ]
         )
 
-        iec_code = next((x for x in results if x["attribute_code"] == "battery__iec_code"), None)
+        iec_code = next((x for x in results if x["code"] == "battery__iec_code"), None)
         self.assertIsNotNone(iec_code)
         self.assertEqual(iec_code["type"], "SELECT")
 
-        weight = next((x for x in results if x["attribute_code"] == "battery__weight"), None)
+        weight = next((x for x in results if x["code"] == "battery__weight"), None)
         self.assertIsNotNone(weight)
         self.assertEqual(weight["type"], "FLOAT")
 
@@ -74,11 +74,11 @@ class ExportDefinitionFactoryTest(TestCase):
         factory = ExportDefinitionFactory(definition)
         results = factory.run()
 
-        quantity = next((x for x in results if x["attribute_code"] == "num_batteries__quantity"), None)
+        quantity = next((x for x in results if x["code"] == "num_batteries__quantity"), None)
         self.assertIsNotNone(quantity)
         self.assertEqual(quantity["type"], "INT")
 
-        battery_type = next((x for x in results if x["attribute_code"] == "num_batteries__type"), None)
+        battery_type = next((x for x in results if x["code"] == "num_batteries__type"), None)
         self.assertIsNotNone(battery_type)
         self.assertEqual(battery_type["type"], "SELECT")
         self.assertEqual(len(battery_type["values"]), 9)
@@ -100,7 +100,7 @@ class ExportDefinitionFactoryTest(TestCase):
         pprint.pprint(results)
 
         lithium_metal_cells = next(
-            (x for x in results if x["attribute_code"] == "number_of_lithium_metal_cells"), None
+            (x for x in results if x["code"] == "number_of_lithium_metal_cells"), None
         )
         self.assertIsNotNone(lithium_metal_cells)
         self.assertEqual(lithium_metal_cells["type"], "INT")
@@ -118,7 +118,7 @@ class ExportDefinitionFactoryTest(TestCase):
         results = factory.run()
 
         customer_package_type = next(
-            (x for x in results if x["attribute_code"] == "customer_package_type"), None
+            (x for x in results if x["code"] == "customer_package_type"), None
         )
         self.assertIsNotNone(customer_package_type)
         self.assertEqual(customer_package_type["type"], "DESCRIPTION")
@@ -135,7 +135,7 @@ class ExportDefinitionFactoryTest(TestCase):
         factory = ExportDefinitionFactory(definition)
         results = factory.run()
 
-        plug = next((x for x in results if x["attribute_code"] == "power_plug_type"), None)
+        plug = next((x for x in results if x["code"] == "power_plug_type"), None)
         self.assertIsNotNone(plug)
         self.assertEqual(plug["type"], "SELECT")
         self.assertEqual(len(plug["values"]), 27)
@@ -154,7 +154,7 @@ class ExportDefinitionFactoryTest(TestCase):
         factory = ExportDefinitionFactory(definition)
         results = factory.run()
 
-        controller = next((x for x in results if x["attribute_code"] == "controller_type"), None)
+        controller = next((x for x in results if x["code"] == "controller_type"), None)
         self.assertIsNotNone(controller)
         self.assertEqual(controller["type"], "SELECT")
         self.assertTrue(controller.get("allow_not_mapped_values"))
@@ -174,7 +174,7 @@ class ExportDefinitionFactoryTest(TestCase):
         factory = ExportDefinitionFactory(definition)
         results = factory.run()
 
-        launch_date = next((x for x in results if x["attribute_code"] == "product_site_launch_date"), None)
+        launch_date = next((x for x in results if x["code"] == "product_site_launch_date"), None)
         self.assertIsNotNone(launch_date)
         self.assertEqual(launch_date["type"], "DATE")
 
@@ -193,7 +193,7 @@ class ExportDefinitionFactoryTest(TestCase):
         import pprint
         pprint.pprint(results)
 
-        color = next((x for x in results if x["attribute_code"] == "color"), None)
+        color = next((x for x in results if x["code"] == "color"), None)
         self.assertIsNotNone(color)
         self.assertEqual(color["type"], "SELECT")
         self.assertTrue(color.get("allow_not_mapped_values"))
