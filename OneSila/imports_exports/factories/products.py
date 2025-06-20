@@ -19,6 +19,29 @@ from taxes.models import VatRate
 class ProductImport(ImportOperationMixin):
     get_identifiers = ['sku', 'type']
 
+    def resolve_get_or_create_integrity_error(self, error):
+        sku = getattr(self.import_instance, 'sku', None)
+
+        if not sku:
+            raise error
+
+        error_msg = str(error)
+        is_duplicate_sku_constraint = (
+                'duplicate key value violates unique constraint' in error_msg and
+                'products_product_sku_multi_tenant_company_id' in error_msg
+        )
+
+        if not is_duplicate_sku_constraint:
+            raise error
+
+        existing = Product.objects.filter(sku=sku, multi_tenant_company=self.multi_tenant_company).first()
+
+        if existing:
+            self.created = False
+            return existing, False
+
+        raise error
+
 
 class AliasProductImport(ImportOperationMixin):
     get_identifiers = ['sku', 'type', 'alias_parent_product']

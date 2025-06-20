@@ -1,12 +1,12 @@
 from sales_channels.factories.mixins import PullRemoteInstanceMixin
-from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
+from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin, PullAmazonMixin
 from sales_channels.integrations.amazon.models import (
     AmazonRemoteLanguage,
     AmazonSalesChannelView,
 )
 
 
-class AmazonRemoteLanguagePullFactory(GetAmazonAPIMixin, PullRemoteInstanceMixin):
+class AmazonRemoteLanguagePullFactory(GetAmazonAPIMixin, PullAmazonMixin, PullRemoteInstanceMixin):
     """Pull default languages for each Amazon marketplace."""
 
     remote_model_class = AmazonRemoteLanguage
@@ -29,7 +29,7 @@ class AmazonRemoteLanguagePullFactory(GetAmazonAPIMixin, PullRemoteInstanceMixin
                 'view_remote_id': mp.marketplace.id,
             }
             for mp in marketplaces
-            if mp.participation.is_participating
+            if mp.participation.is_participating and self.is_real_amazon_marketplace(mp.marketplace)
         ]
 
     def update_get_or_create_lookup(self, lookup, remote_data):

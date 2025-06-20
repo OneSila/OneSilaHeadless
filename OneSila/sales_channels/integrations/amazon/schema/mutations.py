@@ -7,27 +7,27 @@ from sales_channels.integrations.amazon.schema.types.input import (
     AmazonPropertyPartialInput,
     AmazonPropertySelectValueInput,
     AmazonPropertySelectValuePartialInput,
+    AmazonProductTypeInput,
+    AmazonProductTypePartialInput,
+    AmazonSalesChannelImportInput,
+    AmazonSalesChannelImportPartialInput,
+    AmazonValidateAuthInput,
 )
 from sales_channels.integrations.amazon.schema.types.types import (
     AmazonSalesChannelType,
     AmazonPropertyType,
     AmazonPropertySelectValueType,
-)
-from sales_channels.integrations.amazon.schema.types.input import (
-    AmazonSalesChannelInput,
-    AmazonSalesChannelPartialInput,
-    AmazonValidateAuthInput,
-)
-from sales_channels.integrations.amazon.schema.types.types import (
-    AmazonSalesChannelType,
+    AmazonProductTypeType,
     AmazonRedirectUrlType,
+    AmazonSalesChannelImportType,
 )
-from core.schema.core.mutations import create, type, List, update
+from core.schema.core.mutations import create, type, List, update, delete
 from strawberry import Info
 import strawberry_django
 from core.schema.core.extensions import default_extensions
 from core.schema.core.helpers import get_multi_tenant_company
 from django.utils.translation import gettext_lazy as _
+
 
 @type(name="Mutation")
 class AmazonSalesChannelMutation:
@@ -75,10 +75,9 @@ class AmazonSalesChannelMutation:
 
         return sales_channel
 
-    create_amazon_property: AmazonPropertyType = create(AmazonPropertyInput)
-    create_amazon_properties: List[AmazonPropertyType] = create(AmazonPropertyInput)
     update_amazon_property: AmazonPropertyType = update(AmazonPropertyPartialInput)
-
-    create_amazon_property_select_value: AmazonPropertySelectValueType = create(AmazonPropertySelectValueInput)
-    create_amazon_property_select_values: List[AmazonPropertySelectValueType] = create(AmazonPropertySelectValueInput)
     update_amazon_property_select_value: AmazonPropertySelectValueType = update(AmazonPropertySelectValuePartialInput)
+    update_amazon_product_type: AmazonProductTypeType = update(AmazonProductTypePartialInput)
+
+    create_amazon_import_process: AmazonSalesChannelImportType = create(AmazonSalesChannelImportInput)
+    update_amazon_import_process: AmazonSalesChannelImportType = update(AmazonSalesChannelImportPartialInput)

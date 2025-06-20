@@ -87,7 +87,6 @@ class SalesChannelView(PolymorphicModel, RemoteObjectMixin, models.Model):
     url = models.CharField(max_length=512, null=True, blank=True)
 
     class Meta:
-        unique_together = ('sales_channel', 'name')
         verbose_name = 'Sales Channel View'
         verbose_name_plural = 'Sales Channel Views'
 

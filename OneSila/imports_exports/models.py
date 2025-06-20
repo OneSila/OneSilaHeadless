@@ -50,6 +50,15 @@ class Import(PolymorphicModel, models.Model):
         default=False,
         help_text="If True, existing objects fetched during the import will not be updated.",
     )
+    skip_broken_records = models.BooleanField(
+        default=False,
+        help_text="If True, the import will skip records that raise errors and continue processing."
+    )
+    broken_records = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="JSON array storing details of records that failed during import."
+    )
 
     def __str__(self):
         return f"ImportProcess - {self.get_status_display()} ({self.percentage}%)"
@@ -193,7 +202,6 @@ class MappedImport(TypedImport):
         Execute the mapped import using the proper runner.
         """
         from imports_exports.factories.importers import MappedImportRunner
-
         runner = MappedImportRunner(self)
         runner.run()
 

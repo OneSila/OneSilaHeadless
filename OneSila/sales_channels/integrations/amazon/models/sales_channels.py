@@ -117,7 +117,11 @@ class AmazonSalesChannel(SalesChannel):
 
 class AmazonSalesChannelView(SalesChannelView):
     """Amazon marketplace representation."""
-    pass
+    api_region_code = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+    )
 
 
 class AmazonRemoteLanguage(RemoteLanguage):
