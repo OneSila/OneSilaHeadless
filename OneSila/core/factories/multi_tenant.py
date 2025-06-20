@@ -155,6 +155,17 @@ class InviteUserFactory(RequestLoginTokenFactory):
         self.send_signal()
 
 
+class ResendInviteFactory:
+    def __init__(self, user):
+        self.user = user
+
+    def send_signal(self):
+        invited.send(sender=self.user.__class__, instance=self.user)
+
+    def run(self):
+        self.send_signal()
+
+
 class AcceptUserInviteFactory:
     def __init__(self, user, password, language):
         self.user = user
