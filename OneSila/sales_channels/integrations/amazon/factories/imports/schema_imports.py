@@ -154,7 +154,7 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
                     remote_rule_item.remote_type = new_type
                     remote_rule_item.save()
 
-    def get_rules_data(self):
+    def import_rules_process(self):
         sales_channel_views = AmazonSalesChannelView.objects.filter(sales_channel=self.sales_channel)
         self.update_percentage()
         product_tpes = self.get_product_types()
