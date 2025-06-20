@@ -49,11 +49,6 @@ class MagentoSalesChannelViewAdmin(SalesChannelRemoteAdmin):
     pass
 
 
-@admin.register(SalesChannelViewAssign)
-class SalesChannelViewAssignAdmin(SalesChannelRemoteAdmin):
-    pass
-
-
 @admin.register(MagentoRemoteLanguage)
 class MagentoRemoteLanguageAdmin(SalesChannelRemoteAdmin):
     pass

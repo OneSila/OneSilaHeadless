@@ -16,7 +16,7 @@ from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixi
 from sales_channels.integrations.woocommerce.models import WoocommerceProductProperty, \
     WoocommerceGlobalAttribute, WoocommerceGlobalAttributeValue
 from .mixins import SerialiserMixin, WooCommercePayloadMixin, \
-    WoocommerceRemoteValueConversionMixin
+    WoocommerceRemoteValueConversionMixin, WooCommerceUpdateRemoteProductMixin
 from ..exceptions import DuplicateError
 
 import logging
@@ -147,7 +147,7 @@ class WooCommerceProductPropertyMixin(WoocommerceRemoteValueConversionMixin):
         return self.local_instance.product
 
 
-class WooCommerceProductPropertyCreateFactory(WooCommerceProductPropertyMixin, WooCommercePayloadMixin, RemoteProductPropertyCreateFactory, WoocommerceRemoteValueConversionMixin):
+class WooCommerceProductPropertyCreateFactory(WooCommerceProductPropertyMixin, WooCommerceUpdateRemoteProductMixin, WooCommercePayloadMixin, RemoteProductPropertyCreateFactory, WoocommerceRemoteValueConversionMixin):
     def create_remote(self):
         """To assign a property to a product we need to concider that woocommerce looks at things as follows:
         - Global Attributes need to be created first but are part of the product properties but must include the slug.
@@ -167,10 +167,8 @@ class WooCommerceProductPropertyCreateFactory(WooCommerceProductPropertyMixin, W
         self.update_remote_product()
 
 
-class WooCommerceProductPropertyUpdateFactory(WooCommerceProductPropertyMixin, WooCommercePayloadMixin, RemoteProductPropertyUpdateFactory):
+class WooCommerceProductPropertyUpdateFactory(WooCommerceUpdateRemoteProductMixin, WooCommerceProductPropertyMixin, WooCommercePayloadMixin, RemoteProductPropertyUpdateFactory):
     def update_remote(self):
-        # The attributes are not actually updated on the product.
-        # They are set as part of the product. However we do need to update things.
         self.update_remote_product()
 
 

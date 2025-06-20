@@ -74,13 +74,11 @@ class WoocommerceProductTypeMixin:
         try:
             if product.is_configurable():
                 self.is_woocommerce_configurable_product = True
-            elif product.is_simple():
+            else:
                 if is_variation:
                     self.is_woocommerce_variant_product = True
                 else:
                     self.is_woocommerce_simple_product = True
-            else:
-                raise ValueError(f"Product {product} is not configurable or simple. Configure other types.")
         except AttributeError as e:
             raise AttributeError(f"{self.__class__.__name__} {e=}") from e
 

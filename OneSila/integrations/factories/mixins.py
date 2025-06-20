@@ -25,7 +25,7 @@ class IntegrationInstanceOperationMixin:
         Retrieves the API client or wrapper based on the sales channel.
         This method should be overridden to return the appropriate API client.
         """
-        raise NotImplementedError("Subclasses must implement the get_api method to return the API client.")
+        raise NotImplementedError(f"{self.__class__.__name__} must implement the get_api method to return the API client.")
 
     def set_api(self):
         if not hasattr(self, 'api') or self.api is None:

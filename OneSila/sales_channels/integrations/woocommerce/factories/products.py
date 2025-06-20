@@ -41,9 +41,8 @@ class WooCommerceProductMixin(WooCommerceUpdateRemoteProductMixin, WooCommercePa
         return self.local_instance
 
     def process_content_translation(self, short_description, description, url_key, remote_language):
-        # Probably this method should be triggering a translation update.
-        # FIXME Translation or not.  Content must be updated.
-        pass
+        # If you don't trigger set_content the mirror model will not be created.
+        self.set_content()
 
 
 class WooCommerceProductSyncFactory(WooCommerceProductMixin, RemoteProductSyncFactory):
