@@ -43,13 +43,8 @@ logger = logging.getLogger(__name__)
 #
 @receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
 def woocommerce__product__create_from_assign(sender, instance, **kwargs):
-    from sales_channels.integrations.woocommerce.factories.products import WooCommerceProductCreateFactory
-
-    product = instance.product
-    sc = instance.sales_channel
-
-    fac = WooCommerceProductCreateFactory(sales_channel=sc, local_instance=product)
-    fac.run()
+    from sales_channels.integrations.woocommerce.flows.products import create_woocommerce_product_flow
+    create_woocommerce_product_flow(instance)
 
     # count = 1 + (product.get_configurable_variations().count() if hasattr(product, 'get_configurable_variations') else 0)
     # run_generic_sales_channel_task_flow(

@@ -1,7 +1,7 @@
 from huey.contrib.djhuey import db_task
 from products.product_types import CONFIGURABLE
 
-# @TODO: Create factories for this tasks
+# @TODO: Create flows for these tasks
 
 
 @db_task()

@@ -26,24 +26,6 @@ class WooCommerceMediaProductThroughMixin(WooCommercePayloadMixin, WooCommerceUp
 
         return super().preflight_process()
 
-    # def customize_payload(self):
-    #     logger.debug(f"Customizing payload for {self.local_instance=}")
-    #     return self.apply_media_payload()
-
-    # def create_or_update_images(self):
-    #     self.set_woocomerce_product_types()
-    #     logger.info(f"{self.__class__.__name__} create_or_update_images: {self.remote_product=}, {self.remote_product.__dict__=}")
-    #     logger.info(f"{self.__class__.__name__} create_or_update_images: {self.local_instance=}")
-    #     logger.info(f"{self.__class__.__name__} create_or_update_images: {self.is_woocommerce_variant_product=}")
-
-    #     if self.is_woocommerce_variant_product:
-    #         parent_id = self.remote_product.remote_parent_product.remote_id
-    #         variant_id = self.remote_product.remote_id
-    #         return self.api.update_product_variation(parent_id, variant_id, **self.payload)
-    #     else:
-    #         product_id = self.remote_product.remote_id
-    #         return self.api.update_product(product_id, **self.payload)
-
 
 class WooCommerceMediaProductThroughCreateFactory(WooCommerceMediaProductThroughMixin, GetWoocommerceAPIMixin, RemoteMediaProductThroughCreateFactory):
     def create_remote(self):
