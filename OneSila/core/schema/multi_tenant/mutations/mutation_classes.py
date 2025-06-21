@@ -7,7 +7,7 @@ from django.db import transaction
 from core.schema.core.mixins import GetCurrentUserMixin, GetMultiTenantCompanyMixin
 from core.schema.core.mutations import DjangoUpdateMutation, DjangoCreateMutation, Info, models, Any
 from core.factories.multi_tenant import InviteUserFactory, AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory, RequestLoginTokenFactory, \
-    RecoveryTokenFactory, ChangePasswordFactory
+    RecoveryTokenFactory, ChangePasswordFactory, ResendInviteFactory
 from core.models.multi_tenant import MultiTenantUser, MultiTenantUserLoginToken
 from django.utils.translation import gettext_lazy as _
 
@@ -52,6 +52,14 @@ class InviteUserMutation(CleanupDataMixin, GetMultiTenantCompanyMixin, DjangoCre
                 **data)
             fac.run()
             return MultiTenantUser.objects.get(id=fac.user.id)
+
+
+class ResendInviteMutation(CleanupDataMixin, DjangoUpdateMutation):
+    def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
+        fac = ResendInviteFactory(user=instance)
+        fac.run()
+
+        return instance
 
 
 class RecoveryTokenMutation(RequestLoginTokenMutation):
