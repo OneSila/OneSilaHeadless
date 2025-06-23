@@ -1,9 +1,17 @@
 from core.schema.core.types.ordering import order
 from core.schema.core.types.types import auto
 
-from products.models import Product, BundleProduct, ConfigurableProduct, \
-    SimpleProduct, ProductTranslation, ConfigurableVariation, \
-    BundleVariation, AliasProduct
+from products.models import (
+    Product,
+    BundleProduct,
+    ConfigurableProduct,
+    SimpleProduct,
+    ProductTranslation,
+    ConfigurableVariation,
+    BundleVariation,
+    AliasProduct,
+    ProductTranslationBulletPoint,
+)
 
 
 @order(Product)
@@ -50,4 +58,9 @@ class ConfigurableVariationOrder:
 
 @order(BundleVariation)
 class BundleVariationOrder:
+    id: auto
+
+
+@order(ProductTranslationBulletPoint)
+class ProductTranslationBulletPointOrder:
     id: auto

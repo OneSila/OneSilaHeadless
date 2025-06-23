@@ -7,8 +7,17 @@ from core.managers import QuerySet
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin, lazy
 from strawberry_django import filter_field as custom_filter
-from products.models import Product, BundleProduct, ConfigurableProduct, \
-    SimpleProduct, ProductTranslation, ConfigurableVariation, BundleVariation, AliasProduct
+from products.models import (
+    Product,
+    BundleProduct,
+    ConfigurableProduct,
+    SimpleProduct,
+    ProductTranslation,
+    ConfigurableVariation,
+    BundleVariation,
+    AliasProduct,
+    ProductTranslationBulletPoint,
+)
 from products_inspector.models import InspectorBlock
 from taxes.schema.types.filters import VatRateFilter
 from strawberry.relay import from_base64
@@ -81,6 +90,7 @@ class ProductTranslationFilter:
     id: auto
     product: Optional[ProductFilter]
     language: auto
+    sales_channel: Optional[lazy['SalesChannelFilter', "sales_channels.schema.types.filters"]]
 
 
 @filter(ConfigurableVariation)
@@ -95,3 +105,9 @@ class BundleVariationFilter:
     id: auto
     parent: Optional[ProductFilter]
     variation: Optional[ProductFilter]
+
+
+@filter(ProductTranslationBulletPoint)
+class ProductTranslationBulletPointFilter(SearchFilterMixin):
+    id: auto
+    product_translation: Optional[ProductTranslationFilter]
