@@ -18,13 +18,12 @@ class PropertyQuerySet(MultiTenantQuerySet):
 
         language = multi_tenant_company.language
         name = get_product_type_name(language)
-        internal_name = slugify(name).replace('-', '_')
 
         property_instance = self.create(
             type='SELECT',  # we are using the text instead the constant because it created issues in the migration command
             is_public_information=True,
             is_product_type=True,
-            internal_name=internal_name,
+            internal_name='product_type',
             multi_tenant_company=multi_tenant_company
         )
 
