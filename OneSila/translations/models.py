@@ -34,7 +34,7 @@ class TranslationFieldsMixin(models.Model):
 
 # @TODO: This maybe should inherit models.Model?
 class TranslatedModelMixin(OldModel):
-    def _get_translated_value(self, *, field_name, language=None, related_name='translations', fallback=None):
+    def _get_translated_value(self, *, field_name, language=None, related_name='translations', fallback=None, sales_channel=None):
         # we use '' (empty string) instead of None here because some of the translated values severs as __str__
         # __str__ can't be None. In the same process we also create the translation but if we have __str__ None then the process will not work
         translated_value = ''
@@ -49,13 +49,47 @@ class TranslatedModelMixin(OldModel):
             multi_tenant_company = getattr(self, 'multi_tenant_company', None)
             language = multi_tenant_company.language
 
+        is_sales_channel_translation = False
+        translation_kwargs = {
+            'language': language,
+        }
+
+        if related_name == 'translations': # is a product translation
+            translation_kwargs['sales_channel'] = sales_channel
+
         try:
-            translation = translations.get(language=language)
+            translation = translations.get(**translation_kwargs)
+
+            if sales_channel is not None and related_name == 'translations':
+                is_sales_channel_translation = True
+
         except ObjectDoesNotExist:
-            translation = translations.last()
+
+            # If we were searching by sales_channel, try again without it (default)
+            if related_name == 'translations' and sales_channel is not None:
+
+                # Try to get translation just by language
+                try:
+                    translation = translations.get(language=language, sales_channel=None)
+                except ObjectDoesNotExist:
+                    translation = translations.last()
+            else:
+                translation = translations.last()
 
         if translation:
             translated_value = getattr(translation, field_name, '')
+
+        if translated_value == ''  and is_sales_channel_translation and related_name == 'translations' and sales_channel is not None:
+
+            # if the translation instance WAS found but the field doesn't have a value for example there is no description
+            # we will use the default one to populate it
+            return self._get_translated_value(
+                field_name=field_name,
+                language=language,
+                related_name=related_name,
+                fallback=fallback,
+                sales_channel=None
+            )
 
         return translated_value
 

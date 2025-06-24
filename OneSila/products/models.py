@@ -491,6 +491,7 @@ class BundleVariation(models.Model):
 
 class ProductTranslation(TranslationFieldsMixin, models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations")
+    sales_channel = models.ForeignKey('sales_channels.SalesChannel', null=True, blank=True, on_delete=models.CASCADE, related_name='product_translations')
 
     name = models.CharField(max_length=256)
     short_description = models.TextField(blank=True, null=True)
@@ -518,6 +519,22 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         translated_field = 'product'
         unique_together = (
-            ('product', 'language'),
+            ('product', 'language', 'sales_channel'),
             ('url_key', 'multi_tenant_company'),
         )
+
+
+class ProductTranslationBulletPoint(models.Model):
+    product_translation = models.ForeignKey(
+        ProductTranslation,
+        on_delete=models.CASCADE,
+        related_name='bullet_points'
+    )
+    text = models.CharField(max_length=512)
+    sort_order = models.PositiveIntegerField(default=0, help_text="Display order of the bullet point")
+
+    def __str__(self):
+        return f"Bullet Point {self.order} for {self.product_translation}"
+
+    class Meta:
+        ordering = ['sort_order']

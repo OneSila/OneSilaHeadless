@@ -1,6 +1,14 @@
 from core.schema.core.types.input import NodeInput, input, partial
-from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
-    ProductTranslation, ConfigurableVariation, BundleVariation
+from products.models import (
+    Product,
+    BundleProduct,
+    ConfigurableProduct,
+    SimpleProduct,
+    ProductTranslation,
+    ConfigurableVariation,
+    BundleVariation,
+    ProductTranslationBulletPoint,
+)
 
 
 @input(Product, fields="__all__")
@@ -72,4 +80,14 @@ class BundleVariationInput:
 
 @partial(BundleVariation, fields="__all__")
 class BundleVariationPartialInput(NodeInput):
+    pass
+
+
+@input(ProductTranslationBulletPoint, fields="__all__")
+class ProductTranslationBulletPointInput:
+    pass
+
+
+@partial(ProductTranslationBulletPoint, fields="__all__")
+class ProductTranslationBulletPointPartialInput(NodeInput):
     pass
