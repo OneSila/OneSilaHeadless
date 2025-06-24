@@ -530,11 +530,11 @@ class ProductTranslationBulletPoint(models.Model):
         on_delete=models.CASCADE,
         related_name='bullet_points'
     )
-    text = models.CharField(max_length=256)
-    order = models.PositiveIntegerField(default=0, help_text="Display order of the bullet point")
+    text = models.CharField(max_length=512)
+    sort_order = models.PositiveIntegerField(default=0, help_text="Display order of the bullet point")
 
     def __str__(self):
         return f"Bullet Point {self.order} for {self.product_translation}"
 
     class Meta:
-        ordering = ['order']
+        ordering = ['sort_order']

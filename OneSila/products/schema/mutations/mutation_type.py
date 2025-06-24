@@ -75,7 +75,7 @@ class ProductsMutation:
     delete_bundle_variations: List[BundleVariationType] = delete()
 
     create_product_translation_bullet_point: ProductTranslationBulletPointType = create(ProductTranslationBulletPointInput)
-    create_product_translation_bullet_points: List[ProductTranslationBulletPointType] = create(ProductTranslationBulletPointInput)
+    create_product_translation_bullet_points: List[ProductTranslationBulletPointType] = create(List[ProductTranslationBulletPointInput])
     update_product_translation_bullet_point: ProductTranslationBulletPointType = update(ProductTranslationBulletPointPartialInput)
     delete_product_translation_bullet_point: ProductTranslationBulletPointType = delete()
-    delete_product_translation_bullet_points: List[ProductTranslationBulletPointType] = delete()
+    delete_product_translation_bullet_points: List[ProductTranslationBulletPointType] = delete(is_bulk=True)

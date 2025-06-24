@@ -64,3 +64,4 @@ class BundleVariationOrder:
 @order(ProductTranslationBulletPoint)
 class ProductTranslationBulletPointOrder:
     id: auto
+    sort_order: auto
