@@ -3,41 +3,7 @@ import json
 from django.conf import settings
 from sp_api.base import  SellingApiException
 from spapi import SellersApi, SPAPIConfig, SPAPIClient, DefinitionsApi, ListingsApi
-
-import logging
-
 from sales_channels.integrations.amazon.decorators import throttle_safe
-
-# Mute sp-api logs
-logging.getLogger("sp_api").setLevel(logging.WARNING)
-logging.getLogger("spapi").setLevel(logging.WARNING)
-
-# Quiet urllib3/requests connection debug spam
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-logging.getLogger("requests").setLevel(logging.WARNING)
-
-# Optional: If they're flooding stdout handlers
-logging.getLogger("sp_api").propagate = False
-logging.getLogger("spapi").propagate = False
-logging.getLogger("urllib3").propagate = False
-logging.getLogger("requests").propagate = False
-
-
-class _SpAPILogFilter(logging.Filter):
-    """Filter out noisy logs from the Amazon SP API and HTTP libraries."""
-
-    def filter(self, record: logging.LogRecord) -> bool:  # pragma: no cover - pure configuration
-        noisy_sources = ("sp_api", "spapi", "urllib3", "requests")
-        name = record.name or ""
-        path = record.pathname or ""
-        return not any(
-            name.startswith(src) or src in path for src in noisy_sources
-        )
-
-
-for handler in logging.getLogger().handlers:
-    handler.addFilter(_SpAPILogFilter())
-
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 
 class PullAmazonMixin:

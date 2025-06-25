@@ -187,9 +187,6 @@ class ExportDefinitionFactoryTest(TestCase):
         factory = ExportDefinitionFactory(definition)
         results = factory.run()
 
-        import pprint
-        pprint.pprint(results)
-
         color = next((x for x in results if x["code"] == "color"), None)
         self.assertIsNotNone(color)
         self.assertEqual(color["type"], "SELECT")

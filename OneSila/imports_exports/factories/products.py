@@ -328,7 +328,6 @@ class ImportProductInstance(AbstractImportInstance):
                         property=property_instance,
                         product=self.instance)
 
-                    print(f'-------------------------------------------------------- SET LANGUAGE TO {self.language}')
                     product_property_import_instance.language = self.language
                     product_property_import_instance.process()
                     product_property_ids.append(product_property_import_instance.instance.id)
