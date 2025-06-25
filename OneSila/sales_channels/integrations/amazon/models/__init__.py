@@ -11,7 +11,6 @@ from .sales_channels import (
     AmazonSalesChannel,
     AmazonSalesChannelView,
     AmazonRemoteLanguage,
-    AmazonSalesChannelViewAssign,
 )
 from .taxes import AmazonCurrency, AmazonVat
 from .imports import *

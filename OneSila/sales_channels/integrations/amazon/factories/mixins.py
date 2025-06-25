@@ -125,16 +125,12 @@ class GetAmazonAPIMixin:
                     included_data=["summaries", "attributes", "issues", "offers", "relationships"]
                 )
 
-                print('------------------------- ITEMS')
-                print(items)
-
                 for item in items:
-                    print("\n=== Product Item ===")
                     import pprint
                     pprint.pprint(item)# to_dict for full detail
                     printed += 1
 
-                    if printed >= 5:
+                    if printed >= 100:
                         return  # Stop early
 
                 if not page_token:

@@ -4,7 +4,6 @@ from sales_channels.models.sales_channels import (
     SalesChannel,
     SalesChannelView,
     RemoteLanguage,
-    SalesChannelViewAssign,
 )
 import uuid
 
@@ -140,12 +139,3 @@ class AmazonRemoteLanguage(RemoteLanguage):
         blank=True,
         help_text="The marketplace associated with this remote language.",
     )
-
-
-class AmazonSalesChannelViewAssign(SalesChannelViewAssign):
-    """Assign model storing Amazon-specific metadata."""
-
-    issues = models.JSONField(null=True, blank=True)
-
-    class Meta(SalesChannelViewAssign.Meta):
-        pass
