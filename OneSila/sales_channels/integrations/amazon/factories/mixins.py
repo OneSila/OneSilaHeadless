@@ -1,3 +1,5 @@
+import json
+
 from django.conf import settings
 from sp_api.base import  SellingApiException
 from spapi import SellersApi, SPAPIConfig, SPAPIClient, DefinitionsApi, ListingsApi
@@ -51,12 +53,12 @@ class GetAmazonAPIMixin:
 
 
     @throttle_safe(max_retries=5, base_delay=1)
-    def _fetch_listing_items_page(self, listings_api, seller_id, marketplace_id, page_token=None):
+    def _fetch_listing_items_page(self, listings_api, seller_id, marketplace_id, page_token=None, included_data=None):
         kwargs = {
             "seller_id": seller_id,
             "marketplace_ids": [marketplace_id],
             "page_size": 20,
-            "included_data": ["summaries"],
+            "included_data": included_data or ["summaries"],
         }
         if page_token:
             kwargs["page_token"] = page_token
@@ -101,3 +103,39 @@ class GetAmazonAPIMixin:
                     break
 
         return sorted(product_types)
+
+    def get_all_products(self):
+        listings_api = ListingsApi(self._get_client())
+        seller_id = self.sales_channel.remote_id
+        marketplace_ids = list(
+            AmazonSalesChannelView.objects.filter(sales_channel=self.sales_channel)
+            .values_list("remote_id", flat=True)
+        )
+
+        printed = 0
+
+        for marketplace_id in marketplace_ids:
+            page_token = None
+            while True:
+                items, page_token = self._fetch_listing_items_page(
+                    listings_api,
+                    seller_id,
+                    marketplace_id,
+                    page_token,
+                    included_data=["summaries", "attributes", "issues", "offers", "relationships"]
+                )
+
+                print('------------------------- ITEMS')
+                print(items)
+
+                for item in items:
+                    print("\n=== Product Item ===")
+                    import pprint
+                    pprint.pprint(item)# to_dict for full detail
+                    printed += 1
+
+                    if printed >= 5:
+                        return  # Stop early
+
+                if not page_token:
+                    break
