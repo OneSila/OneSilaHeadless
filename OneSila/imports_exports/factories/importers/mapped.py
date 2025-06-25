@@ -16,7 +16,6 @@ class MappedImportRunner(ImportMixin):
         self.import_select_values = import_process.type == TypedImport.TYPE_PROPERTY_SELECT_VALUE
         self.import_rules = import_process.type == TypedImport.TYPE_PROPERTY_RULE
         self.import_products = import_process.type == TypedImport.TYPE_PRODUCT
-
         self.data = None
 
         super().__init__(import_process, language=import_process.language)

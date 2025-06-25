@@ -13,7 +13,7 @@ class ShopifyProductContentUpdateFactory(GetShopifyApiMixin, RemoteProductConten
 
     def customize_payload(self):
 
-        translation = ProductTranslation.objects.filter(product=self.local_instance, language=self.local_instance.multi_tenant_company.language).first()
+        translation = ProductTranslation.objects.filter(product=self.local_instance, language=self.local_instance.multi_tenant_company.language, sales_channel=self.sales_channel).first()
         self.payload = {
             "id": self.remote_product.remote_id
         }
@@ -36,6 +36,10 @@ class ShopifyProductContentUpdateFactory(GetShopifyApiMixin, RemoteProductConten
             }]
 
     def update_remote(self):
+
+        if self.remote_product.is_variation:
+            return {}
+
         gql = self.api.GraphQL()
 
         query = """

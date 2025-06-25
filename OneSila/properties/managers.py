@@ -18,13 +18,12 @@ class PropertyQuerySet(MultiTenantQuerySet):
 
         language = multi_tenant_company.language
         name = get_product_type_name(language)
-        internal_name = slugify(name).replace('-', '_')
 
         property_instance = self.create(
             type='SELECT',  # we are using the text instead the constant because it created issues in the migration command
             is_public_information=True,
             is_product_type=True,
-            internal_name=internal_name,
+            internal_name='product_type',
             multi_tenant_company=multi_tenant_company
         )
 
@@ -36,9 +35,37 @@ class PropertyQuerySet(MultiTenantQuerySet):
         )
         return property_instance
 
+    def create_brand(self, multi_tenant_company):
+        from core.defaults import get_brand_name
+        from .models import PropertyTranslation
+
+        language = multi_tenant_company.language
+        name = get_brand_name(language)
+
+        property_instance = self.create(
+            type='SELECT',
+            is_public_information=True,
+            internal_name='brand',
+            non_deletable=True,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        PropertyTranslation.objects.create(
+            property=property_instance,
+            language=language,
+            name=name,
+            multi_tenant_company=multi_tenant_company,
+        )
+        return property_instance
+
     def delete(self, *args, **kwargs):
+
         if self.filter(is_product_type=True).exists():
             raise ValidationError(_("You cannot delete the product type property."))
+
+        if self.filter(non_deletable=True).exists():
+            raise ValidationError(_("You cannot delete one or more system properties."))
+
         super().delete(*args, **kwargs)
 
 
@@ -54,6 +81,9 @@ class PropertyManager(MultiTenantManager):
 
     def create_product_type(self, multi_tenant_company):
         return self.get_queryset().create_product_type(multi_tenant_company)
+
+    def create_brand(self, multi_tenant_company):
+        return self.get_queryset().create_brand(multi_tenant_company)
 
 
 class PropertySelectValueQuerySet(MultiTenantQuerySet):

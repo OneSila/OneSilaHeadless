@@ -1,9 +1,16 @@
 from core.schema.core.queries import node, connection, DjangoListConnection, type
 from typing import List
 
-from .types.types import ProductType, BundleProductType, ConfigurableProductType, \
-    SimpleProductType, ProductTranslationType, ConfigurableVariationType, \
-    BundleVariationType
+from .types.types import (
+    ProductType,
+    BundleProductType,
+    ConfigurableProductType,
+    SimpleProductType,
+    ProductTranslationType,
+    ConfigurableVariationType,
+    BundleVariationType,
+    ProductTranslationBulletPointType,
+)
 
 
 @type(name="Query")
@@ -28,3 +35,6 @@ class ProductsQuery:
 
     bundle_variation: BundleVariationType = node()
     bundle_variations: DjangoListConnection[BundleVariationType] = connection()
+
+    product_translation_bullet_point: ProductTranslationBulletPointType = node()
+    product_translation_bullet_points: DjangoListConnection[ProductTranslationBulletPointType] = connection()

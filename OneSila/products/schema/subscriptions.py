@@ -1,9 +1,25 @@
 from core.schema.core.subscriptions import type, subscription, Info, AsyncGenerator, model_subscriber
 
-from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, ProductTranslation, \
-    ConfigurableVariation, BundleVariation
-from products.schema.types.types import ProductType, BundleProductType, ConfigurableProductType, \
-    SimpleProductType, ProductTranslationType, ConfigurableVariationType, BundleVariationType
+from products.models import (
+    Product,
+    BundleProduct,
+    ConfigurableProduct,
+    SimpleProduct,
+    ProductTranslation,
+    ConfigurableVariation,
+    BundleVariation,
+    ProductTranslationBulletPoint,
+)
+from products.schema.types.types import (
+    ProductType,
+    BundleProductType,
+    ConfigurableProductType,
+    SimpleProductType,
+    ProductTranslationType,
+    ConfigurableVariationType,
+    BundleVariationType,
+    ProductTranslationBulletPointType,
+)
 
 
 @type(name="Subscription")
@@ -41,4 +57,15 @@ class ProductsSubscription:
     @subscription
     async def bundle_variation(self, info: Info, pk: str) -> AsyncGenerator[BundleVariationType, None]:
         async for i in model_subscriber(info=info, pk=pk, model=BundleVariation):
+            yield i
+
+    @subscription
+    async def product_translation_bullet_point(
+        self, info: Info, pk: str
+    ) -> AsyncGenerator[ProductTranslationBulletPointType, None]:
+        async for i in model_subscriber(
+            info=info,
+            pk=pk,
+            model=ProductTranslationBulletPoint,
+        ):
             yield i

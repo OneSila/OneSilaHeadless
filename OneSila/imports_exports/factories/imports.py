@@ -2,7 +2,8 @@ from imports_exports.decorators import handle_import_exception
 from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.properties import ImportProductPropertiesRuleInstance, ImportPropertySelectValueInstance, \
     ImportPropertyInstance
-from imports_exports.models import Import
+from imports_exports.models import Import, ImportReport
+from notifications.factories.email import SendImportReportEmailFactory
 import traceback
 import math
 
@@ -237,10 +238,39 @@ class ImportMixin:
         pass
     
     def set_broken_records(self):
-        
+
         if len(self._broken_records) > 0:
             self.import_process.broken_records = self._broken_records
             self.import_process.save(update_fields=['broken_records'])
+
+    def send_reports(self):
+
+        reports = ImportReport.objects.filter(import_process=self.import_process)
+        if not reports:
+            return
+
+        context_base = {
+            "import_obj": self.import_process,
+        }
+
+        if self.import_process.skip_broken_records:
+            context_base["errors"] = self.import_process.get_cleaned_errors_from_broken_records()
+
+        company_lang = getattr(self.import_process.multi_tenant_company, "language", "en")
+
+        for report in reports:
+            recipient_emails = list(report.users.values_list("username", flat=True))
+            recipient_emails.extend(report.external_emails or [])
+
+            for email in recipient_emails:
+                language = company_lang
+                user_qs = report.users.filter(username=email)
+                if user_qs.exists():
+                    language = user_qs.first().language
+
+                context = context_base.copy()
+                fac = SendImportReportEmailFactory(email=email, language=language, context=context)
+                fac.run()
 
     def run(self):
         self.prepare_import_process()
@@ -272,3 +302,5 @@ class ImportMixin:
             
             if self.import_process.skip_broken_records:
                 self.set_broken_records()
+
+            self.send_reports()

@@ -1,0 +1,62 @@
+{% extends 'notifications/email/base_email.html' %}
+{% load i18n %}
+{% block content %}
+{% if import_obj.skip_broken_records %}
+<p><strong>{% translate "OneSila Import Report" %}</strong></p>
+
+<p>{% translate "Hello," %}</p>
+
+<p>
+    {% translate "Your recent import in OneSila has completed, but there were some issues detected during the process. Please review the details below:" %}
+</p>
+
+<ul style="margin: 0 0 20px 20px; padding-left: 20px;">
+    {% for error in errors %}
+        <li>{{ error }}</li>
+    {% endfor %}
+</ul>
+
+<p>
+    {% if import_obj.json_file %}
+        <strong>{% translate "Imported File:" %}</strong> {{ import_obj.json_file.name }}<br>
+    {% elif import_obj.json_url %}
+        <strong>{% translate "Imported URL:" %}</strong> {{ import_obj.json_url }}<br>
+    {% endif %}
+    <strong>{% translate "Created at:" %}</strong> {{ import_obj.created_at }}<br>
+    <strong>{% translate "Last updated at:" %}</strong> {{ import_obj.updated_at }}
+</p>
+
+<p style="margin-top:24px">
+    {% translate "If you need assistance resolving these issues, please contact your OneSila support team." %}
+</p>
+<p>
+    {% translate "Thank you for using OneSila." %}
+</p>
+
+{% else %}
+<p><strong>{% translate "OneSila Import Report" %}</strong></p>
+
+<p>{% translate "Hello," %}</p>
+
+<p>
+    {% translate "We regret to inform you that your recent import in OneSila, created at" %} {{ import_obj.created_at }}, {% translate "has failed." %}
+</p>
+
+<p>
+    {% if import_obj.json_file %}
+        <strong>{% translate "Imported File:" %}</strong> {{ import_obj.json_file.name }}<br>
+    {% elif import_obj.json_url %}
+        <strong>{% translate "Imported URL:" %}</strong> {{ import_obj.json_url }}<br>
+    {% endif %}
+    <strong>{% translate "Created at:" %}</strong> {{ import_obj.created_at }}<br>
+    <strong>{% translate "Last updated at:" %}</strong> {{ import_obj.updated_at }}
+</p>
+
+<p style="margin-top:24px">
+    {% translate "Please review your data and try the import again. If you need help, contact the OneSila support team." %}
+</p>
+<p>
+    {% translate "Thank you for using OneSila." %}
+</p>
+{% endif %}
+{% endblock %}

@@ -44,6 +44,7 @@ class Property(TranslatedModelMixin, models.Model):
     add_to_filters = models.BooleanField(default=True)
     is_product_type = models.BooleanField(default=False)
     has_image = models.BooleanField(default=False)
+    non_deletable = models.BooleanField(default=False)
 
     # advanced tab
     value_validator = models.CharField(
@@ -64,8 +65,13 @@ class Property(TranslatedModelMixin, models.Model):
         return self._get_translated_value(field_name='name', related_name='propertytranslation_set')
 
     def delete(self, *args, **kwargs):
+
         if self.is_product_type:
             raise ValidationError(_("Product type cannot be deleted."))
+
+        if self.non_deletable:
+            raise ValidationError(_("This property cannot be deleted."))
+
         super().delete(*args, **kwargs)
 
     def save(self, *args, **kwargs):
