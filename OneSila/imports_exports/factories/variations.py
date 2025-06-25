@@ -26,10 +26,11 @@ class ImportConfigurableVariationInstance(AbstractImportInstance):
         - `variation_data` or `variation_product`
     """
 
-    def __init__(self, data: dict, import_process=None, config_product=None, variation_product=None, instance=None):
+    def __init__(self, data: dict, import_process=None, config_product=None, variation_product=None, instance=None, sales_channel=None):
         super().__init__(data, import_process, instance)
         self.config_product = config_product
         self.variation_product = variation_product
+        self.sales_channel = sales_channel
 
         self.set_field_if_exists('variation_data')
         self.set_field_if_exists('config_product_data')
@@ -50,10 +51,10 @@ class ImportConfigurableVariationInstance(AbstractImportInstance):
 
     def _set_products_import_instance(self):
         if not self.config_product and hasattr(self, 'config_product_data'):
-            self.config_product_import_instance = ImportProductInstance(self.config_product_data, self.import_process)
+            self.config_product_import_instance = ImportProductInstance(self.config_product_data, self.import_process, sales_channel=self.sales_channel)
 
         if not self.variation_product and hasattr(self, 'variation_data'):
-            self.variation_import_instance = ImportProductInstance(self.variation_data, self.import_process)
+            self.variation_import_instance = ImportProductInstance(self.variation_data, self.import_process, sales_channel=self.sales_channel)
 
     def pre_process_logic(self):
         if not self.config_product:
@@ -138,7 +139,7 @@ class ImportConfiguratorVariationsInstance(AbstractImportInstance, GetSelectValu
 
     def _set_config_product_instance(self):
         if not self.config_product and hasattr(self, 'config_product_data'):
-            self.config_product_import_instance = ImportProductInstance(self.config_product_data, self.import_process)
+            self.config_product_import_instance = ImportProductInstance(self.config_product_data, self.import_process, sales_channel=self.sales_channel)
 
     def _set_rule(self):
         if self.rule:
@@ -194,10 +195,11 @@ class ImportBundleVariationInstance(AbstractImportInstance):
         - `quantity`
     """
 
-    def __init__(self, data: dict, import_process=None, bundle_product=None, variation_product=None, instance=None):
+    def __init__(self, data: dict, import_process=None, bundle_product=None, variation_product=None, instance=None, sales_channel=None):
         super().__init__(data, import_process, instance)
         self.bundle_product = bundle_product
         self.variation_product = variation_product
+        self.sales_channel = sales_channel
 
         self.set_field_if_exists('variation_data')
         self.set_field_if_exists('bundle_product_data')
@@ -222,10 +224,10 @@ class ImportBundleVariationInstance(AbstractImportInstance):
 
     def _set_products_import_instance(self):
         if not self.bundle_product and hasattr(self, 'bundle_product_data'):
-            self.bundle_product_import_instance = ImportProductInstance(self.bundle_product_data, self.import_process)
+            self.bundle_product_import_instance = ImportProductInstance(self.bundle_product_data, self.import_process, sales_channel=self.sales_channel)
 
         if not self.variation_product and hasattr(self, 'variation_data'):
-            self.variation_import_instance = ImportProductInstance(self.variation_data, self.import_process)
+            self.variation_import_instance = ImportProductInstance(self.variation_data, self.import_process, sales_channel=self.sales_channel)
 
     def pre_process_logic(self):
         if not self.bundle_product:
@@ -261,10 +263,11 @@ class ImportAliasVariationInstance(AbstractImportInstance):
         - `alias_copy_product_properties` (bool)
     """
 
-    def __init__(self, data: dict, import_process=None, parent_product=None, alias_product=None, instance=None):
+    def __init__(self, data: dict, import_process=None, parent_product=None, alias_product=None, instance=None, sales_channel=None):
         super().__init__(data, import_process, instance)
         self.parent_product = parent_product
         self.alias_product = alias_product
+        self.sales_channel = sales_channel
 
         self.set_field_if_exists('variation_data')
         self.set_field_if_exists('parent_product_data')
@@ -289,7 +292,7 @@ class ImportAliasVariationInstance(AbstractImportInstance):
     def _set_product_import_instances(self):
 
         if not self.parent_product and hasattr(self, 'parent_product_data'):
-            self.parent_product_import_instance = ImportProductInstance(self.parent_product_data, self.import_process)
+            self.parent_product_import_instance = ImportProductInstance(self.parent_product_data, self.import_process, sales_channel=self.sales_channel)
 
     def pre_process_logic(self):
 
@@ -299,7 +302,7 @@ class ImportAliasVariationInstance(AbstractImportInstance):
 
         if not self.alias_product:
             self.variation_data["alias_parent_product"] = self.parent_product
-            self.alias_product_import_instance = ImportProductInstance(self.variation_data, self.import_process)
+            self.alias_product_import_instance = ImportProductInstance(self.variation_data, self.import_process, sales_channel=self.sales_channel)
             self.alias_product_import_instance.process()
             self.alias_product = self.alias_product_import_instance.instance
 

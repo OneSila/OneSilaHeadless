@@ -9,7 +9,7 @@ class MagentoProductContentUpdateFactory(GetMagentoAPIMixin, RemoteProductConten
     remote_model_class = MagentoProductContent
 
     def customize_payload(self):
-        translations = ProductTranslation.objects.filter(product=self.local_instance)
+        translations = ProductTranslation.objects.filter(product=self.local_instance, sales_channel=self.sales_channel)
 
         # Use the mixin to get a mapping of local language -> list of MagentoRemoteLanguage objects
         remote_languages_map = self.get_magento_languages(

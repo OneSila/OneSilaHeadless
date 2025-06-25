@@ -30,12 +30,18 @@ def create_brand_properties(apps, schema_editor):
         if updated:
             property_instance.save()
 
-        PropertyTranslation.objects.create(
+        translation, _ = PropertyTranslation.objects.get_or_create(
             property=property_instance,
             language=language,
-            name=name,
             multi_tenant_company=company,
         )
+
+
+        if translation.name != name:
+            translation.name = name
+            translation.save()
+
+
 
 def reverse_brand_properties(apps, schema_editor):
     pass

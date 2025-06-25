@@ -48,7 +48,7 @@ class AliasProductImport(ImportOperationMixin):
 
 
 class ProductTranslationImport(ImportOperationMixin):
-    get_identifiers = ['product', 'language']
+    get_identifiers = ['product', 'language', 'sales_channel']
 
 
 class SalesPriceImport(ImportOperationMixin):
@@ -57,7 +57,7 @@ class SalesPriceImport(ImportOperationMixin):
 
 class ImportProductInstance(AbstractImportInstance):
 
-    def __init__(self, data: dict, import_process=None, rule=None, translations=None, instance=None):
+    def __init__(self, data: dict, import_process=None, rule=None, translations=None, instance=None, sales_channel=None):
         super().__init__(data, import_process, instance)
 
         if translations is None:
@@ -65,6 +65,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.rule = rule
         self.translations = translations
+        self.sales_channel = sales_channel
 
         default_sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
         self.set_field_if_exists('name')
@@ -368,6 +369,7 @@ class ImportProductInstance(AbstractImportInstance):
                     variation_data,
                     import_process=self.import_process,
                     config_product=self.instance,
+                    sales_channel=self.sales_channel,
                 )
 
                 variation_import.process()
@@ -386,6 +388,7 @@ class ImportProductInstance(AbstractImportInstance):
                     variation_data,
                     import_process=self.import_process,
                     bundle_product=self.instance,
+                    sales_channel=self.sales_channel,
                 )
                 variation_import.process()
                 variation_products_ids.append(variation_import.instance.variation.id)
@@ -402,6 +405,7 @@ class ImportProductInstance(AbstractImportInstance):
                     variation_data,
                     import_process=self.import_process,
                     parent_product=self.instance,
+                    sales_channel=self.sales_channel,
                 )
                 variation_import.process()
                 variation_products_ids.append(variation_import.instance.id)
@@ -476,14 +480,14 @@ class ImportProductInstance(AbstractImportInstance):
 
         for translation in self.translations:
             try:
-                import_instance = ImportProductTranslationInstance(translation, self.import_process, product=self.instance)
+                import_instance = ImportProductTranslationInstance(translation, self.import_process, product=self.instance, sales_channel=self.sales_channel)
                 import_instance.process()
             except IntegrityError as e:
                 if "url_key" in str(e):
                     # Try again with url_key removed
                     translation = translation.copy()
                     translation["url_key"] = None
-                    import_instance = ImportProductTranslationInstance(translation, self.import_process, product=self.instance)
+                    import_instance = ImportProductTranslationInstance(translation, self.import_process, product=self.instance, sales_channel=self.sales_channel)
                     import_instance.process()
                 else:
                     raise
@@ -538,9 +542,10 @@ class ImportProductInstance(AbstractImportInstance):
 
 
 class ImportProductTranslationInstance(AbstractImportInstance):
-    def __init__(self, data: dict, import_process=None, product=None, instance=None):
+    def __init__(self, data: dict, import_process=None, product=None, instance=None, sales_channel=None):
         super().__init__(data, import_process, instance)
         self.product = product
+        self.sales_channel = sales_channel
 
         self.set_field_if_exists('name')
         self.set_field_if_exists('short_description')

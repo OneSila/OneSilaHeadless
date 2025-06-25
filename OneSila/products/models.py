@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Q, Value, CheckConstraint
+from django.db.models import Q, Value, CheckConstraint, UniqueConstraint
 from django.utils.text import slugify
 
 from core import models
@@ -511,7 +511,7 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
         return new_url_key
 
     def save(self, *args, **kwargs):
-        if not self.url_key:
+        if not self.url_key and not self.sales_channel:
             self.url_key = self._get_default_url_key()
 
         super().save(*args, **kwargs)
@@ -520,8 +520,15 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
         translated_field = 'product'
         unique_together = (
             ('product', 'language', 'sales_channel'),
-            ('url_key', 'multi_tenant_company'),
         )
+
+        constraints = [
+            UniqueConstraint(
+                fields=['url_key', 'multi_tenant_company'],
+                condition=Q(url_key__isnull=False),
+                name='uniq_nonnull_url_key_per_company'
+            )
+        ]
 
 
 class ProductTranslationBulletPoint(models.Model):

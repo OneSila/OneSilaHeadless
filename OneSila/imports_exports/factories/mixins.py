@@ -162,7 +162,7 @@ class ImportOperationMixin:
             kwargs = {'multi_tenant_company': self.multi_tenant_company}
             for identifier in identifiers:
                 value = get_nested_attr(self.import_instance, identifier)
-                if value is not None:
+                if value is not None or identifier == 'sales_channel':
                     kwargs[identifier] = value
 
             return kwargs
