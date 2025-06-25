@@ -307,9 +307,11 @@ class ImportProductInstance(AbstractImportInstance):
 
             for property in self.properties:
                 try:
+                    property_instance = property.get('property', None)
                     product_property_import_instance = ImportProductPropertyInstance(
                         property,
                         self.import_process,
+                        property=property_instance,
                         product=self.instance)
 
                     product_property_import_instance.process()
