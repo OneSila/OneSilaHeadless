@@ -2,15 +2,18 @@ from decimal import Decimal
 
 from imports_exports.factories.imports import ImportMixin
 from imports_exports.factories.products import ImportProductInstance
+from products.product_types import SIMPLE
+from properties.models import Property
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
+from sales_channels.integrations.amazon.helpers import infer_product_type, extract_description_and_bullets
 from sales_channels.integrations.amazon.models import (
     AmazonProduct,
     AmazonProductType,
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonSalesChannelView,
-    AmazonSalesChannelViewAssign,
 )
+
 from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
 from sales_channels.models import SalesChannelViewAssign
 
@@ -62,15 +65,32 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     def _parse_prices(self, product):
         prices = []
         for offer in product.offers or []:
+
+            if offer.offer_type != "B2C":
+                continue
+
             price_info = offer.price or {}
-            amount = price_info.get("amount")
-            currency = price_info.get("currency_code")
+            amount = price_info.amount
+            currency = price_info.currency_code
             if amount is not None and currency:
                 prices.append({
                     "price": Decimal(amount),
                     "currency": currency,
                 })
+
         return prices
+
+    def _parse_translations(self, name, language, attributes_dict):
+        description, bullets = extract_description_and_bullets(attributes_dict)
+
+        return [
+            {
+                "name": name,
+                "description": description,
+                "bullet_points": bullets,
+                "language": language,
+            }
+        ]
 
     def _parse_images(self, product):
         attrs = product.attributes or {}
@@ -91,23 +111,27 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 index += 1
         return images
 
-    def _parse_attributes(self, product):
+    def _parse_attributes(self, product, marketplace):
         attrs = []
         mirror_map = {}
         product_attrs = product.attributes or {}
         for code, values in product_attrs.items():
             if code in AMAZON_INTERNAL_PROPERTIES:
                 continue
+
             remote_property = AmazonProperty.objects.filter(sales_channel=self.sales_channel, code=code).first()
             if not remote_property or not remote_property.local_instance:
                 continue
+
             val_entry = values[0]
             value = val_entry.get("value") or val_entry.get("name")
-            if remote_property.type in [remote_property.TYPES.SELECT, remote_property.TYPES.MULTISELECT]:
+            if remote_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
                 select_value = AmazonPropertySelectValue.objects.filter(
                     amazon_property=remote_property,
                     remote_value=value,
+                    marketplace=marketplace
                 ).first()
+
                 if select_value and select_value.local_instance:
                     attrs.append({
                         "property": remote_property.local_instance,
@@ -126,44 +150,69 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             }
         return attrs, mirror_map
 
-    def get_structured_product_data(self, product):
-        summary = self._get_summary(product)
-        asin = summary.get("asin")
-        name = summary.get("item_name")
-        status = summary.get("status") or []
-        sku = product.sku
-
-        product_type_code = summary.get("product_type")
+    def get_product_rule(self, product_data):
+        summary = self._get_summary(product_data)
+        product_type_code = summary.product_type
         rule = None
+
         if product_type_code:
             rule = AmazonProductType.objects.filter(
                 sales_channel=self.sales_channel,
                 product_type_code=product_type_code,
             ).first()
+
             if rule:
                 rule = rule.local_instance
+
+        return rule
+
+    def _get_language_for_marketplace(self, view):
+
+        if not view:
+            return None
+
+        remote_lang = view.remote_languages.first()
+        return remote_lang.local_instance if remote_lang else None
+
+    def get__product_data(self, product_data):
+        summary = self._get_summary(product_data)
+        asin = summary.asin
+        name = summary.item_name
+        status = summary.status or []
+        sku = product_data.sku
+        type = infer_product_type(product_data)
+        marketplace_id = summary.marketplace_id
+
+        view = AmazonSalesChannelView.objects.filter(
+            sales_channel=self.sales_channel,
+            remote_id=marketplace_id,
+        ).first()
+        language = self._get_language_for_marketplace(view)
+
 
         structured = {
             "name": name,
             "sku": sku,
             "active": "BUYABLE" in status,
-            "product_type": rule,
+            "type": type
         }
 
-        structured["prices"] = self._parse_prices(product)
-        structured["images"] = self._parse_images(product)
-        attributes, mirror_map = self._parse_attributes(product)
+        if type == SIMPLE:
+            structured["prices"] = self._parse_prices(product_data)
+            structured["images"] = self._parse_images(product_data)
+
+        attributes, mirror_map = self._parse_attributes(product_data, view)
         if attributes:
             structured["properties"] = attributes
             structured["__mirror_product_properties_map"] = mirror_map
 
-        structured["translations"] = []  # Placeholder for future extension
+        structured["translations"] = self._parse_translations(name, language, attributes)
 
         structured["__asin"] = asin
-        structured["__issues"] = product.issues or []
-        structured["__marketplace_id"] = summary.get("marketplace_id")
+        structured["__issues"] = product_data.issues or []
+        structured["__marketplace_id"] = marketplace_id
 
-        return structured
+        return structured, language
 
     def update_product_import_instance(self, instance: ImportProductInstance):
         instance.prepare_mirror_model_class(
@@ -184,7 +233,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         if marketplace_id:
             view = AmazonSalesChannelView.objects.filter(sales_channel=self.sales_channel, remote_id=marketplace_id).first()
             if view:
-                assign, _ = AmazonSalesChannelViewAssign.objects.get_or_create(
+                assign, _ = SalesChannelViewAssign.objects.get_or_create(
                     sales_channel_view=view,
                     product=import_instance.instance,
                     sales_channel=self.sales_channel,
@@ -197,15 +246,21 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
     def import_products_process(self):
         for product in self.get_products_data():
-            structured = self.get_structured_product_data(product)
+            rule = self.get_product_rule(product)
+            structured, language = self.get__product_data(product)
+
+            product_instance = None
+            remote_product = AmazonProduct.objects.filter(asin=structured["__asin"], multi_tenant_company=self.import_process.multi_tenant_company).first()
+            if remote_product:
+                product_instance = remote_product.local_instance
+
             instance = ImportProductInstance(
                 structured,
                 import_process=self.import_process,
-                rule=structured.get("product_type"),
+                rule=rule,
                 sales_channel=self.sales_channel,
+                instance=product_instance # this will skip the create
             )
-            self.update_import_instance_before_process(instance)
+            instance.language = language
             instance.process()
-            self.update_product_log_instance(instance.log_instance, instance)
             self.update_percentage()
-

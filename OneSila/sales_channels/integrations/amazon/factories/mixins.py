@@ -127,8 +127,10 @@ class GetAmazonAPIMixin:
 
                 for item in items:
                     import pprint
-                    pprint.pprint(item)# to_dict for full detail
+                    pprint.pprint(item.to_dict())  # Optional: print for debugging
                     printed += 1
+
+                    yield item  # ← Now actually yielding the product
 
                     if printed >= 100:
                         return  # Stop early
