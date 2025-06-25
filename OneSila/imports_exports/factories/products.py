@@ -10,7 +10,13 @@ from imports_exports.factories.media import ImportImageInstance
 from imports_exports.factories.mixins import AbstractImportInstance, ImportOperationMixin
 from imports_exports.factories.properties import ImportProductPropertiesRuleInstance, ImportProductPropertyInstance
 from media.models import Image, MediaProductThrough
-from products.models import Product, ProductTranslation, ConfigurableVariation, BundleVariation
+from products.models import (
+    Product,
+    ProductTranslation,
+    ProductTranslationBulletPoint,
+    ConfigurableVariation,
+    BundleVariation,
+)
 from properties.models import Property, ProductPropertiesRuleItem, ProductProperty
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
@@ -536,6 +542,17 @@ class ImportProductInstance(AbstractImportInstance):
                 else:
                     raise
 
+            bullet_points = translation.get('bullet_points')
+
+            if bullet_points is not None:
+                translation_obj.bullet_points.all().delete()
+                for index, text in enumerate(bullet_points):
+                    ProductTranslationBulletPoint.objects.create(
+                        product_translation=translation_obj,
+                        text=text,
+                        sort_order=index,
+                    )
+
             translation_instance_ids.append(translation_obj.id)
 
         self.translation_instances = ProductTranslation.objects.filter(id__in=translation_instance_ids)
@@ -553,6 +570,7 @@ class ImportProductTranslationInstance(AbstractImportInstance):
         self.set_field_if_exists('url_key')
         self.set_field_if_exists('language')
         self.set_field_if_exists('product_data')
+        self.set_field_if_exists('bullet_points')
 
         self.validate()
         self._set_product_import_instance()
@@ -591,6 +609,15 @@ class ImportProductTranslationInstance(AbstractImportInstance):
         fac.run()
 
         self.instance = fac.instance
+
+        if hasattr(self, 'bullet_points') and self.bullet_points is not None:
+            self.instance.bullet_points.all().delete()
+            for index, text in enumerate(self.bullet_points):
+                ProductTranslationBulletPoint.objects.create(
+                    product_translation=self.instance,
+                    text=text,
+                    sort_order=index,
+                )
 
 
 class ImportSalesPriceInstance(AbstractImportInstance):
