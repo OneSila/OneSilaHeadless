@@ -112,8 +112,6 @@ class GetAmazonAPIMixin:
             .values_list("remote_id", flat=True)
         )
 
-        printed = 0
-
         for marketplace_id in marketplace_ids:
             page_token = None
             while True:
@@ -126,14 +124,11 @@ class GetAmazonAPIMixin:
                 )
 
                 for item in items:
+
                     import pprint
-                    pprint.pprint(item.to_dict())  # Optional: print for debugging
-                    printed += 1
+                    pprint.pprint(item.to_dict())
 
-                    yield item  # ← Now actually yielding the product
-
-                    if printed >= 100:
-                        return  # Stop early
+                    yield item
 
                 if not page_token:
                     break
