@@ -16,6 +16,17 @@ logging.getLogger("spapi").setLevel(logging.WARNING)
 logging.getLogger("sp_api").propagate = False
 logging.getLogger("spapi").propagate = False
 
+
+class _SpAPILogFilter(logging.Filter):
+    """Filter out noisy logs from the Amazon SP API libraries."""
+
+    def filter(self, record: logging.LogRecord) -> bool:  # pragma: no cover - pure configuration
+        return "sp_api" not in record.pathname and "spapi" not in record.pathname
+
+
+for handler in logging.getLogger().handlers:
+    handler.addFilter(_SpAPILogFilter())
+
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 
 class PullAmazonMixin:
