@@ -5,13 +5,22 @@ from imports_exports.factories.products import ImportProductInstance
 from products.product_types import SIMPLE
 from properties.models import Property
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
-from sales_channels.integrations.amazon.helpers import infer_product_type, extract_description_and_bullets
+from sales_channels.integrations.amazon.helpers import (
+    infer_product_type,
+    extract_description_and_bullets,
+    get_is_product_variation,
+)
 from sales_channels.integrations.amazon.models import (
     AmazonProduct,
     AmazonProductType,
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonSalesChannelView,
+    AmazonEanCode,
+    AmazonProductProperty,
+    AmazonPrice,
+    AmazonProductContent,
+    AmazonImageProductAssociation,
 )
 
 from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
@@ -244,13 +253,145 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                     assign.issues = issues
                     assign.save()
 
+    def update_remote_product(self, import_instance: ImportProductInstance, product, is_variation: bool):
+        remote_product = import_instance.remote_instance
+        asin = import_instance.data.get("__asin")
+
+        if asin and not remote_product.remote_id:
+            remote_product.remote_id = asin
+
+        sku = getattr(product, "sku", None)
+        if sku and not remote_product.remote_sku:
+            remote_product.remote_sku = sku
+
+        if remote_product.syncing_current_percentage != 100:
+            remote_product.syncing_current_percentage = 100
+
+        if remote_product.is_variation != is_variation:
+            remote_product.is_variation = is_variation
+
+        remote_product.save()
+
+    def handle_ean_code(self, import_instance: ImportProductInstance):
+        amazon_ean_code, _ = AmazonEanCode.objects.get_or_create(
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_product=import_instance.remote_instance,
+        )
+
+        if hasattr(import_instance, "ean_code") and import_instance.ean_code:
+            if amazon_ean_code.ean_code != import_instance.ean_code:
+                amazon_ean_code.ean_code = import_instance.ean_code
+                amazon_ean_code.save()
+
+    def handle_attributes(self, import_instance: ImportProductInstance):
+        if hasattr(import_instance, "properties"):
+            product_properties = import_instance.product_property_instances
+            remote_product = import_instance.remote_instance
+            mirror_map = import_instance.data.get("__mirror_product_properties_map", {})
+
+            for product_property in product_properties:
+                mirror_data = mirror_map.get(product_property.property.id)
+                if not mirror_data:
+                    continue
+
+                remote_property = mirror_data["remote_property"]
+                remote_value = mirror_data["remote_value"]
+
+                remote_product_property, _ = AmazonProductProperty.objects.get_or_create(
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    local_instance=product_property,
+                    remote_product=remote_product,
+                    remote_property=remote_property,
+                )
+
+                if not remote_product_property.remote_value:
+                    remote_product_property.remote_value = remote_value
+                    remote_product_property.save()
+
+    def handle_translations(self, import_instance: ImportProductInstance):
+        if hasattr(import_instance, "translations"):
+            AmazonProductContent.objects.get_or_create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                remote_product=import_instance.remote_instance,
+            )
+
+    def handle_prices(self, import_instance: ImportProductInstance):
+        if hasattr(import_instance, "prices"):
+            remote_product = import_instance.remote_instance
+            amazon_price, _ = AmazonPrice.objects.get_or_create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                remote_product=remote_product,
+            )
+
+            price_data = {}
+            for price_entry in import_instance.prices:
+                currency = price_entry.get("currency")
+                price = price_entry.get("price")
+                rrp = price_entry.get("rrp")
+
+                data = {}
+                if rrp is not None:
+                    data["price"] = float(rrp)
+                if price is not None:
+                    data["discount_price"] = float(price)
+
+                if data:
+                    price_data[currency] = data
+
+            if price_data:
+                amazon_price.price_data = price_data
+                amazon_price.save()
+
+    def handle_images(self, import_instance: ImportProductInstance):
+        if hasattr(import_instance, "images"):
+            for image_ass in import_instance.images_associations_instances:
+                AmazonImageProductAssociation.objects.get_or_create(
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    local_instance=image_ass,
+                    remote_product=import_instance.remote_instance,
+                )
+
+    def handle_variations(self, import_instance: ImportProductInstance):
+        # Variations import will be implemented later
+        pass
+
+    def handle_sales_channels_views(self, import_instance: ImportProductInstance, product):
+        marketplace_id = import_instance.data.get("__marketplace_id")
+        if not marketplace_id:
+            return
+
+        view = AmazonSalesChannelView.objects.filter(
+            sales_channel=self.sales_channel,
+            remote_id=marketplace_id,
+        ).first()
+
+        if not view:
+            return
+
+        SalesChannelViewAssign.objects.get_or_create(
+            product=import_instance.instance,
+            sales_channel_view=view,
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            remote_product=import_instance.remote_instance,
+            sales_channel=self.sales_channel,
+        )
+
     def import_products_process(self):
         for product in self.get_products_data():
+            is_variation, _ = get_is_product_variation(product)
             rule = self.get_product_rule(product)
             structured, language = self.get__product_data(product)
 
             product_instance = None
-            remote_product = AmazonProduct.objects.filter(asin=structured["__asin"], multi_tenant_company=self.import_process.multi_tenant_company).first()
+            remote_product = AmazonProduct.objects.filter(
+                asin=structured["__asin"],
+                multi_tenant_company=self.import_process.multi_tenant_company
+            ).first()
             if remote_product:
                 product_instance = remote_product.local_instance
 
@@ -259,8 +400,30 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 import_process=self.import_process,
                 rule=rule,
                 sales_channel=self.sales_channel,
-                instance=product_instance # this will skip the create
+                instance=product_instance  # this will skip the create
+            )
+            instance.prepare_mirror_model_class(
+                mirror_model_class=AmazonProduct,
+                sales_channel=self.sales_channel,
+                mirror_model_map={"local_instance": "*"},
+                mirror_model_defaults={
+                    "remote_id": structured["__asin"],
+                    "asin": structured["__asin"],
+                    "is_variation": is_variation,
+                },
             )
             instance.language = language
             instance.process()
+
+            self.update_remote_product(instance, product, is_variation)
+            self.handle_ean_code(instance)
+            self.handle_attributes(instance)
+            self.handle_translations(instance)
+            self.handle_prices(instance)
+            self.handle_images(instance)
+            self.handle_variations(instance)
+
+            if not is_variation:
+                self.handle_sales_channels_views(instance, product)
+
             self.update_percentage()
