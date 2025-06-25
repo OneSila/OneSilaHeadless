@@ -1,13 +1,32 @@
 from .fields import create_product
-from ..types.types import ProductType, BundleProductType, ConfigurableProductType, \
-    SimpleProductType, ProductTranslationType, ConfigurableVariationType, \
-    BundleVariationType
-from ..types.input import ProductInput, BundleProductInput, ConfigurableProductInput, \
-    SimpleProductInput, ProductTranslationInput, ConfigurableVariationInput, \
-    BundleVariationInput, ProductPartialInput, ConfigurableProductPartialInput, \
-    BundleProductPartialInput, SimpleProductPartialInput, \
-    ProductTranslationPartialInput, ConfigurableVariationPartialInput, \
-    BundleVariationPartialInput
+from ..types.types import (
+    ProductType,
+    BundleProductType,
+    ConfigurableProductType,
+    SimpleProductType,
+    ProductTranslationType,
+    ConfigurableVariationType,
+    BundleVariationType,
+    ProductTranslationBulletPointType,
+)
+from ..types.input import (
+    ProductInput,
+    BundleProductInput,
+    ConfigurableProductInput,
+    SimpleProductInput,
+    ProductTranslationInput,
+    ConfigurableVariationInput,
+    BundleVariationInput,
+    ProductPartialInput,
+    ConfigurableProductPartialInput,
+    BundleProductPartialInput,
+    SimpleProductPartialInput,
+    ProductTranslationPartialInput,
+    ConfigurableVariationPartialInput,
+    BundleVariationPartialInput,
+    ProductTranslationBulletPointInput,
+    ProductTranslationBulletPointPartialInput,
+)
 from core.schema.core.mutations import create, update, delete, type, List
 
 
@@ -54,3 +73,9 @@ class ProductsMutation:
     update_bundle_variation: BundleVariationType = update(BundleVariationPartialInput)
     delete_bundle_variation: BundleVariationType = delete()
     delete_bundle_variations: List[BundleVariationType] = delete()
+
+    create_product_translation_bullet_point: ProductTranslationBulletPointType = create(ProductTranslationBulletPointInput)
+    create_product_translation_bullet_points: List[ProductTranslationBulletPointType] = create(List[ProductTranslationBulletPointInput])
+    update_product_translation_bullet_point: ProductTranslationBulletPointType = update(ProductTranslationBulletPointPartialInput)
+    delete_product_translation_bullet_point: ProductTranslationBulletPointType = delete()
+    delete_product_translation_bullet_points: List[ProductTranslationBulletPointType] = delete(is_bulk=True)

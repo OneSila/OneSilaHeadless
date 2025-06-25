@@ -7,16 +7,42 @@ from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixi
 from typing import List, Optional
 
 from media.models import Media
-from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
-    ProductTranslation, ConfigurableVariation, BundleVariation, AliasProduct
+from products.models import (
+    Product,
+    BundleProduct,
+    ConfigurableProduct,
+    SimpleProduct,
+    ProductTranslation,
+    ConfigurableVariation,
+    BundleVariation,
+    AliasProduct,
+    ProductTranslationBulletPoint,
+)
 from properties.models import ProductProperty
 from properties.schema.types.types import ProductPropertyType
 from taxes.schema.types.types import VatRateType
-from .filters import ProductFilter, BundleProductFilter, ConfigurableProductFilter, \
-    SimpleProductFilter, ProductTranslationFilter, ConfigurableVariationFilter, BundleVariationFilter, \
-    AliasProductFilter
-from .ordering import ProductOrder, BundleProductOrder, ConfigurableProductOrder, \
-    SimpleProductOrder, ProductTranslationOrder, ConfigurableVariationOrder, BundleVariationOrder, AliasProductOrder
+from .filters import (
+    ProductFilter,
+    BundleProductFilter,
+    ConfigurableProductFilter,
+    SimpleProductFilter,
+    ProductTranslationFilter,
+    ConfigurableVariationFilter,
+    BundleVariationFilter,
+    AliasProductFilter,
+    ProductTranslationBulletPointFilter,
+)
+from .ordering import (
+    ProductOrder,
+    BundleProductOrder,
+    ConfigurableProductOrder,
+    SimpleProductOrder,
+    ProductTranslationOrder,
+    ConfigurableVariationOrder,
+    BundleVariationOrder,
+    AliasProductOrder,
+    ProductTranslationBulletPointOrder,
+)
 
 
 @type(Product, filters=ProductFilter, order=ProductOrder, pagination=True, fields="__all__")
@@ -78,7 +104,7 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
 
 @type(ProductTranslation, filters=ProductTranslationFilter, order=ProductTranslationOrder, pagination=True, fields="__all__")
 class ProductTranslationType(relay.Node, GetQuerysetMultiTenantMixin):
-    pass
+    sales_channel: Optional[Annotated['SalesChannelType', lazy('sales_channels.schema.types.types')]]
 
 
 @type(BundleProduct, filters=BundleProductFilter, order=BundleProductOrder, pagination=True, fields="__all__")
@@ -116,3 +142,14 @@ class AliasProductType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def name(self, info) -> str | None:
         return self.name
+
+
+@type(
+    ProductTranslationBulletPoint,
+    filters=ProductTranslationBulletPointFilter,
+    order=ProductTranslationBulletPointOrder,
+    pagination=True,
+    fields="__all__",
+)
+class ProductTranslationBulletPointType(relay.Node, GetQuerysetMultiTenantMixin):
+    product_translation: Optional[ProductTranslationType]

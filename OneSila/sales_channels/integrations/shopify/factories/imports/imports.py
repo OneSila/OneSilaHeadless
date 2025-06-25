@@ -55,6 +55,10 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
 
         self.tags_property = import_instance.instance
 
+        if not self.tags_property.non_deletable:
+            self.tags_property.non_deletable = True
+            self.tags_property.save()
+
     def get_total_instances(self):
 
         gql = self.api.GraphQL()

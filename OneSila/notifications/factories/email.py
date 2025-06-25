@@ -91,3 +91,20 @@ class SendPasswordChangedEmailFactory(SendBrandedEmail):
         self.template_variables.update({
             'auth_change_password': reverse_lazy('core:auth_change_password')
         })
+
+
+class SendImportReportEmailFactory:
+    subject = _("Import report")
+    template_path = 'notifications/email/import_report.html'
+
+    def __init__(self, *, email, language, context):
+        self.email = email
+        self.language = language
+        self.context = context
+
+    def run(self):
+        activate(self.language)
+        html_body = render_to_string(self.template_path, self.context)
+        send_branded_mail(self.subject, html_body, self.email)
+        deactivate()
+

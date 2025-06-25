@@ -327,7 +327,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     def set_short_description(self):
         """Sets the short description for the product or variation in the payload."""
         self.short_description = self.local_instance._get_translated_value(
-            field_name='short_description', related_name='translations')
+            field_name='short_description', related_name='translations', sales_channel=self.sales_channel)
 
         if self.is_variation:
             self.set_variation_short_description()
@@ -341,7 +341,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     def set_description(self):
         """Sets the description for the product or variation in the payload."""
         self.description = self.local_instance._get_translated_value(
-            field_name='description', related_name='translations')
+            field_name='description', related_name='translations', sales_channel=self.sales_channel)
 
         if self.is_variation:
             self.set_variation_description()
@@ -354,7 +354,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
     def set_url_key(self):
         """Sets the URL key for the product or variation in the payload."""
-        self.url_key = self.local_instance._get_translated_value(field_name='url_key', related_name='translations')
+        self.url_key = self.local_instance._get_translated_value(field_name='url_key', related_name='translations', sales_channel=self.sales_channel)
 
         if self.is_variation:
             self.set_variation_url_key()
@@ -574,19 +574,22 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             short_description = self.local_instance._get_translated_value(
                 field_name='short_description',
                 language=remote_language.local_instance,
-                related_name='translations'
+                related_name='translations',
+                sales_channel=self.sales_channel
             )
 
             description = self.local_instance._get_translated_value(
                 field_name='description',
                 language=remote_language.local_instance,
-                related_name='translations'
+                related_name='translations',
+                sales_channel=self.sales_channel
             )
 
             url_key = self.local_instance._get_translated_value(
                 field_name='url_key',
                 language=remote_language.local_instance,
-                related_name='translations'
+                related_name='translations',
+                sales_channel=self.sales_channel
             )
 
             self.process_content_translation(

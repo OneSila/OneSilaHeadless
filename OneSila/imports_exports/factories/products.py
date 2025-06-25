@@ -10,7 +10,13 @@ from imports_exports.factories.media import ImportImageInstance
 from imports_exports.factories.mixins import AbstractImportInstance, ImportOperationMixin
 from imports_exports.factories.properties import ImportProductPropertiesRuleInstance, ImportProductPropertyInstance
 from media.models import Image, MediaProductThrough
-from products.models import Product, ProductTranslation, ConfigurableVariation, BundleVariation
+from products.models import (
+    Product,
+    ProductTranslation,
+    ProductTranslationBulletPoint,
+    ConfigurableVariation,
+    BundleVariation,
+)
 from properties.models import Property, ProductPropertiesRuleItem, ProductProperty
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
@@ -48,7 +54,7 @@ class AliasProductImport(ImportOperationMixin):
 
 
 class ProductTranslationImport(ImportOperationMixin):
-    get_identifiers = ['product', 'language']
+    get_identifiers = ['product', 'language', 'sales_channel']
 
 
 class SalesPriceImport(ImportOperationMixin):
@@ -57,7 +63,7 @@ class SalesPriceImport(ImportOperationMixin):
 
 class ImportProductInstance(AbstractImportInstance):
 
-    def __init__(self, data: dict, import_process=None, rule=None, translations=None, instance=None):
+    def __init__(self, data: dict, import_process=None, rule=None, translations=None, instance=None, sales_channel=None):
         super().__init__(data, import_process, instance)
 
         if translations is None:
@@ -65,6 +71,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.rule = rule
         self.translations = translations
+        self.sales_channel = sales_channel
 
         default_sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
         self.set_field_if_exists('name')
@@ -368,6 +375,7 @@ class ImportProductInstance(AbstractImportInstance):
                     variation_data,
                     import_process=self.import_process,
                     config_product=self.instance,
+                    sales_channel=self.sales_channel,
                 )
 
                 variation_import.process()
@@ -386,6 +394,7 @@ class ImportProductInstance(AbstractImportInstance):
                     variation_data,
                     import_process=self.import_process,
                     bundle_product=self.instance,
+                    sales_channel=self.sales_channel,
                 )
                 variation_import.process()
                 variation_products_ids.append(variation_import.instance.variation.id)
@@ -402,6 +411,7 @@ class ImportProductInstance(AbstractImportInstance):
                     variation_data,
                     import_process=self.import_process,
                     parent_product=self.instance,
+                    sales_channel=self.sales_channel,
                 )
                 variation_import.process()
                 variation_products_ids.append(variation_import.instance.id)
@@ -476,14 +486,14 @@ class ImportProductInstance(AbstractImportInstance):
 
         for translation in self.translations:
             try:
-                import_instance = ImportProductTranslationInstance(translation, self.import_process, product=self.instance)
+                import_instance = ImportProductTranslationInstance(translation, self.import_process, product=self.instance, sales_channel=self.sales_channel)
                 import_instance.process()
             except IntegrityError as e:
                 if "url_key" in str(e):
                     # Try again with url_key removed
                     translation = translation.copy()
                     translation["url_key"] = None
-                    import_instance = ImportProductTranslationInstance(translation, self.import_process, product=self.instance)
+                    import_instance = ImportProductTranslationInstance(translation, self.import_process, product=self.instance, sales_channel=self.sales_channel)
                     import_instance.process()
                 else:
                     raise
@@ -532,15 +542,28 @@ class ImportProductInstance(AbstractImportInstance):
                 else:
                     raise
 
+            bullet_points = translation.get('bullet_points')
+
+            if bullet_points is not None:
+                translation_obj.bullet_points.all().delete()
+                for index, text in enumerate(bullet_points):
+                    ProductTranslationBulletPoint.objects.create(
+                        multi_tenant_company=translation_obj.multi_tenant_company,
+                        product_translation=translation_obj,
+                        text=text,
+                        sort_order=index,
+                    )
+
             translation_instance_ids.append(translation_obj.id)
 
         self.translation_instances = ProductTranslation.objects.filter(id__in=translation_instance_ids)
 
 
 class ImportProductTranslationInstance(AbstractImportInstance):
-    def __init__(self, data: dict, import_process=None, product=None, instance=None):
+    def __init__(self, data: dict, import_process=None, product=None, instance=None, sales_channel=None):
         super().__init__(data, import_process, instance)
         self.product = product
+        self.sales_channel = sales_channel
 
         self.set_field_if_exists('name')
         self.set_field_if_exists('short_description')
@@ -548,6 +571,7 @@ class ImportProductTranslationInstance(AbstractImportInstance):
         self.set_field_if_exists('url_key')
         self.set_field_if_exists('language')
         self.set_field_if_exists('product_data')
+        self.set_field_if_exists('bullet_points')
 
         self.validate()
         self._set_product_import_instance()
@@ -586,6 +610,15 @@ class ImportProductTranslationInstance(AbstractImportInstance):
         fac.run()
 
         self.instance = fac.instance
+
+        if hasattr(self, 'bullet_points') and self.bullet_points is not None:
+            self.instance.bullet_points.all().delete()
+            for index, text in enumerate(self.bullet_points):
+                ProductTranslationBulletPoint.objects.create(
+                    product_translation=self.instance,
+                    text=text,
+                    sort_order=index,
+                )
 
 
 class ImportSalesPriceInstance(AbstractImportInstance):

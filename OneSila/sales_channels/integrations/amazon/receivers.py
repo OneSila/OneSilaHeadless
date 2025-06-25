@@ -32,8 +32,3 @@ def sales_channels__amazon__handle_pull_views(sender, instance, **kwargs):
 
     currencies_factory = AmazonRemoteCurrencyPullFactory(sales_channel=instance)
     currencies_factory.run()
-
-# Example placeholder for future signal handlers
-# @receiver(post_update, sender='app_name.Model')
-# def app_name__model__action__example(sender, instance, **kwargs):
-#     do_something()

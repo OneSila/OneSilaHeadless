@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError
 from polymorphic.models import PolymorphicModel
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
 from core import models
 import logging
 from django.utils.timezone import now
@@ -11,6 +11,8 @@ import json
 from datetime import datetime
 from django.utils.translation import gettext_lazy as _
 
+from integrations.validators import hostname_validator
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,7 +20,13 @@ class Integration(PolymorphicModel, models.Model):
     """
     Polymorphic model representing a integration like sales channel, such as a website or marketplace or accounting accounts.
     """
-    hostname = models.URLField()
+    # !IMPORTANT: Marketplaces don't need this mandatory. This will be more like a "name" instead, an identifier
+    # we keep it like this because it is very deep in the code so we changed from URL field to CharField with
+    # a validator to be url that can be overridden in the integrations
+    hostname = models.CharField(
+        max_length=255,
+        help_text="Hostname or identifier for the integration (e.g. domain name or marketplace slug)"
+    )
     active = models.BooleanField(default=True)
     verify_ssl = models.BooleanField(default=True)
     requests_per_minute = models.IntegerField(default=60)
@@ -28,6 +36,16 @@ class Integration(PolymorphicModel, models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(20)],
         help_text="Maximum number of task retries (between 1 and 20)"
     )
+
+    def clean(self):
+        from sales_channels.integrations.amazon.models import AmazonSalesChannel
+
+        if not isinstance(self, AmazonSalesChannel):
+            validator = URLValidator(schemes=['http', 'https'])
+            try:
+                validator(self.hostname)
+            except ValidationError:
+                raise ValidationError({'hostname': 'Enter a valid URL (e.g. https://example.com)'})
 
     class Meta:
         unique_together = ('multi_tenant_company', 'hostname')
