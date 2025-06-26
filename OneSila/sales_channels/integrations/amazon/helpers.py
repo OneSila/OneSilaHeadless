@@ -37,13 +37,17 @@ def extract_description_and_bullets(attributes: list[dict]) -> tuple[str | None,
 
 
 def get_is_product_variation(data):
-    """Return whether the product is a variation and its parent SKU if present."""
+    """Return whether the product is a variation and its parent SKUs if present."""
     relationships = getattr(data, 'relationships', []) or []
+    parent_skus = []
 
     for relation in relationships:
         for rel in getattr(relation, 'relationships', []) or []:
             parent_sku = getattr(rel, 'parent_sku', None)
             if parent_sku:
-                return True, parent_sku
+                parent_skus.append(parent_sku)
 
-    return False, None
+    if parent_skus:
+        return True, parent_skus
+    else:
+        return False, []

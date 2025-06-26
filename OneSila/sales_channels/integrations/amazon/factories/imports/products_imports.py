@@ -381,14 +381,15 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
     def import_products_process(self):
         for product in self.get_products_data():
-            is_variation, parent_sku = get_is_product_variation(product)
+            is_variation, parent_skus = get_is_product_variation(product)
             rule = self.get_product_rule(product)
             structured, language = self.get__product_data(product)
 
             # Keep track of parent-child relationships to process later
-            if is_variation and parent_sku:
-                self._configurable_map[structured["sku"]] = parent_sku
-                structured["configurable_parent_sku"] = parent_sku
+            if is_variation and parent_skus:
+                for parent_sku in parent_skus:
+                    self._configurable_map[structured["sku"]] = parent_sku
+                    structured["configurable_parent_sku"] = parent_sku
 
             product_instance = None
             remote_product = AmazonProduct.objects.filter(
