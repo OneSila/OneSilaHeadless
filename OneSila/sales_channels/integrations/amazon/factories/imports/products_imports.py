@@ -39,9 +39,11 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         super().__init__(import_process, language)
         self.sales_channel = sales_channel
         self.api = self.get_api()
-        # Mapping of child SKU to parent SKU for configurator creation
-        # after all products have been imported.
-        self._configurable_map: dict[str, str] = {}
+        # Mapping of parent SKU to a set of child SKUs for configurator
+        # creation after all products have been imported. Children are
+        # stored in sets to avoid duplicates when the same parent SKU
+        # appears across multiple marketplaces.
+        self._configurable_map: dict[str, set[str]] = {}
 
     # ------------------------------------------------------------------
     # Helpers
@@ -62,12 +64,20 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         from products.models import Product, ConfigurableVariation
 
         mtc = self.import_process.multi_tenant_company
-        for child_sku, parent_sku in self._configurable_map.items():
-            parent = Product.objects.filter(sku=parent_sku,
-                                           multi_tenant_company=mtc).first()
-            child = Product.objects.filter(sku=child_sku,
-                                          multi_tenant_company=mtc).first()
-            if parent and parent.is_configurable() and child:
+        for parent_sku, children_skus in self._configurable_map.items():
+            parent = Product.objects.filter(
+                sku=parent_sku,
+                multi_tenant_company=mtc
+            ).first()
+
+            if not parent or not parent.is_configurable():
+                continue
+
+            children = Product.objects.filter(
+                sku__in=list(children_skus),
+                multi_tenant_company=mtc
+            )
+            for child in children:
                 ConfigurableVariation.objects.get_or_create(
                     parent=parent,
                     variation=child,
@@ -388,7 +398,8 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             # Keep track of parent-child relationships to process later
             if is_variation and parent_skus:
                 for parent_sku in parent_skus:
-                    self._configurable_map[structured["sku"]] = parent_sku
+                    children = self._configurable_map.setdefault(parent_sku, set())
+                    children.add(structured["sku"])
                     structured["configurable_parent_sku"] = parent_sku
 
             product_instance = None
