@@ -7,7 +7,7 @@ class RemoteProductConfiguratorQuerySet(PolymorphicQuerySet, MultiTenantQuerySet
     QuerySet for RemoteProductConfigurator with multitenancy and polymorphic support.
     """
 
-    def create_from_remote_product(self, remote_product, rule=None, variations=None):
+    def create_from_remote_product(self, remote_product, rule=None, variations=None, amazon_theme=None):
         """
         Creates a RemoteProductConfigurator from a remote_product, rule, and variations.
         """
@@ -28,7 +28,8 @@ class RemoteProductConfiguratorQuerySet(PolymorphicQuerySet, MultiTenantQuerySet
         configurator = self.create(
             remote_product=remote_product,
             multi_tenant_company=remote_product.multi_tenant_company,
-            sales_channel=sales_channel
+            sales_channel=sales_channel,
+            amazon_theme=amazon_theme,
         )
         configurator.properties.set(all_local_props)
         configurator.save()
