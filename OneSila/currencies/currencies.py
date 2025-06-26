@@ -39,5 +39,6 @@ currencies = {
     'ZA': {'name': 'South African Rand', 'iso_code': 'ZAR', 'symbol': 'R'},
     'SA': {'name': 'Saudi Riyal', 'iso_code': 'SAR', 'symbol': 'ر.س'},
     'AE': {'name': 'United Arab Emirates Dirham', 'iso_code': 'AED', 'symbol': 'د.إ'},
-    'MX': {'name': 'Mexican Peso', 'iso_code': 'MXN', 'symbol': '$'}
+    'MX': {'name': 'Mexican Peso', 'iso_code': 'MXN', 'symbol': '$'},
+    'TR': {'name': 'Turkish Lira', 'iso_code': 'TRY', 'symbol': '₺'}
 }
