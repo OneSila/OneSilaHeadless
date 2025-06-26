@@ -39,6 +39,9 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         super().__init__(import_process, language)
         self.sales_channel = sales_channel
         self.api = self.get_api()
+        # Mapping of child SKU to parent SKU for configurator creation
+        # after all products have been imported.
+        self._configurable_map: dict[str, str] = {}
 
     # ------------------------------------------------------------------
     # Helpers
@@ -52,6 +55,24 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         self.sales_channel.active = True
         self.sales_channel.is_importing = False
         self.sales_channel.save(update_fields=["active", "is_importing"])
+        self._create_configurable_variations()
+
+    def _create_configurable_variations(self):
+        """Create ConfigurableVariation links after all products are imported."""
+        from products.models import Product, ConfigurableVariation
+
+        mtc = self.import_process.multi_tenant_company
+        for child_sku, parent_sku in self._configurable_map.items():
+            parent = Product.objects.filter(sku=parent_sku,
+                                           multi_tenant_company=mtc).first()
+            child = Product.objects.filter(sku=child_sku,
+                                          multi_tenant_company=mtc).first()
+            if parent and parent.is_configurable() and child:
+                ConfigurableVariation.objects.get_or_create(
+                    parent=parent,
+                    variation=child,
+                    multi_tenant_company=mtc,
+                )
 
     # ------------------------------------------------------------------
     # Data fetching
@@ -197,7 +218,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             remote_id=marketplace_id,
         ).first()
         language = self._get_language_for_marketplace(view)
-
 
         structured = {
             "name": name,
@@ -383,9 +403,14 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
     def import_products_process(self):
         for product in self.get_products_data():
-            is_variation, _ = get_is_product_variation(product)
+            is_variation, parent_sku = get_is_product_variation(product)
             rule = self.get_product_rule(product)
             structured, language = self.get__product_data(product)
+
+            # Keep track of parent-child relationships to process later
+            if is_variation and parent_sku:
+                self._configurable_map[structured["sku"]] = parent_sku
+                structured["configurable_parent_sku"] = parent_sku
 
             product_instance = None
             remote_product = AmazonProduct.objects.filter(
