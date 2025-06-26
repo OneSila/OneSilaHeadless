@@ -190,6 +190,30 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             }
         return attrs, mirror_map
 
+    def _parse_configurator_select_values(self, product):
+        configurator_values = []
+        amazon_theme = None
+        relationships = getattr(product, "relationships", []) or []
+        for relation in relationships:
+            for rel in getattr(relation, "relationships", []) or []:
+                vt = getattr(rel, "variation_theme", None)
+                if not vt:
+                    continue
+                attrs = getattr(vt, "attributes", None) or []
+                amazon_theme = getattr(vt, "theme", None)
+                for code in attrs:
+                    remote_property = AmazonProperty.objects.filter(
+                        sales_channel=self.sales_channel,
+                        code=code,
+                    ).first()
+                    if remote_property and remote_property.local_instance:
+                        configurator_values.append({"property": remote_property.local_instance})
+                if attrs:
+                    break
+            if configurator_values:
+                break
+        return configurator_values, amazon_theme
+
     def get_product_rule(self, product_data):
         summary = self._get_summary(product_data)
         product_type_code = summary.product_type
@@ -247,6 +271,11 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             structured["__mirror_product_properties_map"] = mirror_map
 
         structured["translations"] = self._parse_translations(name, language, attributes)
+        configurator_values, amazon_theme = self._parse_configurator_select_values(product_data)
+        if configurator_values:
+            structured["configurator_select_values"] = configurator_values
+        if amazon_theme:
+            structured["__amazon_theme"] = amazon_theme
         structured["__asin"] = asin
         structured["__issues"] = product_data.issues or []
         structured["__marketplace_id"] = marketplace_id
@@ -365,8 +394,27 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 )
 
     def handle_variations(self, import_instance: ImportProductInstance):
-        # Variations import will be implemented later
-        pass
+        theme = import_instance.data.get("__amazon_theme")
+        if not theme:
+            return
+
+        from sales_channels.models.products import RemoteProductConfigurator
+
+        remote_product = import_instance.remote_instance
+        if hasattr(remote_product, "configurator"):
+            configurator = remote_product.configurator
+            configurator.update_if_needed(
+                rule=import_instance.rule,
+                send_sync_signal=False,
+                amazon_theme=theme,
+            )
+        else:
+            RemoteProductConfigurator.objects.create_from_remote_product(
+                remote_product=remote_product,
+                rule=import_instance.rule,
+                variations=None,
+                amazon_theme=theme,
+            )
 
     def handle_sales_channels_views(self, import_instance: ImportProductInstance, product):
         marketplace_id = import_instance.data.get("__marketplace_id")

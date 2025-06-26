@@ -701,12 +701,18 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """
         if hasattr(self.remote_instance, 'configurator'):
             self.configurator = self.remote_instance.configurator
-            self.configurator.update_if_needed(rule=self.rule, variations=self.variations, send_sync_signal=False)
+            self.configurator.update_if_needed(
+                rule=self.rule,
+                variations=self.variations,
+                send_sync_signal=False,
+                amazon_theme=getattr(self, "amazon_theme", None),
+            )
         else:
             self.configurator = RemoteProductConfigurator.objects.create_from_remote_product(
                 remote_product=self.remote_instance,
                 rule=self.rule,
-                variations=self.variations
+                variations=self.variations,
+                amazon_theme=getattr(self, "amazon_theme", None),
             )
             logger.debug(f"Created new configurator for {self.local_instance.name}")
 
