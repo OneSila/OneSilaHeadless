@@ -226,9 +226,10 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             "type": type
         }
 
+        structured["images"] = self._parse_images(product_data)
+
         if type == SIMPLE:
             structured["prices"] = self._parse_prices(product_data)
-            structured["images"] = self._parse_images(product_data)
 
         attributes, mirror_map = self._parse_attributes(product_data, view)
         if attributes:
@@ -236,7 +237,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             structured["__mirror_product_properties_map"] = mirror_map
 
         structured["translations"] = self._parse_translations(name, language, attributes)
-
         structured["__asin"] = asin
         structured["__issues"] = product_data.issues or []
         structured["__marketplace_id"] = marketplace_id
@@ -250,28 +250,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             mirror_model_map={"local_instance": "*"},
             mirror_model_defaults={"asin": instance.data.get("__asin")},
         )
-
-    def update_product_log_instance(self, log_instance, import_instance: ImportProductInstance):
-        remote_product = import_instance.remote_instance
-        log_instance.successfully_imported = True
-        log_instance.remote_product = remote_product
-        log_instance.save()
-
-        marketplace_id = import_instance.data.get("__marketplace_id")
-        issues = import_instance.data.get("__issues")
-        if marketplace_id:
-            view = AmazonSalesChannelView.objects.filter(sales_channel=self.sales_channel, remote_id=marketplace_id).first()
-            if view:
-                assign, _ = SalesChannelViewAssign.objects.get_or_create(
-                    sales_channel_view=view,
-                    product=import_instance.instance,
-                    sales_channel=self.sales_channel,
-                    multi_tenant_company=self.import_process.multi_tenant_company,
-                    defaults={"remote_product": remote_product},
-                )
-                if issues:
-                    assign.issues = issues
-                    assign.save()
 
     def update_remote_product(self, import_instance: ImportProductInstance, product, is_variation: bool):
         remote_product = import_instance.remote_instance
