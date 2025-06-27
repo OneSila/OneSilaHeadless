@@ -1,6 +1,10 @@
 from django.utils.translation import gettext_lazy as _
 from core import models
-from sales_channels.models.sales_channels import SalesChannel, SalesChannelView, RemoteLanguage
+from sales_channels.models.sales_channels import (
+    SalesChannel,
+    SalesChannelView,
+    RemoteLanguage,
+)
 import uuid
 
 

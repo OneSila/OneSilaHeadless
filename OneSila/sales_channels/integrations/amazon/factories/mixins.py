@@ -1,19 +1,9 @@
+import json
+
 from django.conf import settings
 from sp_api.base import  SellingApiException
 from spapi import SellersApi, SPAPIConfig, SPAPIClient, DefinitionsApi, ListingsApi
-
-import logging
-
 from sales_channels.integrations.amazon.decorators import throttle_safe
-
-# Mute sp-api logs
-logging.getLogger("sp_api").setLevel(logging.WARNING)
-logging.getLogger("spapi").setLevel(logging.WARNING)
-
-# Optional: If they're flooding stdout handlers
-logging.getLogger("sp_api").propagate = False
-logging.getLogger("spapi").propagate = False
-
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 
 class PullAmazonMixin:
@@ -51,12 +41,12 @@ class GetAmazonAPIMixin:
 
 
     @throttle_safe(max_retries=5, base_delay=1)
-    def _fetch_listing_items_page(self, listings_api, seller_id, marketplace_id, page_token=None):
+    def _fetch_listing_items_page(self, listings_api, seller_id, marketplace_id, page_token=None, included_data=None):
         kwargs = {
             "seller_id": seller_id,
             "marketplace_ids": [marketplace_id],
             "page_size": 20,
-            "included_data": ["summaries"],
+            "included_data": included_data or ["summaries"],
         }
         if page_token:
             kwargs["page_token"] = page_token
@@ -101,3 +91,37 @@ class GetAmazonAPIMixin:
                     break
 
         return sorted(product_types)
+
+    def get_all_products(self):
+        listings_api = ListingsApi(self._get_client())
+        seller_id = self.sales_channel.remote_id
+        marketplace_ids = list(
+            AmazonSalesChannelView.objects.filter(sales_channel=self.sales_channel)
+            .values_list("remote_id", flat=True)
+        )
+
+        for marketplace_id in marketplace_ids:
+            page_token = None
+            while True:
+                items, page_token = self._fetch_listing_items_page(
+                    listings_api,
+                    seller_id,
+                    marketplace_id,
+                    page_token,
+                    included_data=["summaries", "attributes", "issues", "offers", "relationships"]
+                )
+
+                if hasattr(self, "total_import_instances_cnt"):
+                    self.total_import_instances_cnt += len(items)
+                    if hasattr(self, "set_threshold_chunk"):
+                        self.set_threshold_chunk()
+
+                for item in items:
+
+                    import pprint
+                    pprint.pprint(item.to_dict())
+
+                    yield item
+
+                if not page_token:
+                    break

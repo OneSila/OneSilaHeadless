@@ -12,7 +12,13 @@ from sales_channels.models.products import (
 
 class AmazonProduct(RemoteProduct):
     """Amazon specific remote product."""
-    pass
+
+    asin = models.CharField(
+        max_length=32,
+        null=True,
+        blank=True,
+        help_text="ASIN identifier for the product.",
+    )
 
 
 class AmazonInventory(RemoteInventory):
