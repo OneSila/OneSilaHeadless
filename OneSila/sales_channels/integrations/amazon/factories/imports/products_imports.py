@@ -88,7 +88,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     # Data fetching
     # ------------------------------------------------------------------
     def get_total_instances(self):
-        # SP‑API does not provide a count endpoint easily; return a dummy value.
         return 100
 
     def get_products_data(self):
@@ -156,6 +155,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         mirror_map = {}
         product_attrs = product.attributes or {}
         for code, values in product_attrs.items():
+
             if code in AMAZON_INTERNAL_PROPERTIES:
                 continue
 
@@ -280,7 +280,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         structured["__issues"] = product_data.issues or []
         structured["__marketplace_id"] = marketplace_id
 
-        return structured, language
+        return structured, language, view
 
     def update_product_import_instance(self, instance: ImportProductInstance):
         instance.prepare_mirror_model_class(
@@ -416,15 +416,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 amazon_theme=theme,
             )
 
-    def handle_sales_channels_views(self, import_instance: ImportProductInstance, product):
-        marketplace_id = import_instance.data.get("__marketplace_id")
-        if not marketplace_id:
-            return
-
-        view = AmazonSalesChannelView.objects.filter(
-            sales_channel=self.sales_channel,
-            remote_id=marketplace_id,
-        ).first()
+    def handle_sales_channels_views(self, import_instance: ImportProductInstance, view):
 
         if not view:
             return
@@ -441,7 +433,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         for product in self.get_products_data():
             is_variation, parent_skus = get_is_product_variation(product)
             rule = self.get_product_rule(product)
-            structured, language = self.get__product_data(product)
+            structured, language, view = self.get__product_data(product)
 
             # Keep track of parent-child relationships to process later
             if is_variation and parent_skus:
@@ -463,7 +455,8 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 import_process=self.import_process,
                 rule=rule,
                 sales_channel=self.sales_channel,
-                instance=product_instance  # this will skip the create
+                instance=product_instance,  # this will skip the create
+                update_current_rule=True
             )
             instance.prepare_mirror_model_class(
                 mirror_model_class=AmazonProduct,
@@ -472,6 +465,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 mirror_model_defaults={
                     "remote_id": structured["__asin"],
                     "asin": structured["__asin"],
+                    "remote_sku": structured["sku"],
                     "is_variation": is_variation,
                 },
             )
@@ -484,9 +478,10 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             self.handle_translations(instance)
             self.handle_prices(instance)
             self.handle_images(instance)
-            self.handle_variations(instance)
 
-            if not is_variation:
-                self.handle_sales_channels_views(instance, product)
+            if is_variation:
+                self.handle_variations(instance)
+            else:
+                self.handle_sales_channels_views(instance, view)
 
             self.update_percentage()

@@ -63,7 +63,7 @@ class SalesPriceImport(ImportOperationMixin):
 
 class ImportProductInstance(AbstractImportInstance):
 
-    def __init__(self, data: dict, import_process=None, rule=None, translations=None, instance=None, sales_channel=None):
+    def __init__(self, data: dict, import_process=None, rule=None, translations=None, instance=None, sales_channel=None, update_current_rule=False):
         super().__init__(data, import_process, instance)
 
         if translations is None:
@@ -72,6 +72,7 @@ class ImportProductInstance(AbstractImportInstance):
         self.rule = rule
         self.translations = translations
         self.sales_channel = sales_channel
+        self.update_current_rule = update_current_rule
 
         default_sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
         self.set_field_if_exists('name')
@@ -216,9 +217,11 @@ class ImportProductInstance(AbstractImportInstance):
 
     def _set_rule(self):
 
+        if self.rule and self.update_current_rule:
+            self.update_product_rule()
+
         if not self.rule and not hasattr(self, 'product_type'):
             return
-
 
         required_names = set()
         if hasattr(self, 'configurator_select_values'):
@@ -293,9 +296,9 @@ class ImportProductInstance(AbstractImportInstance):
         if self.created:
             self.create_translations()
 
-    def set_product_properties(self):
+    def update_product_rule(self):
 
-        if self.rule:
+        if self.rule and self.instance and self.rule != self.instance.get_product_rule():
             product_type_property = Property.objects.get(
                 multi_tenant_company=self.multi_tenant_company,
                 is_product_type=True
@@ -315,6 +318,15 @@ class ImportProductInstance(AbstractImportInstance):
 
             product_property_import_instance.language = self.language
             product_property_import_instance.process()
+
+    def set_product_properties(self):
+
+        if self.created:
+            self.update_product_rule()
+        else:
+            if self.update_current_rule:
+                self.update_product_rule()
+
 
         product_property_ids = []
         if self.type in [Product.SIMPLE, Product.BUNDLE, Product.ALIAS] and hasattr(self, 'properties'):
