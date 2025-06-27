@@ -416,18 +416,22 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 amazon_theme=theme,
             )
 
-    def handle_sales_channels_views(self, import_instance: ImportProductInstance, view):
+    def handle_sales_channels_views(self, import_instance: ImportProductInstance, structured_data, view):
 
         if not view:
             return
 
-        SalesChannelViewAssign.objects.get_or_create(
+        assign, _ = SalesChannelViewAssign.objects.get_or_create(
             product=import_instance.instance,
             sales_channel_view=view,
             multi_tenant_company=self.import_process.multi_tenant_company,
             remote_product=import_instance.remote_instance,
             sales_channel=self.sales_channel,
         )
+
+        issues = structured_data.get("__issues") or []
+        assign.issues = [issue.to_dict() if hasattr(issue, "to_dict") else issue.__dict__ for issue in issues]
+        assign.save()
 
     def import_products_process(self):
         for product in self.get_products_data():
@@ -482,6 +486,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             if is_variation:
                 self.handle_variations(instance)
             else:
-                self.handle_sales_channels_views(instance, view)
+                self.handle_sales_channels_views(instance, structured, view)
 
             self.update_percentage()
