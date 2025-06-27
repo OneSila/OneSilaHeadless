@@ -3,7 +3,7 @@ from typing import Optional, List, Annotated
 from strawberry import lazy
 from strawberry.relay import to_base64
 
-from core.schema.core.types.types import type, relay, field
+from core.schema.core.types.types import type, relay, field, strawberry_type
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from currencies.schema.types.types import CurrencyType
 from imports_exports.schema.queries import ImportType
@@ -27,8 +27,14 @@ from .ordering import ImportCurrencyOrder, ImportImageOrder, SalesChannelImportO
     RemoteOrderOrder, RemoteProductOrder, RemoteProductContentOrder, RemoteProductPropertyOrder, \
     RemotePropertyOrder, RemotePropertySelectValueOrder, RemoteVatOrder, SalesChannelOrder, \
     SalesChannelIntegrationPricelistOrder, SalesChannelViewOrder, SalesChannelViewAssignOrder, RemoteLanguageOrder
-from ...integrations.amazon.models import AmazonSalesChannelImport
+from ...integrations.amazon.models import AmazonSalesChannelImport, AmazonSalesChannel
 from ...models.sales_channels import RemoteLanguage
+
+
+@strawberry_type
+class FormattedIssueType:
+    message: str | None
+    severity: str | None
 
 
 @type(SalesChannel, filters=SalesChannelFilter, order=SalesChannelOrder, pagination=True, fields='__all__')
@@ -221,3 +227,25 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
             return self.remote_product.syncing_current_percentage
 
         return 0
+
+    @field(description="List of formatted issues coming from the remote marketplace")
+    def formatted_issues(self, info) -> List[FormattedIssueType]:
+        issues_data = self.issues or []
+        sales_channel_instance = self.sales_channel.get_real_instance()
+
+        formatted: List[FormattedIssueType] = []
+
+        if isinstance(sales_channel_instance, AmazonSalesChannel):
+            for issue in issues_data:
+                if not isinstance(issue, dict):
+                    continue
+                formatted.append(
+                    FormattedIssueType(
+                        message=issue.get("message"),
+                        severity=issue.get("severity"),
+                    )
+                )
+
+        # Other marketplace specific formatting can be added here.
+
+        return formatted
