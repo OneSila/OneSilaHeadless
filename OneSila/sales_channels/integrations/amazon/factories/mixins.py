@@ -111,6 +111,11 @@ class GetAmazonAPIMixin:
                     included_data=["summaries", "attributes", "issues", "offers", "relationships"]
                 )
 
+                if hasattr(self, "total_import_instances_cnt"):
+                    self.total_import_instances_cnt += len(items)
+                    if hasattr(self, "set_threshold_chunk"):
+                        self.set_threshold_chunk()
+
                 for item in items:
 
                     import pprint
