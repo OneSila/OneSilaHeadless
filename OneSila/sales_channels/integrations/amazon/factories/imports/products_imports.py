@@ -88,7 +88,8 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     # Data fetching
     # ------------------------------------------------------------------
     def get_total_instances(self):
-        return 100
+        # Start with zero and update dynamically as pages are fetched.
+        return 0
 
     def get_products_data(self):
         # Delegate to the mixin helper which yields ListingItem objects
