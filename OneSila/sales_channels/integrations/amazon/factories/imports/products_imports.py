@@ -1,5 +1,7 @@
 from decimal import Decimal
 
+from django.db import IntegrityError
+
 from imports_exports.factories.imports import ImportMixin
 from imports_exports.factories.products import ImportProductInstance
 from products.product_types import SIMPLE
@@ -417,20 +419,32 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             )
 
     def handle_sales_channels_views(self, import_instance: ImportProductInstance, structured_data, view):
-
         if not view:
             return
 
-        assign, _ = SalesChannelViewAssign.objects.get_or_create(
-            product=import_instance.instance,
-            sales_channel_view=view,
-            multi_tenant_company=self.import_process.multi_tenant_company,
-            remote_product=import_instance.remote_instance,
-            sales_channel=self.sales_channel,
-        )
+        try:
+            assign, _ = SalesChannelViewAssign.objects.get_or_create(
+                product=import_instance.instance,
+                sales_channel_view=view,
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                remote_product=import_instance.remote_instance,
+                sales_channel=self.sales_channel,
+            )
+        except IntegrityError as e:
+            raise IntegrityError(
+                f"Failed to create SalesChannelViewAssign due to unique constraint violation.\n"
+                f"product_id={import_instance.instance.id}, "
+                f"sales_channel_view_id={view.id}, "
+                f"multi_tenant_company_id={self.import_process.multi_tenant_company.id}, "
+                f"remote_product_id={getattr(import_instance.remote_instance, 'id', 'N/A')}, "
+                f"sales_channel_id={self.sales_channel.id}"
+            ) from e
 
         issues = structured_data.get("__issues") or []
-        assign.issues = [issue.to_dict() if hasattr(issue, "to_dict") else issue.__dict__ for issue in issues]
+        assign.issues = [
+            issue.to_dict() if hasattr(issue, "to_dict") else issue.__dict__
+            for issue in issues
+        ]
         assign.save()
 
     def import_products_process(self):
