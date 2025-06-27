@@ -1,6 +1,8 @@
 import time
 from functools import wraps
 from sp_api.base import SellingApiRequestThrottledException
+import requests
+
 
 def throttle_safe(max_retries=5, base_delay=1.0):
     """
@@ -13,13 +15,12 @@ def throttle_safe(max_retries=5, base_delay=1.0):
             for attempt in range(max_retries + 1):
                 try:
                     return func(*args, **kwargs)
-                except SellingApiRequestThrottledException as e:
-                    if attempt >= max_retries:
+                except (SellingApiRequestThrottledException, requests.exceptions.RequestException):
+                    if attempt == max_retries:
                         raise
                     delay = base_delay * (2 ** attempt)
                     time.sleep(delay)
-                    return None
-            return None
+                    continue
 
         return wrapper
     return decorator
