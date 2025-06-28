@@ -10,7 +10,8 @@ from .mutation_classes import MyMultiTenantCompanyCreateMutation, \
     MyMultiTentantCompanyUpdateMutation, UpdateMeMutation, \
     InviteUserMutation, AcceptInvitationMutation, EnableUserMutation, \
     DisableUserMutation, RequestLoginTokenMutation, RecoveryTokenMutation, \
-    UpdateMyPasswordMutation, UpdateOnboardingStatusMutation, CreateDemoDataMutation, DeleteDemoDataMutation
+    UpdateMyPasswordMutation, UpdateOnboardingStatusMutation, CreateDemoDataMutation, \
+    DeleteDemoDataMutation, ResendInviteMutation
 
 import functools
 import strawberry
@@ -40,6 +41,11 @@ def update_my_password():
 def invite_user():
     extensions = default_extensions
     return InviteUserMutation(MultiTenantInviteUserInput, extensions=extensions)
+
+
+def resend_invite():
+    extensions = default_extensions
+    return ResendInviteMutation(MultiTenantUserStatusInput, extensions=extensions)
 
 
 def accept_user_invitation():
