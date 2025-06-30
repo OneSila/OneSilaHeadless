@@ -23,7 +23,12 @@ class LlmMutation:
         content_type = instance.content_ai_generate_type
         product = Product.objects.get(id=instance.id.node_id, multi_tenant_company=multi_tenant_company)
 
-        content_generator = AIGenerateContentFlow(product=product, language=language, content_type=content_type)
+        content_generator = AIGenerateContentFlow(
+            product=product,
+            language=language,
+            content_type=content_type,
+            sales_channel_type=instance.sales_channel_type,
+        )
         content_generator.flow()
 
         return AiContent(content=content_generator.generated_content, points=content_generator.used_points)
