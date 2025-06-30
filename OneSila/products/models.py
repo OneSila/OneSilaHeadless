@@ -493,10 +493,10 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations")
     sales_channel = models.ForeignKey('sales_channels.SalesChannel', null=True, blank=True, on_delete=models.CASCADE, related_name='product_translations')
 
-    name = models.CharField(max_length=256)
+    name = models.CharField(max_length=512)
     short_description = models.TextField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
-    url_key = models.CharField(max_length=256, null=True, blank=True)
+    url_key = models.CharField(max_length=512, null=True, blank=True)
 
     def __str__(self):
         return f"{self.product} <{self.language}>"
