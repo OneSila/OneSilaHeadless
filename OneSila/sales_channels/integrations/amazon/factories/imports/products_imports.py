@@ -243,11 +243,16 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     def get__product_data(self, product_data):
         summary = self._get_summary(product_data)
         asin = summary.asin
-        name = summary.item_name
         status = summary.status or []
         sku = product_data.sku
         type = infer_product_type(product_data)
         marketplace_id = summary.marketplace_id
+
+        name = summary.item_name
+
+        # it seems that sometimes the name can be None coming from Amazon. IN that case we fallback to sku
+        if name == None:
+            name = sku
 
         view = AmazonSalesChannelView.objects.filter(
             sales_channel=self.sales_channel,
@@ -462,9 +467,11 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
             product_instance = None
             remote_product = AmazonProduct.objects.filter(
-                asin=structured["__asin"],
+                asin=structured["sku"],
+                sales_channel=self.sales_channel,
                 multi_tenant_company=self.import_process.multi_tenant_company
             ).first()
+
             if remote_product:
                 product_instance = remote_product.local_instance
 
