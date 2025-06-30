@@ -96,9 +96,6 @@ class ExportDefinitionFactoryTest(TestCase):
         factory = ExportDefinitionFactory(definition)
         results = factory.run()
 
-        import pprint
-        pprint.pprint(results)
-
         lithium_metal_cells = next(
             (x for x in results if x["code"] == "number_of_lithium_metal_cells"), None
         )
@@ -189,9 +186,6 @@ class ExportDefinitionFactoryTest(TestCase):
 
         factory = ExportDefinitionFactory(definition)
         results = factory.run()
-
-        import pprint
-        pprint.pprint(results)
 
         color = next((x for x in results if x["code"] == "color"), None)
         self.assertIsNotNone(color)

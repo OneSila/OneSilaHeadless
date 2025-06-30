@@ -18,7 +18,7 @@ class SalesChannelImport(Import, models.Model):
     sales_channel = models.ForeignKey(SalesChannel, on_delete=models.CASCADE)
 
     def __str__(self):
-        return f"{self.sales_channel} - {self.get_status_display()}"
+        return f"{self.sales_channel} - {self.get_status_display()} ({self.percentage}%)"
 
 
 class ImportProperty(ImportableModel):
