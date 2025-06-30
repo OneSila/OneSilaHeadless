@@ -18,6 +18,9 @@ from products.models import (
 class ProductOrder:
     id: auto
     sku: auto
+    translations: auto
+    translations__name: auto
+    active: auto
     created_at: auto
     updated_at: auto
 
