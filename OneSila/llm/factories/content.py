@@ -254,3 +254,52 @@ class ShortDescriptionLLM(DescriptionGenLLM):
         ✅Start with an engaging sentence that introduces benefits rather than the product name or title.
         ✅Ensure compatibility with PIM integration** by maintaining a **clean, structured, and well-written output**
         """
+
+
+class BulletPointsLLM(ContentLLMMixin):
+    """Generate bullet points for a product."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bullet_points: list[str] = []
+
+    @property
+    def system_prompt(self):
+        return (
+            "Generate a short list (max 5 items) of concise bullet points in the "
+            "given language describing the product. Respond ONLY with a JSON array "
+            "of strings."
+        )
+
+    @property
+    def prompt(self):
+        prompt = f"""
+        ##Language Code##
+        {self.language_code}
+
+        ##Product name##
+        {self.product_name}
+
+        ##Product attributes##
+        {self.property_values}
+        """
+
+        if self.short_description:
+            prompt += f"""
+            ##Product Short Description##
+            {self.short_description}
+            """
+        return prompt
+
+    def parse_response(self):
+        import json
+
+        try:
+            self.bullet_points = json.loads(self.text_response)
+        except Exception:
+            self.bullet_points = [
+                line.strip("- •\t ")
+                for line in self.text_response.splitlines()
+                if line.strip()
+            ]
+
