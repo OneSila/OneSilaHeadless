@@ -49,3 +49,8 @@ class AIBulkTranslationInput:
     products: Optional[List[ProductPartialInput]] = None
     properties: Optional[List[PropertyPartialInput]] = None
     values: Optional[List[PropertySelectValuePartialInput]] = None
+
+
+@partial(Product, fields="__all__")
+class ProductAiBulletPointsInput(NodeInput):
+    language_code: str
