@@ -19,7 +19,7 @@ class ContentAiGenerateType(Enum):
     NAME = "name"
 
 
-class SalesChannelType(Enum):
+class SalesChannelIntegrationType(Enum):
     MAGENTO = MAGENTO_INTEGRATION
     SHOPIFY = SHOPIFY_INTEGRATION
     AMAZON = AMAZON_INTEGRATION
@@ -29,7 +29,7 @@ class SalesChannelType(Enum):
 class ProductAiContentInput(NodeInput):
     language_code: str
     content_ai_generate_type: ContentAiGenerateType
-    sales_channel_type: Optional[SalesChannelType] = None
+    sales_channel_type: Optional[SalesChannelIntegrationType] = None
 
 
 @strawberry_input
