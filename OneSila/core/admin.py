@@ -26,7 +26,7 @@ class MultiTenantUserAdmin(BaseUserAdmin):
             'fields': ('email', 'password1', 'password2'),
         }),
     )
-    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
+    list_display = ('username', 'multi_tenant_company', 'is_active')
     ordering = ('username',)
     search_fields = ('first_name', 'last_name', 'email')
 
