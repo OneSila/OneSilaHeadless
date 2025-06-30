@@ -392,13 +392,33 @@ class BulletPointsLLM(ContentLLMMixin):
 
     def parse_response(self):
         import json
+        import re
 
         try:
-            self.bullet_points = json.loads(self.text_response)
+            parsed = json.loads(self.text_response)
+            if isinstance(parsed, list):
+                self.bullet_points = [item.strip().strip('",') for item in parsed if isinstance(item, str)]
+                return
         except Exception:
-            self.bullet_points = [
-                line.strip("- •\t ")
-                for line in self.text_response.splitlines()
-                if line.strip()
-            ]
+            pass
 
+        lines = self.text_response.splitlines()
+        cleaned_lines = []
+
+        for line in lines:
+            line = line.strip()
+
+            # Skip code fences and brackets
+            if not line or line in ('```', '```json', '[', ']'):
+                continue
+
+            # Remove starting bullet marks and whitespace
+            line = re.sub(r'^[-•\t ]+', '', line)
+
+            # Remove trailing commas and surrounding quotes
+            line = line.strip().strip('",')
+
+            if line:
+                cleaned_lines.append(line)
+
+        self.bullet_points = cleaned_lines
