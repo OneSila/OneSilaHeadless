@@ -1,4 +1,9 @@
 from .mixins import ContentLLMMixin, AskGPTMixin
+from integrations.constants import (
+    MAGENTO_INTEGRATION,
+    SHOPIFY_INTEGRATION,
+    AMAZON_INTEGRATION,
+)
 
 
 class DescriptionGenLLM(ContentLLMMixin):
@@ -75,8 +80,7 @@ class DescriptionGenLLM(ContentLLMMixin):
     @property
     def system_prompt(self):
         # FIXME: The examples in this context could come from settings in the company account.  Same goes for writing style.
-
-        return f"""
+        base_prompt = f"""
         # AI Assistant for Product Descriptions in HTML
 
         You are an AI assistant responsible for generating high-quality product descriptions in basic HTML for an eCommerce website. Your output must be structured, engaging, and optimized for readability while considering all provided product information, attributes, and images.
@@ -129,6 +133,53 @@ class DescriptionGenLLM(ContentLLMMixin):
         - **Start with an engaging sentence** that introduces the product’s benefits or unique aspects instead of its name or a title.
 
         """
+
+        channel_addition = ""
+        if self.sales_channel_type == AMAZON_INTEGRATION:
+            channel_addition = """
+            ## Amazon Style Guidelines
+
+            You are generating content for an Amazon listing. Please follow these specific rules:
+
+            - Prioritize **keywords** that improve **search visibility**.
+            - Keep sentences **short, direct, and feature-focused**.
+            - Avoid superlatives or vague statements (e.g., "best", "amazing").
+            - Do **not include HTML** unless explicitly allowed (check current context).
+            - Avoid any **subjective claims** (e.g., "perfect for everyone").
+            - Follow a tone that is **informative and conversion-focused**.
+
+            ⚠️ Ensure all claims are factual and align with Amazon's product detail page policies.
+            """
+        elif self.sales_channel_type == SHOPIFY_INTEGRATION:
+            channel_addition = """
+            ## Shopify Style Guidelines
+
+            You are creating a product description for a **Shopify-powered store**:
+
+            - Use an **engaging and branded tone**—feel free to inject personality.
+            - Emphasize **lifestyle benefits** and emotional appeal (e.g., comfort, design).
+            - Structure with **readability in mind**: use `<h3>`, `<ol>`, and short paragraphs.
+            - Focus on **visual imagination**: help the customer picture using the product.
+            - Maintain **light HTML structure** for styling and formatting.
+            - Can include brand-specific wording, seasonal messaging, and storytelling hooks.
+
+            This is **your own storefront**, so emphasize uniqueness and customer connection.
+            """
+        elif self.sales_channel_type == MAGENTO_INTEGRATION:
+            channel_addition = """
+            ## Magento Style Guidelines
+
+            The description is for a **Magento eCommerce storefront**, typically part of a multi-brand or multi-category site.
+
+            - Focus on **clear specification details** (technical, size, materials).
+            - Structure with **headings and bullet points** for fast scanning.
+            - Keep the tone **neutral and informative**, suitable for both B2B and B2C customers.
+            - Use **HTML tags** for clarity, not decoration.
+            - Emphasize **product differentiators**: what sets it apart in catalog context.
+
+            Avoid overly promotional language. Keep it professional and detail-oriented.
+            """
+        return base_prompt + channel_addition
 
     @property
     def prompt(self):
@@ -184,7 +235,7 @@ class ShortDescriptionLLM(DescriptionGenLLM):
 
     @property
     def system_prompt(self):
-        return f"""
+        base_prompt = f"""
         # **System Prompt**
         You are an AI assistant responsible for generating **high-quality product descriptions** for integration into a **Product Information Management (PIM) system**. Your output must be structured, engaging, and optimized for readability while considering **all provided product information, attributes, and images**.
 
@@ -254,3 +305,51 @@ class ShortDescriptionLLM(DescriptionGenLLM):
         ✅Start with an engaging sentence that introduces benefits rather than the product name or title.
         ✅Ensure compatibility with PIM integration** by maintaining a **clean, structured, and well-written output**
         """
+
+        channel_addition = ""
+        if self.sales_channel_type == AMAZON_INTEGRATION:
+            channel_addition = """
+            ## Amazon Style Guidelines
+
+            You are generating content for an Amazon listing. Please follow these specific rules:
+
+            - Prioritize **keywords** that improve **search visibility**.
+            - Keep sentences **short, direct, and feature-focused**.
+            - Avoid superlatives or vague statements (e.g., "best", "amazing").
+            - Do **not include HTML** unless explicitly allowed (check current context).
+            - Avoid any **subjective claims** (e.g., "perfect for everyone").
+            - Follow a tone that is **informative and conversion-focused**.
+
+            ⚠️ Ensure all claims are factual and align with Amazon's product detail page policies.
+            """
+        elif self.sales_channel_type == SHOPIFY_INTEGRATION:
+            channel_addition = """
+            ## Shopify Style Guidelines
+
+            You are creating a product description for a **Shopify-powered store**:
+
+            - Use an **engaging and branded tone**—feel free to inject personality.
+            - Emphasize **lifestyle benefits** and emotional appeal (e.g., comfort, design).
+            - Structure with **readability in mind**: use `<h3>`, `<ol>`, and short paragraphs.
+            - Focus on **visual imagination**: help the customer picture using the product.
+            - Maintain **light HTML structure** for styling and formatting.
+            - Can include brand-specific wording, seasonal messaging, and storytelling hooks.
+
+            This is **your own storefront**, so emphasize uniqueness and customer connection.
+            """
+        elif self.sales_channel_type == MAGENTO_INTEGRATION:
+            channel_addition = """
+            ## Magento Style Guidelines
+
+            The description is for a **Magento eCommerce storefront**, typically part of a multi-brand or multi-category site.
+
+            - Focus on **clear specification details** (technical, size, materials).
+            - Structure with **headings and bullet points** for fast scanning.
+            - Keep the tone **neutral and informative**, suitable for both B2B and B2C customers.
+            - Use **HTML tags** for clarity, not decoration.
+            - Emphasize **product differentiators**: what sets it apart in catalog context.
+
+            Avoid overly promotional language. Keep it professional and detail-oriented.
+            """
+
+        return base_prompt + channel_addition
