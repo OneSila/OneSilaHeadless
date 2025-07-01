@@ -134,6 +134,7 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
         for property_data in public_definition.export_definition:
 
             remote_property, created = AmazonProperty.objects.get_or_create(
+                allow_multiple=True,
                 multi_tenant_company=self.sales_channel.multi_tenant_company,
                 sales_channel=self.sales_channel,
                 code=property_data['code'],

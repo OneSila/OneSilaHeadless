@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('amazon', '0021_amazonproduct_asin'),
-        ('sales_channels', '0037_remoteproperty_allow_multiple'),
+        ('sales_channels', '0037_alter_remoteproperty_unique_together_and_more'),
     ]
 
     operations = [
