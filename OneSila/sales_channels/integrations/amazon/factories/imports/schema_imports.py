@@ -94,12 +94,12 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         import pprint
         print('------------------------------------------ 1')
-        pprint.pprint(response)
+        print(response)
         schema_link = response.var_schema.link.resource
         schema_data = self._download_json(schema_link)
 
         print('------------------------------------------ 1')
-        pprint.pprint(schema_data)
+        print(schema_data)
 
         if is_default_marketplace:
             schema_data["title"] = response.display_name
@@ -132,12 +132,13 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 defaults={"name": "Amazon Asin"},
             )
 
-            if not local_property.non_deletable:
-                local_property.non_deletable = True
-                local_property.save(update_fields=["non_deletable"])
-
             remote_property.local_instance = local_property
             remote_property.save()
+
+        local_property = remote_property.local_instance
+        if not local_property.non_deletable:
+            local_property.non_deletable = True
+            local_property.save(update_fields=["non_deletable"])
 
         return remote_property
 
@@ -234,8 +235,10 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
             )
 
             if (
-                created or
-                (remote_rule_item.remote_type == ProductPropertiesRuleItem.OPTIONAL and new_type == ProductPropertiesRuleItem.REQUIRED)
+                    created_item or
+                    remote_rule_item.remote_type is None or
+                    (
+                            remote_rule_item.remote_type == ProductPropertiesRuleItem.OPTIONAL and new_type == ProductPropertiesRuleItem.REQUIRED)
             ):
                 remote_rule_item.remote_type = new_type
                 remote_rule_item.save()

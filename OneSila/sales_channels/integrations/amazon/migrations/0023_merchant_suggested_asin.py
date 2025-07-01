@@ -45,23 +45,23 @@ def add_merchant_asin(apps, schema_editor):
                 sales_channel=sc,
                 amazon_rule=pt,
                 remote_property=remote_prop,
-                defaults={'remote_type': ProductPropertiesRuleItem.REQUIRED},
+                defaults={'remote_type': 'REQUIRED'},
             )
-            if created or item.remote_type != ProductPropertiesRuleItem.REQUIRED:
-                item.remote_type = ProductPropertiesRuleItem.REQUIRED
+            if created or item.remote_type != 'REQUIRED':
+                item.remote_type = 'REQUIRED'
                 item.save()
 
             if pt.local_instance:
                 rule = pt.local_instance
-                max_sort = rule.items.aggregate(max_sort=Max('sort_order')).get('max_sort') or 0
+                sort_order = 0
                 rule_item, created_local = ProductPropertiesRuleItem.objects.get_or_create(
                     multi_tenant_company=rule.multi_tenant_company,
                     rule=rule,
                     property=local_prop,
-                    defaults={'type': ProductPropertiesRuleItem.REQUIRED, 'sort_order': max_sort + 1},
+                    defaults={'type': 'REQUIRED', 'sort_order': sort_order + 1},
                 )
-                if not created_local and rule_item.type != ProductPropertiesRuleItem.REQUIRED:
-                    rule_item.type = ProductPropertiesRuleItem.REQUIRED
+                if not created_local and rule_item.type != 'REQUIRED':
+                    rule_item.type = 'REQUIRED'
                     rule_item.save(update_fields=['type'])
 
 
