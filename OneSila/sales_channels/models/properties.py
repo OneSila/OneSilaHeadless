@@ -11,8 +11,22 @@ class RemoteProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
     local_instance = models.ForeignKey('properties.Property', on_delete=models.SET_NULL, null=True,
                                        help_text="The local property associated with this remote property.")
 
+    allow_multiple = models.BooleanField(
+        default=False,
+        help_text=(
+            "Set to True to allow multiple remote properties to map "
+            "to the same local property."
+        ),
+    )
+
     class Meta:
-        unique_together = ('sales_channel', 'local_instance')
+        constraints = [
+            models.UniqueConstraint(
+                fields=("sales_channel", "local_instance"),
+                condition=models.Q(allow_multiple=False),
+                name="uniq_remoteproperty_by_channel_local_when_not_multi",
+            )
+        ]
         verbose_name = 'Remote Property'
         verbose_name_plural = 'Remote Properties'
 

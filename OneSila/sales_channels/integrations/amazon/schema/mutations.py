@@ -9,6 +9,8 @@ from sales_channels.integrations.amazon.schema.types.input import (
     AmazonPropertySelectValuePartialInput,
     AmazonProductTypeInput,
     AmazonProductTypePartialInput,
+    AmazonProductTypeItemInput,
+    AmazonProductTypeItemPartialInput,
     AmazonSalesChannelImportInput,
     AmazonSalesChannelImportPartialInput,
     AmazonValidateAuthInput,
@@ -18,6 +20,7 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonPropertyType,
     AmazonPropertySelectValueType,
     AmazonProductTypeType,
+    AmazonProductTypeItemType,
     AmazonRedirectUrlType,
     AmazonSalesChannelImportType,
 )
@@ -78,6 +81,7 @@ class AmazonSalesChannelMutation:
     update_amazon_property: AmazonPropertyType = update(AmazonPropertyPartialInput)
     update_amazon_property_select_value: AmazonPropertySelectValueType = update(AmazonPropertySelectValuePartialInput)
     update_amazon_product_type: AmazonProductTypeType = update(AmazonProductTypePartialInput)
+    update_amazon_product_type_item: AmazonProductTypeItemType = update(AmazonProductTypeItemPartialInput)
 
     create_amazon_import_process: AmazonSalesChannelImportType = create(AmazonSalesChannelImportInput)
     update_amazon_import_process: AmazonSalesChannelImportType = update(AmazonSalesChannelImportPartialInput)
