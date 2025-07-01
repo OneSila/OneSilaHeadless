@@ -19,9 +19,11 @@ from sales_channels.integrations.amazon.models import (
     AmazonEanCode,
     AmazonImageProductAssociation,
     AmazonVat,
+    AmazonDefaultUnitConfigurator,
 )
 from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
 from sales_channels.models import SalesChannelViewAssign
+
 
 @admin.register(AmazonSalesChannel)
 class AmazonSalesChannelAdmin(PolymorphicChildModelAdmin):
@@ -40,73 +42,104 @@ class AmazonSalesChannelAdmin(PolymorphicChildModelAdmin):
         }),
     )
 
+
 @admin.register(AmazonProperty)
 class AmazonPropertyAdmin(SalesChannelRemoteAdmin):
     pass
+
 
 @admin.register(AmazonPropertySelectValue)
 class AmazonPropertySelectValueAdmin(SalesChannelRemoteAdmin):
     pass
 
+
 @admin.register(AmazonProductProperty)
 class AmazonProductPropertyAdmin(SalesChannelRemoteAdmin):
     pass
+
 
 @admin.register(AmazonSalesChannelView)
 class AmazonSalesChannelViewAdmin(SalesChannelRemoteAdmin):
     pass
 
+
 @admin.register(AmazonRemoteLanguage)
 class AmazonRemoteLanguageAdmin(SalesChannelRemoteAdmin):
     pass
+
 
 @admin.register(AmazonCurrency)
 class AmazonCurrencyAdmin(SalesChannelRemoteAdmin):
     pass
 
+
 @admin.register(AmazonProductType)
 class AmazonProductTypeAdmin(SalesChannelRemoteAdmin):
     pass
+
 
 @admin.register(AmazonProductTypeItem)
 class AmazonProductTypeItemAdmin(SalesChannelRemoteAdmin):
     pass
 
+
 @admin.register(AmazonOrder)
 class AmazonOrderAdmin(SalesChannelRemoteAdmin):
     pass
+
 
 @admin.register(AmazonOrderItem)
 class AmazonOrderItemAdmin(SalesChannelRemoteAdmin):
     pass
 
+
 @admin.register(AmazonProduct)
 class AmazonProductAdmin(SalesChannelRemoteProductAdmin):
     pass
+
 
 @admin.register(AmazonProductContent)
 class AmazonProductContentAdmin(SalesChannelRemoteAdmin):
     pass
 
+
 @admin.register(AmazonPrice)
 class AmazonPriceAdmin(SalesChannelRemoteAdmin):
     pass
+
 
 @admin.register(AmazonEanCode)
 class AmazonEanCodeAdmin(SalesChannelRemoteAdmin):
     pass
 
+
 @admin.register(AmazonImageProductAssociation)
 class AmazonImageProductAssociationAdmin(SalesChannelRemoteAdmin):
     pass
+
 
 @admin.register(AmazonVat)
 class AmazonVatAdmin(SalesChannelRemoteAdmin):
     pass
 
+
+@admin.register(AmazonDefaultUnitConfigurator)
+class AmazonDefaultUnitConfiguratorAdmin(SalesChannelRemoteAdmin):
+    pass
+
+
 @admin.register(AmazonPublicDefinition)
 class AmazonPublicDefinitionAdmin(admin.ModelAdmin):
-    list_display = ("api_region_code", "product_type_code", "code", "name", "is_required", "is_internal", "last_fetched")
+    list_display = (
+        "api_region_code",
+        "product_type_code",
+        "code",
+        "name",
+        "is_required",
+        "is_internal",
+        "allowed_in_configurator",
+        "last_fetched",
+    )
     search_fields = ("code", "name", "product_type_code", "api_region_code")
     list_filter = ("api_region_code", "product_type_code", "is_required", "is_internal")
     readonly_fields = ("last_fetched",)
@@ -123,6 +156,7 @@ class AmazonPublicDefinitionAdmin(admin.ModelAdmin):
                 "usage_definition",
                 "is_required",
                 "is_internal",
+                "allowed_in_configurator",
                 "last_fetched",
             )
         }),

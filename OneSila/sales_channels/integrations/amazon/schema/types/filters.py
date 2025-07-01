@@ -13,6 +13,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonPropertySelectValue,
     AmazonProductType,
     AmazonSalesChannelImport, AmazonProductTypeItem,
+    AmazonDefaultUnitConfigurator,
 )
 from properties.schema.types.filters import (
     PropertyFilter,
@@ -116,3 +117,10 @@ class AmazonSalesChannelImportFilter(SearchFilterMixin):
     sales_channel: Optional[SalesChannelFilter]
     status: auto
     type: auto
+
+
+@filter(AmazonDefaultUnitConfigurator)
+class AmazonDefaultUnitConfiguratorFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    marketplace: Optional[SalesChannelViewFilter]

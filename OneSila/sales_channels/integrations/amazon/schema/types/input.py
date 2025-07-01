@@ -6,6 +6,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductType,
     AmazonProductTypeItem,
     AmazonSalesChannelImport,
+    AmazonDefaultUnitConfigurator,
 )
 
 
@@ -73,4 +74,14 @@ class AmazonSalesChannelImportInput:
 
 @partial(AmazonSalesChannelImport, fields="__all__")
 class AmazonSalesChannelImportPartialInput(NodeInput):
+    pass
+
+
+@input(AmazonDefaultUnitConfigurator, fields="__all__")
+class AmazonDefaultUnitConfiguratorInput:
+    pass
+
+
+@partial(AmazonDefaultUnitConfigurator, fields="__all__")
+class AmazonDefaultUnitConfiguratorPartialInput(NodeInput):
     pass

@@ -4,7 +4,33 @@ from core.schema.core.types.types import auto
 from core.schema.core.types.filters import filter, SearchFilterMixin
 from products.schema.types.filters import ProductFilter
 
-from sales_channels.models import ImportCurrency, ImportImage, SalesChannelImport, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
+from sales_channels.models import (
+    ImportCurrency,
+    ImportImage,
+    SalesChannelImport,
+    ImportProduct,
+    ImportProperty,
+    ImportPropertySelectValue,
+    ImportVat,
+    RemoteCategory,
+    RemoteCurrency,
+    RemoteCustomer,
+    RemoteImage,
+    RemoteImageProductAssociation,
+    RemoteInventory,
+    RemoteLog,
+    RemoteOrder,
+    RemoteProduct,
+    RemoteProductContent,
+    RemoteProductProperty,
+    RemoteProperty,
+    RemotePropertySelectValue,
+    RemoteVat,
+    SalesChannel,
+    SalesChannelIntegrationPricelist,
+    SalesChannelView,
+    SalesChannelViewAssign,
+)
 from sales_channels.models.sales_channels import RemoteLanguage
 
 

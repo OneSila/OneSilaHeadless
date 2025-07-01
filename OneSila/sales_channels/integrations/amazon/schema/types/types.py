@@ -17,6 +17,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductType,
     AmazonProductTypeItem,
     AmazonSalesChannelImport,
+    AmazonDefaultUnitConfigurator,
 )
 from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelFilter,
@@ -24,7 +25,7 @@ from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonPropertySelectValueFilter,
     AmazonProductTypeFilter,
     AmazonProductTypeItemFilter,
-    AmazonSalesChannelImportFilter,
+    AmazonSalesChannelImportFilter, AmazonDefaultUnitConfiguratorFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
@@ -33,6 +34,7 @@ from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonProductTypeOrder,
     AmazonProductTypeItemOrder,
     AmazonSalesChannelImportOrder,
+    AmazonDefaultUnitConfiguratorOrder,
 )
 
 
@@ -179,3 +181,21 @@ class AmazonProductTypeItemType(relay.Node, GetQuerysetMultiTenantMixin):
         'ProductPropertiesRuleItemType',
         lazy("properties.schema.types.types")
     ]]
+
+
+@type(
+    AmazonDefaultUnitConfigurator,
+    filters=AmazonDefaultUnitConfiguratorFilter,
+    order=AmazonDefaultUnitConfiguratorOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonDefaultUnitConfiguratorType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    marketplace: Annotated[
+        'SalesChannelViewType',
+        lazy("sales_channels.schema.types.types")
+    ]
