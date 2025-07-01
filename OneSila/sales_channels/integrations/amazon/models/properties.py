@@ -86,6 +86,12 @@ class AmazonProperty(RemoteProperty):
         verbose_name="Attribute Code",
     )
 
+    main_code = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="The main attribute code (part before '__').",
+    )
+
     name = models.CharField(
         max_length=255,
         help_text="The display label for the remote value (e.g., 'Red').",
@@ -113,12 +119,15 @@ class AmazonProperty(RemoteProperty):
                 }
             )
 
+        if self.code:
+            self.main_code = self.code.split("__", 1)[0]
+
         super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = 'Amazon Property'
         verbose_name_plural = 'Amazon Properties'
-        search_terms = ['name', 'code']
+        search_terms = ['name', 'code', 'main_code']
 
 
 class AmazonPropertySelectValue(RemoteObjectMixin, models.Model):
