@@ -290,8 +290,8 @@ class UsageDefinitionFactory:
                 elif key == "language_tag":
                     result[key] = "%auto:language%"
                 elif key == "unit":
-                    parent = self.current_path[-2] if len(self.current_path) >= 2 else ""
-                    result[key] = f"%unit:{parent}%"
+                    attr_code = self._compose_attr_code()
+                    result[key] = f"%unit:{attr_code}%"
                 else:
                     result[key] = self._process(value)
                 self.current_path.pop()
