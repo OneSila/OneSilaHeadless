@@ -90,8 +90,14 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
             seller_id=self.sales_channel.remote_id,
         )
 
+        import pprint
+        print('------------------------------------------ 1')
+        pprint.pprint(response)
         schema_link = response.var_schema.link.resource
         schema_data = self._download_json(schema_link)
+
+        print('------------------------------------------ 1')
+        pprint.pprint(schema_data)
 
         if is_default_marketplace:
             schema_data["title"] = response.display_name
