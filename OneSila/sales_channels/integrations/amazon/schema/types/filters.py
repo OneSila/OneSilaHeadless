@@ -12,7 +12,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonProductType,
-    AmazonSalesChannelImport,
+    AmazonSalesChannelImport, AmazonProductTypeItem,
 )
 from properties.schema.types.filters import (
     PropertyFilter,
