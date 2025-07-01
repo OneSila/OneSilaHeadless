@@ -40,5 +40,10 @@ class AmazonPropertyRuleItemSyncFactory:
             if not created:
                 new_type = item.remote_type or ProductPropertiesRuleItem.OPTIONAL
                 if rule_item.type != new_type:
-                    rule_item.type = new_type
-                    rule_item.save(update_fields=["type"])
+                    if not (
+                        new_type == ProductPropertiesRuleItem.OPTIONAL
+                        and rule_item.type
+                        != ProductPropertiesRuleItem.OPTIONAL
+                    ):
+                        rule_item.type = new_type
+                        rule_item.save(update_fields=["type"])
