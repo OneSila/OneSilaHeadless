@@ -149,13 +149,18 @@ class AmazonDefaultUnitConfigurator(models.Model):
         on_delete=models.CASCADE,
         related_name="default_unit_configurators",
     )
+    marketplace = models.ForeignKey(
+        'amazon.AmazonSalesChannelView',
+        on_delete=models.CASCADE,
+        help_text="The Amazon marketplace for this value."
+    )
     name = models.CharField(max_length=255)
     code = models.CharField(max_length=255)
     selected_unit = models.CharField(max_length=100, null=True, blank=True)
     choices = models.JSONField(default=list, blank=True)
 
     class Meta:
-        unique_together = ("sales_channel", "code")
+        unique_together = ("sales_channel", "marketplace", "code")
         verbose_name = "Default Unit Configurator"
         verbose_name_plural = "Default Unit Configurators"
 

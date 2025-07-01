@@ -123,3 +123,4 @@ class AmazonSalesChannelImportFilter(SearchFilterMixin):
 class AmazonDefaultUnitConfiguratorFilter(SearchFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
+    marketplace: Optional[SalesChannelViewFilter]
