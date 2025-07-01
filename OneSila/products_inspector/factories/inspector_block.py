@@ -6,7 +6,7 @@ from ..exceptions import InspectorBlockFailed
 from products_inspector.constants import HAS_IMAGES_ERROR, MISSING_PRICES_ERROR, NONE, MISSING_VARIATION_ERROR, \
     MISSING_BUNDLE_ITEMS_ERROR, INACTIVE_BUNDLE_ITEMS_ERROR, MISSING_EAN_CODE_ERROR, \
     MISSING_PRODUCT_TYPE_ERROR, MISSING_REQUIRED_PROPERTIES_ERROR, MISSING_OPTIONAL_PROPERTIES_ERROR, MISSING_STOCK_ERROR, \
-    MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, ITEMS_MISMATCH_PRODUCT_TYPE_ERROR, \
+    MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, \
     ITEMS_MISSING_MANDATORY_INFORMATION_ERROR, VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR, \
     DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR
 from products_inspector.models import InspectorBlock
@@ -349,39 +349,6 @@ class VariationMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
             if variations_product_type_value.first() != product_type_value_id:
                 raise InspectorBlockFailed("Variations product type mismatch")
 
-
-@InspectorBlockFactoryRegistry.register(ITEMS_MISMATCH_PRODUCT_TYPE_ERROR)
-class ItemsMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
-    def __init__(self, block, save_inspector=True):
-        super().__init__(block, success_signal=inspector_items_mismatch_product_type_success, failure_signal=inspector_items_mismatch_product_type_failed,
-                         save_inspector=save_inspector)
-
-    def _check(self):
-        from properties.models import ProductProperty
-        from products.models import BundleVariation
-
-        product_type_value_id = ProductProperty.objects.filter(
-            multi_tenant_company=self.multi_tenant_company,
-            product=self.product,
-            property__is_product_type=True
-        ).values_list('value_select', flat=True).first()
-
-        item_ids = BundleVariation.objects.filter_multi_tenant(self.multi_tenant_company). \
-            filter(parent=self.product).values_list('variation_id', flat=True)
-
-        items_product_type_value = ProductProperty.objects.filter(multi_tenant_company=self.multi_tenant_company,
-                                                                  product_id__in=item_ids,
-                                                                  property__is_product_type=True).\
-            values_list('value_select', flat=True).distinct()
-
-        if items_product_type_value.count() == 0 or product_type_value_id is None:
-            return
-
-        if items_product_type_value.count() != 1:
-            raise InspectorBlockFailed("Items products type mismatch")
-        else:
-            if items_product_type_value.first() != product_type_value_id:
-                raise InspectorBlockFailed("Items products type mismatch")
 
 
 @InspectorBlockFactoryRegistry.register(ITEMS_MISSING_MANDATORY_INFORMATION_ERROR)

@@ -4,6 +4,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonProductType,
+    AmazonProductTypeItem,
     AmazonSalesChannelImport,
 )
 
@@ -52,6 +53,16 @@ class AmazonProductTypeInput:
 
 @partial(AmazonProductType, fields="__all__")
 class AmazonProductTypePartialInput(NodeInput):
+    pass
+
+
+@input(AmazonProductTypeItem, fields="__all__")
+class AmazonProductTypeItemInput:
+    pass
+
+
+@partial(AmazonProductTypeItem, fields="__all__")
+class AmazonProductTypeItemPartialInput(NodeInput):
     pass
 
 

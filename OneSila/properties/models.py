@@ -86,6 +86,7 @@ class Property(TranslatedModelMixin, models.Model):
     class Meta:
         verbose_name_plural = _("Properties")
         search_terms = ['propertytranslation__name']
+        ordering = ('propertytranslation__name',)
         constraints = [
             models.UniqueConstraint(
                 fields=['multi_tenant_company'],
@@ -130,6 +131,7 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
 
     class Meta:
         search_terms = ['propertyselectvaluetranslation__value']
+        ordering = ('propertyselectvaluetranslation__value',)
 
 
 class PropertySelectValueTranslation(TranslationFieldsMixin, models.Model):

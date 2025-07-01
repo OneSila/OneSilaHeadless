@@ -118,6 +118,35 @@ DATABASES = {
     }
 }
 
+#
+# Session settings. Effort to fix session issues across multiple workers.
+# By default we keep the default django cache stuff.
+# but sessions let's move the elsewhere.
+#
+
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "onesila_session_cache"
+
+REDIS_HOST = os.getenv('REDIS_HOST', "127.0.0.1")
+REDIS_PORT = os.getenv('REDIS_PORT', 6379)
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    },
+    "onesila_session_cache": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/2",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -245,7 +274,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(os.getenv('REDIS_HOST', "127.0.0.1"), os.getenv('REDIS_PORT', 6379))],
+            "hosts": [f"redis://{REDIS_HOST}:{REDIS_PORT}/3"],
         },
     },
 }
@@ -279,8 +308,8 @@ HUEY = {
     'utc': True,
     'blocking': True,  # Perform blocking pop rather than poll Redis.
     'connection': {
-        'host': 'localhost',
-        'port': 6379,
+        'host': REDIS_HOST,
+        'port': REDIS_PORT,
         'db': 0,
         'connection_pool': None,  # Definitely you should use pooling!
         # ... tons of other options, see redis-py for details.

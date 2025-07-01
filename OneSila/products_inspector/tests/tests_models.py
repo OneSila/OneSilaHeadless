@@ -864,57 +864,6 @@ class InspectorBlockProductTypeMismatchTest(TestCase):
         inspector_block.refresh_from_db()
         self.assertTrue(inspector_block.successfully_checked)
 
-    def test_items_mismatch_product_type(self):
-        # Assign product type to bundle product
-        ProductProperty.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            product=self.bundle_product,
-            property=self.product_type_property,
-            value_select=self.product_type_value_1
-        )
-
-        # Assign same product type to items
-        product_property_1 = ProductProperty.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            product=self.simple_product_1,
-            property=self.product_type_property,
-            value_select=self.product_type_value_1
-        )
-        product_property_2 = ProductProperty.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            product=self.simple_product_2,
-            property=self.product_type_property,
-            value_select=self.product_type_value_1
-        )
-
-        # Link items to bundle product
-        BundleVariation.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            parent=self.bundle_product,
-            variation=self.simple_product_1
-        )
-        future_broken = BundleVariation.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            parent=self.bundle_product,
-            variation=self.simple_product_2
-        )
-
-        # Check if the inspector block is successfully checked
-        inspector_block = self.bundle_product.inspector.blocks.get(error_code=ITEMS_MISMATCH_PRODUCT_TYPE_ERROR)
-        inspector_block.refresh_from_db()
-        self.assertTrue(inspector_block.successfully_checked)
-
-        # Change one item's product type to a different value
-        product_property_2.value_select = self.product_type_value_2
-        product_property_2.save()
-
-        inspector_block.refresh_from_db()
-        self.assertFalse(inspector_block.successfully_checked)
-
-        future_broken.delete()
-        inspector_block.refresh_from_db()
-        self.assertTrue(inspector_block.successfully_checked)
-
 
 class InspectorBlockMissingMandatoryInformationTest(TestCase):
 

@@ -3,7 +3,7 @@ from llm.schema.types.input import ContentAiGenerateType
 
 
 class AIGenerateContentFlow:
-    def __init__(self, product, language, content_type):
+    def __init__(self, product, language, content_type, sales_channel_type=None):
         factory_map = {
             ContentAiGenerateType.DESCRIPTION: DescriptionGenLLM,
             ContentAiGenerateType.SHORT_DESCRIPTION: ShortDescriptionLLM,
@@ -12,7 +12,11 @@ class AIGenerateContentFlow:
 
         self.product = product
         self.language = language
-        self.factory = factory_class(product=product, language_code=language)
+        self.factory = factory_class(
+            product=product,
+            language_code=language,
+            sales_channel_type=sales_channel_type,
+        )
         self.generated_content = ''
         self.used_points = 0
 

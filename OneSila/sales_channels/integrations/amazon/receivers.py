@@ -1,7 +1,14 @@
 from core.receivers import receiver
 from core.signals import post_create, post_update
 from sales_channels.signals import refresh_website_pull_models, sales_channel_created
-from sales_channels.integrations.amazon.models import AmazonSalesChannel
+from sales_channels.integrations.amazon.models import (
+    AmazonSalesChannel,
+    AmazonProperty,
+)
+from sales_channels.integrations.amazon.factories.rule_sync import (
+    AmazonPropertyRuleItemSyncFactory,
+    AmazonProductTypeAsinSyncFactory,
+)
 
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
@@ -32,3 +39,26 @@ def sales_channels__amazon__handle_pull_views(sender, instance, **kwargs):
 
     currencies_factory = AmazonRemoteCurrencyPullFactory(sales_channel=instance)
     currencies_factory.run()
+
+
+@receiver(post_create, sender='amazon.AmazonProperty')
+@receiver(post_update, sender='amazon.AmazonProperty')
+def sales_channels__amazon_property__sync_rule_item(sender, instance: AmazonProperty, **kwargs):
+    """Sync ProductPropertiesRuleItem when an Amazon property is mapped locally."""
+    signal = kwargs.get('signal')
+    if signal == post_update and not instance.is_dirty_field('local_instance', check_relationship=True):
+        return
+
+    sync_factory = AmazonPropertyRuleItemSyncFactory(instance)
+    sync_factory.run()
+
+
+@receiver(post_create, sender='amazon.AmazonProductType')
+@receiver(post_update, sender='amazon.AmazonProductType')
+def sales_channels__amazon_product_type__ensure_asin(sender, instance, **kwargs):
+    signal = kwargs.get('signal')
+    if signal == post_update and not instance.is_dirty_field('local_instance', check_relationship=True):
+        return
+
+    sync_factory = AmazonProductTypeAsinSyncFactory(instance)
+    sync_factory.run()
