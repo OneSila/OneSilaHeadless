@@ -195,3 +195,7 @@ class AmazonDefaultUnitConfiguratorType(relay.Node, GetQuerysetMultiTenantMixin)
         'AmazonSalesChannelType',
         lazy("sales_channels.integrations.amazon.schema.types.types")
     ]
+    marketplace: Annotated[
+        'SalesChannelViewType',
+        lazy("sales_channels.schema.types.types")
+    ]

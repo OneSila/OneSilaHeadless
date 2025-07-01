@@ -52,7 +52,7 @@ class ExportDefinitionFactory:
 
             # If terminal value
             is_leaf = not isinstance(value, dict) or (
-                        "type" in value and "items" not in value and "properties" not in value)
+                "type" in value and "items" not in value and "properties" not in value)
 
             if is_leaf:
                 attr_code = self._compose_attr_code()
@@ -71,7 +71,7 @@ class ExportDefinitionFactory:
         keys = [
             k for k in self.current_path
             if k not in {"value", "unit", "language_tag", "marketplace_id"}
-               and not any(ignore in k for ignore in self.allow_not_mapped_keys)
+            and not any(ignore in k for ignore in self.allow_not_mapped_keys)
         ]
         return "__".join(keys)
 
@@ -325,9 +325,10 @@ class UsageDefinitionFactory:
 class DefaultUnitConfiguratorFactory:
     """Create or update AmazonDefaultUnitConfigurator entries."""
 
-    def __init__(self, public_definition, sales_channel, is_default=False):
+    def __init__(self, public_definition, sales_channel, view, is_default=False):
         self.public_definition = public_definition
         self.sales_channel = sales_channel
+        self.view = view
         self.is_default = is_default
 
     def run(self):
@@ -360,6 +361,7 @@ class DefaultUnitConfiguratorFactory:
 
         configurator, created = AmazonDefaultUnitConfigurator.objects.get_or_create(
             sales_channel=self.sales_channel,
+            marketplace=self.view,
             multi_tenant_company=self.sales_channel.multi_tenant_company,
             code=code,
             defaults={"name": schema.get("title", code)},
@@ -481,12 +483,12 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
                 rule_item.save(update_fields=["type"])
 
     def process_views(self):
-        
+
         for view in self.sales_channel_views:
             lang = view.remote_languages.first()
             is_default = (
-                    lang and self.sales_channel.country and
-                    self.sales_channel.country in lang.remote_code
+                lang and self.sales_channel.country and
+                self.sales_channel.country in lang.remote_code
             )
             self.process_view(view, is_default)
 
@@ -519,9 +521,8 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
                 self.product_type.variation_themes = themes
                 self.product_type.save(update_fields=["variation_themes"])
 
-
-    def create_default_unit_configurator(self, public_definition, is_default):
-        fac = DefaultUnitConfiguratorFactory(public_definition, self.sales_channel, is_default)
+    def create_default_unit_configurator(self, public_definition, view, is_default):
+        fac = DefaultUnitConfiguratorFactory(public_definition, self.sales_channel, view, is_default)
         fac.run()
 
     def sync_public_definitions(self, attr_code, schema_definition, required_properties, view):
@@ -547,10 +548,9 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
                 if attr_base in theme:
                     allowed = True
                     break
-                    
+
         public_def.allowed_in_configurator = allowed
         public_def.save()
-
 
         if public_def.should_refresh() and not public_def.is_internal:
 
@@ -659,7 +659,7 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
                     created_item or
                     remote_rule_item.remote_type is None or
                     (
-                            remote_rule_item.remote_type == ProductPropertiesRuleItem.OPTIONAL and new_type == ProductPropertiesRuleItem.REQUIRED)
+                        remote_rule_item.remote_type == ProductPropertiesRuleItem.OPTIONAL and new_type == ProductPropertiesRuleItem.REQUIRED)
             ):
                 remote_rule_item.remote_type = new_type
                 remote_rule_item.save()
@@ -679,8 +679,8 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
             return
 
         self.create_remote_properties(public_definition, view, is_default)
-        self.create_default_unit_configurator(public_definition, is_default)
-        
+        self.create_default_unit_configurator(public_definition, view, is_default)
+
     def run(self):
         self.ensure_asin_item()
         self.process_views()

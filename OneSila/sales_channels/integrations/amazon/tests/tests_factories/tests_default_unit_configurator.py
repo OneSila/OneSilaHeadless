@@ -16,6 +16,8 @@ class DefaultUnitConfiguratorFactoryTest(TestCase):
         self.sales_channel = AmazonSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company
         )
+        from sales_channels.integrations.amazon.models import AmazonSalesChannelView
+        self.view = AmazonSalesChannelView.objects.create(sales_channel=self.sales_channel)
         self.public_definition = AmazonPublicDefinition.objects.create(
             product_type_code="BATTERY",
             raw_schema=BATTERY_SCHEMA["battery"],
@@ -26,12 +28,13 @@ class DefaultUnitConfiguratorFactoryTest(TestCase):
 
     def test_creates_configurator_for_weight_unit(self):
         factory = DefaultUnitConfiguratorFactory(
-            self.public_definition, self.sales_channel, True
+            self.public_definition, self.sales_channel, self.view, True
         )
         factory.run()
 
         configurator = AmazonDefaultUnitConfigurator.objects.get(
             sales_channel=self.sales_channel,
+            marketplace=self.view,
             code="battery__weight",
         )
 
@@ -49,12 +52,13 @@ class DefaultUnitConfiguratorFactoryTest(TestCase):
     def test_name_not_updated_when_not_default(self):
         # initial creation as default marketplace
         factory = DefaultUnitConfiguratorFactory(
-            self.public_definition, self.sales_channel, True
+            self.public_definition, self.sales_channel, self.view, True
         )
         factory.run()
 
         configurator = AmazonDefaultUnitConfigurator.objects.get(
             sales_channel=self.sales_channel,
+            marketplace=self.view,
             code="battery__weight",
         )
         configurator.name = "Original Name"
@@ -68,10 +72,9 @@ class DefaultUnitConfiguratorFactoryTest(TestCase):
         self.public_definition.save()
 
         factory = DefaultUnitConfiguratorFactory(
-            self.public_definition, self.sales_channel, False
+            self.public_definition, self.sales_channel, self.view, False
         )
         factory.run()
         configurator.refresh_from_db()
 
         self.assertEqual(configurator.name, "Original Name")
-
