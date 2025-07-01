@@ -47,7 +47,7 @@ class UsageDefinitionFactoryTest(TestCase):
                     "weight": [
                         {
                             "value": "%value:battery__weight%",
-                            "unit": "%unit:weight%"
+                            "unit": "%unit:battery__weight%"
                         }
                     ],
                     "marketplace_id": "%auto:marketplace_id%"
