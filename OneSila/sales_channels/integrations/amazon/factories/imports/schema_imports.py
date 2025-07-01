@@ -151,6 +151,15 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
         public_def.raw_schema = schema_definition
         public_def.is_required = attr_code in required_properties
         public_def.is_internal = attr_code in AMAZON_INTERNAL_PROPERTIES
+
+        allowed = False
+        if attr_code != "variation_theme" and product_type_obj.variation_themes:
+            attr_base = attr_code.split("__", 1)[0].upper()
+            for theme in product_type_obj.variation_themes or []:
+                if attr_base in theme:
+                    allowed = True
+                    break
+        public_def.allowed_in_configurator = allowed
         public_def.save()
 
 
@@ -300,6 +309,19 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
                     product_type.save()
 
                 properties = schema_data.get("properties", {})
+
+                variation_schema = properties.get("variation_theme")
+                if variation_schema:
+                    themes = (
+                        variation_schema.get("items", {})
+                        .get("properties", {})
+                        .get("name", {})
+                        .get("enum", [])
+                    )
+                    if themes:
+                        product_type.variation_themes = themes
+                        product_type.save(update_fields=["variation_themes"])
+
                 for code, schema in properties.items():
                     # create AmazonPublicDefinition we will have the thing from the view or instead we can just use the amazon domain thing like Amazon.nl or something that comes from the schema
                     # public_definition = self.get_or_create_public_definition(...)
