@@ -359,6 +359,7 @@ class DefaultUnitConfiguratorFactory:
 
         configurator, created = AmazonDefaultUnitConfigurator.objects.get_or_create(
             sales_channel=self.sales_channel,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
             code=code,
             defaults={"name": schema.get("title", code)},
         )

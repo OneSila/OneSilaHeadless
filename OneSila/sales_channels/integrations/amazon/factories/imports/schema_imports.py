@@ -345,11 +345,8 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
                         continue
 
                     self.create_remote_properties(public_definition, product_type, view, is_default)
-                    DefaultUnitConfiguratorFactory(
-                        public_definition,
-                        self.sales_channel,
-                        is_default,
-                    ).run()
+                    self.create_default_unit_configurator(public_definition, is_default)
+
 
             self.update_percentage()
 
@@ -358,3 +355,7 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
         self.sales_channel.active = self.initial_sales_channel_status
         self.sales_channel.is_importing = False
         self.sales_channel.save()
+
+    def create_default_unit_configurator(self, public_definition, is_default):
+        fac = DefaultUnitConfiguratorFactory(public_definition, self.sales_channel, is_default)
+        fac.run()
