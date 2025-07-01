@@ -308,8 +308,8 @@ HUEY = {
     'utc': True,
     'blocking': True,  # Perform blocking pop rather than poll Redis.
     'connection': {
-        'host': 'localhost',
-        'port': 6379,
+        'host': REDIS_HOST,
+        'port': REDIS_PORT,
         'db': 0,
         'connection_pool': None,  # Definitely you should use pooling!
         # ... tons of other options, see redis-py for details.
