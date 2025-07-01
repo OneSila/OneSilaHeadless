@@ -13,6 +13,7 @@ from sales_channels.integrations.amazon.schema.types.input import (
     AmazonProductTypeItemPartialInput,
     AmazonSalesChannelImportInput,
     AmazonSalesChannelImportPartialInput,
+    AmazonDefaultUnitConfiguratorPartialInput,
     AmazonValidateAuthInput,
 )
 from sales_channels.integrations.amazon.schema.types.types import (
@@ -23,6 +24,7 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonProductTypeItemType,
     AmazonRedirectUrlType,
     AmazonSalesChannelImportType,
+    AmazonDefaultUnitConfiguratorType,
 )
 from core.schema.core.mutations import create, type, List, update, delete
 from strawberry import Info
@@ -82,6 +84,8 @@ class AmazonSalesChannelMutation:
     update_amazon_property_select_value: AmazonPropertySelectValueType = update(AmazonPropertySelectValuePartialInput)
     update_amazon_product_type: AmazonProductTypeType = update(AmazonProductTypePartialInput)
     update_amazon_product_type_item: AmazonProductTypeItemType = update(AmazonProductTypeItemPartialInput)
+
+    update_amazon_default_unit_configurator: AmazonDefaultUnitConfiguratorType = update(AmazonDefaultUnitConfiguratorPartialInput)
 
     create_amazon_import_process: AmazonSalesChannelImportType = create(AmazonSalesChannelImportInput)
     update_amazon_import_process: AmazonSalesChannelImportType = update(AmazonSalesChannelImportPartialInput)
