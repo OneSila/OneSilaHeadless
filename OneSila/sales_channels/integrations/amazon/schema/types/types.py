@@ -25,7 +25,7 @@ from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonPropertySelectValueFilter,
     AmazonProductTypeFilter,
     AmazonProductTypeItemFilter,
-    AmazonSalesChannelImportFilter,
+    AmazonSalesChannelImportFilter, AmazonDefaultUnitConfiguratorFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
