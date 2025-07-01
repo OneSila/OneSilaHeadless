@@ -127,17 +127,20 @@ DATABASES = {
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "onesila_session_cache"
 
+REDIS_HOST = os.getenv('REDIS_HOST', "127.0.0.1")
+REDIS_PORT = os.getenv('REDIS_PORT', 6379)
+
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379/1",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }
     },
     "onesila_session_cache": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379/2",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/2",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }
@@ -271,7 +274,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(os.getenv('REDIS_HOST', "127.0.0.1"), os.getenv('REDIS_PORT', 6379))],
+            "hosts": [f"redis://{REDIS_HOST}:{REDIS_PORT}/3"],
         },
     },
 }
