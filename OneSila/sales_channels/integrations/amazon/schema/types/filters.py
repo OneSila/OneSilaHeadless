@@ -18,6 +18,7 @@ from properties.schema.types.filters import (
     PropertyFilter,
     PropertySelectValueFilter,
     ProductPropertiesRuleFilter,
+    ProductPropertiesRuleItemFilter,
 )
 from sales_channels.schema.types.filters import (
     SalesChannelFilter,
@@ -98,6 +99,15 @@ class AmazonProductTypeFilter(SearchFilterMixin):
         if value not in (None, UNSET):
             queryset = queryset.filter_mapped_remotely(value)
         return queryset, Q()
+
+
+@filter(AmazonProductTypeItem)
+class AmazonProductTypeItemFilter(SearchFilterMixin):
+    id: auto
+    amazon_rule: Optional[AmazonProductTypeFilter]
+    local_instance: Optional[ProductPropertiesRuleItemFilter]
+    remote_property: Optional[AmazonPropertyFilter]
+    remote_type: auto
 
 
 @filter(AmazonSalesChannelImport)

@@ -15,6 +15,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonProductType,
+    AmazonProductTypeItem,
     AmazonSalesChannelImport,
 )
 from sales_channels.integrations.amazon.schema.types.filters import (
@@ -22,6 +23,7 @@ from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonPropertyFilter,
     AmazonPropertySelectValueFilter,
     AmazonProductTypeFilter,
+    AmazonProductTypeItemFilter,
     AmazonSalesChannelImportFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
@@ -29,6 +31,7 @@ from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonPropertyOrder,
     AmazonPropertySelectValueOrder,
     AmazonProductTypeOrder,
+    AmazonProductTypeItemOrder,
     AmazonSalesChannelImportOrder,
 )
 
@@ -127,6 +130,10 @@ class AmazonProductTypeType(relay.Node, GetQuerysetMultiTenantMixin):
         'ProductPropertiesRuleType',
         lazy("properties.schema.types.types")
     ]]
+    amazonproducttypeitem_set: List[Annotated[
+        'AmazonProductTypeItemType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]]
 
     @field()
     def mapped_locally(self, info) -> bool:
@@ -153,3 +160,22 @@ class AmazonSalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def import_id(self, info) -> str:
         return to_base64(ImportType, self.pk)
+
+
+@type(
+    AmazonProductTypeItem,
+    filters=AmazonProductTypeItemFilter,
+    order=AmazonProductTypeItemOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonProductTypeItemType(relay.Node, GetQuerysetMultiTenantMixin):
+    amazon_rule: Annotated[
+        'AmazonProductTypeType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    remote_property: AmazonPropertyType
+    local_instance: Optional[Annotated[
+        'ProductPropertiesRuleItemType',
+        lazy("properties.schema.types.types")
+    ]]
