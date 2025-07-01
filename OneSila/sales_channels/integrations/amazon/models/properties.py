@@ -55,6 +55,7 @@ class AmazonPublicDefinition(models.SharedModel):
 
     is_required = models.BooleanField(default=False)
     is_internal = models.BooleanField(default=False)
+    allowed_in_configurator = models.BooleanField(default=False)
 
     def should_refresh(self):
         if not self.last_fetched:
@@ -198,6 +199,8 @@ class AmazonProductType(RemoteObjectMixin, models.Model):
         help_text="Display name for the Amazon product type (e.g., 'Toys & Games').",
         verbose_name="Remote Name"
     )
+
+    variation_themes = JSONField(null=True, blank=True)
 
     objects = AmazonProductTypeManager()
 
