@@ -22,7 +22,6 @@ from sales_channels.models import (
     SalesChannelView,
     SalesChannelViewAssign,
     ImportProperty,
-    DefaultUnitConfigurator,
 )
 from sales_channels.models.sales_channels import RemoteLanguage
 
@@ -236,12 +235,3 @@ class SalesChannelViewAssignInput:
 class SalesChannelViewAssignPartialInput(NodeInput):
     pass
 
-
-@input(DefaultUnitConfigurator, fields="__all__")
-class DefaultUnitConfiguratorInput:
-    pass
-
-
-@partial(DefaultUnitConfigurator, fields="__all__")
-class DefaultUnitConfiguratorPartialInput(NodeInput):
-    pass

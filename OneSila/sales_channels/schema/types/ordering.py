@@ -27,7 +27,6 @@ from sales_channels.models import (
     SalesChannelIntegrationPricelist,
     SalesChannelView,
     SalesChannelViewAssign,
-    DefaultUnitConfigurator,
 )
 from sales_channels.models.sales_channels import RemoteLanguage
 
@@ -162,6 +161,3 @@ class SalesChannelViewAssignOrder:
     id: auto
 
 
-@order(DefaultUnitConfigurator)
-class DefaultUnitConfiguratorOrder:
-    id: auto

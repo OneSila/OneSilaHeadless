@@ -10,7 +10,6 @@ from .types.types import (
     RemoteLanguageType,
     RemoteCurrencyType,
     SalesChannelImportType,
-    DefaultUnitConfiguratorType,
 )
 
 
@@ -42,8 +41,5 @@ class SalesChannelsQuery:
 
     sales_channel_view_assign: SalesChannelViewAssignType = node()
     sales_channel_view_assigns: DjangoListConnection[SalesChannelViewAssignType] = connection()
-
-    default_unit_configurator: DefaultUnitConfiguratorType = node()
-    default_unit_configurators: DjangoListConnection[DefaultUnitConfiguratorType] = connection()
 
     integration: IntegrationType = node()

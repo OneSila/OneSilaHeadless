@@ -35,7 +35,6 @@ from sales_channels.models import (
     SalesChannelView,
     SalesChannelViewAssign,
     RemoteOrder,
-    DefaultUnitConfigurator,
 )
 from .filters import (
     ImportCurrencyFilter,
@@ -64,7 +63,6 @@ from .filters import (
     SalesChannelViewFilter,
     SalesChannelViewAssignFilter,
     RemoteLanguageFilter,
-    DefaultUnitConfiguratorFilter,
 )
 from .ordering import (
     ImportCurrencyOrder,
@@ -93,7 +91,6 @@ from .ordering import (
     SalesChannelViewOrder,
     SalesChannelViewAssignOrder,
     RemoteLanguageOrder,
-    DefaultUnitConfiguratorOrder,
 )
 from ...integrations.amazon.models import AmazonSalesChannelImport, AmazonSalesChannel
 from ...models.sales_channels import RemoteLanguage
@@ -317,8 +314,3 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
         # Other marketplace specific formatting can be added here.
 
         return formatted
-
-
-@type(DefaultUnitConfigurator, filters=DefaultUnitConfiguratorFilter, order=DefaultUnitConfiguratorOrder, pagination=True, fields='__all__')
-class DefaultUnitConfiguratorType(relay.Node, GetQuerysetMultiTenantMixin):
-    sales_channel: SalesChannelType

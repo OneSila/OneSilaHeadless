@@ -30,7 +30,6 @@ from sales_channels.models import (
     SalesChannelIntegrationPricelist,
     SalesChannelView,
     SalesChannelViewAssign,
-    DefaultUnitConfigurator,
 )
 from sales_channels.models.sales_channels import RemoteLanguage
 
@@ -172,9 +171,3 @@ class SalesChannelViewAssignFilter(SearchFilterMixin):
     sales_channel: Optional[SalesChannelFilter]
     sales_channel_view: Optional[SalesChannelViewFilter]
     product: Optional[ProductFilter]
-
-
-@filter(DefaultUnitConfigurator)
-class DefaultUnitConfiguratorFilter(SearchFilterMixin):
-    id: auto
-    sales_channel: Optional[SalesChannelFilter]

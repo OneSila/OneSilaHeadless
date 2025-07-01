@@ -8,6 +8,5 @@ from .sales_channels import (
     SalesChannelView,
     SalesChannelIntegrationPricelist,
     SalesChannelViewAssign,
-    DefaultUnitConfigurator,
 )
 from .taxes import RemoteVat, RemoteCurrency
