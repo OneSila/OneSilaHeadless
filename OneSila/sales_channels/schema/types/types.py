@@ -9,24 +9,92 @@ from currencies.schema.types.types import CurrencyType
 from imports_exports.schema.queries import ImportType
 from products.schema.types.types import ProductType
 
-from sales_channels.models import ImportCurrency, ImportImage, SalesChannelImport, ImportProduct, ImportProperty, \
-    ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, \
-    RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteProduct, RemoteProductContent, \
-    RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, \
-    SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign, RemoteOrder
-from .filters import ImportCurrencyFilter, ImportImageFilter, SalesChannelImportFilter, ImportProductFilter, \
-    ImportPropertyFilter, ImportPropertySelectValueFilter, ImportVatFilter, RemoteCategoryFilter, RemoteCurrencyFilter, \
-    RemoteCustomerFilter, RemoteImageFilter, RemoteImageProductAssociationFilter, RemoteInventoryFilter, \
-    RemoteLogFilter, RemoteOrderFilter, RemoteProductFilter, RemoteProductContentFilter, \
-    RemoteProductPropertyFilter, RemotePropertyFilter, RemotePropertySelectValueFilter, RemoteVatFilter, \
-    SalesChannelFilter, SalesChannelIntegrationPricelistFilter, SalesChannelViewFilter, SalesChannelViewAssignFilter, \
-    RemoteLanguageFilter
-from .ordering import ImportCurrencyOrder, ImportImageOrder, SalesChannelImportOrder, ImportProductOrder, \
-    ImportPropertyOrder, ImportPropertySelectValueOrder, ImportVatOrder, RemoteCategoryOrder, RemoteCurrencyOrder, \
-    RemoteCustomerOrder, RemoteImageOrder, RemoteImageProductAssociationOrder, RemoteInventoryOrder, RemoteLogOrder, \
-    RemoteOrderOrder, RemoteProductOrder, RemoteProductContentOrder, RemoteProductPropertyOrder, \
-    RemotePropertyOrder, RemotePropertySelectValueOrder, RemoteVatOrder, SalesChannelOrder, \
-    SalesChannelIntegrationPricelistOrder, SalesChannelViewOrder, SalesChannelViewAssignOrder, RemoteLanguageOrder
+from sales_channels.models import (
+    ImportCurrency,
+    ImportImage,
+    SalesChannelImport,
+    ImportProduct,
+    ImportProperty,
+    ImportPropertySelectValue,
+    ImportVat,
+    RemoteCategory,
+    RemoteCurrency,
+    RemoteCustomer,
+    RemoteImage,
+    RemoteImageProductAssociation,
+    RemoteInventory,
+    RemoteLog,
+    RemoteProduct,
+    RemoteProductContent,
+    RemoteProductProperty,
+    RemoteProperty,
+    RemotePropertySelectValue,
+    RemoteVat,
+    SalesChannel,
+    SalesChannelIntegrationPricelist,
+    SalesChannelView,
+    SalesChannelViewAssign,
+    RemoteOrder,
+    DefaultUnitConfigurator,
+)
+from .filters import (
+    ImportCurrencyFilter,
+    ImportImageFilter,
+    SalesChannelImportFilter,
+    ImportProductFilter,
+    ImportPropertyFilter,
+    ImportPropertySelectValueFilter,
+    ImportVatFilter,
+    RemoteCategoryFilter,
+    RemoteCurrencyFilter,
+    RemoteCustomerFilter,
+    RemoteImageFilter,
+    RemoteImageProductAssociationFilter,
+    RemoteInventoryFilter,
+    RemoteLogFilter,
+    RemoteOrderFilter,
+    RemoteProductFilter,
+    RemoteProductContentFilter,
+    RemoteProductPropertyFilter,
+    RemotePropertyFilter,
+    RemotePropertySelectValueFilter,
+    RemoteVatFilter,
+    SalesChannelFilter,
+    SalesChannelIntegrationPricelistFilter,
+    SalesChannelViewFilter,
+    SalesChannelViewAssignFilter,
+    RemoteLanguageFilter,
+    DefaultUnitConfiguratorFilter,
+)
+from .ordering import (
+    ImportCurrencyOrder,
+    ImportImageOrder,
+    SalesChannelImportOrder,
+    ImportProductOrder,
+    ImportPropertyOrder,
+    ImportPropertySelectValueOrder,
+    ImportVatOrder,
+    RemoteCategoryOrder,
+    RemoteCurrencyOrder,
+    RemoteCustomerOrder,
+    RemoteImageOrder,
+    RemoteImageProductAssociationOrder,
+    RemoteInventoryOrder,
+    RemoteLogOrder,
+    RemoteOrderOrder,
+    RemoteProductOrder,
+    RemoteProductContentOrder,
+    RemoteProductPropertyOrder,
+    RemotePropertyOrder,
+    RemotePropertySelectValueOrder,
+    RemoteVatOrder,
+    SalesChannelOrder,
+    SalesChannelIntegrationPricelistOrder,
+    SalesChannelViewOrder,
+    SalesChannelViewAssignOrder,
+    RemoteLanguageOrder,
+    DefaultUnitConfiguratorOrder,
+)
 from ...integrations.amazon.models import AmazonSalesChannelImport, AmazonSalesChannel
 from ...models.sales_channels import RemoteLanguage
 
@@ -249,3 +317,8 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
         # Other marketplace specific formatting can be added here.
 
         return formatted
+
+
+@type(DefaultUnitConfigurator, filters=DefaultUnitConfiguratorFilter, order=DefaultUnitConfiguratorOrder, pagination=True, fields='__all__')
+class DefaultUnitConfiguratorType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: SalesChannelType

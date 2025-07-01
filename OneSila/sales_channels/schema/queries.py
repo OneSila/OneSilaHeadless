@@ -1,8 +1,17 @@
 from core.schema.core.queries import node, connection, DjangoListConnection, type, field
 from integrations.schema.types.types import IntegrationType
-from .types.types import RemoteLogType, RemoteProductType, SalesChannelType, \
-    SalesChannelIntegrationPricelistType, SalesChannelViewType, SalesChannelViewAssignType, RemoteLanguageType, \
-    RemoteCurrencyType, SalesChannelImportType
+from .types.types import (
+    RemoteLogType,
+    RemoteProductType,
+    SalesChannelType,
+    SalesChannelIntegrationPricelistType,
+    SalesChannelViewType,
+    SalesChannelViewAssignType,
+    RemoteLanguageType,
+    RemoteCurrencyType,
+    SalesChannelImportType,
+    DefaultUnitConfiguratorType,
+)
 
 
 @type(name='Query')
@@ -33,5 +42,8 @@ class SalesChannelsQuery:
 
     sales_channel_view_assign: SalesChannelViewAssignType = node()
     sales_channel_view_assigns: DjangoListConnection[SalesChannelViewAssignType] = connection()
+
+    default_unit_configurator: DefaultUnitConfiguratorType = node()
+    default_unit_configurators: DjangoListConnection[DefaultUnitConfiguratorType] = connection()
 
     integration: IntegrationType = node()
