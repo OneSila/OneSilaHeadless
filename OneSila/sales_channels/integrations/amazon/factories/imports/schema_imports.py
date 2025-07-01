@@ -7,9 +7,10 @@ from sales_channels.integrations.amazon.factories.sales_channels.full_schema imp
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 from sales_channels.integrations.amazon.models.properties import AmazonProductType, AmazonPublicDefinition, \
     AmazonProperty, AmazonPropertySelectValue, AmazonProductTypeItem
-from properties.models import ProductPropertiesRuleItem, Property
+from properties.models import ProductPropertiesRuleItem, Property, PropertyTranslation
 from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
 from sales_channels.integrations.amazon.decorators import throttle_safe
+from django.db.models import Max
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
         self.sales_channel = sales_channel
         self.initial_sales_channel_status = sales_channel.active
         self.api = self.get_api()
+        self.merchant_asin_property = self._ensure_merchant_suggested_asin()
 
     def prepare_import_process(self):
         # during the import this needs to stay false to prevent trying to create the mirror models because
@@ -103,6 +105,41 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
             schema_data["title"] = response.display_name
 
         return schema_data
+
+    def _ensure_merchant_suggested_asin(self):
+        remote_property, _ = AmazonProperty.objects.get_or_create(
+            allow_multiple=True,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="merchant_suggested_asin",
+            defaults={"type": Property.TYPES.TEXT},
+        )
+
+        if not remote_property.local_instance:
+            local_property, _ = Property.objects.get_or_create(
+                internal_name="amazon_asin",
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                defaults={
+                    "type": Property.TYPES.TEXT,
+                    "non_deletable": True,
+                },
+            )
+
+            PropertyTranslation.objects.get_or_create(
+                property=local_property,
+                language=self.sales_channel.multi_tenant_company.language,
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                defaults={"name": "Amazon Asin"},
+            )
+
+            if not local_property.non_deletable:
+                local_property.non_deletable = True
+                local_property.save(update_fields=["non_deletable"])
+
+            remote_property.local_instance = local_property
+            remote_property.save()
+
+        return remote_property
 
     def sync_public_definitions(self, attr_code, schema_definition, required_properties, product_type_obj, view):
         """
@@ -203,6 +240,40 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 remote_rule_item.remote_type = new_type
                 remote_rule_item.save()
 
+    def _ensure_asin_item(self, product_type):
+        if not self.merchant_asin_property:
+            return
+
+        item, created = AmazonProductTypeItem.objects.get_or_create(
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            amazon_rule=product_type,
+            remote_property=self.merchant_asin_property,
+        )
+
+        if created or item.remote_type != ProductPropertiesRuleItem.REQUIRED:
+            item.remote_type = ProductPropertiesRuleItem.REQUIRED
+            item.save()
+
+        if (
+            product_type.local_instance
+            and self.merchant_asin_property.local_instance
+        ):
+            rule = product_type.local_instance
+            max_sort = rule.items.aggregate(max_sort=Max("sort_order")).get("max_sort") or 0
+            rule_item, created_local = ProductPropertiesRuleItem.objects.get_or_create(
+                multi_tenant_company=rule.multi_tenant_company,
+                rule=rule,
+                property=self.merchant_asin_property.local_instance,
+                defaults={
+                    "type": ProductPropertiesRuleItem.REQUIRED,
+                    "sort_order": max_sort + 1,
+                },
+            )
+            if not created_local and rule_item.type != ProductPropertiesRuleItem.REQUIRED:
+                rule_item.type = ProductPropertiesRuleItem.REQUIRED
+                rule_item.save(update_fields=["type"])
+
     def import_rules_process(self):
         sales_channel_views = AmazonSalesChannelView.objects.filter(sales_channel=self.sales_channel)
         self.update_percentage()
@@ -214,6 +285,8 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 product_type_code=product_type_code,
                 sales_channel=self.sales_channel,
                 multi_tenant_company=self.sales_channel.multi_tenant_company)
+
+            self._ensure_asin_item(product_type)
 
             # Step 1: Get schemas for all marketplaces
             for view in sales_channel_views:

@@ -7,6 +7,7 @@ from sales_channels.integrations.amazon.models import (
 )
 from sales_channels.integrations.amazon.factories.rule_sync import (
     AmazonPropertyRuleItemSyncFactory,
+    AmazonProductTypeAsinSyncFactory,
 )
 
 
@@ -49,4 +50,15 @@ def sales_channels__amazon_property__sync_rule_item(sender, instance: AmazonProp
         return
 
     sync_factory = AmazonPropertyRuleItemSyncFactory(instance)
+    sync_factory.run()
+
+
+@receiver(post_create, sender='amazon.AmazonProductType')
+@receiver(post_update, sender='amazon.AmazonProductType')
+def sales_channels__amazon_product_type__ensure_asin(sender, instance, **kwargs):
+    signal = kwargs.get('signal')
+    if signal == post_update and not instance.is_dirty_field('local_instance', check_relationship=True):
+        return
+
+    sync_factory = AmazonProductTypeAsinSyncFactory(instance)
     sync_factory.run()
