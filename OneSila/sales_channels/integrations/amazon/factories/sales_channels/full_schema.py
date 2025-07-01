@@ -303,9 +303,16 @@ class UsageDefinitionFactory:
     def _compose_attr_code(self):
         keys = []
         for part in self.current_path:
-            if part in {"value", "language_tag", "marketplace_id", "unit"}:
+            if part in {"value", "language_tag", "marketplace_id", "unit", "standardized_values"}:
                 continue
             if part.endswith("_other_than_listed"):
                 part = part.replace("_other_than_listed", "")
             keys.append(part)
-        return "__".join([self.public_definition.code] + keys) if keys and keys[0] != self.public_definition.code else "__".join(keys)
+
+        if not keys:
+            return self.public_definition.code
+
+        if keys[0] != self.public_definition.code:
+            return "__".join([self.public_definition.code] + keys)
+
+        return "__".join(keys)
