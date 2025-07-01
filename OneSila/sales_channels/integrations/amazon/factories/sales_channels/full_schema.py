@@ -426,14 +426,14 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
         return data
 
     @throttle_safe(max_retries=5, base_delay=1)
-    def _get_schema_for_marketplace(self, view, category_code, is_default_marketplace=False):
+    def _get_schema_for_marketplace(self, view, is_default_marketplace=False):
         """
         SP-API call to get product type definition for a given marketplace view.
         Returns parsed schema JSON with optional title added.
         """
         definitions_api = DefinitionsApi(self._get_client())
         response = definitions_api.get_definitions_product_type(
-            product_type=category_code,
+            product_type=self.product_type.product_type_code,
             marketplace_ids=[view.remote_id],
             requirements="LISTING",
             seller_id=self.sales_channel.remote_id,
