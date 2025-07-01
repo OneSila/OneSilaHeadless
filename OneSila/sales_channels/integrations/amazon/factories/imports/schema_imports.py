@@ -15,6 +15,35 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
+def _resolve_property_type(existing_type: str, new_type: str) -> str:
+    """Return the most permissive property type based on the rules provided."""
+    if existing_type == new_type:
+        return existing_type
+
+    # MULTISELECT beats everything as it can also behave as SELECT
+    if Property.TYPES.MULTISELECT in {existing_type, new_type}:
+        return Property.TYPES.MULTISELECT
+
+    # SELECT has priority over TEXT/DESCRIPTION and other primitives
+    if Property.TYPES.SELECT in {existing_type, new_type}:
+        return Property.TYPES.SELECT
+
+    # DESCRIPTION is preferred over TEXT
+    if {existing_type, new_type} <= {Property.TYPES.TEXT, Property.TYPES.DESCRIPTION}:
+        return Property.TYPES.DESCRIPTION
+
+    # DATETIME encompasses DATE
+    if Property.TYPES.DATETIME in {existing_type, new_type} and Property.TYPES.DATE in {existing_type, new_type}:
+        return Property.TYPES.DATETIME
+
+    # FLOAT encompasses INT
+    if Property.TYPES.FLOAT in {existing_type, new_type} and Property.TYPES.INT in {existing_type, new_type}:
+        return Property.TYPES.FLOAT
+
+    # Default to existing if no special rule matches
+    return existing_type
+
+
 class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
     import_properties = False
     import_select_values = False
@@ -108,18 +137,31 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 multi_tenant_company=self.sales_channel.multi_tenant_company,
                 sales_channel=self.sales_channel,
                 code=property_data['code'],
-                type=property_data['type'],
+                defaults={'type': property_data['type']},
             )
 
-            if created:
-                allows_unmapped_values = property_data.get('allows_unmapped_values', False)
+            allows_unmapped_values = property_data.get('allows_unmapped_values', False)
+
+            if not created:
+                old_type = remote_property.type
+                resolved_type = _resolve_property_type(old_type, property_data['type'])
+                if resolved_type != remote_property.type:
+                    remote_property.type = resolved_type
+                if resolved_type == Property.TYPES.SELECT and (
+                    old_type in [Property.TYPES.TEXT, Property.TYPES.DESCRIPTION] or
+                    property_data['type'] in [Property.TYPES.TEXT, Property.TYPES.DESCRIPTION]
+                ):
+                    remote_property.allows_unmapped_values = True
+                if allows_unmapped_values:
+                    remote_property.allows_unmapped_values = True
+            else:
                 remote_property.name = property_data['name']
                 remote_property.allows_unmapped_values = allows_unmapped_values
-                remote_property.save()
 
             if is_default:
                 remote_property.name = property_data['name']
-                remote_property.save()
+
+            remote_property.save()
 
             if remote_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
                 for value in property_data['values']:
