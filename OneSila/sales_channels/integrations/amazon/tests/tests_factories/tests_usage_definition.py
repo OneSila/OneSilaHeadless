@@ -96,7 +96,7 @@ class UsageDefinitionFactoryTest(TestCase):
         expected = {
             "number_of_lithium_metal_cells": [
                 {
-                    "value": "%value:%",
+                    "value": "%value:number_of_lithium_metal_cells%",
                     "marketplace_id": "%auto:marketplace_id%",
                 }
             ]
@@ -119,7 +119,7 @@ class UsageDefinitionFactoryTest(TestCase):
         expected = {
             "customer_package_type": [
                 {
-                    "value": "%value:%",
+                    "value": "%value:customer_package_type%",
                     "language_tag": "%auto:language%",
                     "marketplace_id": "%auto:marketplace_id%",
                 }
@@ -143,7 +143,7 @@ class UsageDefinitionFactoryTest(TestCase):
         expected = {
             "power_plug_type": [
                 {
-                    "value": "%value:%",
+                    "value": "%value:power_plug_type%",
                     "marketplace_id": "%auto:marketplace_id%",
                 }
             ]
@@ -166,7 +166,7 @@ class UsageDefinitionFactoryTest(TestCase):
         expected = {
             "controller_type": [
                 {
-                    "value": "%value:%",
+                    "value": "%value:controller_type%",
                     "language_tag": "%auto:language%",
                     "marketplace_id": "%auto:marketplace_id%",
                 }
@@ -191,7 +191,7 @@ class UsageDefinitionFactoryTest(TestCase):
             "product_site_launch_date": [
                 {
                     "marketplace_id": "%auto:marketplace_id%",
-                    "value": "%value:%",
+                    "value": "%value:product_site_launch_date%",
                 }
             ]
         }
@@ -213,8 +213,8 @@ class UsageDefinitionFactoryTest(TestCase):
         expected = {
             "color": [
                 {
-                    "standardized_values": ["%value:color__standardized_values%"],
-                    "value": "%value:%",
+                    "standardized_values": ["%value:color%"],
+                    "value": "%value:color%",
                     "language_tag": "%auto:language%",
                     "marketplace_id": "%auto:marketplace_id%",
                 }
