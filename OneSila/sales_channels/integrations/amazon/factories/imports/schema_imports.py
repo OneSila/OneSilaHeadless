@@ -3,7 +3,10 @@ import logging
 from imports_exports.factories.imports import ImportMixin
 from spapi import DefinitionsApi
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
-from sales_channels.integrations.amazon.factories.sales_channels.full_schema import ExportDefinitionFactory
+from sales_channels.integrations.amazon.factories.sales_channels.full_schema import (
+    ExportDefinitionFactory,
+    UsageDefinitionFactory,
+)
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 from sales_channels.integrations.amazon.models.properties import AmazonProductType, AmazonPublicDefinition, \
     AmazonProperty, AmazonPropertySelectValue, AmazonProductTypeItem
@@ -166,7 +169,8 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
             export_definition_fac = ExportDefinitionFactory(public_def)
             export_definition_fac.run()
 
-            # UsageDefinitionFactory(public_def).run()
+            usage_definition_fac = UsageDefinitionFactory(public_def)
+            public_def.usage_definition = usage_definition_fac.run()
             public_def.export_definition = export_definition_fac.results
             public_def.last_fetched = timezone.now()
             public_def.save()

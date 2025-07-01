@@ -7,6 +7,7 @@ from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 from sales_channels.integrations.amazon.models.properties import AmazonProductType, AmazonPublicDefinition, \
     AmazonProperty, AmazonPropertySelectValue, AmazonProductTypeItem
 import requests
+import json
 from properties.models import Property
 
 
@@ -263,7 +264,48 @@ class ExportDefinitionFactory:
 class UsageDefinitionFactory:
     def __init__(self, public_definition):
         self.public_definition = public_definition
+        self.current_path = []
 
     def run(self):
-        # TODO: define how to render values into expected Amazon SP-API format
-        pass
+        schema = self.public_definition.raw_schema or {}
+        root_code = self.public_definition.code
+        body = {root_code: self._process(schema.get(root_code, schema))}
+        result = json.dumps(body, indent=2)
+        return result
+
+    def _process(self, node):
+        if not isinstance(node, dict):
+            return None
+
+        if node.get("type") == "array" and "items" in node:
+            return [self._process(node["items"])]
+
+        properties = node.get("properties")
+        if properties:
+            result = {}
+            for key, value in properties.items():
+                self.current_path.append(key)
+                if key == "marketplace_id":
+                    result[key] = "%auto:marketplace_id%"
+                elif key == "language_tag":
+                    result[key] = "%auto:language%"
+                elif key == "unit":
+                    parent = self.current_path[-2] if len(self.current_path) >= 2 else ""
+                    result[key] = f"%unit:{parent}%"
+                else:
+                    result[key] = self._process(value)
+                self.current_path.pop()
+            return result
+
+        attr_code = self._compose_attr_code()
+        return f"%value:{attr_code}%"
+
+    def _compose_attr_code(self):
+        keys = []
+        for part in self.current_path:
+            if part in {"value", "language_tag", "marketplace_id", "unit"}:
+                continue
+            if part.endswith("_other_than_listed"):
+                part = part.replace("_other_than_listed", "")
+            keys.append(part)
+        return "__".join([self.public_definition.code] + keys) if keys and keys[0] != self.public_definition.code else "__".join(keys)
