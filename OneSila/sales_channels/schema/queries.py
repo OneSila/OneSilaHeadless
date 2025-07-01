@@ -1,8 +1,16 @@
 from core.schema.core.queries import node, connection, DjangoListConnection, type, field
 from integrations.schema.types.types import IntegrationType
-from .types.types import RemoteLogType, RemoteProductType, SalesChannelType, \
-    SalesChannelIntegrationPricelistType, SalesChannelViewType, SalesChannelViewAssignType, RemoteLanguageType, \
-    RemoteCurrencyType, SalesChannelImportType
+from .types.types import (
+    RemoteLogType,
+    RemoteProductType,
+    SalesChannelType,
+    SalesChannelIntegrationPricelistType,
+    SalesChannelViewType,
+    SalesChannelViewAssignType,
+    RemoteLanguageType,
+    RemoteCurrencyType,
+    SalesChannelImportType,
+)
 
 
 @type(name='Query')

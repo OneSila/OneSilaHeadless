@@ -7,6 +7,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductType,
     AmazonProductTypeItem,
     AmazonSalesChannelImport,
+    AmazonDefaultUnitConfigurator,
 )
 
 
@@ -37,4 +38,9 @@ class AmazonProductTypeItemOrder:
 
 @order(AmazonSalesChannelImport)
 class AmazonSalesChannelImportOrder:
+    id: auto
+
+
+@order(AmazonDefaultUnitConfigurator)
+class AmazonDefaultUnitConfiguratorOrder:
     id: auto
