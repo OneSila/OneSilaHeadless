@@ -6,8 +6,11 @@ from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixi
 from sales_channels.integrations.amazon.factories.sales_channels.full_schema import (
     ExportDefinitionFactory,
     UsageDefinitionFactory,
+    DefaultUnitConfiguratorFactory,
 )
-from sales_channels.integrations.amazon.models import AmazonSalesChannelView
+from sales_channels.integrations.amazon.models import (
+    AmazonSalesChannelView,
+)
 from sales_channels.integrations.amazon.models.properties import AmazonProductType, AmazonPublicDefinition, \
     AmazonProperty, AmazonPropertySelectValue, AmazonProductTypeItem
 from properties.models import ProductPropertiesRuleItem, Property, PropertyTranslation
@@ -250,6 +253,7 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 remote_rule_item.remote_type = new_type
                 remote_rule_item.save()
 
+
     def _ensure_asin_item(self, product_type):
         if not self.merchant_asin_property:
             return
@@ -341,6 +345,11 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
                         continue
 
                     self.create_remote_properties(public_definition, product_type, view, is_default)
+                    DefaultUnitConfiguratorFactory(
+                        public_definition,
+                        self.sales_channel,
+                        is_default,
+                    ).run()
 
             self.update_percentage()
 

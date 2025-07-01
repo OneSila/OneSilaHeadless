@@ -3,7 +3,10 @@ from spapi import DefinitionsApi
 from sales_channels.factories.mixins import PullRemoteInstanceMixin
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin, PullAmazonMixin
-from sales_channels.integrations.amazon.models import AmazonSalesChannelView
+from sales_channels.integrations.amazon.models import (
+    AmazonSalesChannelView,
+    AmazonDefaultUnitConfigurator,
+)
 from sales_channels.integrations.amazon.models.properties import AmazonProductType, AmazonPublicDefinition, \
     AmazonProperty, AmazonPropertySelectValue, AmazonProductTypeItem
 import requests
@@ -316,3 +319,71 @@ class UsageDefinitionFactory:
             return "__".join([self.public_definition.code] + keys)
 
         return "__".join(keys)
+
+
+class DefaultUnitConfiguratorFactory:
+    """Create or update AmazonDefaultUnitConfigurator entries."""
+
+    def __init__(self, public_definition, sales_channel, is_default=False):
+        self.public_definition = public_definition
+        self.sales_channel = sales_channel
+        self.is_default = is_default
+
+    def run(self):
+        self._walk(self.public_definition.raw_schema or {}, [self.public_definition.code])
+
+    def _compose_attr_code(self, path):
+        keys = []
+        for part in path:
+            if part in {"value", "language_tag", "marketplace_id", "unit", "standardized_values"}:
+                continue
+            if part.endswith("_other_than_listed"):
+                part = part.replace("_other_than_listed", "")
+            keys.append(part)
+
+        if not keys:
+            return self.public_definition.code
+
+        if keys[0] != self.public_definition.code:
+            return "__".join([self.public_definition.code] + keys)
+
+        return "__".join(keys)
+
+    def _save_configurator(self, code, schema):
+        enum = schema.get("enum") or []
+        enum_names = schema.get("enumNames", enum)
+        choices = [
+            {"value": v, "name": n}
+            for v, n in zip(enum, enum_names)
+        ]
+
+        configurator, created = AmazonDefaultUnitConfigurator.objects.get_or_create(
+            sales_channel=self.sales_channel,
+            code=code,
+            defaults={"name": schema.get("title", code)},
+        )
+
+        if created or self.is_default:
+            configurator.name = schema.get("title", code)
+
+        configurator.choices = choices
+        configurator.save()
+
+    def _walk(self, node, path):
+        if not isinstance(node, dict):
+            return
+
+        if "items" in node and isinstance(node["items"], dict):
+            self._walk(node["items"], path)
+            return
+
+        for key, val in node.get("properties", {}).items():
+            path.append(key)
+            if key == "unit":
+                attr_code = self._compose_attr_code(path)
+                self._save_configurator(attr_code, val)
+                path.pop()
+                continue
+
+            self._walk(val, path)
+            path.pop()
