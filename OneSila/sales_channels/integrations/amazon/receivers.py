@@ -48,5 +48,6 @@ def sales_channels__amazon_property__sync_rule_item(sender, instance: AmazonProp
     if signal == post_update and not instance.is_dirty_field('local_instance', check_relationship=True):
         return
 
+    print('--------------------------------------------------------------- ABOUT TO CREATE ITEM')
     sync_factory = AmazonPropertyRuleItemSyncFactory(instance)
     sync_factory.run()
