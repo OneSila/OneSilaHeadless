@@ -6,6 +6,7 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonProductTypeType,
     AmazonProductTypeItemType,
     AmazonSalesChannelImportType,
+    AmazonDefaultUnitConfiguratorType,
 )
 
 
@@ -28,3 +29,6 @@ class AmazonSalesChannelsQuery:
 
     amazon_import_process: AmazonSalesChannelImportType = node()
     amazon_import_processes: DjangoListConnection[AmazonSalesChannelImportType] = connection()
+
+    amazon_default_unit_configurator: AmazonDefaultUnitConfiguratorType = node()
+    amazon_default_unit_configurators: DjangoListConnection[AmazonDefaultUnitConfiguratorType] = connection()
