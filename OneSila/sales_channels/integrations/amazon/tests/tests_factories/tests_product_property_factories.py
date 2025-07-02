@@ -36,24 +36,23 @@ class AmazonProductPropertyFactoryTest(TestCase):
             remote_id="SELLER123",
         )
         self.view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             name="UK",
             api_region_code="EU_UK",
             remote_id="GB",
         )
         AmazonRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
             sales_channel_view=self.view, remote_code="en"
         )
 
         # Create product type property and value
-        self.product_type_property = baker.make(
-            Property,
-            type=Property.TYPES.SELECT,
-            is_product_type=True,
-            internal_name="category",
-            multi_tenant_company=self.multi_tenant_company,
-        )
+        self.product_type_property = Property.objects.filter(is_product_type=True, multi_tenant_company=self.multi_tenant_company).first()
+
         PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             property=self.product_type_property,
             language=self.multi_tenant_company.language,
             name="Category",
@@ -64,14 +63,15 @@ class AmazonProductPropertyFactoryTest(TestCase):
             multi_tenant_company=self.multi_tenant_company,
         )
         PropertySelectValueTranslation.objects.create(
-            property_select_value=self.product_type_value,
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=self.product_type_value,
             language=self.multi_tenant_company.language,
             value="Chair",
         )
-        self.rule = ProductPropertiesRule.objects.create(
+        self.rule = ProductPropertiesRule.objects.filter(
             product_type=self.product_type_value,
             multi_tenant_company=self.multi_tenant_company,
-        )
+        ).first()
 
         # Create product
         self.product = baker.make(
@@ -95,6 +95,7 @@ class AmazonProductPropertyFactoryTest(TestCase):
             multi_tenant_company=self.multi_tenant_company,
         )
         PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             property=self.color_property,
             language=self.multi_tenant_company.language,
             name="Color",
@@ -105,7 +106,8 @@ class AmazonProductPropertyFactoryTest(TestCase):
             multi_tenant_company=self.multi_tenant_company,
         )
         PropertySelectValueTranslation.objects.create(
-            property_select_value=self.color_value,
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=self.color_value,
             language=self.multi_tenant_company.language,
             value="Red",
         )
@@ -118,18 +120,22 @@ class AmazonProductPropertyFactoryTest(TestCase):
 
         # Remote product
         self.remote_product = AmazonProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             local_instance=self.product,
             remote_sku="AMZSKU",
         )
         SalesChannelViewAssign.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             product=self.product,
             sales_channel_view=self.view,
+            sales_channel=self.sales_channel,
             remote_product=self.remote_product,
         )
 
         # Amazon mapping
         self.amazon_property = AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             local_instance=self.color_property,
             code="color",
@@ -138,6 +144,7 @@ class AmazonProductPropertyFactoryTest(TestCase):
             allows_unmapped_values=True,
         )
         self.amazon_product_type = AmazonProductType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             local_instance=self.rule,
             product_type_code="CHAIR",
@@ -168,6 +175,7 @@ class AmazonProductPropertyFactoryTest(TestCase):
             view=self.view,
             get_value_only=True,
         )
+
         body = fac.create_body()
         self.assertIsNone(body)
         expected = {
@@ -229,7 +237,7 @@ class AmazonProductPropertyFactoryTest(TestCase):
             multi_tenant_company=self.multi_tenant_company,
         )
         PropertySelectValueTranslation.objects.create(
-            property_select_value=size_value,
+            propertyselectvalue=size_value,
             language=self.multi_tenant_company.language,
             value="Large",
         )
