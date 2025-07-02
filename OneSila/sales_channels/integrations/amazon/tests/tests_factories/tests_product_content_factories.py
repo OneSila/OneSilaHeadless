@@ -98,11 +98,13 @@ class AmazonProductContentUpdateFactoryTest(TestCase):
         )
         ProductTranslationBulletPoint.objects.create(
             product_translation=self.translation,
+            multi_tenant_company=self.multi_tenant_company,
             text="Point one",
             sort_order=0,
         )
         ProductTranslationBulletPoint.objects.create(
             product_translation=self.translation,
+            multi_tenant_company=self.multi_tenant_company,
             text="Point two",
             sort_order=1,
         )
