@@ -25,33 +25,42 @@ class GetPropertyQuerysetMultiTenantMixin:
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
         multi_tenant_company = get_multi_tenant_company(info)
-        return (
-            queryset.filter(multi_tenant_company=multi_tenant_company)
-            .with_translated_name()
-            .order_by('translated_name')
-        )
+        queryset = queryset.filter(multi_tenant_company=multi_tenant_company)
+
+        if hasattr(queryset, "with_translated_name"):
+            queryset = queryset.with_translated_name().order_by("translated_name")
+        else:
+            queryset = queryset.order_by(*queryset.model._meta.ordering)
+
+        return queryset
 
 
 class GetPropertySelectValueQuerysetMultiTenantMixin:
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
         multi_tenant_company = get_multi_tenant_company(info)
-        return (
-            queryset.filter(multi_tenant_company=multi_tenant_company)
-            .with_translated_value()
-            .order_by('translated_value')
-        )
+        queryset = queryset.filter(multi_tenant_company=multi_tenant_company)
+
+        if hasattr(queryset, "with_translated_value"):
+            queryset = queryset.with_translated_value().order_by("translated_value")
+        else:
+            queryset = queryset.order_by(*queryset.model._meta.ordering)
+
+        return queryset
 
 
 class GetProductQuerysetMultiTenantMixin:
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
         multi_tenant_company = get_multi_tenant_company(info)
-        return (
-            queryset.filter(multi_tenant_company=multi_tenant_company)
-            .with_translated_name()
-            .order_by('translated_name')
-        )
+        queryset = queryset.filter(multi_tenant_company=multi_tenant_company)
+
+        if hasattr(queryset, "with_translated_name"):
+            queryset = queryset.with_translated_name().order_by("translated_name")
+        else:
+            queryset = queryset.order_by(*queryset.model._meta.ordering)
+
+        return queryset
 
 
 class GetCurrentUserMixin:
