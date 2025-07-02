@@ -9,6 +9,8 @@ class AmazonRemoteValueMixin:
     """Utility methods to obtain remote values for product properties."""
 
     def _get_select_remote_value(self, prop_instance: ProductProperty, remote_property: AmazonProperty):
+
+        # @TODO: MAKE SURE THE VALUES ARE FILTERED BY THE RIGHT LANGUAGE
         if prop_instance.property.type == Property.TYPES.MULTISELECT:
             values = prop_instance.value_multi_select.all()
         else:
@@ -44,6 +46,8 @@ class AmazonRemoteValueMixin:
             return True if value in [True, "true", "1", 1] else False
         if ptype in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
             return self._get_select_remote_value(prop_instance, remote_property)
+
+        # @TODO: MAKE SURE THE TEXT / DESCRIPTION ARE IN THE RIGHT LANGUAGE OF THE MARKETPLACE
         if ptype in [Property.TYPES.TEXT, Property.TYPES.DESCRIPTION]:
             return value
         if ptype == Property.TYPES.DATE:
