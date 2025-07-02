@@ -3,3 +3,4 @@ from .images import (
     AmazonMediaProductThroughUpdateFactory,
     AmazonMediaProductThroughDeleteFactory,
 )
+from .content import AmazonProductContentUpdateFactory
