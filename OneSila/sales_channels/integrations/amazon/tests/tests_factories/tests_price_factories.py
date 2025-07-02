@@ -40,7 +40,6 @@ class AmazonPriceUpdateFactoryTest(TestCase):
             sales_channel_view=self.view,
             local_instance=self.currency,
             remote_code=self.currency.iso_code,
-            is_default=True,
         )
         self.product = baker.make(
             "products.Product",
