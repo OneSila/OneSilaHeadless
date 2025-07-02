@@ -90,17 +90,17 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin, AmazonListingIssuesMixin)
         return True
 
 
-class AmazonMediaProductThroughCreateFactory(
-    AmazonMediaProductThroughBase, RemoteMediaProductThroughCreateFactory
-):
+class AmazonMediaProductThroughCreateFactory(AmazonMediaProductThroughBase, RemoteMediaProductThroughCreateFactory):
     def create_remote(self):
         body = self.build_body()
         return self.patch_listings(body)
 
     def customize_remote_instance_data(self):
         self.remote_instance_data["remote_product"] = self.remote_product
-        self.remote_instance_data["current_position"] = self.local_instance.sort_order
         return self.remote_instance_data
+
+    def set_remote_id(self, response):
+        pass
 
 
 class AmazonMediaProductThroughUpdateFactory(
@@ -114,7 +114,6 @@ class AmazonMediaProductThroughUpdateFactory(
 
     def customize_remote_instance_data(self):
         self.remote_instance_data["remote_product"] = self.remote_product
-        self.remote_instance_data["current_position"] = self.local_instance.sort_order
         return self.remote_instance_data
 
 
