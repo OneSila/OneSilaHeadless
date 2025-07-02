@@ -16,13 +16,16 @@ class ProductQuerySet(MultiTenantQuerySet):
     def filter_has_prices(self):
         return self.filter(type__in=self.model.HAS_PRICES_TYPES)
 
-    def with_translated_name(self):
+    def with_translated_name(self, language_code=None):
         from .models import ProductTranslation
 
         return self.annotate(
             translated_name=Subquery(
                 ProductTranslation.objects
-                .filter(product=OuterRef('pk'))
+                .filter(
+                    product=OuterRef('pk'),
+                    language=language_code
+                )
                 .order_by('name')
                 .values('name')[:1]
             )
