@@ -127,6 +127,12 @@ class AmazonSalesChannelView(SalesChannelView):
         blank=True,
     )
 
+    @property
+    def language_tag(self) -> str | None:
+        """Return the first remote language code for this marketplace."""
+        lang = self.remote_languages.first()
+        return lang.remote_code if lang else None
+
 
 class AmazonRemoteLanguage(RemoteLanguage):
     """Amazon remote language linked to a marketplace."""
