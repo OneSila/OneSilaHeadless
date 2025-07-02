@@ -23,10 +23,8 @@ TOKEN_RE = re.compile(r"%([a-z_]+):([^%]+)%")
 
 
 class AmazonProductPropertyBase(GetAmazonAPIMixin, AmazonRemoteValueMixin, AmazonListingIssuesMixin):
-    def __init__(self, sales_channel, local_instance, remote_product, view, api=None, remote_instance=None, get_value_only=False, skip_checks=False, language=None):
-        self.view = view
-        super().__init__(sales_channel=sales_channel, local_instance=local_instance, remote_product=remote_product, api=api,
-              remote_instance=remote_instance, get_value_only=get_value_only, skip_checks=skip_checks, language=language)
+    """Common helpers for Amazon product property factories."""
+    pass
 
     # ------------------------------------------------------------------
     # Helpers
@@ -145,6 +143,10 @@ class AmazonProductPropertyBase(GetAmazonAPIMixin, AmazonRemoteValueMixin, Amazo
 class AmazonProductPropertyCreateFactory(AmazonProductPropertyBase, RemoteProductPropertyCreateFactory):
     remote_model_class = AmazonProductProperty
 
+    def __init__(self, sales_channel, local_instance, remote_product, view, api=None, skip_checks=False, get_value_only=False, language=None):
+        self.view = view
+        super().__init__(sales_channel, local_instance, remote_product=remote_product, api=api, skip_checks=skip_checks, get_value_only=get_value_only, language=language)
+
     def create_remote(self):
         body = self.create_body()
         if body is None:
@@ -170,6 +172,11 @@ class AmazonProductPropertyCreateFactory(AmazonProductPropertyBase, RemoteProduc
 class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBase, RemoteProductPropertyUpdateFactory):
     remote_model_class = AmazonProductProperty
     create_factory_class = AmazonProductPropertyCreateFactory
+
+    def __init__(self, sales_channel, local_instance, remote_product, view, api=None, get_value_only=False, remote_instance=None, skip_checks=False, language=None):
+        self.view = view
+        super().__init__(sales_channel, local_instance, remote_product=remote_product, api=api,
+              get_value_only=get_value_only, remote_instance=remote_instance, skip_checks=skip_checks, language=language)
 
     def update_remote(self):
         body = self.create_body()
@@ -208,6 +215,10 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBase, RemoteProduc
 class AmazonProductPropertyDeleteFactory(AmazonProductPropertyBase, RemoteProductPropertyDeleteFactory):
     remote_model_class = AmazonProductProperty
     delete_remote_instance = True
+
+    def __init__(self, sales_channel, local_instance, remote_product, view, api=None, remote_instance=None):
+        self.view = view
+        super().__init__(sales_channel, local_instance, remote_product=remote_product, api=api, remote_instance=remote_instance)
 
     def delete_remote(self):
         listings = ListingsApi(self._get_client())
