@@ -52,6 +52,8 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
                 },
             }
 
+            self.body = body
+
             resp = listings.patch_listings_item(
                 seller_id=self.sales_channel.remote_id,
                 sku=self.remote_product.remote_sku,
