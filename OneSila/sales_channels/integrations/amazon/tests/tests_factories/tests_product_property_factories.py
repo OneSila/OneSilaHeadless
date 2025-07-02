@@ -230,6 +230,7 @@ class AmazonProductPropertyFactoryTest(TestCase):
             property=size_property,
             language=self.multi_tenant_company.language,
             name="Size",
+            multi_tenant_company=self.multi_tenant_company,
         )
         size_value = baker.make(
             PropertySelectValue,
@@ -240,6 +241,7 @@ class AmazonProductPropertyFactoryTest(TestCase):
             propertyselectvalue=size_value,
             language=self.multi_tenant_company.language,
             value="Large",
+            multi_tenant_company=self.multi_tenant_company,
         )
         prop_instance = ProductProperty.objects.create(
             product=self.product,
