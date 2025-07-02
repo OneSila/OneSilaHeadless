@@ -12,7 +12,7 @@ from sales_channels.integrations.amazon.models.sales_channels import (
 )
 from sales_channels.integrations.amazon.models.products import AmazonProduct
 from sales_channels.integrations.amazon.models import AmazonPrice, AmazonCurrency
-from sales_channels.integrations.amazon.factories.prices import AmazonPriceUpdateFactory
+from sales_channels.integrations.amazon.factories.prices.prices import AmazonPriceUpdateFactory
 
 
 class AmazonPriceUpdateFactoryTest(TestCase):
@@ -76,17 +76,22 @@ class AmazonPriceUpdateFactoryTest(TestCase):
             price_data={},
         )
 
-    def test_update_factory_builds_correct_body(self):
+    @patch("sales_channels.integrations.amazon.factories.prices.prices.ListingsApi")
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    def test_update_factory_builds_correct_body(self, mock_client, mock_listings):
+        mock_instance = mock_listings.return_value
+        mock_instance.patch_listings_item.side_effect = Exception("no amazon")
+
         factory = AmazonPriceUpdateFactory(
             sales_channel=self.sales_channel,
             local_instance=self.product,
             remote_product=self.remote_product,
             view=self.view,
         )
-        with patch("spapi.ListingsApi.__init__", return_value=None), patch(
-            "spapi.ListingsApi.patch_listings_item", return_value=MagicMock(issues=[]) 
-        ):
+
+        with self.assertRaises(Exception):
             factory.run()
+
         expected = {
             "productType": "CHAIR",
             "requirements": "LISTING",
@@ -99,4 +104,6 @@ class AmazonPriceUpdateFactoryTest(TestCase):
                 ],
             },
         }
-        self.assertEqual(factory.body, expected)
+
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        self.assertEqual(body, expected)
