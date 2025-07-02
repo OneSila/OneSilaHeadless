@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.db.models import Subquery, OuterRef
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from core.managers import MultiTenantManager, MultiTenantQuerySet
@@ -68,6 +69,18 @@ class PropertyQuerySet(MultiTenantQuerySet):
 
         super().delete(*args, **kwargs)
 
+
+    def with_translated_name(self):
+        from .models import PropertyTranslation
+
+        return self.annotate(
+            translated_name=Subquery(
+                PropertyTranslation.objects
+                .filter(property=OuterRef('pk'))
+                .order_by('name')
+                .values('name')[:1]
+            )
+        )
 
 class PropertyManager(MultiTenantManager):
     def get_queryset(self):
