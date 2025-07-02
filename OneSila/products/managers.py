@@ -1,5 +1,6 @@
 from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin, \
     QuerySetProxyModelMixin, MultiTenantQuerySet, MultiTenantManager
+from django.db.models import Subquery, OuterRef
 
 
 class ProductQuerySet(MultiTenantQuerySet):
@@ -14,6 +15,18 @@ class ProductQuerySet(MultiTenantQuerySet):
 
     def filter_has_prices(self):
         return self.filter(type__in=self.model.HAS_PRICES_TYPES)
+
+    def with_translated_name(self):
+        from .models import ProductTranslation
+
+        return self.annotate(
+            translated_name=Subquery(
+                ProductTranslation.objects
+                .filter(product=OuterRef('pk'))
+                .order_by('name')
+                .values('name')[:1]
+            )
+        )
 
     def filter_by_properties_rule(self, rule):
         from properties.models import ProductProperty

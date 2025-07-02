@@ -21,6 +21,39 @@ class GetQuerysetMultiTenantMixin:
         return queryset.filter(multi_tenant_company=multi_tenant_company).order_by(*ordering)
 
 
+class GetPropertyQuerysetMultiTenantMixin:
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        multi_tenant_company = get_multi_tenant_company(info)
+        return (
+            queryset.filter(multi_tenant_company=multi_tenant_company)
+            .with_translated_name()
+            .order_by('translated_name')
+        )
+
+
+class GetPropertySelectValueQuerysetMultiTenantMixin:
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        multi_tenant_company = get_multi_tenant_company(info)
+        return (
+            queryset.filter(multi_tenant_company=multi_tenant_company)
+            .with_translated_value()
+            .order_by('translated_value')
+        )
+
+
+class GetProductQuerysetMultiTenantMixin:
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        multi_tenant_company = get_multi_tenant_company(info)
+        return (
+            queryset.filter(multi_tenant_company=multi_tenant_company)
+            .with_translated_name()
+            .order_by('translated_name')
+        )
+
+
 class GetCurrentUserMixin:
     @classmethod
     def get_current_user(self, info, fail_silently=False):
