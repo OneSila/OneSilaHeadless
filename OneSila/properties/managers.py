@@ -69,7 +69,6 @@ class PropertyQuerySet(MultiTenantQuerySet):
 
         super().delete(*args, **kwargs)
 
-
     def with_translated_name(self):
         from .models import PropertyTranslation
 
@@ -81,6 +80,7 @@ class PropertyQuerySet(MultiTenantQuerySet):
                 .values('name')[:1]
             )
         )
+
 
 class PropertyManager(MultiTenantManager):
     def get_queryset(self):
@@ -107,6 +107,18 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
                   "Please delete the product type rule to remove them."))
 
         return super().delete(*args, **kwargs)
+
+    def with_translated_value(self):
+        from .models import PropertySelectValueTranslation
+
+        return self.annotate(
+            translated_value=Subquery(
+                PropertySelectValueTranslation.objects
+                .filter(propertyselectvalue=OuterRef('pk'))
+                .order_by('value')
+                .values('value')[:1]
+            )
+        )
 
 
 class PropertySelectValueManager(MultiTenantManager):
