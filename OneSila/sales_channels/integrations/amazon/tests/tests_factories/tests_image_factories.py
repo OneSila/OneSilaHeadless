@@ -17,6 +17,8 @@ from sales_channels.integrations.amazon.models.products import (
 )
 from sales_channels.integrations.amazon.factories.products.images import (
     AmazonMediaProductThroughCreateFactory,
+    AmazonMediaProductThroughUpdateFactory,
+    AmazonMediaProductThroughDeleteFactory,
     AmazonMediaProductThroughBase,
 )
 
@@ -125,3 +127,73 @@ class AmazonProductImageFactoryTest(TestCase):
             sales_channel=self.sales_channel,
         ).count()
         self.assertEqual(cnt, 2)
+
+    def test_update_factory_value_only(self):
+        remote_instance = AmazonImageProductAssociation.objects.create(
+            sales_channel=self.sales_channel,
+            local_instance=self.throughs[0],
+            remote_product=self.remote_product,
+        )
+
+        urls = ["https://example.com/updated1.jpg", "https://example.com/updated2.jpg"]
+        expected_attrs = {}
+        for idx, key in enumerate(AmazonMediaProductThroughBase.OFFER_KEYS):
+            expected_attrs[key] = (
+                [{"media_location": urls[idx]}] if idx < len(urls) else None
+            )
+        for idx, key in enumerate(AmazonMediaProductThroughBase.PRODUCT_KEYS):
+            expected_attrs[key] = (
+                [{"media_location": urls[idx]}] if idx < len(urls) else None
+            )
+
+        with patch.object(
+            AmazonMediaProductThroughBase, "_get_images", return_value=urls
+        ):
+            fac = AmazonMediaProductThroughUpdateFactory(
+                sales_channel=self.sales_channel,
+                local_instance=self.throughs[0],
+                remote_product=self.remote_product,
+                remote_instance=remote_instance,
+                view=self.view,
+                get_value_only=True,
+            )
+            body = fac.build_body()
+            self.assertEqual(body["attributes"], expected_attrs)
+            fac.run()
+
+        cnt = AmazonImageProductAssociation.objects.filter(
+            remote_product=self.remote_product,
+            sales_channel=self.sales_channel,
+        ).count()
+        self.assertEqual(cnt, 1)
+
+    def test_delete_factory_value_only(self):
+        remote_instance = AmazonImageProductAssociation.objects.create(
+            sales_channel=self.sales_channel,
+            local_instance=self.throughs[0],
+            remote_product=self.remote_product,
+        )
+
+        keys = (
+            list(AmazonMediaProductThroughBase.OFFER_KEYS)
+            + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+        )
+        expected_attrs = {key: None for key in keys}
+
+        with patch.object(
+            AmazonMediaProductThroughBase, "_get_images", return_value=[]
+        ):
+            fac = AmazonMediaProductThroughDeleteFactory(
+                sales_channel=self.sales_channel,
+                local_instance=self.throughs[0],
+                remote_product=self.remote_product,
+                remote_instance=remote_instance,
+                view=self.view,
+                get_value_only=True,
+            )
+            body = fac.build_body()
+            self.assertEqual(body["attributes"], expected_attrs)
+            fac.run()
+
+        exists = AmazonImageProductAssociation.objects.filter(id=remote_instance.id).exists()
+        self.assertFalse(exists)
