@@ -1,3 +1,9 @@
+from typing import Optional
+
+from django.db import models
+from strawberry_django import order_field, Ordering
+
+from core.schema.core.helpers import get_multi_tenant_company
 from core.schema.core.types.ordering import order
 from core.schema.core.types.types import auto
 
@@ -18,11 +24,21 @@ from products.models import (
 class ProductOrder:
     id: auto
     sku: auto
-    translations: auto
-    translations__name: auto
     active: auto
     created_at: auto
     updated_at: auto
+
+    @order_field
+    def name(
+        self,
+        queryset,
+        info,
+        value: Ordering,
+        prefix: str,
+    ) -> tuple[models.QuerySet, list[str]]:
+        multi_tenant_company = get_multi_tenant_company(info)
+        queryset = queryset.with_translated_name(multi_tenant_company.language)
+        return queryset, [value.resolve(f"{prefix}translated_name")]
 
 
 @order(BundleProduct)

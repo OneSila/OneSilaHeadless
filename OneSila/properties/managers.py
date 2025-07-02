@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.db.models import Subquery, OuterRef
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from core.managers import MultiTenantManager, MultiTenantQuerySet
@@ -68,6 +69,21 @@ class PropertyQuerySet(MultiTenantQuerySet):
 
         super().delete(*args, **kwargs)
 
+    def with_translated_name(self, language_code=None):
+        from .models import PropertyTranslation
+
+        return self.annotate(
+            translated_name=Subquery(
+                PropertyTranslation.objects
+                .filter(
+                    property=OuterRef('pk'),
+                    language=language_code
+                )
+                .order_by('name')
+                .values('name')[:1]
+            )
+        )
+
 
 class PropertyManager(MultiTenantManager):
     def get_queryset(self):
@@ -94,6 +110,21 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
                   "Please delete the product type rule to remove them."))
 
         return super().delete(*args, **kwargs)
+
+    def with_translated_value(self, language_code=None):
+        from .models import PropertySelectValueTranslation
+
+        return self.annotate(
+            translated_value=Subquery(
+                PropertySelectValueTranslation.objects
+                .filter(
+                    propertyselectvalue=OuterRef('pk'),
+                    language=language_code,
+                )
+                .order_by('value')
+                .values('value')[:1]
+            )
+        )
 
 
 class PropertySelectValueManager(MultiTenantManager):
