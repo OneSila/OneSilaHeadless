@@ -29,7 +29,7 @@ from sales_channels.integrations.amazon.factories.sync.select_value_sync import 
 )
 
 
-class SyncFactoriesTest(TestCase):
+class AmazonSyncFactoriesTest(TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = AmazonSalesChannel.objects.create(

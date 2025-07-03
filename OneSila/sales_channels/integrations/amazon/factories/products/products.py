@@ -29,7 +29,7 @@ from sales_channels.integrations.amazon.factories.products.content import (
 from sales_channels.integrations.amazon.models.products import (
     AmazonProduct,
 )
-from sales_channels.integrations.amazon.models.properties import AmazonProductProperty
+from sales_channels.integrations.amazon.models.properties import AmazonProductProperty, AmazonProperty
 from sales_channels.integrations.amazon.models import AmazonCurrency
 from sales_channels.exceptions import SwitchedToCreateException, SwitchedToSyncException
 from spapi import ListingsApi
@@ -85,15 +85,17 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
     # Helpers
     # ------------------------------------------------------------
     def _get_asin(self) -> str | None:
-        try:
-            prop = Property.objects.get(
-                internal_name="amazon_asin",
-                multi_tenant_company=self.sales_channel.multi_tenant_company,
-            )
-        except Property.DoesNotExist:
+        amazon_prop = AmazonProperty.objects.get(
+            code="merchant_suggested_asin",
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            sales_channel=self.sales_channel,
+        )
+
+        if amazon_prop.local_instance is None:
             return None
 
-        pp = ProductProperty.objects.filter(product=self.local_instance, property=prop).first()
+
+        pp = ProductProperty.objects.filter(product=self.local_instance, property=amazon_prop.local_instance).first()
         return pp.get_value() if pp else None
 
     def _get_ean_for_payload(self) -> str | None:
