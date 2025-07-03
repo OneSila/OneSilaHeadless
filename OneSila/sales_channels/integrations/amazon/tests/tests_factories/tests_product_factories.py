@@ -10,6 +10,13 @@ from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonRemoteLanguage,
 )
 from sales_channels.integrations.amazon.models.products import AmazonProduct
+from sales_channels.integrations.amazon.models.properties import AmazonProperty
+from properties.models import (
+    Property,
+    PropertyTranslation,
+    ProductProperty,
+    ProductPropertyTextTranslation,
+)
 from sales_channels.integrations.amazon.factories.products import (
     AmazonProductCreateFactory,
     AmazonProductUpdateFactory,
@@ -41,6 +48,37 @@ class AmazonProductFactoriesTest(TestCase):
             sku="TESTSKU",
             type="SIMPLE",
             multi_tenant_company=self.multi_tenant_company,
+        )
+        # create asin property and assign to product so factories can fetch it
+        asin_local = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+            internal_name="amazon_asin",
+            non_deletable=True,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=asin_local,
+            language=self.multi_tenant_company.language,
+            name="Amazon Asin",
+        )
+        pp = ProductProperty.objects.create(
+            product=self.product,
+            property=asin_local,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductPropertyTextTranslation.objects.create(
+            product_property=pp,
+            language=self.multi_tenant_company.language,
+            value_text="ASIN123",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=asin_local,
+            code="merchant_suggested_asin",
+            type=Property.TYPES.TEXT,
         )
         self.remote_product = AmazonProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
