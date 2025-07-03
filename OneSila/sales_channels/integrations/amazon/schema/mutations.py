@@ -91,7 +91,7 @@ class AmazonSalesChannelMutation:
     create_amazon_import_process: AmazonSalesChannelImportType = create(AmazonSalesChannelImportInput)
     update_amazon_import_process: AmazonSalesChannelImportType = update(AmazonSalesChannelImportPartialInput)
 
-    @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def bulk_update_amazon_property_select_value_local_instance(
         self,
         instance: BulkAmazonPropertySelectValueLocalInstanceInput,
