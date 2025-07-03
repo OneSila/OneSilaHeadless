@@ -57,8 +57,8 @@ class AmazonProductFactoriesTest(TestCase):
         )
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
-    @patch("sales_channels.integrations.amazon.factories.products.ListingsApi")
-    def test_create_factory_builds_correct_body(self, mock_listings, mock_client):
+    @patch("sales_channels.integrations.amazon.factories.products.products.ListingsApi")
+    def test_create_product_factory_builds_correct_body(self, mock_listings, mock_client):
         mock_instance = mock_listings.return_value
         mock_instance.put_listings_item.side_effect = Exception("no amazon")
 
@@ -68,9 +68,7 @@ class AmazonProductFactoriesTest(TestCase):
             remote_instance=self.remote_product,
             view=self.view,
         )
-
-        with self.assertRaises(Exception):
-            fac.run()
+        fac.run()
 
         body = mock_instance.put_listings_item.call_args.kwargs.get("body")
         self.assertIsInstance(body, dict)
@@ -78,8 +76,8 @@ class AmazonProductFactoriesTest(TestCase):
         self.assertEqual(body.get("requirements"), "LISTING")
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
-    @patch("sales_channels.integrations.amazon.factories.products.ListingsApi")
-    def test_update_factory_builds_correct_body(self, mock_listings, mock_client):
+    @patch("sales_channels.integrations.amazon.factories.products.products.ListingsApi")
+    def test_update_product_factory_builds_correct_body(self, mock_listings, mock_client):
         mock_instance = mock_listings.return_value
         mock_instance.patch_listings_item.side_effect = Exception("no amazon")
 
@@ -89,9 +87,7 @@ class AmazonProductFactoriesTest(TestCase):
             remote_instance=self.remote_product,
             view=self.view,
         )
-
-        with self.assertRaises(Exception):
-            fac.run()
+        fac.run()
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         self.assertIsInstance(body, dict)

@@ -55,6 +55,23 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
 
     field_mapping = {}
 
+    def get_sync_product_factory(self):
+        from sales_channels.integrations.amazon.factories.products import AmazonProductSyncFactory
+        return AmazonProductSyncFactory
+
+    def get_create_product_factory(self):
+        from sales_channels.integrations.amazon.factories.products import AmazonProductCreateFactory
+        return AmazonProductCreateFactory
+
+    def get_delete_product_factory(self):
+        from sales_channels.integrations.amazon.factories.products import AmazonProductDeleteFactory
+        return AmazonProductDeleteFactory
+
+    # Expose as properties
+    sync_product_factory = property(get_sync_product_factory)
+    create_product_factory = property(get_create_product_factory)
+    delete_product_factory = property(get_delete_product_factory)
+
     def __init__(self, *args, view=None, **kwargs):
         if view is None:
             raise ValueError("AmazonProduct factories require a view argument")
@@ -302,6 +319,17 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
         remote_image_assoc.delete()
         return True
 
+    def run_create_flow(self):
+        """
+        Method to create the product if it was not created when we tried to sync it
+        """
+        if self.create_product_factory is None:
+            raise ValueError("create_product_factory must be specified in the RemoteProductSyncFactory.")
+
+        fac = self.create_product_factory(self.sales_channel, self.local_instance, api=self.api, view=self.view)
+        fac.run()
+        self.remote_instance = fac.remote_instance
+
 
 class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFactory):
     fixing_identifier_class = AmazonProductBaseFactory
@@ -352,7 +380,7 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
 
 class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactory):
     """Sync Amazon products using marketplace-specific create or update."""
-    
+    create_product_factory = AmazonProductCreateFactory
 
 class AmazonProductDeleteFactory(GetAmazonAPIMixin, RemoteProductDeleteFactory):
     remote_model_class = AmazonProduct
