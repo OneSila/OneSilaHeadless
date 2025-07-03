@@ -20,6 +20,21 @@ class AmazonProduct(RemoteProduct):
         help_text="ASIN identifier for the product.",
     )
 
+    # keep track of which marketplace listings have been created
+    created_marketplaces = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of Amazon marketplace IDs where the product was created.",
+    )
+
+    # store the EAN code used on creation as it cannot be changed later
+    ean_code = models.CharField(
+        max_length=14,
+        null=True,
+        blank=True,
+        help_text="EAN code used when the product was first created.",
+    )
+
 
 class AmazonInventory(RemoteInventory):
     """Amazon specific remote inventory."""
