@@ -102,17 +102,12 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
     # Helpers
     # ------------------------------------------------------------
     def _get_asin(self) -> str | None:
-        amazon_prop = AmazonProperty.objects.get(
-            code="merchant_suggested_asin",
+        asin_property = Property.objects.get(
+            internal_name="amazon_asin",
             multi_tenant_company=self.sales_channel.multi_tenant_company,
-            sales_channel=self.sales_channel,
         )
 
-        if amazon_prop.local_instance is None:
-            return None
-
-
-        pp = ProductProperty.objects.filter(product=self.local_instance, property=amazon_prop.local_instance).first()
+        pp = ProductProperty.objects.filter(product=self.local_instance, property=asin_property).first()
         return pp.get_value() if pp else None
 
     def _get_ean_for_payload(self) -> str | None:
@@ -372,6 +367,7 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
             self.remote_instance.created_marketplaces.append(self.view.remote_id)
             if not self.remote_instance.ean_code:
                 self.remote_instance.ean_code = self._get_ean_for_payload()
+
             self.remote_instance.save(update_fields=["created_marketplaces", "ean_code"])
 
     def serialize_response(self, response):
