@@ -79,6 +79,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
         super().__init__(*args, **kwargs)
         self.attributes: Dict = {}
         self.image_attributes: Dict = {}
+        self.prices_data = {}
 
     # ------------------------------------------------------------
     # Preflight & initialization helpers
@@ -252,16 +253,17 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
         }
 
     def process_content_translation(self, short_description, description, url_key, remote_language):
-        fac = AmazonProductContentUpdateFactory(
-            sales_channel=self.sales_channel,
-            local_instance=self.local_instance,
-            remote_product=self.remote_instance,
-            view=self.view,
-            api=self.api,
-            skip_checks=True,
-            language=remote_language.local_instance,
-        )
-        fac.run()
+        pass
+        # fac = AmazonProductContentUpdateFactory(
+        #     sales_channel=self.sales_channel,
+        #     local_instance=self.local_instance,
+        #     remote_product=self.remote_instance,
+        #     view=self.view,
+        #     api=self.api,
+        #     skip_checks=True,
+        #     language=remote_language.local_instance,
+        # )
+        # fac.run()
 
     # ------------------------------------------------------------
     # Remote helpers
@@ -324,6 +326,9 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
         fac = self.create_product_factory(self.sales_channel, self.local_instance, api=self.api, view=self.view)
         fac.run()
         self.remote_instance = fac.remote_instance
+
+    def assign_ean_code(self):
+        pass # there is no ean code sync for Amazon. This is used as an identifier and cannot be updated later on
 
 
 class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFactory):

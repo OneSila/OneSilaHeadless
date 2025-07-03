@@ -2,7 +2,7 @@ from core.models import MultiTenantCompany
 from django.contrib.auth import get_user_model
 from model_bakery import baker
 from django.test import TestCase as DjangoTestCase
-from django.test import TransactionTestCase
+from django.test import TransactionTestCase as DjangoTransactionTestCase
 from .tests_schemas.tests_queries import TransactionTestCaseMixin
 
 from core.demo_data import DemoDataLibrary
@@ -19,6 +19,11 @@ class TestCaseMixin:
 
 class TestCase(TestCaseMixin, DjangoTestCase):
     pass
+
+
+class TransactionTestCase(TestCaseMixin, DjangoTransactionTestCase):
+    pass
+
 
 
 class TestCaseDemoDataMixin:

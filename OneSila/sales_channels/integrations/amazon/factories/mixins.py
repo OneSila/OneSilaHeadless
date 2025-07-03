@@ -5,6 +5,8 @@ from sp_api.base import  SellingApiException
 from spapi import SellersApi, SPAPIConfig, SPAPIClient, DefinitionsApi, ListingsApi
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
+from sales_channels.models import SalesChannelViewAssign
+
 
 class PullAmazonMixin:
 
