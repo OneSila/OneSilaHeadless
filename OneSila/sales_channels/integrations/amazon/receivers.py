@@ -5,11 +5,11 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
 )
-from sales_channels.integrations.amazon.factories.rule_sync import (
+from sales_channels.integrations.amazon.factories.sync.rule_sync import (
     AmazonPropertyRuleItemSyncFactory,
     AmazonProductTypeAsinSyncFactory,
 )
-from sales_channels.integrations.amazon.factories.select_value_sync import (
+from sales_channels.integrations.amazon.factories.sync.select_value_sync import (
     AmazonPropertySelectValuesSyncFactory,
 )
 

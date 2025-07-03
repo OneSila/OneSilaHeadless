@@ -70,6 +70,5 @@ class AmazonPropertySelectValuesSyncFactory:
                 defaults={"value": val.remote_name.strip()},
             )
 
-            if val.local_instance_id != existing_psv.id:
-                val.local_instance = existing_psv
-                val.save(update_fields=["local_instance"])
+            val.local_instance = existing_psv
+            val.save(update_fields=["local_instance"])
