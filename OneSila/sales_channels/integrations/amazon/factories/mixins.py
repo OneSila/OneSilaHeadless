@@ -151,3 +151,90 @@ class GetAmazonAPIMixin:
 
                 if not page_token:
                     break
+
+    def _get_issue_locale(self):
+        from sales_channels.integrations.amazon.models import AmazonRemoteLanguage
+
+        lang = self.sales_channel.multi_tenant_company.language
+        remote_lang = AmazonRemoteLanguage.objects.filter(
+            local_instance=lang, sales_channel_view__sales_channel=self.sales_channel
+        ).first()
+        return remote_lang.remote_code if remote_lang else None
+
+    def _build_common_body(self, product_type, attributes, listing_owner=True):
+        def clean(data):
+            if isinstance(data, dict):
+                return {k: clean(v) for k, v in data.items() if v is not None}
+            if isinstance(data, list):
+                return [clean(v) for v in data if v is not None]
+            return data
+
+        body = {
+            "productType": product_type,
+            "requirements": "LISTING" if listing_owner else "LISTING_OFFER_ONLY",
+            "attributes": clean(attributes),
+            "issueLocale": self._get_issue_locale(),
+        }
+        if settings.DEBUG:
+            body["mode"] = "VALIDATION_PREVIEW"
+        return body
+
+    def create_product(self, sku, marketplace_id, product_type, attributes, listing_owner=True):
+        body = self._build_common_body(product_type, attributes, listing_owner)
+        listings = ListingsApi(self._get_client())
+        response = listings.put_listings_item(
+            seller_id=self.sales_channel.remote_id,
+            sku=sku,
+            marketplace_ids=[marketplace_id],
+            body=body,
+        )
+        return response
+
+    def _build_patches(self, current_attributes, new_attributes):
+        """Generate JSON patches from current and new attributes."""
+
+        def clean(data):
+            if isinstance(data, dict):
+                return {k: clean(v) for k, v in data.items() if v is not None}
+            if isinstance(data, list):
+                return [clean(v) for v in data if v is not None]
+            return data
+
+        patches = []
+        current_attributes = current_attributes or {}
+        new_attributes = new_attributes or {}
+
+        for key, new_value in new_attributes.items():
+            new_value = clean(new_value)
+            current_value = current_attributes.get(key)
+
+            if new_value is None:
+                if key in current_attributes:
+                    patches.append({"op": "delete", "value": [{key: current_value}]})
+            else:
+                if key not in current_attributes:
+                    patches.append({"op": "add", "value": [{key: new_value}]})
+                elif clean(current_value) != new_value:
+                    patches.append({"op": "replace", "value": [{key: new_value}]})
+
+        return patches
+
+    def update_product(self, sku, marketplace_id, product_type, current_attributes, new_attributes):
+        patches = self._build_patches(current_attributes, new_attributes)
+
+        body = {
+            "productType": product_type,
+            "patches": patches,
+            "issueLocale": self._get_issue_locale(),
+        }
+        if settings.DEBUG:
+            body["mode"] = "VALIDATION_PREVIEW"
+
+        listings = ListingsApi(self._get_client())
+        response = listings.patch_listings_item(
+            seller_id=self.sales_channel.remote_id,
+            sku=sku,
+            marketplace_ids=[marketplace_id],
+            body=body,
+        )
+        return response
