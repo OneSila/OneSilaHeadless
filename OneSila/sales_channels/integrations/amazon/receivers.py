@@ -5,9 +5,12 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
 )
-from sales_channels.integrations.amazon.factories.rule_sync import (
+from sales_channels.integrations.amazon.factories.sync.rule_sync import (
     AmazonPropertyRuleItemSyncFactory,
     AmazonProductTypeAsinSyncFactory,
+)
+from sales_channels.integrations.amazon.factories.sync.select_value_sync import (
+    AmazonPropertySelectValuesSyncFactory,
 )
 
 
@@ -48,8 +51,24 @@ def sales_channels__amazon_property__sync_rule_item(sender, instance: AmazonProp
     signal = kwargs.get('signal')
     if signal == post_update and not instance.is_dirty_field('local_instance', check_relationship=True):
         return
+    if signal == post_create and not instance.local_instance:
+        return
 
     sync_factory = AmazonPropertyRuleItemSyncFactory(instance)
+    sync_factory.run()
+
+
+@receiver(post_create, sender='amazon.AmazonProperty')
+@receiver(post_update, sender='amazon.AmazonProperty')
+def sales_channels__amazon_property__auto_map_select_values(sender, instance: AmazonProperty, **kwargs):
+    """Automatically create local select values when duplicates exist across marketplaces."""
+    signal = kwargs.get('signal')
+    if signal == post_update and not instance.is_dirty_field('local_instance', check_relationship=True):
+        return
+    if signal == post_create and not instance.local_instance:
+        return
+
+    sync_factory = AmazonPropertySelectValuesSyncFactory(instance)
     sync_factory.run()
 
 

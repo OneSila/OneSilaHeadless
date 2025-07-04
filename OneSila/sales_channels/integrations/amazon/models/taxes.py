@@ -14,6 +14,6 @@ class AmazonCurrency(RemoteCurrency):
         help_text="The marketplace associated with this remote currency.",
     )
 
-class AmazonVat(RemoteVat):
+class AmazonTaxCode(RemoteVat):
     """Amazon remote VAT."""
     pass

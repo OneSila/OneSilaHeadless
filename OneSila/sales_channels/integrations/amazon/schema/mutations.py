@@ -15,6 +15,7 @@ from sales_channels.integrations.amazon.schema.types.input import (
     AmazonSalesChannelImportPartialInput,
     AmazonDefaultUnitConfiguratorPartialInput,
     AmazonValidateAuthInput,
+    BulkAmazonPropertySelectValueLocalInstanceInput,
 )
 from sales_channels.integrations.amazon.schema.types.types import (
     AmazonSalesChannelType,
@@ -89,3 +90,36 @@ class AmazonSalesChannelMutation:
 
     create_amazon_import_process: AmazonSalesChannelImportType = create(AmazonSalesChannelImportInput)
     update_amazon_import_process: AmazonSalesChannelImportType = update(AmazonSalesChannelImportPartialInput)
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def bulk_update_amazon_property_select_value_local_instance(
+        self,
+        instance: BulkAmazonPropertySelectValueLocalInstanceInput,
+        info: Info,
+    ) -> List[AmazonPropertySelectValueType]:
+        from sales_channels.integrations.amazon.models import AmazonPropertySelectValue
+        from properties.models import PropertySelectValue
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        local_instance = None
+        if instance.local_instance_id:
+            local_instance = PropertySelectValue.objects.get(
+                id=instance.local_instance_id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            )
+
+        value_ids = [gid.node_id for gid in instance.ids]
+
+        values = list(
+            AmazonPropertySelectValue.objects.filter(
+                id__in=value_ids,
+                multi_tenant_company=multi_tenant_company,
+            )
+        )
+
+        for value in values:
+            value.local_instance = local_instance
+            value.save()
+
+        return values

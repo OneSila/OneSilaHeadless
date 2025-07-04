@@ -13,5 +13,5 @@ from .sales_channels import (
     AmazonRemoteLanguage,
     AmazonDefaultUnitConfigurator
 )
-from .taxes import AmazonCurrency, AmazonVat
+from .taxes import AmazonCurrency, AmazonTaxCode
 from .imports import *

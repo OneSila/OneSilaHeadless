@@ -18,7 +18,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonPrice,
     AmazonEanCode,
     AmazonImageProductAssociation,
-    AmazonVat,
+    AmazonTaxCode,
     AmazonDefaultUnitConfigurator,
 )
 from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
@@ -118,8 +118,8 @@ class AmazonImageProductAssociationAdmin(SalesChannelRemoteAdmin):
     pass
 
 
-@admin.register(AmazonVat)
-class AmazonVatAdmin(SalesChannelRemoteAdmin):
+@admin.register(AmazonTaxCode)
+class AmazonTaxCodeAdmin(SalesChannelRemoteAdmin):
     pass
 
 
