@@ -236,7 +236,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
             self.attributes.update(data)
             return create_fac.remote_instance.id
 
-
     def build_payload(self):
         super().build_payload()
         # gather image attributes before building payload so they are sent with the product
@@ -328,12 +327,12 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
         self.remote_instance = fac.remote_instance
 
     def assign_ean_code(self):
-        pass # there is no ean code sync for Amazon. This is used as an identifier and cannot be updated later on
+        pass  # there is no ean code sync for Amazon. This is used as an identifier and cannot be updated later on
 
     def set_product_properties(self):
         rule_properties_ids = self.local_instance.get_required_and_optional_properties(product_rule=self.rule).values_list('property_id', flat=True)
-        self.product_properties = (ProductProperty.objects.filter_multi_tenant(self.sales_channel.multi_tenant_company). \
-            filter(product=self.local_instance, property_id__in=rule_properties_ids). \
+        self.product_properties = (ProductProperty.objects.filter_multi_tenant(self.sales_channel.multi_tenant_company).
+            filter(product=self.local_instance, property_id__in=rule_properties_ids).
             exclude(property__internal_name='merchant_suggested_asin'))
 
 
@@ -363,12 +362,11 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
     remote_product_eancode_class = None
 
     def perform_remote_action(self):
-        listings = ListingsApi(self._get_client())
-        resp = listings.put_listings_item(
-            seller_id=self.sales_channel.remote_id,
+        resp = self.create_product(
             sku=self.remote_instance.remote_sku,
-            marketplace_ids=[self.view.remote_id],
-            body=self.payload,
+            marketplace_id=self.view.remote_id,
+            product_type=self.remote_type,
+            attributes=self.attributes,
         )
         self.update_assign_issues(getattr(resp, "issues", []))
         return resp
@@ -388,6 +386,7 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
 class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactory):
     """Sync Amazon products using marketplace-specific create or update."""
     create_product_factory = AmazonProductCreateFactory
+
 
 class AmazonProductDeleteFactory(GetAmazonAPIMixin, RemoteProductDeleteFactory):
     remote_model_class = AmazonProduct
