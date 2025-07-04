@@ -104,7 +104,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         asin_local = Property.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             type=Property.TYPES.TEXT,
-            internal_name="amazon_asin",
+            internal_name="merchant_suggested_asin",
             non_deletable=True,
         )
         PropertyTranslation.objects.create(
@@ -202,9 +202,9 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             local_instance=self.rule,
             product_type_code="CHAIR",
         )
-        self.remote_product.remote_type = "CHAIR"
 
         AmazonDefaultUnitConfigurator.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             marketplace=self.view,
             name="Item Package Weight Unit",
@@ -212,6 +212,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             selected_unit="grams",
         )
         AmazonDefaultUnitConfigurator.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             marketplace=self.view,
             name="Battery Weight Unit",
@@ -607,28 +608,31 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         self.assertIsInstance(body, dict)
         self.assertEqual(body.get("requirements"), "LISTING")
 
-
-    def test_create_product_factory_builds_correct_payload(self):
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.products.products.ListingsApi")
+    def test_create_product_factory_builds_correct_payload(self, mock_listings, mock_get_images, mock_get_client):
         """This test checks if the CreateFactory gives the expected payload including attributes, prices, and content."""
-        url = "https://example.com/img.jpg"
-        with patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=[url]):
-            with patch("sales_channels.integrations.amazon.factories.products.products.ListingsApi") as mock_listings:
-                mock_instance = mock_listings.return_value
-                fac = AmazonProductCreateFactory(
-                    sales_channel=self.sales_channel,
-                    local_instance=self.product,
-                    remote_instance=self.remote_product,
-                    view=self.view,
-                )
-                fac.run()
+        mock_instance = mock_listings.return_value
+        url = 'https://example.com/img.jpg'
 
-                body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
 
         keys = list(AmazonMediaProductThroughBase.OFFER_KEYS) + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
         expected_images = {
-            key: ([{"media_location": url}] if idx == 0 else None)
-            for idx, key in enumerate(keys)
+            key: ([{"media_location": url}] if key in ("main_offer_image_locator",
+                                                       "main_product_image_locator") else None)
+            for key in keys
         }
+
         expected_attributes = {
             "merchant_suggested_asin": "ASIN123",
             "item_name": "Chair name",
@@ -673,6 +677,10 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             "attributes": expected_attributes,
         }
 
+        import pprint
+        print('-----------------------')
+        pprint.pprint(body)
+        pprint.pprint(expected_body)
         self.assertEqual(body, expected_body)
 
 

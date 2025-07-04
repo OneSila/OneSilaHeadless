@@ -5,6 +5,9 @@ from model_bakery import baker
 
 from core.tests import TestCase
 from media.models import Media, MediaProductThrough
+from properties.models import PropertySelectValue, PropertySelectValueTranslation, ProductPropertiesRule, Property, \
+    ProductProperty
+from sales_channels.integrations.amazon.models import AmazonProductType
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonSalesChannel,
@@ -59,8 +62,35 @@ class AmazonProductImageFactoryTest(TestCase):
             local_instance=self.product,
             remote_sku="AMZSKU",
         )
-        # set remote_type attribute used by factories
-        self.remote_product.remote_type = "PRODUCT"
+        self.product_type_property = Property.objects.filter(is_product_type=True, multi_tenant_company=self.multi_tenant_company).first()
+
+        self.product_type_value = baker.make(
+            PropertySelectValue,
+            property=self.product_type_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=self.product_type_value,
+            language=self.multi_tenant_company.language,
+            value="Chair",
+        )
+        self.rule = ProductPropertiesRule.objects.filter(
+            product_type=self.product_type_value,
+            multi_tenant_company=self.multi_tenant_company,
+        ).first()
+        ProductProperty.objects.create(
+            product=self.product,
+            property=self.product_type_property,
+            value_select=self.product_type_value,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        AmazonProductType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.rule,
+            product_type_code="CHAIR",
+        )
 
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,

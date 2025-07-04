@@ -4,6 +4,8 @@ from model_bakery import baker
 from core.tests import TestCase
 from currencies.models import Currency
 from currencies.currencies import currencies
+from properties.models import Property, PropertySelectValue, PropertySelectValueTranslation, ProductPropertiesRule, \
+    ProductProperty
 from sales_prices.models import SalesPrice
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
@@ -11,7 +13,7 @@ from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonSalesChannelView,
 )
 from sales_channels.integrations.amazon.models.products import AmazonProduct
-from sales_channels.integrations.amazon.models import AmazonPrice, AmazonCurrency
+from sales_channels.integrations.amazon.models import AmazonPrice, AmazonCurrency, AmazonProductType
 from sales_channels.integrations.amazon.factories.prices.prices import AmazonPriceUpdateFactory
 
 
@@ -61,7 +63,36 @@ class AmazonPriceUpdateFactoryTest(TestCase):
             remote_sku="AMZSKU",
         )
         # remote type is required in the payload
-        self.remote_product.remote_type = "CHAIR"
+        self.product_type_property = Property.objects.filter(is_product_type=True,
+                                                             multi_tenant_company=self.multi_tenant_company).first()
+
+        self.product_type_value = baker.make(
+            PropertySelectValue,
+            property=self.product_type_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=self.product_type_value,
+            language=self.multi_tenant_company.language,
+            value="Chair",
+        )
+        self.rule = ProductPropertiesRule.objects.filter(
+            product_type=self.product_type_value,
+            multi_tenant_company=self.multi_tenant_company,
+        ).first()
+        ProductProperty.objects.create(
+            product=self.product,
+            property=self.product_type_property,
+            value_select=self.product_type_value,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        AmazonProductType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.rule,
+            product_type_code="CHAIR",
+        )
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,

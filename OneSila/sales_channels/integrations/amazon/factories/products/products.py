@@ -104,7 +104,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
     # ------------------------------------------------------------
     def _get_asin(self) -> str | None:
         asin_property = Property.objects.get(
-            internal_name="amazon_asin",
+            internal_name="merchant_suggested_asin",
             multi_tenant_company=self.sales_channel.multi_tenant_company,
         )
 
@@ -329,6 +329,12 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
 
     def assign_ean_code(self):
         pass # there is no ean code sync for Amazon. This is used as an identifier and cannot be updated later on
+
+    def set_product_properties(self):
+        rule_properties_ids = self.local_instance.get_required_and_optional_properties(product_rule=self.rule).values_list('property_id', flat=True)
+        self.product_properties = (ProductProperty.objects.filter_multi_tenant(self.sales_channel.multi_tenant_company). \
+            filter(product=self.local_instance, property_id__in=rule_properties_ids). \
+            exclude(property__internal_name='merchant_suggested_asin'))
 
 
 class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFactory):

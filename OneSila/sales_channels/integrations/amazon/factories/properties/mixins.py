@@ -84,6 +84,7 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin, 
         )
 
     def _get_public_definition(self, product_type: AmazonProductType, main_code: str) -> AmazonPublicDefinition:
+
         return AmazonPublicDefinition.objects.get(
             api_region_code=self.view.api_region_code,
             product_type_code=product_type.product_type_code,
@@ -115,14 +116,14 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin, 
             if kind == "unit":
                 return self._get_unit(code)
             if kind == "value":
-                remote_prop = AmazonProperty.objects.get(
+                self.remote_property = AmazonProperty.objects.get(
                     sales_channel=self.sales_channel, code=code
                 )
-                local_prop = remote_prop.local_instance
+                local_prop = self.remote_property.local_instance
                 prop_instance = ProductProperty.objects.get(
                     product=product, property=local_prop
                 )
-                return self.get_remote_value_for_property(prop_instance, remote_prop)
+                return self.get_remote_value_for_property(prop_instance, self.remote_property)
             return value
 
         def _walk(node):
@@ -182,4 +183,11 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin, 
         }
         self.value = body
         return body
+
+    def preflight_process(self):
+        pass
+
+    def set_remote_id(self, response_data):
+        # the product properties have na remote id
+        pass
 

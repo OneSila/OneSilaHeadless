@@ -175,7 +175,7 @@ class AmazonSyncFactoriesTest(TestCase):
         asin_local = Property.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             type=Property.TYPES.TEXT,
-            internal_name="amazon_asin",
+            internal_name="merchant_suggested_asin",
             non_deletable=True,
         )
         PropertyTranslation.objects.create(
