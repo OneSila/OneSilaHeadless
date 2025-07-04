@@ -161,7 +161,7 @@ class GetAmazonAPIMixin:
         ).first()
         return remote_lang.remote_code if remote_lang else None
 
-    def _build_common_body(self, product_type, attributes, listing_owner=True):
+    def _build_common_body(self, product_type, attributes):
         def clean(data):
             if isinstance(data, dict):
                 return {k: clean(v) for k, v in data.items() if v is not None}
@@ -171,7 +171,7 @@ class GetAmazonAPIMixin:
 
         body = {
             "productType": product_type,
-            "requirements": "LISTING" if listing_owner else "LISTING_OFFER_ONLY",
+            "requirements": "LISTING" if self.sales_channel.listing_owner else "LISTING_OFFER_ONLY",
             "attributes": clean(attributes),
             "issueLocale": self._get_issue_locale(),
         }
@@ -179,8 +179,8 @@ class GetAmazonAPIMixin:
             body["mode"] = "VALIDATION_PREVIEW"
         return body
 
-    def create_product(self, sku, marketplace_id, product_type, attributes, listing_owner=True):
-        body = self._build_common_body(product_type, attributes, listing_owner)
+    def create_product(self, sku, marketplace_id, product_type, attributes):
+        body = self._build_common_body(product_type, attributes)
         listings = ListingsApi(self._get_client())
         response = listings.put_listings_item(
             seller_id=self.sales_channel.remote_id,
