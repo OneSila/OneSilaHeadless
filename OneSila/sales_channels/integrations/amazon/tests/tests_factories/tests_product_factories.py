@@ -1,4 +1,5 @@
 from unittest.mock import patch
+import json
 
 from model_bakery import baker
 
@@ -12,16 +13,39 @@ from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonRemoteLanguage,
 )
 from sales_channels.integrations.amazon.models.products import AmazonProduct
-from sales_channels.integrations.amazon.models.properties import AmazonProperty
+from sales_channels.integrations.amazon.models.properties import (
+    AmazonProperty,
+    AmazonPublicDefinition,
+    AmazonProductType,
+)
+from sales_channels.integrations.amazon.models.sales_channels import (
+    AmazonDefaultUnitConfigurator,
+)
+from sales_channels.integrations.amazon.models import AmazonCurrency
+from sales_prices.models import SalesPrice
+from currencies.models import Currency
+from currencies.currencies import currencies
+from products.models import (
+    ProductTranslation,
+    ProductTranslationBulletPoint,
+)
+from media.models import Media, MediaProductThrough
 from properties.models import (
     Property,
     PropertyTranslation,
     ProductProperty,
-    ProductPropertyTextTranslation, ProductPropertiesRule, PropertySelectValue, PropertySelectValueTranslation,
+    ProductPropertyTextTranslation,
+    ProductPropertiesRule,
+    ProductPropertiesRuleItem,
+    PropertySelectValue,
+    PropertySelectValueTranslation,
 )
 from sales_channels.integrations.amazon.factories.products import (
     AmazonProductCreateFactory,
     AmazonProductUpdateFactory,
+)
+from sales_channels.integrations.amazon.factories.products.images import (
+    AmazonMediaProductThroughBase,
 )
 
 
@@ -121,6 +145,434 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             remote_product=self.remote_product,
         )
 
+        # currency and price
+        self.currency = Currency.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            is_default_currency=True,
+            **currencies["GB"],
+        )
+        AmazonCurrency.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            sales_channel_view=self.view,
+            local_instance=self.currency,
+            remote_code=self.currency.iso_code,
+        )
+        SalesPrice.objects.create(
+            product=self.product,
+            currency=self.currency,
+            rrp=100,
+            price=80,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        # content
+        translation = ProductTranslation.objects.create(
+            product=self.product,
+            sales_channel=self.sales_channel,
+            language=self.multi_tenant_company.language,
+            name="Chair name",
+            description="Chair description",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductTranslationBulletPoint.objects.create(
+            product_translation=translation,
+            multi_tenant_company=self.multi_tenant_company,
+            text="First bullet",
+            sort_order=0,
+        )
+
+        # image
+        media = Media.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Media.IMAGE,
+            owner=self.user,
+        )
+        MediaProductThrough.objects.create(
+            product=self.product,
+            media=media,
+            sort_order=0,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        # product type and remote type
+        AmazonProductType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.rule,
+            product_type_code="CHAIR",
+        )
+        self.remote_product.remote_type = "CHAIR"
+
+        AmazonDefaultUnitConfigurator.objects.create(
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            name="Item Package Weight Unit",
+            code="item_package_weight",
+            selected_unit="grams",
+        )
+        AmazonDefaultUnitConfigurator.objects.create(
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            name="Battery Weight Unit",
+            code="battery__weight",
+            selected_unit="grams",
+        )
+
+        # color property
+        self.color_property = baker.make(
+            Property,
+            type=Property.TYPES.SELECT,
+            internal_name="color",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.color_property,
+            language=self.multi_tenant_company.language,
+            name="Color",
+        )
+        color_value = baker.make(
+            PropertySelectValue,
+            property=self.color_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=color_value,
+            language=self.multi_tenant_company.language,
+            value="Red",
+        )
+        ProductProperty.objects.create(
+            product=self.product,
+            property=self.color_property,
+            value_select=color_value,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.color_property,
+            code="color",
+            type=Property.TYPES.SELECT,
+            allows_unmapped_values=True,
+        )
+
+        # battery properties
+        self.battery_cell = baker.make(
+            Property,
+            type=Property.TYPES.SELECT,
+            internal_name="battery__cell_composition",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.battery_cell,
+            language=self.multi_tenant_company.language,
+            name="Battery Cell Composition",
+        )
+        cell_value = baker.make(
+            PropertySelectValue,
+            property=self.battery_cell,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=cell_value,
+            language=self.multi_tenant_company.language,
+            value="lithium_ion",
+        )
+        ProductProperty.objects.create(
+            product=self.product,
+            property=self.battery_cell,
+            value_select=cell_value,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.battery_cell,
+            code="battery__cell_composition",
+            type=Property.TYPES.SELECT,
+            allows_unmapped_values=True,
+        )
+
+        self.battery_iec = baker.make(
+            Property,
+            type=Property.TYPES.SELECT,
+            internal_name="battery__iec_code",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.battery_iec,
+            language=self.multi_tenant_company.language,
+            name="Battery IEC Code",
+        )
+        iec_value = baker.make(
+            PropertySelectValue,
+            property=self.battery_iec,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=iec_value,
+            language=self.multi_tenant_company.language,
+            value="18650",
+        )
+        ProductProperty.objects.create(
+            product=self.product,
+            property=self.battery_iec,
+            value_select=iec_value,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.battery_iec,
+            code="battery__iec_code",
+            type=Property.TYPES.SELECT,
+            allows_unmapped_values=True,
+        )
+
+        self.battery_weight = baker.make(
+            Property,
+            type=Property.TYPES.FLOAT,
+            internal_name="battery__weight",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.battery_weight,
+            language=self.multi_tenant_company.language,
+            name="Battery Weight",
+        )
+        ProductProperty.objects.create(
+            product=self.product,
+            property=self.battery_weight,
+            value_float=10.0,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.battery_weight,
+            code="battery__weight",
+            type=Property.TYPES.FLOAT,
+        )
+
+        # batteries required
+        self.batteries_required = baker.make(
+            Property,
+            type=Property.TYPES.BOOLEAN,
+            internal_name="batteries_required",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.batteries_required,
+            language=self.multi_tenant_company.language,
+            name="Batteries Required",
+        )
+        ProductProperty.objects.create(
+            product=self.product,
+            property=self.batteries_required,
+            value_boolean=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.batteries_required,
+            code="batteries_required",
+            type=Property.TYPES.BOOLEAN,
+        )
+
+        # condition type
+        self.condition_type = baker.make(
+            Property,
+            type=Property.TYPES.SELECT,
+            internal_name="condition_type",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.condition_type,
+            language=self.multi_tenant_company.language,
+            name="Condition Type",
+        )
+        cond_value = baker.make(
+            PropertySelectValue,
+            property=self.condition_type,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=cond_value,
+            language=self.multi_tenant_company.language,
+            value="new",
+        )
+        ProductProperty.objects.create(
+            product=self.product,
+            property=self.condition_type,
+            value_select=cond_value,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.condition_type,
+            code="condition_type",
+            type=Property.TYPES.SELECT,
+            allows_unmapped_values=True,
+        )
+
+        # item package weight
+        self.item_weight = baker.make(
+            Property,
+            type=Property.TYPES.FLOAT,
+            internal_name="item_package_weight",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.item_weight,
+            language=self.multi_tenant_company.language,
+            name="Item Package Weight",
+        )
+        ProductProperty.objects.create(
+            product=self.product,
+            property=self.item_weight,
+            value_float=2.5,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.item_weight,
+            code="item_package_weight",
+            type=Property.TYPES.FLOAT,
+        )
+
+        # rule items
+        for prop in [
+            self.color_property,
+            self.battery_cell,
+            self.battery_iec,
+            self.battery_weight,
+            self.batteries_required,
+            self.condition_type,
+            self.item_weight,
+        ]:
+            ProductPropertiesRuleItem.objects.get_or_create(
+                multi_tenant_company=self.multi_tenant_company,
+                rule=self.rule,
+                property=prop,
+                defaults={"type": ProductPropertiesRuleItem.OPTIONAL},
+            )
+
+        # public definitions
+        AmazonPublicDefinition.objects.create(
+            api_region_code="EU_UK",
+            product_type_code="CHAIR",
+            code="color",
+            name="Color",
+            usage_definition=json.dumps(
+                {
+                    "color": [
+                        {
+                            "standardized_values": ["%value:color%"],
+                            "value": "%value:color%",
+                            "language_tag": "%auto:language%",
+                            "marketplace_id": "%auto:marketplace_id%",
+                        }
+                    ]
+                }
+            ),
+        )
+        AmazonPublicDefinition.objects.create(
+            api_region_code="EU_UK",
+            product_type_code="CHAIR",
+            code="battery",
+            name="Battery",
+            usage_definition=json.dumps(
+                {
+                    "battery": [
+                        {
+                            "cell_composition": [
+                                {"value": "%value:battery__cell_composition%"}
+                            ],
+                            "cell_composition_other_than_listed": [
+                                {
+                                    "value": "%value:battery__cell_composition%",
+                                    "language_tag": "%auto:language%",
+                                }
+                            ],
+                            "iec_code": [
+                                {"value": "%value:battery__iec_code%"}
+                            ],
+                            "weight": [
+                                {
+                                    "value": "%value:battery__weight%",
+                                    "unit": "%unit:battery__weight%",
+                                }
+                            ],
+                            "marketplace_id": "%auto:marketplace_id%",
+                        }
+                    ]
+                }
+            ),
+        )
+        AmazonPublicDefinition.objects.create(
+            api_region_code="EU_UK",
+            product_type_code="CHAIR",
+            code="batteries_required",
+            name="Batteries Required",
+            usage_definition=json.dumps(
+                {
+                    "batteries_required": [
+                        {
+                            "value": "%value:batteries_required%",
+                            "marketplace_id": "%auto:marketplace_id%",
+                        }
+                    ]
+                }
+            ),
+        )
+        AmazonPublicDefinition.objects.create(
+            api_region_code="EU_UK",
+            product_type_code="CHAIR",
+            code="condition_type",
+            name="Condition Type",
+            usage_definition=json.dumps(
+                {
+                    "condition_type": [
+                        {
+                            "value": "%value:condition_type%",
+                            "marketplace_id": "%auto:marketplace_id%",
+                        }
+                    ]
+                }
+            ),
+        )
+        AmazonPublicDefinition.objects.create(
+            api_region_code="EU_UK",
+            product_type_code="CHAIR",
+            code="item_package_weight",
+            name="Item Package Weight",
+            usage_definition=json.dumps(
+                {
+                    "item_package_weight": [
+                        {
+                            "value": "%value:item_package_weight%",
+                            "unit": "%unit:item_package_weight%",
+                            "marketplace_id": "%auto:marketplace_id%",
+                        }
+                    ]
+                }
+            ),
+        )
+
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch("sales_channels.integrations.amazon.factories.products.products.ListingsApi")
     def test_create_product_factory_builds_correct_body(self, mock_listings, mock_client):
@@ -158,7 +610,70 @@ class AmazonProductFactoriesTest(TransactionTestCase):
 
     def test_create_product_factory_builds_correct_payload(self):
         """This test checks if the CreateFactory gives the expected payload including attributes, prices, and content."""
-        pass
+        url = "https://example.com/img.jpg"
+        with patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=[url]):
+            with patch("sales_channels.integrations.amazon.factories.products.products.ListingsApi") as mock_listings:
+                mock_instance = mock_listings.return_value
+                fac = AmazonProductCreateFactory(
+                    sales_channel=self.sales_channel,
+                    local_instance=self.product,
+                    remote_instance=self.remote_product,
+                    view=self.view,
+                )
+                fac.run()
+
+                body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+
+        keys = list(AmazonMediaProductThroughBase.OFFER_KEYS) + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+        expected_images = {
+            key: ([{"media_location": url}] if idx == 0 else None)
+            for idx, key in enumerate(keys)
+        }
+        expected_attributes = {
+            "merchant_suggested_asin": "ASIN123",
+            "item_name": "Chair name",
+            "product_description": "Chair description",
+            "bullet_point": ["First bullet"],
+            "list_price": [{"currency": "GBP", "amount": 80.0}],
+            "uvp_list_price": [{"currency": "GBP", "amount": 100.0}],
+            **expected_images,
+            "color": [
+                {
+                    "standardized_values": ["Red"],
+                    "value": "Red",
+                    "language_tag": "en",
+                    "marketplace_id": "GB",
+                }
+            ],
+            "battery": [
+                {
+                    "cell_composition": [{"value": "lithium_ion"}],
+                    "cell_composition_other_than_listed": [
+                        {"value": "lithium_ion", "language_tag": "en"}
+                    ],
+                    "iec_code": [{"value": "18650"}],
+                    "weight": [{"value": 10.0, "unit": "grams"}],
+                    "marketplace_id": "GB",
+                }
+            ],
+            "batteries_required": [
+                {"value": True, "marketplace_id": "GB"}
+            ],
+            "condition_type": [
+                {"value": "new", "marketplace_id": "GB"}
+            ],
+            "item_package_weight": [
+                {"value": 2.5, "unit": "grams", "marketplace_id": "GB"}
+            ],
+        }
+
+        expected_body = {
+            "productType": "PRODUCT",
+            "requirements": "LISTING",
+            "attributes": expected_attributes,
+        }
+
+        self.assertEqual(body, expected_body)
 
 
     def test_sync_switches_to_create_if_product_not_exists(self):
