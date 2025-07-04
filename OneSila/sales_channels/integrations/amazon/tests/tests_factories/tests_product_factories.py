@@ -77,7 +77,6 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
         self.product_type_property = Property.objects.filter(is_product_type=True, multi_tenant_company=self.multi_tenant_company).first()
 
-
         self.product_type_value = baker.make(
             PropertySelectValue,
             property=self.product_type_property,
@@ -575,7 +574,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
-    @patch("sales_channels.integrations.amazon.factories.products.products.ListingsApi")
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_create_product_factory_builds_correct_body(self, mock_listings, mock_client):
         mock_instance = mock_listings.return_value
 
@@ -604,13 +603,13 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
         fac.run()
 
-        body = mock_instance.put_listings_item.call_args.kwargs.get("body") # put_listings_item because the create is used
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")  # put_listings_item because the create is used
         self.assertIsInstance(body, dict)
         self.assertEqual(body.get("requirements"), "LISTING")
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
-    @patch("sales_channels.integrations.amazon.factories.products.products.ListingsApi")
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_create_product_factory_builds_correct_payload(self, mock_listings, mock_get_images, mock_get_client):
         """This test checks if the CreateFactory gives the expected payload including attributes, prices, and content."""
         mock_instance = mock_listings.return_value
@@ -683,96 +682,77 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         pprint.pprint(expected_body)
         self.assertEqual(body, expected_body)
 
-
     def test_sync_switches_to_create_if_product_not_exists(self):
         """This test ensures that calling sync triggers a create if the product doesn't exist remotely."""
         pass
-
 
     def test_create_product_on_different_marketplace(self):
         """This test ensures the product is created on a second marketplace correctly and independently using PUT."""
         pass
 
-
     def test_update_product_factory_builds_correct_payload(self):
         """This test checks that the update factory builds a correct patch payload with only changed attributes."""
         pass
-
 
     def test_delete_product_uses_correct_sku_and_marketplace(self):
         """This test ensures delete factory calls the correct endpoint with the proper SKU and marketplace ID."""
         pass
 
-
     def test_update_falls_back_to_create_if_product_missing_remotely(self):
         """This test ensures update falls back to create if the product doesn’t exist remotely in the given marketplace."""
         pass
-
 
     def test_update_images_overwrites_old_ones_correctly(self):
         """This test validates that old images are removed and only the new ones are included in the payload."""
         pass
 
-
     def test_payload_includes_all_supported_property_types(self):
         """This test adds text, select, and multiselect properties and confirms their correct payload structure."""
         pass
-
 
     def test_unmapped_attributes_are_ignored_in_payload(self):
         """This test confirms that unmapped or unknown attributes are not added to the final payload."""
         pass
 
-
     def test_missing_ean_or_asin_raises_exception(self):
         """This test ensures the factory raises ValueError if no EAN/GTIN or ASIN is provided."""
         pass
-
 
     def test_create_product_with_asin_in_payload(self):
         """This test confirms that ASIN is correctly added and EAN is skipped if ASIN exists."""
         pass
 
-
     def test_create_product_with_ean_in_payload(self):
         """This test verifies that EAN is included properly in the absence of ASIN."""
         pass
-
 
     def test_custom_properties_are_processed_correctly(self):
         """This test ensures that various valid custom properties are processed using process_single_property and included in payload."""
         pass
 
-
     def test_existing_remote_property_gets_updated(self):
         """This test simulates an existing remote property and checks that update payload reflects correct values."""
         pass
-
 
     def test_translation_from_sales_channel_is_used_in_payload(self):
         """This test checks that product content is pulled from sales channel translations if available."""
         pass
 
-
     def test_translation_fallbacks_to_global_if_not_in_channel(self):
         """This test ensures fallback to global translation when channel-specific translation is missing."""
         pass
-
 
     def test_price_sync_enabled_includes_price_fields(self):
         """This test ensures that enabling price sync includes correct pricing fields like list_price and uvp_list_price."""
         pass
 
-
     def test_price_sync_disabled_skips_price_fields(self):
         """This test ensures that price fields are skipped when price sync is turned off."""
         pass
 
-
     def test_payload_skips_empty_price_fields_gracefully(self):
         """This test confirms that missing prices do not break payload generation and are omitted silently."""
         pass
-
 
     def test_missing_view_argument_raises_value_error(self):
         """This test confirms that initializing a factory without a view raises ValueError."""
