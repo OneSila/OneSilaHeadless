@@ -8,6 +8,9 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannelImport,
     AmazonDefaultUnitConfigurator,
 )
+from properties.schema.types.input import PropertySelectValuePartialInput
+from strawberry.relay import GlobalID
+from typing import List, Optional
 
 
 @input(AmazonSalesChannel, exclude=['integration_ptr', 'saleschannel_ptr'])
@@ -85,3 +88,9 @@ class AmazonDefaultUnitConfiguratorInput:
 @partial(AmazonDefaultUnitConfigurator, fields="__all__")
 class AmazonDefaultUnitConfiguratorPartialInput(NodeInput):
     pass
+
+
+@strawberry_input
+class BulkAmazonPropertySelectValueLocalInstanceInput:
+    ids: List[GlobalID]
+    local_instance_id: Optional[GlobalID] = None

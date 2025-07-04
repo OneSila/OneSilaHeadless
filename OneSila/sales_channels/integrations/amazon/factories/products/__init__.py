@@ -1,15 +1,12 @@
-from .products import (
+from .images import (
     AmazonMediaProductThroughCreateFactory,
     AmazonMediaProductThroughUpdateFactory,
     AmazonMediaProductThroughDeleteFactory,
+)
+from .content import AmazonProductContentUpdateFactory
+from .products import (
     AmazonProductSyncFactory,
     AmazonProductCreateFactory,
     AmazonProductUpdateFactory,
     AmazonProductDeleteFactory,
-    AmazonProductContentUpdateFactory,
-)
-from .properties import (
-    AmazonProductPropertyCreateFactory,
-    AmazonProductPropertyUpdateFactory,
-    AmazonProductPropertyDeleteFactory,
 )

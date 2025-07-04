@@ -5,6 +5,8 @@ from sp_api.base import  SellingApiException
 from spapi import SellersApi, SPAPIConfig, SPAPIClient, DefinitionsApi, ListingsApi
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
+from sales_channels.models import SalesChannelViewAssign
+
 
 class PullAmazonMixin:
 
@@ -12,6 +14,30 @@ class PullAmazonMixin:
         domain = getattr(marketplace, "domain_name", "")
         name = getattr(marketplace, "name", "").lower()
         return domain.startswith("www.amazon.") and "non-amazon" not in name
+
+
+class AmazonListingIssuesMixin:
+    """Mixin updating SalesChannelViewAssign with issues from SP API."""
+
+    def update_assign_issues(self, issues):
+        if not self.remote_product or not isinstance(self.view, AmazonSalesChannelView):
+            return
+
+        assign = SalesChannelViewAssign.objects.filter(
+            product=self.remote_product.local_instance,
+            sales_channel_view=self.view,
+        ).first()
+        if not assign:
+            return
+
+        if assign.remote_product_id != self.remote_product.id:
+            assign.remote_product = self.remote_product
+
+        assign.issues = [
+            issue.to_dict() if hasattr(issue, "to_dict") else issue
+            for issue in issues or []
+        ]
+        assign.save()
 
 class GetAmazonAPIMixin:
     """Mixin providing an authenticated Amazon SP-API client."""
