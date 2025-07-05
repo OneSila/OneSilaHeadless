@@ -3,7 +3,6 @@ from sales_channels.factories.products.content import RemoteProductContentUpdate
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin, AmazonListingIssuesMixin
 from sales_channels.integrations.amazon.models.products import AmazonProductContent
 from sales_channels.integrations.amazon.models.properties import AmazonProductType
-from spapi import ListingsApi
 
 
 class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, RemoteProductContentUpdateFactory):
@@ -33,24 +32,25 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMi
         )
 
     def customize_payload(self):
+        view_lang = (
+            self.view.remote_languages.first().local_instance
+            if self.view else None
+        )
         lang = (
-            self.language
-            or (self.view.remote_languages.first().local_instance if self.view else None)
-            or self.sales_channel.multi_tenant_company.language
+            self.language or view_lang or self.sales_channel.multi_tenant_company.language
         )
 
-        translation = (
-            ProductTranslation.objects.filter(
-                product=self.local_instance,
-                language=lang,
-                sales_channel=self.sales_channel,
-            ).first()
-            or ProductTranslation.objects.filter(
+        translation = ProductTranslation.objects.filter(
+            product=self.local_instance,
+            language=lang,
+            sales_channel=self.sales_channel,
+        ).first()
+        if not translation:
+            translation = ProductTranslation.objects.filter(
                 product=self.local_instance,
                 language=lang,
                 sales_channel=None,
             ).first()
-        )
 
         if not translation:
             self.payload = {}
@@ -80,12 +80,16 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMi
             "attributes": self.payload,
         }
 
-        listings = ListingsApi(self._get_client())
-        response = listings.patch_listings_item(
-            seller_id=self.sales_channel.remote_id,
-            sku=self.remote_product.remote_sku,
-            marketplace_ids=[self.view.remote_id],
-            body=body,
+        current_attrs = self.get_listing_attributes(
+            self.remote_product.remote_sku,
+            self.view.remote_id,
+        )
+        response = self.update_product(
+            self.remote_product.remote_sku,
+            self.view.remote_id,
+            product_type.product_type_code,
+            current_attrs,
+            body.get("attributes", {}),
         )
         self.update_assign_issues(getattr(response, "issues", []))
 

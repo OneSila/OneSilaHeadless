@@ -1,7 +1,7 @@
 import json
 
 from django.conf import settings
-from sp_api.base import  SellingApiException
+from sp_api.base import SellingApiException
 from spapi import SellersApi, SPAPIConfig, SPAPIClient, DefinitionsApi, ListingsApi
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
@@ -39,6 +39,7 @@ class AmazonListingIssuesMixin:
         ]
         assign.save()
 
+
 class GetAmazonAPIMixin:
     """Mixin providing an authenticated Amazon SP-API client."""
 
@@ -65,6 +66,27 @@ class GetAmazonAPIMixin:
         except SellingApiException as e:
             raise Exception(f"SP-API failed: {e}")
 
+    def get_listing_item(self, sku, marketplace_id):
+        """Return listing item payload for the given sku and marketplace."""
+        listings = ListingsApi(self._get_client())
+        try:
+            resp = listings.get_listings_item(
+                seller_id=self.sales_channel.remote_id,
+                sku=sku,
+                marketplace_ids=[marketplace_id],
+            )
+            return getattr(resp, "payload", None)
+        except Exception:
+            return None
+
+    def get_listing_attributes(self, sku, marketplace_id):
+        """Convenience wrapper returning attributes of a listing item."""
+        payload = self.get_listing_item(sku, marketplace_id)
+        if not payload:
+            return {}
+        if isinstance(payload, dict):
+            return payload.get("attributes", {})
+        return getattr(payload, "attributes", {}) or {}
 
     @throttle_safe(max_retries=5, base_delay=1)
     def _fetch_listing_items_page(self, listings_api, seller_id, marketplace_id, page_token=None, included_data=None):
@@ -88,7 +110,29 @@ class GetAmazonAPIMixin:
 
     def get_product_types(self):
         # @TODO: DON'T FORGET TO REMOVE THAT
-        return ['AIR_PURIFIER', 'APPAREL', 'APPAREL_GLOVES', 'APPAREL_HEAD_NECK_COVERING', 'APPAREL_PIN', 'BACKDROP', 'BALLOON', 'BANNER', 'BASKET', 'BATHWATER_ADDITIVE', 'BED_LINEN_SET', 'BLOWER_INFLATED_DECORATION', 'BODY_PAINT', 'COAT', 'COORDINATED_OUTFIT', 'COSTUME_EYEWEAR', 'COSTUME_HEADWEAR', 'COSTUME_MASK', 'COSTUME_OUTFIT', 'CURTAIN', 'DARTBOARD', 'DECORATIVE_POM_POM', 'DISHWARE_PLACE_SETTING', 'DISHWARE_PLATE', 'DRESS', 'DRINKING_CUP', 'DRINKING_STRAW', 'FIGURINE', 'GARLAND', 'GIFT_WRAP', 'GOLF_CLUB', 'HAIRBAND', 'HANDBAG', 'HAT', 'HELMET', 'HOME', 'KICK_SCOOTER', 'KITCHEN_KNIFE', 'MUSICAL_INSTRUMENT_TOY', 'NECKLACE', 'NECKTIE', 'ONE_PIECE_OUTFIT', 'OUTERWEAR', 'PAJAMAS', 'PARTY_DECORATION_PACK', 'PARTY_SUPPLIES', 'PET_APPAREL', 'PINATA', 'PRETEND_PLAY_TOY', 'PRODUCT', 'PROTECTIVE_GLOVE', 'ROBE', 'SALWAR_SUIT_SET', 'SCULPTURE', 'SHIRT', 'SKIRT', 'SOCKS', 'SPORT_POM_POM', 'SQUEEZE_TOY', 'STORAGE_BOX', 'SUIT', 'SUNGLASSES', 'SUSPENDER', 'TABLECLOTH', 'TIGHTS', 'TOYS_AND_GAMES', 'TOY_BUILDING_BLOCK', 'TOY_FIGURE', 'TOY_GUN', 'TRAY', 'VEST', 'WATER_FLOTATION_DEVICE', 'WIG', 'WINDOW_FILM', 'WREATH']
+        return [
+            'AIR_PURIFIER', 'APPAREL', 'APPAREL_GLOVES',
+            'APPAREL_HEAD_NECK_COVERING', 'APPAREL_PIN', 'BACKDROP',
+            'BALLOON', 'BANNER', 'BASKET', 'BATHWATER_ADDITIVE',
+            'BED_LINEN_SET', 'BLOWER_INFLATED_DECORATION', 'BODY_PAINT',
+            'COAT', 'COORDINATED_OUTFIT', 'COSTUME_EYEWEAR',
+            'COSTUME_HEADWEAR', 'COSTUME_MASK', 'COSTUME_OUTFIT',
+            'CURTAIN', 'DARTBOARD', 'DECORATIVE_POM_POM',
+            'DISHWARE_PLACE_SETTING', 'DISHWARE_PLATE', 'DRESS',
+            'DRINKING_CUP', 'DRINKING_STRAW', 'FIGURINE', 'GARLAND',
+            'GIFT_WRAP', 'GOLF_CLUB', 'HAIRBAND', 'HANDBAG', 'HAT',
+            'HELMET', 'HOME', 'KICK_SCOOTER', 'KITCHEN_KNIFE',
+            'MUSICAL_INSTRUMENT_TOY', 'NECKLACE', 'NECKTIE',
+            'ONE_PIECE_OUTFIT', 'OUTERWEAR', 'PAJAMAS',
+            'PARTY_DECORATION_PACK', 'PARTY_SUPPLIES', 'PET_APPAREL',
+            'PINATA', 'PRETEND_PLAY_TOY', 'PRODUCT', 'PROTECTIVE_GLOVE',
+            'ROBE', 'SALWAR_SUIT_SET', 'SCULPTURE', 'SHIRT', 'SKIRT',
+            'SOCKS', 'SPORT_POM_POM', 'SQUEEZE_TOY', 'STORAGE_BOX',
+            'SUIT', 'SUNGLASSES', 'SUSPENDER', 'TABLECLOTH', 'TIGHTS',
+            'TOYS_AND_GAMES', 'TOY_BUILDING_BLOCK', 'TOY_FIGURE',
+            'TOY_GUN', 'TRAY', 'VEST', 'WATER_FLOTATION_DEVICE', 'WIG',
+            'WINDOW_FILM', 'WREATH'
+        ]
 
         listings_api = ListingsApi(self._get_client())
         seller_id = self.sales_channel.remote_id

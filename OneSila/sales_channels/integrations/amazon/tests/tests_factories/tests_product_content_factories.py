@@ -1,5 +1,5 @@
 import json
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from model_bakery import baker
 
@@ -143,6 +143,7 @@ class AmazonProductContentUpdateFactoryTest(TestCase):
     def test_update_builds_correct_body(self, mock_client, mock_listings):
         mock_instance = mock_listings.return_value
         mock_instance.patch_listings_item.side_effect = Exception("no amazon")
+        mock_instance.get_listings_item.return_value = MagicMock(payload={"attributes": {}})
 
         fac = AmazonProductContentUpdateFactory(
             sales_channel=self.sales_channel,
@@ -162,10 +163,13 @@ class AmazonProductContentUpdateFactoryTest(TestCase):
         }
         expected_body = {
             "productType": "CHAIR",
-            "requirements": "LISTING",
-            "attributes": expected_payload,
+            "patches": [
+                {"op": "add", "value": [{"item_name": "Chair name"}]},
+                {"op": "add", "value": [{"product_description": "Chair description"}]},
+                {"op": "add", "value": [{"bullet_point": ["Point one", "Point two"]}]},
+            ],
+            "issueLocale": "en",
         }
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         self.assertEqual(body, expected_body)
-

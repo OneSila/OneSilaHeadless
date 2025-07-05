@@ -1,7 +1,6 @@
 from sales_channels.factories.prices.prices import RemotePriceUpdateFactory
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin, AmazonListingIssuesMixin
 from sales_channels.integrations.amazon.models import AmazonPrice, AmazonCurrency
-from spapi import ListingsApi
 
 
 class AmazonPriceUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, RemotePriceUpdateFactory):
@@ -54,11 +53,16 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
 
             self.body = body
 
-            resp = listings.patch_listings_item(
-                seller_id=self.sales_channel.remote_id,
-                sku=self.remote_product.remote_sku,
-                marketplace_ids=[self.view.remote_id],
-                body=body,
+            current_attrs = self.get_listing_attributes(
+                self.remote_product.remote_sku,
+                self.view.remote_id,
+            )
+            resp = self.update_product(
+                self.remote_product.remote_sku,
+                self.view.remote_id,
+                self.remote_product.remote_type,
+                current_attrs,
+                body.get("attributes", {}),
             )
             self.update_assign_issues(getattr(resp, "issues", []))
             responses.append(resp)
