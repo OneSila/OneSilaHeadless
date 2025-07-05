@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 import json
 
@@ -575,13 +576,18 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             ),
         )
 
-    def get_put_and_patch_item_listing_mock_response(self):
+    def get_put_and_patch_item_listing_mock_response(self, attributes=None):
         mock_response = MagicMock(spec=["submissionId", "processingStatus", "issues", "status"])
         mock_response.submissionId = "mock-submission-id"
         mock_response.processingStatus = "VALID"
         mock_response.status = "VALID"
         mock_response.issues = []
+
+        if attributes:
+            mock_response.attributes = attributes
+
         return mock_response
+
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
@@ -692,9 +698,43 @@ class AmazonProductFactoriesTest(TransactionTestCase):
 
         self.assertEqual(body, expected_body)
 
-    def test_update_product_factory_builds_correct_payload(self):
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_update_product_factory_builds_correct_payload(self, mock_listings, mock_get_images, mock_get_client):
         """This test checks that the update factory builds a correct patch payload with only changed attributes."""
-        pass
+        url = "https://example.com/img.jpg"
+
+        # mark product as already created on this marketplace so update runs
+        self.remote_product.created_marketplaces = [self.view.remote_id]
+        self.remote_product.save()
+
+        current_attrs = {
+            "item_name": "Old name",
+        }
+
+        mock_instance = mock_listings.return_value
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        current_attrs = {"item_name": "Old name"}
+        mock_instance.get_listings_item.return_value = SimpleNamespace(attributes=current_attrs)
+
+        fac = AmazonProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        expected_patches = fac._build_patches(current_attrs, fac.payload["attributes"])
+        expected_body = {
+            "productType": "PRODUCT",
+            "patches": expected_patches,
+        }
+
+        self.assertEqual(body, expected_body)
 
     def test_sync_switches_to_create_if_product_not_exists(self):
         """This test ensures that calling sync triggers a create if the product doesn't exist remotely."""

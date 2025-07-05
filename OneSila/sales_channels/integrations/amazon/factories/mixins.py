@@ -84,6 +84,7 @@ class GetAmazonAPIMixin:
         except SellingApiException as e:
             raise Exception(f"SP-API failed: {e}")
 
+    @throttle_safe(max_retries=5, base_delay=1)
     def get_listing_item(self, sku, marketplace_id):
         """Return listing item payload for the given sku and marketplace."""
         listings = ListingsApi(self._get_client())
@@ -93,17 +94,21 @@ class GetAmazonAPIMixin:
                 sku=sku,
                 marketplace_ids=[marketplace_id],
             )
-            return getattr(resp, "payload", None)
+            return resp
         except Exception:
             return None
 
+    @throttle_safe(max_retries=5, base_delay=1)
     def get_listing_attributes(self, sku, marketplace_id):
         """Convenience wrapper returning attributes of a listing item."""
         payload = self.get_listing_item(sku, marketplace_id)
+
         if not payload:
             return {}
+
         if isinstance(payload, dict):
             return payload.get("attributes", {})
+
         return getattr(payload, "attributes", {}) or {}
 
     @throttle_safe(max_retries=5, base_delay=1)
@@ -296,6 +301,12 @@ class GetAmazonAPIMixin:
 
     @throttle_safe(max_retries=5, base_delay=1)
     def update_product(self, sku, marketplace_id, product_type, current_attributes, new_attributes):
+        print('---------------------------- CURRENT')
+        print(current_attributes)
+
+        print('---------------------------- NEW')
+        print(new_attributes)
+
         patches = self._build_patches(current_attributes, new_attributes)
 
         body = {

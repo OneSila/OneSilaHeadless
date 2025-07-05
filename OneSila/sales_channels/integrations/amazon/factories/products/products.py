@@ -92,7 +92,11 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         return True
 
     def initialize_remote_product(self):
+
         super().initialize_remote_product()
+        if not(hasattr(self, 'current_attrs')):
+            self.get_saleschannel_remote_object(self.local_instance.sku)
+
         if self.is_create and self.view.remote_id in (self.remote_instance.created_marketplaces or []):
             raise SwitchedToSyncException("Listing already created for marketplace")
         if not self.is_create and self.view.remote_id not in (self.remote_instance.created_marketplaces or []):
@@ -268,13 +272,10 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     # Remote helpers
     # ------------------------------------------------------------
     def get_saleschannel_remote_object(self, sku):
-        self.current_attrs = self.get_listing_attributes(
-            sku,
-            self.view.remote_id,
-        )
+        response = self.get_listing_item(sku, self.view.remote_id)
 
-        if len(self.current_attrs.keys()) == 0:
-            raise Exception(f"Product with sku {sku} does not exist!")
+        self.current_attrs = getattr(response, "attributes", {}) or {}
+        return response
 
     # ------------------------------------------------------------
     # Image assignments
