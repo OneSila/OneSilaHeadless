@@ -6,6 +6,7 @@ from spapi import SellersApi, SPAPIConfig, SPAPIClient, DefinitionsApi, Listings
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 from sales_channels.models import SalesChannelViewAssign
+from sales_channels.models.logs import RemoteLog
 
 
 class PullAmazonMixin:
@@ -16,11 +17,21 @@ class PullAmazonMixin:
         return domain.startswith("www.amazon.") and "non-amazon" not in name
 
 
-class AmazonListingIssuesMixin:
-    """Mixin updating SalesChannelViewAssign with issues from SP API."""
+class GetAmazonAPIMixin:
+    """Mixin providing an authenticated Amazon SP-API client."""
 
-    def update_assign_issues(self, issues):
-        if not self.remote_product or not isinstance(self.view, AmazonSalesChannelView):
+    def update_assign_issues(
+        self,
+        issues,
+        *,
+        action_log=None,
+        payload=None,
+        log_identifier=None,
+        submission_id=None,
+        processing_status=None,
+    ):
+        """Update assign issues and optionally log the action."""
+        if not getattr(self, "remote_product", None) or not isinstance(getattr(self, "view", None), AmazonSalesChannelView):
             return
 
         assign = SalesChannelViewAssign.objects.filter(
@@ -39,9 +50,16 @@ class AmazonListingIssuesMixin:
         ]
         assign.save()
 
-
-class GetAmazonAPIMixin:
-    """Mixin providing an authenticated Amazon SP-API client."""
+        if action_log and log_identifier:
+            self.log_action(
+                action_log,
+                {},
+                payload or {},
+                log_identifier,
+                submission_id=submission_id,
+                processing_status=processing_status,
+                issues=assign.issues,
+            )
 
     def _get_client(self):
         config = SPAPIConfig(
@@ -235,6 +253,19 @@ class GetAmazonAPIMixin:
             issue_locale=self._get_issue_locale(),
             mode="VALIDATION_PREVIEW" if settings.DEBUG else None,
         )
+
+        submission_id = getattr(response, "submissionId", None)
+        processing_status = getattr(response, "status", None) or getattr(response, "processingStatus", None)
+        log_identifier, _ = self.get_identifiers()
+        self.update_assign_issues(
+            getattr(response, "issues", []) or [],
+            action_log=RemoteLog.ACTION_CREATE,
+            payload=body,
+            log_identifier=log_identifier,
+            submission_id=submission_id,
+            processing_status=processing_status,
+        )
+
         return response
 
     def _build_patches(self, current_attributes, new_attributes):
@@ -283,6 +314,18 @@ class GetAmazonAPIMixin:
             body=body,
             issue_locale=self._get_issue_locale(),
             mode="VALIDATION_PREVIEW" if settings.DEBUG else None,
+        )
+
+        submission_id = getattr(response, "submissionId", None)
+        processing_status = getattr(response, "status", None) or getattr(response, "processingStatus", None)
+        log_identifier, _ = self.get_identifiers()
+        self.update_assign_issues(
+            getattr(response, "issues", []) or [],
+            action_log=RemoteLog.ACTION_UPDATE,
+            payload=body,
+            log_identifier=log_identifier,
+            submission_id=submission_id,
+            processing_status=processing_status,
         )
 
         return response

@@ -1,11 +1,11 @@
 from products.models import ProductTranslation, ProductTranslationBulletPoint
 from sales_channels.factories.products.content import RemoteProductContentUpdateFactory
-from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin, AmazonListingIssuesMixin
+from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.models.products import AmazonProductContent
 from sales_channels.integrations.amazon.models.properties import AmazonProductType
 
 
-class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, RemoteProductContentUpdateFactory):
+class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentUpdateFactory):
     """Update product content like name and description on Amazon."""
 
     remote_model_class = AmazonProductContent
@@ -91,7 +91,6 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMi
             current_attrs,
             body.get("attributes", {}),
         )
-        self.update_assign_issues(getattr(response, "issues", []))
 
         return response
 

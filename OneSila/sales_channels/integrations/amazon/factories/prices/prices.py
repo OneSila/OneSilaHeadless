@@ -1,9 +1,9 @@
 from sales_channels.factories.prices.prices import RemotePriceUpdateFactory
-from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin, AmazonListingIssuesMixin
+from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.models import AmazonPrice, AmazonCurrency
 
 
-class AmazonPriceUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, RemotePriceUpdateFactory):
+class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
     """Update product prices for a specific Amazon marketplace."""
 
     remote_model_class = AmazonPrice
@@ -63,7 +63,6 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
                 current_attrs,
                 body.get("attributes", {}),
             )
-            self.update_assign_issues(getattr(resp, "issues", []))
             responses.append(resp)
 
         return responses

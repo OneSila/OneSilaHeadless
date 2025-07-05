@@ -11,7 +11,6 @@ from sales_channels.factories.products.products import (
 )
 from sales_channels.integrations.amazon.factories.mixins import (
     GetAmazonAPIMixin,
-    AmazonListingIssuesMixin,
 )
 from sales_channels.integrations.amazon.factories.products.images import (
     AmazonMediaProductThroughCreateFactory,
@@ -39,7 +38,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, RemoteProductSyncFactory):
+class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     remote_model_class = AmazonProduct
     remote_image_assign_create_factory = AmazonMediaProductThroughCreateFactory
     remote_image_assign_update_factory = AmazonMediaProductThroughUpdateFactory
@@ -350,7 +349,6 @@ class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFa
             self.current_attrs,
             self.payload.get("attributes", {}),
         )
-        self.update_assign_issues(getattr(resp, "issues", []))
         return resp
 
     def serialize_response(self, response):
@@ -371,7 +369,6 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
             product_type=self.payload.get("productType"),
             attributes=self.payload.get("attributes", {}),
         )
-        self.update_assign_issues(getattr(resp, "issues", []))
         return resp
 
     def post_action_process(self):

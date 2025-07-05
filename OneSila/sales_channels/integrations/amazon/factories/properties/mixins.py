@@ -4,7 +4,7 @@ from sales_channels.integrations.amazon.models.properties import (
     AmazonPublicDefinition,
     AmazonPropertySelectValue,
 )
-from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin, AmazonListingIssuesMixin
+from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from properties.models import Property, ProductProperty
 import json
 import re
@@ -65,7 +65,7 @@ class AmazonRemoteValueMixin:
         return value
 
 
-class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin, AmazonListingIssuesMixin):
+class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
     """Common helpers for Amazon product property factories."""
 
     # ------------------------------------------------------------------
