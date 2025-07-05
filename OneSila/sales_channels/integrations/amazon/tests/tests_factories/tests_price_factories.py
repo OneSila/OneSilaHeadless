@@ -112,6 +112,7 @@ class AmazonPriceUpdateFactoryTest(TestCase):
     def test_update_factory_builds_correct_body(self, mock_client, mock_listings):
         mock_instance = mock_listings.return_value
         mock_instance.patch_listings_item.side_effect = Exception("no amazon")
+        mock_instance.get_listings_item.return_value = MagicMock(payload={"attributes": {}})
 
         factory = AmazonPriceUpdateFactory(
             sales_channel=self.sales_channel,
@@ -125,15 +126,17 @@ class AmazonPriceUpdateFactoryTest(TestCase):
 
         expected = {
             "productType": "CHAIR",
-            "requirements": "LISTING",
-            "attributes": {
-                "list_price": [
-                    {"currency": "GBP", "amount": 80.0}
-                ],
-                "uvp_list_price": [
-                    {"currency": "GBP", "amount": 100.0}
-                ],
-            },
+            "patches": [
+                {
+                    "op": "add",
+                    "value": [{"list_price": [{"currency": "GBP", "amount": 80.0}]}],
+                },
+                {
+                    "op": "add",
+                    "value": [{"uvp_list_price": [{"currency": "GBP", "amount": 100.0}]}],
+                },
+            ],
+            "issueLocale": None,
         }
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")

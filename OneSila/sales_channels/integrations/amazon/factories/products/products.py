@@ -133,18 +133,17 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
             else self.sales_channel.multi_tenant_company.language
         )
 
-        translation = (
-            ProductTranslation.objects.filter(
-                product=self.local_instance,
-                language=lang,
-                sales_channel=self.sales_channel,
-            ).first()
-            or ProductTranslation.objects.filter(
+        translation = ProductTranslation.objects.filter(
+            product=self.local_instance,
+            language=lang,
+            sales_channel=self.sales_channel,
+        ).first()
+        if not translation:
+            translation = ProductTranslation.objects.filter(
                 product=self.local_instance,
                 language=lang,
                 sales_channel=None,
             ).first()
-        )
 
         if not translation:
             return {}
@@ -236,7 +235,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
             self.attributes.update(data)
             return create_fac.remote_instance.id
 
-
     def build_payload(self):
         super().build_payload()
         # gather image attributes before building payload so they are sent with the product
@@ -269,16 +267,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
     # Remote helpers
     # ------------------------------------------------------------
     def get_saleschannel_remote_object(self, sku):
-        listings = ListingsApi(self._get_client())
-        try:
-            resp = listings.get_listings_item(
-                seller_id=self.sales_channel.remote_id,
-                sku=sku,
-                marketplace_ids=[self.view.remote_id],
-            )
-            return resp.payload
-        except Exception:
-            return None
+        return self.get_listing_item(sku, self.view.remote_id)
 
     # ------------------------------------------------------------
     # Image assignments
@@ -328,25 +317,33 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
         self.remote_instance = fac.remote_instance
 
     def assign_ean_code(self):
-        pass # there is no ean code sync for Amazon. This is used as an identifier and cannot be updated later on
+        pass  # there is no ean code sync for Amazon. This is used as an identifier and cannot be updated later on
 
     def set_product_properties(self):
         rule_properties_ids = self.local_instance.get_required_and_optional_properties(product_rule=self.rule).values_list('property_id', flat=True)
-        self.product_properties = (ProductProperty.objects.filter_multi_tenant(self.sales_channel.multi_tenant_company). \
-            filter(product=self.local_instance, property_id__in=rule_properties_ids). \
-            exclude(property__internal_name='merchant_suggested_asin'))
+        self.product_properties = (
+            ProductProperty.objects.filter_multi_tenant(
+                self.sales_channel.multi_tenant_company
+            )
+            .filter(product=self.local_instance, property_id__in=rule_properties_ids)
+            .exclude(property__internal_name='merchant_suggested_asin')
+        )
 
 
 class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFactory):
     fixing_identifier_class = AmazonProductBaseFactory
 
     def perform_remote_action(self):
-        listings = ListingsApi(self._get_client())
-        resp = listings.patch_listings_item(
-            seller_id=self.sales_channel.remote_id,
-            sku=self.remote_instance.remote_sku,
-            marketplace_ids=[self.view.remote_id],
-            body=self.payload,
+        current_attrs = self.get_listing_attributes(
+            self.remote_instance.remote_sku,
+            self.view.remote_id,
+        )
+        resp = self.update_product(
+            self.remote_instance.remote_sku,
+            self.view.remote_id,
+            self.payload.get("productType"),
+            current_attrs,
+            self.payload.get("attributes", {}),
         )
         self.update_assign_issues(getattr(resp, "issues", []))
         return resp
@@ -388,6 +385,7 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
 class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactory):
     """Sync Amazon products using marketplace-specific create or update."""
     create_product_factory = AmazonProductCreateFactory
+
 
 class AmazonProductDeleteFactory(GetAmazonAPIMixin, RemoteProductDeleteFactory):
     remote_model_class = AmazonProduct

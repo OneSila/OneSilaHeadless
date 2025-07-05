@@ -1,7 +1,5 @@
 import json
 
-from spapi import ListingsApi
-
 from media.models import Media, MediaProductThrough
 from sales_channels.factories.products.images import (
     RemoteMediaProductThroughCreateFactory,
@@ -68,12 +66,16 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin, AmazonListingIssuesMixin)
     def patch_listings(self, body):
         if self.get_value_only:
             return body["attributes"]
-        listings = ListingsApi(self._get_client())
-        response = listings.patch_listings_item(
-            seller_id=self.sales_channel.remote_id,
-            sku=self.remote_product.remote_sku,
-            marketplace_ids=[self.view.remote_id],
-            body=body,
+        current_attrs = self.get_listing_attributes(
+            self.remote_product.remote_sku,
+            self.view.remote_id,
+        )
+        response = self.update_product(
+            self.remote_product.remote_sku,
+            self.view.remote_id,
+            self.remote_product.remote_type,
+            current_attrs,
+            body.get("attributes", {}),
         )
         self.update_assign_issues(getattr(response, "issues", []))
         return response
@@ -125,4 +127,3 @@ class AmazonMediaProductThroughDeleteFactory(
     def delete_remote(self):
         body = self.build_body()
         return self.patch_listings(body)
-
