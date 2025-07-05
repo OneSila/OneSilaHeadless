@@ -168,7 +168,6 @@ class AmazonProductContentUpdateFactoryTest(TestCase):
                 {"op": "add", "value": [{"product_description": "Chair description"}]},
                 {"op": "add", "value": [{"bullet_point": ["Point one", "Point two"]}]},
             ],
-            "issueLocale": "en",
         }
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")

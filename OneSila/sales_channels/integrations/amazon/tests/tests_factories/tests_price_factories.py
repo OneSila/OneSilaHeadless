@@ -135,7 +135,6 @@ class AmazonPriceUpdateFactoryTest(TestCase):
                     "value": [{"uvp_list_price": [{"currency": "GBP", "amount": 100.0}]}],
                 },
             ],
-            "issueLocale": None,
         }
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")

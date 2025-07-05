@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import json
 
 from model_bakery import baker
@@ -575,10 +575,19 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             ),
         )
 
+    def get_put_and_patch_item_listing_mock_response(self):
+        mock_response = MagicMock(spec=["submissionId", "processingStatus", "issues", "status"])
+        mock_response.submissionId = "mock-submission-id"
+        mock_response.processingStatus = "VALID"
+        mock_response.status = "VALID"
+        mock_response.issues = []
+        return mock_response
+
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_create_product_factory_builds_correct_body(self, mock_listings, mock_client):
         mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
         fac = AmazonProductCreateFactory(
             sales_channel=self.sales_channel,
@@ -594,8 +603,9 @@ class AmazonProductFactoriesTest(TransactionTestCase):
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
-    def test_update_product_factory_builds_correct_body(self, mock_listings, mock_client):
+    def test_update_product_factory_builds_correct_body(self, mock_listings, mock_get_client):
         mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
         fac = AmazonProductUpdateFactory(
             sales_channel=self.sales_channel,
@@ -605,7 +615,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
         fac.run()
 
-        body = mock_instance.put_listings_item.call_args.kwargs.get("body") # put_listings_item because the create is used
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
         self.assertIsInstance(body, dict)
         self.assertEqual(body.get("requirements"), "LISTING")
 
@@ -615,6 +625,8 @@ class AmazonProductFactoriesTest(TransactionTestCase):
     def test_create_product_factory_builds_correct_payload(self, mock_listings, mock_get_images, mock_get_client):
         """This test checks if the CreateFactory gives the expected payload including attributes, prices, and content."""
         mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
         url = 'https://example.com/img.jpg'
 
         fac = AmazonProductCreateFactory(

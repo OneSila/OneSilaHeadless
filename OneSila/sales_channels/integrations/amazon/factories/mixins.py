@@ -242,9 +242,6 @@ class GetAmazonAPIMixin:
         body = self._build_common_body(product_type, attributes)
         listings = ListingsApi(self._get_client())
 
-        print('-------------------------------------------- CREATE BODY')
-        print(body)
-
         response = listings.put_listings_item(
             seller_id=self.sales_channel.remote_id,
             sku=sku,
