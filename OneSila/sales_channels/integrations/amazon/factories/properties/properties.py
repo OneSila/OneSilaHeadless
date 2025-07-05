@@ -51,7 +51,6 @@ class AmazonProductPropertyCreateFactory(AmazonProductPropertyBaseMixin, RemoteP
             current_attrs,
             body.get("attributes", {}),
         )
-        self.update_assign_issues(getattr(response, "issues", []))
         return response
 
     def serialize_response(self, response):
@@ -106,7 +105,6 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteP
             current_attrs,
             body.get("attributes", {}),
         )
-        self.update_assign_issues(getattr(response, "issues", []))
         return response
 
     def serialize_response(self, response):
@@ -149,7 +147,6 @@ class AmazonProductPropertyDeleteFactory(AmazonProductPropertyBaseMixin, RemoteP
                 current_attrs,
                 {self.remote_instance.remote_property.main_code: None},
             )
-            self.update_assign_issues(getattr(response, "issues", []))
             return response
         except Exception:
             return True

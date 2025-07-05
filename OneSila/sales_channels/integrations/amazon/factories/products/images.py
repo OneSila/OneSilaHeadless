@@ -8,14 +8,13 @@ from sales_channels.factories.products.images import (
 )
 from sales_channels.integrations.amazon.factories.mixins import (
     GetAmazonAPIMixin,
-    AmazonListingIssuesMixin,
 )
 from sales_channels.integrations.amazon.models.products import (
     AmazonImageProductAssociation,
 )
 
 
-class AmazonMediaProductThroughBase(GetAmazonAPIMixin, AmazonListingIssuesMixin):
+class AmazonMediaProductThroughBase(GetAmazonAPIMixin):
     """Common logic for Amazon media-product associations."""
 
     remote_model_class = AmazonImageProductAssociation
@@ -77,7 +76,6 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin, AmazonListingIssuesMixin)
             current_attrs,
             body.get("attributes", {}),
         )
-        self.update_assign_issues(getattr(response, "issues", []))
         return response
 
     def build_payload(self):
