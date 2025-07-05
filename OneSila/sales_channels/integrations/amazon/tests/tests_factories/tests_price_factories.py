@@ -107,9 +107,9 @@ class AmazonPriceUpdateFactoryTest(TestCase):
             price_data={},
         )
 
-    @patch("sales_channels.integrations.amazon.factories.prices.prices.ListingsApi")
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
-    def test_update_factory_builds_correct_body(self, mock_client, mock_listings):
+    def test_update_factory_builds_correct_body(self, mock_get_client, mock_listings):
         mock_instance = mock_listings.return_value
         mock_instance.patch_listings_item.side_effect = Exception("no amazon")
         mock_instance.get_listings_item.return_value = MagicMock(payload={"attributes": {}})
@@ -120,7 +120,6 @@ class AmazonPriceUpdateFactoryTest(TestCase):
             remote_product=self.remote_product,
             view=self.view,
         )
-
         with self.assertRaises(Exception):
             factory.run()
 

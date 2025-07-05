@@ -20,7 +20,6 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
         )
 
     def update_remote(self):
-        listings = ListingsApi(self._get_client())
         responses = []
 
         currencies = AmazonCurrency.objects.filter(

@@ -213,24 +213,27 @@ class GetAmazonAPIMixin:
                 return [clean(v) for v in data if v is not None]
             return data
 
-        body = {
+        return {
             "productType": product_type,
             "requirements": "LISTING" if self.sales_channel.listing_owner else "LISTING_OFFER_ONLY",
             "attributes": clean(attributes),
-            "issueLocale": self._get_issue_locale(),
         }
-        if settings.DEBUG:
-            body["mode"] = "VALIDATION_PREVIEW"
-        return body
 
+    @throttle_safe(max_retries=5, base_delay=1)
     def create_product(self, sku, marketplace_id, product_type, attributes):
         body = self._build_common_body(product_type, attributes)
         listings = ListingsApi(self._get_client())
+
+        print('-------------------------------------------- CREATE BODY')
+        print(body)
+
         response = listings.put_listings_item(
             seller_id=self.sales_channel.remote_id,
             sku=sku,
             marketplace_ids=[marketplace_id],
             body=body,
+            issue_locale=self._get_issue_locale(),
+            mode="VALIDATION_PREVIEW" if settings.DEBUG else None,
         )
         return response
 
@@ -263,16 +266,14 @@ class GetAmazonAPIMixin:
 
         return patches
 
+    @throttle_safe(max_retries=5, base_delay=1)
     def update_product(self, sku, marketplace_id, product_type, current_attributes, new_attributes):
         patches = self._build_patches(current_attributes, new_attributes)
 
         body = {
             "productType": product_type,
             "patches": patches,
-            "issueLocale": self._get_issue_locale(),
         }
-        if settings.DEBUG:
-            body["mode"] = "VALIDATION_PREVIEW"
 
         listings = ListingsApi(self._get_client())
         response = listings.patch_listings_item(
@@ -280,5 +281,8 @@ class GetAmazonAPIMixin:
             sku=sku,
             marketplace_ids=[marketplace_id],
             body=body,
+            issue_locale=self._get_issue_locale(),
+            mode="VALIDATION_PREVIEW" if settings.DEBUG else None,
         )
+
         return response

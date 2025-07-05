@@ -138,7 +138,7 @@ class AmazonProductContentUpdateFactoryTest(TestCase):
             remote_product=self.remote_product,
         )
 
-    @patch("sales_channels.integrations.amazon.factories.products.content.ListingsApi")
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     def test_update_builds_correct_body(self, mock_client, mock_listings):
         mock_instance = mock_listings.return_value

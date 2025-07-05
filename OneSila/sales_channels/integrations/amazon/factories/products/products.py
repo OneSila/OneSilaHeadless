@@ -115,6 +115,8 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
         return self.remote_instance.ean_code or self.get_ean_code_value()
 
     def build_basic_attributes(self) -> Dict:
+        self.set_sku()
+
         attrs: Dict = {}
         asin = self._get_asin()
         if asin:
@@ -267,7 +269,13 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
     # Remote helpers
     # ------------------------------------------------------------
     def get_saleschannel_remote_object(self, sku):
-        return self.get_listing_item(sku, self.view.remote_id)
+        self.current_attrs = self.get_listing_attributes(
+            sku,
+            self.view.remote_id,
+        )
+
+        if len(self.current_attrs.keys()) == 0:
+            raise Exception(f"Product with sku {sku} does not exist!")
 
     # ------------------------------------------------------------
     # Image assignments
@@ -334,15 +342,12 @@ class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFa
     fixing_identifier_class = AmazonProductBaseFactory
 
     def perform_remote_action(self):
-        current_attrs = self.get_listing_attributes(
-            self.remote_instance.remote_sku,
-            self.view.remote_id,
-        )
+
         resp = self.update_product(
-            self.remote_instance.remote_sku,
+            self.sku,
             self.view.remote_id,
             self.payload.get("productType"),
-            current_attrs,
+            self.current_attrs,
             self.payload.get("attributes", {}),
         )
         self.update_assign_issues(getattr(resp, "issues", []))
@@ -360,12 +365,11 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
     remote_product_eancode_class = None
 
     def perform_remote_action(self):
-        listings = ListingsApi(self._get_client())
-        resp = listings.put_listings_item(
-            seller_id=self.sales_channel.remote_id,
-            sku=self.remote_instance.remote_sku,
-            marketplace_ids=[self.view.remote_id],
-            body=self.payload,
+        resp = self.create_product(
+            sku=self.sku,
+            marketplace_id=self.view.remote_id,
+            product_type=self.payload.get("productType"),
+            attributes=self.payload.get("attributes", {}),
         )
         self.update_assign_issues(getattr(resp, "issues", []))
         return resp

@@ -55,6 +55,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         self.sales_channel = AmazonSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             remote_id="SELLER123",
+            listing_owner=True
         )
         self.view = AmazonSalesChannelView.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -575,7 +576,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
-    @patch("sales_channels.integrations.amazon.factories.products.products.ListingsApi")
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_create_product_factory_builds_correct_body(self, mock_listings, mock_client):
         mock_instance = mock_listings.return_value
 
@@ -592,7 +593,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         self.assertEqual(body.get("requirements"), "LISTING")
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
-    @patch("sales_channels.integrations.amazon.factories.products.products.ListingsApi")
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_update_product_factory_builds_correct_body(self, mock_listings, mock_client):
         mock_instance = mock_listings.return_value
 
@@ -610,7 +611,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
-    @patch("sales_channels.integrations.amazon.factories.products.products.ListingsApi")
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_create_product_factory_builds_correct_payload(self, mock_listings, mock_get_images, mock_get_client):
         """This test checks if the CreateFactory gives the expected payload including attributes, prices, and content."""
         mock_instance = mock_listings.return_value
@@ -628,9 +629,9 @@ class AmazonProductFactoriesTest(TransactionTestCase):
 
         keys = list(AmazonMediaProductThroughBase.OFFER_KEYS) + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
         expected_images = {
-            key: ([{"media_location": url}] if key in ("main_offer_image_locator",
-                                                       "main_product_image_locator") else None)
+            key: [{"media_location": url}]
             for key in keys
+            if key in ("main_offer_image_locator", "main_product_image_locator")
         }
 
         expected_attributes = {
@@ -677,12 +678,11 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             "attributes": expected_attributes,
         }
 
-        import pprint
-        print('-----------------------')
-        pprint.pprint(body)
-        pprint.pprint(expected_body)
         self.assertEqual(body, expected_body)
 
+    def test_update_product_factory_builds_correct_payload(self):
+        """This test checks that the update factory builds a correct patch payload with only changed attributes."""
+        pass
 
     def test_sync_switches_to_create_if_product_not_exists(self):
         """This test ensures that calling sync triggers a create if the product doesn't exist remotely."""
@@ -691,11 +691,6 @@ class AmazonProductFactoriesTest(TransactionTestCase):
 
     def test_create_product_on_different_marketplace(self):
         """This test ensures the product is created on a second marketplace correctly and independently using PUT."""
-        pass
-
-
-    def test_update_product_factory_builds_correct_payload(self):
-        """This test checks that the update factory builds a correct patch payload with only changed attributes."""
         pass
 
 
