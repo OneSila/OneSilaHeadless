@@ -17,8 +17,8 @@ class GetShopifyApiMixin:
     def get_api(self):
         # Configure your app credentials (once per process)
         shopify.Session.setup(
-            api_key=settings.SHOPIFY_API_KEY,
-            secret=settings.SHOPIFY_API_SECRET,
+            api_key=self.sales_channel.api_key,
+            secret=self.sales_channel.api_secret,
         )
 
         # Create and activate a session for the specific shop
