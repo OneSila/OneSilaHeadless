@@ -1597,9 +1597,36 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         self.assertNotIn("list_price", attrs)
         self.assertNotIn("uvp_list_price", attrs)
 
-    def test_payload_skips_empty_price_fields_gracefully(self):
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_payload_skips_empty_price_fields_gracefully(self, mock_listings, mock_get_images, mock_get_client):
         """This test confirms that missing prices do not break payload generation and are omitted silently."""
-        pass
+        self.sales_channel.sync_prices = True
+        self.sales_channel.save()
+
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = {
+            "submissionId": "mock-submission-id",
+            "processingStatus": "VALID",
+            "status": "VALID",
+            "issues": [],
+        }
+
+
+
+        SalesPrice.objects.filter(product=self.product).delete()
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+        body = mock_listings.return_value.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
+        self.assertFalse(attrs.get("list_price"))
+        self.assertFalse(attrs.get("uvp_list_price"))
 
     def test_missing_view_argument_raises_value_error(self):
         """This test confirms that initializing a factory without a view raises ValueError."""
