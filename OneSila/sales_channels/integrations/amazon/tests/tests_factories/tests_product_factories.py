@@ -744,6 +744,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
     @patch(
         "sales_channels.integrations.amazon.factories.products.AmazonProductCreateFactory.run",
         wraps=AmazonProductCreateFactory.run,
+        autospec=True
     )
     def test_sync_switches_to_create_if_product_not_exists(
         self, mock_create_run, mock_listings, mock_get_client
@@ -771,7 +772,10 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         mock_instance.patch_listings_item.assert_not_called()
 
 
-    def test_create_product_on_different_marketplace(self):
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_create_product_on_different_marketplace(self, mock_listings, mock_get_images, mock_get_client):
         """This test ensures the product is created on a second marketplace correctly and independently using PUT."""
         fr_view = AmazonSalesChannelView.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -817,79 +821,74 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             selected_unit="grams",
         )
 
-        with patch(
-            "sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client",
-            return_value=None,
-        ), patch(
-            "sales_channels.integrations.amazon.factories.mixins.ListingsApi"
-        ) as mock_listings:
-            mock_instance = mock_listings.return_value
-            mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
-            fac = AmazonProductCreateFactory(
-                sales_channel=self.sales_channel,
-                local_instance=self.product,
-                remote_instance=self.remote_product,
-                view=fr_view,
-            )
-            fac.run()
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=fr_view,
+        )
+        fac.run()
 
-            mock_instance.put_listings_item.assert_called_once()
-            mock_instance.patch_listings_item.assert_not_called()
+        mock_instance.put_listings_item.assert_called_once()
+        mock_instance.patch_listings_item.assert_not_called()
 
-            kwargs = mock_instance.put_listings_item.call_args.kwargs
-            self.assertEqual(kwargs.get("marketplace_ids"), ["FR"])
+        kwargs = mock_instance.put_listings_item.call_args.kwargs
+        self.assertEqual(kwargs.get("marketplace_ids"), ["FR"])
 
-            body = kwargs.get("body")
-            keys = list(AmazonMediaProductThroughBase.OFFER_KEYS) + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
-            expected_images = {
-                key: [{"media_location": "https://example.com/img.jpg"}]
-                for key in keys
-                if key in ("main_offer_image_locator", "main_product_image_locator")
-            }
-            expected_attributes = {
-                "merchant_suggested_asin": "ASIN123",
-                "item_name": "Chair name",
-                "product_description": "Chair description",
-                "bullet_point": ["First bullet"],
-                "list_price": [{"currency": "GBP", "amount": 80.0}],
-                "uvp_list_price": [{"currency": "GBP", "amount": 100.0}],
-                **expected_images,
-                "color": [
-                    {
-                        "standardized_values": ["Red"],
-                        "value": "Red",
-                        "language_tag": "fr",
-                        "marketplace_id": "FR",
-                    }
-                ],
-                "battery": [
-                    {
-                        "cell_composition": [{"value": "lithium_ion"}],
-                        "cell_composition_other_than_listed": [
-                            {"value": "lithium_ion", "language_tag": "fr"}
-                        ],
-                        "iec_code": [{"value": "18650"}],
-                        "weight": [{"value": 10.0, "unit": "grams"}],
-                        "marketplace_id": "FR",
-                    }
-                ],
-                "batteries_required": [
-                    {"value": True, "marketplace_id": "FR"}
-                ],
-                "condition_type": [
-                    {"value": "new", "marketplace_id": "FR"}
-                ],
-                "item_package_weight": [
-                    {"value": 2.5, "unit": "grams", "marketplace_id": "FR"}
-                ],
-            }
-            expected_body = {
-                "productType": "PRODUCT",
-                "requirements": "LISTING",
-                "attributes": expected_attributes,
-            }
-            self.assertEqual(body, expected_body)
+        body = kwargs.get("body")
+        keys = list(AmazonMediaProductThroughBase.OFFER_KEYS) + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+        expected_images = {
+            key: [{"media_location": "https://example.com/img.jpg"}]
+            for key in keys
+            if key in ("main_offer_image_locator", "main_product_image_locator")
+        }
+        expected_attributes = {
+            "merchant_suggested_asin": "ASIN123",
+            "item_name": "Chair name",
+            "product_description": "Chair description",
+            "bullet_point": ["First bullet"],
+            "list_price": [{"currency": "GBP", "amount": 80.0}],
+            "uvp_list_price": [{"currency": "GBP", "amount": 100.0}],
+            **expected_images,
+            "color": [
+                {
+                    "standardized_values": ["Red"],
+                    "value": "Red",
+                    "language_tag": "fr",
+                    "marketplace_id": "FR",
+                }
+            ],
+            "battery": [
+                {
+                    "cell_composition": [{"value": "lithium_ion"}],
+                    "cell_composition_other_than_listed": [
+                        {"value": "lithium_ion", "language_tag": "fr"}
+                    ],
+                    "iec_code": [{"value": "18650"}],
+                    "weight": [{"value": 10.0, "unit": "grams"}],
+                    "marketplace_id": "FR",
+                }
+            ],
+            "batteries_required": [
+                {"value": True, "marketplace_id": "FR"}
+            ],
+            "condition_type": [
+                {"value": "new", "marketplace_id": "FR"}
+            ],
+            "item_package_weight": [
+                {"value": 2.5, "unit": "grams", "marketplace_id": "FR"}
+            ],
+        }
+        expected_body = {
+            "productType": "PRODUCT",
+            "requirements": "LISTING",
+            "attributes": expected_attributes,
+        }
+
+        self.assertEqual(body, expected_body)
 
 
     def test_delete_product_uses_correct_sku_and_marketplace(self):
