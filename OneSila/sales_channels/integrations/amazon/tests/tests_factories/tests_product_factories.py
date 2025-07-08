@@ -1193,7 +1193,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
         self.assertEqual(
             attrs.get("size"),
-            [{"value": ["Small", "Large"], "marketplace_id": "GB"}],
+            [{"value": ["Large", "Small"], "marketplace_id": "GB"}],
         )
 
 
