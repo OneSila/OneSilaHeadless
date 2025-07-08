@@ -589,6 +589,10 @@ class AmazonProductFactoriesTest(TransactionTestCase):
 
         return mock_response
 
+    def get_get_listing_item_mock_response(self, attributes=None):
+        """Helper to mock the ListingsApi.get_listings_item response."""
+        return SimpleNamespace(attributes=attributes or {})
+
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_create_product_factory_builds_correct_body(self, mock_listings, mock_client):
@@ -1342,9 +1346,106 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         self.assertEqual(attrs.get("external_product_id_type"), "EAN")
         self.assertNotIn("merchant_suggested_asin", attrs)
 
-    def test_existing_remote_property_gets_updated(self):
-        """This test simulates an existing remote property and checks that update payload reflects correct values."""
-        pass
+    @patch(
+        "sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client",
+        return_value=None,
+    )
+    @patch.object(
+        AmazonMediaProductThroughBase,
+        "_get_images",
+        return_value=["https://example.com/img.jpg"],
+    )
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_existing_remote_property_gets_updated(
+        self, mock_listings, mock_get_images, mock_get_client
+    ):
+        """Simulate existing remote attribute and ensure update uses correct payload."""
+        self.remote_product.created_marketplaces = [self.view.remote_id]
+        self.remote_product.save()
+
+        material_prop = baker.make(
+            Property,
+            type=Property.TYPES.TEXT,
+            internal_name="material",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=material_prop,
+            language=self.multi_tenant_company.language,
+            name="Material",
+        )
+        pp = ProductProperty.objects.create(
+            product=self.product,
+            property=material_prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductPropertyTextTranslation.objects.create(
+            product_property=pp,
+            language=self.multi_tenant_company.language,
+            value_text="Wood",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=material_prop,
+            code="material",
+            type=Property.TYPES.TEXT,
+        )
+        AmazonPublicDefinition.objects.create(
+            api_region_code="EU_UK",
+            product_type_code="CHAIR",
+            code="material",
+            name="Material",
+            usage_definition=json.dumps(
+                {
+                    "material": [
+                        {
+                            "value": "%value:material%",
+                            "marketplace_id": "%auto:marketplace_id%",
+                        }
+                    ]
+                }
+            ),
+        )
+
+        ProductPropertiesRuleItem.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=self.rule,
+            property=material_prop,
+            defaults={"type": ProductPropertiesRuleItem.OPTIONAL},
+        )
+
+        mock_instance = mock_listings.return_value
+        mock_instance.patch_listings_item.return_value = (
+            self.get_put_and_patch_item_listing_mock_response()
+        )
+        current_attrs = {"material": [{"value": "Plastic", "marketplace_id": self.view.remote_id}]}
+        mock_instance.get_listings_item.return_value = self.get_get_listing_item_mock_response(
+            current_attrs
+        )
+
+        fac = AmazonProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        patches = body.get("patches", [])
+        patch_for_material = next(
+            (p for p in patches if "material" in p.get("value", [{}])[0]),
+            None,
+        )
+        self.assertIsNotNone(patch_for_material)
+        self.assertEqual(patch_for_material["op"], "replace")
+        new_val = patch_for_material["value"][0]["material"][0]
+        self.assertEqual(new_val["value"], "Wood")
+        self.assertEqual(new_val["marketplace_id"], self.view.remote_id)
 
     def test_translation_from_sales_channel_is_used_in_payload(self):
         """This test checks that product content is pulled from sales channel translations if available."""
