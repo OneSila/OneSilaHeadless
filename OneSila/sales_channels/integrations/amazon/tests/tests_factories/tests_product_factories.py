@@ -1281,10 +1281,6 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         """This test verifies that EAN is included properly in the absence of ASIN."""
         pass
 
-    def test_custom_properties_are_processed_correctly(self):
-        """This test ensures that various valid custom properties are processed using process_single_property and included in payload."""
-        pass
-
     def test_existing_remote_property_gets_updated(self):
         """This test simulates an existing remote property and checks that update payload reflects correct values."""
         pass
