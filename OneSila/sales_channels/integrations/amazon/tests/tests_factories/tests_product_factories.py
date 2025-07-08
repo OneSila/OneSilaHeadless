@@ -996,9 +996,205 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         mock_instance.patch_listings_item.assert_called_once()
 
 
-    def test_payload_includes_all_supported_property_types(self):
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_payload_includes_all_supported_property_types(self, mock_listings, mock_get_images, mock_get_client):
         """This test adds text, select, and multiselect properties and confirms their correct payload structure."""
-        pass
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        # TEXT property
+        text_prop = baker.make(
+            Property,
+            type=Property.TYPES.TEXT,
+            internal_name="notes",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=text_prop,
+            language=self.multi_tenant_company.language,
+            name="Notes",
+        )
+        pp_text = ProductProperty.objects.create(
+            product=self.product,
+            property=text_prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductPropertyTextTranslation.objects.create(
+            product_property=pp_text,
+            language=self.multi_tenant_company.language,
+            value_text="Some text",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=text_prop,
+            code="notes",
+            type=Property.TYPES.TEXT,
+        )
+        AmazonPublicDefinition.objects.create(
+            api_region_code="EU_UK",
+            product_type_code="CHAIR",
+            code="notes",
+            name="Notes",
+            usage_definition=json.dumps(
+                {
+                    "notes": [
+                        {"value": "%value:notes%", "marketplace_id": "%auto:marketplace_id%"}
+                    ]
+                }
+            ),
+        )
+
+        # SELECT property
+        select_prop = baker.make(
+            Property,
+            type=Property.TYPES.SELECT,
+            internal_name="material",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=select_prop,
+            language=self.multi_tenant_company.language,
+            name="Material",
+        )
+        select_val = baker.make(
+            PropertySelectValue,
+            property=select_prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=select_val,
+            language=self.multi_tenant_company.language,
+            value="Green",
+        )
+        ProductProperty.objects.create(
+            product=self.product,
+            property=select_prop,
+            value_select=select_val,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=select_prop,
+            code="material",
+            type=Property.TYPES.SELECT,
+            allows_unmapped_values=True,
+        )
+        AmazonPublicDefinition.objects.create(
+            api_region_code="EU_UK",
+            product_type_code="CHAIR",
+            code="material",
+            name="Material",
+            usage_definition=json.dumps(
+                {
+                    "material": [
+                        {"value": "%value:material%", "marketplace_id": "%auto:marketplace_id%"}
+                    ]
+                }
+            ),
+        )
+
+        # MULTISELECT property
+        multi_prop = baker.make(
+            Property,
+            type=Property.TYPES.MULTISELECT,
+            internal_name="size",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=multi_prop,
+            language=self.multi_tenant_company.language,
+            name="Size",
+        )
+        size_val1 = baker.make(
+            PropertySelectValue,
+            property=multi_prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        size_val2 = baker.make(
+            PropertySelectValue,
+            property=multi_prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=size_val1,
+            language=self.multi_tenant_company.language,
+            value="Small",
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=size_val2,
+            language=self.multi_tenant_company.language,
+            value="Large",
+        )
+        pp_multi = ProductProperty.objects.create(
+            product=self.product,
+            property=multi_prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        pp_multi.value_multi_select.set([size_val1, size_val2])
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=multi_prop,
+            code="size",
+            type=Property.TYPES.MULTISELECT,
+            allows_unmapped_values=True,
+        )
+        AmazonPublicDefinition.objects.create(
+            api_region_code="EU_UK",
+            product_type_code="CHAIR",
+            code="size",
+            name="Size",
+            usage_definition=json.dumps(
+                {
+                    "size": [
+                        {"value": "%value:size%", "marketplace_id": "%auto:marketplace_id%"}
+                    ]
+                }
+            ),
+        )
+
+        for prop in [text_prop, select_prop, multi_prop]:
+            ProductPropertiesRuleItem.objects.get_or_create(
+                multi_tenant_company=self.multi_tenant_company,
+                rule=self.rule,
+                property=prop,
+                defaults={"type": ProductPropertiesRuleItem.OPTIONAL},
+            )
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes")
+
+        self.assertEqual(
+            attrs.get("notes"),
+            [{"value": "Some text", "marketplace_id": "GB"}],
+        )
+        self.assertEqual(
+            attrs.get("material"),
+            [{"value": "Green", "marketplace_id": "GB"}],
+        )
+        self.assertEqual(
+            attrs.get("size"),
+            [{"value": ["Small", "Large"], "marketplace_id": "GB"}],
+        )
 
 
     def test_unmapped_attributes_are_ignored_in_payload(self):
