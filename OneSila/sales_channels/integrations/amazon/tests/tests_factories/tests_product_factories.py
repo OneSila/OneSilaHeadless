@@ -736,9 +736,39 @@ class AmazonProductFactoriesTest(TransactionTestCase):
 
         self.assertEqual(body, expected_body)
 
-    def test_sync_switches_to_create_if_product_not_exists(self):
+    @patch(
+        "sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client",
+        return_value=None,
+    )
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    @patch(
+        "sales_channels.integrations.amazon.factories.products.AmazonProductCreateFactory.run",
+        wraps=AmazonProductCreateFactory.run,
+    )
+    def test_sync_switches_to_create_if_product_not_exists(
+        self, mock_create_run, mock_listings, mock_get_client
+    ):
         """This test ensures that calling sync triggers a create if the product doesn't exist remotely."""
-        pass
+        self.remote_product.created_marketplaces = []
+        self.remote_product.save()
+
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = (
+            self.get_put_and_patch_item_listing_mock_response()
+        )
+
+        fac = AmazonProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+
+        fac.run()
+
+        mock_create_run.assert_called_once()
+        mock_instance.put_listings_item.assert_called()
+        mock_instance.patch_listings_item.assert_not_called()
 
 
     def test_create_product_on_different_marketplace(self):
