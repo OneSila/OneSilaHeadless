@@ -1572,9 +1572,30 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             [{"currency": "GBP", "amount": 100.0}],
         )
 
-    def test_price_sync_disabled_skips_price_fields(self):
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_price_sync_disabled_skips_price_fields(self, mock_listings, mock_get_images, mock_get_client):
         """This test ensures that price fields are skipped when price sync is turned off."""
-        pass
+        self.sales_channel.sync_prices = False
+        self.sales_channel.save()
+
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
+
+        self.assertNotIn("list_price", attrs)
+        self.assertNotIn("uvp_list_price", attrs)
 
     def test_payload_skips_empty_price_fields_gracefully(self):
         """This test confirms that missing prices do not break payload generation and are omitted silently."""
