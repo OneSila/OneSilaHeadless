@@ -1443,7 +1443,6 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             (p for p in patches if "material" in p.get("value", [{}])[0]),
             None,
         )
-        print(patches)
         self.assertIsNotNone(patch_for_material)
         self.assertEqual(patch_for_material["op"], "replace")
         new_val = patch_for_material["value"][0]["material"][0]
@@ -1628,8 +1627,68 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         self.assertFalse(attrs.get("list_price"))
         self.assertFalse(attrs.get("uvp_list_price"))
 
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_price_update_when_values_differ_and_sync_enabled(self, mock_listings, mock_get_images, mock_get_client):
+        """Ensure differing remote prices trigger an update when sync_prices is enabled."""
+        self.sales_channel.sync_prices = True
+        self.sales_channel.save()
+
+        # product already exists remotely
+        self.remote_product.created_marketplaces = [self.view.remote_id]
+        self.remote_product.save()
+
+        # adjust local price values
+        price = SalesPrice.objects.get(product=self.product, currency=self.currency)
+        price.price = 99.99
+        price.rrp = 109.99
+        price.save()
+
+        mock_instance = mock_listings.return_value
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.get_listings_item.return_value = SimpleNamespace(
+            attributes={
+                "list_price": [{"currency": "GBP", "amount": 89.99}],
+                "uvp_list_price": [{"currency": "GBP", "amount": 100.0}],
+            }
+        )
+
+        fac = AmazonProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        patches = body.get("patches", [])
+
+        price_patch = next((p for p in patches if "list_price" in p.get("value", [{}])[0]), None)
+        self.assertIsNotNone(price_patch)
+        self.assertEqual(price_patch["op"], "replace")
+        self.assertEqual(price_patch["value"][0]["list_price"][0]["amount"], 99.99)
+
+        uvp_patch = next((p for p in patches if "uvp_list_price" in p.get("value", [{}])[0]), None)
+        self.assertIsNotNone(uvp_patch)
+        self.assertEqual(uvp_patch["op"], "replace")
+        self.assertEqual(uvp_patch["value"][0]["uvp_list_price"][0]["amount"], 109.99)
+
     def test_missing_view_argument_raises_value_error(self):
         """This test confirms that initializing a factory without a view raises ValueError."""
-        pass
+        factories = [
+            AmazonProductCreateFactory,
+            AmazonProductUpdateFactory,
+            AmazonProductSyncFactory,
+            AmazonProductDeleteFactory,
+        ]
 
+        for factory_class in factories:
+            with self.assertRaises(ValueError):
+                factory_class(
+                    sales_channel=self.sales_channel,
+                    local_instance=self.product,
+                    remote_instance=self.remote_product,
+                )
 
