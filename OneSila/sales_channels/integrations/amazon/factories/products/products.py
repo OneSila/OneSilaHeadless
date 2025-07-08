@@ -138,34 +138,50 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             else self.sales_channel.multi_tenant_company.language
         )
 
-        translation = ProductTranslation.objects.filter(
+        # Fetch both translations
+        channel_translation = ProductTranslation.objects.filter(
             product=self.local_instance,
             language=lang,
             sales_channel=self.sales_channel,
         ).first()
-        if not translation:
-            translation = ProductTranslation.objects.filter(
-                product=self.local_instance,
-                language=lang,
-                sales_channel=None,
-            ).first()
 
-        if not translation:
-            return {}
+        default_translation = ProductTranslation.objects.filter(
+            product=self.local_instance,
+            language=lang,
+            sales_channel=None,
+        ).first()
 
-        bullet_points = list(
-            ProductTranslationBulletPoint.objects.filter(
-                product_translation=translation
-            ).order_by("sort_order").values_list("text", flat=True)
-        )
+        # Fallback logic per field
+        item_name = None
+        product_description = None
+
+        if channel_translation:
+            item_name = channel_translation.name or None
+            product_description = channel_translation.description or None
+
+        if not item_name and default_translation:
+            item_name = default_translation.name
+
+        if not product_description and default_translation:
+            product_description = default_translation.description
+
+        # Bullet points ONLY from the channel translation
+        bullet_points = []
+        if channel_translation:
+            bullet_points = list(
+                ProductTranslationBulletPoint.objects.filter(
+                    product_translation=channel_translation
+                ).order_by("sort_order").values_list("text", flat=True)
+            )
 
         attrs = {
-            "item_name": translation.name,
-            "product_description": translation.description,
+            "item_name": item_name,
+            "product_description": product_description,
         }
         if bullet_points:
             attrs["bullet_point"] = bullet_points
-        return attrs
+
+        return {k: v for k, v in attrs.items() if v not in (None, "")}
 
     def build_price_attributes(self) -> Dict:
         attrs: Dict = {}
