@@ -773,7 +773,123 @@ class AmazonProductFactoriesTest(TransactionTestCase):
 
     def test_create_product_on_different_marketplace(self):
         """This test ensures the product is created on a second marketplace correctly and independently using PUT."""
-        pass
+        fr_view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            name="France",
+            api_region_code=self.view.api_region_code,
+            remote_id="FR",
+        )
+        AmazonRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            sales_channel_view=fr_view,
+            remote_code="fr",
+        )
+        SalesChannelViewAssign.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            sales_channel_view=fr_view,
+            sales_channel=self.sales_channel,
+            remote_product=self.remote_product,
+        )
+        AmazonCurrency.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            sales_channel_view=fr_view,
+            local_instance=self.currency,
+            remote_code=self.currency.iso_code,
+        )
+        AmazonDefaultUnitConfigurator.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=fr_view,
+            name="Item Package Weight Unit",
+            code="item_package_weight",
+            selected_unit="grams",
+        )
+        AmazonDefaultUnitConfigurator.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=fr_view,
+            name="Battery Weight Unit",
+            code="battery__weight",
+            selected_unit="grams",
+        )
+
+        with patch(
+            "sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client",
+            return_value=None,
+        ), patch(
+            "sales_channels.integrations.amazon.factories.mixins.ListingsApi"
+        ) as mock_listings:
+            mock_instance = mock_listings.return_value
+            mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+            fac = AmazonProductCreateFactory(
+                sales_channel=self.sales_channel,
+                local_instance=self.product,
+                remote_instance=self.remote_product,
+                view=fr_view,
+            )
+            fac.run()
+
+            mock_instance.put_listings_item.assert_called_once()
+            mock_instance.patch_listings_item.assert_not_called()
+
+            kwargs = mock_instance.put_listings_item.call_args.kwargs
+            self.assertEqual(kwargs.get("marketplace_ids"), ["FR"])
+
+            body = kwargs.get("body")
+            keys = list(AmazonMediaProductThroughBase.OFFER_KEYS) + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+            expected_images = {
+                key: [{"media_location": "https://example.com/img.jpg"}]
+                for key in keys
+                if key in ("main_offer_image_locator", "main_product_image_locator")
+            }
+            expected_attributes = {
+                "merchant_suggested_asin": "ASIN123",
+                "item_name": "Chair name",
+                "product_description": "Chair description",
+                "bullet_point": ["First bullet"],
+                "list_price": [{"currency": "GBP", "amount": 80.0}],
+                "uvp_list_price": [{"currency": "GBP", "amount": 100.0}],
+                **expected_images,
+                "color": [
+                    {
+                        "standardized_values": ["Red"],
+                        "value": "Red",
+                        "language_tag": "fr",
+                        "marketplace_id": "FR",
+                    }
+                ],
+                "battery": [
+                    {
+                        "cell_composition": [{"value": "lithium_ion"}],
+                        "cell_composition_other_than_listed": [
+                            {"value": "lithium_ion", "language_tag": "fr"}
+                        ],
+                        "iec_code": [{"value": "18650"}],
+                        "weight": [{"value": 10.0, "unit": "grams"}],
+                        "marketplace_id": "FR",
+                    }
+                ],
+                "batteries_required": [
+                    {"value": True, "marketplace_id": "FR"}
+                ],
+                "condition_type": [
+                    {"value": "new", "marketplace_id": "FR"}
+                ],
+                "item_package_weight": [
+                    {"value": 2.5, "unit": "grams", "marketplace_id": "FR"}
+                ],
+            }
+            expected_body = {
+                "productType": "PRODUCT",
+                "requirements": "LISTING",
+                "attributes": expected_attributes,
+            }
+            self.assertEqual(body, expected_body)
 
 
     def test_delete_product_uses_correct_sku_and_marketplace(self):
