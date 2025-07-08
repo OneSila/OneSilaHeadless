@@ -24,6 +24,7 @@ from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonDefaultUnitConfigurator,
 )
 from sales_channels.integrations.amazon.models import AmazonCurrency
+from eancodes.models import EanCode
 from sales_prices.models import SalesPrice
 from currencies.models import Currency
 from currencies.currencies import currencies
@@ -1242,9 +1243,35 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         body = mock_instance.put_listings_item.call_args.kwargs.get("body")
         self.assertNotIn("fake_property", body.get("attributes", {}))
 
-    def test_missing_ean_or_asin_raises_exception(self):
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_missing_ean_or_asin_raises_exception(self, mock_listings, mock_get_client):
         """This test ensures the factory raises ValueError if no EAN/GTIN or ASIN is provided."""
-        pass
+        ProductProperty.objects.filter(
+            product=self.product,
+            property__internal_name="merchant_suggested_asin",
+        ).delete()
+        AmazonProperty.objects.filter(
+            sales_channel=self.sales_channel,
+            code="merchant_suggested_asin",
+        ).delete()
+
+        EanCode.objects.filter(product=self.product).delete()
+        self.remote_product.ean_code = None
+        self.remote_product.save()
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+
+        with self.assertRaises(ValueError) as ctx:
+            fac.run()
+
+        self.assertIn("ASIN or EAN", str(ctx.exception))
+        mock_listings.return_value.put_listings_item.assert_not_called()
 
     def test_create_product_with_asin_in_payload(self):
         """This test confirms that ASIN is correctly added and EAN is skipped if ASIN exists."""
