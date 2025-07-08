@@ -914,9 +914,29 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         self.assertEqual(kwargs.get("marketplace_ids"), [self.view.remote_id])
 
 
-    def test_update_falls_back_to_create_if_product_missing_remotely(self):
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch("sales_channels.integrations.amazon.factories.products.AmazonProductCreateFactory.run")
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_update_falls_back_to_create_if_product_missing_remotely(
+        self, mock_listings, mock_create_run, mock_get_client
+    ):
         """This test ensures update falls back to create if the product doesn’t exist remotely in the given marketplace."""
-        pass
+        self.remote_product.created_marketplaces = [self.view.remote_id]
+        self.remote_product.save()
+
+        mock_instance = mock_listings.return_value
+        mock_instance.get_listings_item.side_effect = Exception("Not found")
+
+        fac = AmazonProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        mock_create_run.assert_called_once()
+        mock_instance.patch_listings_item.assert_not_called()
 
 
     def test_update_images_overwrites_old_ones_correctly(self):
