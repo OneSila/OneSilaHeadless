@@ -24,6 +24,7 @@ from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonDefaultUnitConfigurator,
 )
 from sales_channels.integrations.amazon.models import AmazonCurrency
+from eancodes.models import EanCode
 from sales_prices.models import SalesPrice
 from currencies.models import Currency
 from currencies.currencies import currencies
@@ -1250,9 +1251,49 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         """This test confirms that ASIN is correctly added and EAN is skipped if ASIN exists."""
         pass
 
-    def test_create_product_with_ean_in_payload(self):
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_create_product_with_ean_in_payload(self, mock_listings, mock_get_images, mock_get_client):
         """This test verifies that EAN is included properly in the absence of ASIN."""
-        pass
+        asin_property = Property.objects.get(
+            internal_name="merchant_suggested_asin",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ProductProperty.objects.filter(
+            product=self.product,
+            property=asin_property,
+        ).delete()
+
+        AmazonProperty.objects.filter(
+            local_instance=asin_property,
+            sales_channel=self.sales_channel,
+        ).delete()
+
+        EanCode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            ean_code="1234567890123",
+        )
+
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
+
+        self.assertEqual(attrs.get("external_product_id"), "1234567890123")
+        self.assertEqual(attrs.get("external_product_id_type"), "EAN")
+        self.assertNotIn("merchant_suggested_asin", attrs)
 
     def test_custom_properties_are_processed_correctly(self):
         """This test ensures that various valid custom properties are processed using process_single_property and included in payload."""
