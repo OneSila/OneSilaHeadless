@@ -393,6 +393,14 @@ class AmazonProductDeleteFactory(GetAmazonAPIMixin, RemoteProductDeleteFactory):
     remote_model_class = AmazonProduct
     delete_remote_instance = True
 
+    def __init__(self, *args, view=None, **kwargs):
+
+        if view is None:
+            raise ValueError("AmazonProduct factories require a view argument")
+
+        self.view = view
+        super().__init__(*args, **kwargs)
+
     def delete_remote(self):
         listings = ListingsApi(self._get_client())
         try:

@@ -6,6 +6,7 @@ from model_bakery import baker
 
 from core.tests import TestCase
 from core.tests import TransactionTestCase
+from sales_channels.integrations.amazon.factories import AmazonProductDeleteFactory
 
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
@@ -891,14 +892,12 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         self.assertEqual(body, expected_body)
 
 
-    @patch(
-        "sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client",
-        return_value=None,
-    )
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch("sales_channels.integrations.amazon.factories.products.products.ListingsApi")
     def test_delete_product_uses_correct_sku_and_marketplace(self, mock_listings, mock_client):
         """This test ensures delete factory calls the correct endpoint with the proper SKU and marketplace ID."""
         mock_instance = mock_listings.return_value
+        mock_instance.delete_listings_item.return_value = {"status": "deleted"}
 
         fac = AmazonProductDeleteFactory(
             sales_channel=self.sales_channel,
