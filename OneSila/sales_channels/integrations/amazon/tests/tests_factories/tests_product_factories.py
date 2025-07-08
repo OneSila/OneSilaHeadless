@@ -1354,9 +1354,38 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         """This test ensures fallback to global translation when channel-specific translation is missing."""
         pass
 
-    def test_price_sync_enabled_includes_price_fields(self):
-        """This test ensures that enabling price sync includes correct pricing fields like list_price and uvp_list_price."""
-        pass
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_price_sync_enabled_includes_price_fields(self, mock_listings, mock_get_images, mock_get_client):
+        """Ensure price attributes are included when price sync is on."""
+        self.sales_channel.sync_prices = True
+        self.sales_channel.save()
+
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = (
+            self.get_put_and_patch_item_listing_mock_response()
+        )
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
+
+        self.assertEqual(
+            attrs.get("list_price"),
+            [{"currency": "GBP", "amount": 80.0}],
+        )
+        self.assertEqual(
+            attrs.get("uvp_list_price"),
+            [{"currency": "GBP", "amount": 100.0}],
+        )
 
     def test_price_sync_disabled_skips_price_fields(self):
         """This test ensures that price fields are skipped when price sync is turned off."""
