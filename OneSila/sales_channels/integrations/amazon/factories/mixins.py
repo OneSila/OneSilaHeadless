@@ -299,12 +299,6 @@ class GetAmazonAPIMixin:
 
     @throttle_safe(max_retries=5, base_delay=1)
     def update_product(self, sku, marketplace_id, product_type, current_attributes, new_attributes):
-        print('---------------------------- CURRENT')
-        print(current_attributes)
-
-        print('---------------------------- NEW')
-        print(new_attributes)
-
         patches = self._build_patches(current_attributes, new_attributes)
 
         body = {

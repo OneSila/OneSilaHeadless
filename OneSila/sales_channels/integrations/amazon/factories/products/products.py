@@ -369,7 +369,6 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
     remote_product_eancode_class = None
 
     def perform_remote_action(self):
-        print('----------------------------------------------- TRY TO CREATE')
         resp = self.create_product(
             sku=self.sku,
             marketplace_id=self.view.remote_id,
