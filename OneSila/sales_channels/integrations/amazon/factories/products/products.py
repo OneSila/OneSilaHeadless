@@ -334,13 +334,11 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
 
     def set_product_properties(self):
         rule_properties_ids = self.local_instance.get_required_and_optional_properties(product_rule=self.rule).values_list('property_id', flat=True)
-        self.product_properties = (
-            ProductProperty.objects.filter_multi_tenant(
+        self.product_properties =  ProductProperty.objects.filter_multi_tenant(
                 self.sales_channel.multi_tenant_company
-            )
-            .filter(product=self.local_instance, property_id__in=rule_properties_ids)
-            .exclude(property__internal_name='merchant_suggested_asin')
-        )
+            ).filter(product=self.local_instance, property_id__in=rule_properties_ids). \
+            exclude(property__internal_name='merchant_suggested_asin')
+
 
 
 class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFactory):
@@ -392,6 +390,20 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
 class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactory):
     """Sync Amazon products using marketplace-specific create or update."""
     create_product_factory = AmazonProductCreateFactory
+
+    def perform_remote_action(self):
+
+        resp = self.update_product(
+            self.sku,
+            self.view.remote_id,
+            self.payload.get("productType"),
+            self.current_attrs,
+            self.payload.get("attributes", {}),
+        )
+        return resp
+
+    def serialize_response(self, response):
+        return response.payload if hasattr(response, "payload") else True
 
 
 class AmazonProductDeleteFactory(GetAmazonAPIMixin, RemoteProductDeleteFactory):

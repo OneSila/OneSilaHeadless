@@ -6,7 +6,7 @@ from model_bakery import baker
 
 from core.tests import TestCase
 from core.tests import TransactionTestCase
-from sales_channels.integrations.amazon.factories import AmazonProductDeleteFactory
+from sales_channels.integrations.amazon.factories import AmazonProductDeleteFactory, AmazonProductSyncFactory
 
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
@@ -1368,6 +1368,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             type=Property.TYPES.TEXT,
             internal_name="material",
             multi_tenant_company=self.multi_tenant_company,
+            is_public_information=True
         )
         PropertyTranslation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -1394,6 +1395,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             code="material",
             type=Property.TYPES.TEXT,
         )
+
         AmazonPublicDefinition.objects.create(
             api_region_code="EU_UK",
             product_type_code="CHAIR",
@@ -1427,7 +1429,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             current_attrs
         )
 
-        fac = AmazonProductUpdateFactory(
+        fac = AmazonProductSyncFactory(
             sales_channel=self.sales_channel,
             local_instance=self.product,
             remote_instance=self.remote_product,
@@ -1441,6 +1443,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             (p for p in patches if "material" in p.get("value", [{}])[0]),
             None,
         )
+        print(patches)
         self.assertIsNotNone(patch_for_material)
         self.assertEqual(patch_for_material["op"], "replace")
         new_val = patch_for_material["value"][0]["material"][0]
@@ -1470,3 +1473,5 @@ class AmazonProductFactoriesTest(TransactionTestCase):
     def test_missing_view_argument_raises_value_error(self):
         """This test confirms that initializing a factory without a view raises ValueError."""
         pass
+
+
