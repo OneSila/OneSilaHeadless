@@ -1350,9 +1350,49 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         """This test checks that product content is pulled from sales channel translations if available."""
         pass
 
-    def test_translation_fallbacks_to_global_if_not_in_channel(self):
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_translation_fallbacks_to_global_if_not_in_channel(self, mock_listings, mock_get_images, mock_get_client):
         """This test ensures fallback to global translation when channel-specific translation is missing."""
-        pass
+        ProductTranslation.objects.filter(product=self.product).delete()
+
+        baker.make(
+            ProductTranslation,
+            product=self.product,
+            sales_channel=None,
+            language=self.multi_tenant_company.language,
+            name="Global Name",
+            description="Global Description",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        baker.make(
+            ProductTranslation,
+            product=self.product,
+            sales_channel=self.sales_channel,
+            language=self.multi_tenant_company.language,
+            name="Channel Name",
+            description=None,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
+
+        self.assertEqual(attrs.get("item_name"), "Channel Name")
+        self.assertEqual(attrs.get("product_description"), "Global Description")
 
     def test_price_sync_enabled_includes_price_fields(self):
         """This test ensures that enabling price sync includes correct pricing fields like list_price and uvp_list_price."""
