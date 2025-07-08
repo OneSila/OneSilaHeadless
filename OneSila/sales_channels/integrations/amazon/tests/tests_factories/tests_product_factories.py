@@ -80,7 +80,6 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
         self.product_type_property = Property.objects.filter(is_product_type=True, multi_tenant_company=self.multi_tenant_company).first()
 
-
         self.product_type_value = baker.make(
             PropertySelectValue,
             property=self.product_type_property,
@@ -990,7 +989,6 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
         mock_instance.patch_listings_item.assert_called_once()
 
-
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
@@ -1246,9 +1244,32 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         """This test ensures the factory raises ValueError if no EAN/GTIN or ASIN is provided."""
         pass
 
-    def test_create_product_with_asin_in_payload(self):
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_create_product_with_asin_in_payload(self, mock_listings, mock_get_images, mock_get_client):
         """This test confirms that ASIN is correctly added and EAN is skipped if ASIN exists."""
-        pass
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = (
+            self.get_put_and_patch_item_listing_mock_response()
+        )
+
+        self.remote_product.ean_code = None
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
+
+        self.assertEqual(attrs.get("merchant_suggested_asin"), "ASIN123")
+        self.assertNotIn("external_product_id", attrs)
+        self.assertNotIn("external_product_id_type", attrs)
 
     def test_create_product_with_ean_in_payload(self):
         """This test verifies that EAN is included properly in the absence of ASIN."""
