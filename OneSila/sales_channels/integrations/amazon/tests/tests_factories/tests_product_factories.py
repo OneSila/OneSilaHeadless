@@ -1361,10 +1361,26 @@ class AmazonProductFactoriesTest(TransactionTestCase):
     def test_price_sync_disabled_skips_price_fields(self):
         """This test ensures that price fields are skipped when price sync is turned off."""
         pass
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
 
-    def test_payload_skips_empty_price_fields_gracefully(self):
+    def test_payload_skips_empty_price_fields_gracefully(self, mock_listings, mock_get_images, mock_get_client):
         """This test confirms that missing prices do not break payload generation and are omitted silently."""
-        pass
+        self.sales_channel.sync_prices = True
+        self.sales_channel.save()
+        SalesPrice.objects.filter(product=self.product).delete()
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+        body = mock_listings.return_value.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
+        self.assertFalse(attrs.get("list_price"))
+        self.assertFalse(attrs.get("uvp_list_price"))
 
     def test_missing_view_argument_raises_value_error(self):
         """This test confirms that initializing a factory without a view raises ValueError."""
