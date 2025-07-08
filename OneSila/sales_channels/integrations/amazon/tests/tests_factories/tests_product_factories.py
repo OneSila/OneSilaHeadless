@@ -946,9 +946,54 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         mock_create_run.assert_called_once()
 
 
-    def test_update_images_overwrites_old_ones_correctly(self):
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img-new.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_update_images_overwrites_old_ones_correctly(self, mock_listings, mock_get_images, mock_get_client):
         """This test validates that old images are removed and only the new ones are included in the payload."""
-        pass
+        self.remote_product.created_marketplaces = [self.view.remote_id]
+        self.remote_product.save()
+
+        mock_instance = mock_listings.return_value
+        mock_instance.get_listings_item.return_value = SimpleNamespace(
+            attributes={
+                "main_product_image_locator": [
+                    {"media_location": "https://example.com/img-old.jpg"}
+                ]
+            }
+        )
+        mock_instance.patch_listings_item.return_value = (
+            self.get_put_and_patch_item_listing_mock_response()
+        )
+
+        fac = AmazonProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        patches = body.get("patches", [])
+        patch_for_main = next(
+            (
+                p
+                for p in patches
+                if "main_product_image_locator" in p.get("value", [{}])[0]
+            ),
+            None,
+        )
+
+        self.assertIsNotNone(patch_for_main)
+        self.assertEqual(patch_for_main["op"], "replace")
+        self.assertEqual(
+            patch_for_main["value"][0]["main_product_image_locator"][0][
+                "media_location"
+            ],
+            "https://example.com/img-new.jpg",
+        )
+        mock_instance.patch_listings_item.assert_called_once()
 
 
     def test_payload_includes_all_supported_property_types(self):
