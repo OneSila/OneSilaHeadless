@@ -88,15 +88,13 @@ class GetAmazonAPIMixin:
     def get_listing_item(self, sku, marketplace_id):
         """Return listing item payload for the given sku and marketplace."""
         listings = ListingsApi(self._get_client())
-        try:
-            resp = listings.get_listings_item(
-                seller_id=self.sales_channel.remote_id,
-                sku=sku,
-                marketplace_ids=[marketplace_id],
-            )
-            return resp
-        except Exception:
-            return None
+        resp = listings.get_listings_item(
+            seller_id=self.sales_channel.remote_id,
+            sku=sku,
+            marketplace_ids=[marketplace_id],
+        )
+        return resp
+
 
     @throttle_safe(max_retries=5, base_delay=1)
     def get_listing_attributes(self, sku, marketplace_id):

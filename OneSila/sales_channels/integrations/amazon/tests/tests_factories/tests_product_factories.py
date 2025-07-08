@@ -926,6 +926,14 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         mock_instance = mock_listings.return_value
         mock_instance.get_listings_item.side_effect = Exception("Not found")
 
+        # Prevent accidental logging crash (mocking even if it shouldn't be called)
+        mock_instance.patch_listings_item.return_value = {
+            "submissionId": "mock-submission-id",
+            "processingStatus": "VALID",
+            "status": "VALID",
+            "issues": [],
+        }
+
         fac = AmazonProductUpdateFactory(
             sales_channel=self.sales_channel,
             local_instance=self.product,
@@ -934,8 +942,8 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
         fac.run()
 
-        mock_create_run.assert_called_once()
         mock_instance.patch_listings_item.assert_not_called()
+        mock_create_run.assert_called_once()
 
 
     def test_update_images_overwrites_old_ones_correctly(self):

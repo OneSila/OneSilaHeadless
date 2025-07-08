@@ -94,7 +94,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     def initialize_remote_product(self):
 
         super().initialize_remote_product()
-        if not(hasattr(self, 'current_attrs')):
+        if not hasattr(self, 'current_attrs'):
             self.get_saleschannel_remote_object(self.local_instance.sku)
 
         if self.is_create and self.view.remote_id in (self.remote_instance.created_marketplaces or []):
@@ -272,7 +272,12 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     # Remote helpers
     # ------------------------------------------------------------
     def get_saleschannel_remote_object(self, sku):
-        response = self.get_listing_item(sku, self.view.remote_id)
+        response = {}
+        try:
+            response = self.get_listing_item(sku, self.view.remote_id)
+        except Exception as e:
+            if not self.is_create:
+                raise SwitchedToCreateException(f"Product with sku {sku} was not found. Initial error: {str(e)}")
 
         self.current_attrs = getattr(response, "attributes", {}) or {}
         return response
@@ -364,6 +369,7 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
     remote_product_eancode_class = None
 
     def perform_remote_action(self):
+        print('----------------------------------------------- TRY TO CREATE')
         resp = self.create_product(
             sku=self.sku,
             marketplace_id=self.view.remote_id,
