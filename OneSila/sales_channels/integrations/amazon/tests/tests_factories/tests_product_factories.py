@@ -176,9 +176,27 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         pass
 
 
-    def test_delete_product_uses_correct_sku_and_marketplace(self):
+    @patch(
+        "sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client",
+        return_value=None,
+    )
+    @patch("sales_channels.integrations.amazon.factories.products.products.ListingsApi")
+    def test_delete_product_uses_correct_sku_and_marketplace(self, mock_listings, mock_client):
         """This test ensures delete factory calls the correct endpoint with the proper SKU and marketplace ID."""
-        pass
+        mock_instance = mock_listings.return_value
+
+        fac = AmazonProductDeleteFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        mock_instance.delete_listings_item.assert_called_once()
+        kwargs = mock_instance.delete_listings_item.call_args.kwargs
+        self.assertEqual(kwargs.get("sku"), self.remote_product.remote_sku)
+        self.assertEqual(kwargs.get("marketplace_ids"), [self.view.remote_id])
 
 
     def test_update_falls_back_to_create_if_product_missing_remotely(self):
