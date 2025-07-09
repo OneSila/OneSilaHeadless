@@ -251,10 +251,18 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             )
             create_fac.run()
 
-            self.remote_product_properties.append(create_fac.remote_instance)
-            data = json.loads(create_fac.remote_value or "{}")
-            self.attributes.update(data)
-            return create_fac.remote_instance.id
+            print('--------------------------------------------- product_property')
+            print(product_property)
+            remote_id = None
+
+            # not mapped values will be skipped instead giving error because it didn't pass the preflight check
+            if hasattr(create_fac, "remote_instance"):
+                self.remote_product_properties.append(create_fac.remote_instance)
+                data = json.loads(create_fac.remote_value or "{}")
+                self.attributes.update(data)
+                remote_id = create_fac.remote_instance.id
+
+            return remote_id
 
     def build_payload(self):
         super().build_payload()
@@ -345,6 +353,25 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         fac.run()
         self.remote_instance = fac.remote_instance
 
+    def run_sync_flow(self):
+        """
+        Runs the sync/update flow.
+        """
+
+        if self.sync_product_factory is None:
+            raise ValueError("sync_product_factory must be specified in the RemoteProductCreateFactory.")
+
+        sync_factory = self.sync_product_factory(
+            sales_channel=self.sales_channel,
+            local_instance=self.local_instance,
+            remote_instance=self.remote_instance,
+            parent_local_instance=self.parent_local_instance,
+            remote_parent_product=self.remote_parent_product,
+            api=self.api,
+            view=self.view
+        )
+        sync_factory.run()
+
     def assign_ean_code(self):
         pass  # there is no ean code sync for Amazon. This is used as an identifier and cannot be updated later on
 
@@ -389,6 +416,9 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
             product_type=self.payload.get("productType"),
             attributes=self.payload.get("attributes", {}),
         )
+        print('------------------------------------------------------------------------')
+        print(resp)
+
         return resp
 
     def post_action_process(self):

@@ -254,6 +254,14 @@ class GetAmazonAPIMixin:
             mode="VALIDATION_PREVIEW" if settings.DEBUG else None,
         )
 
+        print('--------------------------------------- ARGUMENTS')
+        print('mode')
+        print("VALIDATION_PREVIEW" if settings.DEBUG else None)
+        print('body')
+        import pprint
+        pprint.pprint(body)
+        print('-------------------------------------------------')
+
         submission_id = getattr(response, "submissionId", None)
         processing_status = getattr(response, "status", None) or getattr(response, "processingStatus", None)
         log_identifier, _ = self.get_identifiers()

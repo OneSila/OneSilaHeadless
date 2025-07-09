@@ -289,15 +289,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                     }
                 ],
             })
-            remote_property = AmazonProperty.objects.filter(
-                sales_channel=self.sales_channel,
-                code="merchant_suggested_asin",
-            ).first()
-            if remote_property:
-                mirror_map[asin_property.id] = {
-                    "remote_property": remote_property,
-                    "remote_value": asin,
-                }
 
         if attributes:
             structured["properties"] = attributes

@@ -160,7 +160,8 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
         try:
             self._get_remote_property()
         except AmazonProperty.DoesNotExist:
-            raise ValueError("Property not mapped to Amazon")
+            return False
+
         return True
 
     def create_body(self):
