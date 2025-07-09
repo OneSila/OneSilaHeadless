@@ -5,7 +5,7 @@ from django.db import IntegrityError
 from imports_exports.factories.imports import ImportMixin
 from imports_exports.factories.products import ImportProductInstance
 from products.product_types import SIMPLE
-from properties.models import Property
+from properties.models import Property, PropertyTranslation
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.helpers import (
     infer_product_type,
@@ -273,6 +273,32 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             structured["prices"] = self._parse_prices(product_data)
 
         attributes, mirror_map = self._parse_attributes(product_data, view)
+
+        asin_property = Property.objects.filter(
+            internal_name="merchant_suggested_asin",
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+        ).first()
+        if asin_property and asin:
+            attributes.append({
+                "property": asin_property,
+                "value": asin,
+                "translations": [
+                    {
+                        "language": self.sales_channel.multi_tenant_company.language,
+                        "value": asin,
+                    }
+                ],
+            })
+            remote_property = AmazonProperty.objects.filter(
+                sales_channel=self.sales_channel,
+                code="merchant_suggested_asin",
+            ).first()
+            if remote_property:
+                mirror_map[asin_property.id] = {
+                    "remote_property": remote_property,
+                    "remote_value": asin,
+                }
+
         if attributes:
             structured["properties"] = attributes
             structured["__mirror_product_properties_map"] = mirror_map
