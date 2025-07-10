@@ -19,6 +19,8 @@ from products.models import (
     ProductTranslationBulletPoint,
 )
 from products_inspector.models import InspectorBlock
+from sales_channels.integrations.amazon.models import AmazonSalesChannel
+from sales_channels.models import SalesChannelViewAssign
 from taxes.schema.types.filters import VatRateFilter
 from strawberry.relay import from_base64
 
@@ -52,6 +54,23 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
         if value is not None:
             _, id = from_base64(value)
             queryset = queryset.filter(productproperty__value_select_id=id)
+
+        return queryset, Q()
+
+    @custom_filter
+    def amazon_products_with_issues_for_sales_channel(
+        self,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+
+        if value not in (None, UNSET):
+            _, sales_channel_id = from_base64(value)
+            product_ids = SalesChannelViewAssign.objects.filter(
+                sales_channel_id=sales_channel_id
+            ).exclude(issues=[]).values_list("product_id", flat=True)
+            queryset = queryset.filter(id__in=product_ids)
 
         return queryset, Q()
 
