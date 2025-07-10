@@ -211,7 +211,7 @@ class AmazonProductType(RemoteObjectMixin, models.Model):
     )
 
     variation_themes = JSONField(null=True, blank=True)
-    listing_offer_required_properties = JSONField(default=list, blank=True)
+    listing_offer_required_properties = JSONField(default=dict, blank=True)
 
     objects = AmazonProductTypeManager()
 

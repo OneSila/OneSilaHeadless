@@ -429,7 +429,8 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
     def _get_schema_for_marketplace(self, view, is_default_marketplace=False):
         """
         SP-API call to get product type definition for a given marketplace view.
-        Returns parsed schema JSON with optional title added.
+        Returns the parsed schema JSON (title included for the default market) and
+        the set of attribute codes allowed in listing-offer requests.
         """
         definitions_api = DefinitionsApi(self._get_client())
         response = definitions_api.get_definitions_product_type(
@@ -451,12 +452,21 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
 
         offer_schema_link = offer_response.var_schema.link.resource
         offer_schema_data = self._download_json(offer_schema_link)
-        # @TODO: Continue this idea to add the properties of this in a field inside product type and filter out on patch / update
+
+        offer_property_keys = list(offer_schema_data.get("properties", {}).keys())
+
+        # persist offer property keys per api region
+        listing_offer_props = (
+            self.product_type.listing_offer_required_properties or {}
+        )
+        listing_offer_props[view.api_region_code] = offer_property_keys
+        self.product_type.listing_offer_required_properties = listing_offer_props
+        self.product_type.save(update_fields=["listing_offer_required_properties"])
 
         if is_default_marketplace:
             schema_data["title"] = response.display_name
 
-        return schema_data
+        return schema_data, offer_property_keys
 
     @throttle_safe(max_retries=5, base_delay=1)
     def _run_fake_validation_preview(self, view):
@@ -525,7 +535,9 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
             self.process_view(view, is_default)
 
     def process_view(self, view, is_default):
-        schema_data = self._get_schema_for_marketplace(view, is_default_marketplace=is_default)
+        schema_data, offer_allowed_properties = self._get_schema_for_marketplace(
+            view, is_default_marketplace=is_default
+        )
         required_properties = set(schema_data["required"])
 
         validation_issues = self._run_fake_validation_preview(view)
@@ -544,7 +556,14 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
         self.set_variation_theme(properties)
 
         for code, schema in properties.items():
-            self.process_property(code, schema, required_properties, view, is_default)
+            self.process_property(
+                code,
+                schema,
+                required_properties,
+                view,
+                is_default,
+                offer_allowed_properties,
+            )
 
     def set_variation_theme(self, properties):
         variation_schema = properties.get("variation_theme")
@@ -563,7 +582,14 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
         fac = DefaultUnitConfiguratorFactory(public_definition, self.sales_channel, view, is_default)
         fac.run()
 
-    def sync_public_definitions(self, attr_code, schema_definition, required_properties, view):
+    def sync_public_definitions(
+        self,
+        attr_code,
+        schema_definition,
+        required_properties,
+        view,
+        offer_allowed_properties,
+    ):
         """
         Go over the parsed schema_definition and sync AmazonPublicDefinition models.
         """
@@ -588,6 +614,9 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
                     break
 
         public_def.allowed_in_configurator = allowed
+        public_def.allowed_in_listing_offer_request = (
+            attr_code in offer_allowed_properties
+        )
         public_def.save()
 
         if public_def.should_refresh() and not public_def.is_internal:
@@ -702,7 +731,15 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
                 remote_rule_item.remote_type = new_type
                 remote_rule_item.save()
 
-    def process_property(self, code, schema, required_properties, view, is_default):
+    def process_property(
+        self,
+        code,
+        schema,
+        required_properties,
+        view,
+        is_default,
+        offer_allowed_properties,
+    ):
         # create AmazonPublicDefinition we will have the thing from the view or instead we can just use the amazon domain thing like Amazon.nl or something that comes from the schema
         # public_definition = self.get_or_create_public_definition(...)
         # enrich public_definition with export_definition and ussage_definition
@@ -711,7 +748,13 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
         # the first public definition like "battery" will have export_definitions as an array with all the needed things that needs created
         # but we still need to create the public definitions for all of that as well.
         # if schema is_internal we will not do the export_definition and ussage_definition
-        public_definition = self.sync_public_definitions(code, schema, required_properties, view)
+        public_definition = self.sync_public_definitions(
+            code,
+            schema,
+            required_properties,
+            view,
+            offer_allowed_properties,
+        )
 
         if public_definition.is_internal:
             return
