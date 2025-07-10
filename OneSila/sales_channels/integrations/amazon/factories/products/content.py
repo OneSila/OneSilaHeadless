@@ -112,8 +112,8 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentU
             self.remote_product.remote_sku,
             self.view.remote_id,
             product_type.product_type_code,
-            current_attrs,
             body.get("attributes", {}),
+            current_attrs,
         )
 
         return response

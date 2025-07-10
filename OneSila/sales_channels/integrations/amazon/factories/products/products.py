@@ -421,8 +421,8 @@ class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFa
             self.sku,
             self.view.remote_id,
             self.remote_rule,
-            self.current_attrs,
             self.payload.get("attributes", {}),
+            self.current_attrs,
         )
         return resp
 
@@ -471,8 +471,8 @@ class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactor
             self.sku,
             self.view.remote_id,
             self.remote_rule,
-            self.current_attrs,
             self.payload.get("attributes", {}),
+            self.current_attrs,
         )
         return resp
 
