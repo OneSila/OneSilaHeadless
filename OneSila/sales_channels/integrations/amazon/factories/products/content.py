@@ -22,6 +22,11 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentU
             language=language,
         )
 
+    def preflight_check(self):
+        if not self.sales_channel.listing_owner:
+            return False
+        return super().preflight_check()
+
     def _get_product_type(self):
         rule = self.local_instance.get_product_rule()
         if not rule:
@@ -31,43 +36,62 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentU
             local_instance=rule,
         )
 
-    def customize_payload(self):
+    def build_content_attributes(self):
         view_lang = (
             self.view.remote_languages.first().local_instance
-            if self.view else None
-        )
-        lang = (
-            self.language or view_lang or self.sales_channel.multi_tenant_company.language
+            if self.view and self.view.remote_languages.exists()
+            else self.sales_channel.multi_tenant_company.language
         )
 
-        translation = ProductTranslation.objects.filter(
+        lang = self.language or view_lang
+
+        channel_translation = ProductTranslation.objects.filter(
             product=self.local_instance,
             language=lang,
             sales_channel=self.sales_channel,
         ).first()
-        if not translation:
-            translation = ProductTranslation.objects.filter(
-                product=self.local_instance,
-                language=lang,
-                sales_channel=None,
-            ).first()
 
-        if not translation:
-            self.payload = {}
-            return
+        default_translation = ProductTranslation.objects.filter(
+            product=self.local_instance,
+            language=lang,
+            sales_channel=None,
+        ).first()
 
-        bullet_points = list(
-            ProductTranslationBulletPoint.objects.filter(
-                product_translation=translation
-            ).order_by("sort_order").values_list("text", flat=True)
-        )
+        item_name = None
+        product_description = None
 
-        self.payload = {
-            "item_name": translation.name,
-            "product_description": translation.description,
+        if channel_translation:
+            item_name = channel_translation.name or None
+            product_description = channel_translation.description or None
+
+        if not item_name and default_translation:
+            item_name = default_translation.name
+
+        if not product_description and default_translation:
+            product_description = default_translation.description
+
+        bullet_points = []
+        if channel_translation:
+            bullet_points = list(
+                ProductTranslationBulletPoint.objects.filter(
+                    product_translation=channel_translation
+                )
+                .order_by("sort_order")
+                .values_list("text", flat=True)
+            )
+
+        attrs = {
+            "item_name": [{"value": item_name}],
+            "product_description": [{"value": product_description}],
         }
+
         if bullet_points:
-            self.payload["bullet_point"] = bullet_points
+            attrs["bullet_point"] = [{"value": bp} for bp in bullet_points]
+
+        return {k: v for k, v in attrs.items() if v not in (None, "")}
+
+    def customize_payload(self):
+        self.payload = self.build_content_attributes()
 
     def update_remote(self):
         if not self.payload:

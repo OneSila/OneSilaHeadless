@@ -33,6 +33,7 @@ class AmazonProductContentUpdateFactoryTest(TestCase):
         self.sales_channel = AmazonSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             remote_id="SELLER123",
+            listing_owner=True
         )
         self.view = AmazonSalesChannelView.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -157,16 +158,16 @@ class AmazonProductContentUpdateFactoryTest(TestCase):
             fac.run()
 
         expected_payload = {
-            "item_name": "Chair name",
-            "product_description": "Chair description",
-            "bullet_point": ["Point one", "Point two"],
+            "item_name": [{"value": "Chair name"}],
+            "product_description": [{"value": "Chair description"}],
+            "bullet_point": [{"value": "Point one"}, {"value": "Point two"}],
         }
         expected_body = {
             "productType": "CHAIR",
             "patches": [
-                {"op": "add", "value": [{"item_name": "Chair name"}]},
-                {"op": "add", "value": [{"product_description": "Chair description"}]},
-                {"op": "add", "value": [{"bullet_point": ["Point one", "Point two"]}]},
+                {"op": "add", "value": [{"item_name": [{"value": "Chair name"}]}]},
+                {"op": "add", "value": [{"product_description": [{"value": "Chair description"}]}]},
+                {"op": "add", "value": [{"bullet_point": [{"value": "Point one"}, {"value": "Point two"}]}]},
             ],
         }
 
