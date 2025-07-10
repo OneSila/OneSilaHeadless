@@ -286,13 +286,12 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
 
             return remote_id
 
-    def get_remote_product_type(self):
-        remote_rule = AmazonProductType.objects.get(
+    def set_rule(self):
+        super().set_rule()
+        self.remote_rule = AmazonProductType.objects.get(
             local_instance=self.rule,
             sales_channel=self.sales_channel,
         )
-
-        return remote_rule.product_type_code
 
     def build_payload(self):
         super().build_payload()
@@ -304,7 +303,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         self.attributes.update(self.image_attributes)
 
         self.payload = {
-            "productType": self.get_remote_product_type(),
+            "productType": self.remote_rule.product_type_code,
             "attributes": self.attributes,
         }
 
@@ -421,7 +420,7 @@ class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFa
         resp = self.update_product(
             self.sku,
             self.view.remote_id,
-            self.payload.get("productType"),
+            self.remote_rule,
             self.current_attrs,
             self.payload.get("attributes", {}),
         )
@@ -442,7 +441,7 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
         resp = self.create_product(
             sku=self.sku,
             marketplace_id=self.view.remote_id,
-            product_type=self.payload.get("productType"),
+            product_type=self.remote_rule,
             attributes=self.payload.get("attributes", {}),
         )
         print('------------------------------------------------------------------------')
@@ -471,7 +470,7 @@ class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactor
         resp = self.update_product(
             self.sku,
             self.view.remote_id,
-            self.payload.get("productType"),
+            self.remote_rule,
             self.current_attrs,
             self.payload.get("attributes", {}),
         )

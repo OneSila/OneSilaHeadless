@@ -239,7 +239,7 @@ class GetAmazonAPIMixin:
         pt_code = product_type.product_type_code
 
         if not self.sales_channel.listing_owner:
-            region = getattr(getattr(self, "view", None), "api_region_code", None)
+            region = self.view.api_region_code
             allowed_keys = (
                 product_type.listing_offer_required_properties.get(region, [])
                 if isinstance(product_type.listing_offer_required_properties, dict)
