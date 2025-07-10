@@ -48,8 +48,8 @@ class AmazonProductPropertyCreateFactory(AmazonProductPropertyBaseMixin, RemoteP
             self.remote_product.remote_sku,
             self.view.remote_id,
             body.get("productType"),
-            current_attrs,
             body.get("attributes", {}),
+            current_attrs,
         )
         return response
 
@@ -102,8 +102,8 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteP
             self.remote_product.remote_sku,
             self.view.remote_id,
             body.get("productType"),
-            current_attrs,
             body.get("attributes", {}),
+            current_attrs,
         )
         return response
 
@@ -144,8 +144,8 @@ class AmazonProductPropertyDeleteFactory(AmazonProductPropertyBaseMixin, RemoteP
                 self.remote_instance.remote_product.remote_sku,
                 self.view.remote_id,
                 self.remote_instance.remote_product.remote_type,
-                current_attrs,
                 {self.remote_instance.remote_property.main_code: None},
+                current_attrs,
             )
             return response
         except Exception:

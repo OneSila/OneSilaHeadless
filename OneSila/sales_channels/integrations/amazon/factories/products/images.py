@@ -73,8 +73,8 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin):
             self.remote_product.remote_sku,
             self.view.remote_id,
             self.remote_product.remote_type,
-            current_attrs,
             body.get("attributes", {}),
+            current_attrs,
         )
         return response
 

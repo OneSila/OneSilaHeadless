@@ -786,7 +786,6 @@ class AmazonProductFactoriesTest(TransactionTestCase):
 
         mock_create_run.assert_called_once()
         mock_instance.put_listings_item.assert_called()
-        mock_instance.patch_listings_item.assert_not_called()
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -849,7 +848,6 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         fac.run()
 
         mock_instance.put_listings_item.assert_called_once()
-        mock_instance.patch_listings_item.assert_not_called()
 
         kwargs = mock_instance.put_listings_item.call_args.kwargs
         self.assertEqual(kwargs.get("marketplace_ids"), ["FR"])
@@ -949,7 +947,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         mock_instance.get_listings_item.side_effect = Exception("Not found")
 
         # Prevent accidental logging crash (mocking even if it shouldn't be called)
-        mock_instance.patch_listings_item.return_value = {
+        mock_instance.put_listings_item.return_value = {
             "submissionId": "mock-submission-id",
             "processingStatus": "VALID",
             "status": "VALID",
@@ -964,7 +962,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
         fac.run()
 
-        mock_instance.patch_listings_item.assert_not_called()
+        mock_instance.put_listings_item.assert_not_called()
         mock_create_run.assert_called_once()
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
@@ -983,7 +981,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
                 ]
             }
         )
-        mock_instance.patch_listings_item.return_value = (
+        mock_instance.put_listings_item.return_value = (
             self.get_put_and_patch_item_listing_mock_response()
         )
 
@@ -995,26 +993,13 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
         fac.run()
 
-        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
-        patches = body.get("patches", [])
-        patch_for_main = next(
-            (
-                p
-                for p in patches
-                if "main_product_image_locator" in p.get("value", [{}])[0]
-            ),
-            None,
-        )
-
-        self.assertIsNotNone(patch_for_main)
-        self.assertEqual(patch_for_main["op"], "replace")
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
         self.assertEqual(
-            patch_for_main["value"][0]["main_product_image_locator"][0][
-                "media_location"
-            ],
-            "https://example.com/img-new.jpg",
+            attrs.get("main_product_image_locator"),
+            [{"media_location": "https://example.com/img-new.jpg"}],
         )
-        mock_instance.patch_listings_item.assert_called_once()
+        mock_instance.put_listings_item.assert_called_once()
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -1444,7 +1429,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
 
         mock_instance = mock_listings.return_value
-        mock_instance.patch_listings_item.return_value = (
+        mock_instance.put_listings_item.return_value = (
             self.get_put_and_patch_item_listing_mock_response()
         )
         current_attrs = {"material": [{"value": "Plastic", "marketplace_id": self.view.remote_id}]}
@@ -1460,17 +1445,12 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
         fac.run()
 
-        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
-        patches = body.get("patches", [])
-        patch_for_material = next(
-            (p for p in patches if "material" in p.get("value", [{}])[0]),
-            None,
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
+        self.assertEqual(
+            attrs.get("material"),
+            [{"value": "Wood", "marketplace_id": self.view.remote_id}],
         )
-        self.assertIsNotNone(patch_for_material)
-        self.assertEqual(patch_for_material["op"], "replace")
-        new_val = patch_for_material["value"][0]["material"][0]
-        self.assertEqual(new_val["value"], "Wood")
-        self.assertEqual(new_val["marketplace_id"], self.view.remote_id)
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -1679,7 +1659,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         price.save()
 
         mock_instance = mock_listings.return_value
-        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
         mock_instance.get_listings_item.return_value = SimpleNamespace(
             attributes={
                 "list_price": [{"currency": "GBP", "value": 89.99}],
@@ -1704,21 +1684,14 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
         fac.run()
 
-        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
-        patches = body.get("patches", [])
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
 
-        price_patch = next((p for p in patches if "purchasable_offer" in p.get("value", [{}])[0]), None)
-        self.assertIsNotNone(price_patch)
-        self.assertEqual(price_patch["op"], "replace")
         self.assertEqual(
-            price_patch["value"][0]["purchasable_offer"][0]["our_price"][0]["schedule"][0]["value_with_tax"],
+            attrs.get("purchasable_offer")[0]["our_price"][0]["schedule"][0]["value_with_tax"],
             99.99,
         )
-
-        list_price_patch = next((p for p in patches if "list_price" in p.get("value", [{}])[0]), None)
-        self.assertIsNotNone(list_price_patch)
-        self.assertEqual(list_price_patch["op"], "replace")
-        self.assertEqual(list_price_patch["value"][0]["list_price"][0]["value"], 99.99)
+        self.assertEqual(attrs.get("list_price")[0]["value"], 99.99)
 
     def test_missing_view_argument_raises_value_error(self):
         """This test confirms that initializing a factory without a view raises ValueError."""
@@ -1736,4 +1709,31 @@ class AmazonProductFactoriesTest(TransactionTestCase):
                     local_instance=self.product,
                     remote_instance=self.remote_product,
                 )
+
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_update_product_fetches_attributes_when_missing(self, mock_listings):
+        class Dummy(GetAmazonAPIMixin):
+            def __init__(self, sales_channel, view):
+                self.sales_channel = sales_channel
+                self.view = view
+
+            def _get_client(self):
+                return None
+
+            def update_assign_issues(self, *args, **kwargs):
+                pass
+
+        dummy = Dummy(self.sales_channel, self.view)
+
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        with patch.object(dummy, "get_listing_attributes", return_value={"item_name": [{"value": "Old"}]}) as mock_get:
+            product_type = AmazonProductType.objects.get(local_instance=self.rule)
+            dummy.update_product("AMZSKU", self.view.remote_id, product_type, {"item_name": [{"value": "New"}]}, None)
+
+            mock_get.assert_called_once_with("AMZSKU", self.view.remote_id)
+
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        self.assertEqual(body["attributes"].get("item_name"), [{"value": "New"}])
 

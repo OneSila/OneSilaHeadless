@@ -85,21 +85,25 @@ class GetAmazonAPIMixin:
             raise Exception(f"SP-API failed: {e}")
 
     @throttle_safe(max_retries=5, base_delay=1)
-    def get_listing_item(self, sku, marketplace_id):
+    def get_listing_item(self, sku, marketplace_id, *, included_data=None):
         """Return listing item payload for the given sku and marketplace."""
         listings = ListingsApi(self._get_client())
         resp = listings.get_listings_item(
             seller_id=self.sales_channel.remote_id,
             sku=sku,
             marketplace_ids=[marketplace_id],
-            included_data=["summaries", "issues", "offers", "attributes"]
+            included_data=included_data or ["summaries", "issues"],
         )
         return resp
 
     @throttle_safe(max_retries=5, base_delay=1)
     def get_listing_attributes(self, sku, marketplace_id):
         """Convenience wrapper returning attributes of a listing item."""
-        payload = self.get_listing_item(sku, marketplace_id)
+        payload = self.get_listing_item(
+            sku,
+            marketplace_id,
+            included_data=["attributes"],
+        )
 
         if not payload:
             return {}
@@ -320,16 +324,25 @@ class GetAmazonAPIMixin:
         return patches
 
     @throttle_safe(max_retries=5, base_delay=1)
-    def update_product(self, sku, marketplace_id, product_type, current_attributes, new_attributes):
-        patches = self._build_patches(current_attributes, new_attributes)
+    def update_product(
+        self,
+        sku,
+        marketplace_id,
+        product_type,
+        new_attributes,
+        current_attributes=None,
+    ):
+        if current_attributes is None:
+            current_attributes = self.get_listing_attributes(sku, marketplace_id)
 
-        body = {
-            "productType": product_type.product_type_code,
-            "patches": patches,
-        }
+        merged_attributes = {**(current_attributes or {})}
+        for key, value in (new_attributes or {}).items():
+            merged_attributes[key] = value
+
+        body = self._build_common_body(product_type, merged_attributes)
 
         listings = ListingsApi(self._get_client())
-        response = listings.patch_listings_item(
+        response = listings.put_listings_item(
             seller_id=self.sales_channel.remote_id,
             sku=sku,
             marketplace_ids=[marketplace_id],
@@ -338,8 +351,8 @@ class GetAmazonAPIMixin:
             mode="VALIDATION_PREVIEW" if settings.DEBUG else None,
         )
 
-        submission_id = getattr(response, "submissionId", None)
-        processing_status = getattr(response, "status", None) or getattr(response, "processingStatus", None)
+        submission_id = getattr(response, "submission_id", None)
+        processing_status = getattr(response, "status", None)
         log_identifier, _ = self.get_identifiers()
         self.update_assign_issues(
             getattr(response, "issues", []) or [],
