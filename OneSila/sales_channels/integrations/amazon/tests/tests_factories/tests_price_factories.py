@@ -109,9 +109,9 @@ class AmazonPriceUpdateFactoryTest(TestCase):
 
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
-    def test_update_factory_builds_correct_body(self, mock_get_client, mock_listings):
+    def test_update_price_builds_correct_body(self, mock_get_client, mock_listings):
         mock_instance = mock_listings.return_value
-        mock_instance.patch_listings_item.side_effect = Exception("no amazon")
+        mock_instance.put_listings_item.side_effect = Exception("no amazon")
         mock_instance.get_listings_item.return_value = MagicMock(payload={"attributes": {}})
 
         factory = AmazonPriceUpdateFactory(
@@ -125,30 +125,24 @@ class AmazonPriceUpdateFactoryTest(TestCase):
 
         expected = {
             "productType": "CHAIR",
-            "patches": [
-                {
-                    "op": "add",
-                    "value": [
-                        {
-                            "purchasable_offer": [
-                                {
-                                    "audience": "ALL",
-                                    "currency": "GBP",
-                                    "marketplace_id": "GB",
-                                    "our_price": [
-                                        {
-                                            "schedule": [
-                                                {"value_with_tax": 80.0}
-                                            ]
-                                        }
-                                    ],
-                                }
-                            ]
-                        }
-                    ],
-                },
-            ],
+            "requirements": "LISTING_OFFER_ONLY",
+            "attributes": {
+                "purchasable_offer": [
+                    {
+                        "audience": "ALL",
+                        "currency": "GBP",
+                        "marketplace_id": "GB",
+                        "our_price": [
+                            {
+                                "schedule": [
+                                    {"value_with_tax": 80.0}
+                                ]
+                            }
+                        ],
+                    }
+                ]
+            },
         }
 
-        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
         self.assertEqual(body, expected)
