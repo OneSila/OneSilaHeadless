@@ -39,6 +39,7 @@ from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonDefaultUnitConfiguratorOrder,
     AmazonRemoteLogOrder,
 )
+from sales_channels.schema.types.types import FormattedIssueType
 
 
 @strawberry_type
@@ -216,3 +217,22 @@ class AmazonRemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):
         'AmazonSalesChannelType',
         lazy("sales_channels.integrations.amazon.schema.types.types")
     ]
+
+
+    @field(description="List of formatted issues coming from the remote marketplace")
+    def formatted_issues(self, info) -> List[FormattedIssueType]:
+        issues_data = self.issues or []
+        formatted: List[FormattedIssueType] = []
+
+        for issue in issues_data:
+
+            if not isinstance(issue, dict):
+                continue
+            formatted.append(
+                FormattedIssueType(
+                    message=issue.get("message"),
+                    severity=issue.get("severity"),
+                )
+            )
+
+        return formatted

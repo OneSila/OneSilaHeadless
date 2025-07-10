@@ -311,6 +311,4 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
                     )
                 )
 
-        # Other marketplace specific formatting can be added here.
-
         return formatted
