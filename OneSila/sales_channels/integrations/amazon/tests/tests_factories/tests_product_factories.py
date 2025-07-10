@@ -661,7 +661,17 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             "item_name": "Chair name",
             "product_description": "Chair description",
             "bullet_point": ["First bullet"],
-            "list_price": [{"currency": "GBP", "amount": 80.0}],
+            "purchasable_offer": [
+                {
+                    "audience": "ALL",
+                    "currency": "GBP",
+                    "marketplace_id": "GB",
+                    "our_price": [
+                        {"schedule": [{"value_with_tax": 80.0}]}
+                    ],
+                }
+            ],
+            "list_price": [{"currency": "GBP", "value": 80.0}],
             "uvp_list_price": [{"currency": "GBP", "amount": 100.0}],
             **expected_images,
             "color": [
@@ -853,7 +863,17 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             "item_name": "Chair name",
             "product_description": "Chair description",
             "bullet_point": ["First bullet"],
-            "list_price": [{"currency": "GBP", "amount": 80.0}],
+            "purchasable_offer": [
+                {
+                    "audience": "ALL",
+                    "currency": "GBP",
+                    "marketplace_id": "FR",
+                    "our_price": [
+                        {"schedule": [{"value_with_tax": 80.0}]}
+                    ],
+                }
+            ],
+            "list_price": [{"currency": "GBP", "value": 80.0}],
             "uvp_list_price": [{"currency": "GBP", "amount": 100.0}],
             **expected_images,
             "color": [
@@ -1299,8 +1319,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         attrs = body.get("attributes", {})
 
         self.assertEqual(attrs.get("merchant_suggested_asin"), "ASIN123")
-        self.assertNotIn("external_product_id", attrs)
-        self.assertNotIn("external_product_id_type", attrs)
+        self.assertNotIn("externally_assigned_product_identifier", attrs)
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -1342,8 +1361,10 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         body = mock_instance.put_listings_item.call_args.kwargs.get("body")
         attrs = body.get("attributes", {})
 
-        self.assertEqual(attrs.get("external_product_id"), "1234567890123")
-        self.assertEqual(attrs.get("external_product_id_type"), "EAN")
+        self.assertEqual(
+            attrs.get("externally_assigned_product_identifier"),
+            [{"type": "ean", "value": "1234567890123"}],
+        )
         self.assertNotIn("merchant_suggested_asin", attrs)
 
     @patch(
@@ -1563,12 +1584,21 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         attrs = body.get("attributes", {})
 
         self.assertEqual(
-            attrs.get("list_price"),
-            [{"currency": "GBP", "amount": 80.0}],
+            attrs.get("purchasable_offer"),
+            [
+                {
+                    "audience": "ALL",
+                    "currency": "GBP",
+                    "marketplace_id": "GB",
+                    "our_price": [
+                        {"schedule": [{"value_with_tax": 80.0}]}
+                    ],
+                }
+            ],
         )
         self.assertEqual(
-            attrs.get("uvp_list_price"),
-            [{"currency": "GBP", "amount": 100.0}],
+            attrs.get("list_price"),
+            [{"currency": "GBP", "value": 80.0}],
         )
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
@@ -1593,6 +1623,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         body = mock_instance.put_listings_item.call_args.kwargs.get("body")
         attrs = body.get("attributes", {})
 
+        self.assertNotIn("purchasable_offer", attrs)
         self.assertNotIn("list_price", attrs)
         self.assertNotIn("uvp_list_price", attrs)
 
@@ -1624,6 +1655,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         fac.run()
         body = mock_listings.return_value.put_listings_item.call_args.kwargs.get("body")
         attrs = body.get("attributes", {})
+        self.assertFalse(attrs.get("purchasable_offer"))
         self.assertFalse(attrs.get("list_price"))
         self.assertFalse(attrs.get("uvp_list_price"))
 
@@ -1649,7 +1681,17 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
         mock_instance.get_listings_item.return_value = SimpleNamespace(
             attributes={
-                "list_price": [{"currency": "GBP", "amount": 89.99}],
+                "list_price": [{"currency": "GBP", "value": 89.99}],
+                "purchasable_offer": [
+                    {
+                        "audience": "ALL",
+                        "currency": "GBP",
+                        "marketplace_id": "GB",
+                        "our_price": [
+                            {"schedule": [{"value_with_tax": 89.99}]}
+                        ],
+                    }
+                ],
                 "uvp_list_price": [{"currency": "GBP", "amount": 100.0}],
             }
         )
@@ -1665,10 +1707,18 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         patches = body.get("patches", [])
 
-        price_patch = next((p for p in patches if "list_price" in p.get("value", [{}])[0]), None)
+        price_patch = next((p for p in patches if "purchasable_offer" in p.get("value", [{}])[0]), None)
         self.assertIsNotNone(price_patch)
         self.assertEqual(price_patch["op"], "replace")
-        self.assertEqual(price_patch["value"][0]["list_price"][0]["amount"], 99.99)
+        self.assertEqual(
+            price_patch["value"][0]["purchasable_offer"][0]["our_price"][0]["schedule"][0]["value_with_tax"],
+            99.99,
+        )
+
+        list_price_patch = next((p for p in patches if "list_price" in p.get("value", [{}])[0]), None)
+        self.assertIsNotNone(list_price_patch)
+        self.assertEqual(list_price_patch["op"], "replace")
+        self.assertEqual(list_price_patch["value"][0]["list_price"][0]["value"], 99.99)
 
         uvp_patch = next((p for p in patches if "uvp_list_price" in p.get("value", [{}])[0]), None)
         self.assertIsNotNone(uvp_patch)

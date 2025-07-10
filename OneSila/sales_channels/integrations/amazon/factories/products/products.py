@@ -128,8 +128,12 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         else:
             ean = self._get_ean_for_payload()
             if ean:
-                attrs["external_product_id"] = ean #@TODO: Check if this should also go in a "value" wrapper
-                attrs["external_product_id_type"] = "EAN"
+                attrs["externally_assigned_product_identifier"] = [
+                    {
+                        "type": "ean",
+                        "value": ean,
+                    }
+                ]
         return attrs
 
     def build_content_attributes(self) -> Dict:
@@ -200,16 +204,31 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             full, discount = self.local_instance.get_price_for_sales_channel(
                 self.sales_channel, currency=rc.local_instance
             )
-            list_price = discount or full
+
+            sale_price = discount
+            list_price = sale_price if sale_price is not None else full
             if list_price is None:
                 continue
 
-            #  @TODO: Refactor that to use purchasable_offer instead
-            attrs.setdefault("list_price", []).append({
-                "currency": iso,
-                "value": float(list_price)
+            attrs.setdefault("purchasable_offer", []).append(
+                {
+                    "audience": "ALL",
+                    "currency": iso,
+                    "marketplace_id": self.view.remote_id,
+                    "our_price": [
+                        {
+                            "schedule": [
+                                {"value_with_tax": float(list_price)}
+                            ]
+                        }
+                    ],
+                }
+            )
 
-            })
+            if self.sales_channel.listing_owner:
+                attrs.setdefault("list_price", []).append(
+                    {"currency": iso, "value": float(list_price)}
+                )
         return attrs
 
     # ------------------------------------------------------------
