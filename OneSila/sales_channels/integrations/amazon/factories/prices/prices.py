@@ -34,32 +34,27 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
             if not price_info:
                 continue
 
-
-            list_price = price_info.get("price")
-            # @TODO: Price is wrong we need to use
-            # "purchasable_offer": [{
-            #     "audience": "ALL",
-            #     "currency": "USD",
-            #     "marketplace_id": "xxx",
-            #     "our_price": [{
-            #         "schedule": [{
-            #             "value_with_tax": 30.43
-            #         }]
-            #     }]
-            # }]
-            # the list_price only for LISTING and only if we are the owners
-
-            body = {
-                "productType": self.remote_product.remote_type,
-                "requirements": "LISTING",
-                "attributes": {
-                    "list_price": [
-                        {"currency": iso, "amount": list_price}
-                    ],
-                },
+            sale_price = price_info.get("discount_price")
+            list_price = sale_price if sale_price is not None else price_info.get("price")
+            attributes = {
+                "purchasable_offer": [
+                    {
+                        "audience": "ALL",
+                        "currency": iso,
+                        "marketplace_id": self.view.remote_id,
+                        "our_price": [
+                            {
+                                "schedule": [
+                                    {"value_with_tax": list_price}
+                                ]
+                            }
+                        ],
+                    }
+                ]
             }
 
-            self.body = body
+            if self.sales_channel.listing_owner:
+                attributes["list_price"] = [{"currency": iso, "amount": list_price}]
 
             current_attrs = self.get_listing_attributes(
                 self.remote_product.remote_sku,
@@ -70,7 +65,7 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
                 self.view.remote_id,
                 self.remote_product.remote_type,
                 current_attrs,
-                body.get("attributes", {}),
+                attributes,
             )
             responses.append(resp)
 
