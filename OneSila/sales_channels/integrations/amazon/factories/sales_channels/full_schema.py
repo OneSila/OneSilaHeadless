@@ -458,7 +458,7 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
 
         return schema_data
 
-    # @TODO: Add throttle safe here
+    @throttle_safe(max_retries=5, base_delay=1)
     def _run_fake_validation_preview(self, view):
         payload = {
             "productType": self.product_type_code,
