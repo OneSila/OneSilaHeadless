@@ -16,7 +16,7 @@ class TestPublicCurrenciesQuery(TransactionTestCaseMixin, TransactionTestCase):
                 }
             }
         """
-        resp = self.strawberry_anonymous_test_client(query=query)
+        resp = self.strawberry_test_client(query=query)
         self.assertIsNone(resp.errors)
 
         returned = {edge['node']['isoCode'] for edge in resp.data['publicCurrencies']['edges']}
