@@ -622,15 +622,11 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         for media_through in media_throughs:
             # Check if a RemoteImageProductAssociation exists for this media_through
             try:
-                print('---------------------------------- MEDIA')
-                print(media_through)
                 remote_image_assoc = RemoteImageProductAssociation.objects.get(
                     local_instance=media_through,
                     remote_product=self.remote_instance,
                     sales_channel=self.sales_channel
                 )
-                print('---------------------------------- MEDIA REMOTE')
-                print(remote_image_assoc)
                 # If exists, use the update factory
                 remote_image = self.update_image_assignment(media_through, remote_image_assoc)
             except RemoteImageProductAssociation.DoesNotExist:

@@ -34,8 +34,20 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
             if not price_info:
                 continue
 
-            list_price = price_info.get("discount_price") or price_info.get("price")
-            rrp_price = price_info.get("price")
+
+            list_price = price_info.get("price")
+            # @TODO: Price is wrong we need to use
+            # "purchasable_offer": [{
+            #     "audience": "ALL",
+            #     "currency": "USD",
+            #     "marketplace_id": "xxx",
+            #     "our_price": [{
+            #         "schedule": [{
+            #             "value_with_tax": 30.43
+            #         }]
+            #     }]
+            # }]
+            # the list_price only for LISTING and only if we are the owners
 
             body = {
                 "productType": self.remote_product.remote_type,
@@ -43,9 +55,6 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
                 "attributes": {
                     "list_price": [
                         {"currency": iso, "amount": list_price}
-                    ],
-                    "uvp_list_price": [
-                        {"currency": iso, "amount": rrp_price}
                     ],
                 },
             }

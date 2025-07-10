@@ -92,6 +92,7 @@ class GetAmazonAPIMixin:
             seller_id=self.sales_channel.remote_id,
             sku=sku,
             marketplace_ids=[marketplace_id],
+            included_data=["summaries", "issues", "offers", "attributes"]
         )
         return resp
 
@@ -245,6 +246,14 @@ class GetAmazonAPIMixin:
         body = self._build_common_body(product_type, attributes)
         listings = ListingsApi(self._get_client())
 
+        print('--------------------------------------- ARGUMENTS')
+        print('mode')
+        print("VALIDATION_PREVIEW" if settings.DEBUG else None)
+        print('body')
+        import pprint
+        pprint.pprint(body)
+        print('-------------------------------------------------')
+
         response = listings.put_listings_item(
             seller_id=self.sales_channel.remote_id,
             sku=sku,
@@ -254,16 +263,8 @@ class GetAmazonAPIMixin:
             mode="VALIDATION_PREVIEW" if settings.DEBUG else None,
         )
 
-        print('--------------------------------------- ARGUMENTS')
-        print('mode')
-        print("VALIDATION_PREVIEW" if settings.DEBUG else None)
-        print('body')
-        import pprint
-        pprint.pprint(body)
-        print('-------------------------------------------------')
-
-        submission_id = getattr(response, "submissionId", None)
-        processing_status = getattr(response, "status", None) or getattr(response, "processingStatus", None)
+        submission_id = getattr(response, "submission_id", None)
+        processing_status = getattr(response, "status", None)
         log_identifier, _ = self.get_identifiers()
         self.update_assign_issues(
             getattr(response, "issues", []) or [],

@@ -28,7 +28,8 @@ from sales_channels.integrations.amazon.factories.products.content import (
 from sales_channels.integrations.amazon.models.products import (
     AmazonProduct,
 )
-from sales_channels.integrations.amazon.models.properties import AmazonProductProperty, AmazonProperty
+from sales_channels.integrations.amazon.models.properties import AmazonProductProperty, AmazonProperty, \
+    AmazonProductType
 from sales_channels.integrations.amazon.models import AmazonCurrency
 from sales_channels.exceptions import SwitchedToCreateException, SwitchedToSyncException
 from spapi import ListingsApi
@@ -123,11 +124,11 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         attrs: Dict = {}
         asin = self._get_asin()
         if asin:
-            attrs["merchant_suggested_asin"] = asin
+            attrs["merchant_suggested_asin"] = [{"value": asin}]
         else:
             ean = self._get_ean_for_payload()
             if ean:
-                attrs["external_product_id"] = ean
+                attrs["external_product_id"] = ean #@TODO: Check if this should also go in a "value" wrapper
                 attrs["external_product_id_type"] = "EAN"
         return attrs
 
@@ -175,11 +176,12 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             )
 
         attrs = {
-            "item_name": item_name,
-            "product_description": product_description,
+            "item_name": [{"value": item_name}],
+            "product_description": [{"value": product_description}],
         }
+
         if bullet_points:
-            attrs["bullet_point"] = bullet_points
+            attrs["bullet_point"] = [{"value": bp} for bp in bullet_points]
 
         return {k: v for k, v in attrs.items() if v not in (None, "")}
 
@@ -201,10 +203,13 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             list_price = discount or full
             if list_price is None:
                 continue
-            attrs.setdefault("list_price", []).append({"currency": iso, "amount": float(list_price)})
-            if full is not None:
-                attrs.setdefault("uvp_list_price", []).append({"currency": iso, "amount": float(full)})
 
+            #  @TODO: Refactor that to use purchasable_offer instead
+            attrs.setdefault("list_price", []).append({
+                "currency": iso,
+                "value": float(list_price)
+
+            })
         return attrs
 
     # ------------------------------------------------------------
@@ -251,10 +256,8 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             )
             create_fac.run()
 
-            print('--------------------------------------------- product_property')
-            print(product_property)
-            remote_id = None
 
+            remote_id = None
             # not mapped values will be skipped instead giving error because it didn't pass the preflight check
             if hasattr(create_fac, "remote_instance"):
                 self.remote_product_properties.append(create_fac.remote_instance)
@@ -263,6 +266,14 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 remote_id = create_fac.remote_instance.id
 
             return remote_id
+
+    def get_remote_product_type(self):
+        remote_rule = AmazonProductType.objects.get(
+            local_instance=self.rule,
+            sales_channel=self.sales_channel,
+        )
+
+        return remote_rule.product_type_code
 
     def build_payload(self):
         super().build_payload()
@@ -274,8 +285,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         self.attributes.update(self.image_attributes)
 
         self.payload = {
-            "productType": self.remote_type,
-            "requirements": "LISTING",
+            "productType": self.get_remote_product_type(),
             "attributes": self.attributes,
         }
 

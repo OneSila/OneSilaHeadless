@@ -1,6 +1,6 @@
 from django.db.models import Max
 from django.utils import timezone
-from spapi import DefinitionsApi
+from spapi import DefinitionsApi, ListingsApi
 from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
@@ -442,10 +442,42 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
         schema_link = response.var_schema.link.resource
         schema_data = self._download_json(schema_link)
 
+        offer_response = definitions_api.get_definitions_product_type(
+            product_type=self.product_type.product_type_code,
+            marketplace_ids=[view.remote_id],
+            requirements="LISTING_OFFER_ONLY",
+            seller_id=self.sales_channel.remote_id,
+        )
+
+        offer_schema_link = offer_response.var_schema.link.resource
+        offer_schema_data = self._download_json(offer_schema_link)
+        # @TODO: Continue this idea to add the properties of this in a field inside product type and filter out on patch / update
+
         if is_default_marketplace:
             schema_data["title"] = response.display_name
 
         return schema_data
+
+    # @TODO: Add throttle safe here
+    def _run_fake_validation_preview(self, view):
+        payload = {
+            "productType": self.product_type_code,
+            "requirements": "LISTING",
+            "attributes": {
+                "item_name": [{"value": "Dummy product name"}],
+            },
+        }
+
+        listings_api = ListingsApi(self._get_client())
+        response = listings_api.put_listings_item(
+            seller_id=self.sales_channel.remote_id,
+            sku="dummy-sku-for-validation",
+            marketplace_ids=[view.remote_id],
+            body=payload,
+            issue_locale=self.language,
+            mode="VALIDATION_PREVIEW",
+        )
+        return response.issues
 
     def ensure_asin_item(self):
 
@@ -494,7 +526,13 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
 
     def process_view(self, view, is_default):
         schema_data = self._get_schema_for_marketplace(view, is_default_marketplace=is_default)
-        required_properties = schema_data["required"]
+        required_properties = set(schema_data["required"])
+
+        validation_issues = self._run_fake_validation_preview(view)
+
+        for issue in validation_issues:
+            if issue.severity == "ERROR" and "MISSING_ATTRIBUTE" in issue.categories:
+                required_properties.update(issue.attribute_names)
 
         if is_default:
             # create AmazonProductType the schema_data will have a title

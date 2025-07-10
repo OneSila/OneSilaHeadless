@@ -43,6 +43,7 @@ class AmazonPropertySelectValuesSyncFactory:
 
         return [vals for vals in remote_value_map.values() if len(vals) > 1]
 
+    # @TODO: before we create we need to match by existing value in oter marketplace (by its local instance) to avoid duplciates
     def _link_duplicate_values(self, values: list) -> None:
         """Create/link a local PropertySelectValue for each provided remote value."""
         for val in values:
