@@ -1,7 +1,7 @@
 import json
 from unittest.mock import patch, MagicMock
 from model_bakery import baker
-from core.tests import TestCase
+from core.tests import TransactionTestCase
 from currencies.models import Currency
 from currencies.currencies import currencies
 from properties.models import Property, PropertySelectValue, PropertySelectValueTranslation, ProductPropertiesRule, \
@@ -17,7 +17,7 @@ from sales_channels.integrations.amazon.models import AmazonPrice, AmazonCurrenc
 from sales_channels.integrations.amazon.factories.prices.prices import AmazonPriceUpdateFactory
 
 
-class AmazonPriceUpdateFactoryTest(TestCase):
+class AmazonPriceUpdateFactoryTest(TransactionTestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = AmazonSalesChannel.objects.create(
@@ -111,17 +111,19 @@ class AmazonPriceUpdateFactoryTest(TestCase):
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     def test_update_price_builds_correct_body(self, mock_get_client, mock_listings):
         mock_instance = mock_listings.return_value
-        mock_instance.put_listings_item.side_effect = Exception("no amazon")
-        mock_instance.get_listings_item.return_value = MagicMock(payload={"attributes": {}})
-
+        mock_instance.put_listings_item.return_value = {
+            "submissionId": "mock-submission-id",
+            "processingStatus": "VALID",
+            "status": "VALID",
+            "issues": [],
+        }
         factory = AmazonPriceUpdateFactory(
             sales_channel=self.sales_channel,
             local_instance=self.product,
             remote_product=self.remote_product,
             view=self.view,
         )
-        with self.assertRaises(Exception):
-            factory.run()
+        factory.run()
 
         expected = {
             "productType": "CHAIR",

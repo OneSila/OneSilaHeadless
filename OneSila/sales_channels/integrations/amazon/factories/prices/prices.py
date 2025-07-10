@@ -60,7 +60,7 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
             resp = self.update_product(
                 self.remote_product.remote_sku,
                 self.view.remote_id,
-                self.remote_product.remote_type,
+                self.remote_product.get_remote_rule(),
                 attributes,
             )
             responses.append(resp)

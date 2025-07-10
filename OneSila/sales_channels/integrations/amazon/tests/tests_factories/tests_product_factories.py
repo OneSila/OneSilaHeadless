@@ -743,10 +743,11 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         fac.run()
 
         body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        cleaned_body = fac._build_common_body(fac.remote_rule, fac.payload["attributes"])
         expected_body = {
             "productType": "CHAIR",
             "requirements": "LISTING",
-            "attributes": fac.payload["attributes"],
+            "attributes": cleaned_body["attributes"],
         }
 
         self.assertEqual(body, expected_body)

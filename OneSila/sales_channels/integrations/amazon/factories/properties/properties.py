@@ -129,7 +129,7 @@ class AmazonProductPropertyDeleteFactory(AmazonProductPropertyBaseMixin, RemoteP
             response = self.update_product(
                 self.remote_instance.remote_product.remote_sku,
                 self.view.remote_id,
-                self.remote_instance.remote_product.remote_type,
+                self.remote_instance.remote_product.get_remote_rule(),
                 {self.remote_instance.remote_property.main_code: None},
             )
 
