@@ -128,11 +128,24 @@ class AmazonPriceUpdateFactoryTest(TestCase):
             "patches": [
                 {
                     "op": "add",
-                    "value": [{"list_price": [{"currency": "GBP", "amount": 80.0}]}],
-                },
-                {
-                    "op": "add",
-                    "value": [{"uvp_list_price": [{"currency": "GBP", "amount": 100.0}]}],
+                    "value": [
+                        {
+                            "purchasable_offer": [
+                                {
+                                    "audience": "ALL",
+                                    "currency": "GBP",
+                                    "marketplace_id": "GB",
+                                    "our_price": [
+                                        {
+                                            "schedule": [
+                                                {"value_with_tax": 80.0}
+                                            ]
+                                        }
+                                    ],
+                                }
+                            ]
+                        }
+                    ],
                 },
             ],
         }
