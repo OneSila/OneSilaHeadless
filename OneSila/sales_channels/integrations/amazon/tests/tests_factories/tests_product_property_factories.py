@@ -34,6 +34,7 @@ class AmazonProductPropertyFactoryTest(TestCase):
         self.sales_channel = AmazonSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             remote_id="SELLER123",
+            listing_owner=True
         )
         self.view = AmazonSalesChannelView.objects.create(
             multi_tenant_company=self.multi_tenant_company,
