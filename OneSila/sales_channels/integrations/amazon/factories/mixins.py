@@ -96,7 +96,6 @@ class GetAmazonAPIMixin:
         )
         return resp
 
-
     @throttle_safe(max_retries=5, base_delay=1)
     def get_listing_attributes(self, sku, marketplace_id):
         """Convenience wrapper returning attributes of a listing item."""
@@ -228,6 +227,8 @@ class GetAmazonAPIMixin:
         return remote_lang.remote_code if remote_lang else None
 
     def _build_common_body(self, product_type, attributes):
+        """Return body for Amazon create/update requests."""
+
         def clean(data):
             if isinstance(data, dict):
                 return {k: clean(v) for k, v in data.items() if v is not None}
@@ -235,8 +236,20 @@ class GetAmazonAPIMixin:
                 return [clean(v) for v in data if v is not None]
             return data
 
+        pt_code = product_type.product_type_code
+
+        if not self.sales_channel.listing_owner:
+            region = getattr(getattr(self, "view", None), "api_region_code", None)
+            allowed_keys = (
+                product_type.listing_offer_required_properties.get(region, [])
+                if isinstance(product_type.listing_offer_required_properties, dict)
+                else []
+            )
+            if allowed_keys:
+                attributes = {k: v for k, v in (attributes or {}).items() if k in allowed_keys}
+
         return {
-            "productType": product_type,
+            "productType": pt_code,
             "requirements": "LISTING" if self.sales_channel.listing_owner else "LISTING_OFFER_ONLY",
             "attributes": clean(attributes),
         }
@@ -311,7 +324,7 @@ class GetAmazonAPIMixin:
         patches = self._build_patches(current_attributes, new_attributes)
 
         body = {
-            "productType": product_type,
+            "productType": product_type.product_type_code,
             "patches": patches,
         }
 
