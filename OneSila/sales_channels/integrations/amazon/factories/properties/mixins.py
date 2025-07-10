@@ -145,6 +145,15 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
         if not rule:
             raise ValueError("Product has no product rule mapped")
         product_type = self._get_product_type(rule)
+
+        if not product_type:
+            raise ValueError("Product has no product type mapped")
+
+        if not self.sales_channel.listing_owner:
+            allowed_properties = product_type.listing_offer_required_properties.get(self.view.api_region_code, [])
+            if main_code not in allowed_properties:
+                return {}
+
         public_def = self._get_public_definition(product_type, main_code)
         if not public_def.usage_definition:
             raise ValueError("Missing usage definition for property")
