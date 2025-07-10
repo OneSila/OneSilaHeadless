@@ -8,6 +8,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductTypeItem,
     AmazonSalesChannelImport,
     AmazonDefaultUnitConfigurator,
+    AmazonRemoteLog,
 )
 
 
@@ -43,4 +44,9 @@ class AmazonSalesChannelImportOrder:
 
 @order(AmazonDefaultUnitConfigurator)
 class AmazonDefaultUnitConfiguratorOrder:
+    id: auto
+
+
+@order(AmazonRemoteLog)
+class AmazonRemoteLogOrder:
     id: auto

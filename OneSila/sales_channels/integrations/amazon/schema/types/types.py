@@ -18,6 +18,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductTypeItem,
     AmazonSalesChannelImport,
     AmazonDefaultUnitConfigurator,
+    AmazonRemoteLog,
 )
 from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelFilter,
@@ -26,6 +27,7 @@ from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonProductTypeFilter,
     AmazonProductTypeItemFilter,
     AmazonSalesChannelImportFilter, AmazonDefaultUnitConfiguratorFilter,
+    AmazonRemoteLogFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
@@ -35,6 +37,7 @@ from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonProductTypeItemOrder,
     AmazonSalesChannelImportOrder,
     AmazonDefaultUnitConfiguratorOrder,
+    AmazonRemoteLogOrder,
 )
 
 
@@ -198,4 +201,18 @@ class AmazonDefaultUnitConfiguratorType(relay.Node, GetQuerysetMultiTenantMixin)
     marketplace: Annotated[
         'SalesChannelViewType',
         lazy("sales_channels.schema.types.types")
+    ]
+
+
+@type(
+    AmazonRemoteLog,
+    filters=AmazonRemoteLogFilter,
+    order=AmazonRemoteLogOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonRemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
     ]

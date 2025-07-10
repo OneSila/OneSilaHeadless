@@ -7,6 +7,7 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonProductTypeItemType,
     AmazonSalesChannelImportType,
     AmazonDefaultUnitConfiguratorType,
+    AmazonRemoteLogType,
 )
 
 
@@ -32,3 +33,6 @@ class AmazonSalesChannelsQuery:
 
     amazon_default_unit_configurator: AmazonDefaultUnitConfiguratorType = node()
     amazon_default_unit_configurators: DjangoListConnection[AmazonDefaultUnitConfiguratorType] = connection()
+
+    amazon_remote_log: AmazonRemoteLogType = node()
+    amazon_remote_logs: DjangoListConnection[AmazonRemoteLogType] = connection()
