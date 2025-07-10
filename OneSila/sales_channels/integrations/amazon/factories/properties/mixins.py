@@ -152,7 +152,7 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
         if not self.sales_channel.listing_owner:
             allowed_properties = product_type.listing_offer_required_properties.get(self.view.api_region_code, [])
             if main_code not in allowed_properties:
-                return {}
+                return product_type, {}
 
         public_def = self._get_public_definition(product_type, main_code)
         if not public_def.usage_definition:
