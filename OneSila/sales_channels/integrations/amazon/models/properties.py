@@ -109,6 +109,7 @@ class AmazonProperty(RemoteProperty):
     def save(self, *args, **kwargs):
         if self.allow_multiple is not True:
             self.allow_multiple = True
+
         if self.local_instance and self.local_instance.type != self.type:
             raise ValidationError(
                 _(

@@ -28,9 +28,8 @@ from sales_channels.integrations.amazon.factories.properties import (
 )
 
 
-class AmazonProductPropertyFactoryTest(TestCase):
-    def setUp(self):
-        super().setUp()
+class AmazonProductPropertyTestSetupMixin:
+    def prepare_test(self):
         self.sales_channel = AmazonSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             remote_id="SELLER123",
@@ -50,7 +49,8 @@ class AmazonProductPropertyFactoryTest(TestCase):
         )
 
         # Create product type property and value
-        self.product_type_property = Property.objects.filter(is_product_type=True, multi_tenant_company=self.multi_tenant_company).first()
+        self.product_type_property = Property.objects.filter(is_product_type=True,
+                                                             multi_tenant_company=self.multi_tenant_company).first()
 
         PropertyTranslation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -168,7 +168,12 @@ class AmazonProductPropertyFactoryTest(TestCase):
             ),
         )
 
-    def test_create_factory_value_only(self):
+class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupMixin):
+    def setUp(self):
+        super().setUp()
+        self.prepare_test()
+
+    def test_product_property_create_factory_value_only(self):
         fac = AmazonProductPropertyCreateFactory(
             sales_channel=self.sales_channel,
             local_instance=self.product_property,
@@ -190,7 +195,7 @@ class AmazonProductPropertyFactoryTest(TestCase):
         }
         self.assertEqual(json.loads(fac.remote_value), expected)
 
-    def test_update_factory_value_only(self):
+    def test_product_property_update_factory_value_only(self):
         remote_instance = AmazonProductProperty.objects.create(
             sales_channel=self.sales_channel,
             local_instance=self.product_property,
@@ -220,7 +225,7 @@ class AmazonProductPropertyFactoryTest(TestCase):
         remote_instance.refresh_from_db()
         self.assertEqual(json.loads(remote_instance.remote_value), expected)
 
-    def test_create_factory_property_not_mapped(self):
+    def test_product_property_create_factory_property_not_mapped(self):
         size_property = baker.make(
             Property,
             type=Property.TYPES.SELECT,
@@ -262,7 +267,7 @@ class AmazonProductPropertyFactoryTest(TestCase):
         with self.assertRaises(AmazonProperty.DoesNotExist):
             fac.create_body()
 
-    def test_create_factory_rule_not_mapped(self):
+    def test_product_property_create_factory_rule_not_mapped(self):
         self.amazon_product_type.delete()
         fac = AmazonProductPropertyCreateFactory(
             sales_channel=self.sales_channel,
@@ -275,7 +280,7 @@ class AmazonProductPropertyFactoryTest(TestCase):
         with self.assertRaises(AmazonProductType.DoesNotExist):
             fac.create_body()
 
-    def test_create_factory_unmapped_select_value(self):
+    def test_product_property_create_factory_unmapped_select_value(self):
         self.amazon_property.allows_unmapped_values = False
         self.amazon_property.save()
 
@@ -290,3 +295,44 @@ class AmazonProductPropertyFactoryTest(TestCase):
         with self.assertRaises(ValueError):
             fac.create_body()
 
+
+class AmazonProductPropertyFactoryWithoutListingOwnerTest(TestCase, AmazonProductPropertyTestSetupMixin):
+    def setUp(self):
+        super().setUp()
+        self.prepare_test()
+        self.sales_channel.listing_owner = False
+        self.sales_channel.save()
+
+    def test_not_listing_owner_create_factory_value_only(self):
+        fac = AmazonProductPropertyCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product_property,
+            remote_product=self.remote_product,
+            view=self.view,
+            get_value_only=True,
+        )
+
+        body = fac.create_body()
+        self.assertIsNone(body)
+        self.assertEqual(json.loads(fac.remote_value), {})
+
+    def test_not_listing_owner_update_factory_value_only(self):
+        remote_instance = AmazonProductProperty.objects.create(
+            sales_channel=self.sales_channel,
+            local_instance=self.product_property,
+            remote_product=self.remote_product,
+            remote_property=self.amazon_property,
+            remote_value="{}",
+        )
+        fac = AmazonProductPropertyUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product_property,
+            remote_product=self.remote_product,
+            view=self.view,
+            remote_instance=remote_instance,
+            get_value_only=True,
+        )
+        needs_update = fac.additional_update_check()
+        self.assertFalse(needs_update)
+        remote_instance.refresh_from_db()
+        self.assertEqual(json.loads(remote_instance.remote_value), {})

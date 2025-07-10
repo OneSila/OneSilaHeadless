@@ -678,6 +678,7 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
             if not created:
                 old_type = remote_property.type
                 resolved_type = self._resolve_property_type(old_type, property_data['type'])
+
                 if resolved_type != remote_property.type:
                     remote_property.type = resolved_type
                 if resolved_type == Property.TYPES.SELECT and (

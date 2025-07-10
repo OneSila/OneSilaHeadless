@@ -116,7 +116,7 @@ class AmazonProductImageFactoryTest(TestCase):
             )
             self.throughs.append(through)
 
-    def test_create_factory_value_only(self):
+    def test_image_create_factory_value_only(self):
         urls = ["https://example.com/img1.jpg", "https://example.com/img2.jpg"]
         expected_attrs = {}
         for idx, key in enumerate(AmazonMediaProductThroughBase.OFFER_KEYS):
@@ -158,7 +158,7 @@ class AmazonProductImageFactoryTest(TestCase):
         ).count()
         self.assertEqual(cnt, 2)
 
-    def test_update_factory_value_only(self):
+    def test_image_update_factory_value_only(self):
         remote_instance = AmazonImageProductAssociation.objects.create(
             sales_channel=self.sales_channel,
             local_instance=self.throughs[0],

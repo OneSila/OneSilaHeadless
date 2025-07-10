@@ -727,9 +727,6 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         self.remote_product.created_marketplaces = [self.view.remote_id]
         self.remote_product.save()
 
-        current_attrs = {
-            "item_name": "Old name",
-        }
 
         mock_instance = mock_listings.return_value
         mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
