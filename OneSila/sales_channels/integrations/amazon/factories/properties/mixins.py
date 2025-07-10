@@ -151,7 +151,7 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
         usage = json.loads(public_def.usage_definition)
 
         payload = self._replace_tokens(usage, self.local_instance.product)
-        return product_type.product_type_code, payload
+        return product_type, payload
 
     # ------------------------------------------------------------------
     def preflight_check(self):
@@ -165,7 +165,7 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
         return True
 
     def create_body(self):
-        product_type_code, payload = self.build_payload()
+        self.remote_rule, payload = self.build_payload()
 
         self.remote_value = json.dumps(payload)
 
@@ -178,7 +178,7 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
             return None
 
         body = {
-            "productType": product_type_code,
+            "productType": self.remote_rule.product_type_code,
             "requirements": "LISTING",
             "attributes": payload,
         }

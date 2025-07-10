@@ -39,17 +39,12 @@ class AmazonProductPropertyCreateFactory(AmazonProductPropertyBaseMixin, RemoteP
         body = self.create_body()
         if body is None:
             return
-        api = self.get_api()
-        current_attrs = self.get_listing_attributes(
-            self.remote_product.remote_sku,
-            self.view.remote_id,
-        )
+
         response = self.update_product(
             self.remote_product.remote_sku,
             self.view.remote_id,
-            body.get("productType"),
+            self.remote_rule,
             body.get("attributes", {}),
-            current_attrs,
         )
         return response
 
@@ -94,16 +89,11 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteP
         if body is None:
             return
 
-        current_attrs = self.get_listing_attributes(
-            self.remote_product.remote_sku,
-            self.view.remote_id,
-        )
         response = self.update_product(
             self.remote_product.remote_sku,
             self.view.remote_id,
-            body.get("productType"),
+            self.remote_rule,
             body.get("attributes", {}),
-            current_attrs,
         )
         return response
 
@@ -115,7 +105,7 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteP
         self.remote_product = self.remote_instance.remote_product
         self.remote_property = self.remote_instance.remote_property
 
-        product_type_code, payload = self.build_payload()
+        _, payload = self.build_payload()
         self.remote_value = json.dumps(payload)
 
         if self.get_value_only:
@@ -136,17 +126,13 @@ class AmazonProductPropertyDeleteFactory(AmazonProductPropertyBaseMixin, RemoteP
 
     def delete_remote(self):
         try:
-            current_attrs = self.get_listing_attributes(
-                self.remote_instance.remote_product.remote_sku,
-                self.view.remote_id,
-            )
             response = self.update_product(
                 self.remote_instance.remote_product.remote_sku,
                 self.view.remote_id,
                 self.remote_instance.remote_product.remote_type,
                 {self.remote_instance.remote_property.main_code: None},
-                current_attrs,
             )
+
             return response
         except Exception:
             return True

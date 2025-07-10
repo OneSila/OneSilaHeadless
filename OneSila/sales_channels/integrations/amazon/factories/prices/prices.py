@@ -56,16 +56,12 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
             if self.sales_channel.listing_owner:
                 attributes["list_price"] = [{"currency": iso, "value": list_price}]
 
-            current_attrs = self.get_listing_attributes(
-                self.remote_product.remote_sku,
-                self.view.remote_id,
-            )
+
             resp = self.update_product(
                 self.remote_product.remote_sku,
                 self.view.remote_id,
                 self.remote_product.remote_type,
                 attributes,
-                current_attrs,
             )
             responses.append(resp)
 

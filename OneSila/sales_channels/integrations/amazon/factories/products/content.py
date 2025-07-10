@@ -104,16 +104,11 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentU
             "attributes": self.payload,
         }
 
-        current_attrs = self.get_listing_attributes(
-            self.remote_product.remote_sku,
-            self.view.remote_id,
-        )
         response = self.update_product(
             self.remote_product.remote_sku,
             self.view.remote_id,
-            product_type.product_type_code,
+            product_type,
             body.get("attributes", {}),
-            current_attrs,
         )
 
         return response

@@ -99,11 +99,7 @@ class GetAmazonAPIMixin:
     @throttle_safe(max_retries=5, base_delay=1)
     def get_listing_attributes(self, sku, marketplace_id):
         """Convenience wrapper returning attributes of a listing item."""
-        payload = self.get_listing_item(
-            sku,
-            marketplace_id,
-            included_data=["attributes"],
-        )
+        payload = self.get_listing_item(sku, marketplace_id, included_data=["attributes"],)
 
         if not payload:
             return {}

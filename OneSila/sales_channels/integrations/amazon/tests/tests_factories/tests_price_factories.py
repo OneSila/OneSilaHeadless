@@ -107,48 +107,48 @@ class AmazonPriceUpdateFactoryTest(TestCase):
             price_data={},
         )
 
-    # @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
-    # @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
-    # def test_update_factory_builds_correct_body(self, mock_get_client, mock_listings):
-    #     mock_instance = mock_listings.return_value
-    #     mock_instance.patch_listings_item.side_effect = Exception("no amazon")
-    #     mock_instance.get_listings_item.return_value = MagicMock(payload={"attributes": {}})
-    #
-    #     factory = AmazonPriceUpdateFactory(
-    #         sales_channel=self.sales_channel,
-    #         local_instance=self.product,
-    #         remote_product=self.remote_product,
-    #         view=self.view,
-    #     )
-    #     with self.assertRaises(Exception):
-    #         factory.run()
-    #
-    #     expected = {
-    #         "productType": "CHAIR",
-    #         "patches": [
-    #             {
-    #                 "op": "add",
-    #                 "value": [
-    #                     {
-    #                         "purchasable_offer": [
-    #                             {
-    #                                 "audience": "ALL",
-    #                                 "currency": "GBP",
-    #                                 "marketplace_id": "GB",
-    #                                 "our_price": [
-    #                                     {
-    #                                         "schedule": [
-    #                                             {"value_with_tax": 80.0}
-    #                                         ]
-    #                                     }
-    #                                 ],
-    #                             }
-    #                         ]
-    #                     }
-    #                 ],
-    #             },
-    #         ],
-    #     }
-    #
-    #     body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
-    #     self.assertEqual(body, expected)
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    def test_update_factory_builds_correct_body(self, mock_get_client, mock_listings):
+        mock_instance = mock_listings.return_value
+        mock_instance.patch_listings_item.side_effect = Exception("no amazon")
+        mock_instance.get_listings_item.return_value = MagicMock(payload={"attributes": {}})
+
+        factory = AmazonPriceUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_product=self.remote_product,
+            view=self.view,
+        )
+        with self.assertRaises(Exception):
+            factory.run()
+
+        expected = {
+            "productType": "CHAIR",
+            "patches": [
+                {
+                    "op": "add",
+                    "value": [
+                        {
+                            "purchasable_offer": [
+                                {
+                                    "audience": "ALL",
+                                    "currency": "GBP",
+                                    "marketplace_id": "GB",
+                                    "our_price": [
+                                        {
+                                            "schedule": [
+                                                {"value_with_tax": 80.0}
+                                            ]
+                                        }
+                                    ],
+                                }
+                            ]
+                        }
+                    ],
+                },
+            ],
+        }
+
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        self.assertEqual(body, expected)

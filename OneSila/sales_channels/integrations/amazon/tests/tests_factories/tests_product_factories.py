@@ -7,6 +7,7 @@ from model_bakery import baker
 from core.tests import TestCase
 from core.tests import TransactionTestCase
 from sales_channels.integrations.amazon.factories import AmazonProductDeleteFactory, AmazonProductSyncFactory
+from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
@@ -715,43 +716,43 @@ class AmazonProductFactoriesTest(TransactionTestCase):
 
         self.assertEqual(body, expected_body)
 
-    # @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
-    # @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
-    # @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
-    # def test_update_product_factory_builds_correct_payload(self, mock_listings, mock_get_images, mock_get_client):
-    #     """This test checks that the update factory builds a correct patch payload with only changed attributes."""
-    #     url = "https://example.com/img.jpg"
-    #
-    #     # mark product as already created on this marketplace so update runs
-    #     self.remote_product.created_marketplaces = [self.view.remote_id]
-    #     self.remote_product.save()
-    #
-    #     current_attrs = {
-    #         "item_name": "Old name",
-    #     }
-    #
-    #     mock_instance = mock_listings.return_value
-    #     mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
-    #
-    #     current_attrs = {"item_name": "Old name"}
-    #     mock_instance.get_listings_item.return_value = SimpleNamespace(attributes=current_attrs)
-    #
-    #     fac = AmazonProductUpdateFactory(
-    #         sales_channel=self.sales_channel,
-    #         local_instance=self.product,
-    #         remote_instance=self.remote_product,
-    #         view=self.view,
-    #     )
-    #     fac.run()
-    #
-    #     body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
-    #     expected_patches = fac._build_patches(current_attrs, fac.payload["attributes"])
-    #     expected_body = {
-    #         "productType": "PRODUCT",
-    #         "patches": expected_patches,
-    #     }
-    #
-    #     self.assertEqual(body, expected_body)
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_update_product_factory_builds_correct_payload(self, mock_listings, mock_get_images, mock_get_client):
+        """This test checks that the update factory builds a correct patch payload with only changed attributes."""
+        url = "https://example.com/img.jpg"
+
+        # mark product as already created on this marketplace so update runs
+        self.remote_product.created_marketplaces = [self.view.remote_id]
+        self.remote_product.save()
+
+        current_attrs = {
+            "item_name": "Old name",
+        }
+
+        mock_instance = mock_listings.return_value
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        current_attrs = {"item_name": "Old name"}
+        mock_instance.get_listings_item.return_value = SimpleNamespace(attributes=current_attrs)
+
+        fac = AmazonProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        expected_patches = fac._build_patches(current_attrs, fac.payload["attributes"])
+        expected_body = {
+            "productType": "PRODUCT",
+            "patches": expected_patches,
+        }
+
+        self.assertEqual(body, expected_body)
 
     @patch(
         "sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client",
@@ -1719,6 +1720,9 @@ class AmazonProductFactoriesTest(TransactionTestCase):
 
             def _get_client(self):
                 return None
+
+            def get_identifiers(self):
+                return 'test', 'test'
 
             def update_assign_issues(self, *args, **kwargs):
                 pass

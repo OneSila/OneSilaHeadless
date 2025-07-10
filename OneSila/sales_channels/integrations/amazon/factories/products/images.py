@@ -65,17 +65,14 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin):
     def patch_listings(self, body):
         if self.get_value_only:
             return body["attributes"]
-        current_attrs = self.get_listing_attributes(
-            self.remote_product.remote_sku,
-            self.view.remote_id,
-        )
+
         response = self.update_product(
             self.remote_product.remote_sku,
             self.view.remote_id,
             self.remote_product.remote_type,
-            body.get("attributes", {}),
-            current_attrs,
+            body.get("attributes", {})
         )
+
         return response
 
     def build_payload(self):
