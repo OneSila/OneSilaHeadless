@@ -300,7 +300,7 @@ class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Mode
             if send_sync_signal:
                 sync_remote_product.send(
                     sender=self.remote_product.local_instance.__class__,
-                    instance=self.remote_product.local_instance.product
+                    instance=self.remote_product.local_instance
                 )
 
 

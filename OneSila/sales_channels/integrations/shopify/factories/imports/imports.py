@@ -434,7 +434,8 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         # Check if property already exists
         prop = Property.objects.filter(
             multi_tenant_company=self.import_process.multi_tenant_company,
-            internal_name=name
+            internal_name=name,
+            type=internal_type
         ).first()
 
         if not prop:
@@ -789,7 +790,6 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
             mirror_model_map={"local_instance": "*"},
             mirror_model_defaults={"remote_id": product["id"], 'is_variation': is_variation}
         )
-
         import_instance.process()
 
         self.update_remote_product(import_instance, product, is_variation)

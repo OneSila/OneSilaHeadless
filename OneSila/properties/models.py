@@ -81,7 +81,7 @@ class Property(TranslatedModelMixin, models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.multi_tenant_company} -> {self.name}"
+        return f"{self.multi_tenant_company} -> {self.name} ({self.type})"
 
     class Meta:
         verbose_name_plural = _("Properties")

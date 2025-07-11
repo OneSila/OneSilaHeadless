@@ -242,12 +242,22 @@ class ImportProductInstance(AbstractImportInstance):
                 if 'property_data' in property or 'property' in property:
                     if 'property_data' in property:
                         name = property['property_data'].get("name")
+                        type = property['property_data'].get("type")
+
+                        if type != Property.TYPES.SELECT:
+                            continue
+
                         item_data = {
                             'property_data': property['property_data'],
                             'type': ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if name in required_names else ProductPropertiesRuleItem.OPTIONAL
                         }
                     else:
                         name = property['property'].name
+                        type = property['property'].type
+
+                        if type != Property.TYPES.SELECT:
+                            continue
+
                         item_data = {
                             'property': property['property'],
                             'type': ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if name in required_names else ProductPropertiesRuleItem.OPTIONAL

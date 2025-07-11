@@ -710,10 +710,6 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             "attributes": expected_attributes,
         }
 
-        import pprint
-        pprint.pprint(body)
-        pprint.pprint(expected_body)
-
         self.assertEqual(body, expected_body)
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
