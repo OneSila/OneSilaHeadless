@@ -10,14 +10,14 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # migrations.AddField(
-        #     model_name='shopifysaleschannel',
-        #     name='api_key',
-        #     field=models.CharField(blank=True, help_text='API key of the Shopify custom app associated with this store.', max_length=255, null=True),
-        # ),
-        # migrations.AddField(
-        #     model_name='shopifysaleschannel',
-        #     name='api_secret',
-        #     field=models.CharField(blank=True, help_text='API secret of the Shopify custom app associated with this store.', max_length=255, null=True),
-        # ),
+        migrations.AddField(
+            model_name='shopifysaleschannel',
+            name='api_key',
+            field=models.CharField(blank=True, help_text='API key of the Shopify custom app associated with this store.', max_length=255, null=True),
+        ),
+        migrations.AddField(
+            model_name='shopifysaleschannel',
+            name='api_secret',
+            field=models.CharField(blank=True, help_text='API secret of the Shopify custom app associated with this store.', max_length=255, null=True),
+        ),
     ]
