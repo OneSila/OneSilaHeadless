@@ -283,7 +283,7 @@ class ProductPropertiesRuleItem(models.Model):
 
         # Ensure that if type is REQUIRED_IN_CONFIGURATOR, property type must be SELECT or MULTISELECT
         if self.type in [self.REQUIRED_IN_CONFIGURATOR, self.OPTIONAL_IN_CONFIGURATOR] and self.property.type != Property.TYPES.SELECT:
-            raise ValidationError(_("Property must be of type SELECT."))
+            raise ValidationError(_(f"Property {self.property.name} must be of type SELECT."))
 
         # Ensure rule cannot have OPTIONAL_IN_CONFIGURATOR without a REQUIRED_IN_CONFIGURATOR
         if self.type == self.OPTIONAL_IN_CONFIGURATOR and not self.rule.items.filter(type=self.REQUIRED_IN_CONFIGURATOR).exists():
