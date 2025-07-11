@@ -7,7 +7,7 @@ class RefreshLatestIssuesFactory(GetAmazonAPIMixin):
 
     def __init__(self, assign: SalesChannelViewAssign):
         self.assign = assign
-        self.sales_channel = assign.sales_channel
+        self.sales_channel = assign.sales_channel.get_real_instance()
         self.view = assign.sales_channel_view
 
     def run(self):
@@ -18,7 +18,7 @@ class RefreshLatestIssuesFactory(GetAmazonAPIMixin):
         response = self.get_listing_item(
             remote_product.remote_sku,
             self.view.remote_id,
-            included_data=["issues", "updates"],
+            included_data=["issues"],
         )
         issues = getattr(response, "issues", []) or []
         self.assign.issues = [

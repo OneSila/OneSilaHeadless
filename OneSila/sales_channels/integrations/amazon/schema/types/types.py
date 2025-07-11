@@ -218,8 +218,19 @@ class AmazonRemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):
         lazy("sales_channels.integrations.amazon.schema.types.types")
     ]
 
+    @field()
+    def type(self, info) -> str:
+        return str(self.content_type)
 
-    @field(description="List of formatted issues coming from the remote marketplace")
+    @field()
+    def frontend_name(self, info) -> str:
+        return self.frontend_name
+
+    @field()
+    def frontend_error(self, info) -> str | None:
+        return self.frontend_error
+
+    @field()
     def formatted_issues(self, info) -> List[FormattedIssueType]:
         issues_data = self.issues or []
         formatted: List[FormattedIssueType] = []

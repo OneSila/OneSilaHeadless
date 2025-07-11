@@ -85,14 +85,19 @@ class GetAmazonAPIMixin:
             raise Exception(f"SP-API failed: {e}")
 
     @throttle_safe(max_retries=5, base_delay=1)
-    def get_listing_item(self, sku, marketplace_id, *, included_data=None):
+    def get_listing_item(self, sku, marketplace_id, *, included_data=None, issue_locale=None):
         """Return listing item payload for the given sku and marketplace."""
+
+        if issue_locale is None:
+            issue_locale = self._get_issue_locale()
+
         listings = ListingsApi(self._get_client())
         resp = listings.get_listings_item(
             seller_id=self.sales_channel.remote_id,
             sku=sku,
             marketplace_ids=[marketplace_id],
             included_data=included_data or ["summaries", "issues"],
+            issue_locale=issue_locale,
         )
         return resp
 

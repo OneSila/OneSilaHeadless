@@ -126,8 +126,8 @@ class AmazonSalesChannelMutation:
 
         return values
 
-    @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
-    def refresh_latest_issues(
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def refresh_amazon_latest_issues(
         self, instance: SalesChannelViewAssignPartialInput, info: Info
     ) -> SalesChannelViewAssignType:
         """Refresh listing issues for a specific Amazon listing."""
