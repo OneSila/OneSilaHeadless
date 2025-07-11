@@ -85,6 +85,7 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         return []
 
     def repair_remote_sku_if_needed(self, product, remote_product):
+        return
         local_sku = product.sku
 
         if not remote_product.default_variant_id or not local_sku:
