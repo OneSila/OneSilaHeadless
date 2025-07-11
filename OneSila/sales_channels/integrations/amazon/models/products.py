@@ -35,6 +35,22 @@ class AmazonProduct(RemoteProduct):
         help_text="EAN code used when the product was first created.",
     )
 
+    @property
+    def remote_type(self):
+        return self.get_remote_rule().product_type_code
+
+    def get_remote_rule(self):
+        from sales_channels.integrations.amazon.models import AmazonProductType
+
+        local_rule = self.local_instance.get_product_rule()
+        if local_rule is None:
+            raise Exception("Product rule not found.")
+
+        return AmazonProductType.objects.get(
+            local_instance=local_rule,
+            sales_channel=self.sales_channel,
+        )
+
 
 class AmazonInventory(RemoteInventory):
     """Amazon specific remote inventory."""

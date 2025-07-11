@@ -51,7 +51,7 @@ class IntegrationInstanceOperationMixin:
 
         return f"{class_name}:{caller}", fixing_identifier
 
-    def log_action_for_instance(self, remote_instance, action, response_data, payload, identifier):
+    def log_action_for_instance(self, remote_instance, action, response_data, payload, identifier, **extra):
         if not remote_instance:
             raise ValueError("A valid remote_instance must be provided for logging.")
 
@@ -60,10 +60,11 @@ class IntegrationInstanceOperationMixin:
             response=response_data,
             payload=payload,
             identifier=identifier,
-            remote_product=getattr(self, 'remote_product', None)
+            remote_product=getattr(self, 'remote_product', None),
+            **extra
         )
 
-    def log_action(self, action, response_data, payload, identifier):
+    def log_action(self, action, response_data, payload, identifier, **extra):
         """
         Logs actions for remote instance operations.
         """
@@ -72,7 +73,8 @@ class IntegrationInstanceOperationMixin:
             response=response_data,
             payload=payload,
             identifier=identifier,
-            remote_product=getattr(self, 'remote_product', None)
+            remote_product=getattr(self, 'remote_product', None),
+            **extra
         )
 
     def log_error(self, exception, action, identifier, payload, fixing_identifier=None):

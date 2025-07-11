@@ -15,3 +15,4 @@ from .sales_channels import (
 )
 from .taxes import AmazonCurrency, AmazonTaxCode
 from .imports import *
+from .logs import AmazonRemoteLog

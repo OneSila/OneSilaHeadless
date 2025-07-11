@@ -423,9 +423,14 @@ class IntegrationObjectMixin(models.Model):
         Method to create a log entry.
         """
         from sales_channels.models import RemoteLog
+        from sales_channels.integrations.amazon.models import AmazonSalesChannel
+        from sales_channels.integrations.amazon.models import AmazonRemoteLog
 
-        # @TODO: the class here should be configurable but for now we will let the RemoteLog
-        RemoteLog.objects.create(
+        log_model = (
+            AmazonRemoteLog if isinstance(self.integration, AmazonSalesChannel) else RemoteLog
+        )
+
+        log_model.objects.create(
             content_type=ContentType.objects.get_for_model(self),
             object_id=self.pk,
             content_object=self,

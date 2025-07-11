@@ -43,7 +43,7 @@ class AmazonSchemaImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         if not remote_property.local_instance:
             local_property, _ = Property.objects.get_or_create(
-                internal_name="amazon_asin",
+                internal_name="merchant_suggested_asin",
                 multi_tenant_company=self.sales_channel.multi_tenant_company,
                 defaults={
                     "type": Property.TYPES.TEXT,

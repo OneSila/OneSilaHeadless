@@ -21,7 +21,7 @@ def add_merchant_asin(apps, schema_editor):
 
         if not remote_prop.local_instance:
             local_prop, _ = Property.objects.get_or_create(
-                internal_name='amazon_asin',
+                internal_name='merchant_suggested_asin',
                 multi_tenant_company=sc.multi_tenant_company,
                 defaults={'type': 'TEXT', 'non_deletable': True},
             )

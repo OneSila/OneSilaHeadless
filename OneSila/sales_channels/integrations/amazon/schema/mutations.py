@@ -27,6 +27,8 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonSalesChannelImportType,
     AmazonDefaultUnitConfiguratorType,
 )
+from sales_channels.schema.types.input import SalesChannelViewAssignPartialInput
+from sales_channels.schema.types.types import SalesChannelViewAssignType
 from core.schema.core.mutations import create, type, List, update, delete
 from strawberry import Info
 import strawberry_django
@@ -123,3 +125,27 @@ class AmazonSalesChannelMutation:
             value.save()
 
         return values
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def refresh_amazon_latest_issues(
+        self, instance: SalesChannelViewAssignPartialInput, info: Info
+    ) -> SalesChannelViewAssignType:
+        """Refresh listing issues for a specific Amazon listing."""
+        from sales_channels.models import SalesChannelViewAssign
+        from sales_channels.integrations.amazon.factories.sales_channels.issues import (
+            RefreshLatestIssuesFactory,
+        )
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        assign = SalesChannelViewAssign.objects.select_related(
+            "remote_product", "sales_channel_view", "sales_channel"
+        ).get(
+            id=instance.id.node_id,
+            sales_channel__multi_tenant_company=multi_tenant_company,
+        )
+
+        factory = RefreshLatestIssuesFactory(assign=assign)
+        factory.run()
+
+        return assign

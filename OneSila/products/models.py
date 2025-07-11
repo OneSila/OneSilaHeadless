@@ -522,13 +522,14 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
             ('product', 'language', 'sales_channel'),
         )
 
-        constraints = [
-            UniqueConstraint(
-                fields=['url_key', 'multi_tenant_company'],
-                condition=Q(url_key__isnull=False),
-                name='uniq_nonnull_url_key_per_company'
-            )
-        ]
+        # @TODO: Figure out what we do with this
+        # constraints = [
+        #     UniqueConstraint(
+        #         fields=['url_key', 'multi_tenant_company'],
+        #         condition=Q(sales_channel__isnull=False),
+        #         name='uniq_nonnull_url_key_per_company_for_default'
+        #     )
+        # ]
 
 
 class ProductTranslationBulletPoint(models.Model):

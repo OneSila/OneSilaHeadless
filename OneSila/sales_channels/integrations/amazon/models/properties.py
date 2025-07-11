@@ -56,6 +56,7 @@ class AmazonPublicDefinition(models.SharedModel):
     is_required = models.BooleanField(default=False)
     is_internal = models.BooleanField(default=False)
     allowed_in_configurator = models.BooleanField(default=False)
+    allowed_in_listing_offer_request = models.BooleanField(default=False)
 
     def should_refresh(self):
         if not self.last_fetched:
@@ -108,6 +109,7 @@ class AmazonProperty(RemoteProperty):
     def save(self, *args, **kwargs):
         if self.allow_multiple is not True:
             self.allow_multiple = True
+
         if self.local_instance and self.local_instance.type != self.type:
             raise ValidationError(
                 _(
@@ -210,6 +212,7 @@ class AmazonProductType(RemoteObjectMixin, models.Model):
     )
 
     variation_themes = JSONField(null=True, blank=True)
+    listing_offer_required_properties = JSONField(default=dict, blank=True)
 
     objects = AmazonProductTypeManager()
 

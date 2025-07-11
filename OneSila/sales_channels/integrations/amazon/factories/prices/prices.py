@@ -1,10 +1,9 @@
 from sales_channels.factories.prices.prices import RemotePriceUpdateFactory
-from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin, AmazonListingIssuesMixin
+from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.models import AmazonPrice, AmazonCurrency
-from spapi import ListingsApi
 
 
-class AmazonPriceUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, RemotePriceUpdateFactory):
+class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
     """Update product prices for a specific Amazon marketplace."""
 
     remote_model_class = AmazonPrice
@@ -21,7 +20,6 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
         )
 
     def update_remote(self):
-        listings = ListingsApi(self._get_client())
         responses = []
 
         currencies = AmazonCurrency.objects.filter(
@@ -36,31 +34,35 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, Remo
             if not price_info:
                 continue
 
-            list_price = price_info.get("discount_price") or price_info.get("price")
-            rrp_price = price_info.get("price")
-
-            body = {
-                "productType": self.remote_product.remote_type,
-                "requirements": "LISTING",
-                "attributes": {
-                    "list_price": [
-                        {"currency": iso, "amount": list_price}
-                    ],
-                    "uvp_list_price": [
-                        {"currency": iso, "amount": rrp_price}
-                    ],
-                },
+            sale_price = price_info.get("discount_price")
+            list_price = sale_price if sale_price is not None else price_info.get("price")
+            attributes = {
+                "purchasable_offer": [
+                    {
+                        "audience": "ALL",
+                        "currency": iso,
+                        "marketplace_id": self.view.remote_id,
+                        "our_price": [
+                            {
+                                "schedule": [
+                                    {"value_with_tax": list_price}
+                                ]
+                            }
+                        ],
+                    }
+                ]
             }
 
-            self.body = body
+            if self.sales_channel.listing_owner:
+                attributes["list_price"] = [{"currency": iso, "value": list_price}]
 
-            resp = listings.patch_listings_item(
-                seller_id=self.sales_channel.remote_id,
-                sku=self.remote_product.remote_sku,
-                marketplace_ids=[self.view.remote_id],
-                body=body,
+
+            resp = self.update_product(
+                self.remote_product.remote_sku,
+                self.view.remote_id,
+                self.remote_product.get_remote_rule(),
+                attributes,
             )
-            self.update_assign_issues(getattr(resp, "issues", []))
             responses.append(resp)
 
         return responses

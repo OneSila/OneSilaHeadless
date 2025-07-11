@@ -1,5 +1,4 @@
 import json
-from spapi import ListingsApi
 from sales_channels.integrations.amazon.factories.properties.mixins import AmazonProductPropertyBaseMixin
 from sales_channels.integrations.amazon.models.properties import AmazonProductProperty
 
@@ -14,23 +13,39 @@ from sales_channels.factories.properties.properties import (
 class AmazonProductPropertyCreateFactory(AmazonProductPropertyBaseMixin, RemoteProductPropertyCreateFactory):
     remote_model_class = AmazonProductProperty
 
-    def __init__(self, sales_channel, local_instance, remote_product, view, api=None, skip_checks=False, get_value_only=False, language=None):
+    def __init__(
+        self,
+        sales_channel,
+        local_instance,
+        remote_product,
+        view,
+        api=None,
+        skip_checks=False,
+        get_value_only=False,
+        language=None,
+    ):
         self.view = view
-        super().__init__(sales_channel, local_instance, remote_product=remote_product, api=api, skip_checks=skip_checks, get_value_only=get_value_only, language=language)
+        super().__init__(
+            sales_channel,
+            local_instance,
+            remote_product=remote_product,
+            api=api,
+            skip_checks=skip_checks,
+            get_value_only=get_value_only,
+            language=language,
+        )
 
     def create_remote(self):
         body = self.create_body()
         if body is None:
             return
-        api = self.get_api()
-        listings = ListingsApi(self._get_client())
-        response = listings.patch_listings_item(
-            seller_id=self.sales_channel.remote_id,
-            sku=self.remote_product.remote_sku,
-            marketplace_ids=[self.view.remote_id],
-            body=body,
+
+        response = self.update_product(
+            self.remote_product.remote_sku,
+            self.view.remote_id,
+            self.remote_rule,
+            body.get("attributes", {}),
         )
-        self.update_assign_issues(getattr(response, "issues", []))
         return response
 
     def serialize_response(self, response):
@@ -44,10 +59,29 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteP
     remote_model_class = AmazonProductProperty
     create_factory_class = AmazonProductPropertyCreateFactory
 
-    def __init__(self, sales_channel, local_instance, remote_product, view, api=None, get_value_only=False, remote_instance=None, skip_checks=False, language=None):
+    def __init__(
+        self,
+        sales_channel,
+        local_instance,
+        remote_product,
+        view,
+        api=None,
+        get_value_only=False,
+        remote_instance=None,
+        skip_checks=False,
+        language=None,
+    ):
         self.view = view
-        super().__init__(sales_channel, local_instance, remote_product=remote_product, api=api,
-              get_value_only=get_value_only, remote_instance=remote_instance, skip_checks=skip_checks, language=language)
+        super().__init__(
+            sales_channel,
+            local_instance,
+            remote_product=remote_product,
+            api=api,
+            get_value_only=get_value_only,
+            remote_instance=remote_instance,
+            skip_checks=skip_checks,
+            language=language,
+        )
 
     def update_remote(self):
 
@@ -55,14 +89,12 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteP
         if body is None:
             return
 
-        listings = ListingsApi(self._get_client())
-        response = listings.patch_listings_item(
-            seller_id=self.sales_channel.remote_id,
-            sku=self.remote_product.remote_sku,
-            marketplace_ids=[self.view.remote_id],
-            body=body,
+        response = self.update_product(
+            self.remote_product.remote_sku,
+            self.view.remote_id,
+            self.remote_rule,
+            body.get("attributes", {}),
         )
-        self.update_assign_issues(getattr(response, "issues", []))
         return response
 
     def serialize_response(self, response):
@@ -73,7 +105,7 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteP
         self.remote_product = self.remote_instance.remote_product
         self.remote_property = self.remote_instance.remote_property
 
-        product_type_code, payload = self.build_payload()
+        _, payload = self.build_payload()
         self.remote_value = json.dumps(payload)
 
         if self.get_value_only:
@@ -93,19 +125,14 @@ class AmazonProductPropertyDeleteFactory(AmazonProductPropertyBaseMixin, RemoteP
         super().__init__(sales_channel, local_instance, remote_product=remote_product, api=api, remote_instance=remote_instance)
 
     def delete_remote(self):
-        listings = ListingsApi(self._get_client())
         try:
-            response = listings.patch_listings_item(
-                seller_id=self.sales_channel.remote_id,
-                sku=self.remote_instance.remote_product.remote_sku,
-                marketplace_ids=[self.view.remote_id],
-                body={
-                    "productType": self.remote_instance.remote_product.remote_type,
-                    "requirements": "LISTING",
-                    "attributes": {self.remote_instance.remote_property.main_code: None},
-                },
+            response = self.update_product(
+                self.remote_instance.remote_product.remote_sku,
+                self.view.remote_id,
+                self.remote_instance.remote_product.get_remote_rule(),
+                {self.remote_instance.remote_property.main_code: None},
             )
-            self.update_assign_issues(getattr(response, "issues", []))
+
             return response
         except Exception:
             return True

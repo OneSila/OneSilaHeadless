@@ -7,6 +7,7 @@ from core.schema.core.types.types import type, relay, field, strawberry_type
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from currencies.schema.types.types import CurrencyType
 from imports_exports.schema.queries import ImportType
+from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION
 from products.schema.types.types import ProductType
 
 from sales_channels.models import (
@@ -282,6 +283,10 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
     product: ProductType
 
     @field()
+    def integration_type(self, info) -> str:
+        return INTEGRATIONS_TYPES_MAP.get(self.sales_channel.__class__, MAGENTO_INTEGRATION)
+
+    @field()
     def remote_url(self, info) -> str | None:
         return self.remote_url
 
@@ -310,7 +315,5 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
                         severity=issue.get("severity"),
                     )
                 )
-
-        # Other marketplace specific formatting can be added here.
 
         return formatted

@@ -141,7 +141,10 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         for product_property in self.product_properties:
             # Attempt to process the product property
             remote_property_id = self.process_single_property(product_property)
-            existing_remote_property_ids.append(remote_property_id)
+
+            # in the marketplaces some might be skipped if not mapped
+            if remote_property_id:
+                existing_remote_property_ids.append(remote_property_id)
 
         # Delete any remote properties that no longer exist locally
         self.delete_non_existing_remote_product_property(existing_remote_property_ids)
