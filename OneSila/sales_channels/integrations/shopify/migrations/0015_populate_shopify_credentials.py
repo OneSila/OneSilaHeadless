@@ -23,5 +23,5 @@ class Migration(migrations.Migration):
         ('shopify', '0014_shopifysaleschannel_api_key_and_more'),
     ]
     operations = [
-        migrations.RunPython(populate_shopify_api_credentials, reverse_code=migrations.RunPython.noop),
+        # migrations.RunPython(populate_shopify_api_credentials, reverse_code=migrations.RunPython.noop),
     ]
