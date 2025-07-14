@@ -357,7 +357,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             mirror_model_defaults={"asin": instance.data.get("__asin")},
         )
 
-    def update_remote_product(self, import_instance: ImportProductInstance, product, is_variation: bool):
+    def update_remote_product(self, import_instance: ImportProductInstance, product, view,is_variation: bool):
         remote_product = import_instance.remote_instance
         asin = import_instance.data.get("__asin")
 
@@ -373,6 +373,9 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         if remote_product.is_variation != is_variation:
             remote_product.is_variation = is_variation
+
+        if view.remote_id not in (remote_product.created_marketplaces or []):
+            remote_product.created_marketplaces.append(view.remote_id)
 
         remote_product.save()
 
@@ -557,7 +560,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             instance.language = language
             instance.process()
 
-            self.update_remote_product(instance, product, is_variation)
+            self.update_remote_product(instance, product, view, is_variation)
             self.handle_ean_code(instance)
             self.handle_attributes(instance)
             self.handle_translations(instance)
