@@ -639,6 +639,7 @@ class ImportProductTranslationInstance(AbstractImportInstance):
             self.instance.bullet_points.all().delete()
             for index, text in enumerate(self.bullet_points):
                 ProductTranslationBulletPoint.objects.create(
+                    multi_tenant_company=self.instance.multi_tenant_company,
                     product_translation=self.instance,
                     text=text,
                     sort_order=index,

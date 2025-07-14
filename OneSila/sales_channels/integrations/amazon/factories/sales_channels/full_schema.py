@@ -673,7 +673,7 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
                 defaults={'type': property_data['type']},
             )
 
-            allows_unmapped_values = property_data.get('allows_unmapped_values', False)
+            allows_unmapped_values = property_data.get('allow_not_mapped_values', False)
 
             if not created:
                 old_type = remote_property.type

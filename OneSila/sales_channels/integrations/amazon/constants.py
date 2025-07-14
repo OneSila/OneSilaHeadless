@@ -94,5 +94,5 @@ AMAZON_INTERNAL_PROPERTIES = [
 
     # Fulfillment-specific (not PIM core)
     'fulfillment_availability', 'merchant_shipping_group', 'merchant_release_date',
-    'skip_offer', 'supplemental_condition_information', 'product_tax_code', 'uvp_list_price'
+    'skip_offer', 'supplemental_condition_information', 'uvp_list_price'
 ]
