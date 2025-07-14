@@ -85,6 +85,17 @@ class GetAmazonAPIMixin:
             raise Exception(f"SP-API failed: {e}")
 
     @throttle_safe(max_retries=5, base_delay=1)
+    def search_product_types(self, marketplace_id: str, name: str):
+        """Return product type suggestions for an item name."""
+        definitions_api = DefinitionsApi(self._get_client())
+        resp = definitions_api.search_definitions_product_types([
+            marketplace_id
+        ], item_name=name)
+        if hasattr(resp, "to_dict"):
+            return resp.to_dict()
+        return resp
+
+    @throttle_safe(max_retries=5, base_delay=1)
     def get_listing_item(self, sku, marketplace_id, *, included_data=None, issue_locale=None):
         """Return listing item payload for the given sku and marketplace."""
 

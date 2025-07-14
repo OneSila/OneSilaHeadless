@@ -247,3 +247,16 @@ class AmazonRemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):
             )
 
         return formatted
+
+
+@strawberry_type
+class SuggestedAmazonProductTypeEntry:
+    display_name: str
+    marketplace_ids: List[str]
+    name: str
+
+
+@strawberry_type
+class SuggestedAmazonProductType:
+    product_type_version: str
+    product_types: List[SuggestedAmazonProductTypeEntry]
