@@ -1,9 +1,11 @@
 from core.receivers import receiver
 from core.signals import post_create, post_update
 from sales_channels.signals import refresh_website_pull_models, sales_channel_created
+from properties.signals import product_properties_rule_created
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
+    AmazonProductType,
 )
 from sales_channels.integrations.amazon.factories.sync.rule_sync import (
     AmazonPropertyRuleItemSyncFactory,
@@ -81,3 +83,12 @@ def sales_channels__amazon_product_type__ensure_asin(sender, instance, **kwargs)
 
     sync_factory = AmazonProductTypeAsinSyncFactory(instance)
     sync_factory.run()
+
+
+@receiver(product_properties_rule_created, sender='properties.ProductPropertiesRule')
+def sales_channels__amazon_product_type__create_from_local_rule(sender, instance, **kwargs):
+    for sc in AmazonSalesChannel.objects.filter(multi_tenant_company=instance.multi_tenant_company):
+        AmazonProductType.objects.get_or_create_from_local_instance(
+            local_instance=instance,
+            sales_channel=sc,
+        )
