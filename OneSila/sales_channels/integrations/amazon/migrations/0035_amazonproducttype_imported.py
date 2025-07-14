@@ -5,18 +5,39 @@ def create_missing_rules(apps, schema_editor):
     AmazonProductType = apps.get_model('amazon', 'AmazonProductType')
     AmazonSalesChannel = apps.get_model('amazon', 'AmazonSalesChannel')
     ProductPropertiesRule = apps.get_model('properties', 'ProductPropertiesRule')
+    PropertySelectValueTranslation = apps.get_model('properties', 'PropertySelectValueTranslation')
 
     for rule in ProductPropertiesRule.objects.all().iterator():
-        for sc in AmazonSalesChannel.objects.filter(multi_tenant_company=rule.multi_tenant_company).iterator():
-            AmazonProductType.objects.get_or_create(
+        sales_channels = AmazonSalesChannel.objects.filter(multi_tenant_company=rule.multi_tenant_company)
+
+        if not sales_channels.exists():
+            continue
+
+        product_type_value = (
+            PropertySelectValueTranslation.objects
+            .filter(
+                propertyselectvalue_id=rule.product_type_id,
+                language=rule.multi_tenant_company.language
+            )
+            .values_list('value', flat=True)
+            .first()
+        ) or f"ProductType-{rule.product_type_id}"
+
+        for sc in sales_channels.iterator():
+            if not AmazonProductType.objects.filter(
                 multi_tenant_company=rule.multi_tenant_company,
                 local_instance=rule,
                 sales_channel=sc,
-                defaults={
-                    'name': rule.product_type.value,
-                    'imported': False,
-                }
-            )
+            ).exists():
+
+                AmazonProductType.objects.create(
+                    multi_tenant_company=rule.multi_tenant_company,
+                    local_instance=rule,
+                    sales_channel=sc,
+                    name=product_type_value,
+                    imported=False,
+                )
+
 
 
 class Migration(migrations.Migration):

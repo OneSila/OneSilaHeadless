@@ -218,14 +218,17 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                         continue
 
                     elif remote_property.type == Property.TYPES.DATE:
+
                         try:
-                            value = parse(value).date()
+                            parsed = parse(value).date()
+                            value = parsed.strftime('%Y-%m-%d')
                         except Exception:
-                            pass  # leave value as-is if parsing fails
+                            pass
 
                     elif remote_property.type == Property.TYPES.DATETIME:
                         try:
-                            value = parse(value)  # full datetime object
+                            parsed = parse(value)
+                            value = parsed.strftime('%Y-%m-%d %H:%M:%S')
                         except Exception:
                             pass
 
@@ -612,6 +615,10 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 },
             )
             instance.language = language
+
+            print('---------------------------------------')
+            pprint.pprint(structured)
+
             instance.process()
 
             self.update_remote_product(instance, product, view, is_variation)
