@@ -227,6 +227,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             )
 
             if self.sales_channel.listing_owner:
+                # @TODO: This can be value_with_tax depending on marketplace use the public definition to get the value
                 attrs.setdefault("list_price", []).append(
                     {"currency": iso, "value": float(list_price)}
                 )
@@ -363,27 +364,33 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     def process_amazon_single_property(self, product_property, remote_property):
 
         try:
+            remote_product_property = self.remote_product_property_class.objects.get(
+                local_instance=product_property,
+                remote_product=self.remote_instance,
+                sales_channel=self.sales_channel,
+            )
+
             fac = AmazonProductPropertyUpdateFactory(
                 sales_channel=self.sales_channel,
                 local_instance=product_property,
                 remote_product=self.remote_instance,
-                remote_instance=remote_property,
+                remote_instance=remote_product_property,
                 view=self.view,
-                remote_property=remote_property.remote_property,
+                remote_property=remote_property,
                 api=self.api,
                 get_value_only=True,
                 skip_checks=True,
             )
             fac.run()
 
-            if remote_property.needs_update(fac.remote_value):
-                remote_property.remote_value = fac.remote_value
-                remote_property.save()
+            if remote_product_property.needs_update(fac.remote_value):
+                remote_product_property.remote_value = fac.remote_value
+                remote_product_property.save()
 
-            self.remote_product_properties.append(remote_property)
+            self.remote_product_properties.append(remote_product_property)
             data = json.loads(fac.remote_value or "{}")
             self.attributes.update(data)
-            return remote_property.id
+            return remote_product_property.id
 
         except self.remote_product_property_class.DoesNotExist:
             create_fac = AmazonProductPropertyCreateFactory(
@@ -398,6 +405,11 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             )
             create_fac.run()
 
+            if hasattr(create_fac, "remote_instance"):
+                self.remote_product_properties.append(create_fac.remote_instance)
+                data = json.loads(create_fac.remote_value or "{}")
+                self.attributes.update(data)
+
     def process_product_properties(self):
         # We override process_product_properties because:
         # 1. We will not do delete_non_existing_remote_product_property. They will be deleted because are not added to
@@ -407,9 +419,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
 
         for product_property in self.product_properties:
 
-            for remote_property in AmazonProperty.objects.filter(sales_channel=self.sales_channel,
-                                                                 local_instance=product_property.property):
-
+            for remote_property in AmazonProperty.objects.filter(sales_channel=self.sales_channel, local_instance=product_property.property):
                 try:
                     self.process_amazon_single_property(product_property, remote_property)
                 except AmazonUnsupportedPropertyForProductType:
@@ -433,6 +443,8 @@ class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFa
             self.payload.get("attributes", {}),
             self.current_attrs,
         )
+        print('------------------------------------------------------------------------')
+        print(resp)
         return resp
 
     def serialize_response(self, response):
@@ -483,6 +495,8 @@ class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactor
             self.payload.get("attributes", {}),
             self.current_attrs,
         )
+        print('------------------------------------------------------------------------')
+        print(resp)
         return resp
 
     def serialize_response(self, response):

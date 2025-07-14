@@ -343,6 +343,14 @@ class GetAmazonAPIMixin:
 
         body = self._build_common_body(product_type, merged_attributes)
 
+        print('--------------------------------------- ARGUMENTS')
+        print('mode')
+        print("VALIDATION_PREVIEW" if settings.DEBUG else None)
+        print('body')
+        import pprint
+        pprint.pprint(body)
+        print('-------------------------------------------------')
+
         listings = ListingsApi(self._get_client())
         response = listings.put_listings_item(
             seller_id=self.sales_channel.remote_id,

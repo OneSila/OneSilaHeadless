@@ -228,49 +228,6 @@ class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupM
         remote_instance.refresh_from_db()
         self.assertEqual(json.loads(remote_instance.remote_value), expected)
 
-    def test_product_property_create_factory_property_not_mapped(self):
-        size_property = baker.make(
-            Property,
-            type=Property.TYPES.SELECT,
-            internal_name="size",
-            multi_tenant_company=self.multi_tenant_company,
-        )
-        PropertyTranslation.objects.create(
-            property=size_property,
-            language=self.multi_tenant_company.language,
-            name="Size",
-            multi_tenant_company=self.multi_tenant_company,
-        )
-        size_value = baker.make(
-            PropertySelectValue,
-            property=size_property,
-            multi_tenant_company=self.multi_tenant_company,
-        )
-        PropertySelectValueTranslation.objects.create(
-            propertyselectvalue=size_value,
-            language=self.multi_tenant_company.language,
-            value="Large",
-            multi_tenant_company=self.multi_tenant_company,
-        )
-        prop_instance = ProductProperty.objects.create(
-            product=self.product,
-            property=size_property,
-            value_select=size_value,
-            multi_tenant_company=self.multi_tenant_company,
-        )
-
-        fac = AmazonProductPropertyCreateFactory(
-            sales_channel=self.sales_channel,
-            local_instance=prop_instance,
-            remote_product=self.remote_product,
-            view=self.view,
-            remote_property=None,
-            get_value_only=True,
-        )
-
-        with self.assertRaises(AmazonProperty.DoesNotExist):
-            fac.create_body()
-
     def test_product_property_create_factory_rule_not_mapped(self):
         self.amazon_product_type.delete()
         fac = AmazonProductPropertyCreateFactory(

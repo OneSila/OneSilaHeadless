@@ -127,6 +127,13 @@ class AmazonDefaultUnitConfiguratorFilter(SearchFilterMixin):
     sales_channel: Optional[SalesChannelFilter]
     marketplace: Optional[SalesChannelViewFilter]
 
+    @custom_filter
+    def mapped_locally(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
+        if value not in (None, UNSET):
+            queryset = queryset.filter(selected_unit__isnull=not value)
+
+        return queryset, Q()
+
 
 @filter(AmazonRemoteLog)
 class AmazonRemoteLogFilter(SearchFilterMixin):

@@ -119,9 +119,14 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
                     sales_channel=self.sales_channel, code=code
                 )
                 local_prop = self.remote_property.local_instance
-                prop_instance = ProductProperty.objects.get(
-                    product=product, property=local_prop
-                )
+
+                try:
+                    prop_instance = ProductProperty.objects.get(
+                        product=product, property=local_prop
+                    )
+                except ProductProperty.DoesNotExist:
+                    return None
+
                 return self.get_remote_value_for_property(prop_instance, self.remote_property)
             return value
 

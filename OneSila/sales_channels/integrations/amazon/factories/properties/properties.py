@@ -75,7 +75,6 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteP
         language=None,
     ):
         self.view = view
-        self.remote_property = remote_property
         super().__init__(
             sales_channel,
             local_instance,
@@ -86,6 +85,7 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteP
             skip_checks=skip_checks,
             language=language,
         )
+        self.remote_property = remote_property
 
     def update_remote(self):
 
@@ -107,7 +107,6 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteP
     def additional_update_check(self):
         self.local_property = self.local_instance.property
         self.remote_product = self.remote_instance.remote_product
-        self.remote_property = self.remote_instance.remote_property
 
         _, payload = self.build_payload()
         self.remote_value = json.dumps(payload)
@@ -118,6 +117,25 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteP
             return False
 
         return self.remote_instance.needs_update(self.remote_value)
+
+    def create_remote_instance(self):
+        """
+        Attempts to recreate the remote instance using the specified Create Factory.
+        """
+
+        create_factory = AmazonProductPropertyCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.local_instance,
+            remote_product=self.remote_product,
+            view=self.view,
+            remote_property=self.remote_property,
+            api=self.api,
+            skip_checks=True,
+            get_value_only=self.get_value_only,
+            language=self.language)
+        create_factory.run()
+
+        self.remote_instance = create_factory.remote_instance
 
 
 class AmazonProductPropertyDeleteFactory(AmazonProductPropertyBaseMixin, RemoteProductPropertyDeleteFactory):
