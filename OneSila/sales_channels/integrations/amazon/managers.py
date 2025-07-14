@@ -77,3 +77,14 @@ class AmazonPropertySelectValueManager(_MappingManagerMixin, MultiTenantManager)
 class AmazonProductTypeManager(_MappingManagerMixin, MultiTenantManager):
     queryset_class = AmazonProductTypeQuerySet
 
+    def get_or_create_from_local_instance(self, *, local_instance, sales_channel):
+        return self.get_or_create(
+            multi_tenant_company=local_instance.multi_tenant_company,
+            local_instance=local_instance,
+            sales_channel=sales_channel,
+            defaults={
+                "name": local_instance.product_type.value,
+                "imported": False,
+            },
+        )
+
