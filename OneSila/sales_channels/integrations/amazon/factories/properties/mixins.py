@@ -1,3 +1,4 @@
+from sales_channels.integrations.amazon.exceptions import AmazonUnsupportedPropertyForProductType
 from sales_channels.integrations.amazon.models.properties import (
     AmazonProperty,
     AmazonProductType,
@@ -71,10 +72,6 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _get_remote_property(self) -> AmazonProperty:
-        if not getattr(self, "remote_property", None):
-            raise AmazonProperty.DoesNotExist("Remote property not set")
-        return self.remote_property
 
     def _get_product_type(self, rule) -> AmazonProductType:
         return AmazonProductType.objects.get(
@@ -84,11 +81,14 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
 
     def _get_public_definition(self, product_type: AmazonProductType, main_code: str) -> AmazonPublicDefinition:
 
-        return AmazonPublicDefinition.objects.get(
-            api_region_code=self.view.api_region_code,
-            product_type_code=product_type.product_type_code,
-            code=main_code,
-        )
+        try:
+            return AmazonPublicDefinition.objects.get(
+                api_region_code=self.view.api_region_code,
+                product_type_code=product_type.product_type_code,
+                code=main_code,
+            )
+        except AmazonPublicDefinition.DoesNotExist:
+            raise AmazonUnsupportedPropertyForProductType("Amazon property is not supported for this product type")
 
     def _get_unit(self, code: str):
         from sales_channels.integrations.amazon.models.sales_channels import AmazonDefaultUnitConfigurator
@@ -138,8 +138,7 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
 
     # ------------------------------------------------------------------
     def build_payload(self):
-        remote_property = self._get_remote_property()
-        main_code = remote_property.main_code
+        main_code = self.remote_property.main_code
         rule = self.local_instance.product.get_product_rule()
         if not rule:
             raise ValueError("Product has no product rule mapped")
@@ -150,7 +149,7 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
 
         public_def = self._get_public_definition(product_type, main_code)
         if not public_def.usage_definition:
-            raise ValueError("Missing usage definition for property")
+            raise AmazonUnsupportedPropertyForProductType("Missing usage definition for property")
 
         usage = json.loads(public_def.usage_definition)
         payload = self._replace_tokens(usage, self.local_instance.product)
@@ -162,20 +161,8 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
 
         return product_type, payload
 
-    # ------------------------------------------------------------------
-    def preflight_check(self):
-        if not super().preflight_check():
-            return False
-        try:
-            self._get_remote_property()
-        except AmazonProperty.DoesNotExist:
-            return False
-
-        return True
-
     def create_body(self):
         self.remote_rule, payload = self.build_payload()
-
         self.remote_value = json.dumps(payload)
 
         if self.get_value_only:

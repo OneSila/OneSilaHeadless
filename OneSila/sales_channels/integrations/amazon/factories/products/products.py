@@ -9,6 +9,7 @@ from sales_channels.factories.products.products import (
     RemoteProductUpdateFactory,
     RemoteProductDeleteFactory,
 )
+from sales_channels.integrations.amazon.exceptions import AmazonUnsupportedPropertyForProductType
 from sales_channels.integrations.amazon.factories.mixins import (
     GetAmazonAPIMixin,
 )
@@ -231,65 +232,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 )
         return attrs
 
-    # ------------------------------------------------------------
-    # Property handling
-    # ------------------------------------------------------------
-    def process_single_property(self, product_property):
-        try:
-            remote_property = self.remote_product_property_class.objects.get(
-                local_instance=product_property,
-                remote_product=self.remote_instance,
-                sales_channel=self.sales_channel,
-            )
-
-            fac = AmazonProductPropertyUpdateFactory(
-                sales_channel=self.sales_channel,
-                local_instance=product_property,
-                remote_product=self.remote_instance,
-                remote_instance=remote_property,
-                view=self.view,
-                remote_property=remote_property.remote_property,
-                api=self.api,
-                get_value_only=True,
-                skip_checks=True,
-            )
-            fac.run()
-
-            if remote_property.needs_update(fac.remote_value):
-                remote_property.remote_value = fac.remote_value
-                remote_property.save()
-
-            self.remote_product_properties.append(remote_property)
-            data = json.loads(fac.remote_value or "{}")
-            self.attributes.update(data)
-            return remote_property.id
-
-        except self.remote_product_property_class.DoesNotExist:
-            remote_property = AmazonProperty.objects.filter(
-                sales_channel=self.sales_channel,
-                local_instance=product_property.property,
-            ).first()
-            create_fac = AmazonProductPropertyCreateFactory(
-                sales_channel=self.sales_channel,
-                local_instance=product_property,
-                remote_product=self.remote_instance,
-                view=self.view,
-                remote_property=remote_property,
-                api=self.api,
-                get_value_only=True,
-                skip_checks=True,
-            )
-            create_fac.run()
-
-            remote_id = None
-            # not mapped values will be skipped instead giving error because it didn't pass the preflight check
-            if hasattr(create_fac, "remote_instance"):
-                self.remote_product_properties.append(create_fac.remote_instance)
-                data = json.loads(create_fac.remote_value or "{}")
-                self.attributes.update(data)
-                remote_id = create_fac.remote_instance.id
-
-            return remote_id
 
     def set_rule(self):
         super().set_rule()
@@ -414,6 +356,69 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             self.sales_channel.multi_tenant_company
         ).filter(product=self.local_instance, property_id__in=rule_properties_ids). \
             exclude(property__internal_name='merchant_suggested_asin')
+
+    # ------------------------------------------------------------
+    # Property handling
+    # ------------------------------------------------------------
+    def process_amazon_single_property(self, product_property, remote_property):
+
+        try:
+            fac = AmazonProductPropertyUpdateFactory(
+                sales_channel=self.sales_channel,
+                local_instance=product_property,
+                remote_product=self.remote_instance,
+                remote_instance=remote_property,
+                view=self.view,
+                remote_property=remote_property.remote_property,
+                api=self.api,
+                get_value_only=True,
+                skip_checks=True,
+            )
+            fac.run()
+
+            if remote_property.needs_update(fac.remote_value):
+                remote_property.remote_value = fac.remote_value
+                remote_property.save()
+
+            self.remote_product_properties.append(remote_property)
+            data = json.loads(fac.remote_value or "{}")
+            self.attributes.update(data)
+            return remote_property.id
+
+        except self.remote_product_property_class.DoesNotExist:
+            create_fac = AmazonProductPropertyCreateFactory(
+                sales_channel=self.sales_channel,
+                local_instance=product_property,
+                remote_product=self.remote_instance,
+                view=self.view,
+                remote_property=remote_property,
+                api=self.api,
+                get_value_only=True,
+                skip_checks=True,
+            )
+            create_fac.run()
+
+    def process_product_properties(self):
+        # We override process_product_properties because:
+        # 1. We will not do delete_non_existing_remote_product_property. They will be deleted because are not added to
+        # the payload
+        # 2. We use process_amazon_single_property that loop through all the remote proprties and call them for that
+        # remote property. The reason? In Amazon "size" can be mapped to over 30 amazon properties (ring size, t-shirt size etc)
+
+        for product_property in self.product_properties:
+
+            for remote_property in AmazonProperty.objects.filter(sales_channel=self.sales_channel,
+                                                                 local_instance=product_property.property):
+
+                try:
+                    self.process_amazon_single_property(product_property, remote_property)
+                except AmazonUnsupportedPropertyForProductType:
+                    # because we are getting all the properties we might get properties that are not designed for this
+                    # product type. We will just skip those
+                    pass
+
+
+
 
 
 class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFactory):
