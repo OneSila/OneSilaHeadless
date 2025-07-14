@@ -168,6 +168,7 @@ class AmazonProductPropertyTestSetupMixin:
             ),
         )
 
+
 class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupMixin):
     def setUp(self):
         super().setUp()
@@ -179,6 +180,7 @@ class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupM
             local_instance=self.product_property,
             remote_product=self.remote_product,
             view=self.view,
+            remote_property=self.amazon_property,
             get_value_only=True,
         )
 
@@ -208,6 +210,7 @@ class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupM
             local_instance=self.product_property,
             remote_product=self.remote_product,
             view=self.view,
+            remote_property=self.amazon_property,
             remote_instance=remote_instance,
             get_value_only=True,
         )
@@ -261,6 +264,7 @@ class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupM
             local_instance=prop_instance,
             remote_product=self.remote_product,
             view=self.view,
+            remote_property=None,
             get_value_only=True,
         )
 
@@ -274,6 +278,7 @@ class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupM
             local_instance=self.product_property,
             remote_product=self.remote_product,
             view=self.view,
+            remote_property=self.amazon_property,
             get_value_only=True,
         )
 
@@ -289,6 +294,7 @@ class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupM
             local_instance=self.product_property,
             remote_product=self.remote_product,
             view=self.view,
+            remote_property=self.amazon_property,
             get_value_only=True,
         )
 
@@ -309,6 +315,7 @@ class AmazonProductPropertyFactoryWithoutListingOwnerTest(TestCase, AmazonProduc
             local_instance=self.product_property,
             remote_product=self.remote_product,
             view=self.view,
+            remote_property=self.amazon_property,
             get_value_only=True,
         )
 
@@ -329,6 +336,7 @@ class AmazonProductPropertyFactoryWithoutListingOwnerTest(TestCase, AmazonProduc
             local_instance=self.product_property,
             remote_product=self.remote_product,
             view=self.view,
+            remote_property=self.amazon_property,
             remote_instance=remote_instance,
             get_value_only=True,
         )

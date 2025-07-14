@@ -19,12 +19,14 @@ class AmazonProductPropertyCreateFactory(AmazonProductPropertyBaseMixin, RemoteP
         local_instance,
         remote_product,
         view,
+        remote_property,
         api=None,
         skip_checks=False,
         get_value_only=False,
         language=None,
     ):
         self.view = view
+        self.remote_property = remote_property
         super().__init__(
             sales_channel,
             local_instance,
@@ -65,6 +67,7 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteP
         local_instance,
         remote_product,
         view,
+        remote_property,
         api=None,
         get_value_only=False,
         remote_instance=None,
@@ -72,6 +75,9 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteP
         language=None,
     ):
         self.view = view
+        self.remote_property = remote_property or (
+            remote_instance.remote_property if remote_instance else None
+        )
         super().__init__(
             sales_channel,
             local_instance,
@@ -120,8 +126,11 @@ class AmazonProductPropertyDeleteFactory(AmazonProductPropertyBaseMixin, RemoteP
     remote_model_class = AmazonProductProperty
     delete_remote_instance = True
 
-    def __init__(self, sales_channel, local_instance, remote_product, view, api=None, remote_instance=None):
+    def __init__(self, sales_channel, local_instance, remote_product, view, remote_property, api=None, remote_instance=None):
         self.view = view
+        self.remote_property = remote_property or (
+            remote_instance.remote_property if remote_instance else None
+        )
         super().__init__(sales_channel, local_instance, remote_product=remote_product, api=api, remote_instance=remote_instance)
 
     def delete_remote(self):

@@ -248,6 +248,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 remote_product=self.remote_instance,
                 remote_instance=remote_property,
                 view=self.view,
+                remote_property=remote_property.remote_property,
                 api=self.api,
                 get_value_only=True,
                 skip_checks=True,
@@ -264,17 +265,21 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             return remote_property.id
 
         except self.remote_product_property_class.DoesNotExist:
+            remote_property = AmazonProperty.objects.filter(
+                sales_channel=self.sales_channel,
+                local_instance=product_property.property,
+            ).first()
             create_fac = AmazonProductPropertyCreateFactory(
                 sales_channel=self.sales_channel,
                 local_instance=product_property,
                 remote_product=self.remote_instance,
                 view=self.view,
+                remote_property=remote_property,
                 api=self.api,
                 get_value_only=True,
                 skip_checks=True,
             )
             create_fac.run()
-
 
             remote_id = None
             # not mapped values will be skipped instead giving error because it didn't pass the preflight check
@@ -405,11 +410,10 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
 
     def set_product_properties(self):
         rule_properties_ids = self.local_instance.get_required_and_optional_properties(product_rule=self.rule).values_list('property_id', flat=True)
-        self.product_properties =  ProductProperty.objects.filter_multi_tenant(
-                self.sales_channel.multi_tenant_company
-            ).filter(product=self.local_instance, property_id__in=rule_properties_ids). \
+        self.product_properties = ProductProperty.objects.filter_multi_tenant(
+            self.sales_channel.multi_tenant_company
+        ).filter(product=self.local_instance, property_id__in=rule_properties_ids). \
             exclude(property__internal_name='merchant_suggested_asin')
-
 
 
 class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFactory):
