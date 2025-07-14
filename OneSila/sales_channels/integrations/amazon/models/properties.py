@@ -211,6 +211,8 @@ class AmazonProductType(RemoteObjectMixin, models.Model):
         verbose_name="Remote Name"
     )
 
+    imported = models.BooleanField(default=True)
+
     variation_themes = JSONField(null=True, blank=True)
     listing_offer_required_properties = JSONField(default=dict, blank=True)
 
