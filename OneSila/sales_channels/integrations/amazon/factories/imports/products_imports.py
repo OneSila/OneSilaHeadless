@@ -8,6 +8,8 @@ from imports_exports.factories.products import ImportProductInstance
 from products.product_types import SIMPLE
 from properties.models import Property, PropertyTranslation
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
+from sales_channels.integrations.amazon.decorators import throttle_safe
+from spapi import CatalogApi
 from sales_channels.integrations.amazon.helpers import (
     infer_product_type,
     extract_description_and_bullets,
@@ -31,6 +33,7 @@ from sales_channels.integrations.amazon.models.properties import AmazonPublicDef
 from sales_channels.models import SalesChannelViewAssign
 from dateutil.parser import parse
 import datetime
+
 
 class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     """Basic Amazon products import processor."""
@@ -155,12 +158,10 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 index += 1
         return images
 
-    def _parse_attributes(self, product, marketplace):
+    def _parse_attributes(self, attributes, product_type, marketplace):
         attrs = []
         mirror_map = {}
-        product_attrs = product.attributes or {}
-        product_type = product.summaries[0].product_type
-
+        product_attrs = attributes or {}
 
         for code, values in product_attrs.items():
 
@@ -236,6 +237,36 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         return attrs, mirror_map
 
+    @throttle_safe(max_retries=5, base_delay=1)
+    def _fetch_catalog_attributes(self, asin, view):
+        """Fetch additional catalog attributes for a product."""
+        if not asin or not view:
+            return {}
+
+        catalog_api = CatalogApi(self._get_client())
+        try:
+            response = catalog_api.get_catalog_item(
+                asin,
+                [view.remote_id],
+                included_data=["attributes"],
+            )
+        except Exception:
+            return {}
+
+        if isinstance(response, dict):
+            return response.get("attributes", {})
+
+        if hasattr(response, "attributes"):
+            return response.attributes or {}
+
+        if hasattr(response, "payload"):
+            payload = getattr(response, "payload", None)
+            if isinstance(payload, dict):
+                return payload.get("attributes", {})
+            return getattr(payload, "attributes", {}) or {}
+
+        return {}
+
     def _parse_configurator_select_values(self, product):
         configurator_values = []
         amazon_theme = None
@@ -295,7 +326,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         name = summary.item_name
 
         # it seems that sometimes the name can be None coming from Amazon. IN that case we fallback to sku
-        if name == None:
+        if name is None:
             name = sku
 
         view = AmazonSalesChannelView.objects.filter(
@@ -316,7 +347,30 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         if type == SIMPLE:
             structured["prices"] = self._parse_prices(product_data)
 
-        attributes, mirror_map = self._parse_attributes(product_data, view)
+        product_type_code = summary.product_type
+        product_attrs = product_data.attributes or {}
+        attributes, mirror_map = self._parse_attributes(
+            product_attrs, product_type_code, view
+        )
+
+        catalog_attrs = self._fetch_catalog_attributes(asin, view)
+        if catalog_attrs:
+            extra_attrs, extra_map = self._parse_attributes(
+                catalog_attrs,
+                product_type_code,
+                view,
+            )
+            existing_ids = {
+                getattr(a.get("property"), "id", None) for a in attributes
+            }
+            for attr in extra_attrs:
+                prop_id = getattr(attr.get("property"), "id", None)
+                if prop_id not in existing_ids:
+                    attributes.append(attr)
+                    existing_ids.add(prop_id)
+            for k, v in extra_map.items():
+                if k not in mirror_map:
+                    mirror_map[k] = v
         asin_property = Property.objects.filter(
             internal_name="merchant_suggested_asin",
             multi_tenant_company=self.sales_channel.multi_tenant_company,
@@ -357,7 +411,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             mirror_model_defaults={"asin": instance.data.get("__asin")},
         )
 
-    def update_remote_product(self, import_instance: ImportProductInstance, product, view,is_variation: bool):
+    def update_remote_product(self, import_instance: ImportProductInstance, product, view, is_variation: bool):
         remote_product = import_instance.remote_instance
         asin = import_instance.data.get("__asin")
 
