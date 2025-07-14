@@ -27,7 +27,7 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonRedirectUrlType,
     AmazonSalesChannelImportType,
     AmazonDefaultUnitConfiguratorType,
-    SuggestedAmazonProductType,
+    SuggestedAmazonProductType, SuggestedAmazonProductTypeEntry,
 )
 from sales_channels.schema.types.input import (
     SalesChannelViewAssignPartialInput,
