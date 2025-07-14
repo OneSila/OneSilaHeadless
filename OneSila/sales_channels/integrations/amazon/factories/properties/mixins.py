@@ -72,10 +72,9 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
     # Helpers
     # ------------------------------------------------------------------
     def _get_remote_property(self) -> AmazonProperty:
-        return AmazonProperty.objects.get(
-            sales_channel=self.sales_channel,
-            local_instance=self.local_property,
-        )
+        if not getattr(self, "remote_property", None):
+            raise AmazonProperty.DoesNotExist("Remote property not set")
+        return self.remote_property
 
     def _get_product_type(self, rule) -> AmazonProductType:
         return AmazonProductType.objects.get(
@@ -201,4 +200,3 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
     def set_remote_id(self, response_data):
         # the product properties have na remote id
         pass
-
