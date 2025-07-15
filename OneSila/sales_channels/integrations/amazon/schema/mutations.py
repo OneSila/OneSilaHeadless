@@ -193,3 +193,35 @@ class AmazonSalesChannelMutation:
             product_type_version=data.get("product_type_version", ""),
             product_types=product_types,
         )
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def create_amazon_product_types_from_local_rules(
+        self,
+        instance: AmazonSalesChannelPartialInput,
+        info: Info,
+    ) -> List[AmazonProductTypeType]:
+        """Create Amazon product types for all local rules on a given sales channel."""
+        from sales_channels.integrations.amazon.models import (
+            AmazonSalesChannel,
+            AmazonProductType,
+        )
+        from properties.models import ProductPropertiesRule
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        sales_channel = AmazonSalesChannel.objects.get(
+            id=instance.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        product_types: list[AmazonProductType] = []
+        for rule in ProductPropertiesRule.objects.filter(
+            multi_tenant_company=multi_tenant_company
+        ).iterator():
+            product_type, _ = AmazonProductType.objects.get_or_create_from_local_instance(
+                local_instance=rule,
+                sales_channel=sales_channel,
+            )
+            product_types.append(product_type)
+
+        return product_types
