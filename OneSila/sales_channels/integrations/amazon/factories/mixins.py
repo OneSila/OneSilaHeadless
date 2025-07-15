@@ -281,8 +281,9 @@ class GetAmazonAPIMixin:
             return data
 
         pt_code = product_type.product_type_code
+        is_new_listing = "merchant_suggested_asin" not in attributes
 
-        if not self.sales_channel.listing_owner:
+        if not self.sales_channel.listing_owner and not is_new_listing:
             region = self.view.api_region_code
             allowed_keys = (
                 product_type.listing_offer_required_properties.get(region, [])
@@ -294,7 +295,7 @@ class GetAmazonAPIMixin:
 
         return {
             "productType": pt_code,
-            "requirements": "LISTING" if self.sales_channel.listing_owner else "LISTING_OFFER_ONLY",
+            "requirements": "LISTING" if self.sales_channel.listing_owner or is_new_listing else "LISTING_OFFER_ONLY",
             "attributes": clean(attributes),
         }
 
