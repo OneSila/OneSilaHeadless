@@ -399,6 +399,7 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin, EnsureMerchantSuggestedAsi
         self.sales_channel = sales_channel
         self.language = language or sales_channel.multi_tenant_company.language
         self.multi_tenant_company = sales_channel.multi_tenant_company
+        self.product_type = self.get_or_create_product_type()
         self.sales_channel_views = AmazonSalesChannelView.objects.filter(sales_channel=sales_channel)
         if merchant_asin_property is None:
             self.merchant_asin_property = self._ensure_merchant_suggested_asin()
