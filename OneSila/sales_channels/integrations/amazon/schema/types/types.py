@@ -243,6 +243,7 @@ class AmazonRemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):
                 FormattedIssueType(
                     message=issue.get("message"),
                     severity=issue.get("severity"),
+                    validation_issue=issue.get("validation_issue", False),
                 )
             )
 

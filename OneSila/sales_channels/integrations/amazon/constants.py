@@ -81,7 +81,7 @@ AMAZON_INTERNAL_PROPERTIES = [
     'item_name', 'package_level', 'package_contains_sku', 'purchasable_offer',
     'condition_note', 'list_price', 'max_order_quantity', 'product_description', 'bullet_point',
     'child_parent_sku_relationship', 'variation_theme', 'master_pack_layers_per_pallet_quantity',
-    'master_packs_per_layer_quantity', 'is_oem_sourced_product', 'number_of_items', 'parentage_level',
+    'master_packs_per_layer_quantity', 'is_oem_sourced_product', 'parentage_level',
 
     # Auto-linking/ASIN suggestion
     'merchant_suggested_asin', 'externally_assigned_product_identifier',

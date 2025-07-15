@@ -34,7 +34,8 @@ class GetAmazonAPIMixin:
         processing_status=None,
     ):
         """Update assign issues and optionally log the action."""
-        if not getattr(self, "remote_product", None) or not isinstance(getattr(self, "view", None), AmazonSalesChannelView):
+        if not getattr(self, "remote_product", None) or not isinstance(getattr(self, "view", None),
+                                                                       AmazonSalesChannelView):
             return
 
         assign = SalesChannelViewAssign.objects.filter(
@@ -47,11 +48,25 @@ class GetAmazonAPIMixin:
         if assign.remote_product_id != self.remote_product.id:
             assign.remote_product = self.remote_product
 
-        assign.issues = [
+        existing_issues = assign.issues or []
+
+        # Ensure each existing issue is a dictionary
+        existing_issues_dicts = [
             issue.to_dict() if hasattr(issue, "to_dict") else issue
-            for issue in issues or []
+            for issue in existing_issues
         ]
-        assign.save()
+
+        new_issues = []
+        for issue in issues or []:
+            issue_dict = issue.to_dict() if hasattr(issue, "to_dict") else issue
+            issue_dict["validation_issue"] = True
+
+            if issue_dict not in existing_issues_dicts:
+                new_issues.append(issue_dict)
+
+        if new_issues:
+            assign.issues = existing_issues_dicts + new_issues
+            assign.save()
 
         if action_log and log_identifier:
             self.log_action(
