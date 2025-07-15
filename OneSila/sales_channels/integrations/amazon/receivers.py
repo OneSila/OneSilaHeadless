@@ -14,6 +14,7 @@ from sales_channels.integrations.amazon.factories.sync.rule_sync import (
 from sales_channels.integrations.amazon.factories.sync.select_value_sync import (
     AmazonPropertySelectValuesSyncFactory,
 )
+from sales_channels.integrations.amazon.factories.sales_channels.full_schema import AmazonProductTypeRuleFactory
 
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
@@ -83,6 +84,16 @@ def sales_channels__amazon_product_type__ensure_asin(sender, instance, **kwargs)
 
     sync_factory = AmazonProductTypeAsinSyncFactory(instance)
     sync_factory.run()
+
+@receiver(post_update, sender="amazon.AmazonProductType")
+def sales_channels__amazon_product_type__imported_rule(sender, instance, **kwargs):
+    if instance.is_dirty_field("imported") and instance.imported:
+        fac = AmazonProductTypeRuleFactory(
+            product_type_code=instance.product_type_code,
+            sales_channel=instance.sales_channel,
+        )
+        fac.run()
+
 
 
 @receiver(product_properties_rule_created, sender='properties.ProductPropertiesRule')

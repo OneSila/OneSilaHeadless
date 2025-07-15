@@ -9,6 +9,9 @@ from sales_channels.models import SalesChannelViewAssign
 from sales_channels.models.logs import RemoteLog
 
 
+from sales_channels.integrations.amazon.models.properties import AmazonProperty
+from properties.models import Property, PropertyTranslation
+
 class PullAmazonMixin:
 
     def is_real_amazon_marketplace(self, marketplace) -> bool:
@@ -385,3 +388,44 @@ class GetAmazonAPIMixin:
         )
 
         return response
+
+
+class EnsureMerchantSuggestedAsinMixin:
+    """Mixin ensuring the merchant_suggested_asin property exists."""
+
+    def _ensure_merchant_suggested_asin(self):
+        remote_property, _ = AmazonProperty.objects.get_or_create(
+            allow_multiple=True,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="merchant_suggested_asin",
+            defaults={"type": Property.TYPES.TEXT},
+        )
+
+        if not remote_property.local_instance:
+            local_property, _ = Property.objects.get_or_create(
+                internal_name="merchant_suggested_asin",
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                defaults={
+                    "type": Property.TYPES.TEXT,
+                    "non_deletable": True,
+                },
+            )
+
+            PropertyTranslation.objects.get_or_create(
+                property=local_property,
+                language=self.sales_channel.multi_tenant_company.language,
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                defaults={"name": "Amazon Asin"},
+            )
+
+            remote_property.local_instance = local_property
+            remote_property.save()
+
+        local_property = remote_property.local_instance
+        if not local_property.non_deletable:
+            local_property.non_deletable = True
+            local_property.save(update_fields=["non_deletable"])
+
+        return remote_property
+
