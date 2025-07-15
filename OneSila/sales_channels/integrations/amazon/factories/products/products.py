@@ -81,6 +81,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         self.attributes: Dict = {}
         self.image_attributes: Dict = {}
         self.prices_data = {}
+        self.force_listing_requirements = False
 
     # ------------------------------------------------------------
     # Preflight & initialization helpers
@@ -96,6 +97,8 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     def initialize_remote_product(self):
 
         super().initialize_remote_product()
+        if getattr(self, "remote_instance", None):
+            self.force_listing_requirements = getattr(self.remote_instance, "product_owner", False)
         if not hasattr(self, 'current_attrs'):
             self.get_saleschannel_remote_object(self.local_instance.sku)
 
@@ -126,6 +129,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         asin = self._get_asin()
         if asin:
             attrs["merchant_suggested_asin"] = [{"value": asin}]
+            self.force_listing_requirements = False
         else:
             ean = self._get_ean_for_payload()
             if ean:
@@ -135,6 +139,9 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                         "value": ean,
                     }
                 ]
+                self.force_listing_requirements = True
+            else:
+                self.force_listing_requirements = False
         return attrs
 
     def build_content_attributes(self) -> Dict:
@@ -226,7 +233,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 }
             )
 
-            if self.sales_channel.listing_owner:
+            if self.sales_channel.listing_owner or getattr(self.remote_instance, "product_owner", False) or self.force_listing_requirements:
                 # @TODO: This can be value_with_tax depending on marketplace use the public definition to get the value
                 attrs.setdefault("list_price", []).append(
                     {"currency": iso, "value": float(list_price)}
@@ -475,8 +482,12 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
             self.remote_instance.created_marketplaces.append(self.view.remote_id)
             if not self.remote_instance.ean_code:
                 self.remote_instance.ean_code = self._get_ean_for_payload()
+            update_fields = ["created_marketplaces", "ean_code"]
+            if self.force_listing_requirements and not self.remote_instance.product_owner:
+                self.remote_instance.product_owner = True
+                update_fields.append("product_owner")
 
-            self.remote_instance.save(update_fields=["created_marketplaces", "ean_code"])
+            self.remote_instance.save(update_fields=update_fields)
 
     def serialize_response(self, response):
         return response.payload if hasattr(response, "payload") else True

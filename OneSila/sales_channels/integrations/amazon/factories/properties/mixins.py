@@ -159,7 +159,8 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
         usage = json.loads(public_def.usage_definition)
         payload = self._replace_tokens(usage, self.local_instance.product)
 
-        if not self.sales_channel.listing_owner:
+        remote_prod = getattr(self, "remote_product", None)
+        if not self.sales_channel.listing_owner and not getattr(remote_prod, "product_owner", False):
             allowed_properties = product_type.listing_offer_required_properties.get(self.view.api_region_code, [])
             if main_code not in allowed_properties:
                 return product_type, {}
