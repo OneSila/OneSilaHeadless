@@ -13,8 +13,8 @@ class AmazonProductTypeReceiversTest(TestCase):
             remote_id="SELLER",
         )
 
-    @patch("sales_channels.integrations.amazon.receivers.AmazonProductTypeRuleFactory")
-    def test_factory_run_triggered_on_imported_change(self, factory_cls):
+    @patch("sales_channels.integrations.amazon.receivers.create_amazon_product_type_rule_task")
+    def test_factory_run_triggered_on_imported_change(self, task_func):
         pt = AmazonProductType.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
@@ -25,9 +25,7 @@ class AmazonProductTypeReceiversTest(TestCase):
         pt.imported = True
         pt.save()
 
-        factory_cls.assert_called_once_with(
+        task_func.assert_called_once_with(
             product_type_code=pt.product_type_code,
-            sales_channel=pt.sales_channel,
+            sales_channel_id=pt.sales_channel_id,
         )
-        factory_cls.return_value.run.assert_called_once()
-
