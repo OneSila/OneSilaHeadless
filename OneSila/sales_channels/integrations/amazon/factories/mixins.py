@@ -91,11 +91,16 @@ class GetAmazonAPIMixin:
     def search_product_types(self, marketplace_id: str, name: str | None = None) -> dict:
         """Return product type suggestions for an item name."""
         definitions_api = DefinitionsApi(self._get_client())
-        resp = definitions_api.search_definitions_product_types(
-            marketplace_ids=[marketplace_id],
-            item_name=name,
-            locale=self._get_issue_locale()
-        )
+
+        kwargs = {
+            'marketplace_ids': [marketplace_id],
+            'locale': self._get_issue_locale()
+        }
+
+        if name is not None:
+            kwargs['item_name'] = name
+
+        resp = definitions_api.search_definitions_product_types(**kwargs)
 
         if hasattr(resp, "to_dict"):
             return resp.to_dict()

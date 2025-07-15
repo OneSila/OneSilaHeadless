@@ -158,7 +158,7 @@ class AmazonSalesChannelMutation:
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def suggest_amazon_product_type(
         self,
-        name: str,
+        name: str | None,
         marketplace: SalesChannelViewPartialInput,
         info: Info,
     ) -> SuggestedAmazonProductType:
@@ -178,7 +178,7 @@ class AmazonSalesChannelMutation:
         client = _Client()
         client.sales_channel = view.sales_channel.get_real_instance()
 
-        data = client.search_product_types(view.remote_id, name) or {}
+        data = client.search_product_types(view.remote_id, name)
 
         product_types = [
             SuggestedAmazonProductTypeEntry(
