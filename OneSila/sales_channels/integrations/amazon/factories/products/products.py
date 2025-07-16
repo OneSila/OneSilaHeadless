@@ -240,7 +240,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 )
         return attrs
 
-
     def set_rule(self):
         super().set_rule()
         self.remote_rule = AmazonProductType.objects.get(
@@ -435,9 +434,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                     pass
 
 
-
-
-
 class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFactory):
     fixing_identifier_class = AmazonProductBaseFactory
 
@@ -496,6 +492,88 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
 class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactory):
     """Sync Amazon products using marketplace-specific create or update."""
     create_product_factory = AmazonProductCreateFactory
+
+    def _match_amazon_variation_theme(self, configurator):
+        themes = self.remote_rule.variation_themes or []
+        if not themes:
+            return None
+
+        prop_ids = configurator.properties.values_list("id", flat=True)
+        codes = list(
+            AmazonProperty.objects.filter(
+                sales_channel=self.sales_channel,
+                local_instance_id__in=prop_ids,
+            ).values_list("code", flat=True)
+        )
+        codes = [c.lower() for c in codes]
+
+        best_theme = None
+        best_matches = 0
+
+        for theme in themes:
+            parts = [p.lower() for p in theme.split("/")]
+            matches = 0
+            for part in parts:
+                if any(part in code for code in codes):
+                    matches += 1
+            if matches > best_matches:
+                best_matches = matches
+                best_theme = theme
+
+        return best_theme
+
+    def set_remote_configurator(self):
+        super().set_remote_configurator()
+
+        if not hasattr(self, "configurator"):
+            return
+
+        theme = self.configurator.amazon_theme or self._match_amazon_variation_theme(self.configurator)
+        if theme and self.configurator.amazon_theme != theme:
+            self.configurator.amazon_theme = theme
+            self.configurator.save(update_fields=["amazon_theme"])
+
+        self.amazon_theme = self.configurator.amazon_theme
+
+    def build_variation_attributes(self):
+        attrs = {}
+
+        theme = None
+        configurator = None
+
+        if self.is_variation and self.remote_parent_product and hasattr(self.remote_parent_product, "configurator"):
+            configurator = self.remote_parent_product.configurator
+        elif self.local_type == Product.CONFIGURABLE and hasattr(self, "configurator"):
+            configurator = self.configurator
+
+        if configurator:
+            theme = configurator.amazon_theme or self._match_amazon_variation_theme(configurator)
+
+        if theme:
+            attrs["variation_theme"] = [{"value": theme, "marketplace_id": self.view.remote_id}]
+
+        if self.is_variation:
+            attrs["parentage_level"] = [
+                {"value": "child", "marketplace_id": self.view.remote_id}
+            ]
+            if self.remote_parent_product:
+                attrs["child_parent_sku_relationship"] = [
+                    {
+                        "child_relationship_type": "variation",
+                        "parent_sku": self.remote_parent_product.remote_sku,
+                        "marketplace_id": self.view.remote_id,
+                    }
+                ]
+        elif self.local_type == Product.CONFIGURABLE:
+            attrs["parentage_level"] = [
+                {"value": "parent", "marketplace_id": self.view.remote_id}
+            ]
+
+        return attrs
+
+    def customize_payload(self):
+        self.attributes.update(self.build_variation_attributes())
+        self.payload["attributes"] = self.attributes
 
     def perform_remote_action(self):
 
