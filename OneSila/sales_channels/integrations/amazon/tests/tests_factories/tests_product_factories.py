@@ -723,7 +723,6 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         self.remote_product.created_marketplaces = [self.view.remote_id]
         self.remote_product.save()
 
-
         mock_instance = mock_listings.return_value
         mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
@@ -1620,8 +1619,6 @@ class AmazonProductFactoriesTest(TransactionTestCase):
             "issues": [],
         }
 
-
-
         SalesPrice.objects.filter(product=self.product).delete()
         fac = AmazonProductCreateFactory(
             sales_channel=self.sales_channel,
@@ -1735,3 +1732,98 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         body = mock_instance.put_listings_item.call_args.kwargs.get("body")
         self.assertEqual(body["attributes"].get("item_name"), [{"value": "New"}])
 
+
+# path: sales_channels/integrations/amazon/tests/tests_factories/tests_product_factories.py
+class AmazonProductUpdateRequirementsTest(TransactionTestCase):
+    """Validate LISTING versus LISTING_OFFER_ONLY logic for product updates."""
+
+    def setUp(self):
+        super().setUp()
+        setup_product_factories_testcase(self)
+        # mark product as created so update flow runs
+        self.remote_product.created_marketplaces = [self.view.remote_id]
+        self.remote_product.save()
+
+    def _run_factory_and_get_body(self):
+        with patch(
+            "sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client",
+            return_value=None,
+        ), patch.object(
+            AmazonMediaProductThroughBase,
+            "_get_images",
+            return_value=[],
+        ), patch(
+            "sales_channels.integrations.amazon.factories.mixins.ListingsApi"
+        ) as mock_listings:
+            mock_listings.return_value.put_listings_item.return_value = (
+                self.get_put_and_patch_item_listing_mock_response()
+            )
+            mock_listings.return_value.get_listings_item.return_value = (
+                self.get_get_listing_item_mock_response()
+            )
+
+            fac = AmazonProductUpdateFactory(
+                sales_channel=self.sales_channel,
+                local_instance=self.product,
+                remote_instance=self.remote_product,
+                view=self.view,
+            )
+            fac.run()
+            return mock_listings.return_value.put_listings_item.call_args.kwargs.get(
+                "body"
+            )
+
+    def test_non_owner_defaults_to_offer_only(self):
+        self.sales_channel.listing_owner = False
+        self.sales_channel.save()
+        ProductProperty.objects.filter(
+            product=self.product,
+            property__internal_name="merchant_suggested_asin",
+        ).delete()
+        body = self._run_factory_and_get_body()
+        self.assertEqual(body["requirements"], "LISTING_OFFER_ONLY")
+
+    def test_listing_owner_uses_listing_requirements(self):
+        self.sales_channel.listing_owner = True
+        self.sales_channel.save()
+        body = self._run_factory_and_get_body()
+        self.assertEqual(body["requirements"], "LISTING")
+
+    def test_product_owner_uses_listing_requirements(self):
+        self.sales_channel.listing_owner = False
+        self.sales_channel.save()
+        self.remote_product.product_owner = True
+        self.remote_product.save()
+        body = self._run_factory_and_get_body()
+        self.assertEqual(body["requirements"], "LISTING")
+
+    def test_missing_asin_still_uses_listing_requirements(self):
+        self.sales_channel.listing_owner = False
+        self.sales_channel.save()
+        self.remote_product.product_owner = True
+        self.remote_product.save()
+        ProductProperty.objects.filter(
+            product=self.product,
+            property__internal_name="merchant_suggested_asin",
+        ).delete()
+        body = self._run_factory_and_get_body()
+        self.assertEqual(body["requirements"], "LISTING")
+
+    def test_ean_without_asin_uses_listing_requirements(self):
+        """Not listing owner but EAN present should still send LISTING."""
+        self.sales_channel.listing_owner = False
+        self.sales_channel.save()
+        ProductProperty.objects.filter(
+            product=self.product,
+            property__internal_name="merchant_suggested_asin",
+        ).delete()
+        EanCode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            ean_code="1234567890123",
+        )
+        self.remote_product.ean_code = "1234567890123"
+        self.remote_product.save()
+
+        body = self._run_factory_and_get_body()
+        self.assertEqual(body["requirements"], "LISTING")
