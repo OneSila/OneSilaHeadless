@@ -74,8 +74,10 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     delete_product_factory = property(get_delete_product_factory)
 
     def __init__(self, *args, view=None, **kwargs):
+
         if view is None:
             raise ValueError("AmazonProduct factories require a view argument")
+
         self.view = view
         super().__init__(*args, **kwargs)
         self.attributes: Dict = {}
@@ -331,7 +333,12 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         if self.create_product_factory is None:
             raise ValueError("create_product_factory must be specified in the RemoteProductSyncFactory.")
 
-        fac = self.create_product_factory(self.sales_channel, self.local_instance, api=self.api, view=self.view)
+        fac = self.create_product_factory(sales_channel=self.sales_channel,
+                                          local_instance=self.local_instance,
+                                          api=self.api,
+                                          view=self.view,
+                                          parent_local_instance=self.parent_local_instance,
+                                          remote_parent_product=self.remote_parent_product)
         fac.run()
         self.remote_instance = fac.remote_instance
 
@@ -356,6 +363,12 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
 
     def assign_ean_code(self):
         pass  # there is no ean code sync for Amazon. This is used as an identifier and cannot be updated later on
+
+    def get_variation_sku(self):
+        return f"{self.local_instance.sku}"
+
+    def add_variation_to_parent(self):
+        pass
 
     def set_product_properties(self):
         rule_properties_ids = self.local_instance.get_required_and_optional_properties(product_rule=self.rule).values_list('property_id', flat=True)
@@ -477,11 +490,10 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
 
     def build_variation_attributes(self):
         attrs = {}
-
         theme = None
         configurator = None
 
-        if self.is_variation and self.remote_parent_product and hasattr(self.remote_parent_product, "configurator"):
+        if self.is_variation and self.remote_parent_product:
             configurator = self.remote_parent_product.configurator
         elif self.local_type == Product.CONFIGURABLE and hasattr(self, "configurator"):
             configurator = self.configurator
@@ -514,6 +526,50 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     def customize_payload(self):
         self.attributes.update(self.build_variation_attributes())
         self.payload["attributes"] = self.attributes
+
+    def update_child(self, variation, remote_variation):
+        """
+        Updates an existing remote variation (child product).
+        """
+        factory = self.sync_product_factory(
+            sales_channel=self.sales_channel,
+            local_instance=variation,
+            parent_local_instance=self.local_instance,
+            remote_parent_product=self.remote_instance,
+            remote_instance=remote_variation,
+            api=self.api,
+            view=self.view,
+        )
+        factory.run()
+
+    def create_child(self, variation):
+        """
+        Creates a new remote variation (child product).
+        """
+        factory = self.create_product_factory(
+            sales_channel=self.sales_channel,
+            local_instance=variation,
+            parent_local_instance=self.local_instance,
+            remote_parent_product=self.remote_instance,
+            api=self.api,
+            view=self.view,
+        )
+        factory.run()
+        remote_variation = factory.remote_instance
+        return remote_variation
+
+    def delete_child(self, remote_variation):
+        """
+        Deletes a remote variation (child product) that no longer exists locally.
+        """
+        factory = self.delete_product_factory(
+            sales_channel=self.sales_channel,
+            local_instance=remote_variation.local_instance,
+            api=self.api,
+            remote_instance=remote_variation,
+            view=self.view,
+        )
+        factory.run()
 
 
 class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFactory):

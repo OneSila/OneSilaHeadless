@@ -31,7 +31,7 @@ from currencies.models import Currency
 from currencies.currencies import currencies
 from products.models import (
     ProductTranslation,
-    ProductTranslationBulletPoint,
+    ProductTranslationBulletPoint, Product,
 )
 from media.models import Media, MediaProductThrough
 from properties.models import (
@@ -143,8 +143,9 @@ class AmazonProductTestMixin:
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             local_instance=self.product,
-            remote_sku="AMZSKU",
+            remote_sku="TESTSKU",
         )
+
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,
@@ -1832,6 +1833,7 @@ class AmazonProductUpdateRequirementsTest(TransactionTestCase, AmazonProductTest
 
         body = self._run_factory_and_get_body()
         self.assertEqual(body["requirements"], "LISTING")
+
 class AmazonConfigurableProductFlowTest(TransactionTestCase, AmazonProductTestMixin):
     def setUp(self):
         super().setUp()
@@ -1881,8 +1883,6 @@ class AmazonConfigurableProductFlowTest(TransactionTestCase, AmazonProductTestMi
             amazon_theme="COLOR/SIZE",
         )
         self.configurator.properties.set([self.color_property, self.size_property])
-
-        self.remote_product.remote_sku = "PARENTSKU"
         self.remote_product.save()
 
         # child product setup
@@ -1892,7 +1892,13 @@ class AmazonConfigurableProductFlowTest(TransactionTestCase, AmazonProductTestMi
             type="SIMPLE",
             multi_tenant_company=self.multi_tenant_company,
         )
-        ConfigurableVariation.objects.create(parent=self.product, variation=self.child)
+        ProductProperty.objects.create(
+            product=self.child,
+            property=self.product_type_property,
+            value_select=self.product_type_value,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ConfigurableVariation.objects.create(multi_tenant_company=self.multi_tenant_company, parent=self.product, variation=self.child)
         asin_prop = Property.objects.get(
             internal_name="merchant_suggested_asin",
             multi_tenant_company=self.multi_tenant_company,
@@ -1917,6 +1923,7 @@ class AmazonConfigurableProductFlowTest(TransactionTestCase, AmazonProductTestMi
             is_variation=True,
         )
 
+
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
@@ -1927,18 +1934,38 @@ class AmazonConfigurableProductFlowTest(TransactionTestCase, AmazonProductTestMi
         fac = AmazonProductCreateFactory(
             sales_channel=self.sales_channel,
             local_instance=self.product,
-            remote_instance=self.remote_product,
             view=self.view,
         )
         fac.run()
 
-        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
-        attrs = body.get("attributes", {})
-        expected_theme = [{"value": "COLOR/SIZE", "marketplace_id": self.view.remote_id}]
-        expected_parentage = [{"value": "parent", "marketplace_id": self.view.remote_id}]
+        calls = mock_instance.put_listings_item.call_args_list
+        self.assertEqual(len(calls), 2)
 
-        self.assertEqual(attrs.get("variation_theme"), expected_theme)
-        self.assertEqual(attrs.get("parentage_level"), expected_parentage)
+        bodies = [call.kwargs.get("body", {}) for call in calls]
+
+        # Organize parent & child based on 'parentage_level'
+        parent_body = next(b for b in bodies if b["attributes"].get("parentage_level", [{}])[0]["value"] == "parent")
+        child_body = next(b for b in bodies if b["attributes"].get("parentage_level", [{}])[0]["value"] == "child")
+
+        # Shared expectations
+        expected_theme = [{"value": "COLOR/SIZE", "marketplace_id": self.view.remote_id}]
+
+        self.assertEqual(parent_body["attributes"].get("variation_theme"), expected_theme)
+        self.assertEqual(parent_body["attributes"].get("parentage_level"),
+                         [{"value": "parent", "marketplace_id": self.view.remote_id}])
+        self.assertNotIn("child_parent_sku_relationship", parent_body["attributes"])
+
+        self.assertEqual(child_body["attributes"].get("variation_theme"), expected_theme)
+        self.assertEqual(child_body["attributes"].get("parentage_level"),
+                         [{"value": "child", "marketplace_id": self.view.remote_id}])
+        self.assertEqual(
+            child_body["attributes"].get("child_parent_sku_relationship"),
+            [{
+                "child_relationship_type": "variation",
+                "marketplace_id": self.view.remote_id,
+                "parent_sku": self.product.sku,  # or 'TESTSKU' if hardcoded
+            }]
+        )
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -1964,7 +1991,7 @@ class AmazonConfigurableProductFlowTest(TransactionTestCase, AmazonProductTestMi
         expected_rel = [
             {
                 "child_relationship_type": "variation",
-                "parent_sku": "PARENTSKU",
+                "parent_sku": "TESTSKU",
                 "marketplace_id": self.view.remote_id,
             }
         ]
@@ -1981,6 +2008,12 @@ class AmazonConfigurableProductFlowTest(TransactionTestCase, AmazonProductTestMi
             "products.Product",
             sku="SIMPLE",
             type="SIMPLE",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=simple,
+            property=self.product_type_property,
+            value_select=self.product_type_value,
             multi_tenant_company=self.multi_tenant_company,
         )
         asin_prop = Property.objects.get(
