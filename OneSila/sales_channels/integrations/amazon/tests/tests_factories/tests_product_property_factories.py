@@ -7,8 +7,10 @@ from properties.models import (
     PropertySelectValue,
     PropertySelectValueTranslation,
     ProductProperty,
-    ProductPropertiesRule,
+    ProductPropertiesRule, ProductPropertiesRuleItem,
 )
+from sales_channels.integrations.amazon.factories import AmazonProductSyncFactory
+from sales_channels.models.products import RemoteProductConfigurator
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonSalesChannel,
@@ -301,3 +303,106 @@ class AmazonProductPropertyFactoryWithoutListingOwnerTest(TestCase, AmazonProduc
         self.assertFalse(needs_update)
         remote_instance.refresh_from_db()
         self.assertEqual(json.loads(remote_instance.remote_value), {})
+
+
+class AmazonVariationThemeTest(TestCase, AmazonProductPropertyTestSetupMixin):
+    def setUp(self):
+        super().setUp()
+        self.prepare_test()
+
+        # additional size property used for variation matching
+        self.size_property = baker.make(
+            Property,
+            type=Property.TYPES.SELECT,
+            internal_name="size",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.size_property,
+            language=self.multi_tenant_company.language,
+            name="Size",
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.size_property,
+            code="size",
+            type=Property.TYPES.SELECT,
+        )
+        ProductPropertiesRuleItem.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=self.rule,
+            property=self.size_property,
+            defaults={"type": ProductPropertiesRuleItem.OPTIONAL},
+        )
+
+        self.remote_rule = AmazonProductType.objects.get(local_instance=self.rule)
+        self.remote_rule.variation_themes = ["COLOR/SIZE", "SIZE"]
+        self.remote_rule.save()
+
+        self.configurator = RemoteProductConfigurator.objects.create(
+            remote_product=self.remote_product,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+        )
+        self.configurator.properties.set([self.color_property, self.size_property])
+
+    def test_match_amazon_variation_theme(self):
+        fac = AmazonProductSyncFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.remote_rule = self.remote_rule
+        theme = fac._match_amazon_variation_theme(self.configurator)
+        self.assertEqual(theme, "COLOR/SIZE")
+
+    def test_build_variation_attributes_for_child(self):
+        child_product = baker.make(
+            "products.Product",
+            sku="CHILD",
+            type="SIMPLE",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        child_remote = AmazonProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=child_product,
+            remote_parent_product=self.remote_product,
+            remote_sku="CHILD",
+            is_variation=True,
+        )
+
+        self.remote_product.remote_sku = "PARENTSKU"
+        self.remote_product.save()
+
+        self.configurator.amazon_theme = "COLOR/SIZE"
+        self.configurator.save()
+
+        fac = AmazonProductSyncFactory(
+            sales_channel=self.sales_channel,
+            local_instance=child_product,
+            parent_local_instance=self.product,
+            remote_parent_product=self.remote_product,
+            remote_instance=child_remote,
+            view=self.view,
+        )
+        fac.remote_rule = self.remote_rule
+        attrs = fac.build_variation_attributes()
+
+        expected_theme = [{"value": "COLOR/SIZE", "marketplace_id": self.view.remote_id}]
+        expected_parentage = [{"value": "child", "marketplace_id": self.view.remote_id}]
+        expected_rel = [
+            {
+                "child_relationship_type": "variation",
+                "parent_sku": "PARENTSKU",
+                "marketplace_id": self.view.remote_id,
+            }
+        ]
+
+        self.assertEqual(attrs.get("variation_theme"), expected_theme)
+        self.assertEqual(attrs.get("parentage_level"), expected_parentage)
+        self.assertEqual(attrs.get("child_parent_sku_relationship"), expected_rel)

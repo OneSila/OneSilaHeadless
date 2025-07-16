@@ -433,66 +433,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                     # product type. We will just skip those
                     pass
 
-
-class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFactory):
-    fixing_identifier_class = AmazonProductBaseFactory
-
-    def perform_remote_action(self):
-
-        resp = self.update_product(
-            self.sku,
-            self.view.remote_id,
-            self.remote_rule,
-            self.payload.get("attributes", {}),
-            self.current_attrs,
-        )
-        print('------------------------------------------------------------------------')
-        print(resp)
-        return resp
-
-    def serialize_response(self, response):
-        return response.payload if hasattr(response, "payload") else True
-
-
-class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFactory):
-    remote_id_map = "sku"
-    fixing_identifier_class = AmazonProductBaseFactory
-    remote_product_content_class = None
-    remote_price_class = None
-    remote_product_eancode_class = None
-
-    def perform_remote_action(self):
-        resp = self.create_product(
-            sku=self.sku,
-            marketplace_id=self.view.remote_id,
-            product_type=self.remote_rule,
-            attributes=self.payload.get("attributes", {}),
-        )
-        print('------------------------------------------------------------------------')
-        print(resp)
-
-        return resp
-
-    def post_action_process(self):
-        if self.view.remote_id not in (self.remote_instance.created_marketplaces or []):
-            self.remote_instance.created_marketplaces.append(self.view.remote_id)
-            if not self.remote_instance.ean_code:
-                self.remote_instance.ean_code = self._get_ean_for_payload()
-            update_fields = ["created_marketplaces", "ean_code"]
-            if self.force_listing_requirements and not self.remote_instance.product_owner:
-                self.remote_instance.product_owner = True
-                update_fields.append("product_owner")
-
-            self.remote_instance.save(update_fields=update_fields)
-
-    def serialize_response(self, response):
-        return response.payload if hasattr(response, "payload") else True
-
-
-class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactory):
-    """Sync Amazon products using marketplace-specific create or update."""
-    create_product_factory = AmazonProductCreateFactory
-
     def _match_amazon_variation_theme(self, configurator):
         themes = self.remote_rule.variation_themes or []
         if not themes:
@@ -574,6 +514,67 @@ class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactor
     def customize_payload(self):
         self.attributes.update(self.build_variation_attributes())
         self.payload["attributes"] = self.attributes
+
+
+class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFactory):
+    fixing_identifier_class = AmazonProductBaseFactory
+
+    def perform_remote_action(self):
+
+        resp = self.update_product(
+            self.sku,
+            self.view.remote_id,
+            self.remote_rule,
+            self.payload.get("attributes", {}),
+            self.current_attrs,
+        )
+        print('------------------------------------------------------------------------')
+        print(resp)
+        return resp
+
+    def serialize_response(self, response):
+        return response.payload if hasattr(response, "payload") else True
+
+
+class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFactory):
+    remote_id_map = "sku"
+    fixing_identifier_class = AmazonProductBaseFactory
+    remote_product_content_class = None
+    remote_price_class = None
+    remote_product_eancode_class = None
+
+    def perform_remote_action(self):
+        resp = self.create_product(
+            sku=self.sku,
+            marketplace_id=self.view.remote_id,
+            product_type=self.remote_rule,
+            attributes=self.payload.get("attributes", {}),
+        )
+        print('------------------------------------------------------------------------')
+        print(resp)
+
+        return resp
+
+    def post_action_process(self):
+        if self.view.remote_id not in (self.remote_instance.created_marketplaces or []):
+            self.remote_instance.created_marketplaces.append(self.view.remote_id)
+            if not self.remote_instance.ean_code:
+                self.remote_instance.ean_code = self._get_ean_for_payload()
+            update_fields = ["created_marketplaces", "ean_code"]
+            if self.force_listing_requirements and not self.remote_instance.product_owner:
+                self.remote_instance.product_owner = True
+                update_fields.append("product_owner")
+
+            self.remote_instance.save(update_fields=update_fields)
+
+    def serialize_response(self, response):
+        return response.payload if hasattr(response, "payload") else True
+
+
+class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactory):
+    """Sync Amazon products using marketplace-specific create or update."""
+    create_product_factory = AmazonProductCreateFactory
+
 
     def perform_remote_action(self):
 
