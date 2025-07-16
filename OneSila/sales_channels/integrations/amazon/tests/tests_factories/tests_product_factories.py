@@ -51,6 +51,8 @@ from sales_channels.integrations.amazon.factories.products import (
 from sales_channels.integrations.amazon.factories.products.images import (
     AmazonMediaProductThroughBase,
 )
+from sales_channels.models.products import RemoteProductConfigurator
+from products.models import ConfigurableVariation
 
 
 class AmazonProductTestMixin:
@@ -1790,6 +1792,8 @@ class AmazonProductUpdateRequirementsTest(TransactionTestCase, AmazonProductTest
         body = self._run_factory_and_get_body()
         self.assertEqual(body["requirements"], "LISTING")
 
+
+
     def test_product_owner_uses_listing_requirements(self):
         self.sales_channel.listing_owner = False
         self.sales_channel.save()
@@ -1828,3 +1832,194 @@ class AmazonProductUpdateRequirementsTest(TransactionTestCase, AmazonProductTest
 
         body = self._run_factory_and_get_body()
         self.assertEqual(body["requirements"], "LISTING")
+class AmazonConfigurableProductFlowTest(TransactionTestCase, AmazonProductTestMixin):
+    def setUp(self):
+        super().setUp()
+        self.setup_product()
+
+        # make product configurable
+        self.product.type = Product.CONFIGURABLE
+        self.product.save()
+
+        # add size property for variation theme matching
+        self.size_property = baker.make(
+            Property,
+            type=Property.TYPES.SELECT,
+            internal_name="size",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.size_property,
+            language=self.multi_tenant_company.language,
+            name="Size",
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.size_property,
+            code="size",
+            type=Property.TYPES.SELECT,
+        )
+        ProductPropertiesRuleItem.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=self.rule,
+            property=self.size_property,
+            defaults={"type": ProductPropertiesRuleItem.OPTIONAL},
+        )
+
+        # configure remote rule to allow theme
+        self.remote_rule = AmazonProductType.objects.get(local_instance=self.rule)
+        self.remote_rule.variation_themes = ["COLOR/SIZE", "SIZE"]
+        self.remote_rule.save()
+
+        # configurator with theme
+        self.configurator = RemoteProductConfigurator.objects.create(
+            remote_product=self.remote_product,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            amazon_theme="COLOR/SIZE",
+        )
+        self.configurator.properties.set([self.color_property, self.size_property])
+
+        self.remote_product.remote_sku = "PARENTSKU"
+        self.remote_product.save()
+
+        # child product setup
+        self.child = baker.make(
+            "products.Product",
+            sku="CHILD",
+            type="SIMPLE",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ConfigurableVariation.objects.create(parent=self.product, variation=self.child)
+        asin_prop = Property.objects.get(
+            internal_name="merchant_suggested_asin",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        pp = ProductProperty.objects.create(
+            product=self.child,
+            property=asin_prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductPropertyTextTranslation.objects.create(
+            product_property=pp,
+            language=self.multi_tenant_company.language,
+            value_text="ASINCHILD",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.child_remote = AmazonProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.child,
+            remote_parent_product=self.remote_product,
+            remote_sku="CHILD",
+            is_variation=True,
+        )
+
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_configurable_parent_payload_has_theme(self, mock_listings, mock_get_images, mock_get_client):
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
+        expected_theme = [{"value": "COLOR/SIZE", "marketplace_id": self.view.remote_id}]
+        expected_parentage = [{"value": "parent", "marketplace_id": self.view.remote_id}]
+
+        self.assertEqual(attrs.get("variation_theme"), expected_theme)
+        self.assertEqual(attrs.get("parentage_level"), expected_parentage)
+
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_child_payload_has_variation_attributes(self, mock_listings, mock_get_images, mock_get_client):
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.child,
+            parent_local_instance=self.product,
+            remote_parent_product=self.remote_product,
+            remote_instance=self.child_remote,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
+        expected_theme = [{"value": "COLOR/SIZE", "marketplace_id": self.view.remote_id}]
+        expected_parentage = [{"value": "child", "marketplace_id": self.view.remote_id}]
+        expected_rel = [
+            {
+                "child_relationship_type": "variation",
+                "parent_sku": "PARENTSKU",
+                "marketplace_id": self.view.remote_id,
+            }
+        ]
+
+        self.assertEqual(attrs.get("variation_theme"), expected_theme)
+        self.assertEqual(attrs.get("parentage_level"), expected_parentage)
+        self.assertEqual(attrs.get("child_parent_sku_relationship"), expected_rel)
+
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_simple_product_has_no_variation_fields(self, mock_listings, mock_get_images, mock_get_client):
+        simple = baker.make(
+            "products.Product",
+            sku="SIMPLE",
+            type="SIMPLE",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        asin_prop = Property.objects.get(
+            internal_name="merchant_suggested_asin",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        pp = ProductProperty.objects.create(
+            product=simple,
+            property=asin_prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductPropertyTextTranslation.objects.create(
+            product_property=pp,
+            language=self.multi_tenant_company.language,
+            value_text="ASINSIMPLE",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        simple_remote = AmazonProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=simple,
+            remote_sku="SIMPLE",
+        )
+
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=simple,
+            remote_instance=simple_remote,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
+
+        self.assertNotIn("variation_theme", attrs)
+        self.assertNotIn("parentage_level", attrs)
+        self.assertNotIn("child_parent_sku_relationship", attrs)
+
