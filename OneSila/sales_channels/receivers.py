@@ -9,6 +9,7 @@ from media.models import Media
 from properties.signals import product_properties_rule_configurator_updated
 from sales_prices.models import SalesPriceListItem
 from sales_prices.signals import price_changed
+from .integrations.amazon.models import AmazonSalesChannel, AmazonSalesChannelImport
 from .integrations.magento2.models import MagentoProduct
 from .models import SalesChannelImport
 # from .models import ImportProcess
@@ -36,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 @receiver(post_update, sender=SalesChannelImport)
+@receiver(post_update, sender=AmazonSalesChannelImport)
 def import_process_post_update_fist_import_complete_receiver(sender, instance: SalesChannelImport, **kwargs):
 
     sales_channel = instance.sales_channel
@@ -51,6 +53,7 @@ def import_process_post_update_fist_import_complete_receiver(sender, instance: S
 
 
 @receiver(pre_save, sender=SalesChannelImport)
+@receiver(pre_save, sender=AmazonSalesChannelImport)
 def import_process_avoid_duplicate_pre_create_receiver(sender, instance: SalesChannelImport, **kwargs):
     from django.utils.translation import gettext_lazy as _
 
@@ -60,6 +63,7 @@ def import_process_avoid_duplicate_pre_create_receiver(sender, instance: SalesCh
 
 
 @receiver(post_create, sender=SalesChannelImport)
+@receiver(post_create, sender=AmazonSalesChannelImport)
 def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelImport, **kwargs):
     """
     This receiver is used to handle the post_create signal for the SalesChannelImport model.
@@ -73,6 +77,7 @@ def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelI
     from sales_channels.integrations.shopify.tasks import shopify_import_db_task
     from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
     from sales_channels.integrations.woocommerce.tasks import woocommerce_import_db_task
+    from sales_channels.integrations.amazon.tasks import amazon_import_db_task
 
     # NOTE: Magento does not trigger after creation.  The import flow will first set
     # some settings (possibly property stuff) and manually triggger the import via the status.
@@ -84,11 +89,18 @@ def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelI
     elif isinstance(sales_channel, WoocommerceSalesChannel):
         refresh_subscription_receiver(sales_channel)
         woocommerce_import_db_task(import_process=instance, sales_channel=sales_channel)
+
+    elif isinstance(sales_channel, AmazonSalesChannel):
+        refresh_subscription_receiver(sales_channel)
+        amazon_import_db_task(import_process=instance, sales_channel=sales_channel)
+
     else:
         logger.warning(f"Sales channel {type(sales_channel)} is not supported in post_create.")
 
 
+
 @receiver(post_update, sender=SalesChannelImport)
+@receiver(post_update, sender=AmazonSalesChannelImport)
 @trigger_signal_for_dirty_fields('status')
 def import_process_post_update_receiver(sender, instance: SalesChannelImport, **kwargs):
     """
@@ -104,6 +116,7 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
     from sales_channels.integrations.magento2.tasks import magento_import_db_task
     from sales_channels.integrations.shopify.models.sales_channels import ShopifySalesChannel
     from sales_channels.integrations.shopify.tasks import shopify_import_db_task
+    from sales_channels.integrations.amazon.tasks import amazon_import_db_task
     from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
     from sales_channels.integrations.woocommerce.tasks import woocommerce_import_db_task
 
@@ -115,11 +128,14 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
             shopify_import_db_task(import_process=instance, sales_channel=sales_channel)
         elif isinstance(sales_channel, WoocommerceSalesChannel):
             woocommerce_import_db_task(import_process=instance, sales_channel=sales_channel)
+        elif isinstance(sales_channel, AmazonSalesChannel):
+            amazon_import_db_task(import_process=instance, sales_channel=sales_channel)
         else:
             logger.warning(f"Sales channel {type(sales_channel)} is not supported in post_update.")
 
 
 @receiver(post_update, sender=SalesChannelImport)
+@receiver(post_update, sender=AmazonSalesChannelImport)
 def syncing_current_import_percentage_real_time_sync__post_update_receiver(sender, instance, **kwargs):
     """
     Update real time percentage when is changed to the sales channe.

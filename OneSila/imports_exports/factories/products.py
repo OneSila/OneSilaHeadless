@@ -10,7 +10,13 @@ from imports_exports.factories.media import ImportImageInstance
 from imports_exports.factories.mixins import AbstractImportInstance, ImportOperationMixin
 from imports_exports.factories.properties import ImportProductPropertiesRuleInstance, ImportProductPropertyInstance
 from media.models import Image, MediaProductThrough
-from products.models import Product, ProductTranslation, ConfigurableVariation, BundleVariation
+from products.models import (
+    Product,
+    ProductTranslation,
+    ProductTranslationBulletPoint,
+    ConfigurableVariation,
+    BundleVariation,
+)
 from properties.models import Property, ProductPropertiesRuleItem, ProductProperty
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
@@ -24,13 +30,36 @@ logger = logging.getLogger(__name__)
 class ProductImport(ImportOperationMixin):
     get_identifiers = ['sku', 'type']
 
+    def resolve_get_or_create_integrity_error(self, error):
+        sku = getattr(self.import_instance, 'sku', None)
+
+        if not sku:
+            raise error
+
+        error_msg = str(error)
+        is_duplicate_sku_constraint = (
+                'duplicate key value violates unique constraint' in error_msg and
+                'products_product_sku_multi_tenant_company_id' in error_msg
+        )
+
+        if not is_duplicate_sku_constraint:
+            raise error
+
+        existing = Product.objects.filter(sku=sku, multi_tenant_company=self.multi_tenant_company).first()
+
+        if existing:
+            self.created = False
+            return existing, False
+
+        raise error
+
 
 class AliasProductImport(ImportOperationMixin):
     get_identifiers = ['sku', 'type', 'alias_parent_product']
 
 
 class ProductTranslationImport(ImportOperationMixin):
-    get_identifiers = ['product', 'language']
+    get_identifiers = ['product', 'language', 'sales_channel']
 
 
 class SalesPriceImport(ImportOperationMixin):
@@ -39,7 +68,7 @@ class SalesPriceImport(ImportOperationMixin):
 
 class ImportProductInstance(AbstractImportInstance):
 
-    def __init__(self, data: dict, import_process=None, rule=None, translations=None, instance=None):
+    def __init__(self, data: dict, import_process=None, rule=None, translations=None, instance=None, sales_channel=None, update_current_rule=False):
         super().__init__(data, import_process, instance)
 
         if translations is None:
@@ -47,6 +76,8 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.rule = rule
         self.translations = translations
+        self.sales_channel = sales_channel
+        self.update_current_rule = update_current_rule
 
         default_sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
         self.set_field_if_exists('name')
@@ -191,44 +222,61 @@ class ImportProductInstance(AbstractImportInstance):
 
     def _set_rule(self):
 
-        if self.rule:
+        if self.rule and self.update_current_rule:
+            self.update_product_rule()
+
+        if not self.rule and not hasattr(self, 'product_type'):
             return
 
+        required_names = set()
+        if hasattr(self, 'configurator_select_values'):
+            for select_value in self.configurator_select_values:
+                if 'property_data' in select_value:
+                    prop_data = select_value['property_data']
+                    name = prop_data.get("name")
+                    required_names.add(name)
+
+                if "property" in select_value:
+                    prop = select_value["property"]
+                    required_names.add(prop.name)
+
+
+        items = []
+        if hasattr(self, 'properties'):
+            for property in self.properties:
+                if 'property_data' in property or 'property' in property:
+                    if 'property_data' in property:
+                        name = property['property_data'].get("name")
+                        type = property['property_data'].get("type")
+
+                        if type != Property.TYPES.SELECT:
+                            continue
+
+                        item_data = {
+                            'property_data': property['property_data'],
+                            'type': ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if name in required_names else ProductPropertiesRuleItem.OPTIONAL
+                        }
+                    else:
+                        name = property['property'].name
+                        type = property['property'].type
+
+                        if type != Property.TYPES.SELECT:
+                            continue
+
+                        item_data = {
+                            'property': property['property'],
+                            'type': ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if name in required_names else ProductPropertiesRuleItem.OPTIONAL
+                        }
+
+                    items.append(item_data)
+
         if hasattr(self, 'product_type'):
-            required_names = set()
-            if hasattr(self, 'configurator_select_values'):
-                for select_value in self.configurator_select_values:
-                    if 'property_data' in select_value:
-                        prop_data = select_value['property_data']
-                        name = prop_data.get("name")
-                        required_names.add(name)
-
-                    if "property" in select_value:
-                        prop = select_value["property"]
-                        required_names.add(prop.name)
-
-            items = []
-            if hasattr(self, 'properties'):
-                for property in self.properties:
-                    if 'property_data' in property or 'property' in property:
-                        if 'property_data' in property:
-                            name = property['property_data'].get("name")
-                            item_data = {
-                                'property_data': property['property_data'],
-                                'type': ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if name in required_names else ProductPropertiesRuleItem.OPTIONAL
-                            }
-                        else:
-                            name = property['property'].name
-                            item_data = {
-                                'property': property['property'],
-                                'type': ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if name in required_names else ProductPropertiesRuleItem.OPTIONAL
-                            }
-
-                        items.append(item_data)
-
             rule_import_instance = ImportProductPropertiesRuleInstance({"value": self.product_type, "items": items}, self.import_process)
             rule_import_instance.process()
             self.rule = rule_import_instance.instance
+        else:
+            rule_import_instance = ImportProductPropertiesRuleInstance({"items": items}, self.import_process, instance=self.rule)
+            rule_import_instance.process()
 
         self.rule_instance = self.rule
 
@@ -238,7 +286,8 @@ class ImportProductInstance(AbstractImportInstance):
 
             self.translations = [{
                 'name': getattr(self, 'name', 'Unnamed'),
-                'language': self.language
+                'language': self.language,
+                'sales_channel': self.sales_channel,
             }]
 
     def pre_process_logic(self):
@@ -262,9 +311,9 @@ class ImportProductInstance(AbstractImportInstance):
         if self.created:
             self.create_translations()
 
-    def set_product_properties(self):
+    def update_product_rule(self):
 
-        if self.rule:
+        if self.rule and self.instance and self.rule != self.instance.get_product_rule():
             product_type_property = Property.objects.get(
                 multi_tenant_company=self.multi_tenant_company,
                 is_product_type=True
@@ -281,18 +330,32 @@ class ImportProductInstance(AbstractImportInstance):
                 product=self.instance,
                 property=product_type_property
             )
+
+            product_property_import_instance.language = self.language
             product_property_import_instance.process()
+
+    def set_product_properties(self):
+
+        if self.created:
+            self.update_product_rule()
+        else:
+            if self.update_current_rule:
+                self.update_product_rule()
+
 
         product_property_ids = []
         if self.type in [Product.SIMPLE, Product.BUNDLE, Product.ALIAS] and hasattr(self, 'properties'):
 
             for property in self.properties:
                 try:
+                    property_instance = property.get('property', None)
                     product_property_import_instance = ImportProductPropertyInstance(
                         property,
                         self.import_process,
+                        property=property_instance,
                         product=self.instance)
 
+                    product_property_import_instance.language = self.language
                     product_property_import_instance.process()
                     product_property_ids.append(product_property_import_instance.instance.id)
                 except Exception as e:
@@ -350,6 +413,7 @@ class ImportProductInstance(AbstractImportInstance):
                     variation_data,
                     import_process=self.import_process,
                     config_product=self.instance,
+                    sales_channel=self.sales_channel,
                 )
 
                 variation_import.process()
@@ -368,6 +432,7 @@ class ImportProductInstance(AbstractImportInstance):
                     variation_data,
                     import_process=self.import_process,
                     bundle_product=self.instance,
+                    sales_channel=self.sales_channel,
                 )
                 variation_import.process()
                 variation_products_ids.append(variation_import.instance.variation.id)
@@ -384,6 +449,7 @@ class ImportProductInstance(AbstractImportInstance):
                     variation_data,
                     import_process=self.import_process,
                     parent_product=self.instance,
+                    sales_channel=self.sales_channel,
                 )
                 variation_import.process()
                 variation_products_ids.append(variation_import.instance.id)
@@ -455,14 +521,14 @@ class ImportProductInstance(AbstractImportInstance):
 
         for translation in self.translations:
             try:
-                import_instance = ImportProductTranslationInstance(translation, self.import_process, product=self.instance)
+                import_instance = ImportProductTranslationInstance(translation, self.import_process, product=self.instance, sales_channel=self.sales_channel)
                 import_instance.process()
             except IntegrityError as e:
                 if "url_key" in str(e):
                     # Try again with url_key removed
                     translation = translation.copy()
                     translation["url_key"] = None
-                    import_instance = ImportProductTranslationInstance(translation, self.import_process, product=self.instance)
+                    import_instance = ImportProductTranslationInstance(translation, self.import_process, product=self.instance, sales_channel=self.sales_channel)
                     import_instance.process()
                 else:
                     raise
@@ -486,6 +552,7 @@ class ImportProductInstance(AbstractImportInstance):
                 language=language,
                 product=self.instance,
                 name=name,
+                sales_channel=self.sales_channel,
             )
 
             # Update other fields if created or if missing
@@ -511,15 +578,28 @@ class ImportProductInstance(AbstractImportInstance):
                 else:
                     raise
 
+
+            bullet_points = translation.get('bullet_points')
+            if bullet_points is not None:
+                translation_obj.bullet_points.all().delete()
+                for index, text in enumerate(bullet_points):
+                    ProductTranslationBulletPoint.objects.create(
+                        multi_tenant_company=translation_obj.multi_tenant_company,
+                        product_translation=translation_obj,
+                        text=text,
+                        sort_order=index,
+                    )
+
             translation_instance_ids.append(translation_obj.id)
 
         self.translation_instances = ProductTranslation.objects.filter(id__in=translation_instance_ids)
 
 
 class ImportProductTranslationInstance(AbstractImportInstance):
-    def __init__(self, data: dict, import_process=None, product=None, instance=None):
+    def __init__(self, data: dict, import_process=None, product=None, instance=None, sales_channel=None):
         super().__init__(data, import_process, instance)
         self.product = product
+        self.sales_channel = sales_channel
 
         self.set_field_if_exists('name')
         self.set_field_if_exists('short_description')
@@ -527,6 +607,7 @@ class ImportProductTranslationInstance(AbstractImportInstance):
         self.set_field_if_exists('url_key')
         self.set_field_if_exists('language')
         self.set_field_if_exists('product_data')
+        self.set_field_if_exists('bullet_points')
 
         self.validate()
         self._set_product_import_instance()
@@ -565,6 +646,15 @@ class ImportProductTranslationInstance(AbstractImportInstance):
         fac.run()
 
         self.instance = fac.instance
+
+        if hasattr(self, 'bullet_points') and self.bullet_points is not None:
+            self.instance.bullet_points.all().delete()
+            for index, text in enumerate(self.bullet_points):
+                ProductTranslationBulletPoint.objects.create(
+                    product_translation=self.instance,
+                    text=text,
+                    sort_order=index,
+                )
 
 
 class ImportSalesPriceInstance(AbstractImportInstance):

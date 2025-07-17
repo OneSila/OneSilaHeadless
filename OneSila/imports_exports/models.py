@@ -50,6 +50,91 @@ class Import(PolymorphicModel, models.Model):
         default=False,
         help_text="If True, existing objects fetched during the import will not be updated.",
     )
+    skip_broken_records = models.BooleanField(
+        default=False,
+        help_text="If True, the import will skip records that raise errors and continue processing."
+    )
+    broken_records = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="JSON array storing details of records that failed during import."
+    )
+
+    def get_cleaned_errors_from_broken_records(self):
+        import re
+        from django.core.exceptions import ObjectDoesNotExist
+        from products.models import Product
+
+        cleaned_errors = []
+        broken_records = self.broken_records
+        company = self.multi_tenant_company
+
+        custom_error_starts = [
+            "Parent product must be of type CONFIGURABLE.",
+            "Variation product must be of type SIMPLE or BUNDLE or ALIAS.",
+            "Parent product must be of type BUNDLE.",
+        ]
+
+        def matches_custom_save_error(msg):
+            return any(msg.strip().startswith(pattern) for pattern in custom_error_starts)
+
+        def find_sku_and_type(data, target_sku):
+            if data.get("sku") == target_sku:
+                return data.get("type"), data.get("alias_parent_sku")
+            for key in ["variations", "bundle_variations", "alias_variations"]:
+                for var in data.get(key, []):
+                    var_data = var.get("variation_data", {})
+                    if var_data.get("sku") == target_sku:
+                        return var_data.get("type"), var_data.get("alias_parent_sku")
+            return None, None
+
+        for record in broken_records:
+            error_msg = record.get("error", "")
+            data = record.get("data", {})
+
+            if matches_custom_save_error(error_msg):
+                cleaned_errors.append(error_msg)
+                continue
+
+            match_alias_detail = re.search(
+                r'Failing row contains\s*\((.*?)\)', error_msg, re.DOTALL
+            )
+            if match_alias_detail:
+                row = match_alias_detail.group(1)
+                parts = [p.strip() for p in row.split(',')]
+                if len(parts) >= 4:
+                    sku = parts[3]
+                    feed_type, alias_parent_sku = find_sku_and_type(data, sku)
+                    if alias_parent_sku:
+                        cleaned_errors.append(
+                            f"Alias product for SKU {sku} is linked to the product with SKU: {alias_parent_sku} that doesn't exist."
+                        )
+                    else:
+                        cleaned_errors.append(
+                            f"Alias product for SKU {sku} is linked to a product that doesn't exist (could not find alias_parent_sku in data)."
+                        )
+                    continue
+
+            match_duplicate = re.search(
+                r'Key \(sku, multi_tenant_company_id\)=\(([^,\n]+),', error_msg
+            )
+            if match_duplicate:
+                sku = match_duplicate.group(1).strip()
+                feed_type, _ = find_sku_and_type(data, sku)
+                try:
+                    local_product_type = Product.objects.get(multi_tenant_company=company, sku=sku).type
+                except ObjectDoesNotExist:
+                    local_product_type = "NOT FOUND"
+
+                cleaned_errors.append(
+                    f"SKU {sku} has wrong product type in data feed ({feed_type}). In OneSila this is marked as {local_product_type}"
+                )
+                continue
+
+            if not matches_custom_save_error(error_msg):
+                cleaned_errors.append("Unknown error format")
+
+        return cleaned_errors
 
     def __str__(self):
         return f"ImportProcess - {self.get_status_display()} ({self.percentage}%)"
@@ -193,9 +278,45 @@ class MappedImport(TypedImport):
         Execute the mapped import using the proper runner.
         """
         from imports_exports.factories.importers import MappedImportRunner
-
         runner = MappedImportRunner(self)
         runner.run()
 
         if self.is_periodic:
             self.mark_as_run()
+
+
+class ImportReport(models.Model):
+    """Stores email report information for an :class:`Import`."""
+
+    import_process = models.ForeignKey(
+        Import,
+        on_delete=models.CASCADE,
+        related_name="reports",
+    )
+    users = models.ManyToManyField(
+        'core.MultiTenantUser',
+        blank=True,
+        help_text="Internal users that will receive a report.",
+    )
+    external_emails = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of external emails that will receive a report.",
+    )
+
+    def clean(self):
+        super().clean()
+        company = self.import_process.multi_tenant_company
+
+        # this will need refactor at some point
+        if self.pk:
+            invalid = self.users.exclude(multi_tenant_company=company)
+            if invalid.exists():
+                raise ValidationError(
+                    "All users must belong to the same company as the import process."
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+

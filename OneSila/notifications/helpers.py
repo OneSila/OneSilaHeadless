@@ -31,7 +31,7 @@ def send_branded_mail(subject, html, to_email, from_email=None, fail_silently=Tr
     text = textify(html)
     html = transform(html, base_url=generate_absolute_url())
 
-    mail = EmailMultiAlternatives(subject, text, settings.EMAIL_HOST_USER, [to_email])
+    mail = EmailMultiAlternatives(subject, text, from_email, [to_email])
     mail.attach_alternative(html, "text/html")
 
     if attachment:

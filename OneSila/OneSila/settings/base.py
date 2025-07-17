@@ -121,6 +121,35 @@ DATABASES = {
     }
 }
 
+#
+# Session settings. Effort to fix session issues across multiple workers.
+# By default we keep the default django cache stuff.
+# but sessions let's move the elsewhere.
+#
+
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "onesila_session_cache"
+
+REDIS_HOST = os.getenv('REDIS_HOST', "127.0.0.1")
+REDIS_PORT = os.getenv('REDIS_PORT', 6379)
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    },
+    "onesila_session_cache": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/2",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -248,7 +277,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(os.getenv('REDIS_HOST', "127.0.0.1"), os.getenv('REDIS_PORT', 6379))],
+            "hosts": [f"redis://{REDIS_HOST}:{REDIS_PORT}/3"],
         },
     },
 }
@@ -310,8 +339,8 @@ HUEY = {
     'utc': True,
     'blocking': True,  # Perform blocking pop rather than poll Redis.
     'connection': {
-        'host': 'localhost',
-        'port': 6379,
+        'host': REDIS_HOST,
+        'port': REDIS_PORT,
         'db': 0,
         'connection_pool': None,  # Definitely you should use pooling!
         # ... tons of other options, see redis-py for details.
@@ -351,12 +380,11 @@ MAGENTO_LOG_DIR_PATH = os.getenv('MAGENTO_LOG_DIR_PATH', '/var/log/OneSilaHeadle
 # Shopify integration Settings (sales_channels.integrations.shopify)
 #
 
-SHOPIFY_SCOPES = ['read_products', 'write_products', 'read_markets_home', 'read_orders', 'read_publications', 'write_publications']
+SHOPIFY_SCOPES = ['read_products', 'write_products', 'read_locales', 'read_orders', 'read_publications', 'write_publications']
 SHOPIFY_API_VERSION = "2025-04"
+SHOPIFY_TEST_REDIRECT_URI = os.getenv('SHOPIFY_TEST_REDIRECT_URI')
 SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
 SHOPIFY_API_SECRET = os.getenv('SHOPIFY_API_SECRET')
-SHOPIFY_TEST_REDIRECT_URI = os.getenv('SHOPIFY_TEST_REDIRECT_URI')
-
 #
 # OpenAI settings. (llm)
 #
@@ -370,3 +398,35 @@ AI_POINT_PRICE = os.getenv('AI_POINT_PRICE', 0.1)
 #
 
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'loggers': {
+        'http.client': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'urllib3.connectionpool': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        # optional redundancy
+        'requests.packages.urllib3.connectionpool': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+}

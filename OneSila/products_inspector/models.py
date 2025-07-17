@@ -209,17 +209,6 @@ class VariationMismatchProductTypeInspectorBlock(InspectorBlock):
         verbose_name = _("Inspector Block Variation Mismatch Product Type")
 
 
-class ItemsMismatchProductTypeInspectorBlock(InspectorBlock):
-    from .constants import items_mismatch_product_type_block
-
-    objects = ItemsMismatchProductTypeManager()
-    proxy_filter_fields = items_mismatch_product_type_block
-
-    class Meta:
-        proxy = True
-        verbose_name = _("Inspector Block Items Mismatch Product Type")
-
-
 class ItemsMissingMandatoryInformationInspectorBlock(InspectorBlock):
     from .constants import items_missing_mandatory_information_block
 

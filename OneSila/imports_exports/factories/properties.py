@@ -427,7 +427,7 @@ class ImportProductPropertiesRuleInstance(AbstractImportInstance):
 
     def validate(self):
 
-        if not hasattr(self, 'value'):
+        if not hasattr(self, 'value') and self.instance is None:
             raise ValueError("The 'value' field is required.")
 
         if hasattr(self, 'items') and not isinstance(self.items, list):
@@ -436,7 +436,7 @@ class ImportProductPropertiesRuleInstance(AbstractImportInstance):
     def _set_property_import_instance(self):
 
         # If the property is not provided, run the property import.
-        if not self.product_type:
+        if not self.product_type and not self.instance:
             product_type_property = Property.objects.get(multi_tenant_company=self.multi_tenant_company,
                                                          is_product_type=True)
 
@@ -447,15 +447,17 @@ class ImportProductPropertiesRuleInstance(AbstractImportInstance):
     def pre_process_logic(self):
 
         # If the property is not provided, run the property import.
-        if not self.product_type:
+        if not self.product_type and not self.instance:
             self.property_select_value_import_instance.process()
             self.product_type = self.property_select_value_import_instance.instance
 
     def process_logic(self):
-        fac = ProductPropertiesRuleImport(self, self.import_process, instance=self.instance)
-        fac.run()
 
-        self.instance = fac.instance
+        if not self.instance:
+            fac = ProductPropertiesRuleImport(self, self.import_process, instance=self.instance)
+            fac.run()
+
+            self.instance = fac.instance
 
     def before_process_item_logic(self, item_import_instance):
         pass
@@ -739,12 +741,12 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
         )
 
     def post_process_logic(self):
+        if self.property.type not in Property.TYPES.TRANSLATED:
+            return
 
         if not hasattr(self, 'translations'):
             return
 
-        if self.property.type not in Property.TYPES.TRANSLATED:
-            return
 
         for translation in getattr(self, 'translations', []):
             language = translation.get('language')

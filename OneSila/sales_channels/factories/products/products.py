@@ -143,7 +143,10 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         for product_property in self.product_properties:
             # Attempt to process the product property
             remote_property_id = self.process_single_property(product_property)
-            existing_remote_property_ids.append(remote_property_id)
+
+            # in the marketplaces some might be skipped if not mapped
+            if remote_property_id:
+                existing_remote_property_ids.append(remote_property_id)
 
         # Delete any remote properties that no longer exist locally
         self.delete_non_existing_remote_product_property(existing_remote_property_ids)
@@ -335,7 +338,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     def set_short_description(self):
         """Sets the short description for the product or variation in the payload."""
         self.short_description = self.local_instance._get_translated_value(
-            field_name='short_description', related_name='translations')
+            field_name='short_description', related_name='translations', sales_channel=self.sales_channel)
 
         if self.is_variation:
             self.set_variation_short_description()
@@ -349,7 +352,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     def set_description(self):
         """Sets the description for the product or variation in the payload."""
         self.description = self.local_instance._get_translated_value(
-            field_name='description', related_name='translations')
+            field_name='description', related_name='translations', sales_channel=self.sales_channel)
 
         if self.is_variation:
             self.set_variation_description()
@@ -362,7 +365,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
     def set_url_key(self):
         """Sets the URL key for the product or variation in the payload."""
-        self.url_key = self.local_instance._get_translated_value(field_name='url_key', related_name='translations')
+        self.url_key = self.local_instance._get_translated_value(field_name='url_key', related_name='translations', sales_channel=self.sales_channel)
 
         if self.is_variation:
             self.set_variation_url_key()
@@ -586,19 +589,22 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             short_description = self.local_instance._get_translated_value(
                 field_name='short_description',
                 language=remote_language.local_instance,
-                related_name='translations'
+                related_name='translations',
+                sales_channel=self.sales_channel
             )
 
             description = self.local_instance._get_translated_value(
                 field_name='description',
                 language=remote_language.local_instance,
-                related_name='translations'
+                related_name='translations',
+                sales_channel=self.sales_channel
             )
 
             url_key = self.local_instance._get_translated_value(
                 field_name='url_key',
                 language=remote_language.local_instance,
-                related_name='translations'
+                related_name='translations',
+                sales_channel=self.sales_channel
             )
 
             self.process_content_translation(
@@ -710,12 +716,18 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """
         if hasattr(self.remote_instance, 'configurator'):
             self.configurator = self.remote_instance.configurator
-            self.configurator.update_if_needed(rule=self.rule, variations=self.variations, send_sync_signal=False)
+            self.configurator.update_if_needed(
+                rule=self.rule,
+                variations=self.variations,
+                send_sync_signal=False,
+                amazon_theme=getattr(self, "amazon_theme", None),
+            )
         else:
             self.configurator = RemoteProductConfigurator.objects.create_from_remote_product(
                 remote_product=self.remote_instance,
                 rule=self.rule,
-                variations=self.variations
+                variations=self.variations,
+                amazon_theme=getattr(self, "amazon_theme", None),
             )
             logger.debug(f"Created new configurator for {self.local_instance.name}")
 

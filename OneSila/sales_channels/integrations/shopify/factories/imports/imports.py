@@ -46,6 +46,10 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
 
         self.tags_property = import_instance.instance
 
+        if not self.tags_property.non_deletable:
+            self.tags_property.non_deletable = True
+            self.tags_property.save()
+
     def get_total_instances(self):
 
         gql = self.api.GraphQL()
@@ -72,6 +76,7 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
         return []
 
     def repair_remote_sku_if_needed(self, product, remote_product):
+        return
         local_sku = product.sku
 
         if not remote_product.default_variant_id or not local_sku:
@@ -132,7 +137,7 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
         return local_sku
 
     def handle_attributes(self, import_instance: ImportProductInstance):
-        if hasattr(import_instance, 'attributes'):
+        if hasattr(import_instance, 'properties'):
             product_properties = import_instance.product_property_instances
             remote_product = import_instance.remote_instance
             mirror_map = import_instance.data.get('__mirror_product_properties_map', {})
@@ -336,7 +341,8 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
         # Check if property already exists
         prop = Property.objects.filter(
             multi_tenant_company=self.import_process.multi_tenant_company,
-            internal_name=name
+            internal_name=name,
+            type=internal_type
         ).first()
 
         if not prop:
@@ -639,7 +645,7 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
         attributes, configurator_select_values, mirror_product_properties_map = self.get_product_attributes(product, product_type=product_type)
 
         if product_type == Product.SIMPLE:
-            structured_data['attributes'] = attributes
+            structured_data['properties'] = attributes
             structured_data['__mirror_product_properties_map'] = mirror_product_properties_map
             structured_data['configurator_select_values'] = configurator_select_values
 
@@ -650,10 +656,10 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
 
             if configurable_attributes:
 
-                if 'attributes' in structured_data:
-                    structured_data['attributes'].extend(configurable_attributes)
+                if 'properties' in structured_data:
+                    structured_data['properties'].extend(configurable_attributes)
                 else:
-                    structured_data['attributes'] = configurable_attributes
+                    structured_data['properties'] = configurable_attributes
 
             if configurable_configurator_select_values:
                 if '__mirror_product_properties_map' in structured_data:
@@ -691,7 +697,6 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
             mirror_model_map={"local_instance": "*"},
             mirror_model_defaults={"remote_id": product["id"], 'is_variation': is_variation}
         )
-
         import_instance.process()
 
         self.update_remote_product(import_instance, product, is_variation)

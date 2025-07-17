@@ -305,7 +305,10 @@ class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
             if int(remote_instance_mirror.remote_id) not in existing_remote_ids:
                 self.log_action_for_instance(remote_instance_mirror, RemoteLog.ACTION_DELETE, {}, {}, self.get_identifiers()[0])
                 remote_instance_mirror.delete()
-                logger.debug(f"Deleted remote instance mirror: {remote_instance_mirror}")
+                logger.debug(f"Deleted remote instance mirror: {remote_instance_mirror}")\
+
+    def post_pull_action(self):
+        pass
 
     def run(self):
         """
@@ -318,6 +321,7 @@ class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
         self.build_payload()
         self.fetch_remote_instances()
         self.process_remote_instances()
+        self.post_pull_action()
 
 
 class EanCodeValueMixin:

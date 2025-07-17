@@ -8,7 +8,7 @@ from products.models import Product
 from products_inspector.constants import HAS_IMAGES_ERROR, MISSING_PRICES_ERROR, INACTIVE_BUNDLE_ITEMS_ERROR, \
     MISSING_BUNDLE_ITEMS_ERROR, MISSING_VARIATION_ERROR, MISSING_EAN_CODE_ERROR, \
     MISSING_PRODUCT_TYPE_ERROR, MISSING_REQUIRED_PROPERTIES_ERROR, MISSING_OPTIONAL_PROPERTIES_ERROR, MISSING_STOCK_ERROR, \
-    MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, ITEMS_MISMATCH_PRODUCT_TYPE_ERROR, \
+    MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, \
     ITEMS_MISSING_MANDATORY_INFORMATION_ERROR, VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR, \
     DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR
 from products_inspector.models import InspectorBlock, Inspector
@@ -223,7 +223,6 @@ def products_inspector__inspector__trigger_block_sales_pricelist_delete(sender, 
 
 
 # VARIATION_MISMATCH_PRODUCT_TYPE_ERROR  ----------------------------------
-# ITEMS_MISMATCH_PRODUCT_TYPE_ERROR  --------------------------------------
 # ITEMS_MISSING_MANDATORY_INFORMATION_ERROR  ------------------------------
 # VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR  -------------------------
 
@@ -241,7 +240,6 @@ def products_inspector__inspector__trigger_block_product_type_variations_mismatc
 
     product = instance.product
     error_codes_to_trigger = [VARIATION_MISMATCH_PRODUCT_TYPE_ERROR,
-                              ITEMS_MISMATCH_PRODUCT_TYPE_ERROR,
                               MISSING_EAN_CODE_ERROR,
                               DUPLICATE_VARIATIONS_ERROR,
                               NON_CONFIGURABLE_RULE_ERROR]
@@ -258,12 +256,6 @@ def products_inspector__inspector__trigger_block_product_type_variations_mismatc
                                      error_code=VARIATION_MISMATCH_PRODUCT_TYPE_ERROR,
                                      run_async=False)
 
-    for item in BundleVariation.objects.filter(variation=product).iterator():
-        inspector_block_refresh.send(sender=item.parent.inspector.__class__,
-                                     instance=item.parent.inspector,
-                                     error_code=ITEMS_MISMATCH_PRODUCT_TYPE_ERROR,
-                                     run_async=False)
-
 
 @receiver(post_create, sender='products.ConfigurableVariation')
 @receiver(post_delete, sender='products.ConfigurableVariation')
@@ -273,11 +265,6 @@ def products_inspector__inspector__trigger_block_product_mismatch_variation_chan
     inspector_block_refresh.send(sender=instance.parent.inspector.__class__,
                                  instance=instance.parent.inspector,
                                  error_code=VARIATION_MISMATCH_PRODUCT_TYPE_ERROR,
-                                 run_async=False)
-
-    inspector_block_refresh.send(sender=instance.parent.inspector.__class__,
-                                 instance=instance.parent.inspector,
-                                 error_code=ITEMS_MISMATCH_PRODUCT_TYPE_ERROR,
                                  run_async=False)
 
     inspector_block_refresh.send(sender=instance.parent.inspector.__class__,

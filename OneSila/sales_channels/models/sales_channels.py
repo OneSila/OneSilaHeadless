@@ -87,7 +87,6 @@ class SalesChannelView(PolymorphicModel, RemoteObjectMixin, models.Model):
     url = models.CharField(max_length=512, null=True, blank=True)
 
     class Meta:
-        unique_together = ('sales_channel', 'name')
         verbose_name = 'Sales Channel View'
         verbose_name_plural = 'Sales Channel Views'
 
@@ -104,6 +103,7 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.SET_NULL, null=True,
                                        blank=True, help_text="The remote product associated with this assign.")
     needs_resync = models.BooleanField(default=False, help_text="Indicates if a resync is needed.")
+    issues = models.JSONField(default=list, null=True, blank=True)
 
     class Meta:
         unique_together = ('product', 'sales_channel_view')

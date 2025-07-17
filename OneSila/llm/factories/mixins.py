@@ -199,11 +199,12 @@ class ContentLLMMixin(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
 
         return True
 
-    def __init__(self, product, language_code):
+    def __init__(self, product, language_code, sales_channel_type=None):
         super().__init__()
         self.product = product
         self.multi_tenant_company = product.multi_tenant_company
         self.language_code = language_code
+        self.sales_channel_type = sales_channel_type
 
     def _set_translation(self):
         self.translation = ProductTranslation.objects.filter(

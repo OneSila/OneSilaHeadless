@@ -3,37 +3,114 @@ from typing import Optional, List, Annotated
 from strawberry import lazy
 from strawberry.relay import to_base64
 
-from core.schema.core.types.types import type, relay, field
+from core.schema.core.types.types import type, relay, field, strawberry_type
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from currencies.schema.types.types import CurrencyType
 from imports_exports.schema.queries import ImportType
+from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION
 from products.schema.types.types import ProductType
 from integrations.schema.types.types import IntegrationType
 
-from sales_channels.models import ImportCurrency, ImportImage, SalesChannelImport, ImportProduct, ImportProperty, \
-    ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, \
-    RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteProduct, RemoteProductContent, \
-    RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, \
-    SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign, RemoteOrder
-from .filters import ImportCurrencyFilter, ImportImageFilter, SalesChannelImportFilter, ImportProductFilter, \
-    ImportPropertyFilter, ImportPropertySelectValueFilter, ImportVatFilter, RemoteCategoryFilter, RemoteCurrencyFilter, \
-    RemoteCustomerFilter, RemoteImageFilter, RemoteImageProductAssociationFilter, RemoteInventoryFilter, \
-    RemoteLogFilter, RemoteOrderFilter, RemoteProductFilter, RemoteProductContentFilter, \
-    RemoteProductPropertyFilter, RemotePropertyFilter, RemotePropertySelectValueFilter, RemoteVatFilter, \
-    SalesChannelFilter, SalesChannelIntegrationPricelistFilter, SalesChannelViewFilter, SalesChannelViewAssignFilter, \
-    RemoteLanguageFilter
-from .ordering import ImportCurrencyOrder, ImportImageOrder, SalesChannelImportOrder, ImportProductOrder, \
-    ImportPropertyOrder, ImportPropertySelectValueOrder, ImportVatOrder, RemoteCategoryOrder, RemoteCurrencyOrder, \
-    RemoteCustomerOrder, RemoteImageOrder, RemoteImageProductAssociationOrder, RemoteInventoryOrder, RemoteLogOrder, \
-    RemoteOrderOrder, RemoteProductOrder, RemoteProductContentOrder, RemoteProductPropertyOrder, \
-    RemotePropertyOrder, RemotePropertySelectValueOrder, RemoteVatOrder, SalesChannelOrder, \
-    SalesChannelIntegrationPricelistOrder, SalesChannelViewOrder, SalesChannelViewAssignOrder, RemoteLanguageOrder
+from sales_channels.models import (
+    ImportCurrency,
+    ImportImage,
+    SalesChannelImport,
+    ImportProduct,
+    ImportProperty,
+    ImportPropertySelectValue,
+    ImportVat,
+    RemoteCategory,
+    RemoteCurrency,
+    RemoteCustomer,
+    RemoteImage,
+    RemoteImageProductAssociation,
+    RemoteInventory,
+    RemoteLog,
+    RemoteProduct,
+    RemoteProductContent,
+    RemoteProductProperty,
+    RemoteProperty,
+    RemotePropertySelectValue,
+    RemoteVat,
+    SalesChannel,
+    SalesChannelIntegrationPricelist,
+    SalesChannelView,
+    SalesChannelViewAssign,
+    RemoteOrder,
+)
+from .filters import (
+    ImportCurrencyFilter,
+    ImportImageFilter,
+    SalesChannelImportFilter,
+    ImportProductFilter,
+    ImportPropertyFilter,
+    ImportPropertySelectValueFilter,
+    ImportVatFilter,
+    RemoteCategoryFilter,
+    RemoteCurrencyFilter,
+    RemoteCustomerFilter,
+    RemoteImageFilter,
+    RemoteImageProductAssociationFilter,
+    RemoteInventoryFilter,
+    RemoteLogFilter,
+    RemoteOrderFilter,
+    RemoteProductFilter,
+    RemoteProductContentFilter,
+    RemoteProductPropertyFilter,
+    RemotePropertyFilter,
+    RemotePropertySelectValueFilter,
+    RemoteVatFilter,
+    SalesChannelFilter,
+    SalesChannelIntegrationPricelistFilter,
+    SalesChannelViewFilter,
+    SalesChannelViewAssignFilter,
+    RemoteLanguageFilter,
+)
+from .ordering import (
+    ImportCurrencyOrder,
+    ImportImageOrder,
+    SalesChannelImportOrder,
+    ImportProductOrder,
+    ImportPropertyOrder,
+    ImportPropertySelectValueOrder,
+    ImportVatOrder,
+    RemoteCategoryOrder,
+    RemoteCurrencyOrder,
+    RemoteCustomerOrder,
+    RemoteImageOrder,
+    RemoteImageProductAssociationOrder,
+    RemoteInventoryOrder,
+    RemoteLogOrder,
+    RemoteOrderOrder,
+    RemoteProductOrder,
+    RemoteProductContentOrder,
+    RemoteProductPropertyOrder,
+    RemotePropertyOrder,
+    RemotePropertySelectValueOrder,
+    RemoteVatOrder,
+    SalesChannelOrder,
+    SalesChannelIntegrationPricelistOrder,
+    SalesChannelViewOrder,
+    SalesChannelViewAssignOrder,
+    RemoteLanguageOrder,
+)
+from ...integrations.amazon.models import AmazonSalesChannelImport, AmazonSalesChannel
 from ...models.sales_channels import RemoteLanguage
+
+
+@strawberry_type
+class FormattedIssueType:
+    message: str | None
+    severity: str | None
 
 
 @type(SalesChannel, filters=SalesChannelFilter, order=SalesChannelOrder, pagination=True, fields='__all__')
 class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
     saleschannelimport_set: List[Annotated['SalesChannelImportType', lazy("sales_channels.schema.types.types")]]
+
+    @field()
+    def amazon_imports(self) -> List[Annotated['AmazonSalesChannelImportType', lazy("sales_channels.integrations.amazon.schema.types.types")]]:
+        return AmazonSalesChannelImport.objects.filter(sales_channel=self)
 
 
 @type(ImportCurrency, filters=ImportCurrencyFilter, order=ImportCurrencyOrder, pagination=True, fields='__all__')
@@ -207,6 +284,10 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
     product: ProductType
 
     @field()
+    def integration_type(self, info) -> str:
+        return INTEGRATIONS_TYPES_MAP.get(self.sales_channel.__class__, MAGENTO_INTEGRATION)
+
+    @field()
     def remote_url(self, info) -> str | None:
         return self.remote_url
 
@@ -217,3 +298,23 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
             return self.remote_product.syncing_current_percentage
 
         return 0
+
+    @field(description="List of formatted issues coming from the remote marketplace")
+    def formatted_issues(self, info) -> List[FormattedIssueType]:
+        issues_data = self.issues or []
+        sales_channel_instance = self.sales_channel.get_real_instance()
+
+        formatted: List[FormattedIssueType] = []
+
+        if isinstance(sales_channel_instance, AmazonSalesChannel):
+            for issue in issues_data:
+                if not isinstance(issue, dict):
+                    continue
+                formatted.append(
+                    FormattedIssueType(
+                        message=issue.get("message"),
+                        severity=issue.get("severity"),
+                    )
+                )
+
+        return formatted

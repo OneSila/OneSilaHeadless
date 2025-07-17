@@ -12,7 +12,44 @@ from sales_channels.models.products import (
 
 class AmazonProduct(RemoteProduct):
     """Amazon specific remote product."""
-    pass
+
+    asin = models.CharField(
+        max_length=32,
+        null=True,
+        blank=True,
+        help_text="ASIN identifier for the product.",
+    )
+
+    # keep track of which marketplace listings have been created
+    created_marketplaces = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of Amazon marketplace IDs where the product was created.",
+    )
+
+    # store the EAN code used on creation as it cannot be changed later
+    ean_code = models.CharField(
+        max_length=14,
+        null=True,
+        blank=True,
+        help_text="EAN code used when the product was first created.",
+    )
+
+    @property
+    def remote_type(self):
+        return self.get_remote_rule().product_type_code
+
+    def get_remote_rule(self):
+        from sales_channels.integrations.amazon.models import AmazonProductType
+
+        local_rule = self.local_instance.get_product_rule()
+        if local_rule is None:
+            raise Exception("Product rule not found.")
+
+        return AmazonProductType.objects.get(
+            local_instance=local_rule,
+            sales_channel=self.sales_channel,
+        )
 
 
 class AmazonInventory(RemoteInventory):

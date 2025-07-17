@@ -30,7 +30,6 @@ class TestCase(TestCaseMixin, DjangoTestCase):
 class TransactionTestCase(TestCaseMixin, DjangoTransactionTestCase):
     pass
 
-
 class TestCaseDemoDataMixin:
     # This variable will be shared across all TestCases subsclassed from here.
     # That will ensure we only try to generate the demo-data once.

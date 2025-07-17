@@ -1,8 +1,9 @@
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_save, pre_save, post_delete
 from django.dispatch import receiver
 from core.models.multi_tenant import MultiTenantUser, MultiTenantCompany
 from core.signals import post_create, post_update
 from core.schema.core.subscriptions import refresh_subscription_receiver
+from sales_channels.integrations.amazon.models import AmazonSalesChannel
 
 
 @receiver(post_save)
@@ -40,3 +41,10 @@ def core__multi_tenant_company__pres_save__ensure_languages_contains_default(sen
     # Ensure the default language is present
     if instance.language and instance.language not in instance.languages:
         instance.languages.append(instance.language)
+
+
+@receiver(post_save, sender=AmazonSalesChannel)
+@receiver(post_delete, sender=AmazonSalesChannel)
+def core__multi_tenant_company__has_amazon_integration_refresh(sender, instance, **kwargs):
+    if instance:
+        refresh_subscription_receiver(instance.multi_tenant_company)

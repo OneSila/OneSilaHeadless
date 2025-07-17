@@ -1,4 +1,9 @@
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, Annotated, lazy
+from core.schema.core.types.types import relay, type, field, Annotated, lazy
+from core.schema.core.mixins import (
+    GetPropertyQuerysetMultiTenantMixin,
+    GetPropertySelectValueQuerysetMultiTenantMixin,
+    GetQuerysetMultiTenantMixin,
+)
 
 from typing import List, Optional
 from media.schema.types.types import ImageType
@@ -13,7 +18,7 @@ from .ordering import PropertyOrder, PropertyTranslationOrder, \
 
 
 @type(Property, filters=PropertyFilter, order=PropertyOrder, pagination=True, fields="__all__")
-class PropertyType(relay.Node, GetQuerysetMultiTenantMixin):
+class PropertyType(relay.Node, GetPropertyQuerysetMultiTenantMixin):
     propertytranslation_set: List[Annotated['PropertyTranslationType', lazy("properties.schema.types.types")]]
 
     @field()
@@ -27,7 +32,7 @@ class PropertyTranslationType(relay.Node, GetQuerysetMultiTenantMixin):
 
 
 @type(PropertySelectValue, filters=PropertySelectValueFilter, order=PropertySelectValueOrder, pagination=True, fields="__all__")
-class PropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
+class PropertySelectValueType(relay.Node, GetPropertySelectValueQuerysetMultiTenantMixin):
     property: PropertyType
     image: Optional[ImageType]
     productpropertiesrule_set: List[Annotated['ProductPropertiesRuleType', lazy("properties.schema.types.types")]]
@@ -73,6 +78,10 @@ class ProductPropertyTextTranslationType(relay.Node, GetQuerysetMultiTenantMixin
 class ProductPropertiesRuleType(relay.Node, GetQuerysetMultiTenantMixin):
     product_type: PropertySelectValueType
     items: List[Annotated['ProductPropertiesRuleItemType', lazy("properties.schema.types.types")]]
+
+    @field()
+    def value(self, info) -> str:
+        return self.value
 
 
 @type(ProductPropertiesRuleItem, filters=ProductPropertiesRuleItemFilter, order=ProductPropertiesRuleItemOrder, pagination=True, fields="__all__")

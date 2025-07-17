@@ -1,5 +1,7 @@
 import json
 import mimetypes
+from io import TextIOWrapper
+
 import requests
 from django.core.exceptions import ValidationError
 from imports_exports.factories.imports import ImportMixin
@@ -14,7 +16,6 @@ class MappedImportRunner(ImportMixin):
         self.import_select_values = import_process.type == TypedImport.TYPE_PROPERTY_SELECT_VALUE
         self.import_rules = import_process.type == TypedImport.TYPE_PROPERTY_RULE
         self.import_products = import_process.type == TypedImport.TYPE_PRODUCT
-
         self.data = None
 
         super().__init__(import_process, language=import_process.language)
@@ -33,9 +34,10 @@ class MappedImportRunner(ImportMixin):
                 raise ValidationError("File MIME type is not recognized as JSON.")
 
             try:
-                with self.import_process.json_file.open('r', encoding='utf-8') as f:
-                    self.data = json.load(f)
-
+                # open in binary mode…
+                with self.import_process.json_file.open('rb') as bin_f:
+                    text_f = TextIOWrapper(bin_f, encoding='utf-8')
+                    self.data = json.load(text_f)
             except json.JSONDecodeError:
                 raise ValidationError("Uploaded file is not valid JSON.")
 

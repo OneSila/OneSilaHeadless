@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 @receiver(post_create, sender=MultiTenantCompany)
 def create_default_product_type_property(sender, instance, **kwargs):
     Property.objects.create_product_type(instance)
+    Property.objects.create_brand(instance)
 
 
 @receiver(post_create, sender=PropertyTranslation)

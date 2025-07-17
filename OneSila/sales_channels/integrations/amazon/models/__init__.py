@@ -5,10 +5,14 @@ from .products import (
     AmazonCategory, AmazonEanCode
 )
 from .properties import (
-    AmazonProperty, AmazonPropertySelectValue, AmazonProductProperty
+    AmazonProperty, AmazonPropertySelectValue, AmazonProductProperty, AmazonProductType, AmazonProductTypeItem
 )
 from .sales_channels import (
-    AmazonSalesChannel, AmazonSalesChannelView, AmazonRemoteLanguage
+    AmazonSalesChannel,
+    AmazonSalesChannelView,
+    AmazonRemoteLanguage,
+    AmazonDefaultUnitConfigurator
 )
-from .taxes import AmazonCurrency, AmazonVat
+from .taxes import AmazonCurrency, AmazonTaxCode
 from .imports import *
+from .logs import AmazonRemoteLog

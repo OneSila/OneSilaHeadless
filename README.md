@@ -123,3 +123,9 @@ Or with html
 ```bash
 coverage html
 ```
+
+## Supported Currencies
+
+The list of available currencies can be found in `currencies/currencies.py`.
+Each entry contains the ISO code, human readable name and symbol. Recent
+additions include codes such as `AFN` (Afghan Afghani) and `CHF` (Swiss Franc).

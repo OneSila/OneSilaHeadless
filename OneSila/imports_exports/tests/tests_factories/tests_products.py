@@ -387,6 +387,24 @@ class ImportProductInstanceProcessTest(TestCase):
         translation = ProductTranslation.objects.filter(product=instance.instance).first()
         self.assertEqual(translation.short_description, "Short Desc")
 
+    def test_create_product_with_bullet_points(self):
+        data = {
+            "name": "Bullet Product",
+            "sku": "BULLET001",
+            "translations": [
+                {
+                    "bullet_points": ["Point A", "Point B"]
+                }
+            ]
+        }
+
+        instance = ImportProductInstance(data, self.import_process)
+        instance.process()
+
+        translation = ProductTranslation.objects.filter(product=instance.instance).first()
+        bullet_texts = list(translation.bullet_points.order_by('sort_order').values_list('text', flat=True))
+        self.assertEqual(bullet_texts, ["Point A", "Point B"])
+
     def test_create_product_with_images(self):
         data = {
             "name": "Image Product",
@@ -929,3 +947,35 @@ class ImportProductInstanceCreateOnlyTest(TestCase):
             MediaProductThrough.objects.filter(product=product).count(),
             initial_images + 1,
         )
+
+
+class ImportProductWithSameSkuAndDifferentTypeTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.import_instance = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+    def test_fallback_applies_when_type_is_wrong(self):
+        first_data = {
+            "name": "First",
+            "sku": "FALLBACK-001",
+            "type": "SIMPLE"
+        }
+        instance1 = ImportProductInstance(first_data, self.import_instance)
+        instance1.process()
+        product = instance1.instance
+
+        # Second time with wrong type
+        second_data = {
+            "name": "Second Attempt",
+            "sku": "FALLBACK-001",
+            "type": "BUNDLE"
+        }
+
+        instance2 = ImportProductInstance(second_data, self.import_instance)
+        instance2.process()
+
+        self.assertEqual(instance2.instance.id, product.id)
+        self.assertEqual(instance2.created, False)
+        self.assertEqual(instance2.instance.type, product.type)
+        self.assertEqual(instance2.instance.type, "SIMPLE")
+

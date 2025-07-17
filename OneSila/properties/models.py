@@ -45,6 +45,7 @@ class Property(TranslatedModelMixin, models.Model):
     add_to_filters = models.BooleanField(default=True)
     is_product_type = models.BooleanField(default=False)
     has_image = models.BooleanField(default=False)
+    non_deletable = models.BooleanField(default=False)
 
     # advanced tab
     value_validator = models.CharField(
@@ -66,8 +67,13 @@ class Property(TranslatedModelMixin, models.Model):
         return self._get_translated_value(field_name='name', related_name='propertytranslation_set')
 
     def delete(self, *args, **kwargs):
+
         if self.is_product_type:
             raise ValidationError(_("Product type cannot be deleted."))
+
+        if self.non_deletable:
+            raise ValidationError(_("This property cannot be deleted."))
+
         super().delete(*args, **kwargs)
 
     def save(self, *args, **kwargs):
@@ -77,11 +83,12 @@ class Property(TranslatedModelMixin, models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.multi_tenant_company} -> {self.name}"
+        return f"{self.multi_tenant_company} -> {self.name} ({self.type})"
 
     class Meta:
         verbose_name_plural = _("Properties")
         search_terms = ['propertytranslation__name']
+        ordering = ('propertytranslation__name',)
         constraints = [
             models.UniqueConstraint(
                 fields=['multi_tenant_company'],
@@ -126,6 +133,7 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
 
     class Meta:
         search_terms = ['propertyselectvaluetranslation__value']
+        ordering = ('propertyselectvaluetranslation__value',)
 
 
 class PropertySelectValueTranslation(TranslationFieldsMixin, models.Model):
@@ -240,6 +248,10 @@ class ProductPropertiesRule(models.Model):
     def __str__(self):
         return f"{self.product_type} <{self.multi_tenant_company}>"
 
+    @property
+    def value(self):
+        return self.product_type.value
+
     def save(self, *args, **kwargs):
 
         if not self.product_type.property.is_product_type:
@@ -286,7 +298,7 @@ class ProductPropertiesRuleItem(models.Model):
 
         # Ensure that if type is REQUIRED_IN_CONFIGURATOR, property type must be SELECT or MULTISELECT
         if self.type in [self.REQUIRED_IN_CONFIGURATOR, self.OPTIONAL_IN_CONFIGURATOR] and self.property.type != Property.TYPES.SELECT:
-            raise ValidationError(_("Property must be of type SELECT."))
+            raise ValidationError(_(f"Property {self.property.name} must be of type SELECT."))
 
         # Ensure rule cannot have OPTIONAL_IN_CONFIGURATOR without a REQUIRED_IN_CONFIGURATOR
         if self.type == self.OPTIONAL_IN_CONFIGURATOR and not self.rule.items.filter(type=self.REQUIRED_IN_CONFIGURATOR).exists():

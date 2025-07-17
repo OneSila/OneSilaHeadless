@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Q, Value, CheckConstraint
+from django.db.models import Q, Value, CheckConstraint, UniqueConstraint
 from django.utils.text import slugify
 
 from core import models
@@ -434,10 +434,22 @@ class ConfigurableVariation(models.Model):
 
     def save(self, *args, **kwargs):
         if self.parent.is_not_configurable():
-            raise IntegrityError(_("parent needs to a product of type CONFIGURABLE. Not %s" % (self.parent.type)))
+            raise IntegrityError(
+                _(
+                    f"Parent product must be of type CONFIGURABLE. "
+                    f"Parent SKU: {self.parent.sku}, type: {self.parent.type}; "
+                    f"Variation SKU: {self.variation.sku}, type: {self.variation.type}."
+                )
+            )
 
         if self.variation.is_configurable():
-            raise IntegrityError(_("variation needs to a product of type BUNDLE or SIMPLE. Not %s" % (self.parent.type)))
+            raise IntegrityError(
+                _(
+                    f"Variation product must be of type SIMPLE or BUNDLE or ALIAS. "
+                    f"Variation SKU: {self.variation.sku}, type: {self.variation.type}; "
+                    f"Parent SKU: {self.parent.sku}, type: {self.parent.type}."
+                )
+            )
 
         super().save(*args, **kwargs)
 
@@ -458,10 +470,22 @@ class BundleVariation(models.Model):
 
     def save(self, *args, **kwargs):
         if self.parent.is_not_bundle():
-            raise IntegrityError(_("parent needs to a product of type BUNDLE. Not %s" % (self.parent.type)))
+            raise IntegrityError(
+                _(
+                    f"Parent product must be of type BUNDLE. "
+                    f"Parent SKU: {self.parent.sku}, type: {self.parent.type}; "
+                    f"Variation SKU: {self.variation.sku}, type: {self.variation.type}."
+                )
+            )
 
         if self.variation.is_configurable():
-            raise IntegrityError(_("variation needs to a product of type BUNDLE or SIMPLE. Not %s" % (self.parent.type)))
+            raise IntegrityError(
+                _(
+                    f"Variation product must be of type SIMPLE or BUNDLE or ALIAS. "
+                    f"Variation SKU: {self.variation.sku}, type: {self.variation.type}; "
+                    f"Parent SKU: {self.parent.sku}, type: {self.parent.type}."
+                )
+            )
 
         super().save(*args, **kwargs)
 
@@ -471,11 +495,12 @@ class BundleVariation(models.Model):
 
 class ProductTranslation(TranslationFieldsMixin, models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations")
+    sales_channel = models.ForeignKey('sales_channels.SalesChannel', null=True, blank=True, on_delete=models.CASCADE, related_name='product_translations')
 
-    name = models.CharField(max_length=256)
+    name = models.CharField(max_length=512)
     short_description = models.TextField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
-    url_key = models.CharField(max_length=256, null=True, blank=True)
+    url_key = models.CharField(max_length=512, null=True, blank=True)
 
     def __str__(self):
         return f"{self.product} <{self.language}>"
@@ -490,7 +515,7 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
         return new_url_key
 
     def save(self, *args, **kwargs):
-        if not self.url_key:
+        if not self.url_key and not self.sales_channel:
             self.url_key = self._get_default_url_key()
 
         super().save(*args, **kwargs)
@@ -498,6 +523,30 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         translated_field = 'product'
         unique_together = (
-            ('product', 'language'),
-            ('url_key', 'multi_tenant_company'),
+            ('product', 'language', 'sales_channel'),
         )
+
+        # @TODO: Figure out what we do with this
+        # constraints = [
+        #     UniqueConstraint(
+        #         fields=['url_key', 'multi_tenant_company'],
+        #         condition=Q(sales_channel__isnull=False),
+        #         name='uniq_nonnull_url_key_per_company_for_default'
+        #     )
+        # ]
+
+
+class ProductTranslationBulletPoint(models.Model):
+    product_translation = models.ForeignKey(
+        ProductTranslation,
+        on_delete=models.CASCADE,
+        related_name='bullet_points'
+    )
+    text = models.CharField(max_length=512)
+    sort_order = models.PositiveIntegerField(default=0, help_text="Display order of the bullet point")
+
+    def __str__(self):
+        return f"Bullet Point {self.order} for {self.product_translation}"
+
+    class Meta:
+        ordering = ['sort_order']

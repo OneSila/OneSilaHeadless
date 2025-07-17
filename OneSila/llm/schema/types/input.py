@@ -3,6 +3,11 @@ from typing import Optional, List
 from core.schema.core.types.input import NodeInput, partial, strawberry_input
 from products.models import Product
 from enum import Enum
+from integrations.constants import (
+    MAGENTO_INTEGRATION,
+    SHOPIFY_INTEGRATION,
+    AMAZON_INTEGRATION,
+)
 
 from products.schema.types.input import ProductPartialInput
 from properties.schema.types.input import PropertyPartialInput, PropertySelectValuePartialInput
@@ -14,10 +19,17 @@ class ContentAiGenerateType(Enum):
     NAME = "name"
 
 
+class SalesChannelIntegrationType(Enum):
+    MAGENTO = MAGENTO_INTEGRATION
+    SHOPIFY = SHOPIFY_INTEGRATION
+    AMAZON = AMAZON_INTEGRATION
+
+
 @partial(Product, fields="__all__")
 class ProductAiContentInput(NodeInput):
     language_code: str
     content_ai_generate_type: ContentAiGenerateType
+    sales_channel_type: Optional[SalesChannelIntegrationType] = None
 
 
 @strawberry_input
@@ -37,3 +49,8 @@ class AIBulkTranslationInput:
     products: Optional[List[ProductPartialInput]] = None
     properties: Optional[List[PropertyPartialInput]] = None
     values: Optional[List[PropertySelectValuePartialInput]] = None
+
+
+@partial(Product, fields="__all__")
+class ProductAiBulletPointsInput(NodeInput):
+    language_code: str

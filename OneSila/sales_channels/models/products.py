@@ -189,6 +189,13 @@ class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Mode
         help_text="Local properties used for configurator logic."
     )
 
+    amazon_theme = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Amazon variation theme associated with this configurator.",
+    )
+
     objects = RemoteProductConfiguratorManager()
 
     class Meta:
@@ -260,7 +267,7 @@ class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Mode
 
         return list(Property.objects.filter(id__in=all_ids))
 
-    def update_if_needed(self, rule=None, variations=None, send_sync_signal=True):
+    def update_if_needed(self, rule=None, variations=None, send_sync_signal=True, amazon_theme=None):
         """
         Updates the `properties` (local Property instances) if there are changes based on the current rule and variations.
         """
@@ -277,14 +284,23 @@ class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Mode
         existing_prop_ids = set(self.properties.values_list('id', flat=True))
         new_prop_ids = set(p.id for p in all_props)
 
+        changed = False
+
         if existing_prop_ids != new_prop_ids:
             self.properties.set(all_props)
+            changed = True
+
+        if amazon_theme is not None and self.amazon_theme != amazon_theme:
+            self.amazon_theme = amazon_theme
+            changed = True
+
+        if changed:
             self.save()
 
             if send_sync_signal:
                 sync_remote_product.send(
                     sender=self.remote_product.local_instance.__class__,
-                    instance=self.remote_product.local_instance.product
+                    instance=self.remote_product.local_instance
                 )
 
 

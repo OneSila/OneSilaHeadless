@@ -1,7 +1,17 @@
 from core.receivers import receiver
 from core.signals import post_create, post_update
 from sales_channels.signals import refresh_website_pull_models, sales_channel_created
-from sales_channels.integrations.amazon.models import AmazonSalesChannel
+from sales_channels.integrations.amazon.models import (
+    AmazonSalesChannel,
+    AmazonProperty,
+)
+from sales_channels.integrations.amazon.factories.sync.rule_sync import (
+    AmazonPropertyRuleItemSyncFactory,
+    AmazonProductTypeAsinSyncFactory,
+)
+from sales_channels.integrations.amazon.factories.sync.select_value_sync import (
+    AmazonPropertySelectValuesSyncFactory,
+)
 
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
@@ -33,7 +43,41 @@ def sales_channels__amazon__handle_pull_views(sender, instance, **kwargs):
     currencies_factory = AmazonRemoteCurrencyPullFactory(sales_channel=instance)
     currencies_factory.run()
 
-# Example placeholder for future signal handlers
-# @receiver(post_update, sender='app_name.Model')
-# def app_name__model__action__example(sender, instance, **kwargs):
-#     do_something()
+
+@receiver(post_create, sender='amazon.AmazonProperty')
+@receiver(post_update, sender='amazon.AmazonProperty')
+def sales_channels__amazon_property__sync_rule_item(sender, instance: AmazonProperty, **kwargs):
+    """Sync ProductPropertiesRuleItem when an Amazon property is mapped locally."""
+    signal = kwargs.get('signal')
+    if signal == post_update and not instance.is_dirty_field('local_instance', check_relationship=True):
+        return
+    if signal == post_create and not instance.local_instance:
+        return
+
+    sync_factory = AmazonPropertyRuleItemSyncFactory(instance)
+    sync_factory.run()
+
+
+@receiver(post_create, sender='amazon.AmazonProperty')
+@receiver(post_update, sender='amazon.AmazonProperty')
+def sales_channels__amazon_property__auto_map_select_values(sender, instance: AmazonProperty, **kwargs):
+    """Automatically create local select values when duplicates exist across marketplaces."""
+    signal = kwargs.get('signal')
+    if signal == post_update and not instance.is_dirty_field('local_instance', check_relationship=True):
+        return
+    if signal == post_create and not instance.local_instance:
+        return
+
+    sync_factory = AmazonPropertySelectValuesSyncFactory(instance)
+    sync_factory.run()
+
+
+@receiver(post_create, sender='amazon.AmazonProductType')
+@receiver(post_update, sender='amazon.AmazonProductType')
+def sales_channels__amazon_product_type__ensure_asin(sender, instance, **kwargs):
+    signal = kwargs.get('signal')
+    if signal == post_update and not instance.is_dirty_field('local_instance', check_relationship=True):
+        return
+
+    sync_factory = AmazonProductTypeAsinSyncFactory(instance)
+    sync_factory.run()

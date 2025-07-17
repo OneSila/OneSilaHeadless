@@ -1,6 +1,10 @@
 from django.utils.translation import gettext_lazy as _
 from core import models
-from sales_channels.models.sales_channels import SalesChannel, SalesChannelView, RemoteLanguage
+from sales_channels.models.sales_channels import (
+    SalesChannel,
+    SalesChannelView,
+    RemoteLanguage,
+)
 import uuid
 
 
@@ -98,6 +102,10 @@ class AmazonSalesChannel(SalesChannel):
         blank=True,
         help_text="Stores the last OAuth connection failure traceback."
     )
+    listing_owner = models.BooleanField(
+        default=False,
+        help_text="Indicates if the sales channel have listing_owner status and can edit or create listings"
+    )
 
     class Meta:
         verbose_name = 'Amazon Sales Channel'
@@ -117,7 +125,17 @@ class AmazonSalesChannel(SalesChannel):
 
 class AmazonSalesChannelView(SalesChannelView):
     """Amazon marketplace representation."""
-    pass
+    api_region_code = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+    )
+
+    @property
+    def language_tag(self) -> str | None:
+        """Return the first remote language code for this marketplace."""
+        lang = self.remote_languages.first()
+        return lang.remote_code if lang else None
 
 
 class AmazonRemoteLanguage(RemoteLanguage):
@@ -131,3 +149,30 @@ class AmazonRemoteLanguage(RemoteLanguage):
         blank=True,
         help_text="The marketplace associated with this remote language.",
     )
+
+
+class AmazonDefaultUnitConfigurator(models.Model):
+    """Store default unit configuration for a sales channel attribute."""
+
+    sales_channel = models.ForeignKey(
+        SalesChannel,
+        on_delete=models.CASCADE,
+        related_name="default_unit_configurators",
+    )
+    marketplace = models.ForeignKey(
+        'amazon.AmazonSalesChannelView',
+        on_delete=models.CASCADE,
+        help_text="The Amazon marketplace for this value."
+    )
+    name = models.CharField(max_length=255)
+    code = models.CharField(max_length=255)
+    selected_unit = models.CharField(max_length=100, null=True, blank=True)
+    choices = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        unique_together = ("sales_channel", "marketplace", "code")
+        verbose_name = "Default Unit Configurator"
+        verbose_name_plural = "Default Unit Configurators"
+
+    def __str__(self):
+        return f"{self.code} @ {self.sales_channel}"

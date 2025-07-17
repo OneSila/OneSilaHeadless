@@ -1,5 +1,6 @@
 import logging
 
+from django.db import IntegrityError
 from django.db.models.fields.related import ManyToManyField
 from core.helpers import get_nested_attr
 from django.conf import settings
@@ -161,7 +162,7 @@ class ImportOperationMixin:
             kwargs = {'multi_tenant_company': self.multi_tenant_company}
             for identifier in identifiers:
                 value = get_nested_attr(self.import_instance, identifier)
-                if value is not None:
+                if value is not None or identifier == 'sales_channel':
                     kwargs[identifier] = value
 
             return kwargs
@@ -185,6 +186,12 @@ class ImportOperationMixin:
             else:
                 self.force_created = True
 
+    def resolve_get_or_create_integrity_error(self, error):
+        """
+        This method allows overrides, by default it just raise the error
+        """
+        raise error
+
     def get_or_create_instance(self):
         """
         Attempts to retrieve the local instance using the built kwargs; if not found, create it.
@@ -195,7 +202,11 @@ class ImportOperationMixin:
                 self.instance = self.import_instance.local_class.objects.create(**self.get_kwargs)
                 self.created = True
             else:
-                self.instance, self.created = self.import_instance.local_class.objects.get_or_create(**self.get_kwargs)
+                try:
+                    self.instance, self.created = self.import_instance.local_class.objects.get_or_create(
+                        **self.get_kwargs)
+                except IntegrityError as e:
+                    self.instance, self.created = self.resolve_get_or_create_integrity_error(e)
 
         return self.instance
 
