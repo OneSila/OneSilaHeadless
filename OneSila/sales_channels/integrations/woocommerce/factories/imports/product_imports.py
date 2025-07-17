@@ -438,15 +438,21 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         # Check manually in woocomemrce if the variation DOES have an sku
         # if not, we must set it in advance or later efforts become
         # to complicated to inject skus after import
-        if not parent_sku:
-            parent_sku = generate_sku()
-            structured_data['sku'] = parent_sku
-            self.api.update_product(remote_id, sku=parent_sku)
+        # if not parent_sku:
+        #     parent_sku = generate_sku()
+        #     structured_data['sku'] = parent_sku
+        #     self.api.update_product(remote_id, sku=parent_sku)
+
+        local_product = None
+        remote_product_instance = WoocommerceProduct.objects.filter(remote_id=remote_id, sales_channel=self.sales_channel).first()
+        if remote_product_instance:
+            local_product = remote_product_instance.local_instance
 
         # first create your import instance and assign remote_product.
         parent_importer_instance = ImportProductInstance(
             data=structured_data,
             import_process=self.import_process,
+            instance=local_product
         )
         parent_importer_instance.prepare_mirror_model_class(
             mirror_model_class=WoocommerceProduct,
@@ -491,14 +497,14 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         parent_sku = parent_importer_instance.instance.sku
         variation_data = self.api.get_product_variation(parent_remote_id, variation_id)
 
-        variation_sku = variation_data.get('sku')
+        # variation_sku = variation_data.get('sku')
         # Check manually in woocomemrce if the variation DOES have an sku
         # if not, we must set it in advance or later efforts become
         # to complicated to inject skus after import
-        if variation_sku == parent_sku or not variation_sku:
-            variation_sku = generate_sku()
-            self.api.update_product_variation(parent_remote_id, variation_id, sku=variation_sku)
-            variation_data['sku'] = variation_sku
+        # if variation_sku == parent_sku or not variation_sku:
+        #     variation_sku = generate_sku()
+        #     self.api.update_product_variation(parent_remote_id, variation_id, sku=variation_sku)
+        #     variation_data['sku'] = variation_sku
 
         base_product_data, *_ = self.get_base_product_data(variation_data, parent_sku=parent_sku)
         properties_data = self.get_properties_data_for_product(variation_data, is_variation=True, parent_data=parent_data)
@@ -515,9 +521,15 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
             'configurable_parent_sku': parent_sku,
         }
 
+        local_product = None
+        remote_product_instance = WoocommerceProduct.objects.filter(remote_id=variation_id, sales_channel=self.sales_channel, remote_parent_product__remote_id=parent_remote_id).first()
+        if remote_product_instance:
+            local_product = remote_product_instance.local_instance
+
         variation_importer_instance = ImportProductInstance(
             data=payload,
             import_process=self.import_process,
+            instance=local_product
         )
         variation_importer_instance.prepare_mirror_model_class(
             mirror_model_class=WoocommerceProduct,

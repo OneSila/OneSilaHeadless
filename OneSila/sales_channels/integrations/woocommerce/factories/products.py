@@ -126,6 +126,7 @@ class WooCommerceProductCreateFactory(WooCommerceProductSyncFactory, Woocommerce
         """
         if self.is_woocommerce_variant_product:
             if getattr(self, "is_variation_add", False):
+
                 parent_factory = WooCommerceProductUpdateFactory(
                     sales_channel=self.sales_channel,
                     local_instance=self.parent_local_instance,
@@ -133,6 +134,7 @@ class WooCommerceProductCreateFactory(WooCommerceProductSyncFactory, Woocommerce
                     api=self.api,
                 )
                 parent_factory.run()
+
             resp = self.api.create_product_variation(
                 self.remote_instance.remote_parent_product.remote_id,
                 **self.payload,
@@ -173,7 +175,7 @@ class WooCommerceProductDeleteFactory(SerialiserMixin, GetWoocommerceAPIMixin, R
         """
         try:
             if self.remote_instance.is_variation:
-                return self.api.delete_product_variation(self.remote_instance.remote_id, self.remote_instance.remote_parent_product.remote_id)
+                return self.api.delete_product_variation(self.remote_instance.remote_parent_product.remote_id, self.remote_instance.remote_id)
             else:
                 return self.api.delete_product(self.remote_instance.remote_id)
         except FailedToDeleteError:
@@ -245,8 +247,4 @@ class WooCommerceProductVariationDeleteFactory(SerialiserMixin, GetWoocommerceAP
     remote_model_class = WoocommerceProduct
 
     def delete_remote_instance_process(self, *args, **kwargs):
-        try:
-            return self.api.delete_product_variation(self.remote_instance.remote_id, self.remote_instance.remote_parent_product.remote_id)
-        except FailedToDeleteError:
-            # this never existed so we can just pass this
-            pass
+        deleted = self.api.delete_product_variation(self.remote_instance.remote_parent_product.remote_id, self.remote_instance.remote_id)

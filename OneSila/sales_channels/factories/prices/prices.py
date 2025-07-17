@@ -109,8 +109,15 @@ class RemotePriceUpdateFactory(ToUpdateCurrenciesMixin, ProductAssignmentMixin, 
             # the remote Price object.
             self.remote_instance = self.remote_model_class.objects.get(remote_product=self.remote_product)
         except self.remote_model_class.DoesNotExist:
-            logger.error(f"{self.__class__.__name__} Preflight check: Remote instance {self.remote_model_class.__name__} not found for sales channel {self.sales_channel} and product {self.local_instance}")
-            return False
+            if self.remote_model_class:
+                self.remote_instance, _ = self.remote_model_class.objects.get_or_create(
+                    remote_product=self.remote_product,
+                    sales_channel=self.sales_channel,
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
+                )
+            else:
+                logger.error(f"{self.__class__.__name__} Preflight check: Remote instance {self.remote_model_class.__name__} not found for sales channel {self.sales_channel} and product {self.local_instance}")
+                return False
 
         return bool(self.to_update_currencies)
 
