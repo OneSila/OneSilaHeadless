@@ -114,12 +114,27 @@ class WooCommerceProductCreateFactory(WooCommerceProductSyncFactory, Woocommerce
     remote_product_content_class = WoocommerceProductContent
     remote_product_eancode_class = WoocommerceEanCode
 
+    def __init__(self, *args, is_variation_add: bool = False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.is_variation_add = is_variation_add
+
     def perform_non_subclassed_remote_action(self):
         """
         Creates a remote product in WooCommerce.
         """
         if self.is_woocommerce_variant_product:
-            resp = self.api.create_product_variation(self.remote_instance.remote_parent_product.remote_id, **self.payload)
+            resp = self.api.create_product_variation(
+                self.remote_instance.remote_parent_product.remote_id,
+                **self.payload,
+            )
+            if getattr(self, "is_variation_add", False):
+                parent_factory = WooCommerceProductUpdateFactory(
+                    sales_channel=self.sales_channel,
+                    local_instance=self.parent_local_instance,
+                    remote_instance=self.remote_instance.remote_parent_product,
+                    api=self.api,
+                )
+                parent_factory.run()
         else:
             resp = self.api.create_product(**self.payload)
 
