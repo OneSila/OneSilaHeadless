@@ -14,6 +14,8 @@ from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixi
 from sales_channels.integrations.woocommerce.models import WoocommerceProduct, \
     WoocommerceProductProperty, WoocommerceProductProperty, WoocommercePrice, \
     WoocommerceProductContent, WoocommerceEanCode, WoocommerceCurrency
+from sales_channels.models.products import RemoteProduct
+from sales_channels.models.sales_channels import SalesChannelViewAssign
 from .mixins import WooCommerceUpdateRemoteProductMixin, WoocommerceProductTypeMixin, \
     WooCommercePayloadMixin, SerialiserMixin, GetWoocommerceAPIMixin
 from .properties import WooCommerceProductPropertyCreateFactory, \
@@ -114,12 +116,27 @@ class WooCommerceProductCreateFactory(WooCommerceProductSyncFactory, Woocommerce
     remote_product_content_class = WoocommerceProductContent
     remote_product_eancode_class = WoocommerceEanCode
 
+    def __init__(self, *args, is_variation_add: bool = False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.is_variation_add = is_variation_add
+
     def perform_non_subclassed_remote_action(self):
         """
         Creates a remote product in WooCommerce.
         """
         if self.is_woocommerce_variant_product:
-            resp = self.api.create_product_variation(self.remote_instance.remote_parent_product.remote_id, **self.payload)
+            if getattr(self, "is_variation_add", False):
+                parent_factory = WooCommerceProductUpdateFactory(
+                    sales_channel=self.sales_channel,
+                    local_instance=self.parent_local_instance,
+                    remote_instance=self.remote_instance.remote_parent_product,
+                    api=self.api,
+                )
+                parent_factory.run()
+            resp = self.api.create_product_variation(
+                self.remote_instance.remote_parent_product.remote_id,
+                **self.payload,
+            )
         else:
             resp = self.api.create_product(**self.payload)
 
@@ -170,6 +187,52 @@ class WooCommerceProductVariationAddFactory(SerialiserMixin, GetWoocommerceAPIMi
     """
     remote_model_class = WoocommerceProduct
     create_factory_class = WooCommerceProductCreateFactory
+
+    def preflight_check(self):
+        """Extends the base check to ensure the parent product is updated when
+        a new variation is added."""
+        if self.skip_checks:
+            return True
+
+        # Check for SalesChannelViewAssign associated with the remote parent product
+        parent_assign_exists = SalesChannelViewAssign.objects.filter(
+            product=self.parent_product,
+            sales_channel=self.sales_channel,
+        ).exists()
+
+        if not parent_assign_exists:
+            return False
+
+        try:
+            self.remote_parent_product = RemoteProduct.objects.get(
+                local_instance=self.parent_product,
+                sales_channel=self.sales_channel,
+            )
+        except RemoteProduct.DoesNotExist:
+            return False
+
+        try:
+            self.remote_instance = RemoteProduct.objects.get(
+                local_instance=self.local_instance,
+                sales_channel=self.sales_channel,
+                remote_parent_product=self.remote_parent_product,
+            )
+        except RemoteProduct.DoesNotExist:
+            if self.create_if_not_exists:
+                factory = self.create_factory_class(
+                    sales_channel=self.sales_channel,
+                    local_instance=self.local_instance,
+                    parent_local_instance=self.parent_product,
+                    remote_parent_product=self.remote_parent_product,
+                    api=self.api,
+                    is_variation_add=True,
+                )
+                factory.run()
+                self.remote_instance = factory.remote_instance
+            else:
+                raise
+
+        return True
 
     def update_remote(self, *args, **kwargs):
         # Woocommerce doesnt need assinging a variation.
