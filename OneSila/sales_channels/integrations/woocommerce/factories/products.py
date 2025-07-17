@@ -21,7 +21,7 @@ from .properties import WooCommerceProductPropertyCreateFactory, \
 from .media import WooCommerceMediaProductThroughCreateFactory, \
     WooCommerceMediaProductThroughUpdateFactory, WooCommerceMediaProductThroughDeleteFactory
 from .ean import WooCommerceEanCodeUpdateFactory
-from ..exceptions import DuplicateError
+from ..exceptions import DuplicateError, FailedToDeleteError
 
 import logging
 logger = logging.getLogger(__name__)
@@ -154,10 +154,13 @@ class WooCommerceProductDeleteFactory(SerialiserMixin, GetWoocommerceAPIMixin, R
         """
         Deletes a remote product in WooCommerce.
         """
-        if self.remote_instance.is_variation:
-            return self.api.delete_product_variation(self.remote_instance.remote_id, self.remote_instance.remote_parent_product.remote_id)
-        else:
-            return self.api.delete_product(self.remote_instance.remote_id)
+        try:
+            if self.remote_instance.is_variation:
+                return self.api.delete_product_variation(self.remote_instance.remote_id, self.remote_instance.remote_parent_product.remote_id)
+            else:
+                return self.api.delete_product(self.remote_instance.remote_id)
+        except FailedToDeleteError:
+            pass
 
 
 class WooCommerceProductVariationAddFactory(SerialiserMixin, GetWoocommerceAPIMixin, RemoteProductVariationAddFactory):
@@ -179,4 +182,8 @@ class WooCommerceProductVariationDeleteFactory(SerialiserMixin, GetWoocommerceAP
     remote_model_class = WoocommerceProduct
 
     def delete_remote_instance_process(self, *args, **kwargs):
-        return self.api.delete_product_variation(self.remote_instance.remote_id, self.remote_instance.remote_parent_product.remote_id)
+        try:
+            return self.api.delete_product_variation(self.remote_instance.remote_id, self.remote_instance.remote_parent_product.remote_id)
+        except FailedToDeleteError:
+            # this never existed so we can just pass this
+            pass

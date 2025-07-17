@@ -614,22 +614,8 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
         self.payload['regular_price'] = price_info.get('price', None)
         self.payload['sale_price'] = price_info.get('discount_price', None)
 
-        product = self.get_local_product()
-        kwargs = {
-            'local_instance': product,
-            'sales_channel': self.sales_channel,
-            'multi_tenant_company': self.sales_channel.multi_tenant_company,
-        }
-        if self.is_woocommerce_variant_product:
-            kwargs['remote_parent_product'] = self.remote_product.remote_parent_product
-        else:
-            kwargs['remote_parent_product'] = None
-
-        logger.debug(f"Getting remote product with kwargs: {kwargs}")
-
-        remote_product = WoocommerceProduct.objects.get(**kwargs)
         WoocommercePrice.objects.get_or_create(
-            remote_product=remote_product,
+            remote_product=self.remote_product,
             sales_channel=self.sales_channel,
             multi_tenant_company=self.sales_channel.multi_tenant_company,
         )

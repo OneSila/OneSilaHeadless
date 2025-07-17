@@ -130,7 +130,7 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
         elif isinstance(sales_channel, MagentoSalesChannel):
             return f"{self.sales_channel_view.url}{self.product.url_key}.html"
         elif isinstance(sales_channel, WoocommerceSalesChannel):
-            return f"{self.sales_channel_view.url}/products/{self.product.url_key}.html"
+            return f"{self.sales_channel_view.url}/products/{self.product.url_key}"
 
         return f"{self.sales_channel_view.url}{self.product.url_key}.html"
 
