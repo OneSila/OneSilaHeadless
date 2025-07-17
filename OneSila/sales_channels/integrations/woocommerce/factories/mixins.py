@@ -546,13 +546,53 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
             self.currency_iso_code = self.currency.iso_code
 
     def apply_content_payload(self):
-        # FIXME: This approach ignores the sales-channel setting that variations
-        # should have the configurable name.  This needs fixing.
+        """Set name, description and short_description based on translations."""
+
         product = self.get_local_product()
-        translation = product.translations.get(language=self.sales_channel_assign_language)
-        self.payload['name'] = translation.name
-        self.payload['description'] = translation.description
-        self.payload['short_description'] = translation.short_description
+        lang = getattr(self, "language", None) or self.sales_channel_assign_language
+
+        channel_translation = product.translations.filter(
+            language=lang,
+            sales_channel=self.sales_channel,
+        ).first()
+
+        default_translation = product.translations.filter(
+            language=lang,
+            sales_channel=None,
+        ).first()
+
+        name = None
+        description = None
+        short_description = None
+
+        if channel_translation:
+            name = channel_translation.name or None
+            description = channel_translation.description
+            if description == "<p><br></p>":
+                description = ""
+            short_description = channel_translation.short_description
+
+        if not name and default_translation:
+            name = default_translation.name
+
+        if (not description) and default_translation:
+            description = default_translation.description
+            if description == "<p><br></p>":
+                description = ""
+
+        if (not short_description) and default_translation:
+            short_description = default_translation.short_description
+
+        if short_description == "<p><br></p>":
+            short_description = ""
+
+        if name is not None:
+            self.payload["name"] = name
+        if description is not None:
+            self.payload["description"] = description
+        if short_description is not None:
+            self.payload["short_description"] = short_description
+
         return self.payload
 
     def apply_ean_code_payload(self):
