@@ -1,5 +1,7 @@
 from functools import wraps
-from .exceptions import NoneValueNotAllowedError
+import time
+import requests
+from .exceptions import NoneValueNotAllowedError, InternalWoocomPostError
 
 
 def raise_for_none(arg_name):
@@ -44,3 +46,24 @@ def raise_for_none_response(func):
             raise NoneValueNotAllowedError(f"Response from {func.__name__} cannot be None")
         return response
     return wrapper
+
+
+def retry_request(max_retries=5, base_delay=1.0):
+    """Retry decorated function on request related errors."""
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except (requests.exceptions.RequestException, InternalWoocomPostError):
+                    if attempt == max_retries:
+                        raise
+                    delay = base_delay * (2 ** attempt)
+                    time.sleep(delay)
+                    continue
+
+        return wrapper
+
+    return decorator

@@ -14,7 +14,7 @@ from .exceptions import FailedToGetAttributesError, FailedToGetError, \
 from .constants import API_ATTRIBUTE_PREFIX
 from .helpers import convert_fields_to_int, clearout_none_values, convert_fields_to_string, \
     raise_for_required_fields
-from .decorators import raise_for_none, raise_for_none_response
+from .decorators import raise_for_none, raise_for_none_response, retry_request
 import urllib3
 import requests
 from copy import deepcopy
@@ -92,6 +92,7 @@ class WoocommerceApiWrapper:
 
         return data
 
+    @retry_request(max_retries=5, base_delay=1)
     @raise_for_none_response
     def get(self, endpoint, params=None, return_json=True):
         resp = self.woocom.get(endpoint, params=params)
@@ -119,6 +120,7 @@ class WoocommerceApiWrapper:
         except Exception as e:
             raise FailedToGetError(e, response=resp) from e
 
+    @retry_request(max_retries=5, base_delay=1)
     @raise_for_none_response
     def post(self, endpoint, data=None):
         logger.debug(f"POSTing to {endpoint} with data: {data}")
@@ -137,6 +139,7 @@ class WoocommerceApiWrapper:
             logger.error(f"Failed to post to {endpoint} with data: {data} , response: {resp.text} and error: {e}")
             raise FailedToPostError(e, response=resp) from e
 
+    @retry_request(max_retries=5, base_delay=1)
     @raise_for_none_response
     def put(self, endpoint, data=None):
         resp = self.woocom.put(endpoint, data=data)
@@ -146,6 +149,7 @@ class WoocommerceApiWrapper:
         except Exception as e:
             raise FailedToPutError(e, response=resp) from e
 
+    @retry_request(max_retries=5, base_delay=1)
     def delete(self, endpoint):
         # Why force?  https://docs.woocommerce.com/rest-api-reference/products/delete-a-product/
         # We want to bypass trash and permanently delete the instance.
