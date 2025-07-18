@@ -10,6 +10,7 @@ from properties.models import (
     ProductPropertiesRule, ProductPropertiesRuleItem,
 )
 from sales_channels.integrations.amazon.factories import AmazonProductSyncFactory
+from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
 from sales_channels.models.products import RemoteProductConfigurator
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
@@ -171,7 +172,7 @@ class AmazonProductPropertyTestSetupMixin:
         )
 
 
-class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupMixin):
+class AmazonProductPropertyFactoryTest(DisableWooCommerceSignalsMixin, TestCase, AmazonProductPropertyTestSetupMixin):
     def setUp(self):
         super().setUp()
         self.prepare_test()
@@ -261,7 +262,7 @@ class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupM
             fac.create_body()
 
 
-class AmazonProductPropertyFactoryWithoutListingOwnerTest(TestCase, AmazonProductPropertyTestSetupMixin):
+class AmazonProductPropertyFactoryWithoutListingOwnerTest(DisableWooCommerceSignalsMixin, TestCase, AmazonProductPropertyTestSetupMixin):
     def setUp(self):
         super().setUp()
         self.prepare_test()
@@ -305,7 +306,7 @@ class AmazonProductPropertyFactoryWithoutListingOwnerTest(TestCase, AmazonProduc
         self.assertEqual(json.loads(remote_instance.remote_value), {})
 
 
-class AmazonVariationThemeTest(TestCase, AmazonProductPropertyTestSetupMixin):
+class AmazonVariationThemeTest(DisableWooCommerceSignalsMixin, TestCase, AmazonProductPropertyTestSetupMixin):
     def setUp(self):
         super().setUp()
         self.prepare_test()

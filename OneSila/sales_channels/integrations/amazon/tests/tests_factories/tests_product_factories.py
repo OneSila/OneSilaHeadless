@@ -8,6 +8,7 @@ from core.tests import TestCase
 from core.tests import TransactionTestCase
 from sales_channels.integrations.amazon.factories import AmazonProductDeleteFactory, AmazonProductSyncFactory
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
+from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
 
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
@@ -154,7 +155,7 @@ class AmazonProductTestMixin:
             remote_product=self.remote_product,
         )
     
-        self.currency = Currency.objects.create(
+        self.currency, _ = Currency.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             is_default_currency=True,
             **currencies["GB"],
@@ -590,7 +591,7 @@ class AmazonProductTestMixin:
         return SimpleNamespace(attributes=attributes or {})
 
 
-class AmazonProductFactoriesTest(TransactionTestCase, AmazonProductTestMixin):
+class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonProductTestMixin):
     def setUp(self):
         super().setUp()
         self.setup_product()
@@ -1738,7 +1739,7 @@ class AmazonProductFactoriesTest(TransactionTestCase, AmazonProductTestMixin):
         self.assertEqual(body["attributes"].get("item_name"), [{"value": "New"}])
 
 
-class AmazonProductUpdateRequirementsTest(TransactionTestCase, AmazonProductTestMixin):
+class AmazonProductUpdateRequirementsTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonProductTestMixin):
     """Validate LISTING versus LISTING_OFFER_ONLY logic for product updates."""
 
     def setUp(self):
@@ -1834,7 +1835,7 @@ class AmazonProductUpdateRequirementsTest(TransactionTestCase, AmazonProductTest
         body = self._run_factory_and_get_body()
         self.assertEqual(body["requirements"], "LISTING")
 
-class AmazonConfigurableProductFlowTest(TransactionTestCase, AmazonProductTestMixin):
+class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonProductTestMixin):
     def setUp(self):
         super().setUp()
         self.setup_product()
