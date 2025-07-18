@@ -169,7 +169,7 @@ class AmazonProductPropertyTestSetupMixin:
             ),
         )
 
-class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupMixin, DisableWooCommerceSignalsMixin):
+class AmazonProductPropertyFactoryTest(DisableWooCommerceSignalsMixin, TestCase, AmazonProductPropertyTestSetupMixin):
     def setUp(self):
         super().setUp()
         self.prepare_test()
@@ -297,7 +297,7 @@ class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupM
             fac.create_body()
 
 
-class AmazonProductPropertyFactoryWithoutListingOwnerTest(TestCase, AmazonProductPropertyTestSetupMixin, DisableWooCommerceSignalsMixin):
+class AmazonProductPropertyFactoryWithoutListingOwnerTest(DisableWooCommerceSignalsMixin, TestCase, AmazonProductPropertyTestSetupMixin):
     def setUp(self):
         super().setUp()
         self.prepare_test()

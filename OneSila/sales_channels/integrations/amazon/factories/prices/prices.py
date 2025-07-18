@@ -19,6 +19,9 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
             skip_checks=skip_checks,
         )
 
+    def get_local_product(self):
+        return self.local_instance
+
     def update_remote(self):
         responses = []
 

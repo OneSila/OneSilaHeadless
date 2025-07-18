@@ -1,3 +1,5 @@
+import uuid
+
 from core.tests import TestCase
 from django.conf import settings
 
@@ -142,9 +144,10 @@ class WoocommerceApiWrapperTestCase(TestCase):
         """
         Test that create_attribute creates an delete an attribute successfully.
         """
-        result = self.api_wrapper.create_attribute('test-attribute', 'Test Attribute')
+        attribute_slug = f'test-attribute-{uuid.uuid4().hex[:6]}'
+        result = self.api_wrapper.create_attribute(attribute_slug, 'Test Attribute')
         self.assertIsInstance(result, dict)
-        self.assertEqual(result['slug'], 'test-attribute')
+        self.assertEqual(result['slug'], attribute_slug)
         self.assertEqual(result['name'], 'Test Attribute')
         self.assertEqual(result['type'], 'select')
 
@@ -156,7 +159,8 @@ class WoocommerceApiWrapperTestCase(TestCase):
         Test that create_attribute_term creates an delete an attribute term successfully.
         """
         # Create an attribute
-        attribute_result = self.api_wrapper.create_attribute('test-attribute-term-test', 'Test Attribute')
+        attribute_slug = f'test-attribute-term-{uuid.uuid4().hex[:6]}'
+        attribute_result = self.api_wrapper.create_attribute(attribute_slug, 'Test Attribute')
         # Create an attribute value
         result = self.api_wrapper.create_attribute_term(attribute_result['id'], 'Test Attribute Term')
         self.assertIsInstance(result, dict)
@@ -216,10 +220,11 @@ class WoocommerceApiWrapperTestCase(TestCase):
         result = self.api_wrapper.delete_product(result['id'])
 
     def test_create_product_and_add_img(self):
+        sku = f'TEST-PRODUCT-IMG-ADD-{uuid.uuid4().hex[:6]}'
         kwargs = {
             'name': 'Test test_create_product_and_add_img',
             'type': 'simple',
-            'sku': 'TEST-PRODUCT-IMG-ADD',
+            'sku': sku,
             'status': 'publish',
             'catalog_visibility': 'visible',
             'regular_price': '0.9',

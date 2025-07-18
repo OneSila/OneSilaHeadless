@@ -18,7 +18,7 @@ from sales_channels.integrations.amazon.models import AmazonPrice, AmazonCurrenc
 from sales_channels.integrations.amazon.factories.prices.prices import AmazonPriceUpdateFactory
 
 
-class AmazonPriceUpdateFactoryTest(TransactionTestCase, DisableWooCommerceSignalsMixin):
+class AmazonPriceUpdateFactoryTest(DisableWooCommerceSignalsMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = AmazonSalesChannel.objects.create(
