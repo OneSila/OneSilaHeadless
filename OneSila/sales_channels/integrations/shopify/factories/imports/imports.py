@@ -10,7 +10,8 @@ from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.properties import ImportPropertyInstance
 from products.models import Product
 from properties.models import Property
-from sales_channels.integrations.shopify.constants import MEDIA_FRAGMENT, DEFAULT_METAFIELD_NAMESPACE, SHOPIFY_TAGS
+from sales_channels.integrations.shopify.constants import MEDIA_FRAGMENT, DEFAULT_METAFIELD_NAMESPACE, SHOPIFY_TAGS, \
+    DEFAULT_PRODUCT_TYPE
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin
 from sales_channels.integrations.shopify.models import ShopifyProduct, ShopifyEanCode, ShopifyProductProperty, \
     ShopifyProductContent, ShopifyImageProductAssociation, ShopifyPrice
@@ -549,7 +550,7 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
         variations = []
         index_to_id_map = {}
         parent_name = product.get("title", "").strip()
-        product_type = product.get("productType")
+        product_type = product.get("productType", DEFAULT_PRODUCT_TYPE)
         variant_edges = product.get("variants", {}).get("edges", [])
 
         for idx, edge in enumerate(variant_edges):
@@ -609,6 +610,9 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
         }
 
         rule_product_type = product.get("productType") if parent_product_type is None else parent_product_type
+        if rule_product_type is None:
+            rule_product_type = DEFAULT_PRODUCT_TYPE
+
         if rule_product_type:
             structured_data["product_type"] = rule_product_type
 
