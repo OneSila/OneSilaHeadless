@@ -78,10 +78,10 @@ AMAZON_INTERNAL_PROPERTIES = [
     'swatch_product_image_locator', 'image_locator_ps01', 'image_locator_ps02',
     'image_locator_ps03', 'image_locator_ps04', 'image_locator_ps05', 'image_locator_ps06',
 
-    'item_name', 'recommended_browse_nodes', 'package_level', 'package_contains_sku', 'purchasable_offer',
+    'item_name', 'package_level', 'package_contains_sku', 'purchasable_offer',
     'condition_note', 'list_price', 'max_order_quantity', 'product_description', 'bullet_point',
     'child_parent_sku_relationship', 'variation_theme', 'master_pack_layers_per_pallet_quantity',
-    'master_packs_per_layer_quantity', 'is_oem_sourced_product', 'number_of_items', 'parentage_level',
+    'master_packs_per_layer_quantity', 'is_oem_sourced_product', 'parentage_level',
 
     # Auto-linking/ASIN suggestion
     'merchant_suggested_asin', 'externally_assigned_product_identifier',
@@ -94,5 +94,5 @@ AMAZON_INTERNAL_PROPERTIES = [
 
     # Fulfillment-specific (not PIM core)
     'fulfillment_availability', 'merchant_shipping_group', 'merchant_release_date',
-    'skip_offer', 'supplemental_condition_information', 'product_tax_code', 'uvp_list_price'
+    'skip_offer', 'supplemental_condition_information', 'uvp_list_price'
 ]

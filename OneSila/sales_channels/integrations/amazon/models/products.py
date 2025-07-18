@@ -35,6 +35,11 @@ class AmazonProduct(RemoteProduct):
         help_text="EAN code used when the product was first created.",
     )
 
+    product_owner = models.BooleanField(
+        default=False,
+        help_text="Indicates if this listing was created by us and we can manage listing level data.",
+    )
+
     @property
     def remote_type(self):
         return self.get_remote_rule().product_type_code

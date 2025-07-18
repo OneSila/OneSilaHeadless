@@ -102,6 +102,7 @@ from ...models.sales_channels import RemoteLanguage
 class FormattedIssueType:
     message: str | None
     severity: str | None
+    validation_issue: bool
 
 
 @type(SalesChannel, filters=SalesChannelFilter, order=SalesChannelOrder, pagination=True, fields='__all__')
@@ -314,6 +315,7 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
                     FormattedIssueType(
                         message=issue.get("message"),
                         severity=issue.get("severity"),
+                        validation_issue=issue.get("validation_issue", False),
                     )
                 )
 

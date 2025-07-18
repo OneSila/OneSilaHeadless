@@ -173,6 +173,7 @@ class AmazonDefaultUnitConfigurator(models.Model):
         unique_together = ("sales_channel", "marketplace", "code")
         verbose_name = "Default Unit Configurator"
         verbose_name_plural = "Default Unit Configurators"
+        search_terms = ['name', 'code']
 
     def __str__(self):
         return f"{self.code} @ {self.sales_channel}"

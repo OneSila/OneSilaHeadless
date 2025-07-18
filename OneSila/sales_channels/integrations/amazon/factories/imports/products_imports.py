@@ -1,3 +1,4 @@
+import pprint
 from decimal import Decimal
 
 from django.db import IntegrityError
@@ -7,10 +8,12 @@ from imports_exports.factories.products import ImportProductInstance
 from products.product_types import SIMPLE
 from properties.models import Property, PropertyTranslation
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
+from sales_channels.integrations.amazon.decorators import throttle_safe
+from spapi import CatalogApi
 from sales_channels.integrations.amazon.helpers import (
     infer_product_type,
     extract_description_and_bullets,
-    get_is_product_variation,
+    get_is_product_variation, extract_amazon_attribute_value,
 )
 from sales_channels.integrations.amazon.models import (
     AmazonProduct,
@@ -26,7 +29,10 @@ from sales_channels.integrations.amazon.models import (
 )
 
 from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
+from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
 from sales_channels.models import SalesChannelViewAssign
+from dateutil.parser import parse
+import datetime
 
 
 class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
@@ -152,45 +158,117 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 index += 1
         return images
 
-    def _parse_attributes(self, product, marketplace):
+    def _parse_attributes(self, attributes, product_type, marketplace):
         attrs = []
         mirror_map = {}
-        product_attrs = product.attributes or {}
+        product_attrs = attributes or {}
+
         for code, values in product_attrs.items():
 
             if code in AMAZON_INTERNAL_PROPERTIES:
                 continue
 
-            remote_property = AmazonProperty.objects.filter(sales_channel=self.sales_channel, code=code).first()
-            if not remote_property or not remote_property.local_instance:
+            definition = AmazonPublicDefinition.objects.filter(
+                code=code,
+                api_region_code=marketplace.api_region_code,
+                product_type_code=product_type).first()
+
+            if definition is None:
                 continue
 
-            val_entry = values[0]
-            value = val_entry.get("value") or val_entry.get("name")
-            if remote_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
-                select_value = AmazonPropertySelectValue.objects.filter(
-                    amazon_property=remote_property,
-                    remote_value=value,
-                    marketplace=marketplace
-                ).first()
+            if definition.export_definition:
+                for value in definition.export_definition:
+                    real_code = value.get("code")
+                    remote_property = AmazonProperty.objects.filter(sales_channel=self.sales_channel, code=real_code).first()
 
-                if select_value and select_value.local_instance:
-                    attrs.append({
-                        "property": remote_property.local_instance,
-                        "value": select_value.local_instance.id,
-                        "value_is_id": True,
-                    })
+                    if not remote_property or not remote_property.local_instance:
+                        continue
+
+                    value = extract_amazon_attribute_value({code: values[0]}, real_code)
+                    if remote_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
+                        select_value = AmazonPropertySelectValue.objects.filter(
+                            amazon_property=remote_property,
+                            remote_value=value,
+                            marketplace=marketplace
+                        ).first()
+
+                        if select_value is None and remote_property.allows_unmapped_values:
+                            new_remote_select_value, _ = AmazonPropertySelectValue.objects.get_or_create(
+                                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                                sales_channel=self.sales_channel,
+                                marketplace=marketplace,
+                                amazon_property=remote_property,
+                                remote_value=value,
+                            )
+
+                            new_remote_select_value.remote_name = value
+                            new_remote_select_value.save()
+
+                        if select_value and select_value.local_instance:
+                            attrs.append({
+                                "property": remote_property.local_instance,
+                                "value": select_value.local_instance.id,
+                                "value_is_id": True,
+                            })
+                            mirror_map[remote_property.local_instance.id] = {
+                                "remote_property": remote_property,
+                                "remote_value": value,
+                            }
+
+                        continue
+
+                    elif remote_property.type == Property.TYPES.DATE:
+
+                        try:
+                            parsed = parse(value).date()
+                            value = parsed.strftime('%Y-%m-%d')
+                        except Exception:
+                            pass
+
+                    elif remote_property.type == Property.TYPES.DATETIME:
+                        try:
+                            parsed = parse(value)
+                            value = parsed.strftime('%Y-%m-%d %H:%M:%S')
+                        except Exception:
+                            pass
+
+                    attrs.append({"property": remote_property.local_instance, "value": value})
                     mirror_map[remote_property.local_instance.id] = {
                         "remote_property": remote_property,
                         "remote_value": value,
                     }
-                continue
-            attrs.append({"property": remote_property.local_instance, "value": value})
-            mirror_map[remote_property.local_instance.id] = {
-                "remote_property": remote_property,
-                "remote_value": value,
-            }
+
         return attrs, mirror_map
+
+    @throttle_safe(max_retries=5, base_delay=1)
+    def _fetch_catalog_attributes(self, asin, view):
+        """Fetch additional catalog attributes for a product."""
+        if not asin or not view:
+            return {}
+
+        catalog_api = CatalogApi(self._get_client())
+        try:
+            response = catalog_api.get_catalog_item(
+                asin,
+                [view.remote_id],
+                included_data=["attributes"],
+            )
+        except Exception:
+            return {}
+
+        if isinstance(response, dict):
+            return response.get("attributes", {})
+
+        if hasattr(response, "attributes"):
+            return response.attributes or {}
+
+        if hasattr(response, "payload"):
+            payload = getattr(response, "payload", None)
+            if isinstance(payload, dict):
+                return payload.get("attributes", {})
+            return getattr(payload, "attributes", {}) or {}
+
+        return {}
 
     def _parse_configurator_select_values(self, product):
         configurator_values = []
@@ -251,7 +329,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         name = summary.item_name
 
         # it seems that sometimes the name can be None coming from Amazon. IN that case we fallback to sku
-        if name == None:
+        if name is None:
             name = sku
 
         view = AmazonSalesChannelView.objects.filter(
@@ -272,8 +350,30 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         if type == SIMPLE:
             structured["prices"] = self._parse_prices(product_data)
 
-        attributes, mirror_map = self._parse_attributes(product_data, view)
+        product_type_code = summary.product_type
+        product_attrs = product_data.attributes or {}
+        attributes, mirror_map = self._parse_attributes(
+            product_attrs, product_type_code, view
+        )
 
+        catalog_attrs = self._fetch_catalog_attributes(asin, view)
+        if catalog_attrs:
+            extra_attrs, extra_map = self._parse_attributes(
+                catalog_attrs,
+                product_type_code,
+                view,
+            )
+            existing_ids = {
+                getattr(a.get("property"), "id", None) for a in attributes
+            }
+            for attr in extra_attrs:
+                prop_id = getattr(attr.get("property"), "id", None)
+                if prop_id not in existing_ids:
+                    attributes.append(attr)
+                    existing_ids.add(prop_id)
+            for k, v in extra_map.items():
+                if k not in mirror_map:
+                    mirror_map[k] = v
         asin_property = Property.objects.filter(
             internal_name="merchant_suggested_asin",
             multi_tenant_company=self.sales_channel.multi_tenant_company,
@@ -294,7 +394,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             structured["properties"] = attributes
             structured["__mirror_product_properties_map"] = mirror_map
 
-        structured["translations"] = self._parse_translations(name, language, attributes)
+        structured["translations"] = self._parse_translations(name, language, product_data.attributes)
         configurator_values, amazon_theme = self._parse_configurator_select_values(product_data)
         if configurator_values:
             structured["configurator_select_values"] = configurator_values
@@ -314,7 +414,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             mirror_model_defaults={"asin": instance.data.get("__asin")},
         )
 
-    def update_remote_product(self, import_instance: ImportProductInstance, product, is_variation: bool):
+    def update_remote_product(self, import_instance: ImportProductInstance, product, view, is_variation: bool):
         remote_product = import_instance.remote_instance
         asin = import_instance.data.get("__asin")
 
@@ -330,6 +430,9 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         if remote_product.is_variation != is_variation:
             remote_product.is_variation = is_variation
+
+        if view.remote_id not in (remote_product.created_marketplaces or []):
+            remote_product.created_marketplaces.append(view.remote_id)
 
         remote_product.save()
 
@@ -512,9 +615,13 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 },
             )
             instance.language = language
+
+            print('---------------------------------------')
+            pprint.pprint(structured)
+
             instance.process()
 
-            self.update_remote_product(instance, product, is_variation)
+            self.update_remote_product(instance, product, view, is_variation)
             self.handle_ean_code(instance)
             self.handle_attributes(instance)
             self.handle_translations(instance)
