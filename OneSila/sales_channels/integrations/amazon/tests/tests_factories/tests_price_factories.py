@@ -6,6 +6,7 @@ from currencies.models import Currency
 from currencies.currencies import currencies
 from properties.models import Property, PropertySelectValue, PropertySelectValueTranslation, ProductPropertiesRule, \
     ProductProperty
+from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
 from sales_prices.models import SalesPrice
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
@@ -17,7 +18,7 @@ from sales_channels.integrations.amazon.models import AmazonPrice, AmazonCurrenc
 from sales_channels.integrations.amazon.factories.prices.prices import AmazonPriceUpdateFactory
 
 
-class AmazonPriceUpdateFactoryTest(TransactionTestCase):
+class AmazonPriceUpdateFactoryTest(TransactionTestCase, DisableWooCommerceSignalsMixin):
     def setUp(self):
         super().setUp()
         self.sales_channel = AmazonSalesChannel.objects.create(
@@ -31,7 +32,7 @@ class AmazonPriceUpdateFactoryTest(TransactionTestCase):
             api_region_code="EU_UK",
             remote_id="GB",
         )
-        self.currency = Currency.objects.create(
+        self.currency, _ = Currency.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             is_default_currency=True,
             **currencies["GB"],

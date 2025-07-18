@@ -13,6 +13,7 @@ from properties.models import (
     ProductProperty,
     ProductPropertiesRule,
 )
+from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonSalesChannel,
@@ -27,7 +28,7 @@ from sales_channels.integrations.amazon.models.properties import AmazonProductTy
 from sales_channels.integrations.amazon.factories.products import AmazonProductContentUpdateFactory
 
 
-class AmazonProductContentUpdateFactoryTest(TestCase):
+class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = AmazonSalesChannel.objects.create(

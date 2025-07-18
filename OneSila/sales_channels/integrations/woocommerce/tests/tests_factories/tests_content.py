@@ -5,7 +5,7 @@ from sales_channels.integrations.woocommerce.factories.products import (
 )
 from sales_channels.integrations.woocommerce.exceptions import FailedToGetProductBySkuError
 from sales_channels.integrations.woocommerce.factories.content import WoocommerceProductContentUpdateFactory
-
+import uuid
 
 import logging
 
@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 class WooCommerceContentUpdateFactoryTest(WooCommerceProductFactoryTestMixin):
     def test_woocommerce_content_update(self):
-        sku = 'test_content_update'
+        sku = f"test_content_update_{uuid.uuid4().hex[:6]}"
+
         try:
             self.api.delete_product_by_sku(sku)
         except FailedToGetProductBySkuError:

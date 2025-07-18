@@ -8,6 +8,7 @@ from core.tests import TestCase
 from core.tests import TransactionTestCase
 from sales_channels.integrations.amazon.factories import AmazonProductDeleteFactory, AmazonProductSyncFactory
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
+from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
 
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
@@ -53,7 +54,7 @@ from sales_channels.integrations.amazon.factories.products.images import (
 )
 
 
-class AmazonProductFactoriesTest(TransactionTestCase):
+class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = AmazonSalesChannel.objects.create(
@@ -150,7 +151,7 @@ class AmazonProductFactoriesTest(TransactionTestCase):
         )
 
         # currency and price
-        self.currency = Currency.objects.create(
+        self.currency, _ = Currency.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             is_default_currency=True,
             **currencies["GB"],

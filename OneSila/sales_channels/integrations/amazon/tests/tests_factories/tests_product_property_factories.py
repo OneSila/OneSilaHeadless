@@ -9,6 +9,7 @@ from properties.models import (
     ProductProperty,
     ProductPropertiesRule,
 )
+from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonSalesChannel,
@@ -168,7 +169,7 @@ class AmazonProductPropertyTestSetupMixin:
             ),
         )
 
-class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupMixin):
+class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupMixin, DisableWooCommerceSignalsMixin):
     def setUp(self):
         super().setUp()
         self.prepare_test()
@@ -296,7 +297,7 @@ class AmazonProductPropertyFactoryTest(TestCase, AmazonProductPropertyTestSetupM
             fac.create_body()
 
 
-class AmazonProductPropertyFactoryWithoutListingOwnerTest(TestCase, AmazonProductPropertyTestSetupMixin):
+class AmazonProductPropertyFactoryWithoutListingOwnerTest(TestCase, AmazonProductPropertyTestSetupMixin, DisableWooCommerceSignalsMixin):
     def setUp(self):
         super().setUp()
         self.prepare_test()

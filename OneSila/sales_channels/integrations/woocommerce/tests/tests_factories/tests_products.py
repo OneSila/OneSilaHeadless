@@ -1,3 +1,4 @@
+from eancodes.models import EanCode
 from .mixins import TestCaseWoocommerceMixin
 from django.conf import settings
 from django.db import transaction
@@ -216,6 +217,9 @@ class WooCommerceProductFactoryTest(TestCaseDemoDataMixin, WooCommerceProductFac
             multi_tenant_company=self.multi_tenant_company,
             sku=sku,
         )
+        ean_obj = EanCode.objects.get(product=product)
+        ean_obj.ean_code = '3421312321321'
+        ean_obj.save()
         self.assign_product_to_sales_channel(product)
 
         # Find product-type properties for this product
