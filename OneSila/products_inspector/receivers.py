@@ -56,6 +56,12 @@ def products_inspector__inspector__trigger_block_has_images(sender, instance, **
     inspector_block_refresh.send(sender=instance.product.inspector.__class__, instance=instance.product.inspector, error_code=HAS_IMAGES_ERROR, run_async=False)
 
 
+@receiver(post_create, sender='sales_channels.SalesChannelViewAssign')
+@receiver(post_delete, sender='sales_channels.SalesChannelViewAssign')
+def products_inspector__inspector__trigger_block_has_images_assign(sender, instance, **kwargs):
+    inspector_block_refresh.send(sender=instance.product.inspector.__class__, instance=instance.product.inspector, error_code=HAS_IMAGES_ERROR, run_async=False)
+
+
 # MISSING_PRICES_ERROR ----------------------------------------------------------
 
 @receiver(post_update, sender='products.Product')
