@@ -7,6 +7,9 @@ from eancodes.models import EanCode
 from eancodes.signals import ean_code_released_for_product
 from inventory.models import Inventory, InventoryLocation
 from products.models import ConfigurableProduct, SimpleProduct, BundleVariation, BundleProduct, ConfigurableVariation
+from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel, WoocommerceSalesChannelView
+from sales_channels.models import SalesChannelViewAssign
+from unittest.mock import patch
 from media.models import MediaProductThrough, Media
 from products_inspector.constants import *
 from products_inspector.models import Inspector
@@ -50,6 +53,58 @@ class InspectorBlockHasImageTestCase(TestCase):
         inspector_block.refresh_from_db()
 
         # Step 5: Recheck the inspector's has_missing_information - it should now be False
+        self.assertTrue(inspector_block.successfully_checked)
+
+    def test_simple_product_assignment_requires_images(self):
+        product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company
+        )
+
+        inspector_block = product.inspector.blocks.get(error_code=HAS_IMAGES_ERROR)
+        self.assertTrue(inspector_block.successfully_checked)
+
+        with patch('sales_channels.integrations.woocommerce.models.WoocommerceSalesChannel.connect', lambda self: None):
+            sales_channel = WoocommerceSalesChannel.objects.create(
+                hostname='https://example.com',
+                api_key='k',
+                api_secret='s',
+                api_version=WoocommerceSalesChannel.API_VERSION_3,
+                timeout=5,
+                active=False,
+                multi_tenant_company=self.multi_tenant_company,
+            )
+            view = WoocommerceSalesChannelView.objects.create(
+                sales_channel=sales_channel,
+                multi_tenant_company=self.multi_tenant_company,
+                name='Main',
+                url='https://example.com'
+            )
+            SalesChannelViewAssign.objects.create(
+                product=product,
+                sales_channel=sales_channel,
+                sales_channel_view=view,
+                multi_tenant_company=self.multi_tenant_company,
+            )
+
+        inspector_block.refresh_from_db()
+        self.assertFalse(inspector_block.successfully_checked)
+
+        image = SimpleUploadedFile('img.jpg', b'img', content_type='image/jpeg')
+        media = Media.objects.create(
+            type=Media.IMAGE,
+            image=image,
+            owner=self.user
+        )
+
+        MediaProductThrough.objects.create(
+            product=product,
+            media=media,
+            sort_order=1,
+            is_main_image=True,
+            multi_tenant_company=self.multi_tenant_company
+        )
+
+        inspector_block.refresh_from_db()
         self.assertTrue(inspector_block.successfully_checked)
 
 
