@@ -98,6 +98,7 @@ class Property(TranslatedModelMixin, models.Model):
             ),
             models.UniqueConstraint(
                 fields=['multi_tenant_company', 'internal_name'],
+                condition=Q(internal_name__isnull=False),
                 name='unique_internal_name_per_company',
                 violation_error_message=_("This internal name already exists for this company.")
             ),
