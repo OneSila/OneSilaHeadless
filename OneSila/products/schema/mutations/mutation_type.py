@@ -88,7 +88,7 @@ class ProductsMutation:
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def duplicate_product(self, info: Info, product: ProductPartialInput, sku: str | None = None) -> ProductType:
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        instance = product.pk
+        instance =  Product.objects.get(id=product.id.node_id)
         if instance.multi_tenant_company != multi_tenant_company:
             raise PermissionError("Invalid company")
         duplicated = Product.objects.duplicate_product(instance, sku=sku)

@@ -93,6 +93,7 @@ class ProductQuerySet(MultiTenantQuerySet):
                 )
                 for bp in trans.bullet_points.all():
                     ProductTranslationBulletPoint.objects.create(
+                        multi_tenant_company=multi_tenant_company,
                         product_translation=new_trans,
                         text=bp.text,
                         sort_order=bp.sort_order,

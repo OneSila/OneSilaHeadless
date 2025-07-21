@@ -6,7 +6,7 @@ from products.models import SimpleProduct, ProductTranslation
 
 
 DUPLICATE_PRODUCT_MUTATION = """
-    mutation($product: GlobalID!, $sku: String) {
+    mutation($product: ProductPartialInput!, $sku: String) {
       duplicateProduct(product: $product, sku: $sku) {
         id
         sku
@@ -29,7 +29,7 @@ class DuplicateProductMutationTestCase(TransactionTestCaseMixin, TransactionTest
     def test_duplicate_product_mutation(self):
         resp = self.strawberry_test_client(
             query=DUPLICATE_PRODUCT_MUTATION,
-            variables={"product": self.to_global_id(self.product), "sku": None},
+            variables={"product": {"id": self.to_global_id(self.product)}, "sku": None},
         )
 
         self.assertIsNone(resp.errors)
@@ -39,7 +39,7 @@ class DuplicateProductMutationTestCase(TransactionTestCaseMixin, TransactionTest
     def test_duplicate_product_mutation_existing_sku(self):
         resp = self.strawberry_test_client(
             query=DUPLICATE_PRODUCT_MUTATION,
-            variables={"product": self.to_global_id(self.product), "sku": self.product.sku},
+            variables={"product": {"id": self.to_global_id(self.product)}, "sku": self.product.sku},
             asserts_errors=False,
         )
 
