@@ -205,6 +205,12 @@ class DescriptionGenLLM(ContentLLMMixin):
             ##Product Short Description##
             {self.short_description}
             """
+
+        if self.brand_prompt:
+            prompt += f"""
+            ##Brand Personality##
+            {self.brand_prompt}
+            """
         return prompt
 
 
@@ -387,6 +393,11 @@ class BulletPointsLLM(ContentLLMMixin):
             prompt += f"""
             ##Product Short Description##
             {self.short_description}
+            """
+        if self.brand_prompt:
+            prompt += f"""
+            ##Brand Personality##
+            {self.brand_prompt}
             """
         return prompt
 

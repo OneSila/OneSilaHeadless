@@ -205,6 +205,7 @@ class ContentLLMMixin(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
         self.multi_tenant_company = product.multi_tenant_company
         self.language_code = language_code
         self.sales_channel_type = sales_channel_type
+        self.brand_prompt = None
 
     def _set_translation(self):
         self.translation = ProductTranslation.objects.filter(
@@ -272,6 +273,32 @@ class ContentLLMMixin(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
         else:
             self.property_values = get_product_properties_dict(self.product)
 
+    def _set_brand_prompt(self):
+        from properties.models import ProductProperty
+        from llm.models import BrandCustomPrompt
+
+        brand_prop = ProductProperty.objects.filter(
+            product=self.product,
+            property__internal_name='brand'
+        ).select_related('value_select').first()
+
+        self.brand_prompt = None
+        if brand_prop and brand_prop.value_select:
+            brand_value = brand_prop.value_select
+            custom = BrandCustomPrompt.objects.filter(
+                brand_value=brand_value,
+                language=self.language_code,
+                multi_tenant_company=self.multi_tenant_company,
+            ).first()
+            if not custom:
+                custom = BrandCustomPrompt.objects.filter(
+                    brand_value=brand_value,
+                    language__isnull=True,
+                    multi_tenant_company=self.multi_tenant_company,
+                ).first()
+            if custom:
+                self.brand_prompt = custom.prompt
+
     @property
     def system_prompt(self):
         raise Exception("System prompt not configured.")
@@ -297,6 +324,7 @@ class ContentLLMMixin(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
         self._set_is_configurable()
         self._set_product_rule()
         self._set_property_values()
+        self._set_brand_prompt()
         self._set_images()
         self._set_documents()
 

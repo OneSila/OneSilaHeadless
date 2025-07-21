@@ -1,4 +1,5 @@
 from core import models
+from django.core.exceptions import ValidationError
 
 
 class AbstractAiProcess(models.Model):
@@ -48,3 +49,17 @@ class AiImportProcess(AbstractAiProcess):
 
     def __str__(self):
         return f"Import Process ({self.get_type_display()}) - Cost: {self.cost}"
+
+
+class BrandCustomPrompt(models.Model):
+    brand_value = models.ForeignKey('properties.PropertySelectValue', on_delete=models.CASCADE)
+    language = models.CharField(max_length=10, null=True, blank=True)
+    prompt = models.TextField()
+
+    def save(self, *args, **kwargs):
+        if self.brand_value.property.internal_name != 'brand':
+            raise ValidationError("Brand value must belong to property with internal_name 'brand'")
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.brand_value.value} - {self.language or 'any'}"
