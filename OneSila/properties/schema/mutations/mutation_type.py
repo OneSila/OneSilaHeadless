@@ -67,7 +67,7 @@ class PropertiesMutation:
     delete_product_properties_rule_item: ProductPropertiesRuleItemType = delete()
     delete_product_properties_rule_items: List[ProductPropertiesRuleItemType] = delete()
 
-    @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def check_property_for_duplicates(self, name: str, info: Info) -> PropertyDuplicatesType:
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
         duplicates = Property.objects.check_for_duplicates(name, multi_tenant_company)
