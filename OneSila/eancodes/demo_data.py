@@ -4,7 +4,7 @@ from django.db.models import Q
 from core.models import DemoDataRelation
 from eancodes.models import EanCode
 from products.models import Product
-from products.product_types import SIMPLE, BUNDLE
+from products.product_types import SIMPLE, ALIAS, BUNDLE
 
 registry = DemoDataLibrary()
 
@@ -14,15 +14,18 @@ def generate_demo_eancodes(multi_tenant_company):
     from eancodes.flows import GenerateEancodesFlow
     f = GenerateEancodesFlow(multi_tenant_company=multi_tenant_company, prefix='99999999991')
     f.flow()
+    # FIXME this should be filtered on the actual product-type.
+    # not "any" relation.  Much is registered in the demo-data.
+    demo_data_relations = DemoDataRelation.objects.\
+        filter(multi_tenant_company=multi_tenant_company).\
+        values_list('object_id', flat=True)
 
     for instance in f.ean_codes:
-
         product = Product.objects.filter(
-            type=SIMPLE,
+            type__in=[SIMPLE, ALIAS, BUNDLE],
             multi_tenant_company=multi_tenant_company,
             eancode__isnull=True,
-            id__in=DemoDataRelation.objects.filter(multi_tenant_company=multi_tenant_company)
-                                           .values_list('object_id', flat=True)  # Ensures product is demo data
+            id__in=demo_data_relations
         ).first()
 
         # we don't want to have ean codes that we can still assign to make the onboarding work

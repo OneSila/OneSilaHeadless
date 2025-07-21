@@ -6,6 +6,10 @@ from imports_exports.models import Import, ImportReport
 from notifications.factories.email import SendImportReportEmailFactory
 import traceback
 import math
+from core.decorators import timeit_and_log
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class ImportMixin:
@@ -272,6 +276,7 @@ class ImportMixin:
                 fac = SendImportReportEmailFactory(email=email, language=language, context=context)
                 fac.run()
 
+    @timeit_and_log(logger, "importing products")
     def run(self):
         self.prepare_import_process()
         self.calculate_percentage()

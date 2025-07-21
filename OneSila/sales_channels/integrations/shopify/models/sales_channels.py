@@ -44,7 +44,6 @@ class ShopifySalesChannel(SalesChannel):
         help_text="The product property that maps to Shopify vendor (brand)."
     )
 
-
     # for when is_external_install is True
     hmac = models.CharField(
         max_length=512,

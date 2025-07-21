@@ -9,6 +9,7 @@ from sales_channels.factories.products.products import (
     RemoteProductUpdateFactory,
     RemoteProductDeleteFactory,
 )
+from sales_channels.integrations.amazon.exceptions import AmazonUnsupportedPropertyForProductType
 from sales_channels.integrations.amazon.factories.mixins import (
     GetAmazonAPIMixin,
 )
@@ -73,13 +74,16 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     delete_product_factory = property(get_delete_product_factory)
 
     def __init__(self, *args, view=None, **kwargs):
+
         if view is None:
             raise ValueError("AmazonProduct factories require a view argument")
+
         self.view = view
         super().__init__(*args, **kwargs)
         self.attributes: Dict = {}
         self.image_attributes: Dict = {}
         self.prices_data = {}
+        self.force_listing_requirements = False
 
     # ------------------------------------------------------------
     # Preflight & initialization helpers
@@ -95,6 +99,8 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     def initialize_remote_product(self):
 
         super().initialize_remote_product()
+        if getattr(self, "remote_instance", None):
+            self.force_listing_requirements = getattr(self.remote_instance, "product_owner", False)
         if not hasattr(self, 'current_attrs'):
             self.get_saleschannel_remote_object(self.local_instance.sku)
 
@@ -125,6 +131,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         asin = self._get_asin()
         if asin:
             attrs["merchant_suggested_asin"] = [{"value": asin}]
+            self.force_listing_requirements = False
         else:
             ean = self._get_ean_for_payload()
             if ean:
@@ -134,6 +141,9 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                         "value": ean,
                     }
                 ]
+                self.force_listing_requirements = True
+            else:
+                self.force_listing_requirements = False
         return attrs
 
     def build_content_attributes(self) -> Dict:
@@ -225,66 +235,12 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 }
             )
 
-            if self.sales_channel.listing_owner:
+            if self.sales_channel.listing_owner or getattr(self.remote_instance, "product_owner", False) or self.force_listing_requirements:
+                # @TODO: This can be value_with_tax depending on marketplace use the public definition to get the value
                 attrs.setdefault("list_price", []).append(
                     {"currency": iso, "value": float(list_price)}
                 )
         return attrs
-
-    # ------------------------------------------------------------
-    # Property handling
-    # ------------------------------------------------------------
-    def process_single_property(self, product_property):
-        try:
-            remote_property = self.remote_product_property_class.objects.get(
-                local_instance=product_property,
-                remote_product=self.remote_instance,
-                sales_channel=self.sales_channel,
-            )
-
-            fac = AmazonProductPropertyUpdateFactory(
-                sales_channel=self.sales_channel,
-                local_instance=product_property,
-                remote_product=self.remote_instance,
-                remote_instance=remote_property,
-                view=self.view,
-                api=self.api,
-                get_value_only=True,
-                skip_checks=True,
-            )
-            fac.run()
-
-            if remote_property.needs_update(fac.remote_value):
-                remote_property.remote_value = fac.remote_value
-                remote_property.save()
-
-            self.remote_product_properties.append(remote_property)
-            data = json.loads(fac.remote_value or "{}")
-            self.attributes.update(data)
-            return remote_property.id
-
-        except self.remote_product_property_class.DoesNotExist:
-            create_fac = AmazonProductPropertyCreateFactory(
-                sales_channel=self.sales_channel,
-                local_instance=product_property,
-                remote_product=self.remote_instance,
-                view=self.view,
-                api=self.api,
-                get_value_only=True,
-                skip_checks=True,
-            )
-            create_fac.run()
-
-
-            remote_id = None
-            # not mapped values will be skipped instead giving error because it didn't pass the preflight check
-            if hasattr(create_fac, "remote_instance"):
-                self.remote_product_properties.append(create_fac.remote_instance)
-                data = json.loads(create_fac.remote_value or "{}")
-                self.attributes.update(data)
-                remote_id = create_fac.remote_instance.id
-
-            return remote_id
 
     def set_rule(self):
         super().set_rule()
@@ -377,7 +333,12 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         if self.create_product_factory is None:
             raise ValueError("create_product_factory must be specified in the RemoteProductSyncFactory.")
 
-        fac = self.create_product_factory(self.sales_channel, self.local_instance, api=self.api, view=self.view)
+        fac = self.create_product_factory(sales_channel=self.sales_channel,
+                                          local_instance=self.local_instance,
+                                          api=self.api,
+                                          view=self.view,
+                                          parent_local_instance=self.parent_local_instance,
+                                          remote_parent_product=self.remote_parent_product)
         fac.run()
         self.remote_instance = fac.remote_instance
 
@@ -403,13 +364,212 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     def assign_ean_code(self):
         pass  # there is no ean code sync for Amazon. This is used as an identifier and cannot be updated later on
 
+    def get_variation_sku(self):
+        return f"{self.local_instance.sku}"
+
+    def add_variation_to_parent(self):
+        pass
+
     def set_product_properties(self):
         rule_properties_ids = self.local_instance.get_required_and_optional_properties(product_rule=self.rule).values_list('property_id', flat=True)
-        self.product_properties =  ProductProperty.objects.filter_multi_tenant(
-                self.sales_channel.multi_tenant_company
-            ).filter(product=self.local_instance, property_id__in=rule_properties_ids). \
+        self.product_properties = ProductProperty.objects.filter_multi_tenant(
+            self.sales_channel.multi_tenant_company
+        ).filter(product=self.local_instance, property_id__in=rule_properties_ids). \
             exclude(property__internal_name='merchant_suggested_asin')
 
+    # ------------------------------------------------------------
+    # Property handling
+    # ------------------------------------------------------------
+    def process_amazon_single_property(self, product_property, remote_property):
+
+        try:
+            remote_product_property = self.remote_product_property_class.objects.get(
+                local_instance=product_property,
+                remote_product=self.remote_instance,
+                sales_channel=self.sales_channel,
+            )
+
+            fac = AmazonProductPropertyUpdateFactory(
+                sales_channel=self.sales_channel,
+                local_instance=product_property,
+                remote_product=self.remote_instance,
+                remote_instance=remote_product_property,
+                view=self.view,
+                remote_property=remote_property,
+                api=self.api,
+                get_value_only=True,
+                skip_checks=True,
+            )
+            fac.run()
+
+            if remote_product_property.needs_update(fac.remote_value):
+                remote_product_property.remote_value = fac.remote_value
+                remote_product_property.save()
+
+            self.remote_product_properties.append(remote_product_property)
+            data = json.loads(fac.remote_value or "{}")
+            self.attributes.update(data)
+            return remote_product_property.id
+
+        except self.remote_product_property_class.DoesNotExist:
+            create_fac = AmazonProductPropertyCreateFactory(
+                sales_channel=self.sales_channel,
+                local_instance=product_property,
+                remote_product=self.remote_instance,
+                view=self.view,
+                remote_property=remote_property,
+                api=self.api,
+                get_value_only=True,
+                skip_checks=True,
+            )
+            create_fac.run()
+
+            if hasattr(create_fac, "remote_instance"):
+                self.remote_product_properties.append(create_fac.remote_instance)
+                data = json.loads(create_fac.remote_value or "{}")
+                self.attributes.update(data)
+
+    def process_product_properties(self):
+        # We override process_product_properties because:
+        # 1. We will not do delete_non_existing_remote_product_property. They will be deleted because are not added to
+        # the payload
+        # 2. We use process_amazon_single_property that loop through all the remote proprties and call them for that
+        # remote property. The reason? In Amazon "size" can be mapped to over 30 amazon properties (ring size, t-shirt size etc)
+
+        for product_property in self.product_properties:
+
+            for remote_property in AmazonProperty.objects.filter(sales_channel=self.sales_channel, local_instance=product_property.property):
+                try:
+                    self.process_amazon_single_property(product_property, remote_property)
+                except AmazonUnsupportedPropertyForProductType:
+                    # because we are getting all the properties we might get properties that are not designed for this
+                    # product type. We will just skip those
+                    pass
+
+    def _match_amazon_variation_theme(self, configurator):
+        themes = self.remote_rule.variation_themes or []
+        if not themes:
+            return None
+
+        prop_ids = configurator.properties.values_list("id", flat=True)
+        codes = list(
+            AmazonProperty.objects.filter(
+                sales_channel=self.sales_channel,
+                local_instance_id__in=prop_ids,
+            ).values_list("code", flat=True)
+        )
+        codes = [c.lower() for c in codes]
+
+        best_theme = None
+        best_matches = 0
+
+        for theme in themes:
+            parts = [p.lower() for p in theme.split("/")]
+            matches = 0
+            for part in parts:
+                if any(part in code for code in codes):
+                    matches += 1
+            if matches > best_matches:
+                best_matches = matches
+                best_theme = theme
+
+        return best_theme
+
+    def set_remote_configurator(self):
+        super().set_remote_configurator()
+
+        if not hasattr(self, "configurator"):
+            return
+
+        theme = self.configurator.amazon_theme or self._match_amazon_variation_theme(self.configurator)
+        if theme and self.configurator.amazon_theme != theme:
+            self.configurator.amazon_theme = theme
+            self.configurator.save(update_fields=["amazon_theme"])
+
+        self.amazon_theme = self.configurator.amazon_theme
+
+    def build_variation_attributes(self):
+        attrs = {}
+        theme = None
+        configurator = None
+
+        if self.is_variation and self.remote_parent_product:
+            configurator = self.remote_parent_product.configurator
+        elif self.local_type == Product.CONFIGURABLE and hasattr(self, "configurator"):
+            configurator = self.configurator
+
+        if configurator:
+            theme = configurator.amazon_theme or self._match_amazon_variation_theme(configurator)
+
+        if theme:
+            attrs["variation_theme"] = [{"value": theme, "marketplace_id": self.view.remote_id}]
+
+        if self.is_variation:
+            attrs["parentage_level"] = [
+                {"value": "child", "marketplace_id": self.view.remote_id}
+            ]
+            if self.remote_parent_product:
+                attrs["child_parent_sku_relationship"] = [
+                    {
+                        "child_relationship_type": "variation",
+                        "parent_sku": self.remote_parent_product.remote_sku,
+                        "marketplace_id": self.view.remote_id,
+                    }
+                ]
+        elif self.local_type == Product.CONFIGURABLE:
+            attrs["parentage_level"] = [
+                {"value": "parent", "marketplace_id": self.view.remote_id}
+            ]
+
+        return attrs
+
+    def customize_payload(self):
+        self.attributes.update(self.build_variation_attributes())
+        self.payload["attributes"] = self.attributes
+
+    def update_child(self, variation, remote_variation):
+        """
+        Updates an existing remote variation (child product).
+        """
+        factory = self.sync_product_factory(
+            sales_channel=self.sales_channel,
+            local_instance=variation,
+            parent_local_instance=self.local_instance,
+            remote_parent_product=self.remote_instance,
+            remote_instance=remote_variation,
+            api=self.api,
+            view=self.view,
+        )
+        factory.run()
+
+    def create_child(self, variation):
+        """
+        Creates a new remote variation (child product).
+        """
+        factory = self.create_product_factory(
+            sales_channel=self.sales_channel,
+            local_instance=variation,
+            parent_local_instance=self.local_instance,
+            remote_parent_product=self.remote_instance,
+            api=self.api,
+            view=self.view,
+        )
+        factory.run()
+        remote_variation = factory.remote_instance
+        return remote_variation
+
+    def delete_child(self, remote_variation):
+        """
+        Deletes a remote variation (child product) that no longer exists locally.
+        """
+        factory = self.delete_product_factory(
+            sales_channel=self.sales_channel,
+            local_instance=remote_variation.local_instance,
+            api=self.api,
+            remote_instance=remote_variation,
+            view=self.view,
+        )
+        factory.run()
 
 
 class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFactory):
@@ -424,6 +584,8 @@ class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFa
             self.payload.get("attributes", {}),
             self.current_attrs,
         )
+        print('------------------------------------------------------------------------')
+        print(resp)
         return resp
 
     def serialize_response(self, response):
@@ -454,8 +616,12 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
             self.remote_instance.created_marketplaces.append(self.view.remote_id)
             if not self.remote_instance.ean_code:
                 self.remote_instance.ean_code = self._get_ean_for_payload()
+            update_fields = ["created_marketplaces", "ean_code"]
+            if self.force_listing_requirements and not self.remote_instance.product_owner:
+                self.remote_instance.product_owner = True
+                update_fields.append("product_owner")
 
-            self.remote_instance.save(update_fields=["created_marketplaces", "ean_code"])
+            self.remote_instance.save(update_fields=update_fields)
 
     def serialize_response(self, response):
         return response.payload if hasattr(response, "payload") else True
@@ -464,6 +630,7 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
 class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactory):
     """Sync Amazon products using marketplace-specific create or update."""
     create_product_factory = AmazonProductCreateFactory
+
 
     def perform_remote_action(self):
 
@@ -474,6 +641,8 @@ class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactor
             self.payload.get("attributes", {}),
             self.current_attrs,
         )
+        print('------------------------------------------------------------------------')
+        print(resp)
         return resp
 
     def serialize_response(self, response):

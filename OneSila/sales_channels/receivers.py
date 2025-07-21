@@ -2,7 +2,7 @@ from django.db.models.signals import post_delete, pre_delete, pre_save
 
 from core.decorators import trigger_signal_for_dirty_fields
 from core.schema.core.subscriptions import refresh_subscription_receiver
-from core.signals import post_create, post_update, mutation_update
+from core.signals import post_create, post_update, mutation_update, post_save
 from eancodes.signals import ean_code_released_for_product
 from inventory.models import Inventory
 from media.models import Media
@@ -30,6 +30,10 @@ from .signals import (
 from django.dispatch import receiver
 from properties.models import Property, PropertyTranslation, PropertySelectValueTranslation, PropertySelectValue, ProductProperty, \
     ProductPropertyTextTranslation
+
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 @receiver(post_update, sender=SalesChannelImport)
@@ -61,41 +65,73 @@ def import_process_avoid_duplicate_pre_create_receiver(sender, instance: SalesCh
 @receiver(post_create, sender=SalesChannelImport)
 @receiver(post_create, sender=AmazonSalesChannelImport)
 def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelImport, **kwargs):
+    """
+    This receiver is used to handle the post_create signal for the SalesChannelImport model.
+    It is used to trigger the import process for the sales channel upon creation.
+
+    A few things you need to know:
+    - new integrations need to be added here.
+    - also add the declaration on post_update: import_process_post_update_receiver
+    """
     from sales_channels.integrations.shopify.models.sales_channels import ShopifySalesChannel
     from sales_channels.integrations.shopify.tasks import shopify_import_db_task
+    from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
+    from sales_channels.integrations.woocommerce.tasks import woocommerce_import_db_task
     from sales_channels.integrations.amazon.tasks import amazon_import_db_task
 
+    # NOTE: Magento does not trigger after creation.  The import flow will first set
+    # some settings (possibly property stuff) and manually triggger the import via the status.
+    # all other import integrations need to be declared here.
     sales_channel = instance.sales_channel.get_real_instance()
     if isinstance(sales_channel, ShopifySalesChannel):
         refresh_subscription_receiver(sales_channel)
         shopify_import_db_task(import_process=instance, sales_channel=sales_channel)
+    elif isinstance(sales_channel, WoocommerceSalesChannel):
+        refresh_subscription_receiver(sales_channel)
+        woocommerce_import_db_task(import_process=instance, sales_channel=sales_channel)
 
-    if isinstance(sales_channel, AmazonSalesChannel):
+    elif isinstance(sales_channel, AmazonSalesChannel):
         refresh_subscription_receiver(sales_channel)
         amazon_import_db_task(import_process=instance, sales_channel=sales_channel)
+
+    else:
+        logger.warning(f"Sales channel {type(sales_channel)} is not supported in post_create.")
+
 
 
 @receiver(post_update, sender=SalesChannelImport)
 @receiver(post_update, sender=AmazonSalesChannelImport)
 @trigger_signal_for_dirty_fields('status')
 def import_process_post_update_receiver(sender, instance: SalesChannelImport, **kwargs):
+    """
+    This receiver is used to handle the post_update signal for the SalesChannelImport model.
+    It is used to trigger the import process for the sales channel.
+
+    A few things you need to know:
+    - new integrations need to be added here.
+    - these models have dirty-save. So just re-saving in the backend when someting doesnt trigger wont work.
+    - also add the declaration on post-create import_process_ashopify_post_create_receiver()
+    """
     from sales_channels.integrations.magento2.models import MagentoSalesChannel
     from sales_channels.integrations.magento2.tasks import magento_import_db_task
     from sales_channels.integrations.shopify.models.sales_channels import ShopifySalesChannel
     from sales_channels.integrations.shopify.tasks import shopify_import_db_task
     from sales_channels.integrations.amazon.tasks import amazon_import_db_task
+    from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
+    from sales_channels.integrations.woocommerce.tasks import woocommerce_import_db_task
 
     sales_channel = instance.sales_channel.get_real_instance()
     if instance.status == SalesChannelImport.STATUS_PENDING:
-
         if isinstance(sales_channel, MagentoSalesChannel):
             magento_import_db_task(import_process=instance, sales_channel=sales_channel)
-
-        if isinstance(sales_channel, ShopifySalesChannel):
+        elif isinstance(sales_channel, ShopifySalesChannel):
             shopify_import_db_task(import_process=instance, sales_channel=sales_channel)
-
-        if isinstance(sales_channel, AmazonSalesChannel):
+        elif isinstance(sales_channel, WoocommerceSalesChannel):
+            woocommerce_import_db_task(import_process=instance, sales_channel=sales_channel)
+        elif isinstance(sales_channel, AmazonSalesChannel):
             amazon_import_db_task(import_process=instance, sales_channel=sales_channel)
+        else:
+            logger.warning(f"Sales channel {type(sales_channel)} is not supported in post_update.")
 
 
 @receiver(post_update, sender=SalesChannelImport)
@@ -539,6 +575,7 @@ def sales_channels__media__post_delete_receiver(sender, instance, **kwargs):
 
 @receiver(post_create, sender='sales_channels.SalesChannel')
 @receiver(post_create, sender='magento2.MagentoSalesChannel')
+@receiver(post_create, sender='woocommerce.WoocommerceSalesChannel')
 def sales_channels__sales_channel__post_create_receiver(sender, instance, **kwargs):
     """
     Handles the creation of SalesChannel instances.

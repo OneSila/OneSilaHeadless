@@ -1,16 +1,17 @@
-import datetime
+
 import json
 from decimal import Decimal
 
 from mkdocs.config.config_options import Optional
 
 from core.helpers import clean_json_data
-from imports_exports.factories.imports import ImportMixin
+from sales_channels.factories.imports import SalesChannelImportMixin
 from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.properties import ImportPropertyInstance
 from products.models import Product
 from properties.models import Property
-from sales_channels.integrations.shopify.constants import MEDIA_FRAGMENT, DEFAULT_METAFIELD_NAMESPACE, SHOPIFY_TAGS
+from sales_channels.integrations.shopify.constants import MEDIA_FRAGMENT, DEFAULT_METAFIELD_NAMESPACE, SHOPIFY_TAGS, \
+    DEFAULT_PRODUCT_TYPE
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin
 from sales_channels.integrations.shopify.models import ShopifyProduct, ShopifyEanCode, ShopifyProductProperty, \
     ShopifyProductContent, ShopifyImageProductAssociation, ShopifyPrice
@@ -21,26 +22,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
-    import_properties = True
-    import_select_values = True
-    import_rules = True
-    import_products = True
+class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
+    remote_ean_code_class = ShopifyEanCode
+    remote_product_content_class = ShopifyProductContent
+    remote_imageproductassociation_class = ShopifyImageProductAssociation
+    remote_price_class = ShopifyPrice
 
     def __init__(self, import_process, sales_channel, language=None):
-        super().__init__(import_process, language)
-
-        self.sales_channel = sales_channel
-        self.initial_sales_channel_status = sales_channel.active
-        self.api = self.get_api()
+        super().__init__(import_process, sales_channel, language)
 
     def prepare_import_process(self):
-
-        # during the import this needs to stay false to prevent trying to create the mirror models because
-        # we create them manually
-        self.sales_channel.active = False
-        self.sales_channel.is_importing = True
-        self.sales_channel.save()
+        super().prepare_import_process()
 
         property_tag_data = {
             "name": "Shopify Tags",
@@ -145,33 +137,6 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         logger.info(f"Repaired remote_sku for product {remote_product.remote_id} using default_variant_id")
         return local_sku
 
-    def create_log_instance(self, import_instance: ImportProductInstance, structured_data: dict):
-
-        log_instance = ImportProduct.objects.create(
-            multi_tenant_company=self.import_process.multi_tenant_company,
-            import_process=self.import_process,
-            remote_product=import_instance.remote_instance,
-            raw_data=clean_json_data(import_instance.data),
-            structured_data=clean_json_data(structured_data),
-            successfully_imported=True
-        )
-
-        log_instance.content_type = ContentType.objects.get_for_model(import_instance.instance)
-        log_instance.object_id = import_instance.instance.pk
-
-    def handle_ean_code(self, import_instance: ImportProductInstance):
-
-        shopify_ean_code, _ = ShopifyEanCode.objects.get_or_create(
-            multi_tenant_company=self.import_process.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            remote_product=import_instance.remote_instance,
-        )
-
-        if hasattr(import_instance, 'ean_code') and import_instance.ean_code:
-            if shopify_ean_code.ean_code != import_instance.ean_code:
-                shopify_ean_code.ean_code = import_instance.ean_code
-                shopify_ean_code.save()
-
     def handle_attributes(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, 'properties'):
             product_properties = import_instance.product_property_instances
@@ -216,63 +181,6 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
 
                 if updated:
                     remote_product_property.save()
-
-    def handle_prices(self, import_instance: ImportProductInstance):
-        if not hasattr(import_instance, 'prices'):
-            return
-
-        remote_product = import_instance.remote_instance
-
-        shopify_price, _ = ShopifyPrice.objects.get_or_create(
-            multi_tenant_company=self.import_process.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            remote_product=remote_product,
-        )
-
-        price_data = {}
-
-        for price_entry in import_instance.prices:
-            currency = price_entry.get("currency")
-            price = price_entry.get("price")
-            rrp = price_entry.get("rrp")
-
-            data = {}
-            if rrp is not None:
-                data["price"] = float(rrp)
-            if price is not None:
-                data["discount_price"] = float(price)
-
-            if data:
-                price_data[currency] = data
-
-        if price_data:
-            shopify_price.price_data = price_data
-            shopify_price.save()
-
-    def handle_translations(self, import_instance: ImportProductInstance):
-        if hasattr(import_instance, 'translations'):
-            ShopifyProductContent.objects.get_or_create(
-                multi_tenant_company=self.import_process.multi_tenant_company,
-                sales_channel=self.sales_channel,
-                remote_product=import_instance.remote_instance,
-            )
-
-    def handle_images(self, import_instance: ImportProductInstance):
-        if hasattr(import_instance, 'images'):
-            remote_id_map = import_instance.data.get('__image_index_to_remote_id', {})
-
-            for index, image_ass in enumerate(import_instance.images_associations_instances):
-                image_association, _ = ShopifyImageProductAssociation.objects.get_or_create(
-                    multi_tenant_company=self.import_process.multi_tenant_company,
-                    sales_channel=self.sales_channel,
-                    local_instance=image_ass,
-                    remote_product=import_instance.remote_instance,
-                )
-
-                remote_id = remote_id_map.get(str(index))
-                if remote_id and not image_association.remote_id:
-                    image_association.remote_id = remote_id
-                    image_association.save()
 
     def handle_variations(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, 'variations'):
@@ -434,7 +342,8 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         # Check if property already exists
         prop = Property.objects.filter(
             multi_tenant_company=self.import_process.multi_tenant_company,
-            internal_name=name
+            internal_name=name,
+            type=internal_type
         ).first()
 
         if not prop:
@@ -641,7 +550,7 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         variations = []
         index_to_id_map = {}
         parent_name = product.get("title", "").strip()
-        product_type = product.get("productType")
+        product_type = product.get("productType", DEFAULT_PRODUCT_TYPE)
         variant_edges = product.get("variants", {}).get("edges", [])
 
         for idx, edge in enumerate(variant_edges):
@@ -701,6 +610,9 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
         }
 
         rule_product_type = product.get("productType") if parent_product_type is None else parent_product_type
+        if rule_product_type is None:
+            rule_product_type = DEFAULT_PRODUCT_TYPE
+
         if rule_product_type:
             structured_data["product_type"] = rule_product_type
 
@@ -789,7 +701,6 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
             mirror_model_map={"local_instance": "*"},
             mirror_model_defaults={"remote_id": product["id"], 'is_variation': is_variation}
         )
-
         import_instance.process()
 
         self.update_remote_product(import_instance, product, is_variation)
@@ -906,8 +817,3 @@ class ShopifyImportProcessor(ImportMixin, GetShopifyApiMixin):
 
                 self.get_product_data(product)
                 self.update_percentage()
-
-    def process_completed(self):
-        self.sales_channel.active = self.initial_sales_channel_status
-        self.sales_channel.is_importing = False
-        self.sales_channel.save()

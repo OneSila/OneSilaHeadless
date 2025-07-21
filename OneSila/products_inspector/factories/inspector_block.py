@@ -167,8 +167,18 @@ class HasImagesInspectorBlockFactory(InspectorBlockFactory):
         super().__init__(block, success_signal=inspector_has_images_success, failure_signal=inspector_has_images_failed, save_inspector=save_inspector)
 
     def _check(self):
-        if MediaProductThrough.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product).count() == 0:
-            raise InspectorBlockFailed("Product does not have required images.")
+        images_count = MediaProductThrough.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product).count()
+
+        if self.product.is_configurable():
+            if images_count == 0:
+                raise InspectorBlockFailed("Product does not have required images.")
+            return
+
+        from sales_channels.models import SalesChannelViewAssign
+
+        if SalesChannelViewAssign.objects.filter(multi_tenant_company=self.multi_tenant_company, product=self.product).exists():
+            if images_count == 0:
+                raise InspectorBlockFailed("Product does not have required images.")
 
 
 @InspectorBlockFactoryRegistry.register(MISSING_PRICES_ERROR)

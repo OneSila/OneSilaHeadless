@@ -11,6 +11,9 @@ from .types.types import (
     RemoteCurrencyType,
     SalesChannelImportType,
 )
+from .types.types import RemoteLogType, RemoteProductType, SalesChannelType, \
+    SalesChannelIntegrationPricelistType, SalesChannelViewType, SalesChannelViewAssignType, RemoteLanguageType, \
+    RemoteCurrencyType, SalesChannelImportType, IntegrationType
 
 
 @type(name='Query')

@@ -14,12 +14,14 @@ from pathlib import Path
 from django.utils.translation import gettext_lazy as _
 from operator import itemgetter
 import os
+import sys
 
 SECRET_KEY = "FAKE-KEY-DONT-KEEP-THIS-YOU-SHOULD-SET-A-NEW-ONE"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DEBUG = False
+TESTING = 'test' in sys.argv
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -60,6 +62,7 @@ INSTALLED_LOCAL_APPS = [
     'sales_channels',
     'sales_channels.integrations.magento2',
     'sales_channels.integrations.shopify',
+    'sales_channels.integrations.woocommerce',
     'sales_channels.integrations.amazon',
     'sales_prices',
     'properties',
@@ -298,7 +301,35 @@ CORS_ALLOWED_METHODS = [
     '*'
 ]
 
+#
+# Default User Agent.  Used by integrations to identify the source of the request.
+#
 
+ONESILA_DEFAULT_USER_AGENT = "OneSila.com PIM/1.0"
+
+
+#
+# Integrations test settings
+#
+
+SALES_CHANNELS_INTEGRATIONS_TEST_STORES = {
+    'WOOCOMMERCE': {
+        'hostname': os.getenv('INTEGRATIONS_TEST_STORES_WOOCOMMERCE_HOSTNAME'),
+        'api_key': os.getenv('INTEGRATIONS_TEST_STORES_WOOCOMMERCE_API_KEY'),
+        'api_secret': os.getenv('INTEGRATIONS_TEST_STORES_WOOCOMMERCE_API_SECRET'),
+        'verify_ssl': False,
+        'requests_per_minute': 60,
+        'active': True,
+        'import_products': True,
+        'import_orders': True,
+        'api_version': 'wc/v3',
+        'timeout': 10,
+    }
+}
+
+#
+# Huey settings
+#
 HUEY = {
     'huey_class': 'huey.RedisHuey',
     'name': 'hueyonesilaheadless',

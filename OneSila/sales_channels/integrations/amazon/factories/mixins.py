@@ -9,6 +9,9 @@ from sales_channels.models import SalesChannelViewAssign
 from sales_channels.models.logs import RemoteLog
 
 
+from sales_channels.integrations.amazon.models.properties import AmazonProperty
+from properties.models import Property, PropertyTranslation
+
 class PullAmazonMixin:
 
     def is_real_amazon_marketplace(self, marketplace) -> bool:
@@ -31,7 +34,8 @@ class GetAmazonAPIMixin:
         processing_status=None,
     ):
         """Update assign issues and optionally log the action."""
-        if not getattr(self, "remote_product", None) or not isinstance(getattr(self, "view", None), AmazonSalesChannelView):
+        if not getattr(self, "remote_product", None) or not isinstance(getattr(self, "view", None),
+                                                                       AmazonSalesChannelView):
             return
 
         assign = SalesChannelViewAssign.objects.filter(
@@ -44,11 +48,25 @@ class GetAmazonAPIMixin:
         if assign.remote_product_id != self.remote_product.id:
             assign.remote_product = self.remote_product
 
-        assign.issues = [
+        existing_issues = assign.issues or []
+
+        # Ensure each existing issue is a dictionary
+        existing_issues_dicts = [
             issue.to_dict() if hasattr(issue, "to_dict") else issue
-            for issue in issues or []
+            for issue in existing_issues
         ]
-        assign.save()
+
+        new_issues = []
+        for issue in issues or []:
+            issue_dict = issue.to_dict() if hasattr(issue, "to_dict") else issue
+            issue_dict["validation_issue"] = True
+
+            if issue_dict not in existing_issues_dicts:
+                new_issues.append(issue_dict)
+
+        if new_issues:
+            assign.issues = existing_issues_dicts + new_issues
+            assign.save()
 
         if action_log and log_identifier:
             self.log_action(
@@ -83,6 +101,26 @@ class GetAmazonAPIMixin:
             return response.payload
         except SellingApiException as e:
             raise Exception(f"SP-API failed: {e}")
+
+    @throttle_safe(max_retries=5, base_delay=1)
+    def search_product_types(self, marketplace_id: str, name: str | None = None) -> dict:
+        """Return product type suggestions for an item name."""
+        definitions_api = DefinitionsApi(self._get_client())
+
+        kwargs = {
+            'marketplace_ids': [marketplace_id],
+            'locale': self._get_issue_locale()
+        }
+
+        if name is not None:
+            kwargs['item_name'] = name
+
+        resp = definitions_api.search_definitions_product_types(**kwargs)
+
+        if hasattr(resp, "to_dict"):
+            return resp.to_dict()
+
+        return resp
 
     @throttle_safe(max_retries=5, base_delay=1)
     def get_listing_item(self, sku, marketplace_id, *, included_data=None, issue_locale=None):
@@ -243,8 +281,14 @@ class GetAmazonAPIMixin:
             return data
 
         pt_code = product_type.product_type_code
+        has_asin = "merchant_suggested_asin" in (attributes or {})
+        force_listing = getattr(self, "force_listing_requirements", False)
+        remote_product = getattr(self, "remote_product", getattr(self, "remote_instance", None))
+        product_owner = getattr(remote_product, "product_owner", False)
 
-        if not self.sales_channel.listing_owner:
+        is_new_listing = has_asin or force_listing
+
+        if not (self.sales_channel.listing_owner or product_owner) and not is_new_listing:
             region = self.view.api_region_code
             allowed_keys = (
                 product_type.listing_offer_required_properties.get(region, [])
@@ -256,7 +300,7 @@ class GetAmazonAPIMixin:
 
         return {
             "productType": pt_code,
-            "requirements": "LISTING" if self.sales_channel.listing_owner else "LISTING_OFFER_ONLY",
+            "requirements": "LISTING" if (self.sales_channel.listing_owner or product_owner or is_new_listing) else "LISTING_OFFER_ONLY",
             "attributes": clean(attributes),
         }
 
@@ -343,6 +387,14 @@ class GetAmazonAPIMixin:
 
         body = self._build_common_body(product_type, merged_attributes)
 
+        print('--------------------------------------- ARGUMENTS')
+        print('mode')
+        print("VALIDATION_PREVIEW" if settings.DEBUG else None)
+        print('body')
+        import pprint
+        pprint.pprint(body)
+        print('-------------------------------------------------')
+
         listings = ListingsApi(self._get_client())
         response = listings.put_listings_item(
             seller_id=self.sales_channel.remote_id,
@@ -366,3 +418,44 @@ class GetAmazonAPIMixin:
         )
 
         return response
+
+
+class EnsureMerchantSuggestedAsinMixin:
+    """Mixin ensuring the merchant_suggested_asin property exists."""
+
+    def _ensure_merchant_suggested_asin(self):
+        remote_property, _ = AmazonProperty.objects.get_or_create(
+            allow_multiple=True,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="merchant_suggested_asin",
+            defaults={"type": Property.TYPES.TEXT},
+        )
+
+        if not remote_property.local_instance:
+            local_property, _ = Property.objects.get_or_create(
+                internal_name="merchant_suggested_asin",
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                defaults={
+                    "type": Property.TYPES.TEXT,
+                    "non_deletable": True,
+                },
+            )
+
+            PropertyTranslation.objects.get_or_create(
+                property=local_property,
+                language=self.sales_channel.multi_tenant_company.language,
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                defaults={"name": "Amazon Asin"},
+            )
+
+            remote_property.local_instance = local_property
+            remote_property.save()
+
+        local_property = remote_property.local_instance
+        if not local_property.non_deletable:
+            local_property.non_deletable = True
+            local_property.save(update_fields=["non_deletable"])
+
+        return remote_property
+

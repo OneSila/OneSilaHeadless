@@ -8,6 +8,7 @@ from media.models import Media, MediaProductThrough
 from properties.models import PropertySelectValue, PropertySelectValueTranslation, ProductPropertiesRule, Property, \
     ProductProperty
 from sales_channels.integrations.amazon.models import AmazonProductType
+from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonSalesChannel,
@@ -26,7 +27,7 @@ from sales_channels.integrations.amazon.factories.products.images import (
 )
 
 
-class AmazonProductImageFactoryTest(TestCase):
+class AmazonProductImageFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = AmazonSalesChannel.objects.create(

@@ -3,7 +3,7 @@ from django.utils import timezone
 from spapi import DefinitionsApi, ListingsApi
 from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
 from sales_channels.integrations.amazon.decorators import throttle_safe
-from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
+from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin, EnsureMerchantSuggestedAsinMixin
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannelView,
     AmazonDefaultUnitConfigurator,
@@ -393,15 +393,18 @@ class DefaultUnitConfiguratorFactory:
             path.pop()
 
 
-class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
+class AmazonProductTypeRuleFactory(GetAmazonAPIMixin, EnsureMerchantSuggestedAsinMixin):
     def __init__(self, product_type_code, sales_channel, merchant_asin_property=None, api=None, language=None):
         self.product_type_code = product_type_code
         self.sales_channel = sales_channel
         self.language = language or sales_channel.multi_tenant_company.language
         self.multi_tenant_company = sales_channel.multi_tenant_company
-        self.merchant_asin_property = merchant_asin_property
-        self.sales_channel_views = AmazonSalesChannelView.objects.filter(sales_channel=sales_channel)
         self.product_type = self.get_or_create_product_type()
+        self.sales_channel_views = AmazonSalesChannelView.objects.filter(sales_channel=sales_channel)
+        if merchant_asin_property is None:
+            self.merchant_asin_property = self._ensure_merchant_suggested_asin()
+        else:
+            self.merchant_asin_property = merchant_asin_property
 
         if api is None:
             self.api = self.get_api()
@@ -673,7 +676,7 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin):
                 defaults={'type': property_data['type']},
             )
 
-            allows_unmapped_values = property_data.get('allows_unmapped_values', False)
+            allows_unmapped_values = property_data.get('allow_not_mapped_values', False)
 
             if not created:
                 old_type = remote_property.type

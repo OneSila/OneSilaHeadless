@@ -2,7 +2,7 @@ from django.contrib import admin
 from polymorphic.admin import PolymorphicChildModelAdmin
 from pygments.lexers import JsonLexer
 from core.admin import ModelAdmin
-from .models import SalesChannel, RemoteLog, SalesChannelImport
+from .models import SalesChannel, RemoteLog, SalesChannelImport, SalesChannelViewAssign
 from .models.products import RemoteProductConfigurator
 
 
@@ -62,4 +62,17 @@ class SalesChannelRemoteProductAdmin(ModelAdmin):
         'created_by_multi_tenant_user',
         'sales_channel',
         'local_instance',
+    ]
+
+
+@admin.register(SalesChannelViewAssign)
+class SalesChannelViewAssignAdmin(SalesChannelRemoteAdmin):
+    raw_id_fields = [
+        'sales_channel',
+        'product',
+        'remote_product',
+        'sales_channel_view',
+        'created_by_multi_tenant_user',
+        'last_update_by_multi_tenant_user',
+        'multi_tenant_company',
     ]

@@ -65,3 +65,5 @@ currencies = {
     'UA': {'name': 'Ukrainian Hryvnia', 'iso_code': 'UAH', 'symbol': '₴'},
     'VN': {'name': 'Vietnamese Dong', 'iso_code': 'VND', 'symbol': '₫'}
 }
+
+iso_list = [currency['iso_code'] for currency in currencies.values()]

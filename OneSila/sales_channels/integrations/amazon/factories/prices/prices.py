@@ -19,6 +19,9 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
             skip_checks=skip_checks,
         )
 
+    def get_local_product(self):
+        return self.local_instance
+
     def update_remote(self):
         responses = []
 
@@ -53,7 +56,7 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
                 ]
             }
 
-            if self.sales_channel.listing_owner:
+            if self.sales_channel.listing_owner or self.remote_product.product_owner:
                 attributes["list_price"] = [{"currency": iso, "value": list_price}]
 
 

@@ -10,6 +10,7 @@ from properties.models import ProductPropertiesRuleItem, ProductPropertiesRule, 
     PropertySelectValueTranslation, Property, ProductProperty
 from sales_prices.models import SalesPrice
 from currencies.currencies import currencies
+from core.exceptions import ValidationError
 
 
 class ImportProductInstanceValidateTest(TestCase):
@@ -128,18 +129,16 @@ class ImportProductTranslationAndSalesPriceValidateTest(TestCase):
             sku="test123"
         )
 
-        self.default_currency = Currency.objects.create(
+        self.default_currency, _ = Currency.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
-            iso_code="EUR",
-            name="Euro",
-            symbol="€",
-            is_default_currency=True
+            is_default_currency=True,
+            **currencies['GB']
         )
 
-        self.public_currency = PublicCurrency.objects.create(
-            iso_code="EUR",
-            name="Euro",
-            symbol="€"
+        self.public_currency, _ = PublicCurrency.objects.get_or_create(
+            iso_code="GBP",
+            name="Pound",
+            symbol="£"
         )
 
     # ------------------------
@@ -261,10 +260,10 @@ class ImportProductTranslationAndSalesPriceValidateTest(TestCase):
             "product_data": {"name": "Invalid Currency"}
         }
 
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(ValidationError) as cm:
             ImportSalesPriceInstance(data, self.import_process)
 
-        self.assertIn("The price use unsupported currency", str(cm.exception))
+        self.assertIn("unknown in the public currency list", str(cm.exception))
 
 
 class ImportProductInstanceProcessTest(TestCase):
@@ -867,6 +866,7 @@ class ImportProductInstanceParentLinkingTest(TestCase):
         alias = Product.objects.get(sku="ALIAS-001")
         self.assertIsNotNone(alias.alias_parent_product)
         self.assertEqual(alias.alias_parent_product.sku, "MAIN-001")
+
 
 class ImportProductInstanceCreateOnlyTest(TestCase):
     def setUp(self):

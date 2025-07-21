@@ -7,7 +7,8 @@ from django.core.exceptions import ValidationError
 from magento.models import ProductAttribute, AttributeOption, AttributeSet, TaxClass
 from core.helpers import clean_json_data
 from currencies.models import Currency
-from imports_exports.factories.imports import ImportMixin
+from sales_channels.factories.imports.decorators import if_allowed_by_saleschannel
+from sales_channels.factories.imports import SalesChannelImportMixin
 from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.properties import ImportPropertyInstance, ImportPropertySelectValueInstance, \
     ImportProductPropertiesRuleInstance, ImportProductPropertiesRuleItemInstance
@@ -36,29 +37,24 @@ from taxes.models import VatRate
 logger = logging.getLogger(__name__)
 
 
-class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
-    import_properties = True
-    import_select_values = True
-    import_rules = True
-    import_products = True
+class MagentoImportProcessor(SalesChannelImportMixin, GetMagentoAPIMixin):
+    remote_ean_code_class = MagentoEanCode
+    remote_imageproductassociation_class = MagentoImageProductAssociation
+    remote_price_class = MagentoPrice
 
     def __init__(self, import_process, sales_channel, language=None):
-        super().__init__(import_process, language)
-
-        self.sales_channel = sales_channel
-        self.initial_sales_channel_status = sales_channel.active
-        self.api = self.get_api()
-
+        super().__init__(import_process, sales_channel, language)
         self.remote_local_property_map = {}
 
     def prepare_import_process(self):
+        """
+        This method starts off with gathering the configuration from the frontend
+        wizard and collecting the pieces in order to do the import cleanly.
 
-        # during the import this needs to stay false to prevent trying to create the mirror models because
-        # we create them manually
-        self.sales_channel.active = False
-        self.sales_channel.is_importing = True
-        self.sales_channel.save()
-
+        There is also a bunch of magento currency and multi-langual preperation done
+        in order to structer the data correctly during the import.
+        """
+        super().prepare_import_process()
         # get properties
         self.properties = ImportProperty.objects.filter(import_process=self.import_process)
 
@@ -285,23 +281,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 "remote_property": remote_property
             }
         )
-
-    def update_select_value_log_instance(self, log_instance: ImportPropertySelectValue,
-                                         import_instance: ImportPropertySelectValueInstance):
-        mirror_property_select_value = import_instance.remote_instance
-
-        log_instance.successfully_imported = True
-        log_instance.content_type = ContentType.objects.get_for_model(import_instance.instance)
-        log_instance.object_id = import_instance.instance.pk
-
-        if mirror_property_select_value:
-            log_instance.remote_property_value = mirror_property_select_value
-
-        log_instance.save()
-
-        if mirror_property_select_value and not mirror_property_select_value.remote_id:
-            mirror_property_select_value.remote_id = log_instance.raw_data['value']
-            mirror_property_select_value.save()
 
     def import_rules_process(self):
         for rule_data in self.rules:
@@ -629,15 +608,14 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 )
                 rule_item_import_instance.process()
 
+    @if_allowed_by_saleschannel('sync_ean_codes')
     def get_product_ean_code(self, custom_attributes: dict) -> Optional[str]:
         """
         Returns the EAN code from custom_attributes if present and syncing is enabled.
         """
-        if self.sales_channel.sync_ean_codes:
-            ean_code_key = self.sales_channel.ean_code_attribute
-            if ean_code_key in custom_attributes:
-                return custom_attributes[ean_code_key]
-        return None
+        ean_code_key = self.sales_channel.ean_code_attribute
+        if ean_code_key in custom_attributes:
+            return custom_attributes[ean_code_key]
 
     def get_vat_name(self, custom_attributes: dict) -> Optional[str]:
         if 'tax_class_id' in custom_attributes:
@@ -696,33 +674,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
 
         return structured_data
 
-    def create_log_instance(self, import_instance: ImportProductInstance, structured_data: dict):
-
-        log_instance = ImportProduct.objects.create(
-            multi_tenant_company=self.import_process.multi_tenant_company,
-            import_process=self.import_process,
-            remote_product=import_instance.remote_instance,
-            raw_data=clean_json_data(import_instance.data),
-            structured_data=clean_json_data(structured_data),
-            successfully_imported=True
-        )
-
-        log_instance.content_type = ContentType.objects.get_for_model(import_instance.instance)
-        log_instance.object_id = import_instance.instance.pk
-
-    def handle_ean_code(self, import_instance: ImportProductInstance):
-
-        magento_ean_code, _ = MagentoEanCode.objects.get_or_create(
-            multi_tenant_company=self.import_process.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            remote_product=import_instance.remote_instance,
-        )
-
-        if hasattr(import_instance, 'ean_code'):
-            if magento_ean_code.ean_code != import_instance.ean_code:
-                magento_ean_code.ean_code = import_instance.ean_code
-                magento_ean_code.save()
-
     def handle_attributes(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, 'properties'):
             product_properties = import_instance.product_property_instances
@@ -749,35 +700,6 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 if not remote_product_property.remote_value:
                     remote_product_property.remote_value = remote_value
                     remote_product_property.save()
-
-    def handle_prices(self, import_instance: ImportProductInstance):
-        if hasattr(import_instance, 'prices'):
-
-            full_price, discounted_price = import_instance.instance.get_price_for_sales_channel(self.sales_channel)
-
-            if full_price is not None:
-                full_price = Decimal(full_price)
-            if discounted_price is not None:
-                discounted_price = Decimal(discounted_price)
-
-            for price in import_instance.prices:
-                magento_price, _ = MagentoPrice.objects.get_or_create(
-                    multi_tenant_company=self.import_process.multi_tenant_company,
-                    sales_channel=self.sales_channel,
-                    remote_product=import_instance.remote_instance,
-                )
-
-                magento_price.price = full_price
-                magento_price.discount_price = discounted_price
-                magento_price.save()
-
-    def handle_translations(self, import_instance: ImportProductInstance):
-        if hasattr(import_instance, 'translations'):
-            MagentoProductContent.objects.get_or_create(
-                multi_tenant_company=self.import_process.multi_tenant_company,
-                sales_channel=self.sales_channel,
-                remote_product=import_instance.remote_instance,
-            )
 
     def handle_images(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, 'images'):
@@ -937,6 +859,8 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                     rule=rule,
                 )
 
+                # This is creating the remote_id and is actually
+                # your "import_instance".
                 product_import_instance.prepare_mirror_model_class(
                     mirror_model_class=MagentoProduct,
                     sales_channel=self.sales_channel,
@@ -968,8 +892,3 @@ class MagentoImportProcessor(ImportMixin, GetMagentoAPIMixin):
                 product_batch = products_api.next()
             except ValueError:
                 break
-
-    def process_completed(self):
-        self.sales_channel.active = self.initial_sales_channel_status
-        self.sales_channel.is_importing = False
-        self.sales_channel.save()

@@ -270,3 +270,38 @@ class ProductPropertiesRuleManager(MultiTenantManager):
 
     def delete(self, *args, **kwargs):
         return self.get_queryset().delete(*args, **kwargs)
+
+
+class ProductPropertyQuerySet(MultiTenantQuerySet):
+    def filter_for_configurator(self):
+        from .models import ProductPropertiesRuleItem, Property, ProductPropertiesRule, \
+            PropertySelectValue
+
+        product_type_prod_props = self.filter(property__is_product_type=True)
+        product_type_selects = PropertySelectValue.objects.filter(
+            property__in=product_type_prod_props.values('property')
+        )
+        rules = ProductPropertiesRule.objects.filter(
+            multi_tenant_company__in=self.values('multi_tenant_company'),
+            product_type__in=product_type_selects)
+        rule_items = ProductPropertiesRuleItem.objects.filter(
+            rule__in=rules,
+            type__in=[
+                ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
+                ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
+            ],
+            multi_tenant_company__in=self.all().values('multi_tenant_company')
+        )
+        properties = Property.objects.filter(
+            multi_tenant_company__in=self.all().values('multi_tenant_company'),
+            id__in=rule_items.values_list('property_id', flat=True)
+        )
+        return self.filter(property__in=properties)
+
+
+class ProductPropertyManager(MultiTenantManager):
+    def get_queryset(self):
+        return ProductPropertyQuerySet(self.model, using=self._db)
+
+    def filter_for_configurator(self):
+        return self.get_queryset().filter_for_configurator()

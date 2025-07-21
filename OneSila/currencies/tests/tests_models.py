@@ -8,7 +8,9 @@ from currencies.currencies import currencies
 
 class CurrencyTestCase(TestCase):
     def test_blind_follow(self):
-        currency_master, _ = Currency.objects.get_or_create(is_default_currency=True, follow_official_rate=True,
+        currency_master, _ = Currency.objects.get_or_create(
+            is_default_currency=True,
+            # follow_official_rate=True,
             multi_tenant_company=self.multi_tenant_company,
             **currencies['GB'])
         currency_slave, _ = Currency.objects.get_or_create(is_default_currency=False, inherits_from=currency_master,

@@ -64,7 +64,7 @@ class RemoteProductVariationAddFactory(RemoteInstanceUpdateFactory):
                     sales_channel=self.sales_channel,
                     local_instance=self.local_instance,
                     parent_local_instance=self.parent_product,
-                    api=self.api
+                    api=self.api,
                 )
                 factory.run()
                 self.remote_instance = factory.remote_instance

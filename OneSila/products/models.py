@@ -29,7 +29,7 @@ class Product(TranslatedModelMixin, models.Model):
     allow_backorder = models.BooleanField(default=False)
     alias_parent_product = models.ForeignKey(
         'self',
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name='alias_products'
@@ -357,7 +357,11 @@ class Product(TranslatedModelMixin, models.Model):
         return variations
 
     def _generate_sku(self, save=False):
-        self.sku = shake_256(shortuuid.uuid().encode('utf-8')).hexdigest(7)
+        from .helpers import generate_sku
+        self.sku = generate_sku()
+
+        if save:
+            self.save()
 
     def save(self, *args, **kwargs):
 
@@ -375,7 +379,7 @@ class Product(TranslatedModelMixin, models.Model):
         constraints = [
             CheckConstraint(
                 check=Q(type='ALIAS', alias_parent_product__isnull=False) | ~Q(type='ALIAS'),
-                name='alias_requires_parent'
+                name='alias_requires_alias_parent_product'
             )
         ]
 

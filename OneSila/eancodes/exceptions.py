@@ -1,2 +1,1 @@
-class ValidationError(Exception):
-    pass
+from core.exceptions import ValidationError

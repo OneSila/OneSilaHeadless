@@ -8,11 +8,14 @@ import json
 
 logger = logging.getLogger(__name__)
 
+
 class ShopifyInstalledView(EmptyTemplateView):
     pass
 
+
 class ShopifyEntryView(EmptyTemplateView):
     pass
+
 
 @csrf_exempt
 def shopify_customer_data_request(request):

@@ -1,6 +1,17 @@
 from core.schema.core.types.input import NodeInput, input, partial, strawberry_input
 from sales_channels.integrations.shopify.models import ShopifySalesChannel
 
+
+@strawberry_input
+class ShopifyValidateAuthInput:
+    shop: str
+    code: str
+    state: str
+    hmac: str
+    host: str
+    timestamp: str
+
+
 @strawberry_input
 class ShopifyValidateAuthInput:
     shop: str
