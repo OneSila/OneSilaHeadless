@@ -1,41 +1,4 @@
-from decimal import Decimal
-
-from strawberry.relay.utils import to_base64
-from contacts.schema.types.types import CompanyType
-from core.schema.core.types.types import relay, type, field, Annotated, lazy, strawberry_type
-from core.schema.core.mixins import GetQuerysetMultiTenantMixin
-
-from typing import List, Optional
-
 from media.models import Media
-from products.models import (
-    Product,
-    BundleProduct,
-    ConfigurableProduct,
-    SimpleProduct,
-    ProductTranslation,
-    ConfigurableVariation,
-    BundleVariation,
-    AliasProduct,
-    ProductTranslationBulletPoint,
-)
-from properties.models import ProductProperty
-from properties.schema.types.types import ProductPropertyType
-from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
-    ProductTranslation, ConfigurableVariation, BundleVariation, AliasProduct
-
-from taxes.schema.types.types import VatRateType
-from .filters import (
-    ProductFilter,
-    BundleProductFilter,
-    ConfigurableProductFilter,
-    SimpleProductFilter,
-    ProductTranslationFilter,
-    ConfigurableVariationFilter,
-    BundleVariationFilter,
-    AliasProductFilter,
-    ProductTranslationBulletPointFilter,
-)
 from .ordering import (
     ProductOrder,
     BundleProductOrder,
@@ -47,6 +10,54 @@ from .ordering import (
     AliasProductOrder,
     ProductTranslationBulletPointOrder,
 )
+from .filters import (
+    ProductFilter,
+    BundleProductFilter,
+    ConfigurableProductFilter,
+    SimpleProductFilter,
+    ProductTranslationFilter,
+    ConfigurableVariationFilter,
+    BundleVariationFilter,
+    AliasProductFilter,
+    ProductTranslationBulletPointFilter,
+)
+from taxes.schema.types.types import VatRateType
+from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
+    ProductTranslation, ConfigurableVariation, BundleVariation, AliasProduct
+from properties.schema.types.types import ProductPropertyType
+from properties.models import ProductProperty
+from products.models import (
+    Product,
+    BundleProduct,
+    ConfigurableProduct,
+    SimpleProduct,
+    ProductTranslation,
+    ConfigurableVariation,
+    BundleVariation,
+    AliasProduct,
+    ProductTranslationBulletPoint,
+)
+from decimal import Decimal
+
+from strawberry.relay.utils import to_base64
+from contacts.schema.types.types import CompanyType
+from core.schema.core.types.types import relay, type, field, Annotated, lazy, strawberry_type
+from core.schema.core.mixins import GetQuerysetMultiTenantMixin
+
+from typing import List, Optional
+
+
+@strawberry_type
+class InspectorCompletionBlockType:
+    code: int
+    completed: bool
+
+
+@strawberry_type
+class InspectorCompletionType:
+    percentage: int
+    inspector_status: int
+    blocks: List[InspectorCompletionBlockType]
 
 
 @type(Product, filters=ProductFilter, order=ProductOrder, pagination=True, fields="__all__")
@@ -102,6 +113,30 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
             return ORANGE
         else:
             return GREEN
+
+    @field()
+    def inspector_completion(self, info) -> InspectorCompletionType:
+        from products_inspector.constants import RED, ORANGE, GREEN
+
+        percentage, blocks = self.inspector.completion_percentage()
+
+        if self.inspector.has_missing_information:
+            inspector_status = RED
+        elif self.inspector.has_missing_optional_information:
+            inspector_status = ORANGE
+        else:
+            inspector_status = GREEN
+
+        block_types = [
+            InspectorCompletionBlockType(code=b["code"], completed=b["completed"])
+            for b in blocks
+        ]
+
+        return InspectorCompletionType(
+            percentage=percentage,
+            inspector_status=inspector_status,
+            blocks=block_types,
+        )
 
     @field()
     def has_parents(self, info) -> bool:
