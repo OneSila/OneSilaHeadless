@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db.models.signals import post_delete, pre_delete
 from django.dispatch import receiver
-from django.utils.text import slugify
+from properties.helpers import generate_unique_internal_name
 from django.utils.translation import gettext_lazy as _
 from core.models import MultiTenantCompany
 from core.signals import post_create, post_update
@@ -23,8 +23,12 @@ def create_default_product_type_property(sender, instance, **kwargs):
 @receiver(post_create, sender=PropertyTranslation)
 def properties__property_translation__post_save(sender, instance, **kwargs):
     if not instance.property.internal_name:
-        instance.property.internal_name = slugify(instance.name).replace('-', '_')
-        instance.property.save(update_fields=['internal_name'])
+        internal_name = generate_unique_internal_name(
+            instance.name,
+            instance.property.multi_tenant_company,
+            instance.property.id,
+        )
+        Property.objects.filter(id=instance.property.id).update(internal_name=internal_name)
 
 
 @receiver(post_update, sender=PropertySelectValueTranslation)

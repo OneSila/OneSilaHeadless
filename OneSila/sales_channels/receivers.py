@@ -6,7 +6,11 @@ from core.signals import post_create, post_update, mutation_update, post_save
 from eancodes.signals import ean_code_released_for_product
 from inventory.models import Inventory
 from media.models import Media
-from properties.signals import product_properties_rule_configurator_updated
+from properties.signals import (
+    product_properties_rule_configurator_updated,
+    property_created,
+    property_select_value_created,
+)
 from sales_prices.models import SalesPriceListItem
 from sales_prices.signals import price_changed
 from .integrations.amazon.models import AmazonSalesChannel, AmazonSalesChannelImport
@@ -96,7 +100,6 @@ def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelI
 
     else:
         logger.warning(f"Sales channel {type(sales_channel)} is not supported in post_create.")
-
 
 
 @receiver(post_update, sender=SalesChannelImport)
@@ -198,21 +201,25 @@ def sales_channels__property__pre_delete_receiver(sender, instance: Property, **
         delete_remote_property.send(sender=instance.__class__, instance=instance)
 
 
+@receiver(property_created, sender='properties.Property')
+def sales_channels__property__created_receiver(sender, instance: Property, language, **kwargs):
+    """Send create signal for newly created properties."""
+    if instance.is_public_information:
+        create_remote_property.send(sender=instance.__class__, instance=instance, language=language)
+
+
 @receiver(post_create, sender='properties.PropertyTranslation')
 def sales_channels__property_translation__post_create_receiver(sender, instance: PropertyTranslation, **kwargs):
     """
     Handles post-create events for the PropertyTranslation model.
     - Send create signal if it's the first translation.
     """
-    if not instance.property.is_public_information:
-        return
-
-    translation_count = PropertyTranslation.objects.filter(property=instance.property).count()
-    if translation_count == 1:
-        # Send create signal only if this is the first translation
-        create_remote_property.send(sender=instance.property.__class__, instance=instance.property, language=instance.language)
-    else:
-        update_remote_property.send(sender=instance.property.__class__, instance=instance.property, language=instance.language)
+    if instance.property.is_public_information:
+        update_remote_property.send(
+            sender=instance.property.__class__,
+            instance=instance.property,
+            language=instance.language,
+        )
 
 
 @receiver(post_update, sender='properties.PropertyTranslation')
@@ -236,6 +243,17 @@ def sales_channels__property_translation__post_delete_receiver(sender, instance:
 # ------------------------------------------------------------- SEND SIGNALS FOR PROPERTIES SELECT VALUE
 
 
+@receiver(property_select_value_created, sender='properties.PropertySelectValue')
+def sales_channels__property_select_value__created_receiver(sender, instance: PropertySelectValue, language, **kwargs):
+    """Send create signal for newly created property select values."""
+    if instance.property.is_public_information:
+        create_remote_property_select_value.send(
+            sender=instance.__class__,
+            instance=instance,
+            language=language,
+        )
+
+
 @receiver(post_create, sender='properties.PropertySelectValueTranslation')
 def sales_channels__property_select_value_translation__post_create_receiver(sender, instance: PropertySelectValueTranslation, **kwargs):
     """
@@ -245,18 +263,12 @@ def sales_channels__property_select_value_translation__post_create_receiver(send
     """
     property_instance = instance.propertyselectvalue.property
 
-    # Only send signals if the associated Property is marked as public information
     if property_instance.is_public_information:
-        translation_count = PropertySelectValueTranslation.objects.filter(propertyselectvalue=instance.propertyselectvalue).count()
-
-        if translation_count == 1:
-            # Send create signal only if this is the first translation
-            create_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__,
-                                                     instance=instance.propertyselectvalue, language=instance.language)
-        else:
-            # For additional translations, send an update signal
-            update_remote_property_select_value.send(sender=instance.propertyselectvalue.__class__,
-                                                     instance=instance.propertyselectvalue, language=instance.language)
+        update_remote_property_select_value.send(
+            sender=instance.propertyselectvalue.__class__,
+            instance=instance.propertyselectvalue,
+            language=instance.language,
+        )
 
 
 @receiver(post_update, sender='properties.PropertySelectValueTranslation')
