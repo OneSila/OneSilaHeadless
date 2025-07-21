@@ -95,3 +95,9 @@ class ProductPropertiesRuleItemType(relay.Node, GetQuerysetMultiTenantMixin):
 class PropertyDuplicatesType:
     duplicate_found: bool
     duplicates: List[PropertyType]
+
+
+@strawberry.type
+class PropertySelectValueDuplicatesType:
+    duplicate_found: bool
+    duplicates: List[PropertySelectValueType]

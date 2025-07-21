@@ -154,10 +154,45 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
             )
         )
 
+    def find_duplicates(self, value, property_instance, language_code=None, threshold=0.8):
+        """Return property select values with a value similar to the given one."""
+        from .models import PropertySelectValueTranslation
+
+        if language_code is None:
+            language_code = settings.LANGUAGE_CODE
+
+        processed_value = slugify(value).replace("-", "").lower()
+        translations = PropertySelectValueTranslation.objects.filter(
+            propertyselectvalue__in=self,
+            propertyselectvalue__property=property_instance,
+            language=language_code,
+        ).select_related("propertyselectvalue")
+
+        matched_ids = []
+        for translation in translations:
+            processed = slugify(translation.value).replace("-", "").lower()
+            ratio = difflib.SequenceMatcher(None, processed_value, processed).ratio()
+            if ratio >= threshold:
+                matched_ids.append(translation.propertyselectvalue_id)
+
+        return self.filter(id__in=matched_ids)
+
 
 class PropertySelectValueManager(MultiTenantManager):
     def get_queryset(self):
         return PropertySelectValueQuerySet(self.model, using=self._db)
+
+    def check_for_duplicates(self, value, property_instance, multi_tenant_company, threshold=0.8):
+        qs = self.filter(
+            multi_tenant_company=multi_tenant_company,
+            property=property_instance,
+        )
+        return qs.find_duplicates(
+            value,
+            property_instance,
+            language_code=multi_tenant_company.language,
+            threshold=threshold,
+        )
 
 
 class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
