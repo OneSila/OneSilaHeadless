@@ -39,12 +39,4 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(deduplicate_internal_names, migrations.RunPython.noop),
-        migrations.AddConstraint(
-            model_name='property',
-            constraint=models.UniqueConstraint(
-                fields=['multi_tenant_company', 'internal_name'],
-                condition=models.Q(internal_name__isnull=False),
-                name='unique_internal_name_per_company',
-            ),
-        ),
     ]
