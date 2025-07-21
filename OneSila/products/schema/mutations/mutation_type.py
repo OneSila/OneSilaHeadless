@@ -1,3 +1,5 @@
+from typing import Optional, List as TypingList
+
 from .fields import create_product
 from strawberry import Info
 import strawberry_django
@@ -13,6 +15,7 @@ from ..types.types import (
     ConfigurableVariationType,
     BundleVariationType,
     ProductTranslationBulletPointType,
+    ProductVariationsTaskResponse,
 )
 from ..types.input import (
     ProductInput,
@@ -31,6 +34,8 @@ from ..types.input import (
     BundleVariationPartialInput,
     ProductTranslationBulletPointInput,
     ProductTranslationBulletPointPartialInput,
+    ProductPropertiesRulePartialInput,
+    PropertySelectValuePartialInput,
 )
 from core.schema.core.mutations import create, update, delete, type, List
 
@@ -86,6 +91,47 @@ class ProductsMutation:
     delete_product_translation_bullet_points: List[ProductTranslationBulletPointType] = delete(is_bulk=True)
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def generate_product_variations(
+        self,
+        info: Info,
+        rule: ProductPropertiesRulePartialInput,
+        config_product: ProductPartialInput,
+        select_values: TypingList[PropertySelectValuePartialInput],
+        language_code: str | None = None,
+    ) -> ProductVariationsTaskResponse:
+        from products.tasks import products__generate_variations_task
+        from products.models import Product
+        from properties.models import ProductPropertiesRule, PropertySelectValue
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        rule_obj = ProductPropertiesRule.objects.get(
+            id=rule.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+        config_product_obj = Product.objects.get(
+            id=config_product.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        value_ids = [sv.id.node_id for sv in select_values]
+        select_value_ids = list(
+            PropertySelectValue.objects.filter(
+                id__in=value_ids,
+                multi_tenant_company=multi_tenant_company,
+            ).values_list("id", flat=True)
+        )
+
+        products__generate_variations_task(
+            rule_id=rule_obj.id,
+            config_product_id=config_product_obj.id,
+            select_value_ids=select_value_ids,
+            language=language_code,
+        )
+
+        return ProductVariationsTaskResponse(success=True)
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def duplicate_product(self, info: Info, product: ProductPartialInput, sku: str | None = None) -> ProductType:
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
         instance =  Product.objects.get(id=product.id.node_id)
@@ -93,3 +139,4 @@ class ProductsMutation:
             raise PermissionError("Invalid company")
         duplicated = Product.objects.duplicate_product(instance, sku=sku)
         return duplicated
+
