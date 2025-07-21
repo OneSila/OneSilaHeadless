@@ -393,6 +393,12 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
         },
+        # 'file': {
+        #     'level': 'DEBUG',
+        #     'class': 'logging.FileHandler',
+        #     'filename': '/var/log/OneSilaHeadless/django.log',
+        #     'formatter': 'verbose',
+        # },
     },
     'root': {
         'handlers': ['console'],
