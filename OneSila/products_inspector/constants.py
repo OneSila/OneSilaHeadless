@@ -58,12 +58,12 @@ ERROR_TYPES = (
 # BLOCKS CONFIG SECTION
 has_image_block = {
     'error_code': HAS_IMAGES_ERROR,
-    'simple_product_applicability': OPTIONAL,
+    'simple_product_applicability': REQUIRED,
     'configurable_product_applicability': REQUIRED,
-    'manufacturable_product_applicability': OPTIONAL,
-    'bundle_product_applicability': OPTIONAL,
-    'dropship_product_applicability': OPTIONAL,
-    'supplier_product_applicability': OPTIONAL,
+    'manufacturable_product_applicability': REQUIRED,
+    'bundle_product_applicability': REQUIRED,
+    'dropship_product_applicability': REQUIRED,
+    'supplier_product_applicability': REQUIRED,
 }
 
 missing_prices_block = {

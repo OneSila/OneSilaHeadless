@@ -176,7 +176,7 @@ class HasImagesInspectorBlockFactory(InspectorBlockFactory):
 
         from sales_channels.models import SalesChannelViewAssign
 
-        if SalesChannelViewAssign.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product).exists():
+        if SalesChannelViewAssign.objects.filter(multi_tenant_company=self.multi_tenant_company, product=self.product).exists():
             if images_count == 0:
                 raise InspectorBlockFailed("Product does not have required images.")
 
