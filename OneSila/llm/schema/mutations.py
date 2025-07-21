@@ -11,13 +11,20 @@ from .types.input import (
     AIBulkTranslationInput,
     ProductAiBulletPointsInput,
 )
-from core.schema.core.mutations import type
+from core.schema.core.mutations import type, create, update, delete, List
+from .types.types import BrandCustomPromptType
+from .types.input import BrandCustomPromptInput, BrandCustomPromptPartialInput
 from core.schema.core.helpers import get_multi_tenant_company
 from products.models import Product
 
 
 @type(name="Mutation")
 class LlmMutation:
+    create_brand_custom_prompt: BrandCustomPromptType = create(BrandCustomPromptInput)
+    create_brand_custom_prompts: List[BrandCustomPromptType] = create(BrandCustomPromptInput)
+    update_brand_custom_prompt: BrandCustomPromptType = update(BrandCustomPromptPartialInput)
+    delete_brand_custom_prompt: BrandCustomPromptType = delete()
+    delete_brand_custom_prompts: List[BrandCustomPromptType] = delete(is_bulk=True)
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def generate_product_ai_content(self, instance: ProductAiContentInput, info: Info) -> AiContent:
