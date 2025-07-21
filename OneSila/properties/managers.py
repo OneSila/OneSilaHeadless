@@ -1,6 +1,8 @@
 from django.core.exceptions import ValidationError
 from django.db.models import Subquery, OuterRef
 from django.utils.text import slugify
+from django.conf import settings
+import difflib
 from django.utils.translation import gettext_lazy as _
 from core.managers import MultiTenantManager, MultiTenantQuerySet
 from django.db import transaction
@@ -84,6 +86,28 @@ class PropertyQuerySet(MultiTenantQuerySet):
             )
         )
 
+    def find_duplicates(self, name, language_code=None, threshold=0.8):
+        """Return properties with a name similar to the given value."""
+        from .models import PropertyTranslation
+
+        if language_code is None:
+            language_code = settings.LANGUAGE_CODE
+
+        processed_name = slugify(name).replace("-", "").lower()
+        translations = PropertyTranslation.objects.filter(
+            property__in=self,
+            language=language_code,
+        ).select_related("property")
+
+        matched_ids = []
+        for translation in translations:
+            processed = slugify(translation.name).replace("-", "").lower()
+            ratio = difflib.SequenceMatcher(None, processed_name, processed).ratio()
+            if ratio >= threshold:
+                matched_ids.append(translation.property_id)
+
+        return self.filter(id__in=matched_ids)
+
 
 class PropertyManager(MultiTenantManager):
     def get_queryset(self):
@@ -100,6 +124,10 @@ class PropertyManager(MultiTenantManager):
 
     def create_brand(self, multi_tenant_company):
         return self.get_queryset().create_brand(multi_tenant_company)
+
+    def check_for_duplicates(self, name, multi_tenant_company, threshold=0.8):
+        qs = self.filter(multi_tenant_company=multi_tenant_company)
+        return qs.find_duplicates(name, language_code=multi_tenant_company.language, threshold=threshold)
 
 
 class PropertySelectValueQuerySet(MultiTenantQuerySet):
