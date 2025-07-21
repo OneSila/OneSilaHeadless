@@ -96,6 +96,12 @@ class Property(TranslatedModelMixin, models.Model):
                 name='unique_is_product_type',
                 violation_error_message=_("You can only have one product type per multi-tenant company.")
             ),
+            models.UniqueConstraint(
+                fields=['multi_tenant_company', 'internal_name'],
+                condition=Q(internal_name__isnull=False),
+                name='unique_internal_name_per_company',
+                violation_error_message=_("This internal name already exists for this company.")
+            ),
         ]
 
 
