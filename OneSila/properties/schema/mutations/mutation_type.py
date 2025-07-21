@@ -84,7 +84,7 @@ class PropertiesMutation:
         info: Info,
     ) -> PropertySelectValueDuplicatesType:
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        property_instance = property.pk
+        property_instance = Property.objects.get(id=property.id.node_id)
         duplicates = PropertySelectValue.objects.check_for_duplicates(
             value,
             property_instance,

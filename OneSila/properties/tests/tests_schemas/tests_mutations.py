@@ -78,7 +78,7 @@ class CheckPropertySelectValueForDuplicatesTestCase(TransactionTestCaseMixin, Tr
 
     def test_duplicate_found(self):
         mutation = """
-            mutation($property: GlobalID!, $value: String!) {
+            mutation($property: PropertyPartialInput!, $value: String!) {
               checkPropertySelectValueForDuplicates(property: $property, value: $value) {
                 duplicateFound
                 duplicates { id }
@@ -87,7 +87,7 @@ class CheckPropertySelectValueForDuplicatesTestCase(TransactionTestCaseMixin, Tr
         """
         resp = self.strawberry_test_client(
             query=mutation,
-            variables={"property": self.to_global_id(self.prop), "value": "Red"},
+            variables={"property": {"id": self.to_global_id(self.prop)}, "value": "Red2"},
         )
 
         self.assertIsNone(resp.errors)
@@ -97,7 +97,7 @@ class CheckPropertySelectValueForDuplicatesTestCase(TransactionTestCaseMixin, Tr
 
     def test_no_duplicate_found(self):
         mutation = """
-            mutation($property: GlobalID!, $value: String!) {
+            mutation($property: PropertyPartialInput!, $value: String!) {
               checkPropertySelectValueForDuplicates(property: $property, value: $value) {
                 duplicateFound
                 duplicates { id }
@@ -106,7 +106,7 @@ class CheckPropertySelectValueForDuplicatesTestCase(TransactionTestCaseMixin, Tr
         """
         resp = self.strawberry_test_client(
             query=mutation,
-            variables={"property": self.to_global_id(self.prop), "value": "Blue"},
+            variables={"property": {"id": self.to_global_id(self.prop)}, "value": "Blue"},
         )
 
         self.assertIsNone(resp.errors)

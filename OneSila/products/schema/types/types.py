@@ -115,7 +115,7 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
             return GREEN
 
     @field()
-    def inspector_completion(self, info) -> InspectorCompletionType:
+    def percentage_inspector_status(self, info) -> InspectorCompletionType:
         from products_inspector.constants import RED, ORANGE, GREEN
 
         percentage, blocks = self.inspector.completion_percentage()
