@@ -6,8 +6,8 @@ from core.schema.core.helpers import get_multi_tenant_company
 from .fields import complete_create_product_properties_rule, complete_update_product_properties_rule, \
     bulk_create_product_properties, create_property, create_property_select_value
 from ..types.types import PropertyType, PropertyTranslationType, PropertySelectValueType, ProductPropertyType, ProductPropertyTextTranslationType, \
-    PropertySelectValueTranslationType, ProductPropertiesRuleType, ProductPropertiesRuleItemType, PropertyDuplicatesType
-from properties.models import Property
+    PropertySelectValueTranslationType, ProductPropertiesRuleType, ProductPropertiesRuleItemType, PropertyDuplicatesType, PropertySelectValueDuplicatesType
+from properties.models import Property, PropertySelectValue
 from ..types.input import PropertyInput, PropertyTranslationInput, PropertySelectValueInput, ProductPropertyInput, \
     PropertyPartialInput, PropertyTranslationPartialInput, PropertySelectValuePartialInput, ProductPropertyPartialInput, ProductPropertyTextTranslationInput, \
     PropertySelectValueTranslationInput, PropertySelectValueTranslationPartialInput, ProductPropertyTextTranslationPartialInput, ProductPropertiesRuleInput, \
@@ -72,6 +72,25 @@ class PropertiesMutation:
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
         duplicates = Property.objects.check_for_duplicates(name, multi_tenant_company)
         return PropertyDuplicatesType(
+            duplicate_found=duplicates.exists(),
+            duplicates=list(duplicates),
+        )
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def check_property_select_value_for_duplicates(
+        self,
+        value: str,
+        property: PropertyPartialInput,
+        info: Info,
+    ) -> PropertySelectValueDuplicatesType:
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        property_instance = property.pk
+        duplicates = PropertySelectValue.objects.check_for_duplicates(
+            value,
+            property_instance,
+            multi_tenant_company,
+        )
+        return PropertySelectValueDuplicatesType(
             duplicate_found=duplicates.exists(),
             duplicates=list(duplicates),
         )
