@@ -57,7 +57,7 @@ class BrandCustomPrompt(models.Model):
     LANGUAGES = get_languages()
 
     brand_value = models.ForeignKey('properties.PropertySelectValue', on_delete=models.CASCADE)
-    language = models.CharField(max_length=7, choices=LANGUAGES, default=settings.LANGUAGE_CODE)
+    language = models.CharField(max_length=7, choices=LANGUAGES, default=settings.LANGUAGE_CODE, null=True, blank=True)
     prompt = models.TextField()
 
 

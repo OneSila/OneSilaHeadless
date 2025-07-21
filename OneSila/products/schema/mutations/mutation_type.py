@@ -94,8 +94,8 @@ class ProductsMutation:
     def generate_product_variations(
         self,
         info: Info,
-        rule: ProductPropertiesRulePartialInput,
-        config_product: ProductPartialInput,
+        rule_product_type: PropertySelectValuePartialInput,
+        product: ProductPartialInput,
         select_values: TypingList[PropertySelectValuePartialInput],
         language_code: str | None = None,
     ) -> ProductVariationsTaskResponse:
@@ -106,11 +106,12 @@ class ProductsMutation:
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
 
         rule_obj = ProductPropertiesRule.objects.get(
-            id=rule.id.node_id,
+            product_type_id=rule_product_type.id.node_id,
             multi_tenant_company=multi_tenant_company,
         )
+
         config_product_obj = Product.objects.get(
-            id=config_product.id.node_id,
+            id=product.id.node_id,
             multi_tenant_company=multi_tenant_company,
         )
 
