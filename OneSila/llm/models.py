@@ -1,5 +1,8 @@
+from django.conf import settings
 from core import models
 from django.core.exceptions import ValidationError
+
+from core.helpers import get_languages
 
 
 class AbstractAiProcess(models.Model):
@@ -52,9 +55,15 @@ class AiImportProcess(AbstractAiProcess):
 
 
 class BrandCustomPrompt(models.Model):
+    LANGUAGES = get_languages()
+
     brand_value = models.ForeignKey('properties.PropertySelectValue', on_delete=models.CASCADE)
-    language = models.CharField(max_length=10, null=True, blank=True)
+    language = models.CharField(max_length=7, choices=LANGUAGES, default=settings.LANGUAGE_CODE)
     prompt = models.TextField()
+
+
+    class Meta:
+        unique_together = ('brand_value', 'language')
 
     def save(self, *args, **kwargs):
         if self.brand_value.property.internal_name != 'brand':
