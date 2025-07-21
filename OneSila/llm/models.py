@@ -1,8 +1,7 @@
 from django.conf import settings
 from core import models
-from django.core.exceptions import ValidationError
-
 from core.helpers import get_languages
+from django.core.exceptions import ValidationError
 
 
 class AbstractAiProcess(models.Model):
