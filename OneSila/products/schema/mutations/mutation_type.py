@@ -1,4 +1,9 @@
 from .fields import create_product
+from strawberry import Info
+import strawberry_django
+from core.schema.core.extensions import default_extensions
+from core.schema.core.helpers import get_multi_tenant_company
+from products.models import Product
 from ..types.types import (
     ProductType,
     BundleProductType,
@@ -79,3 +84,12 @@ class ProductsMutation:
     update_product_translation_bullet_point: ProductTranslationBulletPointType = update(ProductTranslationBulletPointPartialInput)
     delete_product_translation_bullet_point: ProductTranslationBulletPointType = delete()
     delete_product_translation_bullet_points: List[ProductTranslationBulletPointType] = delete(is_bulk=True)
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def duplicate_product(self, info: Info, product: ProductPartialInput, sku: str | None = None) -> ProductType:
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        instance = product.pk
+        if instance.multi_tenant_company != multi_tenant_company:
+            raise PermissionError("Invalid company")
+        duplicated = Product.objects.duplicate_product(instance, sku=sku)
+        return duplicated

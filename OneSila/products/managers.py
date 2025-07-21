@@ -41,6 +41,153 @@ class ProductQuerySet(MultiTenantQuerySet):
         product_ids = ProductProperty.objects.filter(value_select=product_type).values_list('product_id', flat=True)
         return self.filter_multi_tenant(multi_tenant_company=product_type.multi_tenant_company).filter(id__in=product_ids)
 
+    def duplicate_product(self, product, *, sku=None):
+        from django.db import transaction
+        from django.core.exceptions import ValidationError
+        from .models import (
+            Product,
+            ProductTranslation,
+            ProductTranslationBulletPoint,
+            ConfigurableVariation,
+            BundleVariation,
+        )
+        from media.models import MediaProductThrough
+        from properties.models import (
+            ProductProperty,
+            ProductPropertyTextTranslation,
+        )
+        from sales_prices.models import SalesPrice, SalesPriceListItem
+
+        multi_tenant_company = product.multi_tenant_company
+
+        if sku is not None and Product.objects.filter(
+            multi_tenant_company=multi_tenant_company,
+            sku=sku,
+        ).exists():
+            raise ValidationError("SKU already exists")
+
+        with transaction.atomic():
+            new_product = Product.objects.create(
+                multi_tenant_company=multi_tenant_company,
+                sku=sku,
+                active=product.active,
+                type=product.type,
+                vat_rate=product.vat_rate,
+                allow_backorder=product.allow_backorder,
+                alias_parent_product=product.alias_parent_product,
+                created_by_multi_tenant_user=product.created_by_multi_tenant_user,
+                last_update_by_multi_tenant_user=product.last_update_by_multi_tenant_user,
+            )
+
+            # Translations
+            for trans in product.translations.all():
+                new_trans = ProductTranslation.objects.create(
+                    product=new_product,
+                    sales_channel=trans.sales_channel,
+                    name=trans.name,
+                    short_description=trans.short_description,
+                    description=trans.description,
+                    url_key=trans.url_key,
+                    language=trans.language,
+                    multi_tenant_company=multi_tenant_company,
+                )
+                for bp in trans.bullet_points.all():
+                    ProductTranslationBulletPoint.objects.create(
+                        product_translation=new_trans,
+                        text=bp.text,
+                        sort_order=bp.sort_order,
+                    )
+
+            # Images
+            MediaProductThrough.objects.bulk_create([
+                MediaProductThrough(
+                    media=img.media,
+                    product=new_product,
+                    sort_order=img.sort_order,
+                    is_main_image=img.is_main_image,
+                    multi_tenant_company=multi_tenant_company,
+                )
+                for img in MediaProductThrough.objects.filter(product=product)
+            ])
+
+            # Properties
+            for pp in ProductProperty.objects.filter(product=product).select_related("property"):
+                new_pp = ProductProperty.objects.create(
+                    product=new_product,
+                    property=pp.property,
+                    value_boolean=pp.value_boolean,
+                    value_int=pp.value_int,
+                    value_float=pp.value_float,
+                    value_date=pp.value_date,
+                    value_datetime=pp.value_datetime,
+                    value_select=pp.value_select,
+                    multi_tenant_company=multi_tenant_company,
+                )
+
+                for t in pp.productpropertytexttranslation_set.all():
+                    ProductPropertyTextTranslation.objects.create(
+                        product_property=new_pp,
+                        language=t.language,
+                        value_text=t.value_text,
+                        value_description=t.value_description,
+                        multi_tenant_company=multi_tenant_company,
+                    )
+
+            # Prices
+            for sp in SalesPrice.objects.filter(product=product):
+                SalesPrice.objects.create(
+                    product=new_product,
+                    currency=sp.currency,
+                    rrp=sp.rrp,
+                    price=sp.price,
+                    multi_tenant_company=multi_tenant_company,
+                )
+
+            for item in SalesPriceListItem.objects.filter(product=product):
+                SalesPriceListItem.objects.create(
+                    salespricelist=item.salespricelist,
+                    product=new_product,
+                    price_auto=item.price_auto,
+                    discount_auto=item.discount_auto,
+                    price_override=item.price_override,
+                    discount_override=item.discount_override,
+                    multi_tenant_company=multi_tenant_company,
+                )
+
+            # Configurable variations
+            for cv in ConfigurableVariation.objects.filter(parent=product):
+                ConfigurableVariation.objects.create(
+                    parent=new_product,
+                    variation=cv.variation,
+                    multi_tenant_company=multi_tenant_company,
+                )
+
+            for cv in ConfigurableVariation.objects.filter(variation=product):
+                ConfigurableVariation.objects.create(
+                    parent=cv.parent,
+                    variation=new_product,
+                    multi_tenant_company=multi_tenant_company,
+                )
+
+            # Bundle variations
+            for bv in BundleVariation.objects.filter(parent=product):
+                BundleVariation.objects.create(
+                    parent=new_product,
+                    variation=bv.variation,
+                    quantity=bv.quantity,
+                    multi_tenant_company=multi_tenant_company,
+                )
+
+            for bv in BundleVariation.objects.filter(variation=product):
+                BundleVariation.objects.create(
+                    parent=bv.parent,
+                    variation=new_product,
+                    quantity=bv.quantity,
+                    multi_tenant_company=multi_tenant_company,
+                )
+
+            return new_product
+
 
 class ProductManager(MultiTenantManager):
     def get_queryset(self):
@@ -51,6 +198,9 @@ class ProductManager(MultiTenantManager):
 
     def filter_by_product_type(self, product_type):
         return self.get_queryset().filter_by_product_type(product_type)
+
+    def duplicate_product(self, product, **kwargs):
+        return self.get_queryset().duplicate_product(product, **kwargs)
 
 
 class ConfigurableQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
