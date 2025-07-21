@@ -1,6 +1,5 @@
 from strawberry.exceptions import StrawberryException
 
-from core.schema.core.helpers import get_multi_tenant_company
 from core.schema.core.mixins import GetCurrentUserMixin
 from core.schema.core.mutations import CreateMutation, UpdateMutation
 from strawberry_django.optimizer import DjangoOptimizerExtension
@@ -160,3 +159,5 @@ class BulkCreateProductProperties(CreateMutation):
                 translation.save()
 
             return obj
+
+
