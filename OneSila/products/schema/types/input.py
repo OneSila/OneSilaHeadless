@@ -1,3 +1,7 @@
+from typing import List
+
+import strawberry
+
 from core.schema.core.types.input import NodeInput, input, partial
 from products.models import (
     Product,
@@ -8,6 +12,10 @@ from products.models import (
     ConfigurableVariation,
     BundleVariation,
     ProductTranslationBulletPoint,
+)
+from properties.schema.types.input import (
+    ProductPropertiesRulePartialInput,
+    PropertySelectValuePartialInput,
 )
 
 
@@ -91,3 +99,5 @@ class ProductTranslationBulletPointInput:
 @partial(ProductTranslationBulletPoint, fields="__all__")
 class ProductTranslationBulletPointPartialInput(NodeInput):
     pass
+
+
