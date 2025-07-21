@@ -5,11 +5,13 @@ from django.core.exceptions import ValidationError
 
 
 class TranslatableCreateMutation(CreateMutation):
-    def __init__(self, *args, extensions, translation_model, translation_field, translation_model_to_model_field, **kwargs):
+    def __init__(self, *args, extensions, translation_model, translation_field,
+                 translation_model_to_model_field, signal=None, **kwargs):
         super().__init__(*args, extensions=extensions, **kwargs)
         self.translation_model = translation_model
         self.translation_field = translation_field
         self.translation_model_to_model_field = translation_model_to_model_field
+        self.signal = signal
 
     def create(self, data: dict[str, Any], *, info: Info):
         with DjangoOptimizerExtension.disabled():
@@ -29,4 +31,7 @@ class TranslatableCreateMutation(CreateMutation):
 
             self.translation_model.objects.create(**kwargs)
             instance.refresh_from_db()
+            if self.signal:
+                self.signal.send(sender=instance.__class__, instance=instance, language=language)
+
             return instance
