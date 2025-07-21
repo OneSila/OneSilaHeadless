@@ -32,7 +32,7 @@ from sales_channels.integrations.amazon.schema import AmazonSalesChannelMutation
 from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
 from translations.schema import TranslationsQuery
 from integrations.schema import IntegrationsQuery, IntegrationsMutation
-from llm.schema import LlmMutation
+from llm.schema import LlmMutation, LlmQuery
 
 
 #
@@ -60,6 +60,7 @@ class Query(
         TaxesQuery,
         TimeZoneQuery,
         TranslationsQuery,
+        LlmQuery,
 ):
     pass
 
