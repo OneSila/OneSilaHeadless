@@ -194,3 +194,8 @@ class AliasProductType(relay.Node, GetQuerysetMultiTenantMixin):
 )
 class ProductTranslationBulletPointType(relay.Node, GetQuerysetMultiTenantMixin):
     product_translation: Optional[ProductTranslationType]
+
+
+@strawberry_type
+class ProductVariationsTaskResponse:
+    success: bool
