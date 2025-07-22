@@ -7,6 +7,7 @@ from integrations.constants import (
     MAGENTO_INTEGRATION,
     SHOPIFY_INTEGRATION,
     AMAZON_INTEGRATION,
+    WOOCOMMERCE_INTEGRATION,
 )
 
 from products.schema.types.input import ProductPartialInput
@@ -27,6 +28,7 @@ class SalesChannelIntegrationType(Enum):
     MAGENTO = MAGENTO_INTEGRATION
     SHOPIFY = SHOPIFY_INTEGRATION
     AMAZON = AMAZON_INTEGRATION
+    WOOCOMMERCE = WOOCOMMERCE_INTEGRATION
 
 
 @partial(Product, fields="__all__")
