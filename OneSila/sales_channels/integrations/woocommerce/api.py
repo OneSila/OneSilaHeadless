@@ -444,7 +444,7 @@ class WoocommerceApiWrapper:
         """
         for i in self.get('settings/general'):
             if i['id'] == key:
-                return i['default']
+                return i['value']
         raise ValueError(f"Setting with key {key} not found")
 
     def get_store_currency(self):
