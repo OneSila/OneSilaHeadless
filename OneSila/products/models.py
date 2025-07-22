@@ -54,7 +54,7 @@ class Product(TranslatedModelMixin, models.Model):
 
     @property
     def name(self):
-        return self._get_translated_value(field_name='name', related_name='translations', fallback='sku')
+        return self._get_translated_value(field_name='name', related_name='translations', fallback='No Name Set')
 
     @property
     def url_key(self):
