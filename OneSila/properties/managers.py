@@ -5,7 +5,8 @@ from django.conf import settings
 import difflib
 from django.utils.translation import gettext_lazy as _
 from core.managers import MultiTenantManager, MultiTenantQuerySet
-from django.db import transaction
+from django.db import transaction, IntegrityError
+from .helpers import generate_unique_internal_name
 
 
 class PropertyQuerySet(MultiTenantQuerySet):
@@ -128,6 +129,32 @@ class PropertyManager(MultiTenantManager):
     def check_for_duplicates(self, name, multi_tenant_company, threshold=0.8):
         qs = self.filter(multi_tenant_company=multi_tenant_company)
         return qs.find_duplicates(name, language_code=multi_tenant_company.language, threshold=threshold)
+
+    def get_or_create(self, **kwargs):
+        internal_name = kwargs.get('internal_name')
+        if not internal_name and 'defaults' in kwargs:
+            internal_name = kwargs['defaults'].get('internal_name')
+
+        try:
+            return super().get_or_create(**kwargs)
+        except IntegrityError as exc:
+            if (
+                internal_name
+                and 'unique_internal_name_per_company' in str(exc)
+            ):
+                unique_name = generate_unique_internal_name(
+                    internal_name,
+                    kwargs.get('multi_tenant_company'),
+                )
+
+                if 'internal_name' in kwargs:
+                    kwargs['internal_name'] = unique_name
+                else:
+                    kwargs.setdefault('defaults', {})['internal_name'] = unique_name
+
+                return super().get_or_create(**kwargs)
+
+            raise
 
 
 class PropertySelectValueQuerySet(MultiTenantQuerySet):
