@@ -209,6 +209,8 @@ class DescriptionGenLLM(ContentLLMMixin):
         if self.brand_prompt:
             prompt += f"""
             ##Brand Personality##
+            Adjust your product description to fit this brand personality, so that it speaks to a person that
+            matchies this ICP / brand personality.
             {self.brand_prompt}
             """
         return prompt
