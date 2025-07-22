@@ -55,10 +55,3 @@ class ShopifyRemoteCurrencyPullFactory(GetShopifyApiMixin, PullRemoteInstanceMix
         if currency and not remote_instance_mirror.local_instance:
             remote_instance_mirror.local_instance = currency
             remote_instance_mirror.save(update_fields=['local_instance'])
-
-    def update_remote_instance_mirror(self, remote_data, remote_instance_mirror):
-        super().update_remote_instance_mirror(remote_data, remote_instance_mirror)
-        currency = remote_data.get('local_currency')
-        if currency and remote_instance_mirror.local_instance != currency:
-            remote_instance_mirror.local_instance = currency
-            remote_instance_mirror.save(update_fields=['local_instance'])

@@ -22,7 +22,7 @@ from sales_channels.signals import (
     create_remote_image_association,
     update_remote_image_association,
     delete_remote_image_association,
-    delete_remote_image, refresh_website_pull_models,
+    delete_remote_image, refresh_website_pull_models, sales_channel_created,
 )
 
 from sales_channels.flows.default import (
@@ -44,17 +44,27 @@ logger = logging.getLogger(__name__)
 @receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
 def woocommerce__product__create_from_assign(sender, instance, **kwargs):
     from sales_channels.integrations.woocommerce.flows.products import create_woocommerce_product_flow
-    create_woocommerce_product_flow(instance)
+    from products.product_types import CONFIGURABLE
 
-    # count = 1 + (product.get_configurable_variations().count() if hasattr(product, 'get_configurable_variations') else 0)
-    # run_generic_sales_channel_task_flow(
-    #     task_func=create_shopify_product_db_task,
-    #     multi_tenant_company=product.multi_tenant_company,
-    #     sales_channels_filter_kwargs={'id': sc.id},
-    #     number_of_remote_requests=count,
-    #     sales_channel_class=ShopifySalesChannel,
-    #     product_id=product.id,
-    # )
+    product = instance.product
+    sales_channel = instance.sales_channel
+
+    if not isinstance(sales_channel, WoocommerceSalesChannel):
+        return
+
+    if product.type == CONFIGURABLE:
+        number_of_remote_requests = 1 + product.get_configurable_variations().count()
+    else:
+        number_of_remote_requests = 1
+
+    run_generic_sales_channel_task_flow(
+        task_func=create_woocommerce_product_db_task,
+        multi_tenant_company=product.multi_tenant_company,
+        sales_channels_filter_kwargs={'id': sales_channel.id},
+        number_of_remote_requests=number_of_remote_requests,
+        sales_channel_class=WoocommerceSalesChannel,
+        product_id=product.id,
+    )
 
 
 #
@@ -304,6 +314,8 @@ def woocommerce__image__delete(sender, instance, **kwargs):
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
 @receiver(refresh_website_pull_models, sender='woocommerce.WoocommerceSalesChannel')
+@receiver(sales_channel_created, sender='sales_channels.SalesChannel')
+@receiver(sales_channel_created, sender='magento2.WoocommerceSalesChannel')
 def sales_channels__woocommerce__handle_pull_woocommerce_sales_channel_views(sender, instance, **kwargs):
     from sales_channels.integrations.woocommerce.factories.pulling import (
         WoocommerceSalesChannelViewPullFactory,

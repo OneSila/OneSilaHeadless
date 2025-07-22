@@ -51,14 +51,6 @@ def shopify__product__create_from_assign(sender, instance, **kwargs):
     if not isinstance(sc, ShopifySalesChannel):
         return
 
-    # from sales_channels.integrations.shopify.factories.products.products import  ShopifyProductCreateFactory
-    #
-    # product = instance.product
-    # sc = instance.sales_channel
-    #
-    # fac = ShopifyProductCreateFactory(sales_channel=sc, local_instance=product)
-    # fac.run()
-
     run_generic_sales_channel_task_flow(
         task_func=create_shopify_product_db_task,
         multi_tenant_company=product.multi_tenant_company,
