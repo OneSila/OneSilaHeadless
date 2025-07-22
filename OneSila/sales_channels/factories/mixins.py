@@ -388,6 +388,7 @@ class LocalCurrencyMappingMixin:
 
         for remote_data in self.remote_instances:
             code = remote_data.get(code_field)
+
             if not code:
                 continue
 
@@ -397,3 +398,13 @@ class LocalCurrencyMappingMixin:
             ).first()
 
             remote_data["local_currency"] = currency
+
+
+    def create_remote_instance_mirror(self, remote_data, remote_instance_mirror):
+        super().create_remote_instance_mirror(remote_data, remote_instance_mirror)
+        currency = remote_data.get('local_currency')
+
+        if currency and not remote_instance_mirror.local_instance:
+            remote_instance_mirror.local_instance = currency
+            remote_instance_mirror.save(update_fields=['local_instance'])
+

@@ -191,6 +191,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         images = self.get_images(product_data)
         prices = self.get_prices(product_data)
         tax = self.get_tax_class(product_data)
+        translation = self.get_content(product_data)
 
         # Now that we have all of the data, let's build th actual payload.
         payload = {
@@ -204,6 +205,9 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
 
         if not is_configurable:
             payload['prices'] = prices
+
+        if translation:
+            payload['translations'] = translation
 
         logger.debug(f"Structured product data: {payload}")
 
