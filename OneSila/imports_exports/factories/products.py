@@ -38,8 +38,8 @@ class ProductImport(ImportOperationMixin):
 
         error_msg = str(error)
         is_duplicate_sku_constraint = (
-                'duplicate key value violates unique constraint' in error_msg and
-                'products_product_sku_multi_tenant_company_id' in error_msg
+            'duplicate key value violates unique constraint' in error_msg and
+            'products_product_sku_multi_tenant_company_id' in error_msg
         )
 
         if not is_duplicate_sku_constraint:
@@ -240,7 +240,6 @@ class ImportProductInstance(AbstractImportInstance):
                     prop = select_value["property"]
                     required_names.add(prop.name)
 
-
         items = []
         if hasattr(self, 'properties'):
             for property in self.properties:
@@ -341,7 +340,6 @@ class ImportProductInstance(AbstractImportInstance):
         else:
             if self.update_current_rule:
                 self.update_product_rule()
-
 
         product_property_ids = []
         if self.type in [Product.SIMPLE, Product.BUNDLE, Product.ALIAS] and hasattr(self, 'properties'):
@@ -528,7 +526,8 @@ class ImportProductInstance(AbstractImportInstance):
                     # Try again with url_key removed
                     translation = translation.copy()
                     translation["url_key"] = None
-                    import_instance = ImportProductTranslationInstance(translation, self.import_process, product=self.instance, sales_channel=self.sales_channel)
+                    import_instance = ImportProductTranslationInstance(
+                        translation, self.import_process, product=self.instance, sales_channel=self.sales_channel)
                     import_instance.process()
                 else:
                     raise
@@ -578,7 +577,6 @@ class ImportProductInstance(AbstractImportInstance):
                 else:
                     raise
 
-
             bullet_points = translation.get('bullet_points')
             if bullet_points is not None:
                 translation_obj.bullet_points.all().delete()
@@ -591,6 +589,49 @@ class ImportProductInstance(AbstractImportInstance):
                     )
 
             translation_instance_ids.append(translation_obj.id)
+
+            if self.sales_channel is not None:
+                exists_default = ProductTranslation.objects.filter(
+                    multi_tenant_company=self.instance.multi_tenant_company,
+                    product=self.instance,
+                    language=language,
+                    sales_channel=None,
+                ).exists()
+                if not exists_default:
+                    try:
+                        default_obj = ProductTranslation.objects.create(
+                            multi_tenant_company=self.instance.multi_tenant_company,
+                            language=language,
+                            product=self.instance,
+                            name=name,
+                            short_description=short_description,
+                            description=description,
+                            url_key=url_key,
+                            sales_channel=None,
+                        )
+                    except IntegrityError as e:
+                        if "url_key" in str(e):
+                            default_obj = ProductTranslation.objects.create(
+                                multi_tenant_company=self.instance.multi_tenant_company,
+                                language=language,
+                                product=self.instance,
+                                name=name,
+                                short_description=short_description,
+                                description=description,
+                                url_key=None,
+                                sales_channel=None,
+                            )
+                        else:
+                            raise
+
+                    if bullet_points is not None:
+                        for index, text in enumerate(bullet_points):
+                            ProductTranslationBulletPoint.objects.create(
+                                multi_tenant_company=default_obj.multi_tenant_company,
+                                product_translation=default_obj,
+                                text=text,
+                                sort_order=index,
+                            )
 
         self.translation_instances = ProductTranslation.objects.filter(id__in=translation_instance_ids)
 
@@ -656,6 +697,49 @@ class ImportProductTranslationInstance(AbstractImportInstance):
                     text=text,
                     sort_order=index,
                 )
+
+        if self.sales_channel is not None:
+            exists_default = ProductTranslation.objects.filter(
+                multi_tenant_company=self.instance.multi_tenant_company,
+                product=self.product,
+                language=self.language,
+                sales_channel=None,
+            ).exists()
+            if not exists_default:
+                try:
+                    default_obj = ProductTranslation.objects.create(
+                        multi_tenant_company=self.instance.multi_tenant_company,
+                        product=self.product,
+                        language=self.language,
+                        name=self.instance.name,
+                        short_description=self.instance.short_description,
+                        description=self.instance.description,
+                        url_key=self.instance.url_key,
+                        sales_channel=None,
+                    )
+                except IntegrityError as e:
+                    if "url_key" in str(e):
+                        default_obj = ProductTranslation.objects.create(
+                            multi_tenant_company=self.instance.multi_tenant_company,
+                            product=self.product,
+                            language=self.language,
+                            name=self.instance.name,
+                            short_description=self.instance.short_description,
+                            description=self.instance.description,
+                            url_key=None,
+                            sales_channel=None,
+                        )
+                    else:
+                        raise
+
+                if hasattr(self, 'bullet_points') and self.bullet_points is not None:
+                    for index, text in enumerate(self.bullet_points):
+                        ProductTranslationBulletPoint.objects.create(
+                            multi_tenant_company=default_obj.multi_tenant_company,
+                            product_translation=default_obj,
+                            text=text,
+                            sort_order=index,
+                        )
 
 
 class ImportSalesPriceInstance(AbstractImportInstance):
