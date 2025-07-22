@@ -403,6 +403,12 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'loggers': {
+        # The amazon package has a bug that shows you a log of the
+        # request x-times every time you do a request.
+        # This stops that flood to ensure we can actually use logs
+        # without loosing track.
+        # Keep both http.client + urllib3.connectinpool + requests.packages.urllib3.connectionpool
+        # to ensure we cover all bases.
         'http.client': {
             'handlers': ['console'],
             'level': 'WARNING',
@@ -431,6 +437,9 @@ LOGGING = {
         #     'formatter': 'verbose',
         # },
     },
+    # The amazon package has a bug that shows you a log of the
+    # request x-times every time you do a request. The 'root' logger
+    # config is for the same purpose of the remarks above in 'loggers'
     'root': {
         'handlers': ['console'],
         'level': 'WARNING',
