@@ -1,6 +1,6 @@
 from typing import Optional, List
 
-from core.schema.core.types.input import NodeInput, partial, strawberry_input
+from core.schema.core.types.input import NodeInput, partial, strawberry_input, input
 from products.models import Product
 from enum import Enum
 from integrations.constants import (
@@ -10,7 +10,11 @@ from integrations.constants import (
 )
 
 from products.schema.types.input import ProductPartialInput
-from properties.schema.types.input import PropertyPartialInput, PropertySelectValuePartialInput
+from properties.schema.types.input import (
+    PropertyPartialInput,
+    PropertySelectValuePartialInput,
+)
+from llm.models import BrandCustomPrompt
 
 
 class ContentAiGenerateType(Enum):
@@ -54,3 +58,13 @@ class AIBulkTranslationInput:
 @partial(Product, fields="__all__")
 class ProductAiBulletPointsInput(NodeInput):
     language_code: str
+
+
+@input(BrandCustomPrompt, fields="__all__")
+class BrandCustomPromptInput:
+    pass
+
+
+@partial(BrandCustomPrompt, fields="__all__")
+class BrandCustomPromptPartialInput(NodeInput):
+    pass

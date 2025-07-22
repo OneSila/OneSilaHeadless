@@ -1,4 +1,5 @@
 from core.schema.core.types.types import relay, type, field, Annotated, lazy
+import strawberry
 from core.schema.core.mixins import (
     GetPropertyQuerysetMultiTenantMixin,
     GetPropertySelectValueQuerysetMultiTenantMixin,
@@ -88,3 +89,15 @@ class ProductPropertiesRuleType(relay.Node, GetQuerysetMultiTenantMixin):
 class ProductPropertiesRuleItemType(relay.Node, GetQuerysetMultiTenantMixin):
     rule: ProductPropertiesRuleType
     property: PropertyType
+
+
+@strawberry.type
+class PropertyDuplicatesType:
+    duplicate_found: bool
+    duplicates: List[PropertyType]
+
+
+@strawberry.type
+class PropertySelectValueDuplicatesType:
+    duplicate_found: bool
+    duplicates: List[PropertySelectValueType]

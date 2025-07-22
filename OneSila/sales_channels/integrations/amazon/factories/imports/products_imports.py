@@ -615,10 +615,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 },
             )
             instance.language = language
-
-            print('---------------------------------------')
-            pprint.pprint(structured)
-
             instance.process()
 
             self.update_remote_product(instance, product, view, is_variation)

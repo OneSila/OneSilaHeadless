@@ -33,9 +33,6 @@ class MagentoPropertyCreateFactory(GetMagentoAPIMixin, MagentoEntityNotFoundGene
     update_if_not_exists = True
     update_factory_class = 'sales_channels.integrations.magento2.factories.properties.MagentoPropertyUpdateFactory'
 
-    def get_attribute_code(self):
-        return slugify(self.local_instance.name).replace('-', '_')
-
     def customize_payload(self):
         """
         Customizes the payload to include the correct 'frontend_input' mapping and wraps it under 'data'.
@@ -44,7 +41,7 @@ class MagentoPropertyCreateFactory(GetMagentoAPIMixin, MagentoEntityNotFoundGene
         self.payload['frontend_input'] = PROPERTY_FRONTEND_INPUT_MAP.get(self.local_instance.type, ProductAttribute.TEXT)
 
         # we need to set it like this because of some issue with the order of the signals
-        self.payload['attribute_code'] = self.get_attribute_code()
+        self.payload['attribute_code'] = self.local_instance.internal_name
         self.payload['frontend_labels'] = self.get_frontend_labels(
             translations=self.local_instance.propertytranslation_set.all(),
             value_field='name',
@@ -65,7 +62,7 @@ class MagentoPropertyCreateFactory(GetMagentoAPIMixin, MagentoEntityNotFoundGene
         self.remote_instance.attribute_code = response_data.get('data').get('attribute_code')
 
     def fetch_existing_remote_data(self):
-        return self.api.product_attributes.by_code(self.get_attribute_code())
+        return self.api.product_attributes.by_code(self.local_instance.internal_name)
 
 
 class MagentoPropertyUpdateFactory(GetMagentoAPIMixin, RemotePropertyUpdateFactory, MagentoTranslationMixin):

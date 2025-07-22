@@ -18,6 +18,7 @@ class PropertyFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     is_public_information: auto
     is_product_type: auto
     type: auto
+    internal_name: auto
 
 
 @filter(PropertySelectValue)
