@@ -1,4 +1,4 @@
-from sales_channels.factories.mixins import PullRemoteInstanceMixin
+from sales_channels.factories.mixins import PullRemoteInstanceMixin, LocalCurrencyMappingMixin
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceCurrency, \
     WoocommerceRemoteLanguage
@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class WoocommerceRemoteCurrencyPullFactory(GetWoocommerceAPIMixin, PullRemoteInstanceMixin):
+class WoocommerceRemoteCurrencyPullFactory(GetWoocommerceAPIMixin, LocalCurrencyMappingMixin, PullRemoteInstanceMixin):
     """
     Pulls the primary and presentment currencies configured on a Woocommerce store.
     """
@@ -28,6 +28,7 @@ class WoocommerceRemoteCurrencyPullFactory(GetWoocommerceAPIMixin, PullRemoteIns
     def fetch_remote_instances(self):
         currency = self.api.get_store_currency()
         self.remote_instances = [{'remote_code': currency, }]
+        self.add_local_currency()
 
 
 class WoocommerceLanguagePullFactory(GetWoocommerceAPIMixin, PullRemoteInstanceMixin):

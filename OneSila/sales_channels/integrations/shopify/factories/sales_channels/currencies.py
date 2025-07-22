@@ -1,12 +1,11 @@
 import json
 
-from sales_channels.factories.mixins import PullRemoteInstanceMixin
+from sales_channels.factories.mixins import PullRemoteInstanceMixin, LocalCurrencyMappingMixin
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin
 from sales_channels.integrations.shopify.models import ShopifyCurrency
-from currencies.models import Currency
 
 
-class ShopifyRemoteCurrencyPullFactory(GetShopifyApiMixin, PullRemoteInstanceMixin):
+class ShopifyRemoteCurrencyPullFactory(GetShopifyApiMixin, LocalCurrencyMappingMixin, PullRemoteInstanceMixin):
     """
     Pulls the primary and presentment currencies configured on a Shopify store.
     """
@@ -38,16 +37,11 @@ class ShopifyRemoteCurrencyPullFactory(GetShopifyApiMixin, PullRemoteInstanceMix
 
         primary = shop_data["currencyCode"]
 
-        local_currency = Currency.objects.filter(
-            iso_code=primary,
-            multi_tenant_company=self.sales_channel.multi_tenant_company,
-        ).first()
-
         self.remote_instances = [{
             'code': primary,
             'primary': True,
-            'local_currency': local_currency,
         }]
+        self.add_local_currency()
 
     def create_remote_instance_mirror(self, remote_data, remote_instance_mirror):
         super().create_remote_instance_mirror(remote_data, remote_instance_mirror)
