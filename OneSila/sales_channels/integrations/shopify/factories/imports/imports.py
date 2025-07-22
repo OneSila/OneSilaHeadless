@@ -1,5 +1,6 @@
 
 import json
+from datetime import datetime
 from decimal import Decimal
 
 from mkdocs.config.config_options import Optional
@@ -14,7 +15,7 @@ from sales_channels.integrations.shopify.constants import MEDIA_FRAGMENT, DEFAUL
     DEFAULT_PRODUCT_TYPE
 from sales_channels.integrations.shopify.factories.mixins import GetShopifyApiMixin
 from sales_channels.integrations.shopify.models import ShopifyProduct, ShopifyEanCode, ShopifyProductProperty, \
-    ShopifyProductContent, ShopifyImageProductAssociation, ShopifyPrice
+    ShopifyProductContent, ShopifyImageProductAssociation, ShopifyPrice, ShopifyCurrency
 from sales_channels.models import ImportProduct, SalesChannelViewAssign
 from django.contrib.contenttypes.models import ContentType
 import logging
@@ -355,6 +356,7 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
                 "add_to_filters": False,
                 "has_image": False
             }
+
             import_instance = ImportPropertyInstance(data, self.import_process)
             import_instance.process()
             prop = import_instance.instance
@@ -510,6 +512,7 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
 
         price = product.get("price")
         compare_at_price = product.get("compareAtPrice")
+        default_currency = ShopifyCurrency.objects.get(sales_channel=self.sales_channel, is_default=True)
 
         if price is not None or compare_at_price is not None:
             price_entry = {}
@@ -517,6 +520,8 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
                 price_entry["price"] = price
             if compare_at_price is not None:
                 price_entry["rrp"] = compare_at_price
+
+            price_entry['currency'] = default_currency.local_instance.iso_code
             prices.append(price_entry)
             return prices
 
@@ -532,6 +537,8 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
                     price_entry["price"] = price
                 if compare_at_price is not None:
                     price_entry["rrp"] = compare_at_price
+
+                price_entry['currency'] = default_currency.local_instance.iso_code
                 prices.append(price_entry)
 
         return prices

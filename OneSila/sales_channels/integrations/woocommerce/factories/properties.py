@@ -138,11 +138,6 @@ class WooCommerceProductPropertyMixin(WoocommerceRemoteValueConversionMixin):
     update_if_not_exists = True
     update_factory_class = "WooCommerceProductPropertyUpdateFactory"
 
-    # field_mapping = {
-    #     'name': 'name',
-    #     'is_public_information': 'visible',
-    # }
-
     def get_local_product(self):
         return self.local_instance.product
 
@@ -172,7 +167,11 @@ class WooCommerceProductPropertyUpdateFactory(WooCommerceUpdateRemoteProductMixi
         self.update_remote_product()
 
 
-class WooCommerceProductPropertyDeleteFactory(WooCommerceProductPropertyMixin, WooCommercePayloadMixin, RemoteProductPropertyDeleteFactory):
+class WooCommerceProductPropertyDeleteFactory(WooCommerceUpdateRemoteProductMixin, WooCommerceProductPropertyMixin, WooCommercePayloadMixin, RemoteProductPropertyDeleteFactory):
+
+    def get_local_product(self):
+        return self.remote_instance.remote_product.local_instance
+
     def delete_remote(self):
         # The attributes are not actually updated on the product.
         # They are set as part of the product

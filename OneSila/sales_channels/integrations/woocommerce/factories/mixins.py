@@ -520,17 +520,6 @@ class WooCommerceUpdateRemoteProductMixin(SerialiserMixin, GetWoocommerceAPIMixi
 
 class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSalesChannelLanguageMixin, WoocommerceProductTypeMixin, ToUpdateCurrenciesMixin):
     remote_id_map = 'id'
-    # Key is the local field, value is the remote field
-    field_mapping = {
-        'sku': 'sku',
-        # The price fields are not really fields
-        # but "magic" and get set during the payload build.
-        # 'price': 'regular_price',
-        # 'discount': 'sale_price',
-        # 'name': 'name',
-        # 'description': 'description',
-        # 'short_description': 'short_description',
-    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -540,9 +529,7 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
 
     def set_currency(self):
         if not hasattr(self, 'currency'):
-            self.currency = WoocommerceCurrency.objects.get(
-                sales_channel=self.sales_channel,
-            ).local_instance
+            self.currency = WoocommerceCurrency.objects.get(sales_channel=self.sales_channel).local_instance
             self.currency_iso_code = self.currency.iso_code
 
     def apply_content_payload(self):
@@ -672,6 +659,8 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
         # Apply the status payload.
         #
         product = self.get_local_product()
+        self.payload['sku'] = product.sku
+
         if product.active:
             self.payload['status'] = 'publish'
             self.payload['catalog_visibility'] = 'visible'

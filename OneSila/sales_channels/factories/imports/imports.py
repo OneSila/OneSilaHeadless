@@ -108,7 +108,7 @@ class SalesChannelImportMixin(ImportMixin):
 
     def get_remote_model_class(self, model_name: str):
         try:
-            return self.getattr(self, model_name)
+            return getattr(self, model_name)
         except AttributeError:
             raise AttributeError(f"remote_model_class {model_name} not set on {self.__class__.__name__}")
 
