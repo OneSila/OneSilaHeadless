@@ -7,6 +7,7 @@ from ..models.logs import RemoteLog
 import logging
 from eancodes.models import EanCode
 from ..exceptions import PreFlightCheckError
+from currencies.models import Currency
 
 logger = logging.getLogger(__name__)
 
@@ -372,3 +373,27 @@ class SyncProgressMixin:
             return
 
         self.remote_instance.set_new_sync_percentage(100)
+
+
+class LocalCurrencyMappingMixin:
+    """Mixin to map pulled currency codes to local ``Currency`` instances."""
+
+    def _get_remote_code_field(self) -> str:
+        """Return the key used in ``remote_data`` for the currency code."""
+        return getattr(self, "field_mapping", {}).get("remote_code", "code")
+
+    def add_local_currency(self) -> None:
+        """Attach a matching ``Currency`` instance to each remote record."""
+        code_field = self._get_remote_code_field()
+
+        for remote_data in self.remote_instances:
+            code = remote_data.get(code_field)
+            if not code:
+                continue
+
+            currency = Currency.objects.filter(
+                iso_code=code,
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+            ).first()
+
+            remote_data["local_currency"] = currency

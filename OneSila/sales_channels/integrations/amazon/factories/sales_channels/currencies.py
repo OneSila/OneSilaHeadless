@@ -1,4 +1,4 @@
-from sales_channels.factories.mixins import PullRemoteInstanceMixin
+from sales_channels.factories.mixins import PullRemoteInstanceMixin, LocalCurrencyMappingMixin
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin, PullAmazonMixin
 from sales_channels.integrations.amazon.models import (
     AmazonCurrency,
@@ -6,7 +6,7 @@ from sales_channels.integrations.amazon.models import (
 )
 
 
-class AmazonRemoteCurrencyPullFactory(GetAmazonAPIMixin, PullAmazonMixin, PullRemoteInstanceMixin):
+class AmazonRemoteCurrencyPullFactory(GetAmazonAPIMixin, PullAmazonMixin, LocalCurrencyMappingMixin, PullRemoteInstanceMixin):
     """Pull default currencies for each Amazon marketplace."""
 
     remote_model_class = AmazonCurrency
@@ -31,6 +31,7 @@ class AmazonRemoteCurrencyPullFactory(GetAmazonAPIMixin, PullAmazonMixin, PullRe
             for mp in marketplaces
             if mp.participation.is_participating and self.is_real_amazon_marketplace(mp.marketplace)
         ]
+        self.add_local_currency()
 
     def update_get_or_create_lookup(self, lookup, remote_data):
         view = AmazonSalesChannelView.objects.filter(
