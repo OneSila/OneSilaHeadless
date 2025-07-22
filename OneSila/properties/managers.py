@@ -131,30 +131,31 @@ class PropertyManager(MultiTenantManager):
         return qs.find_duplicates(name, language_code=multi_tenant_company.language, threshold=threshold)
 
     def get_or_create(self, **kwargs):
-        internal_name = kwargs.get('internal_name')
-        if not internal_name and 'defaults' in kwargs:
-            internal_name = kwargs['defaults'].get('internal_name')
+        internal_name = kwargs.get("internal_name")
+        if not internal_name and "defaults" in kwargs:
+            internal_name = kwargs["defaults"].get("internal_name")
 
-        try:
+        if not internal_name:
             return super().get_or_create(**kwargs)
-        except IntegrityError as exc:
-            if (
-                internal_name
-                and 'unique_internal_name_per_company' in str(exc)
-            ):
-                unique_name = generate_unique_internal_name(
-                    internal_name,
-                    kwargs.get('multi_tenant_company'),
-                )
 
-                if 'internal_name' in kwargs:
-                    kwargs['internal_name'] = unique_name
-                else:
-                    kwargs.setdefault('defaults', {})['internal_name'] = unique_name
+        base_name = slugify(internal_name).replace("-", "_")
+        counter = 0
 
+        while True:
+            candidate = base_name if counter == 0 else f"{base_name}_{counter}"
+
+            if "internal_name" in kwargs:
+                kwargs["internal_name"] = candidate
+            else:
+                kwargs.setdefault("defaults", {})["internal_name"] = candidate
+
+            try:
                 return super().get_or_create(**kwargs)
-
-            raise
+            except IntegrityError as exc:
+                if "unique_internal_name_per_company" in str(exc):
+                    counter += 1
+                    continue
+                raise
 
 
 class PropertySelectValueQuerySet(MultiTenantQuerySet):
