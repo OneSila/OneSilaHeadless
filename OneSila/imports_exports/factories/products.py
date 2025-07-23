@@ -3,7 +3,6 @@ from hashlib import shake_256
 
 import shortuuid
 from django.db import IntegrityError
-
 from currencies.models import Currency, PublicCurrency
 from eancodes.models import EanCode
 from imports_exports.factories.media import ImportImageInstance
@@ -387,8 +386,12 @@ class ImportProductInstance(AbstractImportInstance):
     def set_prices(self):
         sales_price_ids = []
         for price in self.prices:
-            image_import_instance = ImportSalesPriceInstance(price, product=self.instance, import_process=self.import_process)
-            image_import_instance.process()
+            try:
+                image_import_instance = ImportSalesPriceInstance(price, product=self.instance, import_process=self.import_process)
+                image_import_instance.process()
+            except IntegrityError:
+                # if the price is wrong we will skip it
+                pass
 
     def set_variations(self):
         from .variations import ImportConfiguratorVariationsInstance, ImportConfigurableVariationInstance
