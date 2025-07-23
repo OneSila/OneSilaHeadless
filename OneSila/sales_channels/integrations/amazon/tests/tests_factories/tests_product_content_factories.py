@@ -144,7 +144,7 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     def test_update_content_builds_correct_body(self, mock_client, mock_listings):
         mock_instance = mock_listings.return_value
-        mock_instance.put_listings_item.side_effect = Exception("no amazon")
+        mock_instance.patch_listings_item.side_effect = Exception("no amazon")
         mock_instance.get_listings_item.return_value = MagicMock(payload={"attributes": {}})
 
         fac = AmazonProductContentUpdateFactory(
@@ -171,5 +171,5 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
             },
         }
 
-        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         self.assertEqual(body, expected_body)

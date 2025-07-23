@@ -87,7 +87,7 @@ class AmazonProductTestMixin:
             is_product_type=True,
             multi_tenant_company=self.multi_tenant_company,
         ).first()
-    
+
         self.product_type_value = baker.make(
             PropertySelectValue,
             property=self.product_type_property,
@@ -99,7 +99,7 @@ class AmazonProductTestMixin:
             language=self.multi_tenant_company.language,
             value="Chair",
         )
-    
+
         self.rule = ProductPropertiesRule.objects.filter(
             product_type=self.product_type_value,
             multi_tenant_company=self.multi_tenant_company,
@@ -154,7 +154,7 @@ class AmazonProductTestMixin:
             sales_channel=self.sales_channel,
             remote_product=self.remote_product,
         )
-    
+
         self.currency, _ = Currency.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             is_default_currency=True,
@@ -174,7 +174,7 @@ class AmazonProductTestMixin:
             price=80,
             multi_tenant_company=self.multi_tenant_company,
         )
-    
+
         translation = ProductTranslation.objects.create(
             product=self.product,
             sales_channel=self.sales_channel,
@@ -189,7 +189,7 @@ class AmazonProductTestMixin:
             text="First bullet",
             sort_order=0,
         )
-    
+
         media = Media.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             type=Media.IMAGE,
@@ -201,14 +201,14 @@ class AmazonProductTestMixin:
             sort_order=0,
             multi_tenant_company=self.multi_tenant_company,
         )
-    
+
         AmazonProductType.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             local_instance=self.rule,
             product_type_code="CHAIR",
         )
-    
+
         AmazonDefaultUnitConfigurator.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
@@ -225,7 +225,7 @@ class AmazonProductTestMixin:
             code="battery__weight",
             selected_unit="grams",
         )
-    
+
         self.color_property = baker.make(
             Property,
             type=Property.TYPES.SELECT,
@@ -263,7 +263,7 @@ class AmazonProductTestMixin:
             type=Property.TYPES.SELECT,
             allows_unmapped_values=True,
         )
-    
+
         self.battery_cell = baker.make(
             Property,
             type=Property.TYPES.SELECT,
@@ -301,7 +301,7 @@ class AmazonProductTestMixin:
             type=Property.TYPES.SELECT,
             allows_unmapped_values=True,
         )
-    
+
         self.battery_iec = baker.make(
             Property,
             type=Property.TYPES.SELECT,
@@ -339,7 +339,7 @@ class AmazonProductTestMixin:
             type=Property.TYPES.SELECT,
             allows_unmapped_values=True,
         )
-    
+
         self.battery_weight = baker.make(
             Property,
             type=Property.TYPES.FLOAT,
@@ -365,7 +365,7 @@ class AmazonProductTestMixin:
             code="battery__weight",
             type=Property.TYPES.FLOAT,
         )
-    
+
         self.batteries_required = baker.make(
             Property,
             type=Property.TYPES.BOOLEAN,
@@ -391,7 +391,7 @@ class AmazonProductTestMixin:
             code="batteries_required",
             type=Property.TYPES.BOOLEAN,
         )
-    
+
         self.condition_type = baker.make(
             Property,
             type=Property.TYPES.SELECT,
@@ -429,7 +429,7 @@ class AmazonProductTestMixin:
             type=Property.TYPES.SELECT,
             allows_unmapped_values=True,
         )
-    
+
         self.item_weight = baker.make(
             Property,
             type=Property.TYPES.FLOAT,
@@ -455,7 +455,7 @@ class AmazonProductTestMixin:
             code="item_package_weight",
             type=Property.TYPES.FLOAT,
         )
-    
+
         for prop in [
             self.color_property,
             self.battery_cell,
@@ -471,7 +471,7 @@ class AmazonProductTestMixin:
                 property=prop,
                 defaults={"type": ProductPropertiesRuleItem.OPTIONAL},
             )
-    
+
         AmazonPublicDefinition.objects.create(
             api_region_code="EU_UK",
             product_type_code="CHAIR",
@@ -573,7 +573,6 @@ class AmazonProductTestMixin:
             ),
         )
 
-
     def get_put_and_patch_item_listing_mock_response(self, attributes=None):
         mock_response = MagicMock(spec=["submissionId", "processingStatus", "issues", "status"])
         mock_response.submissionId = "mock-submission-id"
@@ -600,7 +599,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_create_product_factory_builds_correct_body(self, mock_listings, mock_client):
         mock_instance = mock_listings.return_value
-        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
         fac = AmazonProductCreateFactory(
             sales_channel=self.sales_channel,
@@ -618,7 +617,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_update_product_factory_builds_correct_body(self, mock_listings, mock_get_client):
         mock_instance = mock_listings.return_value
-        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
         fac = AmazonProductUpdateFactory(
             sales_channel=self.sales_channel,
@@ -628,7 +627,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         )
         fac.run()
 
-        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         self.assertIsInstance(body, dict)
         self.assertEqual(body.get("requirements"), "LISTING")
 
@@ -638,7 +637,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     def test_create_product_factory_builds_correct_payload(self, mock_listings, mock_get_images, mock_get_client):
         """This test checks if the CreateFactory gives the expected payload including attributes, prices, and content."""
         mock_instance = mock_listings.return_value
-        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
         url = 'https://example.com/img.jpg'
 
@@ -722,7 +721,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_update_product_factory_builds_correct_payload(self, mock_listings, mock_get_images, mock_get_client):
-        """This test checks that the update factory builds a correct payload using PUT."""
+        """This test checks that the update factory builds a correct payload using PATCH."""
         url = "https://example.com/img.jpg"
 
         # mark product as already created on this marketplace so update runs
@@ -730,7 +729,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         self.remote_product.save()
 
         mock_instance = mock_listings.return_value
-        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
         current_attrs = {"item_name": "Old name"}
         mock_instance.get_listings_item.return_value = SimpleNamespace(attributes=current_attrs)
@@ -743,7 +742,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         )
         fac.run()
 
-        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         cleaned_body = fac._build_common_body(fac.remote_rule, fac.payload["attributes"])
         expected_body = {
             "productType": "CHAIR",
@@ -771,7 +770,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         self.remote_product.save()
 
         mock_instance = mock_listings.return_value
-        mock_instance.put_listings_item.return_value = (
+        mock_instance.patch_listings_item.return_value = (
             self.get_put_and_patch_item_listing_mock_response()
         )
 
@@ -785,7 +784,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         fac.run()
 
         mock_create_run.assert_called_once()
-        mock_instance.put_listings_item.assert_called()
+        mock_instance.patch_listings_item.assert_called()
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -947,7 +946,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         mock_instance.get_listings_item.side_effect = Exception("Not found")
 
         # Prevent accidental logging crash (mocking even if it shouldn't be called)
-        mock_instance.put_listings_item.return_value = {
+        mock_instance.patch_listings_item.return_value = {
             "submissionId": "mock-submission-id",
             "processingStatus": "VALID",
             "status": "VALID",
@@ -962,7 +961,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         )
         fac.run()
 
-        mock_instance.put_listings_item.assert_not_called()
+        mock_instance.patch_listings_item.assert_not_called()
         mock_create_run.assert_called_once()
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
@@ -981,7 +980,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
                 ]
             }
         )
-        mock_instance.put_listings_item.return_value = (
+        mock_instance.patch_listings_item.return_value = (
             self.get_put_and_patch_item_listing_mock_response()
         )
 
@@ -993,13 +992,13 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         )
         fac.run()
 
-        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         attrs = body.get("attributes", {})
         self.assertEqual(
             attrs.get("main_product_image_locator"),
             [{"media_location": "https://example.com/img-new.jpg"}],
         )
-        mock_instance.put_listings_item.assert_called_once()
+        mock_instance.patch_listings_item.assert_called_once()
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -1237,7 +1236,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         )
 
         mock_instance = mock_listings.return_value
-        mock_instance.put_listings_item.return_value = (
+        mock_instance.patch_listings_item.return_value = (
             self.get_put_and_patch_item_listing_mock_response()
         )
 
@@ -1302,7 +1301,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         )
         fac.run()
 
-        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         attrs = body.get("attributes", {})
 
         self.assertEqual(attrs.get("merchant_suggested_asin"), [{"value": "ASIN123"}])
@@ -1735,7 +1734,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
 
             mock_get.assert_called_once_with("AMZSKU", self.view.remote_id)
 
-        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         self.assertEqual(body["attributes"].get("item_name"), [{"value": "New"}])
 
 
@@ -1774,7 +1773,7 @@ class AmazonProductUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transa
                 view=self.view,
             )
             fac.run()
-            return mock_listings.return_value.put_listings_item.call_args.kwargs.get(
+            return mock_listings.return_value.patch_listings_item.call_args.kwargs.get(
                 "body"
             )
 
@@ -1793,8 +1792,6 @@ class AmazonProductUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transa
         self.sales_channel.save()
         body = self._run_factory_and_get_body()
         self.assertEqual(body["requirements"], "LISTING")
-
-
 
     def test_product_owner_uses_listing_requirements(self):
         self.sales_channel.listing_owner = False
@@ -1834,6 +1831,7 @@ class AmazonProductUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transa
 
         body = self._run_factory_and_get_body()
         self.assertEqual(body["requirements"], "LISTING")
+
 
 class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonProductTestMixin):
     def setUp(self):
@@ -1923,7 +1921,6 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
             remote_sku="CHILD",
             is_variation=True,
         )
-
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -2056,4 +2053,3 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
         self.assertNotIn("variation_theme", attrs)
         self.assertNotIn("parentage_level", attrs)
         self.assertNotIn("child_parent_sku_relationship", attrs)
-
