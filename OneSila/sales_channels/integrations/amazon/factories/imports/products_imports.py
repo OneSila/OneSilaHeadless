@@ -5,7 +5,8 @@ from django.db import IntegrityError
 
 from imports_exports.factories.imports import ImportMixin
 from imports_exports.factories.products import ImportProductInstance
-from products.product_types import SIMPLE
+from products.models import Product
+from products.product_types import SIMPLE, CONFIGURABLE
 from properties.models import Property, PropertyTranslation
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.decorators import throttle_safe
@@ -581,9 +582,13 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             # Keep track of parent-child relationships to process later
             if is_variation and parent_skus:
                 for parent_sku in parent_skus:
-                    children = self._configurable_map.setdefault(parent_sku, set())
-                    children.add(structured["sku"])
-                    structured["configurable_parent_sku"] = parent_sku
+
+                    if Product.objects.filter(multi_tenant_company=self.sales_channel.multi_tenant_company, sku=parent_sku).exists():
+                        structured['configurable_parent_sku'] = parent_sku
+                    else:
+                        children = self._configurable_map.setdefault(parent_sku, set())
+                        children.add(structured["sku"])
+                        structured["configurable_parent_sku"] = parent_sku
 
             product_instance = None
             remote_product = AmazonProduct.objects.filter(
@@ -624,9 +629,10 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             self.handle_prices(instance)
             self.handle_images(instance)
 
-            if is_variation:
+            if structured['type'] == CONFIGURABLE:
                 self.handle_variations(instance)
-            else:
+
+            if not is_variation:
                 self.handle_sales_channels_views(instance, structured, view)
 
             self.update_percentage()

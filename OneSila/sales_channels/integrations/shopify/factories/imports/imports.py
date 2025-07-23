@@ -557,7 +557,7 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
         variations = []
         index_to_id_map = {}
         parent_name = product.get("title", "").strip()
-        product_type = product.get("productType", DEFAULT_PRODUCT_TYPE)
+        product_type = product.get("productType") or DEFAULT_PRODUCT_TYPE
         variant_edges = product.get("variants", {}).get("edges", [])
 
         for idx, edge in enumerate(variant_edges):
@@ -616,7 +616,7 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
             "active": active,
         }
 
-        rule_product_type = product.get("productType") if parent_product_type is None else parent_product_type
+        rule_product_type =  parent_product_type if parent_product_type not in [None, ""] else product.get("productType")
         if rule_product_type is None:
             rule_product_type = DEFAULT_PRODUCT_TYPE
 
