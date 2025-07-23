@@ -34,6 +34,7 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
 
     def prepare_import_process(self):
         super().prepare_import_process()
+        self.default_currency = ShopifyCurrency.objects.get(sales_channel=self.sales_channel, is_default=True)
 
         property_tag_data = {
             "name": "Shopify Tags",
@@ -512,7 +513,12 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
 
         price = product.get("price")
         compare_at_price = product.get("compareAtPrice")
-        default_currency = ShopifyCurrency.objects.get(sales_channel=self.sales_channel, is_default=True)
+
+        try:
+            if float(compare_at_price) == 0:
+                compare_at_price = None
+        except (TypeError, ValueError):
+            pass
 
         if price is not None or compare_at_price is not None:
             price_entry = {}
@@ -521,7 +527,7 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
             if compare_at_price is not None:
                 price_entry["rrp"] = compare_at_price
 
-            price_entry['currency'] = default_currency.local_instance.iso_code
+            price_entry['currency'] = self.default_currency.local_instance.iso_code
             prices.append(price_entry)
             return prices
 
@@ -531,6 +537,12 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
             price = variant.get("price")
             compare_at_price = variant.get("compareAtPrice")
 
+            try:
+                if float(compare_at_price) == 0:
+                    compare_at_price = None
+            except (TypeError, ValueError):
+                pass
+
             if price is not None or compare_at_price is not None:
                 price_entry = {}
                 if price is not None:
@@ -538,7 +550,7 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
                 if compare_at_price is not None:
                     price_entry["rrp"] = compare_at_price
 
-                price_entry['currency'] = default_currency.local_instance.iso_code
+                price_entry['currency'] = self.default_currency.local_instance.iso_code
                 prices.append(price_entry)
 
         return prices

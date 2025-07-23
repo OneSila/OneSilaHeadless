@@ -233,6 +233,7 @@ class SalesChannelImportMixin(ImportMixin):
             instance.save()
 
     def process_completed(self):
-        self.sales_channel.active = self.initial_sales_channel_status
+        # Comment this for now to prevent issues with delayed signals retriggering the products
+        # self.sales_channel.active = self.initial_sales_channel_status
         self.sales_channel.is_importing = False
         self.sales_channel.save()

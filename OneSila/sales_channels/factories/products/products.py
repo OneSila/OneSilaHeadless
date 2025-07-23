@@ -735,7 +735,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """
         Synchronizes each variation (child product) associated with the configurable product.
         """
-        existing_remote_variation_ids = []
 
         for variation in self.variations:
 
@@ -755,11 +754,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
             self.update_progress()
 
-            # Keep track of existing remote variation IDs
-            existing_remote_variation_ids.append(remote_variation.id)
-
-        # After processing all variations, delete any remote variations not in the local set
-        self.delete_removed_variations(existing_remote_variation_ids)
 
     def update_child(self, variation, remote_variation):
         """
@@ -826,19 +820,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             remote_instance=remote_variation
         )
         factory.run()
-
-    def delete_removed_variations(self, existing_remote_variation_ids):
-        """
-        Deletes remote variations that are no longer present in the local variations.
-        """
-        # Get all remote variations linked to this remote parent product, excluding the existing ones
-        remote_variations_to_delete = self.remote_model_class.objects.filter(
-            remote_parent_product=self.remote_instance,
-            sales_channel=self.sales_channel
-        ).exclude(id__in=existing_remote_variation_ids)
-
-        for remote_variation in remote_variations_to_delete:
-            self.delete_child(remote_variation)
 
     def assign_ean_code(self):
         """
