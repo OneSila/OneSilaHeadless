@@ -53,3 +53,4 @@ git+https://github.com/OneSila/OneSilaMagento2Api.git@v1.0.29
 shopifyapi
 amzn-sp-api
 python-amazon-sp-api
+deepdiff

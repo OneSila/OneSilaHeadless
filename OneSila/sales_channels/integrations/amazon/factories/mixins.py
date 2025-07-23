@@ -7,6 +7,7 @@ from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 from sales_channels.models import SalesChannelViewAssign
 from sales_channels.models.logs import RemoteLog
+from deepdiff import DeepDiff
 
 
 from sales_channels.integrations.amazon.models.properties import AmazonProperty
@@ -366,8 +367,10 @@ class GetAmazonAPIMixin:
             else:
                 if key not in current_attributes:
                     patches.append({"op": "add", "path": path, "value": new_value})
-                elif clean(current_value) != new_value:
-                    patches.append({"op": "replace", "path": path, "value": new_value})
+                else:
+                    diff = DeepDiff(current_value, new_value, ignore_order=True)
+                    if diff:
+                        patches.append({"op": "replace", "path": path, "value": new_value})
 
         return patches
 
