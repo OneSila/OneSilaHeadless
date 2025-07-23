@@ -616,9 +616,14 @@ class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
             "active": active,
         }
 
-        rule_product_type =  parent_product_type if parent_product_type not in [None, ""] else product.get("productType")
-        if rule_product_type is None:
-            rule_product_type = DEFAULT_PRODUCT_TYPE
+        product_type_value = product.get("productType")
+        if not product_type_value:
+            product_type_value = DEFAULT_PRODUCT_TYPE
+
+        if parent_product_type not in [None, ""]:
+            rule_product_type = parent_product_type
+        else:
+            rule_product_type = product_type_value
 
         if rule_product_type:
             structured_data["product_type"] = rule_product_type
