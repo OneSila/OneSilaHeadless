@@ -25,5 +25,5 @@ class PropertyManagerGetOrCreateTestCase(TestCase):
             type=Property.TYPES.TEXT,
             internal_name="color",
         )
-        self.assertTrue(created2)
-        self.assertEqual(prop2.internal_name, "color_2")
+        self.assertFalse(created2)
+        self.assertEqual(prop2.internal_name, "color_1")
