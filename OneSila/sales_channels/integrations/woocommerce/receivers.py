@@ -323,11 +323,11 @@ def sales_channels__woocommerce__handle_pull_woocommerce_sales_channel_views(sen
         WoocommerceLanguagePullFactory
     )
 
-    # views_factory = WoocommerceSalesChannelViewPullFactory(sales_channel=instance)
-    # views_factory.run()
-    #
-    # languages_factory = WoocommerceLanguagePullFactory(sales_channel=instance)
-    # languages_factory.run()
-    #
-    # currencies_factory = WoocommerceRemoteCurrencyPullFactory(sales_channel=instance)
-    # currencies_factory.run()
+    views_factory = WoocommerceSalesChannelViewPullFactory(sales_channel=instance)
+    views_factory.run()
+
+    languages_factory = WoocommerceLanguagePullFactory(sales_channel=instance)
+    languages_factory.run()
+
+    currencies_factory = WoocommerceRemoteCurrencyPullFactory(sales_channel=instance)
+    currencies_factory.run()
