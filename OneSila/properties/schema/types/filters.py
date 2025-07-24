@@ -24,8 +24,6 @@ class PropertyFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     is_product_type: auto
     type: auto
     internal_name: auto
-    missing_main_translation: Optional[bool]
-    missing_translations: Optional[bool]
 
     @custom_filter
     def missing_main_translation(
@@ -83,8 +81,6 @@ class PropertySelectValueFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     property: Optional[PropertyFilter]
     image: Optional[ImageFilter]
-    missing_main_translation: Optional[bool]
-    missing_translations: Optional[bool]
 
     @custom_filter
     def is_product_type(self, queryset, value: bool, prefix: str):
