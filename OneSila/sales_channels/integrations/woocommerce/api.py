@@ -488,6 +488,9 @@ class WoocommerceApiWrapper:
         # Perhaps with a real woocommerce plugin that takes care of all the
         # woocom access and lanagues issues?
 
+        # FIXME: Amit suggets we scrape the store and get the language from the html.
+        # <html dir="ltr" lang="en-GB" prefix="og: https://ogp.me/ns#">
+
         key = 'woocommerce_default_country'
         try:
             value = self.get_from_settings(key)
@@ -514,6 +517,6 @@ class WoocommerceApiWrapper:
             elif country in ['RO']:
                 return 'ro_RO'
             else:
-                raise FailedToGetStoreLanguageError(f"Language not found for key {key}")
+                raise FailedToGetStoreLanguageError(f"Language for country {country} not configured. Contact OneSila Suport.")
         except ValueError:
-            raise FailedToGetStoreLanguageError(f"Language not found for key {key}")
+            raise FailedToGetStoreLanguageError(f"Unable to determine WooCommerce language configuration. Contact OneSila Suport.")
