@@ -140,6 +140,13 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
             remote_product=self.remote_product,
         )
 
+    def get_patch_value(self, patches, path):
+        for patch in patches:
+            if patch["path"] == path:
+                return patch["value"]
+
+        return None
+
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     def test_update_content_builds_correct_body(self, mock_client, mock_listings):
@@ -172,4 +179,23 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
         }
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
-        self.assertEqual(body, expected_body)
+        patches = body.get("patches", [])
+
+        self.assertEqual(body.get("productType"), "CHAIR")
+
+        self.assertIn(
+            {'op': 'add', 'path': '/attributes/item_name', 'value': [{'value': 'Chair name'}]},
+            patches,
+        )
+        self.assertIn(
+            {'op': 'add', 'path': '/attributes/product_description', 'value': [{'value': 'Chair description'}]},
+            patches,
+        )
+        self.assertIn(
+            {
+                'op': 'add',
+                'path': '/attributes/bullet_point',
+                'value': [{'value': 'Point one'}, {'value': 'Point two'}],
+            },
+            patches,
+        )

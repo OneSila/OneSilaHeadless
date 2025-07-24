@@ -107,10 +107,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         if self.is_create and self.view.remote_id in (self.remote_instance.created_marketplaces or []):
             raise SwitchedToSyncException("Listing already created for marketplace")
         if not self.is_create and self.view.remote_id not in (self.remote_instance.created_marketplaces or []):
-            print('------------------------------------------------------ ?????')
-            print(self.is_create)
-            print(self.view.remote_id)
-            print(self.remote_instance.created_marketplaces )
             raise SwitchedToCreateException("Listing missing for marketplace")
 
     # ------------------------------------------------------------

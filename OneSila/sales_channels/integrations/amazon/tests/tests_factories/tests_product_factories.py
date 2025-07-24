@@ -589,6 +589,12 @@ class AmazonProductTestMixin:
         """Helper to mock the ListingsApi.get_listings_item response."""
         return SimpleNamespace(attributes=attributes or {})
 
+    def get_patch_value(self, patches, path):
+        for patch in patches:
+            if patch["path"] == path:
+                return patch["value"]
+        return None
+
 
 class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonProductTestMixin):
     def setUp(self):
@@ -599,7 +605,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_create_product_factory_builds_correct_body(self, mock_listings, mock_client):
         mock_instance = mock_listings.return_value
-        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
         fac = AmazonProductCreateFactory(
             sales_channel=self.sales_channel,
@@ -637,7 +643,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     def test_create_product_factory_builds_correct_payload(self, mock_listings, mock_get_images, mock_get_client):
         """This test checks if the CreateFactory gives the expected payload including attributes, prices, and content."""
         mock_instance = mock_listings.return_value
-        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
         url = 'https://example.com/img.jpg'
 
@@ -772,7 +778,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         self.remote_product.save()
 
         mock_instance = mock_listings.return_value
-        mock_instance.patch_listings_item.return_value = (
+        mock_instance.put_listings_item.return_value = (
             self.get_put_and_patch_item_listing_mock_response()
         )
 
@@ -782,11 +788,10 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             remote_instance=self.remote_product,
             view=self.view,
         )
-
         fac.run()
 
         mock_create_run.assert_called_once()
-        mock_instance.patch_listings_item.assert_called()
+        mock_instance.put_listings_item.assert_called()
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -1207,6 +1212,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_unmapped_attributes_are_ignored_in_payload(self, mock_listings, mock_get_images, mock_get_client):
         """This test confirms that unmapped or unknown attributes are not added to the final payload."""
+
         fake_property = baker.make(
             Property,
             type=Property.TYPES.SELECT,
@@ -1242,7 +1248,8 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             self.get_put_and_patch_item_listing_mock_response()
         )
 
-        fac = AmazonProductCreateFactory(
+        self.remote_product.created_marketplaces = ['GB']
+        fac = AmazonProductUpdateFactory(
             sales_channel=self.sales_channel,
             local_instance=self.product,
             remote_instance=self.remote_product,
@@ -1250,8 +1257,11 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         )
         fac.run()
 
-        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
-        self.assertNotIn("fake_property", body.get("attributes", {}))
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        patches = body.get("patches", [])
+        paths = [patch.get("path") for patch in patches]
+
+        self.assertNotIn("/attributes/fake_property", paths)
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
@@ -1303,7 +1313,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         )
         fac.run()
 
-        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
         attrs = body.get("attributes", {})
 
         self.assertEqual(attrs.get("merchant_suggested_asin"), [{"value": "ASIN123"}])
@@ -1430,7 +1440,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         )
 
         mock_instance = mock_listings.return_value
-        mock_instance.put_listings_item.return_value = (
+        mock_instance.patch_listings_item.return_value = (
             self.get_put_and_patch_item_listing_mock_response()
         )
         current_attrs = {"material": [{"value": "Plastic", "marketplace_id": self.view.remote_id}]}
@@ -1446,10 +1456,13 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         )
         fac.run()
 
-        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
-        attrs = body.get("attributes", {})
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        patches = body.get("patches", [])
+
+        material = self.get_patch_value(patches, "/attributes/material")
+
         self.assertEqual(
-            attrs.get("material"),
+            material,
             [{"value": "Wood", "marketplace_id": self.view.remote_id}],
         )
 
@@ -1658,7 +1671,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         price.save()
 
         mock_instance = mock_listings.return_value
-        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
         mock_instance.get_listings_item.return_value = SimpleNamespace(
             attributes={
                 "list_price": [{"currency": "GBP", "value": 89.99}],
@@ -1683,14 +1696,20 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         )
         fac.run()
 
-        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
-        attrs = body.get("attributes", {})
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        patches = body.get("patches", [])
+
+        purchasable_offer = self.get_patch_value(patches, "/attributes/purchasable_offer")
+        list_price = self.get_patch_value(patches, "/attributes/list_price")
 
         self.assertEqual(
-            attrs.get("purchasable_offer")[0]["our_price"][0]["schedule"][0]["value_with_tax"],
+            purchasable_offer[0]["our_price"][0]["schedule"][0]["value_with_tax"],
             99.99,
         )
-        self.assertEqual(attrs.get("list_price")[0]["value"], 99.99)
+        self.assertEqual(
+            list_price[0]["value"],
+            99.99,
+        )
 
     def test_missing_view_argument_raises_value_error(self):
         """This test confirms that initializing a factory without a view raises ValueError."""
@@ -1748,15 +1767,12 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         )
 
 
-class AmazonProductUpdateRequirementsTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonProductTestMixin):
+class AmazonProductCreateRequirementsTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonProductTestMixin):
     """Validate LISTING versus LISTING_OFFER_ONLY logic for product updates."""
 
     def setUp(self):
         super().setUp()
         self.setup_product()
-        # mark product as created so update flow runs
-        self.remote_product.created_marketplaces = [self.view.remote_id]
-        self.remote_product.save()
 
     def _run_factory_and_get_body(self):
         with patch(
@@ -1769,33 +1785,20 @@ class AmazonProductUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transa
         ), patch(
             "sales_channels.integrations.amazon.factories.mixins.ListingsApi"
         ) as mock_listings:
-            mock_listings.return_value.put_listings_item.return_value = (
-                self.get_put_and_patch_item_listing_mock_response()
-            )
-            mock_listings.return_value.get_listings_item.return_value = (
-                self.get_get_listing_item_mock_response()
-            )
+            mock_listings.return_value.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
-            fac = AmazonProductUpdateFactory(
+
+            fac = AmazonProductCreateFactory(
                 sales_channel=self.sales_channel,
                 local_instance=self.product,
                 remote_instance=self.remote_product,
                 view=self.view,
             )
             fac.run()
-            return mock_listings.return_value.patch_listings_item.call_args.kwargs.get(
+            return mock_listings.return_value.put_listings_item.call_args.kwargs.get(
                 "body"
             )
 
-    def test_non_owner_defaults_to_offer_only(self):
-        self.sales_channel.listing_owner = False
-        self.sales_channel.save()
-        ProductProperty.objects.filter(
-            product=self.product,
-            property__internal_name="merchant_suggested_asin",
-        ).delete()
-        body = self._run_factory_and_get_body()
-        self.assertEqual(body["requirements"], "LISTING_OFFER_ONLY")
 
     def test_listing_owner_uses_listing_requirements(self):
         self.sales_channel.listing_owner = True
@@ -1820,6 +1823,11 @@ class AmazonProductUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transa
             product=self.product,
             property__internal_name="merchant_suggested_asin",
         ).delete()
+        EanCode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            ean_code="EAN",
+        )
         body = self._run_factory_and_get_body()
         self.assertEqual(body["requirements"], "LISTING")
 

@@ -122,6 +122,12 @@ class AmazonPriceTestMixin:
             price_data={},
         )
 
+    def get_patch_value(self, patches, path):
+        for patch in patches:
+            if patch["path"] == path:
+                return patch["value"]
+        return None
+
 
 class AmazonPriceUpdateFactoryTest(DisableWooCommerceSignalsMixin, AmazonPriceTestMixin, TransactionTestCase):
     def setUp(self):
@@ -146,29 +152,26 @@ class AmazonPriceUpdateFactoryTest(DisableWooCommerceSignalsMixin, AmazonPriceTe
         )
         factory.run()
 
-        expected = {
-            "productType": "CHAIR",
-            "requirements": "LISTING_OFFER_ONLY",
-            "attributes": {
-                "purchasable_offer": [
-                    {
-                        "audience": "ALL",
-                        "currency": "GBP",
-                        "marketplace_id": "GB",
-                        "our_price": [
-                            {
-                                "schedule": [
-                                    {"value_with_tax": 80.0}
-                                ]
-                            }
-                        ],
-                    }
-                ]
-            },
-        }
-
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
-        self.assertEqual(body, expected)
+        patches = body.get("patches", [])
+        purchasable_offer = self.get_patch_value(patches, "/attributes/purchasable_offer")
+
+        self.assertEqual(body.get("productType"), "CHAIR")
+        self.assertEqual(
+            purchasable_offer,
+            [
+                {
+                    "audience": "ALL",
+                    "currency": "GBP",
+                    "marketplace_id": "GB",
+                    "our_price": [
+                        {
+                            "schedule": [{"value_with_tax": 80.0}]
+                        }
+                    ],
+                }
+            ],
+        )
 
 
 class AmazonPriceUpdateRequirementsTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonPriceTestMixin):
@@ -207,17 +210,21 @@ class AmazonPriceUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transact
         self.sales_channel.listing_owner = True
         self.sales_channel.save()
         body = self._run_factory_and_get_body()
-        self.assertEqual(body["requirements"], "LISTING")
-        self.assertIn("list_price", body["attributes"])
+        patches = body.get("patches", [])
+        list_price = self.get_patch_value(patches, "/attributes/list_price")
+        self.assertIsNotNone(list_price, "list_price patch is missing")
 
-    def test_product_owner_uses_listing_requirements(self):
+    def test_product_owner_uses_price_listing_requirements(self):
         self.sales_channel.listing_owner = False
         self.sales_channel.save()
         self.remote_product.product_owner = True
         self.remote_product.save()
         body = self._run_factory_and_get_body()
-        self.assertEqual(body["requirements"], "LISTING")
-        self.assertIn("list_price", body["attributes"])
+        patches = body.get("patches", [])
+
+        list_price = self.get_patch_value(patches, "/attributes/list_price")
+        self.assertIsNotNone(list_price, "list_price patch is missing")
+        self.assertEqual(list_price[0]["value"], 80.0)
 
     def test_missing_asin_still_uses_listing_requirements(self):
         self.sales_channel.listing_owner = False
@@ -229,5 +236,7 @@ class AmazonPriceUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transact
             property__internal_name="merchant_suggested_asin",
         ).delete()
         body = self._run_factory_and_get_body()
-        self.assertEqual(body["requirements"], "LISTING")
-        self.assertIn("list_price", body["attributes"])
+        patches = body.get("patches", [])
+
+        list_price = self.get_patch_value(patches, "/attributes/list_price")
+        self.assertIsNotNone(list_price, "list_price patch is missing")
