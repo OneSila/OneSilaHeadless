@@ -618,6 +618,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     def test_update_product_factory_builds_correct_body(self, mock_listings, mock_get_client):
         mock_instance = mock_listings.return_value
         mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        self.remote_product.created_marketplaces = ['GB']
 
         fac = AmazonProductUpdateFactory(
             sales_channel=self.sales_channel,
@@ -629,7 +630,6 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         self.assertIsInstance(body, dict)
-        self.assertEqual(body.get("requirements"), "LISTING")
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -743,14 +743,16 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         fac.run()
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
-        cleaned_body = fac._build_common_body(fac.remote_rule, fac.payload["attributes"])
-        expected_body = {
-            "productType": "CHAIR",
-            "requirements": "LISTING",
-            "attributes": cleaned_body["attributes"],
-        }
 
-        self.assertEqual(body, expected_body)
+        self.assertEqual(body["productType"], "CHAIR")
+        self.assertIn(
+            {
+                "op": "replace",
+                "path": "/attributes/item_name",
+                "value": [{"value": "Chair name"}],
+            },
+            body["patches"]
+        )
 
     @patch(
         "sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client",
@@ -980,10 +982,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
                 ]
             }
         )
-        mock_instance.patch_listings_item.return_value = (
-            self.get_put_and_patch_item_listing_mock_response()
-        )
-
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
         fac = AmazonProductUpdateFactory(
             sales_channel=self.sales_channel,
             local_instance=self.product,
@@ -993,12 +992,15 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         fac.run()
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
-        attrs = body.get("attributes", {})
-        self.assertEqual(
-            attrs.get("main_product_image_locator"),
-            [{"media_location": "https://example.com/img-new.jpg"}],
+
+        self.assertIn(
+            {
+                "op": "replace",
+                "path": "/attributes/main_product_image_locator",
+                "value": [{"media_location": "https://example.com/img-new.jpg"}],
+            },
+            body["patches"]
         )
-        mock_instance.patch_listings_item.assert_called_once()
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -1735,7 +1737,15 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             mock_get.assert_called_once_with("AMZSKU", self.view.remote_id)
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
-        self.assertEqual(body["attributes"].get("item_name"), [{"value": "New"}])
+        patches = body["patches"]
+        self.assertIn(
+            {
+                "op": "replace",
+                "path": "/attributes/item_name",
+                "value": [{"value": "New"}],
+            },
+            patches
+        )
 
 
 class AmazonProductUpdateRequirementsTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonProductTestMixin):

@@ -391,10 +391,7 @@ class GetAmazonAPIMixin:
         body = {
             "productType": product_type.product_type_code,
             "patches": patches,
-            "issueLocale": self._get_issue_locale(),
         }
-        if settings.DEBUG:
-            body["mode"] = "VALIDATION_PREVIEW"
 
         listings = ListingsApi(self._get_client())
         response = listings.patch_listings_item(
@@ -402,6 +399,8 @@ class GetAmazonAPIMixin:
             sku=sku,
             marketplace_ids=[marketplace_id],
             body=body,
+            issue_locale=self._get_issue_locale(),
+            mode="VALIDATION_PREVIEW" if settings.DEBUG else None,
         )
 
         submission_id = getattr(response, "submission_id", None)
