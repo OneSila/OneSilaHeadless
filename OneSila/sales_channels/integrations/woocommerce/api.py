@@ -495,6 +495,8 @@ class WoocommerceApiWrapper:
 
             if country in ['GB', 'US', 'CA', 'AU', 'NZ']:
                 return f'en_{country}'
+            elif country in ['IE']:
+                return "en_GB"
             elif country in ['DE', 'AT', 'CH']:
                 return 'de_DE'
             elif country in ['FR', 'LU', 'CH']:
