@@ -7,10 +7,12 @@ from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 from sales_channels.models import SalesChannelViewAssign
 from sales_channels.models.logs import RemoteLog
+from deepdiff import DeepDiff
 
 
 from sales_channels.integrations.amazon.models.properties import AmazonProperty
 from properties.models import Property, PropertyTranslation
+
 
 class PullAmazonMixin:
 
@@ -357,15 +359,18 @@ class GetAmazonAPIMixin:
         for key, new_value in new_attributes.items():
             new_value = clean(new_value)
             current_value = current_attributes.get(key)
+            path = f"/attributes/{key}"
 
             if new_value is None:
                 if key in current_attributes:
-                    patches.append({"op": "delete", "value": [{key: current_value}]})
+                    patches.append({"op": "delete", "path": path})
             else:
                 if key not in current_attributes:
-                    patches.append({"op": "add", "value": [{key: new_value}]})
-                elif clean(current_value) != new_value:
-                    patches.append({"op": "replace", "value": [{key: new_value}]})
+                    patches.append({"op": "add", "path": path, "value": new_value})
+                else:
+                    diff = DeepDiff(current_value, new_value, ignore_order=True)
+                    if diff:
+                        patches.append({"op": "replace", "path": path, "value": new_value})
 
         return patches
 
@@ -381,22 +386,15 @@ class GetAmazonAPIMixin:
         if current_attributes is None:
             current_attributes = self.get_listing_attributes(sku, marketplace_id)
 
-        merged_attributes = {**(current_attributes or {})}
-        for key, value in (new_attributes or {}).items():
-            merged_attributes[key] = value
+        patches = self._build_patches(current_attributes, new_attributes)
 
-        body = self._build_common_body(product_type, merged_attributes)
-
-        print('--------------------------------------- ARGUMENTS')
-        print('mode')
-        print("VALIDATION_PREVIEW" if settings.DEBUG else None)
-        print('body')
-        import pprint
-        pprint.pprint(body)
-        print('-------------------------------------------------')
+        body = {
+            "productType": product_type.product_type_code,
+            "patches": patches,
+        }
 
         listings = ListingsApi(self._get_client())
-        response = listings.put_listings_item(
+        response = listings.patch_listings_item(
             seller_id=self.sales_channel.remote_id,
             sku=sku,
             marketplace_ids=[marketplace_id],
@@ -458,4 +456,3 @@ class EnsureMerchantSuggestedAsinMixin:
             local_property.save(update_fields=["non_deletable"])
 
         return remote_property
-
