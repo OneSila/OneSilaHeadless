@@ -57,11 +57,7 @@ class PropertyFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
         if value not in (None, UNSET):
             ids: list[int] = []
 
-            properties = queryset.select_related("multi_tenant_company").prefetch_related(
-                "propertytranslation_set"
-            )
-
-            for prop in properties:
+            for prop in queryset:
                 required_languages = set(prop.multi_tenant_company.languages or [])
                 translation_languages = {
                     pt.language for pt in prop.propertytranslation_set.all()
@@ -123,11 +119,7 @@ class PropertySelectValueFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
         if value not in (None, UNSET):
             ids: list[int] = []
 
-            values = queryset.select_related("multi_tenant_company").prefetch_related(
-                "propertyselectvaluetranslation_set"
-            )
-
-            for val in values:
+            for val in queryset:
                 required_languages = set(val.multi_tenant_company.languages or [])
                 translation_languages = {
                     pt.language for pt in val.propertyselectvaluetranslation_set.all()
