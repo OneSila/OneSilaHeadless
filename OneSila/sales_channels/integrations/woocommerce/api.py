@@ -469,6 +469,9 @@ class WoocommerceApiWrapper:
                 'url': resp_data['url'],
             }
         else:
+            # This specific error is caught when creating the store.  Do not change this.
+            # or your import procedure will break as it has fallback settings to cover
+            # if the webssite does not expose wp-json.
             raise FailedToGetStoreConfigError(f"Failed to get store config: {resp.status_code}")
 
     def get_store_language(self):
