@@ -386,7 +386,6 @@ class GetAmazonAPIMixin:
         if current_attributes is None or current_attributes == {}:
             current_attributes = self.get_listing_attributes(sku, marketplace_id)
 
-        print(current_attributes)
         patches = self._build_patches(current_attributes, new_attributes)
 
         body = {
