@@ -1,16 +1,21 @@
 from typing import Optional, List
 
-from core.schema.core.types.input import NodeInput, partial, strawberry_input
+from core.schema.core.types.input import NodeInput, partial, strawberry_input, input
 from products.models import Product
 from enum import Enum
 from integrations.constants import (
     MAGENTO_INTEGRATION,
     SHOPIFY_INTEGRATION,
     AMAZON_INTEGRATION,
+    WOOCOMMERCE_INTEGRATION,
 )
 
 from products.schema.types.input import ProductPartialInput
-from properties.schema.types.input import PropertyPartialInput, PropertySelectValuePartialInput
+from properties.schema.types.input import (
+    PropertyPartialInput,
+    PropertySelectValuePartialInput,
+)
+from llm.models import BrandCustomPrompt
 
 
 class ContentAiGenerateType(Enum):
@@ -23,6 +28,7 @@ class SalesChannelIntegrationType(Enum):
     MAGENTO = MAGENTO_INTEGRATION
     SHOPIFY = SHOPIFY_INTEGRATION
     AMAZON = AMAZON_INTEGRATION
+    WOOCOMMERCE = WOOCOMMERCE_INTEGRATION
 
 
 @partial(Product, fields="__all__")
@@ -54,3 +60,13 @@ class AIBulkTranslationInput:
 @partial(Product, fields="__all__")
 class ProductAiBulletPointsInput(NodeInput):
     language_code: str
+
+
+@input(BrandCustomPrompt, fields="__all__")
+class BrandCustomPromptInput:
+    pass
+
+
+@partial(BrandCustomPrompt, fields="__all__")
+class BrandCustomPromptPartialInput(NodeInput):
+    pass

@@ -6,6 +6,7 @@ from imports_exports.factories.mixins import ImportOperationMixin, AbstractImpor
 from llm.factories.property_type_detector import DetectPropertyTypeLLM
 from properties.models import Property, PropertyTranslation, PropertySelectValue, PropertySelectValueTranslation, \
     ProductPropertiesRule, ProductPropertiesRuleItem, ProductProperty, ProductPropertyTextTranslation
+from dateutil.parser import parse as flexible_parse
 
 
 logger = logging.getLogger(__name__)
@@ -390,6 +391,14 @@ class ImportProductPropertiesRuleInstance(AbstractImportInstance):
       - require_ean_code: Optional boolean indicating whether an EAN code is required.
       - items: Optional the data for
 
+    Example data structure:
+      {
+        "value": "T-Shirt",
+        "require_ean_code": false,
+        "items": [
+          { "type": "REQUIRED", "property_data": { "internal_name": "size" } }
+        ]
+      }
     """
 
     def __init__(self, data: dict, import_process=None, product_type=None, instance=None):
@@ -567,6 +576,8 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
     """
     Import instance for PropertySelectValue.
 
+    # FIXME: This docstring is not clear. Maybe out of date?  Perhaps supply example.
+
     Expected data keys:
       - value: The select value to be imported.
       - property_data: (Optional) A dict for importing the Property if no property is provided.
@@ -667,13 +678,16 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
             self.value_boolean = bool(self.value)
         elif self.property.type in [Property.TYPES.DATE, Property.TYPES.DATETIME]:
 
-            date_format = '%Y-%m-%d %H:%M:%S'
-            parsed_datetime = datetime.strptime(self.value, date_format)
+            try:
+                parsed_datetime = flexible_parse(self.value)
+            except Exception as e:
+                raise ValueError(f"Invalid date format for value {self.value}: {e}")
 
             if self.property.type == Property.TYPES.DATETIME:
                 self.value_datetime = parsed_datetime
             else:
                 self.value_date = parsed_datetime.date()
+
 
         elif self.property.type == Property.TYPES.TEXT:
             self.value_text = self.value

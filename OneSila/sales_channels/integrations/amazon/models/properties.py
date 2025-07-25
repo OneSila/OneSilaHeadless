@@ -1,4 +1,4 @@
-from django.db.models import JSONField
+from django.db.models import JSONField, UniqueConstraint, Q
 
 from properties.models import ProductPropertiesRule, ProductPropertiesRuleItem, Property
 from sales_channels.models.mixins import RemoteObjectMixin
@@ -56,6 +56,7 @@ class AmazonPublicDefinition(models.SharedModel):
     is_required = models.BooleanField(default=False)
     is_internal = models.BooleanField(default=False)
     allowed_in_configurator = models.BooleanField(default=False)
+    allowed_in_listing_offer_request = models.BooleanField(default=False)
 
     def should_refresh(self):
         if not self.last_fetched:
@@ -108,6 +109,7 @@ class AmazonProperty(RemoteProperty):
     def save(self, *args, **kwargs):
         if self.allow_multiple is not True:
             self.allow_multiple = True
+
         if self.local_instance and self.local_instance.type != self.type:
             raise ValidationError(
                 _(
@@ -209,12 +211,32 @@ class AmazonProductType(RemoteObjectMixin, models.Model):
         verbose_name="Remote Name"
     )
 
+    imported = models.BooleanField(default=True)
+
     variation_themes = JSONField(null=True, blank=True)
+    listing_offer_required_properties = JSONField(default=dict, blank=True)
 
     objects = AmazonProductTypeManager()
 
     class Meta:
-        unique_together = ('local_instance', 'sales_channel')
+        constraints = [
+            UniqueConstraint(
+                fields=['local_instance', 'sales_channel'],
+                condition=Q(local_instance__isnull=False),
+                name='unique_amazonproducttype_local_instance_sales_channel_not_null',
+                violation_error_message = _(
+                "An Amazon product type with this local rule already exists for this sales channel."
+            )
+            ),
+            UniqueConstraint(
+                fields=['product_type_code', 'sales_channel'],
+                condition=Q(product_type_code__isnull=False),
+                name='unique_amazonproducttype_code_sales_channel_not_null',
+                violation_error_message= _(
+                    "An Amazon product type with this product type code already exists for this sales channel."
+                )
+            )
+        ]
         verbose_name = 'Amazon Product Type'
         verbose_name_plural = 'Amazon Product Types'
         search_terms = ['name', 'product_type_code']

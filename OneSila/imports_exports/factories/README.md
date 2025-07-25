@@ -467,6 +467,55 @@ Auto-generates multiple variations for a configurable product using a rule and v
 }
 ```
 
+Or a full example when creating a configurable product:
+
+```json
+data = {
+    "name": "Fancy Flying Product",
+    "sku": "SKU9221AF",
+    "type": "CONFIGURABLE",
+    "active": True,
+    "vat_rate": 19,
+    "ean_code": "1234567890123",
+    "allow_backorder": False,
+    "product_type": "Chair",
+    "properties": [
+        {"property_data": {"name": "Color", "type": "SELECT"}, "value": "Red"},
+        {"property_data": {"name": "Material", "type": "SELECT", "value": "Metal"}},
+    ],
+    "translations": [
+        {
+            "name": "Fancy Product",
+            "short_description": "Short desc",
+            "description": "Longer description",
+            "url_key": "fancy-product"
+        }
+    ],
+    "images": [
+        {
+          "image_url": "https://2.com/img-.jpeg",
+          "is_main_image": true
+        }
+    ],
+    "prices": [
+        {"price": 12.99, "currency": "EUR"},
+        {"price": 12.99, "currency": "USD"},
+    ],
+    "variations": [
+        {
+            'variation_data': {"name": "Variant 1"}
+        },
+        {
+            'variation_data': {"name": "Variant 2"}
+        }
+    ],
+    "configurator_select_values": [
+        {"property_data": {"name": "Size"}, "value": "Large"},
+        {"property_data": {"name": "Color"}, "value": "Blue"},
+    ]
+}
+```
+
 ### 💡 Notes
 - If using `values`, each must contain both `property_data` and `value`.
 - If using `select_values`, these must be existing `PropertySelectValue` objects.

@@ -2,6 +2,9 @@ from datetime import datetime
 from functools import wraps
 from django.db import transaction
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 def timeit_and_log(logger, default_msg='', print_logger=False):
     '''
@@ -85,3 +88,37 @@ def run_task_after_commit(task_func):
         transaction.on_commit(lambda: task_func(*args, **kwargs))
 
     return wrapper
+
+
+def log_method_calls(cls):
+    """"Use this decorator to log which methods are being called
+    from a class.  This is a class decorator"""
+    for attr_name in dir(cls):
+        attr = getattr(cls, attr_name)
+        if callable(attr) and not attr_name.startswith("__"):
+            setattr(cls, attr_name, log_wrapper(attr))
+    return cls
+
+
+def log_wrapper(method):
+    def wrapped(*args, **kwargs):
+        logger.debug(f"Called: {method.__qualname__}({args[1:]}, {kwargs})")
+        return method(*args, **kwargs)
+    return wrapped
+
+
+def soft_fail():
+    """
+    Decorator that catches any exceptions, logs them to the error log,
+    and returns None instead of raising the exception.
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except Exception as e:
+                logger.error(f"Error in {f.__name__}: {str(e)}", exc_info=True)
+                return None
+        return wrapper
+    return decorator

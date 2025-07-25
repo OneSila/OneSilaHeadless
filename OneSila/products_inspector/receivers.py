@@ -21,6 +21,7 @@ from properties.signals import product_properties_rule_created, product_properti
 @receiver(post_create, sender='products.SimpleProduct')
 @receiver(post_create, sender='products.ConfigurableProduct')
 @receiver(post_create, sender='products.BundleProduct')
+@receiver(post_create, sender='products.AliasProduct')
 def products_inspector__inspector__product_created(sender, instance, **kwargs):
     """
     When currencies change rates, most likely your prices need an update as well.
@@ -55,11 +56,18 @@ def products_inspector__inspector__trigger_block_has_images(sender, instance, **
     inspector_block_refresh.send(sender=instance.product.inspector.__class__, instance=instance.product.inspector, error_code=HAS_IMAGES_ERROR, run_async=False)
 
 
+@receiver(post_create, sender='sales_channels.SalesChannelViewAssign')
+@receiver(post_delete, sender='sales_channels.SalesChannelViewAssign')
+def products_inspector__inspector__trigger_block_has_images_assign(sender, instance, **kwargs):
+    inspector_block_refresh.send(sender=instance.product.inspector.__class__, instance=instance.product.inspector, error_code=HAS_IMAGES_ERROR, run_async=False)
+
+
 # MISSING_PRICES_ERROR ----------------------------------------------------------
 
 @receiver(post_update, sender='products.Product')
 @receiver(post_update, sender='products.SimpleProduct')
 @receiver(post_update, sender='products.BundleProduct')
+@receiver(post_update, sender='products.AliasProduct')
 @trigger_signal_for_dirty_fields('active')
 def products_inspector__inspector__trigger_block_product_active_change(sender, instance, **kwargs):
     inspector_block_refresh.send(sender=instance.inspector.__class__, instance=instance.inspector, error_code=MISSING_PRICES_ERROR, run_async=False)
@@ -91,6 +99,7 @@ def products_inspector__inspector__trigger_block_bom_change(sender, instance, **
 @receiver(post_update, sender='products.Product')
 @receiver(post_update, sender='products.SimpleProduct')
 @receiver(post_update, sender='products.BundleProduct')
+@receiver(post_update, sender='products.AliasProduct')
 @trigger_signal_for_dirty_fields('active')
 def products_inspector__inspector__trigger_block_bundle_items_component_active_status_change(sender, instance, **kwargs):
     from products_inspector.flows.inspector_block import recursively_check_components
@@ -118,6 +127,7 @@ def products_inspector__inspector__trigger_block_parent_variations_change(sender
 @receiver(ean_code_released_for_product, sender='products.Product')
 @receiver(ean_code_released_for_product, sender='products.SimpleProduct')
 @receiver(ean_code_released_for_product, sender='products.BundleProduct')
+@receiver(ean_code_released_for_product, sender='products.AliasProduct')
 def products_inspector__inspector__trigger_block_ean_code_released(sender, instance, **kwargs):
     inspector_block_refresh.send(sender=instance.inspector.__class__, instance=instance.inspector, error_code=MISSING_EAN_CODE_ERROR, run_async=False)
 
@@ -169,6 +179,8 @@ def products_inspector__inspector__trigger_block_product_properties_change(sende
 
 @receiver(post_update, sender='products.Product')
 @receiver(post_update, sender='products.SimpleProduct')
+@receiver(post_update, sender='products.BundleProduct')
+@receiver(post_update, sender='products.AliasProduct')
 @trigger_signal_for_dirty_fields('active', 'allow_backorder')
 def products_inspector__inspector__trigger_block_product_active_or_allow_backorder_change(sender, instance, **kwargs):
     inspector_block_refresh.send(sender=instance.inspector.__class__, instance=instance.inspector, error_code=MISSING_STOCK_ERROR, run_async=False)
@@ -280,9 +292,11 @@ def products_inspector__inspector__trigger_block_product_mismatch_variation_chan
 @receiver(inspector_missing_info_detected, sender='products.Product')
 @receiver(inspector_missing_info_detected, sender='products.SimpleProduct')
 @receiver(inspector_missing_info_detected, sender='products.BundleProduct')
+@receiver(inspector_missing_info_detected, sender='products.AliasProduct')
 @receiver(inspector_missing_info_resolved, sender='products.Product')
 @receiver(inspector_missing_info_resolved, sender='products.SimpleProduct')
 @receiver(inspector_missing_info_resolved, sender='products.BundleProduct')
+@receiver(inspector_missing_info_resolved, sender='products.AliasProduct')
 def products_inspector__inspector__trigger_block_product_inspector_change(sender, instance, **kwargs):
     from products.models import ConfigurableVariation, BundleVariation
 

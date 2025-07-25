@@ -1,5 +1,10 @@
 from typing import Any
+
 from strawberry import Info
+
+from strawberry_django.optimizer import DjangoOptimizerExtension
+
+from core.schema.core.mutations import CreateMutation
 from products.models import AliasProduct
 from translations.schema.mutations import TranslatableCreateMutation
 
@@ -27,3 +32,6 @@ class AliasProductCreateMutation(TranslatableCreateMutation):
 
         instance.refresh_from_db()
         return instance
+
+
+

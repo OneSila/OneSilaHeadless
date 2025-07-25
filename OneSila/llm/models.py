@@ -1,4 +1,7 @@
+from django.conf import settings
 from core import models
+from core.helpers import get_languages
+from django.core.exceptions import ValidationError
 
 
 class AbstractAiProcess(models.Model):
@@ -48,3 +51,23 @@ class AiImportProcess(AbstractAiProcess):
 
     def __str__(self):
         return f"Import Process ({self.get_type_display()}) - Cost: {self.cost}"
+
+
+class BrandCustomPrompt(models.Model):
+    LANGUAGES = get_languages()
+
+    brand_value = models.ForeignKey('properties.PropertySelectValue', on_delete=models.CASCADE)
+    language = models.CharField(max_length=7, choices=LANGUAGES, default=settings.LANGUAGE_CODE, null=True, blank=True)
+    prompt = models.TextField()
+
+
+    class Meta:
+        unique_together = ('brand_value', 'language')
+
+    def save(self, *args, **kwargs):
+        if self.brand_value.property.internal_name != 'brand':
+            raise ValidationError("Brand value must belong to property with internal_name 'brand'")
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.brand_value.value} - {self.language or 'any'}"

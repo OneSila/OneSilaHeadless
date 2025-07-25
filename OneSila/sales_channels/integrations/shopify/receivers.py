@@ -51,14 +51,6 @@ def shopify__product__create_from_assign(sender, instance, **kwargs):
     if not isinstance(sc, ShopifySalesChannel):
         return
 
-    # from sales_channels.integrations.shopify.factories.products.products import  ShopifyProductCreateFactory
-    #
-    # product = instance.product
-    # sc = instance.sales_channel
-    #
-    # fac = ShopifyProductCreateFactory(sales_channel=sc, local_instance=product)
-    # fac.run()
-
     run_generic_sales_channel_task_flow(
         task_func=create_shopify_product_db_task,
         multi_tenant_company=product.multi_tenant_company,
@@ -179,6 +171,7 @@ def shopify__product_property__update(sender, instance, **kwargs):
         product_property_id=instance.id,
     )
 
+
 @receiver(post_update, sender='properties.ProductProperty')
 @receiver(mutation_update, sender='properties.ProductProperty')
 @receiver(post_delete, sender='properties.ProductProperty')
@@ -194,6 +187,24 @@ def shopify__product_property__tags__update(sender, instance, **kwargs):
             sales_channel_class=ShopifySalesChannel,
             product_id=product.id,
         )
+
+
+@receiver(post_update, sender='properties.ProductProperty')
+@receiver(mutation_update, sender='properties.ProductProperty')
+@receiver(post_delete, sender='properties.ProductProperty')
+def shopify__product_property__tags__update(sender, instance, **kwargs):
+    product = instance.product
+
+    if instance.property.internal_name == SHOPIFY_TAGS:
+
+        run_product_specific_sales_channel_task_flow(
+            task_func=sync_shopify_product_db_task,
+            multi_tenant_company=product.multi_tenant_company,
+            product=product,
+            sales_channel_class=ShopifySalesChannel,
+            product_id=product.id,
+        )
+
 
 @receiver(delete_remote_product_property, sender='properties.ProductProperty')
 def shopify__product_property__delete(sender, instance, **kwargs):

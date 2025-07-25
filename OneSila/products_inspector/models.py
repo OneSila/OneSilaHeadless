@@ -29,6 +29,40 @@ class Inspector(models.Model):
     def __str__(self):
         return f"Inspector for {self.product.sku}"
 
+    def completion_percentage(self) -> tuple[int, list[dict]]:
+        """Return completion percentage and block info.
+
+        The percentage is rounded to the nearest whole number and only
+        considers blocks marked as REQUIRED or OPTIONAL. The blocks list
+        includes dictionaries with ``code`` and ``completed`` keys for the
+        applicable blocks.
+        """
+        from products_inspector.constants import REQUIRED, OPTIONAL
+
+        total_blocks = 0
+        completed_blocks = 0
+        blocks = []
+
+        for block in self.blocks.all():
+            target_field = block.get_target_field_key()
+            if not target_field:
+                continue
+
+            applicability = getattr(block, target_field, None)
+            if applicability in (REQUIRED, OPTIONAL):
+                total_blocks += 1
+                completed = block.successfully_checked
+                if completed:
+                    completed_blocks += 1
+                blocks.append({"code": block.error_code, "completed": completed})
+
+        if total_blocks == 0:
+            percentage = 100
+        else:
+            percentage = round((completed_blocks / total_blocks) * 100)
+
+        return percentage, blocks
+
 
 class InspectorBlock(models.Model):
     from products_inspector.constants import ERROR_TYPES, MANDATORY_TYPE_CHOICES, NONE

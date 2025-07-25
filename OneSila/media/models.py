@@ -46,7 +46,7 @@ class Media(models.Model):
 
     video_url = models.URLField(null=True, blank=True)
 
-    image_type = models.CharField(max_length=4, choices=IMAGE_TYPE_CHOICES, default=PACK_SHOT)
+    image_type = models.CharField(max_length=5, choices=IMAGE_TYPE_CHOICES, default=PACK_SHOT)
     image = models.ImageField(_('Image (High resolution)'),
         upload_to='images/', validators=[validate_image_extension],
         null=True, blank=True)

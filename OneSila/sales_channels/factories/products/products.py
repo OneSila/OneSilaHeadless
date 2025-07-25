@@ -2,7 +2,7 @@ from integrations.models import IntegrationLog
 from media.models import MediaProductThrough, Media
 from products.models import Product
 from properties.models import ProductProperty
-from sales_channels.exceptions import SwitchedToSyncException, SwitchedToCreateException
+from sales_channels.exceptions import SwitchedToSyncException, SwitchedToCreateException, ConfigurationMissingError
 from sales_channels.factories.mixins import IntegrationInstanceOperationMixin, RemoteInstanceDeleteFactory, \
     EanCodeValueMixin, SyncProgressMixin
 import logging
@@ -131,6 +131,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.product_properties = ProductProperty.objects.filter_multi_tenant(self.sales_channel.multi_tenant_company). \
             filter(product=self.local_instance, property_id__in=rule_properties_ids)
 
+        logger.debug(f"Setting product properties {self.product_properties}")
+
     def process_product_properties(self):
         """
         Processes each property retrieved from the product and performs the necessary actions,
@@ -141,7 +143,10 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         for product_property in self.product_properties:
             # Attempt to process the product property
             remote_property_id = self.process_single_property(product_property)
-            existing_remote_property_ids.append(remote_property_id)
+
+            # in the marketplaces some might be skipped if not mapped
+            if remote_property_id:
+                existing_remote_property_ids.append(remote_property_id)
 
         # Delete any remote properties that no longer exist locally
         self.delete_non_existing_remote_product_property(existing_remote_property_ids)
@@ -183,6 +188,9 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         except self.remote_product_property_class.DoesNotExist:
             # If the remote product property does not exist, create it
+            # This create factory is configured to not remotely actually create the property,
+            # but only to return the payload if it exists. (get_value_only=True)
+            # Skip check will ignore the pre-flight checks.
             create_factory = self.remote_product_property_create_factory(
                 local_instance=product_property,
                 sales_channel=self.sales_channel,
@@ -207,10 +215,13 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         :param existing_remote_property_ids: The list of existing remote property IDs to keep.
         """
         # Find remote product properties that are not in the list of existing IDs
-        remote_properties_to_delete = self.remote_product_property_class.objects.filter(
-            remote_product=self.remote_instance,
-            sales_channel=self.sales_channel
-        ).exclude(id__in=existing_remote_property_ids)
+        try:
+            remote_properties_to_delete = self.remote_product_property_class.objects.filter(
+                remote_product=self.remote_instance,
+                sales_channel=self.sales_channel
+            ).exclude(id__in=existing_remote_property_ids)
+        except AttributeError:
+            raise ConfigurationMissingError(f"Did you forget to set `remote_product_property_class`?")
 
         # Run the delete factory for each property that needs to be removed
         for remote_property in remote_properties_to_delete:
@@ -452,6 +463,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.add_field_in_payload('price', self.price)
             self.add_field_in_payload('discount', self.discount)
 
+        logger.debug(f"Set price for {self.local_instance.name}: {self.price}")
+
     def set_variation_price(self):
         """Sets the price for variations, allowing for overrides."""
         pass
@@ -477,6 +490,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
                 setter_method()
             else:
                 logger.warning(f"Setter method set_{field} not found.")
+
+        logger.debug(f"Build payload inspection for {self.local_instance.name}: {self.payload}")
 
     def set_variation_allow_backorder(self):
         """
@@ -720,7 +735,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """
         Synchronizes each variation (child product) associated with the configurable product.
         """
-        existing_remote_variation_ids = []
 
         for variation in self.variations:
 
@@ -740,11 +754,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
             self.update_progress()
 
-            # Keep track of existing remote variation IDs
-            existing_remote_variation_ids.append(remote_variation.id)
-
-        # After processing all variations, delete any remote variations not in the local set
-        self.delete_removed_variations(existing_remote_variation_ids)
 
     def update_child(self, variation, remote_variation):
         """
@@ -811,19 +820,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             remote_instance=remote_variation
         )
         factory.run()
-
-    def delete_removed_variations(self, existing_remote_variation_ids):
-        """
-        Deletes remote variations that are no longer present in the local variations.
-        """
-        # Get all remote variations linked to this remote parent product, excluding the existing ones
-        remote_variations_to_delete = self.remote_model_class.objects.filter(
-            remote_parent_product=self.remote_instance,
-            sales_channel=self.sales_channel
-        ).exclude(id__in=existing_remote_variation_ids)
-
-        for remote_variation in remote_variations_to_delete:
-            self.delete_child(remote_variation)
 
     def assign_ean_code(self):
         """
@@ -1123,6 +1119,8 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
                 multi_tenant_company=self.sales_channel.multi_tenant_company
             )
             logger.debug(f"Created RemoteProductContent for {self.remote_instance}")
+        else:
+            raise NotImplementedError("No remote_product_content_class found in {self.__class__.__name__}")
 
     def set_ean_code(self):
         super().set_ean_code()
@@ -1150,7 +1148,6 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
             logger.debug(f"Created RemoteInventory for {self.remote_instance}")
 
     def set_price(self):
-
         if not self.sales_channel.sync_prices:
             return
 
@@ -1169,6 +1166,10 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
                 remote_price_obj.price_data = self.prices_data
                 remote_price_obj.save(update_fields=["price_data"])
                 logger.debug(f"Updated price_data for {self.remote_instance} → {self.prices_data}")
+        else:
+            msg = f"No remote_price_class found in {self.__class__.__name__}"
+            logger.error(msg)
+            raise AttributeError(msg)
 
     def perform_non_subclassed_remote_action(self):
         """

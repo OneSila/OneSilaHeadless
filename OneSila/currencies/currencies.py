@@ -40,5 +40,30 @@ currencies = {
     'SA': {'name': 'Saudi Riyal', 'iso_code': 'SAR', 'symbol': 'ر.س'},
     'AE': {'name': 'United Arab Emirates Dirham', 'iso_code': 'AED', 'symbol': 'د.إ'},
     'MX': {'name': 'Mexican Peso', 'iso_code': 'MXN', 'symbol': '$'},
-    'TR': {'name': 'Turkish Lira', 'iso_code': 'TRY', 'symbol': '₺'}
+    'TR': {'name': 'Turkish Lira', 'iso_code': 'TRY', 'symbol': '₺'},
+    # Additional currencies
+    'AF': {'name': 'Afghan Afghani', 'iso_code': 'AFN', 'symbol': '؋'},
+    'AL': {'name': 'Albanian Lek', 'iso_code': 'ALL', 'symbol': 'Lek'},
+    'DZ': {'name': 'Algerian Dinar', 'iso_code': 'DZD', 'symbol': 'د.ج'},
+    'AR': {'name': 'Argentine Peso', 'iso_code': 'ARS', 'symbol': '$'},
+    'CL': {'name': 'Chilean Peso', 'iso_code': 'CLP', 'symbol': '$'},
+    'CO': {'name': 'Colombian Peso', 'iso_code': 'COP', 'symbol': '$'},
+    'EG': {'name': 'Egyptian Pound', 'iso_code': 'EGP', 'symbol': '£'},
+    'HK': {'name': 'Hong Kong Dollar', 'iso_code': 'HKD', 'symbol': '$'},
+    'ID': {'name': 'Indonesian Rupiah', 'iso_code': 'IDR', 'symbol': 'Rp'},
+    'IL': {'name': 'Israeli New Shekel', 'iso_code': 'ILS', 'symbol': '₪'},
+    'KR': {'name': 'South Korean Won', 'iso_code': 'KRW', 'symbol': '₩'},
+    'MY': {'name': 'Malaysian Ringgit', 'iso_code': 'MYR', 'symbol': 'RM'},
+    'NZ': {'name': 'New Zealand Dollar', 'iso_code': 'NZD', 'symbol': '$'},
+    'NG': {'name': 'Nigerian Naira', 'iso_code': 'NGN', 'symbol': '₦'},
+    'NO': {'name': 'Norwegian Krone', 'iso_code': 'NOK', 'symbol': 'kr'},
+    'PK': {'name': 'Pakistani Rupee', 'iso_code': 'PKR', 'symbol': '₨'},
+    'QA': {'name': 'Qatari Rial', 'iso_code': 'QAR', 'symbol': 'ر.ق'},
+    'CH': {'name': 'Swiss Franc', 'iso_code': 'CHF', 'symbol': 'Fr'},
+    'SG': {'name': 'Singapore Dollar', 'iso_code': 'SGD', 'symbol': '$'},
+    'TW': {'name': 'New Taiwan Dollar', 'iso_code': 'TWD', 'symbol': 'NT$'},
+    'UA': {'name': 'Ukrainian Hryvnia', 'iso_code': 'UAH', 'symbol': '₴'},
+    'VN': {'name': 'Vietnamese Dong', 'iso_code': 'VND', 'symbol': '₫'}
 }
+
+iso_list = [currency['iso_code'] for currency in currencies.values()]

@@ -297,10 +297,10 @@ class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Mode
         if changed:
             self.save()
 
-            if send_sync_signal:
+            if send_sync_signal and not self.remote_product.local_instance.inspector.has_missing_information:
                 sync_remote_product.send(
                     sender=self.remote_product.local_instance.__class__,
-                    instance=self.remote_product.local_instance.product
+                    instance=self.remote_product.local_instance
                 )
 
 

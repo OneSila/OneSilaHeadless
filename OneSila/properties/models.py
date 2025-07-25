@@ -1,7 +1,8 @@
 from core import models
 from django.utils.translation import gettext_lazy as _
 
-from properties.managers import PropertyManager, ProductPropertiesRuleManager, PropertySelectValueManager
+from properties.managers import PropertyManager, ProductPropertiesRuleManager, \
+    PropertySelectValueManager, ProductPropertyManager
 from translations.models import TranslationFieldsMixin, TranslatedModelMixin
 from builtins import property as django_property  # in this file we will use property as django property because we have fields named property
 from django.db.models import Q
@@ -56,6 +57,7 @@ class Property(TranslatedModelMixin, models.Model):
     )
     # the name that will be used in integration. Consider making it a foreign key with integrations in the future. for now is enough
     # it will be the snake case version of the name in default language "Product Type" => "product_type"
+    # This internal name is auto-populated via siganls once the tranlsation is saved.
     internal_name = models.CharField(max_length=255, null=True, blank=True, verbose_name=_('Internal Name'))
 
     objects = PropertyManager()
@@ -81,7 +83,7 @@ class Property(TranslatedModelMixin, models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.multi_tenant_company} -> {self.name}"
+        return f"{self.multi_tenant_company} -> {self.name} ({self.type})"
 
     class Meta:
         verbose_name_plural = _("Properties")
@@ -93,6 +95,12 @@ class Property(TranslatedModelMixin, models.Model):
                 condition=Q(is_product_type=True),
                 name='unique_is_product_type',
                 violation_error_message=_("You can only have one product type per multi-tenant company.")
+            ),
+            models.UniqueConstraint(
+                fields=['multi_tenant_company', 'internal_name'],
+                condition=Q(internal_name__isnull=False),
+                name='unique_internal_name_per_company',
+                violation_error_message=_("This internal name already exists for this company.")
             ),
         ]
 
@@ -159,10 +167,12 @@ class ProductProperty(TranslatedModelMixin, models.Model):
     value_select = models.ForeignKey(PropertySelectValue, on_delete=models.PROTECT, related_name='value_select_set', null=True, blank=True)
     value_multi_select = models.ManyToManyField(PropertySelectValue, related_name='value_multi_select_set', blank=True)
 
+    objects = ProductPropertyManager()
+
     def __str__(self):
         return f"{self.product} {self.property} > {self.get_value()}"
 
-    def get_value(self):
+    def get_value(self, language=None):
         """
         Converts the various values and returns you the right type/value for the given property.
         """
@@ -171,12 +181,23 @@ class ProductProperty(TranslatedModelMixin, models.Model):
         if type == Property.TYPES.MULTISELECT:
             type = 'multi_select'
 
-        return getattr(self, 'get_value_{}'.format(type.lower()))()
+        method = getattr(self, 'get_value_{}'.format(type.lower()))
+        return method(language)
 
-    def get_value_int(self):
+    def get_serialised_value(self, language=None):
+        value = self.get_value()
+
+        if self.property.type == Property.TYPES.MULTISELECT:
+            value = list({value.value for value in self.value_multi_select.all()})
+        elif self.property.type == Property.TYPES.SELECT:
+            value = value.value
+
+        return value
+
+    def get_value_int(self, language=None):
         return self.value_int
 
-    def get_value_float(self):
+    def get_value_float(self, language=None):
         return self.value_float
 
     def get_value_text(self, language=None):
@@ -185,19 +206,19 @@ class ProductProperty(TranslatedModelMixin, models.Model):
     def get_value_description(self, language=None):
         return self._get_translated_value(field_name='value_description', related_name='productpropertytexttranslation_set', language=language)
 
-    def get_value_boolean(self):
+    def get_value_boolean(self, language=None):
         return self.value_boolean
 
-    def get_value_date(self):
+    def get_value_date(self, language=None):
         return self.value_date
 
-    def get_value_datetime(self):
+    def get_value_datetime(self, language=None):
         return self.value_datetime
 
-    def get_value_select(self):
+    def get_value_select(self, language=None):
         return self.value_select
 
-    def get_value_multi_select(self):
+    def get_value_multi_select(self, language=None):
         return self.value_multi_select
 
     class Meta:
@@ -283,7 +304,7 @@ class ProductPropertiesRuleItem(models.Model):
 
         # Ensure that if type is REQUIRED_IN_CONFIGURATOR, property type must be SELECT or MULTISELECT
         if self.type in [self.REQUIRED_IN_CONFIGURATOR, self.OPTIONAL_IN_CONFIGURATOR] and self.property.type != Property.TYPES.SELECT:
-            raise ValidationError(_("Property must be of type SELECT."))
+            raise ValidationError(_(f"Property {self.property.name} must be of type SELECT."))
 
         # Ensure rule cannot have OPTIONAL_IN_CONFIGURATOR without a REQUIRED_IN_CONFIGURATOR
         if self.type == self.OPTIONAL_IN_CONFIGURATOR and not self.rule.items.filter(type=self.REQUIRED_IN_CONFIGURATOR).exists():

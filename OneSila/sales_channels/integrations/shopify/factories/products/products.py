@@ -149,7 +149,6 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         else:
             self.payload['metafields'] = self.metafields
 
-
     def get_saleschannel_remote_object(self, sku):
         gql = self.api.GraphQL()
         query = """

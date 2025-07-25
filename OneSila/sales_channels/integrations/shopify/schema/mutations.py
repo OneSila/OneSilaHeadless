@@ -58,4 +58,3 @@ class ShopifySalesChannelMutation:
         factory.run()
 
         return sales_channel
-

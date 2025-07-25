@@ -45,6 +45,7 @@ class AmazonPropertySelectValuesSyncFactory:
 
     def _link_duplicate_values(self, values: list) -> None:
         """Create/link a local PropertySelectValue for each provided remote value."""
+        existing_psv = None
         for val in values:
             lang = val.marketplace.remote_languages.first()
             if not lang or not val.remote_name:
@@ -52,16 +53,20 @@ class AmazonPropertySelectValuesSyncFactory:
                 continue
 
             language_code = lang.local_instance
-            existing_psv = PropertySelectValue.objects.filter(
-                property=self.local_property,
-                propertyselectvaluetranslation__value__iexact=val.remote_name.strip(),
-            ).first()
 
-            if not existing_psv:
-                existing_psv = PropertySelectValue.objects.create(
+            # Create the PropertySelectValue only once for the first valid entry
+            if existing_psv is None:
+                existing_psv = PropertySelectValue.objects.filter(
                     property=self.local_property,
-                    multi_tenant_company=self.amazon_property.multi_tenant_company,
-                )
+                    propertyselectvaluetranslation__language=language_code,
+                    propertyselectvaluetranslation__value__iexact=val.remote_name.strip(),
+                ).first()
+
+                if not existing_psv:
+                    existing_psv = PropertySelectValue.objects.create(
+                        property=self.local_property,
+                        multi_tenant_company=self.amazon_property.multi_tenant_company,
+                    )
 
             PropertySelectValueTranslation.objects.get_or_create(
                 propertyselectvalue=existing_psv,

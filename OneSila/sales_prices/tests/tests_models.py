@@ -107,20 +107,16 @@ class SalesPriceListItemQuerySetTestCase(TestCase):
         discount_override = None
 
         product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        currency, _ = Currency.objects.get_or_create(
-            is_default_currency=True,
-            multi_tenant_company=self.multi_tenant_company,
-            **currencies['GB'])
         salesprice, _ = product.salesprice_set.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
-            currency=currency)
+            currency=self.currency)
         salesprice.set_prices(rrp=rrp, price=price)
 
         price_list = SalesPriceList.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             name='Test list test_discount_price',
             auto_update_prices=True,
-            currency=currency,
+            currency=self.currency,
         )
 
         price_list_price = SalesPriceListItem.objects.create(

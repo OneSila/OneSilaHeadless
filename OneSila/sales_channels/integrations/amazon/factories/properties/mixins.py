@@ -1,10 +1,11 @@
+from sales_channels.integrations.amazon.exceptions import AmazonUnsupportedPropertyForProductType
 from sales_channels.integrations.amazon.models.properties import (
     AmazonProperty,
     AmazonProductType,
     AmazonPublicDefinition,
     AmazonPropertySelectValue,
 )
-from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin, AmazonListingIssuesMixin
+from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from properties.models import Property, ProductProperty
 import json
 import re
@@ -65,17 +66,12 @@ class AmazonRemoteValueMixin:
         return value
 
 
-class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin, AmazonListingIssuesMixin):
+class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
     """Common helpers for Amazon product property factories."""
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _get_remote_property(self) -> AmazonProperty:
-        return AmazonProperty.objects.get(
-            sales_channel=self.sales_channel,
-            local_instance=self.local_property,
-        )
 
     def _get_product_type(self, rule) -> AmazonProductType:
         return AmazonProductType.objects.get(
@@ -84,11 +80,15 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin, 
         )
 
     def _get_public_definition(self, product_type: AmazonProductType, main_code: str) -> AmazonPublicDefinition:
-        return AmazonPublicDefinition.objects.get(
-            api_region_code=self.view.api_region_code,
-            product_type_code=product_type.product_type_code,
-            code=main_code,
-        )
+
+        try:
+            return AmazonPublicDefinition.objects.get(
+                api_region_code=self.view.api_region_code,
+                product_type_code=product_type.product_type_code,
+                code=main_code,
+            )
+        except AmazonPublicDefinition.DoesNotExist:
+            raise AmazonUnsupportedPropertyForProductType("Amazon property is not supported for this product type")
 
     def _get_unit(self, code: str):
         from sales_channels.integrations.amazon.models.sales_channels import AmazonDefaultUnitConfigurator
@@ -115,14 +115,19 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin, 
             if kind == "unit":
                 return self._get_unit(code)
             if kind == "value":
-                remote_prop = AmazonProperty.objects.get(
+                self.remote_property = AmazonProperty.objects.get(
                     sales_channel=self.sales_channel, code=code
                 )
-                local_prop = remote_prop.local_instance
-                prop_instance = ProductProperty.objects.get(
-                    product=product, property=local_prop
-                )
-                return self.get_remote_value_for_property(prop_instance, remote_prop)
+                local_prop = self.remote_property.local_instance
+
+                try:
+                    prop_instance = ProductProperty.objects.get(
+                        product=product, property=local_prop
+                    )
+                except ProductProperty.DoesNotExist:
+                    return None
+
+                return self.get_remote_value_for_property(prop_instance, self.remote_property)
             return value
 
         def _walk(node):
@@ -138,33 +143,32 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin, 
 
     # ------------------------------------------------------------------
     def build_payload(self):
-        remote_property = self._get_remote_property()
-        main_code = remote_property.main_code
+        main_code = self.remote_property.main_code
         rule = self.local_instance.product.get_product_rule()
         if not rule:
             raise ValueError("Product has no product rule mapped")
         product_type = self._get_product_type(rule)
+
+        if not product_type:
+            raise ValueError("Product has no product type mapped")
+
         public_def = self._get_public_definition(product_type, main_code)
         if not public_def.usage_definition:
-            raise ValueError("Missing usage definition for property")
+            raise AmazonUnsupportedPropertyForProductType("Missing usage definition for property")
+
         usage = json.loads(public_def.usage_definition)
-
         payload = self._replace_tokens(usage, self.local_instance.product)
-        return product_type.product_type_code, payload
 
-    # ------------------------------------------------------------------
-    def preflight_check(self):
-        if not super().preflight_check():
-            return False
-        try:
-            self._get_remote_property()
-        except AmazonProperty.DoesNotExist:
-            raise ValueError("Property not mapped to Amazon")
-        return True
+        remote_prod = getattr(self, "remote_product", None)
+        if not self.sales_channel.listing_owner and not getattr(remote_prod, "product_owner", False):
+            allowed_properties = product_type.listing_offer_required_properties.get(self.view.api_region_code, [])
+            if main_code not in allowed_properties:
+                return product_type, {}
+
+        return product_type, payload
 
     def create_body(self):
-        product_type_code, payload = self.build_payload()
-
+        self.remote_rule, payload = self.build_payload()
         self.remote_value = json.dumps(payload)
 
         if self.get_value_only:
@@ -176,10 +180,16 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin, 
             return None
 
         body = {
-            "productType": product_type_code,
+            "productType": self.remote_rule.product_type_code,
             "requirements": "LISTING",
             "attributes": payload,
         }
         self.value = body
         return body
 
+    def preflight_process(self):
+        pass
+
+    def set_remote_id(self, response_data):
+        # the product properties have na remote id
+        pass

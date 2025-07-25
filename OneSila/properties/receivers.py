@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db.models.signals import post_delete, pre_delete
 from django.dispatch import receiver
-from django.utils.text import slugify
+from properties.helpers import generate_unique_internal_name
 from django.utils.translation import gettext_lazy as _
 from core.models import MultiTenantCompany
 from core.signals import post_create, post_update
@@ -22,18 +22,19 @@ def create_default_product_type_property(sender, instance, **kwargs):
 
 @receiver(post_create, sender=PropertyTranslation)
 def properties__property_translation__post_save(sender, instance, **kwargs):
-
     if not instance.property.internal_name:
-        instance.property.internal_name = slugify(instance.name).replace('-', '_')
-        instance.property.save(update_fields=['internal_name'])
+        internal_name = generate_unique_internal_name(
+            instance.name,
+            instance.property.multi_tenant_company,
+            instance.property.id,
+        )
+        Property.objects.filter(id=instance.property.id).update(internal_name=internal_name)
 
 
 @receiver(post_update, sender=PropertySelectValueTranslation)
 def properties__property_select_value_translation__rename_rule(sender, instance, **kwargs):
-
     property_instance = instance.propertyselectvalue.property
     if property_instance.is_product_type:
-
         try:
             rule = ProductPropertiesRule.objects.get(
                 product_type=instance.propertyselectvalue,
@@ -69,7 +70,6 @@ def delete_product_type_property_select_value(sender, instance, **kwargs):
 
 @receiver(pre_delete, sender=PropertySelectValue)
 def prevent_property_select_value_deletion(sender, instance, **kwargs):
-
     if ProductProperty.objects.filter(value_multi_select=instance).exists():
         raise ValidationError(
             _("This value cannot be deleted because it is used in as a product property multi-select field.")

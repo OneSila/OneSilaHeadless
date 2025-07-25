@@ -3,7 +3,6 @@ from hashlib import shake_256
 
 import shortuuid
 from django.db import IntegrityError
-
 from currencies.models import Currency, PublicCurrency
 from eancodes.models import EanCode
 from imports_exports.factories.media import ImportImageInstance
@@ -20,6 +19,11 @@ from products.models import (
 from properties.models import Property, ProductPropertiesRuleItem, ProductProperty
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
+from currencies.currencies import iso_list
+from core.exceptions import ValidationError
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class ProductImport(ImportOperationMixin):
@@ -33,8 +37,8 @@ class ProductImport(ImportOperationMixin):
 
         error_msg = str(error)
         is_duplicate_sku_constraint = (
-                'duplicate key value violates unique constraint' in error_msg and
-                'products_product_sku_multi_tenant_company_id' in error_msg
+            'duplicate key value violates unique constraint' in error_msg and
+            'products_product_sku_multi_tenant_company_id' in error_msg
         )
 
         if not is_duplicate_sku_constraint:
@@ -235,19 +239,28 @@ class ImportProductInstance(AbstractImportInstance):
                     prop = select_value["property"]
                     required_names.add(prop.name)
 
-
         items = []
         if hasattr(self, 'properties'):
             for property in self.properties:
                 if 'property_data' in property or 'property' in property:
                     if 'property_data' in property:
                         name = property['property_data'].get("name")
+                        type = property['property_data'].get("type")
+
+                        if type != Property.TYPES.SELECT:
+                            continue
+
                         item_data = {
                             'property_data': property['property_data'],
                             'type': ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if name in required_names else ProductPropertiesRuleItem.OPTIONAL
                         }
                     else:
                         name = property['property'].name
+                        type = property['property'].type
+
+                        if type != Property.TYPES.SELECT:
+                            continue
+
                         item_data = {
                             'property': property['property'],
                             'type': ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR if name in required_names else ProductPropertiesRuleItem.OPTIONAL
@@ -327,7 +340,6 @@ class ImportProductInstance(AbstractImportInstance):
             if self.update_current_rule:
                 self.update_product_rule()
 
-
         product_property_ids = []
         if self.type in [Product.SIMPLE, Product.BUNDLE, Product.ALIAS] and hasattr(self, 'properties'):
 
@@ -374,8 +386,12 @@ class ImportProductInstance(AbstractImportInstance):
     def set_prices(self):
         sales_price_ids = []
         for price in self.prices:
-            image_import_instance = ImportSalesPriceInstance(price, product=self.instance, import_process=self.import_process)
-            image_import_instance.process()
+            try:
+                image_import_instance = ImportSalesPriceInstance(price, product=self.instance, import_process=self.import_process)
+                image_import_instance.process()
+            except IntegrityError:
+                # if the price is wrong we will skip it
+                pass
 
     def set_variations(self):
         from .variations import ImportConfiguratorVariationsInstance, ImportConfigurableVariationInstance
@@ -442,7 +458,6 @@ class ImportProductInstance(AbstractImportInstance):
         self.alias_variations_instances = Product.objects.filter(id__in=variation_products_ids)
 
     def set_rule_product_property(self):
-
         rule_product_property, _ = ProductProperty.objects.get_or_create(
             multi_tenant_company=self.config_product.multi_tenant_company,
             product=self.instance,
@@ -454,7 +469,6 @@ class ImportProductInstance(AbstractImportInstance):
             rule_product_property.save()
 
     def _handle_parent_sku_links(self):
-
         parent_sku = self.data.get("configurable_parent_sku")
         if parent_sku:
             parent = Product.objects.filter(sku=parent_sku, multi_tenant_company=self.multi_tenant_company).first()
@@ -478,7 +492,6 @@ class ImportProductInstance(AbstractImportInstance):
                 return
 
     def post_process_logic(self):
-
         if self.type == Product.SIMPLE:
             self.update_ean_code()
 
@@ -516,7 +529,8 @@ class ImportProductInstance(AbstractImportInstance):
                     # Try again with url_key removed
                     translation = translation.copy()
                     translation["url_key"] = None
-                    import_instance = ImportProductTranslationInstance(translation, self.import_process, product=self.instance, sales_channel=self.sales_channel)
+                    import_instance = ImportProductTranslationInstance(
+                        translation, self.import_process, product=self.instance, sales_channel=self.sales_channel)
                     import_instance.process()
                 else:
                     raise
@@ -566,7 +580,6 @@ class ImportProductInstance(AbstractImportInstance):
                 else:
                     raise
 
-
             bullet_points = translation.get('bullet_points')
             if bullet_points is not None:
                 translation_obj.bullet_points.all().delete()
@@ -579,6 +592,49 @@ class ImportProductInstance(AbstractImportInstance):
                     )
 
             translation_instance_ids.append(translation_obj.id)
+
+            if self.sales_channel is not None:
+                exists_default = ProductTranslation.objects.filter(
+                    multi_tenant_company=self.instance.multi_tenant_company,
+                    product=self.instance,
+                    language=language,
+                    sales_channel=None,
+                ).exists()
+                if not exists_default:
+                    try:
+                        default_obj = ProductTranslation.objects.create(
+                            multi_tenant_company=self.instance.multi_tenant_company,
+                            language=language,
+                            product=self.instance,
+                            name=name,
+                            short_description=short_description,
+                            description=description,
+                            url_key=url_key,
+                            sales_channel=None,
+                        )
+                    except IntegrityError as e:
+                        if "url_key" in str(e):
+                            default_obj = ProductTranslation.objects.create(
+                                multi_tenant_company=self.instance.multi_tenant_company,
+                                language=language,
+                                product=self.instance,
+                                name=name,
+                                short_description=short_description,
+                                description=description,
+                                url_key=None,
+                                sales_channel=None,
+                            )
+                        else:
+                            raise
+
+                    if bullet_points is not None:
+                        for index, text in enumerate(bullet_points):
+                            ProductTranslationBulletPoint.objects.create(
+                                multi_tenant_company=default_obj.multi_tenant_company,
+                                product_translation=default_obj,
+                                text=text,
+                                sort_order=index,
+                            )
 
         self.translation_instances = ProductTranslation.objects.filter(id__in=translation_instance_ids)
 
@@ -639,10 +695,54 @@ class ImportProductTranslationInstance(AbstractImportInstance):
             self.instance.bullet_points.all().delete()
             for index, text in enumerate(self.bullet_points):
                 ProductTranslationBulletPoint.objects.create(
+                    multi_tenant_company=self.instance.multi_tenant_company,
                     product_translation=self.instance,
                     text=text,
                     sort_order=index,
                 )
+
+        if self.sales_channel is not None:
+            exists_default = ProductTranslation.objects.filter(
+                multi_tenant_company=self.instance.multi_tenant_company,
+                product=self.product,
+                language=self.language,
+                sales_channel=None,
+            ).exists()
+            if not exists_default:
+                try:
+                    default_obj = ProductTranslation.objects.create(
+                        multi_tenant_company=self.instance.multi_tenant_company,
+                        product=self.product,
+                        language=self.language,
+                        name=self.instance.name,
+                        short_description=self.instance.short_description,
+                        description=self.instance.description,
+                        url_key=self.instance.url_key,
+                        sales_channel=None,
+                    )
+                except IntegrityError as e:
+                    if "url_key" in str(e):
+                        default_obj = ProductTranslation.objects.create(
+                            multi_tenant_company=self.instance.multi_tenant_company,
+                            product=self.product,
+                            language=self.language,
+                            name=self.instance.name,
+                            short_description=self.instance.short_description,
+                            description=self.instance.description,
+                            url_key=None,
+                            sales_channel=None,
+                        )
+                    else:
+                        raise
+
+                if hasattr(self, 'bullet_points') and self.bullet_points is not None:
+                    for index, text in enumerate(self.bullet_points):
+                        ProductTranslationBulletPoint.objects.create(
+                            multi_tenant_company=default_obj.multi_tenant_company,
+                            product_translation=default_obj,
+                            text=text,
+                            sort_order=index,
+                        )
 
 
 class ImportSalesPriceInstance(AbstractImportInstance):
@@ -662,6 +762,7 @@ class ImportSalesPriceInstance(AbstractImportInstance):
             self._set_currency()
 
         self.validate()
+        self.validate_currency()
         self._set_product_import_instance()
 
     @property
@@ -672,10 +773,20 @@ class ImportSalesPriceInstance(AbstractImportInstance):
     def updatable_fields(self):
         return ['rrp', 'price']
 
+    def validate_currency(self):
+        currency = self.data.get('currency')
+        if not currency:
+            raise ValidationError("Currency is required.")
+
+        if currency not in iso_list:
+            raise ValidationError(f"Currency {currency} is not supported.")
+
     def validate(self):
         """
-        Validate that the 'value' key exists.
+        Validate that the 'value' key exists
         """
+        # FIXME: This should really populate a SalesPrice Instance and
+        # run full_clean() instead of replicating the logic.  Very fragile.
         if not hasattr(self, 'rrp') and not hasattr(self, 'price'):
             raise ValueError("Both 'rrp' and 'price' cannot be None.")
 
@@ -689,22 +800,23 @@ class ImportSalesPriceInstance(AbstractImportInstance):
             raise ValueError("Both 'currency' cannot be None.")
 
     def _set_public_currency(self):
-
-        if hasattr(self, 'currency'):
-            self.public_currency = PublicCurrency.objects.filter(iso_code=self.currency).first()
-
-            if self.public_currency is None:
-                raise ValueError("The price use unsupported currency.")
+        try:
+            self.public_currency = PublicCurrency.objects.get(iso_code=self.currency)
+        except AttributeError:
+            # Currency is optional in this validation.
+            # It falls back to the company currency at a later stage should
+            # it be missing.
+            pass
+        except PublicCurrency.DoesNotExist:
+            raise ValidationError(f"Currency {self.currency} is unknown in the public currency list.")
 
     def _set_currency(self):
-
         if not hasattr(self, 'currency'):
-            self.currency = Currency.objects.get(multi_tenant_company=self.multi_tenant_company, is_default_currency=True)
+            self.currency, _ = Currency.objects.get_or_create(multi_tenant_company=self.multi_tenant_company, is_default_currency=True)
             return
 
         if hasattr(self, 'currency') and hasattr(self, 'public_currency'):
-
-            self.currency = Currency.objects.get(
+            self.currency, _ = Currency.objects.get_or_create(
                 multi_tenant_company=self.multi_tenant_company,
                 iso_code=self.public_currency.iso_code,
             )
@@ -714,7 +826,6 @@ class ImportSalesPriceInstance(AbstractImportInstance):
         raise ValueError("There is no way to receive the currency.")
 
     def _set_product_import_instance(self):
-
         if not self.product:
             self.product_import_instance = ImportProductInstance(self.product_data, self.import_process)
 

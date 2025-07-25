@@ -15,6 +15,20 @@ class ShopifySalesChannel(SalesChannel):
         null=True, blank=True
     )
 
+    api_key = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="API key of the Shopify custom app associated with this store.",
+    )
+
+    api_secret = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="API secret of the Shopify custom app associated with this store.",
+    )
+
     state = models.CharField(
         max_length=64,
         unique=True,
@@ -29,7 +43,6 @@ class ShopifySalesChannel(SalesChannel):
         on_delete=models.SET_NULL,
         help_text="The product property that maps to Shopify vendor (brand)."
     )
-
 
     # for when is_external_install is True
     hmac = models.CharField(

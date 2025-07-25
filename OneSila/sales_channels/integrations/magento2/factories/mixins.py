@@ -90,6 +90,8 @@ class MagentoTranslationMixin:
 
 
 class RemoteValueMixin(MagentoTranslationMixin):
+    """ Convert OneSila payloads to Magento expected format."""
+
     def get_remote_value(self):
         # Get the local property type and value
         property_type = self.local_property.type

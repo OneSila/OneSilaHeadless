@@ -1,9 +1,12 @@
 from django.core.exceptions import ValidationError
 from django.db.models import Subquery, OuterRef
 from django.utils.text import slugify
+from django.conf import settings
+import difflib
 from django.utils.translation import gettext_lazy as _
 from core.managers import MultiTenantManager, MultiTenantQuerySet
-from django.db import transaction
+from django.db import transaction, IntegrityError
+from .helpers import generate_unique_internal_name
 
 
 class PropertyQuerySet(MultiTenantQuerySet):
@@ -84,6 +87,28 @@ class PropertyQuerySet(MultiTenantQuerySet):
             )
         )
 
+    def find_duplicates(self, name, language_code=None, threshold=0.8):
+        """Return properties with a name similar to the given value."""
+        from .models import PropertyTranslation
+
+        if language_code is None:
+            language_code = settings.LANGUAGE_CODE
+
+        processed_name = slugify(name).replace("-", "").lower()
+        translations = PropertyTranslation.objects.filter(
+            property__in=self,
+            language=language_code,
+        ).select_related("property")
+
+        matched_ids = []
+        for translation in translations:
+            processed = slugify(translation.name).replace("-", "").lower()
+            ratio = difflib.SequenceMatcher(None, processed_name, processed).ratio()
+            if ratio >= threshold:
+                matched_ids.append(translation.property_id)
+
+        return self.filter(id__in=matched_ids)
+
 
 class PropertyManager(MultiTenantManager):
     def get_queryset(self):
@@ -100,6 +125,37 @@ class PropertyManager(MultiTenantManager):
 
     def create_brand(self, multi_tenant_company):
         return self.get_queryset().create_brand(multi_tenant_company)
+
+    def check_for_duplicates(self, name, multi_tenant_company, threshold=0.8):
+        qs = self.filter(multi_tenant_company=multi_tenant_company)
+        return qs.find_duplicates(name, language_code=multi_tenant_company.language, threshold=threshold)
+
+    def get_or_create(self, **kwargs):
+        internal_name = kwargs.get("internal_name")
+        if not internal_name and "defaults" in kwargs:
+            internal_name = kwargs["defaults"].get("internal_name")
+
+        if not internal_name:
+            return super().get_or_create(**kwargs)
+
+        base_name = slugify(internal_name).replace("-", "_")
+        counter = 0
+
+        while True:
+            candidate = base_name if counter == 0 else f"{base_name}_{counter}"
+
+            if "internal_name" in kwargs:
+                kwargs["internal_name"] = candidate
+            else:
+                kwargs.setdefault("defaults", {})["internal_name"] = candidate
+
+            try:
+                return super().get_or_create(**kwargs)
+            except IntegrityError as exc:
+                if "unique_internal_name_per_company" in str(exc):
+                    counter += 1
+                    continue
+                raise
 
 
 class PropertySelectValueQuerySet(MultiTenantQuerySet):
@@ -126,10 +182,45 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
             )
         )
 
+    def find_duplicates(self, value, property_instance, language_code=None, threshold=0.8):
+        """Return property select values with a value similar to the given one."""
+        from .models import PropertySelectValueTranslation
+
+        if language_code is None:
+            language_code = settings.LANGUAGE_CODE
+
+        processed_value = slugify(value).replace("-", "").lower()
+        translations = PropertySelectValueTranslation.objects.filter(
+            propertyselectvalue__in=self,
+            propertyselectvalue__property=property_instance,
+            language=language_code,
+        ).select_related("propertyselectvalue")
+
+        matched_ids = []
+        for translation in translations:
+            processed = slugify(translation.value).replace("-", "").lower()
+            ratio = difflib.SequenceMatcher(None, processed_value, processed).ratio()
+            if ratio >= threshold:
+                matched_ids.append(translation.propertyselectvalue_id)
+
+        return self.filter(id__in=matched_ids)
+
 
 class PropertySelectValueManager(MultiTenantManager):
     def get_queryset(self):
         return PropertySelectValueQuerySet(self.model, using=self._db)
+
+    def check_for_duplicates(self, value, property_instance, multi_tenant_company, threshold=0.8):
+        qs = self.filter(
+            multi_tenant_company=multi_tenant_company,
+            property=property_instance,
+        )
+        return qs.find_duplicates(
+            value,
+            property_instance,
+            language_code=multi_tenant_company.language,
+            threshold=threshold,
+        )
 
 
 class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
@@ -270,3 +361,38 @@ class ProductPropertiesRuleManager(MultiTenantManager):
 
     def delete(self, *args, **kwargs):
         return self.get_queryset().delete(*args, **kwargs)
+
+
+class ProductPropertyQuerySet(MultiTenantQuerySet):
+    def filter_for_configurator(self):
+        from .models import ProductPropertiesRuleItem, Property, ProductPropertiesRule, \
+            PropertySelectValue
+
+        product_type_prod_props = self.filter(property__is_product_type=True)
+        product_type_selects = PropertySelectValue.objects.filter(
+            property__in=product_type_prod_props.values('property')
+        )
+        rules = ProductPropertiesRule.objects.filter(
+            multi_tenant_company__in=self.values('multi_tenant_company'),
+            product_type__in=product_type_selects)
+        rule_items = ProductPropertiesRuleItem.objects.filter(
+            rule__in=rules,
+            type__in=[
+                ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
+                ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
+            ],
+            multi_tenant_company__in=self.all().values('multi_tenant_company')
+        )
+        properties = Property.objects.filter(
+            multi_tenant_company__in=self.all().values('multi_tenant_company'),
+            id__in=rule_items.values_list('property_id', flat=True)
+        )
+        return self.filter(property__in=properties)
+
+
+class ProductPropertyManager(MultiTenantManager):
+    def get_queryset(self):
+        return ProductPropertyQuerySet(self.model, using=self._db)
+
+    def filter_for_configurator(self):
+        return self.get_queryset().filter_for_configurator()

@@ -25,12 +25,14 @@ from sales_channels.integrations.magento2.schema import MagentoSalesChannelMutat
     MagentoSalesChannelsSubscription
 from sales_channels.integrations.shopify.schema import ShopifySalesChannelMutation, ShopifySalesChannelsQuery, \
     ShopifySalesChannelsSubscription
+from sales_channels.integrations.woocommerce.schema import WoocommerceSalesChannelMutation, WoocommerceSalesChannelsQuery, \
+    WoocommerceSalesChannelsSubscription
 from sales_channels.integrations.amazon.schema import AmazonSalesChannelMutation, AmazonSalesChannelsQuery, \
     AmazonSalesChannelsSubscription
 from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
 from translations.schema import TranslationsQuery
 from integrations.schema import IntegrationsQuery, IntegrationsMutation
-from llm.schema import LlmMutation
+from llm.schema import LlmMutation, LlmQuery
 
 
 #
@@ -38,25 +40,70 @@ from llm.schema import LlmMutation
 #
 
 @strawberry.type
-class Query(CurrenciesQuery, CountryQuery, EanCodesQuery, IntegrationsQuery,
-        LanguageQuery, LeadTimesQuery, MediaQuery, MultiTenantQuery, MagentoSalesChannelsQuery, ShopifySalesChannelsQuery,
-        AmazonSalesChannelsQuery, ProductsQuery, PropertiesQuery, SalesPricesQuery, SalesChannelsQuery,
-        TaxesQuery, TimeZoneQuery, TranslationsQuery):
+class Query(
+        AmazonSalesChannelsQuery,
+        CurrenciesQuery,
+        CountryQuery,
+        EanCodesQuery,
+        IntegrationsQuery,
+        LanguageQuery,
+        LeadTimesQuery,
+        MediaQuery,
+        MultiTenantQuery,
+        MagentoSalesChannelsQuery,
+        ShopifySalesChannelsQuery,
+        WoocommerceSalesChannelsQuery,
+        ProductsQuery,
+        PropertiesQuery,
+        SalesPricesQuery,
+        SalesChannelsQuery,
+        TaxesQuery,
+        TimeZoneQuery,
+        TranslationsQuery,
+        LlmQuery,
+):
     pass
 
 
 @strawberry.type
-class Mutation(CurrenciesMutation, EanCodesMutation, MediaMutation, MultiTenantMutation, ShopifySalesChannelMutation,
-       AmazonSalesChannelMutation, ProductsInspectorMutation, ProductsMutation, PropertiesMutation, IntegrationsMutation, LlmMutation,
-       SalesPricesMutation, SalesChannelsMutation, MagentoSalesChannelMutation, TaxesMutation):
+class Mutation(
+        AmazonSalesChannelMutation,
+        CurrenciesMutation,
+        EanCodesMutation,
+        MediaMutation,
+        MultiTenantMutation,
+        ShopifySalesChannelMutation,
+        WoocommerceSalesChannelMutation,
+        ProductsInspectorMutation,
+        ProductsMutation,
+        PropertiesMutation,
+        IntegrationsMutation,
+        LlmMutation,
+        SalesPricesMutation,
+        SalesChannelsMutation,
+        MagentoSalesChannelMutation,
+        TaxesMutation,
+):
     pass
 
 
 @strawberry.type
-class Subscription(CurrenciesSubscription, EanCodesSubscription, MediaSubscription, MultiTenantSubscription,
-        ProductsInspectorSubscription, ProductsSubscription, PropertiesSubscription, SalesPriceSubscription,
-        MagentoSalesChannelsSubscription, SalesChannelsSubscription, TaxSubscription, ShopifySalesChannelsSubscription,
-        AmazonSalesChannelsSubscription):
+class Subscription(
+        AmazonSalesChannelsSubscription,
+        CurrenciesSubscription,
+        EanCodesSubscription,
+        MediaSubscription,
+        MultiTenantSubscription,
+        ProductsInspectorSubscription,
+        ProductsSubscription,
+        PropertiesSubscription,
+        SalesPriceSubscription,
+        MagentoSalesChannelsSubscription,
+        SalesChannelsSubscription,
+        TaxSubscription,
+        ShopifySalesChannelsSubscription,
+        WoocommerceSalesChannelsSubscription,
+):
     pass
 
 #

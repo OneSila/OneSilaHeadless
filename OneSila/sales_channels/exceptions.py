@@ -8,3 +8,17 @@ class SwitchedToSyncException(Exception):
     """Indicates that a create operation encountered an already-existing remote instance
     and should switch to a sync/update flow."""
     pass
+
+
+class ConfigurationMissingError(Exception):
+    """
+    Exception raised when a configuration is missing.
+    """
+    pass
+
+
+class PreFlightCheckError(Exception):
+    """
+    Exception raised when a pre-flight check fails.
+    """
+    pass

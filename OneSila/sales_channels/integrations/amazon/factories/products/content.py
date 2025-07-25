@@ -1,12 +1,11 @@
 from products.models import ProductTranslation, ProductTranslationBulletPoint
 from sales_channels.factories.products.content import RemoteProductContentUpdateFactory
-from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin, AmazonListingIssuesMixin
+from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.models.products import AmazonProductContent
 from sales_channels.integrations.amazon.models.properties import AmazonProductType
-from spapi import ListingsApi
 
 
-class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMixin, RemoteProductContentUpdateFactory):
+class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentUpdateFactory):
     """Update product content like name and description on Amazon."""
 
     remote_model_class = AmazonProductContent
@@ -23,6 +22,12 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMi
             language=language,
         )
 
+    def preflight_check(self):
+        if not self.sales_channel.listing_owner and not self.remote_product.product_owner:
+            return False
+
+        return super().preflight_check()
+
     def _get_product_type(self):
         rule = self.local_instance.get_product_rule()
         if not rule:
@@ -32,42 +37,62 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMi
             local_instance=rule,
         )
 
-    def customize_payload(self):
-        lang = (
-            self.language
-            or (self.view.remote_languages.first().local_instance if self.view else None)
-            or self.sales_channel.multi_tenant_company.language
+    def build_content_attributes(self):
+        view_lang = (
+            self.view.remote_languages.first().local_instance
+            if self.view and self.view.remote_languages.exists()
+            else self.sales_channel.multi_tenant_company.language
         )
 
-        translation = (
-            ProductTranslation.objects.filter(
-                product=self.local_instance,
-                language=lang,
-                sales_channel=self.sales_channel,
-            ).first()
-            or ProductTranslation.objects.filter(
-                product=self.local_instance,
-                language=lang,
-                sales_channel=None,
-            ).first()
-        )
+        lang = self.language or view_lang
 
-        if not translation:
-            self.payload = {}
-            return
+        channel_translation = ProductTranslation.objects.filter(
+            product=self.local_instance,
+            language=lang,
+            sales_channel=self.sales_channel,
+        ).first()
 
-        bullet_points = list(
-            ProductTranslationBulletPoint.objects.filter(
-                product_translation=translation
-            ).order_by("sort_order").values_list("text", flat=True)
-        )
+        default_translation = ProductTranslation.objects.filter(
+            product=self.local_instance,
+            language=lang,
+            sales_channel=None,
+        ).first()
 
-        self.payload = {
-            "item_name": translation.name,
-            "product_description": translation.description,
+        item_name = None
+        product_description = None
+
+        if channel_translation:
+            item_name = channel_translation.name or None
+            product_description = channel_translation.description or None
+
+        if not item_name and default_translation:
+            item_name = default_translation.name
+
+        if not product_description and default_translation:
+            product_description = default_translation.description
+
+        bullet_points = []
+        if channel_translation:
+            bullet_points = list(
+                ProductTranslationBulletPoint.objects.filter(
+                    product_translation=channel_translation
+                )
+                .order_by("sort_order")
+                .values_list("text", flat=True)
+            )
+
+        attrs = {
+            "item_name": [{"value": item_name}],
+            "product_description": [{"value": product_description}],
         }
+
         if bullet_points:
-            self.payload["bullet_point"] = bullet_points
+            attrs["bullet_point"] = [{"value": bp} for bp in bullet_points]
+
+        return {k: v for k, v in attrs.items() if v not in (None, "")}
+
+    def customize_payload(self):
+        self.payload = self.build_content_attributes()
 
     def update_remote(self):
         if not self.payload:
@@ -80,14 +105,12 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, AmazonListingIssuesMi
             "attributes": self.payload,
         }
 
-        listings = ListingsApi(self._get_client())
-        response = listings.patch_listings_item(
-            seller_id=self.sales_channel.remote_id,
-            sku=self.remote_product.remote_sku,
-            marketplace_ids=[self.view.remote_id],
-            body=body,
+        response = self.update_product(
+            self.remote_product.remote_sku,
+            self.view.remote_id,
+            product_type,
+            body.get("attributes", {}),
         )
-        self.update_assign_issues(getattr(response, "issues", []))
 
         return response
 

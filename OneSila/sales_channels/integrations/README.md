@@ -1,8 +1,16 @@
-**Integrations Folder README**
+# Integrations Folder README
 
 This document explains how to add new sales-channel integrations under `sales_channels/integrations/` so we keep a consistent structure and approach across all integrations (e.g., Magento, Shopify, etc.).
 
----
+## Macro steps to follow
+
+To do this integration:
+1. Do the PULL factories (or you end up with strange situations in the final step when creating the ProductSyncFactories)
+2. Make sure your SalesChannelViewAssign SalesChannelView and SalesChannel infrastructure exists and your test-mixins are connected to it
+3. You do the Attributes, Media, etc.
+4. Lastly the Productfactories
+5. Only now do the import factories
+
 
 ## 📁 Directory Structure
 
@@ -22,6 +30,32 @@ sales_channels/
         ├── factories/
         ├── mixins.py
         └── …
+```
+
+- **Root integration package**: `sales_channels/integrations` is a Python package (contains `__init__.py`).
+- **Each integration** is a Django app (one directory per channel):
+  - Name the directory after the integration (e.g., `shopify`, `magento2`).
+  - Inside each, you'll have standard Django app files (`apps.py`, `models.py`, `views.py` if needed), plus your layered subfolders:
+    - `models.py` – sales-channel-specific mirror models
+    - `mixins.py` – API client mixins (e.g., `GetMagentoAPIMixin`, `GetShopifyAPIMixin`)
+    - `factories/` – layered `CreateFactory` / `UpdateFactory` classes
+    - `admin.py`, etc., as required.
+
+## Creating a New Integration App
+
+1. **Use the management command to scaffold a new integration**
+   ```bash
+   python manage.py create_sales_channel_integration <integration_name>
+   ```
+
+   This command will:
+   - Create the integration directory
+   - Generate the app structure
+   - Set up the `AppConfig`
+   - Create necessary subfolders and files
+   - Generate boilerplate for models, mixins, and factories
+
+2. **Add to `INSTALLED_APPS`**
 ```
 
 - **Root integration package**: `sales_channels/integrations` is a Python package (contains `__init__.py`).
@@ -124,10 +158,30 @@ Create skeleton for integration:
    ```
 
 10. **Testing & Sanity Check**
+   - Write a TESTS to instantiate your mixin and factories, call .run(), and verify your integration API sees your test data.
+   - Add any admin registrations or serializers as needed.
+   - Add the logins to a fake test-store to your local settings and set it up in github as well.
+   - Write a quick Django shell script to instantiate your mixin and factories, call .run(), and verify the Shopify API sees your test product.
+   - Add any admin registrations or serializers as needed.
+
+## Checklist for New Integrations
+
+- [ ] Integration created via `create_sales_channel_integration` command
+- [ ] Mirror models customized in `models.py`
+- [ ] API client setup completed in `mixins.py`
+- [ ] Create/Update factories implemented and tested
+- [ ] Sample `.run()` script or test demonstrating a successful API interaction
+
+Keep this README up-to-date as we refine our integration conventions! 🎉
+
+10. **Testing & Sanity Check**
     - Write a quick Django shell script to instantiate your mixin and factories, call .run(), and verify the Shopify API sees your test product.
     - Add any admin registrations or serializers as needed.
 
----
+
+## Help / Tips & Tricks
+
+- **Magic failure of factories?**: Ensure the products you're testing with are assigned to the a sales channel view.  Often the reason is silent failure of the pre-flight checks, which stops the factory from running without any feedback.
 
 ## ✅ Checklist for New Integrations
 

@@ -45,6 +45,6 @@ def core__multi_tenant_company__pres_save__ensure_languages_contains_default(sen
 
 @receiver(post_save, sender=AmazonSalesChannel)
 @receiver(post_delete, sender=AmazonSalesChannel)
-def core__multi_tenant_company__has_amazon_integration_refresh(sender, instance, created, **kwargs):
+def core__multi_tenant_company__has_amazon_integration_refresh(sender, instance, **kwargs):
     if instance:
         refresh_subscription_receiver(instance.multi_tenant_company)

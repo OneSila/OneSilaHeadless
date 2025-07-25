@@ -1,5 +1,5 @@
 import json
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from model_bakery import baker
 
@@ -13,6 +13,7 @@ from properties.models import (
     ProductProperty,
     ProductPropertiesRule,
 )
+from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonSalesChannel,
@@ -27,12 +28,13 @@ from sales_channels.integrations.amazon.models.properties import AmazonProductTy
 from sales_channels.integrations.amazon.factories.products import AmazonProductContentUpdateFactory
 
 
-class AmazonProductContentUpdateFactoryTest(TestCase):
+class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = AmazonSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             remote_id="SELLER123",
+            listing_owner=True
         )
         self.view = AmazonSalesChannelView.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -138,11 +140,19 @@ class AmazonProductContentUpdateFactoryTest(TestCase):
             remote_product=self.remote_product,
         )
 
-    @patch("sales_channels.integrations.amazon.factories.products.content.ListingsApi")
+    def get_patch_value(self, patches, path):
+        for patch in patches:
+            if patch["path"] == path:
+                return patch["value"]
+
+        return None
+
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
-    def test_update_builds_correct_body(self, mock_client, mock_listings):
+    def test_update_content_builds_correct_body(self, mock_client, mock_listings):
         mock_instance = mock_listings.return_value
         mock_instance.patch_listings_item.side_effect = Exception("no amazon")
+        mock_instance.get_listings_item.return_value = MagicMock(payload={"attributes": {}})
 
         fac = AmazonProductContentUpdateFactory(
             sales_channel=self.sales_channel,
@@ -155,17 +165,37 @@ class AmazonProductContentUpdateFactoryTest(TestCase):
         with self.assertRaises(Exception):
             fac.run()
 
-        expected_payload = {
-            "item_name": "Chair name",
-            "product_description": "Chair description",
-            "bullet_point": ["Point one", "Point two"],
-        }
         expected_body = {
             "productType": "CHAIR",
             "requirements": "LISTING",
-            "attributes": expected_payload,
+            "attributes": {
+                "item_name": [{"value": "Chair name"}],
+                "product_description": [{"value": "Chair description"}],
+                "bullet_point": [
+                    {"value": "Point one"},
+                    {"value": "Point two"},
+                ],
+            },
         }
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
-        self.assertEqual(body, expected_body)
+        patches = body.get("patches", [])
 
+        self.assertEqual(body.get("productType"), "CHAIR")
+
+        self.assertIn(
+            {'op': 'add', 'path': '/attributes/item_name', 'value': [{'value': 'Chair name'}]},
+            patches,
+        )
+        self.assertIn(
+            {'op': 'add', 'path': '/attributes/product_description', 'value': [{'value': 'Chair description'}]},
+            patches,
+        )
+        self.assertIn(
+            {
+                'op': 'add',
+                'path': '/attributes/bullet_point',
+                'value': [{'value': 'Point one'}, {'value': 'Point two'}],
+            },
+            patches,
+        )

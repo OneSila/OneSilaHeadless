@@ -1,7 +1,5 @@
 import json
 
-from spapi import ListingsApi
-
 from media.models import Media, MediaProductThrough
 from sales_channels.factories.products.images import (
     RemoteMediaProductThroughCreateFactory,
@@ -10,14 +8,13 @@ from sales_channels.factories.products.images import (
 )
 from sales_channels.integrations.amazon.factories.mixins import (
     GetAmazonAPIMixin,
-    AmazonListingIssuesMixin,
 )
 from sales_channels.integrations.amazon.models.products import (
     AmazonImageProductAssociation,
 )
 
 
-class AmazonMediaProductThroughBase(GetAmazonAPIMixin, AmazonListingIssuesMixin):
+class AmazonMediaProductThroughBase(GetAmazonAPIMixin):
     """Common logic for Amazon media-product associations."""
 
     remote_model_class = AmazonImageProductAssociation
@@ -68,14 +65,14 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin, AmazonListingIssuesMixin)
     def patch_listings(self, body):
         if self.get_value_only:
             return body["attributes"]
-        listings = ListingsApi(self._get_client())
-        response = listings.patch_listings_item(
-            seller_id=self.sales_channel.remote_id,
-            sku=self.remote_product.remote_sku,
-            marketplace_ids=[self.view.remote_id],
-            body=body,
+
+        response = self.update_product(
+            self.remote_product.remote_sku,
+            self.view.remote_id,
+            self.remote_product.get_remote_rule(),
+            body.get("attributes", {})
         )
-        self.update_assign_issues(getattr(response, "issues", []))
+
         return response
 
     def build_payload(self):
@@ -125,4 +122,3 @@ class AmazonMediaProductThroughDeleteFactory(
     def delete_remote(self):
         body = self.build_body()
         return self.patch_listings(body)
-

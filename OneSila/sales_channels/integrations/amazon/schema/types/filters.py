@@ -14,6 +14,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductType,
     AmazonSalesChannelImport, AmazonProductTypeItem,
     AmazonDefaultUnitConfigurator,
+    AmazonRemoteLog,
 )
 from properties.schema.types.filters import (
     PropertyFilter,
@@ -24,6 +25,7 @@ from properties.schema.types.filters import (
 from sales_channels.schema.types.filters import (
     SalesChannelFilter,
     SalesChannelViewFilter,
+    RemoteProductFilter,
 )
 
 
@@ -124,3 +126,16 @@ class AmazonDefaultUnitConfiguratorFilter(SearchFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     marketplace: Optional[SalesChannelViewFilter]
+
+    @custom_filter
+    def mapped_locally(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
+        if value not in (None, UNSET):
+            queryset = queryset.filter(selected_unit__isnull=not value)
+
+        return queryset, Q()
+
+
+@filter(AmazonRemoteLog)
+class AmazonRemoteLogFilter(SearchFilterMixin):
+    id: auto
+    remote_product: Optional[RemoteProductFilter]

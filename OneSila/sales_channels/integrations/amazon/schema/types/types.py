@@ -18,6 +18,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductTypeItem,
     AmazonSalesChannelImport,
     AmazonDefaultUnitConfigurator,
+    AmazonRemoteLog,
 )
 from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelFilter,
@@ -26,6 +27,7 @@ from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonProductTypeFilter,
     AmazonProductTypeItemFilter,
     AmazonSalesChannelImportFilter, AmazonDefaultUnitConfiguratorFilter,
+    AmazonRemoteLogFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
@@ -35,7 +37,9 @@ from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonProductTypeItemOrder,
     AmazonSalesChannelImportOrder,
     AmazonDefaultUnitConfiguratorOrder,
+    AmazonRemoteLogOrder,
 )
+from sales_channels.schema.types.types import FormattedIssueType
 
 
 @strawberry_type
@@ -199,3 +203,61 @@ class AmazonDefaultUnitConfiguratorType(relay.Node, GetQuerysetMultiTenantMixin)
         'SalesChannelViewType',
         lazy("sales_channels.schema.types.types")
     ]
+
+
+@type(
+    AmazonRemoteLog,
+    filters=AmazonRemoteLogFilter,
+    order=AmazonRemoteLogOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonRemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+
+    @field()
+    def type(self, info) -> str:
+        return str(self.content_type)
+
+    @field()
+    def frontend_name(self, info) -> str:
+        return self.frontend_name
+
+    @field()
+    def frontend_error(self, info) -> str | None:
+        return self.frontend_error
+
+    @field()
+    def formatted_issues(self, info) -> List[FormattedIssueType]:
+        issues_data = self.issues or []
+        formatted: List[FormattedIssueType] = []
+
+        for issue in issues_data:
+
+            if not isinstance(issue, dict):
+                continue
+            formatted.append(
+                FormattedIssueType(
+                    message=issue.get("message"),
+                    severity=issue.get("severity"),
+                    validation_issue=issue.get("validation_issue", False),
+                )
+            )
+
+        return formatted
+
+
+@strawberry_type
+class SuggestedAmazonProductTypeEntry:
+    display_name: str
+    marketplace_ids: List[str]
+    name: str
+
+
+@strawberry_type
+class SuggestedAmazonProductType:
+    product_type_version: str
+    product_types: List[SuggestedAmazonProductTypeEntry]

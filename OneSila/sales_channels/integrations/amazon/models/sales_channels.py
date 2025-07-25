@@ -102,6 +102,10 @@ class AmazonSalesChannel(SalesChannel):
         blank=True,
         help_text="Stores the last OAuth connection failure traceback."
     )
+    listing_owner = models.BooleanField(
+        default=False,
+        help_text="Indicates if the sales channel have listing_owner status and can edit or create listings"
+    )
 
     class Meta:
         verbose_name = 'Amazon Sales Channel'
@@ -169,6 +173,7 @@ class AmazonDefaultUnitConfigurator(models.Model):
         unique_together = ("sales_channel", "marketplace", "code")
         verbose_name = "Default Unit Configurator"
         verbose_name_plural = "Default Unit Configurators"
+        search_terms = ['name', 'code']
 
     def __str__(self):
         return f"{self.code} @ {self.sales_channel}"

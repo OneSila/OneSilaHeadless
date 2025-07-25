@@ -1,5 +1,7 @@
 from django.db import transaction
 from django.db.models import Q
+
+from core import models
 from media.models import MediaProductThrough
 from .inspector import InspectorCreateOrUpdateFactory, SaveInspectorMixin
 from ..exceptions import InspectorBlockFailed
@@ -167,8 +169,18 @@ class HasImagesInspectorBlockFactory(InspectorBlockFactory):
         super().__init__(block, success_signal=inspector_has_images_success, failure_signal=inspector_has_images_failed, save_inspector=save_inspector)
 
     def _check(self):
-        if MediaProductThrough.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product).count() == 0:
-            raise InspectorBlockFailed("Product does not have required images.")
+        images_count = MediaProductThrough.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product).count()
+
+        if self.product.is_configurable():
+            if images_count == 0:
+                raise InspectorBlockFailed("Product does not have required images.")
+            return
+
+        from sales_channels.models import SalesChannelViewAssign
+
+        if SalesChannelViewAssign.objects.filter(multi_tenant_company=self.multi_tenant_company, product=self.product).exists():
+            if images_count == 0:
+                raise InspectorBlockFailed("Product does not have required images.")
 
 
 @InspectorBlockFactoryRegistry.register(MISSING_PRICES_ERROR)
@@ -179,9 +191,21 @@ class MissingPricesInspectorBlockFactory(InspectorBlockFactory):
     def _check(self):
         from sales_prices.models import SalesPrice
 
-        if self.product.active:
-            if SalesPrice.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product).count() == 0:
-                raise InspectorBlockFailed("Product is missing default price.")
+        if not self.product.active:
+            return
+
+        prices_qs = SalesPrice.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product)
+
+        if not prices_qs.exists():
+            raise InspectorBlockFailed("Product is missing default price.")
+
+        # All entries are placeholders
+        valid_prices_exist = prices_qs.filter(
+            models.Q(price__isnull=False, price__gt=0) | models.Q(rrp__isnull=False, rrp__gt=0)
+        ).exists()
+
+        if not valid_prices_exist:
+            raise InspectorBlockFailed("Product has only placeholder prices (RRP and Price are missing or zero).")
 
 
 @InspectorBlockFactoryRegistry.register(INACTIVE_BUNDLE_ITEMS_ERROR)

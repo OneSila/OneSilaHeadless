@@ -5,6 +5,7 @@ from properties.schema.mutations.mutation_classes import CompleteCreateProductPr
 from properties.schema.types.input import PropertyInput, PropertySelectValueInput, ProductPropertiesRuleInput, \
     ProductPropertiesRulePartialInput, BulkProductPropertyInput
 from properties.models import PropertyTranslation, PropertySelectValueTranslation
+from properties.signals import property_created, property_select_value_created
 from translations.schema.mutations import TranslatableCreateMutation
 
 
@@ -14,7 +15,8 @@ def create_property():
         extensions=extensions,
         translation_model=PropertyTranslation,
         translation_field='name',
-        translation_model_to_model_field='property')
+        translation_model_to_model_field='property',
+        signal=property_created)
 
 
 def create_property_select_value():
@@ -23,7 +25,8 @@ def create_property_select_value():
         extensions=extensions,
         translation_model=PropertySelectValueTranslation,
         translation_field='value',
-        translation_model_to_model_field='propertyselectvalue')
+        translation_model_to_model_field='propertyselectvalue',
+        signal=property_select_value_created)
 
 
 def complete_create_product_properties_rule():
