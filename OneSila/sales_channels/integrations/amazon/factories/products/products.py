@@ -235,11 +235,12 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 }
             )
 
-            if self.sales_channel.listing_owner or getattr(self.remote_instance, "product_owner", False) or self.force_listing_requirements:
-                # @TODO: This can be value_with_tax depending on marketplace use the public definition to get the value
-                attrs.setdefault("list_price", []).append(
-                    {"currency": iso, "value": float(list_price)}
-                )
+            # if self.sales_channel.listing_owner or getattr(self.remote_instance, "product_owner", False) or self.force_listing_requirements:
+            #     # @TODO: This can be value_with_tax depending on marketplace use the public definition to get the value
+            #     attrs.setdefault("list_price", []).append(
+            #         {"currency": iso, "value": float(list_price)}
+            #     )
+
         return attrs
 
     def set_rule(self):
