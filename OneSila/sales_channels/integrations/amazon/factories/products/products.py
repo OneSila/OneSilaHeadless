@@ -584,8 +584,6 @@ class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFa
             self.payload.get("attributes", {}),
             self.current_attrs,
         )
-        print('------------------------------------------------------------------------')
-        print(resp)
         return resp
 
     def serialize_response(self, response):
@@ -606,8 +604,6 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
             product_type=self.remote_rule,
             attributes=self.payload.get("attributes", {}),
         )
-        print('------------------------------------------------------------------------')
-        print(resp)
 
         return resp
 
@@ -641,8 +637,6 @@ class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactor
             self.payload.get("attributes", {}),
             self.current_attrs,
         )
-        print('------------------------------------------------------------------------')
-        print(resp)
         return resp
 
     def serialize_response(self, response):
