@@ -12,7 +12,7 @@ from properties.models import Property, ProductProperty, \
     ProductProperty, PropertySelectValue, PropertyTranslation, ProductPropertyTextTranslation, PropertySelectValueTranslation, ProductPropertiesRule, \
     ProductPropertiesRuleItem
 from products.schema.types.filters import ProductFilter
-from django.db.models import Q, F
+from django.db.models import Q, F, Count
 from core.managers import QuerySet
 from strawberry import UNSET
 
@@ -55,19 +55,21 @@ class PropertyFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     ) -> tuple[QuerySet, Q]:
 
         if value not in (None, UNSET):
-            ids: list[int] = []
+            languages = queryset.values_list(
+                "multi_tenant_company__languages", flat=True
+            ).first() or []
+            required_count = len(languages)
 
-            for prop in queryset:
-                required_languages = set(prop.multi_tenant_company.languages or [])
-                translation_languages = {
-                    pt.language for pt in prop.propertytranslation_set.all()
-                }
-                is_missing = not required_languages.issubset(translation_languages)
+            queryset = queryset.annotate(
+                translations_count=Count(
+                    "propertytranslation__language", distinct=True
+                )
+            )
 
-                if (value and is_missing) or (not value and not is_missing):
-                    ids.append(prop.id)
-
-            queryset = queryset.filter(id__in=ids)
+            if value:
+                queryset = queryset.filter(translations_count__lt=required_count)
+            else:
+                queryset = queryset.filter(translations_count=required_count)
 
         return queryset, Q()
 
@@ -117,19 +119,21 @@ class PropertySelectValueFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     ) -> tuple[QuerySet, Q]:
 
         if value not in (None, UNSET):
-            ids: list[int] = []
+            languages = queryset.values_list(
+                "multi_tenant_company__languages", flat=True
+            ).first() or []
+            required_count = len(languages)
 
-            for val in queryset:
-                required_languages = set(val.multi_tenant_company.languages or [])
-                translation_languages = {
-                    pt.language for pt in val.propertyselectvaluetranslation_set.all()
-                }
-                is_missing = not required_languages.issubset(translation_languages)
+            queryset = queryset.annotate(
+                translations_count=Count(
+                    "propertyselectvaluetranslation__language", distinct=True
+                )
+            )
 
-                if (value and is_missing) or (not value and not is_missing):
-                    ids.append(val.id)
-
-            queryset = queryset.filter(id__in=ids)
+            if value:
+                queryset = queryset.filter(translations_count__lt=required_count)
+            else:
+                queryset = queryset.filter(translations_count=required_count)
 
         return queryset, Q()
 
