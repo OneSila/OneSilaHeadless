@@ -1,15 +1,6 @@
 from django.utils.translation import gettext_lazy as _
 from core import models
 from sales_channels.models.sales_channels import SalesChannel, SalesChannelView, RemoteLanguage
-from sales_channels.models.products import (
-    RemoteProduct, RemoteInventory, RemotePrice, RemoteProductContent,
-    RemoteImageProductAssociation, RemoteCategory, RemoteEanCode,
-)
-from sales_channels.models.properties import (
-    RemoteProperty, RemotePropertySelectValue, RemoteProductProperty,
-)
-from sales_channels.models.orders import RemoteOrder, RemoteOrderItem
-from sales_channels.models.taxes import RemoteCurrency
 import uuid
 
 
@@ -96,62 +87,3 @@ class EbaySalesChannelView(SalesChannelView):
 class EbayRemoteLanguage(RemoteLanguage):
     """eBay remote language model."""
     pass
-
-
-class EbayProperty(RemoteProperty):
-    """eBay attribute model."""
-    pass
-
-
-class EbayPropertySelectValue(RemotePropertySelectValue):
-    """eBay attribute value model."""
-    pass
-
-
-class EbayProduct(RemoteProduct):
-    """eBay product model."""
-    pass
-
-
-class EbayProductProperty(RemoteProductProperty):
-    """eBay product property model."""
-    pass
-
-
-class EbayEanCode(RemoteEanCode):
-    """eBay EAN code model."""
-    pass
-
-
-class EbayMediaThroughProduct(RemoteImageProductAssociation):
-    """eBay media through product model."""
-    pass
-
-
-class EbayCurrency(RemoteCurrency):
-    """eBay currency model."""
-
-    class Meta:
-        verbose_name_plural = _("eBay Currencies")
-
-
-class EbayPrice(RemotePrice):
-    """eBay price model."""
-    pass
-
-
-class EbayProductContent(RemoteProductContent):
-    """eBay product content model."""
-    pass
-
-
-class EbayOrder(RemoteOrder):
-    """eBay order model."""
-    pass
-
-
-class EbayOrderItem(RemoteOrderItem):
-    """eBay order item model."""
-    pass
-
-
