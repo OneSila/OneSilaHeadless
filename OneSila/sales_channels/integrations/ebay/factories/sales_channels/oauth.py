@@ -18,7 +18,7 @@ class GetEbayRedirectUrlFactory:
 
     def run(self):
         oauth = token._OAuth2Api(
-            sandbox=self.sales_channel.environment == EbaySalesChannel.SANDBOX,
+            sandbox=settings.DEBUG,
             client_id=settings.EBAY_CLIENT_ID,
             client_secret=settings.EBAY_CLIENT_SECRET,
             ru_name=getattr(settings, "EBAY_RU_NAME", None),
@@ -37,7 +37,7 @@ class ValidateEbayAuthFactory:
 
     def exchange_token(self):
         oauth = token._OAuth2Api(
-            sandbox=self.sales_channel.environment == EbaySalesChannel.SANDBOX,
+            sandbox=settings.DEBUG,
             client_id=settings.EBAY_CLIENT_ID,
             client_secret=settings.EBAY_CLIENT_SECRET,
             ru_name=getattr(settings, "EBAY_RU_NAME", None),
