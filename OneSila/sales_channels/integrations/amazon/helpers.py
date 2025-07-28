@@ -41,6 +41,7 @@ def extract_amazon_attribute_value(entry: dict, code: str) -> str | None:
         code: 'item_package_dimensions__length' -> entry: {'length': {'value': '30.00'}} → returns '30.00'
         code: 'outer__material' -> entry: {'material': [{'value': 'POLYESTER'}]} → returns 'POLYESTER'
     """
+
     parts = code.split("__")
     current = entry
 
