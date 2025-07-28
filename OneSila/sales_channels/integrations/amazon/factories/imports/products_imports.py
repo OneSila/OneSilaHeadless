@@ -198,6 +198,8 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                             real_code,
                             values[0],
                         )
+                        continue
+
                     if remote_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
                         select_value = AmazonPropertySelectValue.objects.filter(
                             amazon_property=remote_property,
