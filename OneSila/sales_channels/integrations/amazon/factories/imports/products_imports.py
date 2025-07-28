@@ -1,5 +1,6 @@
 import pprint
 from decimal import Decimal
+import logging
 
 from django.db import IntegrityError
 
@@ -34,6 +35,9 @@ from sales_channels.integrations.amazon.models.properties import AmazonPublicDef
 from sales_channels.models import SalesChannelViewAssign
 from dateutil.parser import parse
 import datetime
+
+
+logger = logging.getLogger(__name__)
 
 
 class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
@@ -186,6 +190,13 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                         continue
 
                     value = extract_amazon_attribute_value({code: values[0]}, real_code)
+                    if value is None:
+                        logger.debug(
+                            "Could not extract value for attribute '%s' (real code '%s') with entry %s",
+                            code,
+                            real_code,
+                            values[0],
+                        )
                     if remote_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
                         select_value = AmazonPropertySelectValue.objects.filter(
                             amazon_property=remote_property,
