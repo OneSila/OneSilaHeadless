@@ -33,6 +33,7 @@ from sales_channels.integrations.amazon.models import (
 from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
 from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
 from sales_channels.models import SalesChannelViewAssign
+from core.helpers import ensure_serializable
 from dateutil.parser import parse
 import datetime
 
@@ -579,7 +580,9 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         issues = structured_data.get("__issues") or []
         assign.issues = [
-            issue.to_dict() if hasattr(issue, "to_dict") else issue.__dict__
+            ensure_serializable(
+                issue.to_dict() if hasattr(issue, "to_dict") else issue.__dict__
+            )
             for issue in issues
         ]
         assign.save()

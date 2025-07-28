@@ -1,5 +1,6 @@
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.models import SalesChannelViewAssign
+from core.helpers import ensure_serializable
 
 
 class RefreshLatestIssuesFactory(GetAmazonAPIMixin):
@@ -22,7 +23,9 @@ class RefreshLatestIssuesFactory(GetAmazonAPIMixin):
         )
         issues = getattr(response, "issues", []) or []
         self.assign.issues = [
-            issue.to_dict() if hasattr(issue, "to_dict") else issue
+            ensure_serializable(
+                issue.to_dict() if hasattr(issue, "to_dict") else issue
+            )
             for issue in issues
         ]
         self.assign.save()

@@ -7,6 +7,7 @@ from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 from sales_channels.models import SalesChannelViewAssign
 from sales_channels.models.logs import RemoteLog
+from core.helpers import ensure_serializable
 from deepdiff import DeepDiff
 
 
@@ -54,13 +55,15 @@ class GetAmazonAPIMixin:
 
         # Ensure each existing issue is a dictionary
         existing_issues_dicts = [
-            issue.to_dict() if hasattr(issue, "to_dict") else issue
+            ensure_serializable(issue.to_dict() if hasattr(issue, "to_dict") else issue)
             for issue in existing_issues
         ]
 
         new_issues = []
         for issue in issues or []:
-            issue_dict = issue.to_dict() if hasattr(issue, "to_dict") else issue
+            issue_dict = ensure_serializable(
+                issue.to_dict() if hasattr(issue, "to_dict") else issue
+            )
             issue_dict["validation_issue"] = True
 
             if issue_dict not in existing_issues_dicts:

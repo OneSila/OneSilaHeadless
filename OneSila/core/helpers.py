@@ -3,6 +3,7 @@ import json
 from django.conf import settings
 from django.http import HttpResponse
 import os
+import datetime
 from get_absolute_url.helpers import reverse_lazy
 from io import BytesIO
 import zipfile
@@ -130,6 +131,17 @@ def is_json_serializable(value):
         return True
     except (TypeError, OverflowError):
         return False
+
+
+def ensure_serializable(value):
+    """Recursively converts common non-serializable objects to JSON-friendly types."""
+    if isinstance(value, (datetime.datetime, datetime.date)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {k: ensure_serializable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [ensure_serializable(v) for v in value]
+    return value
 
 
 def safe_run_task(task_func, *args, **kwargs):
