@@ -192,7 +192,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
                     value = extract_amazon_attribute_value({code: values[0]}, real_code)
                     if value is None:
-                        logger.debug(
+                        logger.error(
                             "Could not extract value for attribute '%s' (real code '%s') with entry %s",
                             code,
                             real_code,
