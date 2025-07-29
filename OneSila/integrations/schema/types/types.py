@@ -19,6 +19,7 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
         from sales_channels.integrations.shopify.models import ShopifySalesChannel
         from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
         from sales_channels.integrations.amazon.models import AmazonSalesChannel
+        from sales_channels.integrations.ebay.models import EbaySalesChannel
 
         if isinstance(self, MagentoSalesChannel):
             return True
@@ -27,6 +28,8 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
         elif isinstance(self, WoocommerceSalesChannel):
             return bool(self.api_key and self.api_secret)
         elif isinstance(self, AmazonSalesChannel):
+            return self.access_token is not None
+        elif isinstance(self, EbaySalesChannel):
             return self.access_token is not None
 
         raise NotImplementedError(f"Integration type {self.__class__} not implemented")
@@ -41,6 +44,9 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
         from sales_channels.integrations.woocommerce.schema.types.types import WoocommerceSalesChannelType
         from sales_channels.integrations.amazon.models import AmazonSalesChannel
         from sales_channels.integrations.amazon.schema.types.types import AmazonSalesChannelType
+        from sales_channels.integrations.ebay.models import EbaySalesChannel
+        from sales_channels.integrations.ebay.schema.types.types import EbaySalesChannelType
+
 
         if isinstance(self, MagentoSalesChannel):
             graphql_type = MagentoSalesChannelType
@@ -50,6 +56,8 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
             graphql_type = WoocommerceSalesChannelType
         elif isinstance(self, AmazonSalesChannel):
             graphql_type = AmazonSalesChannelType
+        elif isinstance(self, EbaySalesChannel):
+            graphql_type = EbaySalesChannelType
         else:
             raise NotImplementedError(f"Integration type {self.__class__} not implemented")
 

@@ -103,6 +103,8 @@ SHOPIFY_TEST_REDIRECT_URI = "https://dcfa-79-118-110-129.ngrok-free.app/integrat
 AMAZON_CLIENT_ID = None
 AMAZON_CLIENT_SECRET = None
 AMAZON_APP_ID = None
+
 EBAY_CLIENT_ID = None
 EBAY_CLIENT_SECRET = None
 EBAY_APPLICATION_SCOPES = ["https://api.ebay.com/oauth/api_scope"]
+EBAY_RU_NAME = 'Name'
