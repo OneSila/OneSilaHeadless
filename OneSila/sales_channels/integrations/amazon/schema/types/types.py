@@ -19,6 +19,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannelImport,
     AmazonDefaultUnitConfigurator,
     AmazonRemoteLog,
+    AmazonSalesChannelView,
 )
 from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelFilter,
@@ -27,7 +28,7 @@ from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonProductTypeFilter,
     AmazonProductTypeItemFilter,
     AmazonSalesChannelImportFilter, AmazonDefaultUnitConfiguratorFilter,
-    AmazonRemoteLogFilter,
+    AmazonRemoteLogFilter, AmazonSalesChannelViewFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
@@ -37,7 +38,7 @@ from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonProductTypeItemOrder,
     AmazonSalesChannelImportOrder,
     AmazonDefaultUnitConfiguratorOrder,
-    AmazonRemoteLogOrder,
+    AmazonRemoteLogOrder, AmazonSalesChannelViewOrder,
 )
 from sales_channels.schema.types.types import FormattedIssueType
 
@@ -203,6 +204,24 @@ class AmazonDefaultUnitConfiguratorType(relay.Node, GetQuerysetMultiTenantMixin)
         'SalesChannelViewType',
         lazy("sales_channels.schema.types.types")
     ]
+
+
+@type(
+    AmazonSalesChannelView,
+    filters=AmazonSalesChannelViewFilter,
+    order=AmazonSalesChannelViewOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonSalesChannelViewType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+
+    @field()
+    def active(self, info) -> bool:
+        return self.sales_channel.active
 
 
 @type(
