@@ -603,9 +603,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 is_variation = remote_product.is_variation
 
                 if is_variation:
-                    parent_skus = AmazonProduct.objects.filter(
-                        remote_parent_product=remote_product.remote_parent_product
-                    ).values_list("remote_sku", flat=True)
+                    parent_skus = list(AmazonProduct.objects.filter(remote_parent_product=remote_product.remote_parent_product).values_list("remote_sku", flat=True))
                 else:
                     parent_skus = []
             else:
