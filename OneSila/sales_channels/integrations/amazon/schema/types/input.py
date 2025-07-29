@@ -7,6 +7,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductTypeItem,
     AmazonSalesChannelImport,
     AmazonDefaultUnitConfigurator,
+    AmazonSalesChannelView,
 )
 from properties.schema.types.input import PropertySelectValuePartialInput
 from strawberry.relay import GlobalID
@@ -87,6 +88,16 @@ class AmazonDefaultUnitConfiguratorInput:
 
 @partial(AmazonDefaultUnitConfigurator, fields="__all__")
 class AmazonDefaultUnitConfiguratorPartialInput(NodeInput):
+    pass
+
+
+@input(AmazonSalesChannelView, fields="__all__")
+class AmazonSalesChannelViewInput:
+    pass
+
+
+@partial(AmazonSalesChannelView, fields="__all__")
+class AmazonSalesChannelViewPartialInput(NodeInput):
     pass
 
 
