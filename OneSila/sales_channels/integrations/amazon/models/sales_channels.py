@@ -5,6 +5,7 @@ from sales_channels.models.sales_channels import (
     SalesChannelView,
     RemoteLanguage,
 )
+from django.db.models import Q
 import uuid
 
 
@@ -134,6 +135,18 @@ class AmazonSalesChannelView(SalesChannelView):
         default=False,
         help_text="Marks the default marketplace for this Amazon store.",
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sales_channel"],
+                condition=Q(is_default=True),
+                name="unique_default_marketplace",
+                violation_error_message=_(
+                    "You can only have one default marketplace per Amazon store."
+                ),
+            )
+        ]
 
     @property
     def language_tag(self) -> str | None:
