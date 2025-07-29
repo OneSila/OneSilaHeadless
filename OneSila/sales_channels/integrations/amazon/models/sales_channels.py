@@ -1,5 +1,6 @@
 from django.utils.translation import gettext_lazy as _
 from core import models
+from core.exceptions import ValidationError
 from sales_channels.models.sales_channels import (
     SalesChannel,
     SalesChannelView,
@@ -136,17 +137,18 @@ class AmazonSalesChannelView(SalesChannelView):
         help_text="Marks the default marketplace for this Amazon store.",
     )
 
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["sales_channel"],
-                condition=Q(is_default=True),
-                name="unique_default_marketplace",
-                violation_error_message=_(
-                    "You can only have one default marketplace per Amazon store."
-                ),
-            )
-        ]
+    def clean(self):
+        super().clean()
+        if self.is_default:
+
+            # Check if another default exists for the same sales_channel can't have constraing because we get errors
+            # amazon.AmazonSalesChannelView: (models.E016) 'constraints' refers to field 'sales_channel' which is not local to model 'AmazonSalesChannelView'
+            exists = AmazonSalesChannelView.objects.filter(
+                sales_channel=self.sales_channel,
+                is_default=True
+            ).exclude(pk=self.pk).exists()
+            if exists:
+                raise ValidationError("You can only have one default marketplace per Amazon store.")
 
     @property
     def language_tag(self) -> str | None:
