@@ -130,6 +130,10 @@ class AmazonSalesChannelView(SalesChannelView):
         null=True,
         blank=True,
     )
+    is_default = models.BooleanField(
+        default=False,
+        help_text="Marks the default marketplace for this Amazon store.",
+    )
 
     @property
     def language_tag(self) -> str | None:

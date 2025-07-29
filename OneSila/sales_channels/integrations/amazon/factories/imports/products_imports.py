@@ -591,7 +591,26 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
     def import_products_process(self):
         for product in self.get_products_data():
-            is_variation, parent_skus = get_is_product_variation(product)
+            product_instance = None
+            remote_product = AmazonProduct.objects.filter(
+                remote_sku=product.sku,
+                sales_channel=self.sales_channel,
+                multi_tenant_company=self.import_process.multi_tenant_company
+            ).first()
+
+            if remote_product:
+                product_instance = remote_product.local_instance
+                is_variation = remote_product.is_variation
+
+                if is_variation:
+                    parent_skus = AmazonProduct.objects.filter(
+                        remote_parent_product=remote_product.remote_parent_product
+                    ).values_list("remote_sku", flat=True)
+                else:
+                    parent_skus = []
+            else:
+                is_variation, parent_skus = get_is_product_variation(product)
+
             rule = self.get_product_rule(product)
             structured, language, view = self.get__product_data(product)
 
@@ -605,16 +624,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                         children = self._configurable_map.setdefault(parent_sku, set())
                         children.add(structured["sku"])
                         structured["configurable_parent_sku"] = parent_sku
-
-            product_instance = None
-            remote_product = AmazonProduct.objects.filter(
-                asin=structured["sku"],
-                sales_channel=self.sales_channel,
-                multi_tenant_company=self.import_process.multi_tenant_company
-            ).first()
-
-            if remote_product:
-                product_instance = remote_product.local_instance
 
             instance = ImportProductInstance(
                 structured,

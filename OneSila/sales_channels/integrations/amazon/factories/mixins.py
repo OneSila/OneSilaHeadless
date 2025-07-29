@@ -206,10 +206,10 @@ class GetAmazonAPIMixin:
 
         listings_api = ListingsApi(self._get_client())
         seller_id = self.sales_channel.remote_id
-        marketplace_ids = list(
-            AmazonSalesChannelView.objects.filter(sales_channel=self.sales_channel)
-            .values_list("remote_id", flat=True)
-        )
+        views = AmazonSalesChannelView.objects.filter(
+            sales_channel=self.sales_channel
+        ).order_by("-is_default")
+        marketplace_ids = list(views.values_list("remote_id", flat=True))
 
         product_types = set()
 
@@ -235,10 +235,10 @@ class GetAmazonAPIMixin:
     def get_all_products(self):
         listings_api = ListingsApi(self._get_client())
         seller_id = self.sales_channel.remote_id
-        marketplace_ids = list(
-            AmazonSalesChannelView.objects.filter(sales_channel=self.sales_channel)
-            .values_list("remote_id", flat=True)
-        )
+        views = AmazonSalesChannelView.objects.filter(
+            sales_channel=self.sales_channel
+        ).order_by("-is_default")
+        marketplace_ids = list(views.values_list("remote_id", flat=True))
         issue_locale = self._get_issue_locale()
         import pprint
 
