@@ -1,6 +1,11 @@
 """Utility helpers for Amazon integration."""
 
+import logging
+
 from products.product_types import CONFIGURABLE, SIMPLE
+
+
+logger = logging.getLogger(__name__)
 
 
 def infer_product_type(data) -> str:
@@ -33,16 +38,12 @@ def extract_description_and_bullets(attributes: dict) -> tuple[str | None, list[
 
     return description, bullets
 
+
 def extract_amazon_attribute_value(entry: dict, code: str) -> str | None:
-    """
-    Extracts a value from an Amazon attribute entry based on a possibly nested code.
-    Examples:
-        code: 'brand' -> entry: {'value': 'X'} → returns 'X'
-        code: 'item_package_dimensions__length' -> entry: {'length': {'value': '30.00'}} → returns '30.00'
-        code: 'outer__material' -> entry: {'material': [{'value': 'POLYESTER'}]} → returns 'POLYESTER'
-    """
+    """Extract a value from an Amazon attribute entry using a possibly nested code."""
     parts = code.split("__")
     current = entry
+    original_entry = entry
 
     for part in parts:
         if isinstance(current, list):
@@ -50,15 +51,26 @@ def extract_amazon_attribute_value(entry: dict, code: str) -> str | None:
         if isinstance(current, dict):
             current = current.get(part)
         else:
+            logger.debug(
+                "extract_amazon_attribute_value failed at part '%s' for code '%s' with entry %s",
+                part,
+                code,
+                original_entry,
+            )
             return None
 
     if isinstance(current, list):
         current = current[0] if current else None
     if isinstance(current, dict):
-        return current.get("value") or current.get("name")
+        return current.get("value") if "value" in current else current.get("name")
     if isinstance(current, str):
         return current
 
+    logger.debug(
+        "extract_amazon_attribute_value returned None for code '%s' with entry %s",
+        code,
+        original_entry,
+    )
     return None
 
 
