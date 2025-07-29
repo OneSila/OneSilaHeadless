@@ -6,9 +6,10 @@ from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 
 from ebay_rest import token
-
+from datetime import datetime
 from sales_channels.integrations.ebay.models import EbaySalesChannel
 from sales_channels.signals import refresh_website_pull_models
+from django.utils.timezone import make_aware
 
 
 class GetEbayRedirectUrlFactory:
@@ -35,6 +36,10 @@ class ValidateEbayAuthFactory:
         self.sales_channel = sales_channel
         self.code = code
 
+    def parse_ebay_datetime(value: str) -> datetime:
+        dt = datetime.fromisoformat(value.replace(":", ".", 3))
+        return make_aware(dt)
+
     def exchange_token(self):
         oauth = token._OAuth2Api(
             sandbox=settings.DEBUG,
@@ -42,8 +47,14 @@ class ValidateEbayAuthFactory:
             client_secret=settings.EBAY_CLIENT_SECRET,
             ru_name=getattr(settings, "EBAY_RU_NAME", None),
         )
+
+        print('--------------------------------------------------- 1')
+
         try:
             token_obj = oauth.exchange_code_for_access_token(self.code)
+            if hasattr(token_obj, "error") and token_obj.error:
+                raise Exception(token_obj.error)
+
         except Exception:
             tb = traceback.format_exc()
             self.sales_channel.connection_error = tb
@@ -55,6 +66,7 @@ class ValidateEbayAuthFactory:
         self.sales_channel.refresh_token_expiration = token_obj.refresh_token_expiry
         self.sales_channel.expiration_date = token_obj.token_expiry
         self.sales_channel.save()
+
 
     def dispatch_refresh(self):
         refresh_website_pull_models.send(

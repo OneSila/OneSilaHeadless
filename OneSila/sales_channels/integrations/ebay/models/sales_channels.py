@@ -29,7 +29,7 @@ class EbaySalesChannel(SalesChannel):
         help_text="User ID for the eBay account.",
     )
     refresh_token = models.CharField(
-        max_length=512,
+        max_length=2048,
         null=True,
         blank=True,
         help_text="Refresh token used to generate new access tokens.",
@@ -40,7 +40,7 @@ class EbaySalesChannel(SalesChannel):
         help_text="When the refresh token will expire.",
     )
     access_token = models.CharField(
-        max_length=512,
+        max_length=4096,
         null=True,
         blank=True,
         help_text="Access token for API requests.",
