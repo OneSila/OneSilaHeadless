@@ -6,7 +6,14 @@ from sales_channels.integrations.amazon.models.properties import AmazonProductTy
 
 
 class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentUpdateFactory):
-    """Update product content like name and description on Amazon."""
+    """
+
+    Update product content like name and description on Amazon.
+
+    Even if there is a language_tag inside each translatable entry this cannot be used within the same marketplace:
+    Example Amazon BE supports NL, EN, FR. We cannot update the content for FR version. This is done internally in Amazon
+    What we can do is if we have Amazon FR as well we can have different versions but only on the default language level
+    """
 
     remote_model_class = AmazonProductContent
 
