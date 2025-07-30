@@ -456,6 +456,26 @@ class AmazonProductTestMixin:
             type=Property.TYPES.FLOAT,
         )
 
+        self.gtin_exemption = baker.make(
+            Property,
+            type=Property.TYPES.BOOLEAN,
+            internal_name="supplier_declared_has_product_identifier_exemption",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.gtin_exemption,
+            language=self.multi_tenant_company.language,
+            name="GTIN Exemption",
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.gtin_exemption,
+            code="supplier_declared_has_product_identifier_exemption",
+            type=Property.TYPES.BOOLEAN,
+        )
+
         for prop in [
             self.color_property,
             self.battery_cell,
@@ -464,6 +484,7 @@ class AmazonProductTestMixin:
             self.batteries_required,
             self.condition_type,
             self.item_weight,
+            self.gtin_exemption,
         ]:
             ProductPropertiesRuleItem.objects.get_or_create(
                 multi_tenant_company=self.multi_tenant_company,
@@ -1371,6 +1392,66 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         return_value=["https://example.com/img.jpg"],
     )
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_create_product_with_gtin_exemption(self, mock_listings, mock_get_images, mock_get_client):
+        """If GTIN exemption property is true use it instead of EAN."""
+        asin_property = Property.objects.get(
+            internal_name="merchant_suggested_asin",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ProductProperty.objects.filter(
+            product=self.product,
+            property=asin_property,
+        ).delete()
+
+        AmazonProperty.objects.filter(
+            local_instance=asin_property,
+            sales_channel=self.sales_channel,
+        ).delete()
+
+        ProductProperty.objects.create(
+            product=self.product,
+            property=self.gtin_exemption,
+            value_boolean=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        EanCode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            ean_code="1234567890123",
+        )
+
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
+
+        self.assertEqual(
+            attrs.get("supplier_declared_has_product_identifier_exemption"),
+            [{"value": True}],
+        )
+        self.assertNotIn("externally_assigned_product_identifier", attrs)
+
+    @patch(
+        "sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client",
+        return_value=None,
+    )
+    @patch.object(
+        AmazonMediaProductThroughBase,
+        "_get_images",
+        return_value=["https://example.com/img.jpg"],
+    )
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_existing_remote_property_gets_updated(
         self, mock_listings, mock_get_images, mock_get_client
     ):
@@ -1783,7 +1864,6 @@ class AmazonProductCreateRequirementsTest(DisableWooCommerceSignalsMixin, Transa
         ) as mock_listings:
             mock_listings.return_value.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
-
             fac = AmazonProductCreateFactory(
                 sales_channel=self.sales_channel,
                 local_instance=self.product,
@@ -1794,7 +1874,6 @@ class AmazonProductCreateRequirementsTest(DisableWooCommerceSignalsMixin, Transa
             return mock_listings.return_value.put_listings_item.call_args.kwargs.get(
                 "body"
             )
-
 
     def test_listing_owner_uses_listing_requirements(self):
         self.sales_channel.listing_owner = True
