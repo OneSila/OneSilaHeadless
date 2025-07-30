@@ -362,6 +362,7 @@ class GetAmazonAPIMixin:
         skip_keys = {
             "merchant_suggested_asin",
             "externally_assigned_product_identifier",
+            "supplier_declared_has_product_identifier_exemption"
         }
 
         for key, new_value in new_attributes.items():
