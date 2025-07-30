@@ -1,6 +1,9 @@
 import json
 from typing import Dict
 
+from datetime import timedelta
+
+from django.utils import timezone
 from products.models import Product, ProductTranslation, ProductTranslationBulletPoint
 from properties.models import Property, ProductProperty
 from sales_channels.factories.products.products import (
@@ -29,8 +32,12 @@ from sales_channels.integrations.amazon.factories.products.content import (
 from sales_channels.integrations.amazon.models.products import (
     AmazonProduct,
 )
-from sales_channels.integrations.amazon.models.properties import AmazonProductProperty, AmazonProperty, \
-    AmazonProductType
+from sales_channels.integrations.amazon.models.properties import (
+    AmazonProductProperty,
+    AmazonProperty,
+    AmazonProductType,
+    AmazonPublicDefinition,
+)
 from sales_channels.integrations.amazon.models import AmazonCurrency
 from sales_channels.exceptions import SwitchedToCreateException, SwitchedToSyncException
 from spapi import ListingsApi
@@ -124,6 +131,36 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     def _get_ean_for_payload(self) -> str | None:
         return self.remote_instance.ean_code or self.get_ean_code_value()
 
+    def _get_list_price_config(self):
+        """Return tuple of (attribute_code, value_key)."""
+        rule = self.local_instance.get_product_rule()
+        if not rule:
+            return "list_price", "value"
+
+        product_type = AmazonProductType.objects.filter(
+            sales_channel=self.sales_channel,
+            local_instance=rule,
+        ).first()
+        if not product_type:
+            return "list_price", "value"
+
+        public_def = (
+            AmazonPublicDefinition.objects.filter(
+                api_region_code=self.view.api_region_code,
+                product_type_code=product_type.product_type_code,
+                code__in=["list_price", "uvp_list_price"],
+            )
+            .first()
+        )
+
+        if not public_def:
+            return "list_price", "value"
+
+        schema = public_def.raw_schema or {}
+        props = schema.get("items", {}).get("properties", {})
+        value_key = "value_with_tax" if "value_with_tax" in props else "value"
+        return public_def.code, value_key
+
     def build_basic_attributes(self) -> Dict:
         self.set_sku()
 
@@ -204,42 +241,26 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         if not self.sales_channel.sync_prices:
             return attrs
 
-        currencies = AmazonCurrency.objects.filter(
+        price_fac = AmazonPriceUpdateFactory(
             sales_channel=self.sales_channel,
-            sales_channel_view=self.view,
-        ).select_related("local_instance")
+            local_instance=self.local_instance,
+            remote_product=self.remote_instance,
+            view=self.view,
+            api=self.api,
+            skip_checks=True,
+            get_value_only=True,
+        )
+        price_fac.run()
+        values = price_fac.value or {}
 
-        for rc in currencies:
-            iso = rc.local_instance.iso_code
-            full, discount = self.local_instance.get_price_for_sales_channel(
-                self.sales_channel, currency=rc.local_instance
-            )
+        purchasable_offer = values.get("purchasable_offer_values")
+        list_price_vals = values.get("list_price_values")
+        list_price_code = values.get("list_price_code")
 
-            sale_price = discount
-            list_price = sale_price if sale_price is not None else full
-            if list_price is None:
-                continue
-
-            attrs.setdefault("purchasable_offer", []).append(
-                {
-                    "audience": "ALL",
-                    "currency": iso,
-                    "marketplace_id": self.view.remote_id,
-                    "our_price": [
-                        {
-                            "schedule": [
-                                {"value_with_tax": float(list_price)}
-                            ]
-                        }
-                    ],
-                }
-            )
-
-            # if self.sales_channel.listing_owner or getattr(self.remote_instance, "product_owner", False) or self.force_listing_requirements:
-            #     # @TODO: This can be value_with_tax depending on marketplace use the public definition to get the value
-            #     attrs.setdefault("list_price", []).append(
-            #         {"currency": iso, "value": float(list_price)}
-            #     )
+        if purchasable_offer:
+            attrs["purchasable_offer"] = purchasable_offer
+        if list_price_vals:
+            attrs[list_price_code] = list_price_vals
 
         return attrs
 
