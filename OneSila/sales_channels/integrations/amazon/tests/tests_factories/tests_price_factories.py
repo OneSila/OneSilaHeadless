@@ -58,7 +58,6 @@ class AmazonPriceTestMixin:
         SalesPrice.objects.create(
             product=self.product,
             currency=self.currency,
-            rrp=100,
             price=80,
             multi_tenant_company=self.multi_tenant_company,
         )
@@ -173,6 +172,42 @@ class AmazonPriceUpdateFactoryTest(DisableWooCommerceSignalsMixin, AmazonPriceTe
             ],
         )
 
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    def test_update_price_includes_discounted_price(self, mock_get_client, mock_listings):
+        """Ensure discounted_price is included when a discount exists."""
+        price = SalesPrice.objects.get(product=self.product, currency=self.currency)
+        price.rrp = 100
+        price.price = 80
+        price.save()
+
+        mock_instance = mock_listings.return_value
+        mock_instance.patch_listings_item.return_value = {
+            "submissionId": "mock-submission-id",
+            "processingStatus": "VALID",
+            "status": "VALID",
+            "issues": [],
+        }
+
+        factory = AmazonPriceUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_product=self.remote_product,
+            view=self.view,
+        )
+        factory.run()
+
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        patches = body.get("patches", [])
+        purchasable_offer = self.get_patch_value(patches, "/attributes/purchasable_offer")
+
+        discounted = purchasable_offer[0].get("discounted_price")
+        self.assertIsNotNone(discounted, "discounted_price is missing")
+        schedule = discounted[0]["schedule"][0]
+        self.assertEqual(schedule["value_with_tax"], 80.0)
+        self.assertIn("start_at", schedule)
+        self.assertIn("end_at", schedule)
+
 
 class AmazonPriceUpdateRequirementsTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonPriceTestMixin):
     """Validate LISTING versus LISTING_OFFER_ONLY logic for price updates."""
@@ -224,7 +259,7 @@ class AmazonPriceUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transact
 
         list_price = self.get_patch_value(patches, "/attributes/list_price")
         self.assertIsNotNone(list_price, "list_price patch is missing")
-        self.assertEqual(list_price[0]["value"], 80.0)
+        self.assertEqual(list_price[0]["value_with_tax"], 80.0)
 
     def test_missing_asin_still_uses_listing_requirements(self):
         self.sales_channel.listing_owner = False

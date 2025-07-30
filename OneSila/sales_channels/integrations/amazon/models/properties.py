@@ -107,6 +107,7 @@ class AmazonProperty(RemoteProperty):
     objects = AmazonPropertyManager()
 
     def save(self, *args, **kwargs):
+
         if self.allow_multiple is not True:
             self.allow_multiple = True
 

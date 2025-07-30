@@ -467,13 +467,22 @@ class ImportProductPropertiesRuleInstance(AbstractImportInstance):
         pass
 
     def post_process_logic(self):
-
         if hasattr(self, 'items'):
-
             for item_data in self.items:
-                item_import_instance = ImportProductPropertiesRuleItemInstance(data=item_data,
-                                                                               import_process=self.import_process,
-                                                                               rule=self.instance)
+                is_select = item_data.get('type') in [
+                    ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
+                    ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
+                ]
+
+                property_data = item_data.get('property_data')
+                if is_select and isinstance(property_data, dict) and property_data.get('type') != Property.TYPES.SELECT:
+                    property_data['type'] = Property.TYPES.SELECT
+
+                item_import_instance = ImportProductPropertiesRuleItemInstance(
+                    data=item_data,
+                    import_process=self.import_process,
+                    rule=self.instance
+                )
                 self.before_process_item_logic(item_import_instance)
                 item_import_instance.process()
                 self.after_process_item_logic(item_import_instance.instance, item_import_instance.remote_instance)

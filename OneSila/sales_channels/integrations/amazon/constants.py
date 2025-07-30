@@ -85,7 +85,6 @@ AMAZON_INTERNAL_PROPERTIES = [
 
     # Auto-linking/ASIN suggestion
     'merchant_suggested_asin', 'externally_assigned_product_identifier',
-    'supplier_declared_has_product_identifier_exemption',
 
     # Amazon-only compliance metadata (for now)
     'compliance_media', 'gpsr_safety_attestation', 'gpsr_manufacturer_reference',
@@ -96,3 +95,10 @@ AMAZON_INTERNAL_PROPERTIES = [
     'fulfillment_availability', 'merchant_shipping_group', 'merchant_release_date',
     'skip_offer', 'supplemental_condition_information', 'uvp_list_price'
 ]
+
+# Attributes that should be ignored when generating update patches
+AMAZON_PATCH_SKIP_KEYS = {
+    'merchant_suggested_asin',
+    'externally_assigned_product_identifier',
+    'supplier_declared_has_product_identifier_exemption',
+}

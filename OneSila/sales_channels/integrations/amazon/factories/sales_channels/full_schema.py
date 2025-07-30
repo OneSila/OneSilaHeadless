@@ -3,7 +3,11 @@ from django.utils import timezone
 from spapi import DefinitionsApi, ListingsApi
 from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
 from sales_channels.integrations.amazon.decorators import throttle_safe
-from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin, EnsureMerchantSuggestedAsinMixin
+from sales_channels.integrations.amazon.factories.mixins import (
+    GetAmazonAPIMixin,
+    EnsureMerchantSuggestedAsinMixin,
+    EnsureGtinExemptionMixin,
+)
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannelView,
     AmazonDefaultUnitConfigurator,
@@ -393,18 +397,37 @@ class DefaultUnitConfiguratorFactory:
             path.pop()
 
 
-class AmazonProductTypeRuleFactory(GetAmazonAPIMixin, EnsureMerchantSuggestedAsinMixin):
-    def __init__(self, product_type_code, sales_channel, merchant_asin_property=None, api=None, language=None):
+class AmazonProductTypeRuleFactory(
+    GetAmazonAPIMixin,
+    EnsureMerchantSuggestedAsinMixin,
+    EnsureGtinExemptionMixin,
+):
+    def __init__(
+        self,
+        product_type_code,
+        sales_channel,
+        merchant_asin_property=None,
+        gtin_exemption_property=None,
+        api=None,
+        language=None,
+    ):
         self.product_type_code = product_type_code
         self.sales_channel = sales_channel
         self.language = language or sales_channel.multi_tenant_company.language
         self.multi_tenant_company = sales_channel.multi_tenant_company
         self.product_type = self.get_or_create_product_type()
-        self.sales_channel_views = AmazonSalesChannelView.objects.filter(sales_channel=sales_channel)
+        self.sales_channel_views = AmazonSalesChannelView.objects.filter(
+            sales_channel=sales_channel
+        )
         if merchant_asin_property is None:
             self.merchant_asin_property = self._ensure_merchant_suggested_asin()
         else:
             self.merchant_asin_property = merchant_asin_property
+
+        if gtin_exemption_property is None:
+            self.gtin_exemption_property = self._ensure_gtin_exemption()
+        else:
+            self.gtin_exemption_property = gtin_exemption_property
 
         if api is None:
             self.api = self.get_api()
@@ -526,6 +549,19 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin, EnsureMerchantSuggestedAsi
             if not created_local and rule_item.type != ProductPropertiesRuleItem.REQUIRED:
                 rule_item.type = ProductPropertiesRuleItem.REQUIRED
                 rule_item.save(update_fields=["type"])
+
+    def ensure_gtin_exemption_item(self):
+
+        if not self.gtin_exemption_property:
+            return
+
+        AmazonProductTypeItem.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            amazon_rule=self.product_type,
+            remote_property=self.gtin_exemption_property,
+            defaults={"remote_type": ProductPropertiesRuleItem.OPTIONAL},
+        )
 
     def process_views(self):
 
@@ -768,4 +804,5 @@ class AmazonProductTypeRuleFactory(GetAmazonAPIMixin, EnsureMerchantSuggestedAsi
 
     def run(self):
         self.ensure_asin_item()
+        self.ensure_gtin_exemption_item()
         self.process_views()

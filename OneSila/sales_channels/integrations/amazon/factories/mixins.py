@@ -12,6 +12,7 @@ from deepdiff import DeepDiff
 
 
 from sales_channels.integrations.amazon.models.properties import AmazonProperty
+from sales_channels.integrations.amazon.constants import AMAZON_PATCH_SKIP_KEYS
 from properties.models import Property, PropertyTranslation
 
 
@@ -206,10 +207,10 @@ class GetAmazonAPIMixin:
 
         listings_api = ListingsApi(self._get_client())
         seller_id = self.sales_channel.remote_id
-        marketplace_ids = list(
-            AmazonSalesChannelView.objects.filter(sales_channel=self.sales_channel)
-            .values_list("remote_id", flat=True)
-        )
+        views = AmazonSalesChannelView.objects.filter(
+            sales_channel=self.sales_channel
+        ).order_by("-is_default")
+        marketplace_ids = list(views.values_list("remote_id", flat=True))
 
         product_types = set()
 
@@ -235,10 +236,10 @@ class GetAmazonAPIMixin:
     def get_all_products(self):
         listings_api = ListingsApi(self._get_client())
         seller_id = self.sales_channel.remote_id
-        marketplace_ids = list(
-            AmazonSalesChannelView.objects.filter(sales_channel=self.sales_channel)
-            .values_list("remote_id", flat=True)
-        )
+        views = AmazonSalesChannelView.objects.filter(
+            sales_channel=self.sales_channel
+        ).order_by("-is_default")
+        marketplace_ids = list(views.values_list("remote_id", flat=True))
         issue_locale = self._get_issue_locale()
         import pprint
 
@@ -359,7 +360,11 @@ class GetAmazonAPIMixin:
         current_attributes = current_attributes or {}
         new_attributes = new_attributes or {}
 
+        skip_keys = AMAZON_PATCH_SKIP_KEYS
+
         for key, new_value in new_attributes.items():
+            if key in skip_keys:
+                continue
             new_value = clean(new_value)
             current_value = current_attributes.get(key)
             path = f"/attributes/{key}"
@@ -386,11 +391,10 @@ class GetAmazonAPIMixin:
         new_attributes,
         current_attributes=None,
     ):
-        if current_attributes is None:
+        if current_attributes is None or current_attributes == {}:
             current_attributes = self.get_listing_attributes(sku, marketplace_id)
 
         patches = self._build_patches(current_attributes, new_attributes)
-
         body = {
             "productType": product_type.product_type_code,
             "patches": patches,
@@ -405,7 +409,6 @@ class GetAmazonAPIMixin:
             issue_locale=self._get_issue_locale(),
             mode="VALIDATION_PREVIEW" if settings.DEBUG else None,
         )
-
         submission_id = getattr(response, "submission_id", None)
         processing_status = getattr(response, "status", None)
         log_identifier, _ = self.get_identifiers()
@@ -457,5 +460,37 @@ class EnsureMerchantSuggestedAsinMixin:
         if not local_property.non_deletable:
             local_property.non_deletable = True
             local_property.save(update_fields=["non_deletable"])
+
+        return remote_property
+
+
+class EnsureGtinExemptionMixin:
+    """Mixin ensuring the supplier_declared_has_product_identifier_exemption property exists."""
+
+    def _ensure_gtin_exemption(self):
+        remote_property, _ = AmazonProperty.objects.get_or_create(
+            allow_multiple=True,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="supplier_declared_has_product_identifier_exemption",
+            defaults={"type": Property.TYPES.BOOLEAN},
+        )
+
+        if not remote_property.local_instance:
+            local_property, _ = Property.objects.get_or_create(
+                internal_name="supplier_declared_has_product_identifier_exemption",
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                defaults={"type": Property.TYPES.BOOLEAN},
+            )
+
+            PropertyTranslation.objects.get_or_create(
+                property=local_property,
+                language=self.sales_channel.multi_tenant_company.language,
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                defaults={"name": "GTIN Exemption"},
+            )
+
+            remote_property.local_instance = local_property
+            remote_property.save()
 
         return remote_property

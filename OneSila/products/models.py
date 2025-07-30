@@ -356,6 +356,87 @@ class Product(TranslatedModelMixin, models.Model):
 
         return variations
 
+    def get_properties_for_configurable_product(self, product_rule=None):
+        """Return properties shared across all active variations."""
+        from properties.models import ProductProperty, ProductPropertiesRuleItem, Property
+        from django.db.models import Count, Min, Value, CharField
+        from django.db.models.functions import Cast, Coalesce, Concat
+
+        if not self.is_configurable():
+            return ProductProperty.objects.none()
+
+        variations = self.get_configurable_variations(active_only=True)
+        if not variations.exists():
+            return ProductProperty.objects.none()
+
+        rule = product_rule or self.get_product_rule()
+        if not rule:
+            return ProductProperty.objects.none()
+
+        rule_property_ids = rule.items.exclude(
+            type=ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR
+        ).values_list("property_id", flat=True)
+
+        variation_count = variations.count()
+
+        qs = ProductProperty.objects.filter(
+            product__in=variations,
+            property_id__in=rule_property_ids,
+        ).select_related("property", "value_select")
+
+        # handle non multi-select properties using database aggregation
+        aggregated = (
+            qs.exclude(property__type=Property.TYPES.MULTISELECT)
+            .annotate(
+                serialized_value=Concat(
+                    Coalesce(Cast("value_boolean", CharField()), Value("")),
+                    Value("|"),
+                    Coalesce(Cast("value_int", CharField()), Value("")),
+                    Value("|"),
+                    Coalesce(Cast("value_float", CharField()), Value("")),
+                    Value("|"),
+                    Coalesce(Cast("value_date", CharField()), Value("")),
+                    Value("|"),
+                    Coalesce(Cast("value_datetime", CharField()), Value("")),
+                    Value("|"),
+                    Coalesce(Cast("value_select_id", CharField()), Value("")),
+                    output_field=CharField(),
+                )
+            )
+            .values("property_id")
+            .annotate(
+                unique_values=Count("serialized_value", distinct=True),
+                total=Count("product", distinct=True),
+                sample=Min("id"),
+            )
+            .filter(unique_values=1, total=variation_count)
+        )
+
+        shared_ids = list(aggregated.values_list("sample", flat=True))
+
+        # handle multi-select properties in python
+        ms_props = (
+            qs.filter(property__type=Property.TYPES.MULTISELECT)
+            .prefetch_related("value_multi_select")
+        )
+
+        prop_data = {}
+        for pp in ms_props:
+            val = tuple(sorted(pp.value_multi_select.values_list("id", flat=True)))
+            info = prop_data.setdefault(
+                pp.property_id,
+                {"sample": pp, "value": val, "products": set(), "same": True},
+            )
+            info["products"].add(pp.product_id)
+            if info["value"] != val:
+                info["same"] = False
+
+        for data in prop_data.values():
+            if data["same"] and len(data["products"]) == variation_count:
+                shared_ids.append(data["sample"].id)
+
+        return ProductProperty.objects.filter(id__in=shared_ids)
+
     def _generate_sku(self, save=False):
         from .helpers import generate_sku
         self.sku = generate_sku()

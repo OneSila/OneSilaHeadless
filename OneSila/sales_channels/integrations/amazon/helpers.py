@@ -39,6 +39,14 @@ def extract_description_and_bullets(attributes: dict) -> tuple[str | None, list[
     return description, bullets
 
 
+def is_safe_content(value: str | None) -> bool:
+    """Return True if the value is considered valid content."""
+    if value is None:
+        return False
+    value = str(value).strip()
+    return value not in ("", "<p><br></p>")
+
+
 def extract_amazon_attribute_value(entry: dict, code: str) -> str | None:
     """Extract a value from an Amazon attribute entry using a possibly nested code."""
     parts = code.split("__")

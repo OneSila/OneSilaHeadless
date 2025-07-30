@@ -1,7 +1,14 @@
 import json
 from typing import Dict
 
-from products.models import Product, ProductTranslation, ProductTranslationBulletPoint
+from datetime import timedelta
+
+from django.utils import timezone
+from products.models import (
+    Product,
+    ProductTranslation,
+    ProductTranslationBulletPoint,
+)
 from properties.models import Property, ProductProperty
 from sales_channels.factories.products.products import (
     RemoteProductSyncFactory,
@@ -13,6 +20,7 @@ from sales_channels.integrations.amazon.exceptions import AmazonUnsupportedPrope
 from sales_channels.integrations.amazon.factories.mixins import (
     GetAmazonAPIMixin,
 )
+from sales_channels.integrations.amazon.factories.prices import AmazonPriceUpdateFactory
 from sales_channels.integrations.amazon.factories.products.images import (
     AmazonMediaProductThroughCreateFactory,
     AmazonMediaProductThroughUpdateFactory,
@@ -26,11 +34,16 @@ from sales_channels.integrations.amazon.factories.properties import (
 from sales_channels.integrations.amazon.factories.products.content import (
     AmazonProductContentUpdateFactory,
 )
+from sales_channels.integrations.amazon.helpers import is_safe_content
 from sales_channels.integrations.amazon.models.products import (
     AmazonProduct,
 )
-from sales_channels.integrations.amazon.models.properties import AmazonProductProperty, AmazonProperty, \
-    AmazonProductType
+from sales_channels.integrations.amazon.models.properties import (
+    AmazonProductProperty,
+    AmazonProperty,
+    AmazonProductType,
+    AmazonPublicDefinition,
+)
 from sales_channels.integrations.amazon.models import AmazonCurrency
 from sales_channels.exceptions import SwitchedToCreateException, SwitchedToSyncException
 from spapi import ListingsApi
@@ -124,6 +137,33 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     def _get_ean_for_payload(self) -> str | None:
         return self.remote_instance.ean_code or self.get_ean_code_value()
 
+    def _extract_asin_from_listing(self, response) -> str | None:
+        """Return the ASIN from a listing API response if present."""
+        summaries = getattr(response, "summaries", None) if response else None
+        asin = None
+        if summaries:
+            if isinstance(summaries, dict):
+                asin = summaries.get("asin")
+            else:
+                for summary in summaries:
+                    asin = getattr(summary, "asin", None)
+                    if asin is None and isinstance(summary, dict):
+                        asin = summary.get("asin")
+                    if asin:
+                        break
+        return asin
+
+    def _get_gtin_exemption(self) -> bool | None:
+        prop = Property.objects.filter(
+            internal_name="supplier_declared_has_product_identifier_exemption",
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+        ).first()
+        if not prop:
+            return None
+
+        pp = ProductProperty.objects.filter(product=self.local_instance, property=prop).first()
+        return pp.get_value() if pp else None
+
     def build_basic_attributes(self) -> Dict:
         self.set_sku()
 
@@ -133,17 +173,24 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             attrs["merchant_suggested_asin"] = [{"value": asin}]
             self.force_listing_requirements = False
         else:
-            ean = self._get_ean_for_payload()
-            if ean:
-                attrs["externally_assigned_product_identifier"] = [
-                    {
-                        "type": "ean",
-                        "value": ean,
-                    }
+            exemption = self._get_gtin_exemption()
+            if exemption:
+                attrs["supplier_declared_has_product_identifier_exemption"] = [
+                    {"value": True}
                 ]
                 self.force_listing_requirements = True
             else:
-                self.force_listing_requirements = False
+                ean = self._get_ean_for_payload()
+                if ean:
+                    attrs["externally_assigned_product_identifier"] = [
+                        {
+                            "type": "ean",
+                            "value": ean,
+                        }
+                    ]
+                    self.force_listing_requirements = True
+                else:
+                    self.force_listing_requirements = False
         return attrs
 
     def build_content_attributes(self) -> Dict:
@@ -153,7 +200,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             else self.sales_channel.multi_tenant_company.language
         )
 
-        # Fetch both translations
         channel_translation = ProductTranslation.objects.filter(
             product=self.local_instance,
             language=lang,
@@ -166,7 +212,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             sales_channel=None,
         ).first()
 
-        # Fallback logic per field
         item_name = None
         product_description = None
 
@@ -180,19 +225,21 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         if not product_description and default_translation:
             product_description = default_translation.description
 
-        # Bullet points ONLY from the channel translation
         bullet_points = []
         if channel_translation:
             bullet_points = list(
                 ProductTranslationBulletPoint.objects.filter(
                     product_translation=channel_translation
-                ).order_by("sort_order").values_list("text", flat=True)
+                )
+                .order_by("sort_order")
+                .values_list("text", flat=True)
             )
 
-        attrs = {
-            "item_name": [{"value": item_name}],
-            "product_description": [{"value": product_description}],
-        }
+        attrs = {}
+        if item_name:
+            attrs["item_name"] = [{"value": item_name}]
+        if is_safe_content(product_description):
+            attrs["product_description"] = [{"value": product_description}]
 
         if bullet_points:
             attrs["bullet_point"] = [{"value": bp} for bp in bullet_points]
@@ -204,42 +251,27 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         if not self.sales_channel.sync_prices:
             return attrs
 
-        currencies = AmazonCurrency.objects.filter(
+        price_fac = AmazonPriceUpdateFactory(
             sales_channel=self.sales_channel,
-            sales_channel_view=self.view,
-        ).select_related("local_instance")
+            local_instance=self.local_instance,
+            remote_product=self.remote_instance,
+            view=self.view,
+            api=self.api,
+            skip_checks=True,
+            get_value_only=True,
+        )
+        price_fac.run()
+        values = price_fac.value or {}
 
-        for rc in currencies:
-            iso = rc.local_instance.iso_code
-            full, discount = self.local_instance.get_price_for_sales_channel(
-                self.sales_channel, currency=rc.local_instance
-            )
+        purchasable_offer = values.get("purchasable_offer_values")
+        list_price_vals = values.get("list_price_values")
 
-            sale_price = discount
-            list_price = sale_price if sale_price is not None else full
-            if list_price is None:
-                continue
+        if purchasable_offer:
+            attrs["purchasable_offer"] = purchasable_offer
 
-            attrs.setdefault("purchasable_offer", []).append(
-                {
-                    "audience": "ALL",
-                    "currency": iso,
-                    "marketplace_id": self.view.remote_id,
-                    "our_price": [
-                        {
-                            "schedule": [
-                                {"value_with_tax": float(list_price)}
-                            ]
-                        }
-                    ],
-                }
-            )
+        if list_price_vals:
+            attrs["list_price"] = list_price_vals
 
-            if self.sales_channel.listing_owner or getattr(self.remote_instance, "product_owner", False) or self.force_listing_requirements:
-                # @TODO: This can be value_with_tax depending on marketplace use the public definition to get the value
-                attrs.setdefault("list_price", []).append(
-                    {"currency": iso, "value": float(list_price)}
-                )
         return attrs
 
     def set_rule(self):
@@ -282,12 +314,54 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     def get_saleschannel_remote_object(self, sku):
         response = {}
         try:
-            response = self.get_listing_item(sku, self.view.remote_id)
+            response = self.get_listing_item(
+                sku,
+                self.view.remote_id,
+                included_data=["summaries", "issues", "attributes"],
+            )
         except Exception as e:
             if not self.is_create:
-                raise SwitchedToCreateException(f"Product with sku {sku} was not found. Initial error: {str(e)}")
+                raise SwitchedToCreateException(
+                    f"Product with sku {sku} was not found. Initial error: {str(e)}"
+                )
 
         self.current_attrs = getattr(response, "attributes", {}) or {}
+
+        if not self._get_asin():
+            asin = self._extract_asin_from_listing(response)
+            if asin:
+                update_fields = []
+                if not self.remote_instance.remote_id:
+                    self.remote_instance.remote_id = asin
+                    update_fields.append("remote_id")
+                if not getattr(self.remote_instance, "asin", None):
+                    self.remote_instance.asin = asin
+                    update_fields.append("asin")
+                if update_fields:
+                    self.remote_instance.save(update_fields=update_fields)
+
+                try:
+                    asin_property = Property.objects.get(
+                        internal_name="merchant_suggested_asin",
+                        multi_tenant_company=self.sales_channel.multi_tenant_company,
+                    )
+                except Property.DoesNotExist:
+                    asin_property = None
+
+                if asin_property:
+                    pp, _ = ProductProperty.objects.get_or_create(
+                        product=self.local_instance,
+                        property=asin_property,
+                        multi_tenant_company=self.sales_channel.multi_tenant_company,
+                    )
+                    from properties.models import ProductPropertyTextTranslation
+
+                    ProductPropertyTextTranslation.objects.update_or_create(
+                        product_property=pp,
+                        language=self.sales_channel.multi_tenant_company.language,
+                        defaults={"value_text": asin},
+                    )
+
         return response
 
     # ------------------------------------------------------------
@@ -371,11 +445,15 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         pass
 
     def set_product_properties(self):
-        rule_properties_ids = self.local_instance.get_required_and_optional_properties(product_rule=self.rule).values_list('property_id', flat=True)
-        self.product_properties = ProductProperty.objects.filter_multi_tenant(
-            self.sales_channel.multi_tenant_company
-        ).filter(product=self.local_instance, property_id__in=rule_properties_ids). \
-            exclude(property__internal_name='merchant_suggested_asin')
+        if self.local_instance.is_configurable():
+            self.product_properties = self.local_instance.get_properties_for_configurable_product(product_rule=self.rule)
+        else:
+            rule_properties_ids = self.local_instance.get_required_and_optional_properties(product_rule=self.rule).values_list('property_id', flat=True)
+            self.product_properties = ProductProperty.objects.filter_multi_tenant(
+                self.sales_channel.multi_tenant_company
+            ).filter(product=self.local_instance, property_id__in=rule_properties_ids)
+
+        self.product_properties = self.product_properties.exclude(property__internal_name='merchant_suggested_asin')
 
     # ------------------------------------------------------------
     # Property handling
@@ -627,7 +705,6 @@ class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactor
     """Sync Amazon products using marketplace-specific create or update."""
     create_product_factory = AmazonProductCreateFactory
 
-
     def perform_remote_action(self):
 
         resp = self.update_product(
@@ -656,6 +733,10 @@ class AmazonProductDeleteFactory(GetAmazonAPIMixin, RemoteProductDeleteFactory):
         super().__init__(*args, **kwargs)
 
     def delete_remote(self):
+
+        # @TODO: Temporary disable deletes
+        return
+
         listings = ListingsApi(self._get_client())
         try:
             resp = listings.delete_listings_item(
