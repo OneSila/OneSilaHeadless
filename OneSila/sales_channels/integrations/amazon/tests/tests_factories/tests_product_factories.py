@@ -756,6 +756,65 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             body["patches"]
         )
 
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_update_product_skips_merchant_asin_patch(self, mock_listings, mock_get_images, mock_get_client):
+        """ASIN should never be part of the patch payload."""
+        self.remote_product.created_marketplaces = [self.view.remote_id]
+        self.remote_product.save()
+
+        mock_instance = mock_listings.return_value
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.get_listings_item.return_value = SimpleNamespace(attributes={})
+
+        fac = AmazonProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        paths = [p.get("path") for p in body.get("patches", [])]
+        self.assertNotIn("/attributes/merchant_suggested_asin", paths)
+
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_update_product_skips_external_id_patch(self, mock_listings, mock_get_images, mock_get_client):
+        """External identifiers like EAN should not be patched."""
+        self.remote_product.created_marketplaces = [self.view.remote_id]
+        self.remote_product.ean_code = "1234567890123"
+        self.remote_product.save()
+
+        ProductProperty.objects.filter(
+            product=self.product,
+            property__internal_name="merchant_suggested_asin",
+        ).delete()
+        EanCode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            ean_code="1234567890123",
+        )
+
+        mock_instance = mock_listings.return_value
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.get_listings_item.return_value = SimpleNamespace(attributes={})
+
+        fac = AmazonProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        paths = [p.get("path") for p in body.get("patches", [])]
+        self.assertNotIn("/attributes/externally_assigned_product_identifier", paths)
+
     @patch(
         "sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client",
         return_value=None,
@@ -1783,7 +1842,6 @@ class AmazonProductCreateRequirementsTest(DisableWooCommerceSignalsMixin, Transa
         ) as mock_listings:
             mock_listings.return_value.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
-
             fac = AmazonProductCreateFactory(
                 sales_channel=self.sales_channel,
                 local_instance=self.product,
@@ -1794,7 +1852,6 @@ class AmazonProductCreateRequirementsTest(DisableWooCommerceSignalsMixin, Transa
             return mock_listings.return_value.put_listings_item.call_args.kwargs.get(
                 "body"
             )
-
 
     def test_listing_owner_uses_listing_requirements(self):
         self.sales_channel.listing_owner = True

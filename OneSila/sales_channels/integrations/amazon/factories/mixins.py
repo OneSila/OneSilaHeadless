@@ -359,7 +359,14 @@ class GetAmazonAPIMixin:
         current_attributes = current_attributes or {}
         new_attributes = new_attributes or {}
 
+        skip_keys = {
+            "merchant_suggested_asin",
+            "externally_assigned_product_identifier",
+        }
+
         for key, new_value in new_attributes.items():
+            if key in skip_keys:
+                continue
             new_value = clean(new_value)
             current_value = current_attributes.get(key)
             path = f"/attributes/{key}"
