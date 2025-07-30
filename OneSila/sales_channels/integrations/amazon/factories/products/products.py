@@ -124,6 +124,22 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     def _get_ean_for_payload(self) -> str | None:
         return self.remote_instance.ean_code or self.get_ean_code_value()
 
+    def _extract_asin_from_listing(self, response) -> str | None:
+        """Return the ASIN from a listing API response if present."""
+        summaries = getattr(response, "summaries", None) if response else None
+        asin = None
+        if summaries:
+            if isinstance(summaries, dict):
+                asin = summaries.get("asin")
+            else:
+                for summary in summaries:
+                    asin = getattr(summary, "asin", None)
+                    if asin is None and isinstance(summary, dict):
+                        asin = summary.get("asin")
+                    if asin:
+                        break
+        return asin
+
     def build_basic_attributes(self) -> Dict:
         self.set_sku()
 
@@ -283,12 +299,54 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     def get_saleschannel_remote_object(self, sku):
         response = {}
         try:
-            response = self.get_listing_item(sku, self.view.remote_id)
+            response = self.get_listing_item(
+                sku,
+                self.view.remote_id,
+                included_data=["summaries", "issues", "attributes"],
+            )
         except Exception as e:
             if not self.is_create:
-                raise SwitchedToCreateException(f"Product with sku {sku} was not found. Initial error: {str(e)}")
+                raise SwitchedToCreateException(
+                    f"Product with sku {sku} was not found. Initial error: {str(e)}"
+                )
 
         self.current_attrs = getattr(response, "attributes", {}) or {}
+
+        if not self._get_asin():
+            asin = self._extract_asin_from_listing(response)
+            if asin:
+                update_fields = []
+                if not self.remote_instance.remote_id:
+                    self.remote_instance.remote_id = asin
+                    update_fields.append("remote_id")
+                if not getattr(self.remote_instance, "asin", None):
+                    self.remote_instance.asin = asin
+                    update_fields.append("asin")
+                if update_fields:
+                    self.remote_instance.save(update_fields=update_fields)
+
+                try:
+                    asin_property = Property.objects.get(
+                        internal_name="merchant_suggested_asin",
+                        multi_tenant_company=self.sales_channel.multi_tenant_company,
+                    )
+                except Property.DoesNotExist:
+                    asin_property = None
+
+                if asin_property:
+                    pp, _ = ProductProperty.objects.get_or_create(
+                        product=self.local_instance,
+                        property=asin_property,
+                        multi_tenant_company=self.sales_channel.multi_tenant_company,
+                    )
+                    from properties.models import ProductPropertyTextTranslation
+
+                    ProductPropertyTextTranslation.objects.update_or_create(
+                        product_property=pp,
+                        language=self.sales_channel.multi_tenant_company.language,
+                        defaults={"value_text": asin},
+                    )
+
         return response
 
     # ------------------------------------------------------------
