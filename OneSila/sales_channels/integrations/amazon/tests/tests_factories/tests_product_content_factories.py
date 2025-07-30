@@ -199,3 +199,38 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
             },
             patches,
         )
+
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    def test_update_content_skips_empty_description(self, mock_client, mock_listings):
+        mock_instance = mock_listings.return_value
+        mock_instance.patch_listings_item.side_effect = Exception("no amazon")
+        mock_instance.get_listings_item.return_value = MagicMock(payload={"attributes": {}})
+
+        self.translation.description = "<p><br></p>"
+        self.translation.save()
+        ProductTranslation.objects.create(
+            product=self.product,
+            sales_channel=None,
+            language=self.multi_tenant_company.language,
+            name="Default name",
+            description="<p><br></p>",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        fac = AmazonProductContentUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_product=self.remote_product,
+            view=self.view,
+            remote_instance=self.remote_content,
+        )
+
+        with self.assertRaises(Exception):
+            fac.run()
+
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        patches = body.get("patches", [])
+
+        for patch in patches:
+            self.assertNotEqual(patch.get("path"), "/attributes/product_description")

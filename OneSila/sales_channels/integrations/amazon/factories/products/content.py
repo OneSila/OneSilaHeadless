@@ -3,6 +3,7 @@ from sales_channels.factories.products.content import RemoteProductContentUpdate
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.models.products import AmazonProductContent
 from sales_channels.integrations.amazon.models.properties import AmazonProductType
+from sales_channels.integrations.amazon.helpers import is_safe_content
 
 
 class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentUpdateFactory):
@@ -17,8 +18,21 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentU
 
     remote_model_class = AmazonProductContent
 
-    def __init__(self, sales_channel, local_instance, remote_product, view, api=None, skip_checks=False, remote_instance=None, language=None):
+    def __init__(
+        self,
+        sales_channel,
+        local_instance,
+        remote_product,
+        view,
+        api=None,
+        skip_checks=False,
+        remote_instance=None,
+        language=None,
+        get_value_only=False,
+    ):
         self.view = view
+        self.get_value_only = get_value_only
+        self.value = None
         super().__init__(
             sales_channel,
             local_instance,
@@ -88,10 +102,11 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentU
                 .values_list("text", flat=True)
             )
 
-        attrs = {
-            "item_name": [{"value": item_name}],
-            "product_description": [{"value": product_description}],
-        }
+        attrs = {}
+        if item_name:
+            attrs["item_name"] = [{"value": item_name}]
+        if is_safe_content(product_description):
+            attrs["product_description"] = [{"value": product_description}]
 
         if bullet_points:
             attrs["bullet_point"] = [{"value": bp} for bp in bullet_points]
@@ -103,7 +118,11 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentU
 
     def update_remote(self):
         if not self.payload:
-            return {}
+            return self.payload if self.get_value_only else {}
+
+        if self.get_value_only:
+            self.value = self.payload
+            return self.value
 
         product_type = self._get_product_type()
         body = {
