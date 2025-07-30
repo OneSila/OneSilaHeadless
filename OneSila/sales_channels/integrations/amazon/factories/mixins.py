@@ -12,6 +12,7 @@ from deepdiff import DeepDiff
 
 
 from sales_channels.integrations.amazon.models.properties import AmazonProperty
+from sales_channels.integrations.amazon.constants import AMAZON_PATCH_SKIP_KEYS
 from properties.models import Property, PropertyTranslation
 
 
@@ -359,11 +360,7 @@ class GetAmazonAPIMixin:
         current_attributes = current_attributes or {}
         new_attributes = new_attributes or {}
 
-        skip_keys = {
-            "merchant_suggested_asin",
-            "externally_assigned_product_identifier",
-            "supplier_declared_has_product_identifier_exemption"
-        }
+        skip_keys = AMAZON_PATCH_SKIP_KEYS
 
         for key, new_value in new_attributes.items():
             if key in skip_keys:
