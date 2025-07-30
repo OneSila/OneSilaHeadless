@@ -440,11 +440,15 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         pass
 
     def set_product_properties(self):
-        rule_properties_ids = self.local_instance.get_required_and_optional_properties(product_rule=self.rule).values_list('property_id', flat=True)
-        self.product_properties = ProductProperty.objects.filter_multi_tenant(
-            self.sales_channel.multi_tenant_company
-        ).filter(product=self.local_instance, property_id__in=rule_properties_ids). \
-            exclude(property__internal_name='merchant_suggested_asin')
+        if self.local_instance.is_configurable():
+            self.product_properties = self.local_instance.get_properties_for_configurable_product(product_rule=self.rule)
+        else:
+            rule_properties_ids = self.local_instance.get_required_and_optional_properties(product_rule=self.rule).values_list('property_id', flat=True)
+            self.product_properties = ProductProperty.objects.filter_multi_tenant(
+                self.sales_channel.multi_tenant_company
+            ).filter(product=self.local_instance, property_id__in=rule_properties_ids)
+
+        self.product_properties = self.product_properties.exclude(property__internal_name='merchant_suggested_asin')
 
     # ------------------------------------------------------------
     # Property handling
