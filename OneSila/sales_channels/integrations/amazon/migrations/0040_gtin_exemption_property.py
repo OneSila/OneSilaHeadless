@@ -75,5 +75,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(add_gtin_exemption, noop),
+        # THIS WAS BROKEN!!!!
+        # migrations.RunPython(add_gtin_exemption, noop),
     ]
