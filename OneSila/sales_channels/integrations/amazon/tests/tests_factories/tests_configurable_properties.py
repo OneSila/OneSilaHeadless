@@ -37,12 +37,7 @@ class AmazonConfigurablePropertySelectionTest(DisableWooCommerceSignalsMixin, Te
         )
 
         # Product type property and rule
-        self.product_type_property = baker.make(
-            Property,
-            type=Property.TYPES.SELECT,
-            is_product_type=True,
-            multi_tenant_company=self.multi_tenant_company,
-        )
+        self.product_type_property = Property.objects.filter(is_product_type=True).first()
         PropertyTranslation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             property=self.product_type_property,
@@ -60,7 +55,7 @@ class AmazonConfigurablePropertySelectionTest(DisableWooCommerceSignalsMixin, Te
             language=self.multi_tenant_company.language,
             value="Chair",
         )
-        self.rule = ProductPropertiesRule.objects.create(
+        self.rule, _ = ProductPropertiesRule.objects.get_or_create(
             product_type=self.product_type_value,
             multi_tenant_company=self.multi_tenant_company,
         )
@@ -279,18 +274,39 @@ class AmazonConfigurablePropertySelectionTest(DisableWooCommerceSignalsMixin, Te
         return sorted(pp.property.internal_name for pp in fac.product_properties)
 
     def test_scenario_one_shared_properties(self):
+        """
+        Scenario 1:
+        - Red / M / Textile / 1
+        - Blue / M / Textile / 2
+
+        -> configurable properties M Textile
+        """
         self.create_variation("V1", self.color_red, self.size_m, self.material_textile, 1)
         self.create_variation("V2", self.color_blue, self.size_m, self.material_textile, 2)
         names = self._run_factory()
         self.assertEqual(sorted(names), ["material", "size"])
 
     def test_scenario_two_shared_properties(self):
+        """
+        Scenario 2:
+        - Red / M / Textile / 1
+        - Blue / L /  Plastic / 1
+
+        -> configurable properties 1
+        """
         self.create_variation("V1", self.color_red, self.size_m, self.material_textile, 1)
         self.create_variation("V2", self.color_blue, self.size_l, self.material_plastic, 1)
         names = self._run_factory()
         self.assertEqual(sorted(names), ["number_of_items"])  # only number_of_items shared
 
     def test_scenario_three_shared_properties(self):
+        """
+        Scenario 3:
+        - Red / M / Textile / 1
+        - Red / L /  Textile / 1
+
+        -> configurable properties 1 Textile 1
+        """
         self.create_variation("V1", self.color_red, self.size_m, self.material_textile, 1)
         self.create_variation("V2", self.color_red, self.size_l, self.material_textile, 1)
         names = self._run_factory()
