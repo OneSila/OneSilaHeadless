@@ -1996,19 +1996,19 @@ class AmazonConfigurablePropertySelectionTest(DisableWooCommerceSignalsMixin, Tr
             product_type=self.product_type_value,
             multi_tenant_company=self.multi_tenant_company,
         )
-        AmazonProductType.objects.create(
+        AmazonProductType.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             local_instance=self.rule,
             product_type_code="CHAIR",
         )
 
-        self.color_property = baker.make(
-            Property,
+        self.color_property, _ = Property.objects.get_or_create(
             type=Property.TYPES.SELECT,
             internal_name="color",
             multi_tenant_company=self.multi_tenant_company,
         )
+
         PropertyTranslation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             property=self.color_property,
@@ -2121,25 +2121,28 @@ class AmazonConfigurablePropertySelectionTest(DisableWooCommerceSignalsMixin, Tr
             name="Number of items",
         )
 
-        ProductPropertiesRuleItem.objects.create(
+        item_color, _ = ProductPropertiesRuleItem.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             rule=self.rule,
             property=self.color_property,
-            type=ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
         )
-        ProductPropertiesRuleItem.objects.create(
+
+        item_color.type = ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR
+        item_color.save()
+
+        ProductPropertiesRuleItem.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             rule=self.rule,
             property=self.size_property,
             type=ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR,
         )
-        ProductPropertiesRuleItem.objects.create(
+        ProductPropertiesRuleItem.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             rule=self.rule,
             property=self.material_property,
             type=ProductPropertiesRuleItem.REQUIRED,
         )
-        ProductPropertiesRuleItem.objects.create(
+        ProductPropertiesRuleItem.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             rule=self.rule,
             property=self.items_property,
