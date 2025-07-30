@@ -58,7 +58,6 @@ class AmazonPriceTestMixin:
         SalesPrice.objects.create(
             product=self.product,
             currency=self.currency,
-            rrp=100,
             price=80,
             multi_tenant_company=self.multi_tenant_company,
         )
@@ -224,7 +223,7 @@ class AmazonPriceUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transact
 
         list_price = self.get_patch_value(patches, "/attributes/list_price")
         self.assertIsNotNone(list_price, "list_price patch is missing")
-        self.assertEqual(list_price[0]["value"], 80.0)
+        self.assertEqual(list_price[0]["value_with_tax"], 80.0)
 
     def test_missing_asin_still_uses_listing_requirements(self):
         self.sales_channel.listing_owner = False

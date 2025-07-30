@@ -170,7 +170,6 @@ class AmazonProductTestMixin:
         SalesPrice.objects.create(
             product=self.product,
             currency=self.currency,
-            rrp=100,
             price=80,
             multi_tenant_company=self.multi_tenant_company,
         )
@@ -700,7 +699,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
                     ],
                 }
             ],
-            "list_price": [{"currency": "GBP", "value": 80.0}],
+            "list_price": [{"currency": "GBP", "value_with_tax": 80.0}],
             **expected_images,
             "color": [
                 {
@@ -956,7 +955,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
                     ],
                 }
             ],
-            'list_price': [{'currency': 'GBP', 'value': 80.0}],
+            'list_price': [{'currency': 'GBP', 'value_with_tax': 80.0}],
             **expected_images,
             "color": [
                 {
@@ -1010,10 +1009,11 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         )
         fac.run()
 
-        mock_instance.delete_listings_item.assert_called_once()
-        kwargs = mock_instance.delete_listings_item.call_args.kwargs
-        self.assertEqual(kwargs.get("sku"), self.remote_product.remote_sku)
-        self.assertEqual(kwargs.get("marketplace_ids"), [self.view.remote_id])
+        # @TODO: Temporary disable deletes
+        # mock_instance.delete_listings_item.assert_called_once()
+        # kwargs = mock_instance.delete_listings_item.call_args.kwargs
+        # self.assertEqual(kwargs.get("sku"), self.remote_product.remote_sku)
+        # self.assertEqual(kwargs.get("marketplace_ids"), [self.view.remote_id])
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch("sales_channels.integrations.amazon.factories.products.AmazonProductCreateFactory.run")
@@ -1728,10 +1728,8 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
                 }
             ],
         )
-        self.assertEqual(
-            attrs.get("list_price"),
-            [{"currency": "GBP", "value": 80.0}],
-        )
+
+        self.assertEqual(attrs.get("list_price"),[{"currency": "GBP", "value_with_tax": 80.0}])
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -1757,7 +1755,6 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
 
         self.assertNotIn("purchasable_offer", attrs)
         self.assertNotIn("list_price", attrs)
-        self.assertNotIn("uvp_list_price", attrs)
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -1787,7 +1784,6 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         attrs = body.get("attributes", {})
         self.assertFalse(attrs.get("purchasable_offer"))
         self.assertFalse(attrs.get("list_price"))
-        self.assertFalse(attrs.get("uvp_list_price"))
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -1810,7 +1806,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
         mock_instance.get_listings_item.return_value = SimpleNamespace(
             attributes={
-                "list_price": [{"currency": "GBP", "value": 89.99}],
+                "list_price": [{"currency": "GBP", "value_with_tax": 89.99}],
                 "purchasable_offer": [
                     {
                         "audience": "ALL",
@@ -1843,7 +1839,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             99.99,
         )
         self.assertEqual(
-            list_price[0]["value"],
+            list_price[0]["value_with_tax"],
             99.99,
         )
 

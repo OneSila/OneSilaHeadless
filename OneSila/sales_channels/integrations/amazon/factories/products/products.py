@@ -16,6 +16,7 @@ from sales_channels.integrations.amazon.exceptions import AmazonUnsupportedPrope
 from sales_channels.integrations.amazon.factories.mixins import (
     GetAmazonAPIMixin,
 )
+from sales_channels.integrations.amazon.factories.prices import AmazonPriceUpdateFactory
 from sales_channels.integrations.amazon.factories.products.images import (
     AmazonMediaProductThroughCreateFactory,
     AmazonMediaProductThroughUpdateFactory,
@@ -259,12 +260,12 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
 
         purchasable_offer = values.get("purchasable_offer_values")
         list_price_vals = values.get("list_price_values")
-        list_price_code = values.get("list_price_code")
 
         if purchasable_offer:
             attrs["purchasable_offer"] = purchasable_offer
+
         if list_price_vals:
-            attrs[list_price_code] = list_price_vals
+            attrs["list_price"] = list_price_vals
 
         return attrs
 
@@ -723,6 +724,10 @@ class AmazonProductDeleteFactory(GetAmazonAPIMixin, RemoteProductDeleteFactory):
         super().__init__(*args, **kwargs)
 
     def delete_remote(self):
+
+        # @TODO: Temporary disable deletes
+        return
+
         listings = ListingsApi(self._get_client())
         try:
             resp = listings.delete_listings_item(

@@ -44,33 +44,33 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
     def _get_list_price_config(self):
         rule = self.local_instance.get_product_rule()
         if not rule:
-            return "list_price", "value"
+            return "value_with_tax"
 
         product_type = AmazonProductType.objects.filter(
             sales_channel=self.sales_channel,
             local_instance=rule,
         ).first()
         if not product_type:
-            return "list_price", "value"
+            return "value_with_tax"
 
         public_def = (
             AmazonPublicDefinition.objects.filter(
                 api_region_code=self.view.api_region_code,
                 product_type_code=product_type.product_type_code,
-                code__in=["list_price", "uvp_list_price"],
+                code__in=["list_price"],
             )
             .first()
         )
         if not public_def:
-            return "list_price", "value"
+            return "value_with_tax"
 
         schema = public_def.raw_schema or {}
         props = schema.get("items", {}).get("properties", {})
         value_key = "value_with_tax" if "value_with_tax" in props else "value"
-        return public_def.code, value_key
+        return value_key
 
     def update_remote(self):
-        list_price_code, value_key = self._get_list_price_config()
+        value_key = self._get_list_price_config()
 
         currencies = AmazonCurrency.objects.filter(
             sales_channel=self.sales_channel,
@@ -90,21 +90,16 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
             full_price = price_info.get("price")
             discount_price = price_info.get("discount_price")
 
-            our_price = discount_price if discount_price is not None else full_price
-
-            if our_price is None:
-                continue
-
             offer_entry = {
                 "audience": "ALL",
                 "currency": iso,
                 "marketplace_id": self.view.remote_id,
                 "our_price": [
-                    {"schedule": [{"value_with_tax": our_price}]}
+                    {"schedule": [{"value_with_tax": full_price}]}
                 ],
             }
 
-            if discount_price is not None and full_price is not None:
+            if discount_price is not None:
                 start = timezone.now().date().isoformat()
                 end = (timezone.now() + timedelta(days=365)).date().isoformat()
                 offer_entry["discounted_price"] = [
@@ -132,15 +127,16 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
             self.value = {
                 "purchasable_offer_values": purchasable_offer_values,
                 "list_price_values": list_price_values if list_price_values else None,
-                "list_price_code": list_price_code,
             }
+
             return self.value
 
         attributes = {}
         if purchasable_offer_values:
             attributes["purchasable_offer"] = purchasable_offer_values
+
         if list_price_values:
-            attributes[list_price_code] = list_price_values
+            attributes["list_price"] = list_price_values
 
         if not attributes:
             return []
@@ -151,7 +147,7 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
             self.remote_product.get_remote_rule(),
             attributes,
         )
-        return [resp]
+        return resp
 
     def serialize_response(self, response):
-        return [r.payload if hasattr(r, "payload") else {} for r in response]
+        return response.payload if hasattr(response, "payload") else {}
