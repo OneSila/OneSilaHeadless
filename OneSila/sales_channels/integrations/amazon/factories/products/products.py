@@ -140,6 +140,17 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                         break
         return asin
 
+    def _get_gtin_exemption(self) -> bool | None:
+        prop = Property.objects.filter(
+            internal_name="supplier_declared_has_product_identifier_exemption",
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+        ).first()
+        if not prop:
+            return None
+
+        pp = ProductProperty.objects.filter(product=self.local_instance, property=prop).first()
+        return pp.get_value() if pp else None
+
     def build_basic_attributes(self) -> Dict:
         self.set_sku()
 
@@ -149,17 +160,24 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             attrs["merchant_suggested_asin"] = [{"value": asin}]
             self.force_listing_requirements = False
         else:
-            ean = self._get_ean_for_payload()
-            if ean:
-                attrs["externally_assigned_product_identifier"] = [
-                    {
-                        "type": "ean",
-                        "value": ean,
-                    }
+            exemption = self._get_gtin_exemption()
+            if exemption:
+                attrs["supplier_declared_has_product_identifier_exemption"] = [
+                    {"value": True}
                 ]
                 self.force_listing_requirements = True
             else:
-                self.force_listing_requirements = False
+                ean = self._get_ean_for_payload()
+                if ean:
+                    attrs["externally_assigned_product_identifier"] = [
+                        {
+                            "type": "ean",
+                            "value": ean,
+                        }
+                    ]
+                    self.force_listing_requirements = True
+                else:
+                    self.force_listing_requirements = False
         return attrs
 
     def build_content_attributes(self) -> Dict:
@@ -685,7 +703,6 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
 class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactory):
     """Sync Amazon products using marketplace-specific create or update."""
     create_product_factory = AmazonProductCreateFactory
-
 
     def perform_remote_action(self):
 
