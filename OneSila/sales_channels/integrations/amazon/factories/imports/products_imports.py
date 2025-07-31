@@ -1,6 +1,7 @@
 import pprint
 from decimal import Decimal
 import logging
+import traceback
 
 from django.db import IntegrityError
 
@@ -58,6 +59,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         # stored in sets to avoid duplicates when the same parent SKU
         # appears across multiple marketplaces.
         self._configurable_map: dict[str, set[str]] = {}
+        self.broken_records: list[dict] = []
 
     # ------------------------------------------------------------------
     # Helpers
@@ -72,6 +74,9 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         self.sales_channel.is_importing = False
         self.sales_channel.save(update_fields=["active", "is_importing"])
         self._create_configurable_variations()
+        if self.broken_records:
+            self.import_process.broken_records = self.broken_records
+            self.import_process.save(update_fields=["broken_records"])
 
     def _create_configurable_variations(self):
         """Create ConfigurableVariation links after all products are imported."""
@@ -603,7 +608,11 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 is_variation = remote_product.is_variation
 
                 if is_variation:
-                    parent_skus = list(AmazonProduct.objects.filter(remote_parent_product=remote_product.remote_parent_product).values_list("remote_sku", flat=True))
+                    parent_skus = list(
+                        AmazonProduct.objects
+                        .filter(remote_parent_product=remote_product.remote_parent_product)
+                        .values_list("remote_sku", flat=True)
+                    )
                 else:
                     parent_skus = []
             else:
@@ -643,7 +652,25 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 },
             )
             instance.language = language
-            instance.process()
+            try:
+                instance.process()
+            except Exception as e:
+                if self.import_process.skip_broken_records:
+                    record = {
+                        "data": structured,
+                        "error": str(e),
+                        "traceback": traceback.format_exc(),
+                        "context": {
+                            "sku": structured.get("sku"),
+                            "asin": structured.get("__asin"),
+                            "region": getattr(view, "api_region_code", None),
+                            "is_variation": is_variation,
+                        },
+                    }
+                    self.broken_records.append(record)
+                    continue
+                else:
+                    raise
 
             self.update_remote_product(instance, product, view, is_variation)
             self.handle_ean_code(instance)
