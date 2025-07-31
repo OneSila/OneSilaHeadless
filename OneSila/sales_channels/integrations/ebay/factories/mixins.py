@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import requests
 from ebay_rest.reference import Reference
 from ebay_rest.api.sell_marketing.api_client import ApiClient
 from ebay_rest.api.sell_marketing.configuration import Configuration
@@ -28,11 +27,11 @@ class GetEbayAPIMixin:
             identity_host = "https://apiz.sandbox.ebay.com"
 
         configuration = Configuration()
-        configuration.host = ""
-        api_client = ApiClient(configuration)
+        configuration.host = host
         token = getattr(self.sales_channel, "access_token", None)
         if token:
-            api_client.default_headers.update({"Authorization": f"Bearer {token}"})
+            configuration.access_token = token
+        api_client = ApiClient(configuration)
         api_client.default_headers.update({"Content-Type": "application/json"})
 
         self.api_host = host
