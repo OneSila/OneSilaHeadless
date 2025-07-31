@@ -81,9 +81,19 @@ class EbaySalesChannel(SalesChannel):
 
 class EbaySalesChannelView(SalesChannelView):
     """eBay marketplace or site representation."""
-    pass
+    is_default = models.BooleanField(
+        default=False,
+        help_text="Marks the default marketplace for this eBay store.",
+    )
 
 
 class EbayRemoteLanguage(RemoteLanguage):
     """eBay remote language model."""
-    pass
+    sales_channel_view = models.ForeignKey(
+        EbaySalesChannelView,
+        on_delete=models.CASCADE,
+        related_name='remote_languages',
+        null=True,
+        blank=True,
+        help_text="The marketplace associated with this remote language.",
+    )
