@@ -21,6 +21,9 @@ from django.db.utils import IntegrityError
 from decimal import Decimal
 
 import logging
+
+from ...exceptions import UnsupportedProductTypeError
+
 logger = logging.getLogger(__name__)
 
 
@@ -77,7 +80,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         }
         """
         # Note, no such thing as a product-type in woocommerce.
-        ptype = product_data.get('type')
+        ptype = product_data.get('type', 'unknown')
         is_configurable = False
 
         if ptype == 'simple':
@@ -91,7 +94,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
             local_type = Product.SIMPLE
             is_variation = True
         else:
-            raise NotImplementedError(f"Unknown woocommcerce product type: {ptype}")
+            raise UnsupportedProductTypeError(ptype)
 
         try:
             active = product_data["status"] == "publish" and product_data["catalog_visibility"] == "visible"
@@ -526,7 +529,8 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         }
 
         local_product = None
-        remote_product_instance = WoocommerceProduct.objects.filter(remote_id=variation_id, sales_channel=self.sales_channel, remote_parent_product__remote_id=parent_remote_id).first()
+        remote_product_instance = WoocommerceProduct.objects.filter(
+            remote_id=variation_id, sales_channel=self.sales_channel, remote_parent_product__remote_id=parent_remote_id).first()
         if remote_product_instance:
             local_product = remote_product_instance.local_instance
 
@@ -589,4 +593,8 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         self.update_percentage()
 
         for remote_product in self.product_data:
-            self.process_full_product(remote_product)
+            try:
+                self.process_full_product(remote_product)
+            except UnsupportedProductTypeError as exc:
+                logger.warning(str(exc))
+                continue
