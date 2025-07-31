@@ -4,7 +4,7 @@ from imports_exports.factories.properties import ImportProductPropertiesRuleInst
 from products.models import Product
 from core.decorators import timeit_and_log
 
-from ..exceptions import SanityCheckError, UnsupportedProductTypeError
+from ..exceptions import SanityCheckError
 from ..mixins import GetWoocommerceAPIMixin
 from .temp_structure import ImportProcessorTempStructureMixin
 from sales_channels.integrations.woocommerce.constants import EAN_CODE_WOOCOMMERCE_FIELD_NAME, \
@@ -21,6 +21,9 @@ from django.db.utils import IntegrityError
 from decimal import Decimal
 
 import logging
+
+from ...exceptions import UnsupportedProductTypeError
+
 logger = logging.getLogger(__name__)
 
 
@@ -77,7 +80,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         }
         """
         # Note, no such thing as a product-type in woocommerce.
-        ptype = product_data.get('type')
+        ptype = product_data.get('type', 'unknown')
         is_configurable = False
 
         if ptype == 'simple':
