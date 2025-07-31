@@ -604,6 +604,13 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
     def import_products_process(self):
         for product in self.get_products_data():
+            # Skip items that do not contain any useful information
+            if (
+                not getattr(product, "summaries", None)
+                and not getattr(product, "attributes", None)
+                and not getattr(product, "product_types", None)
+            ):
+                continue
             product_instance = None
             remote_product = AmazonProduct.objects.filter(
                 remote_sku=product.sku,
@@ -677,7 +684,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 }
                 self.broken_records.append(record)
                 continue
-
 
             self.update_remote_product(instance, product, view, is_variation)
             self.handle_ean_code(instance)
