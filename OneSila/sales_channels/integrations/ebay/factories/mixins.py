@@ -2,77 +2,81 @@
 
 from __future__ import annotations
 
+import requests
+from django.conf import settings
+
 import json
+
+from ebay_rest import API
+from ebay_rest.api import commerce_identity
 from ebay_rest.reference import Reference
 from ebay_rest.api.sell_marketing.api_client import ApiClient
 from ebay_rest.api.sell_marketing.configuration import Configuration
 
-from sales_channels.integrations.ebay.models.sales_channels import EbaySalesChannel
-
+from ebay_rest.api.commerce_identity.api.user_api import UserApi
 
 class GetEbayAPIMixin:
-    """Mixin providing a simple authenticated API client for eBay."""
 
-    api: ApiClient
-    api_host: str
-    identity_host: str
+    def get_api(self) -> API:
+        """Returns a fully authenticated API instance."""
+        credentials = {
+            "app_id": settings.EBAY_CLIENT_ID,
+            "cert_id": settings.EBAY_CLIENT_SECRET,
+            "dev_id": settings.EBAY_DEV_ID,
+            "redirect_uri": settings.EBAY_RU_NAME,
+        }
 
-    def get_api(self) -> ApiClient:
-        """Return an authenticated :class:`ApiClient` for eBay APIs."""
+        user_info = {
+            "refresh_token": self.sales_channel.refresh_token,
+            "refresh_token_expiry": self.sales_channel.refresh_token_expiration.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
+            "email_or_username": "OneSila",
+            "password": "???" # For some reason username and password are validating even if we provide the
+                              # refresh_token and we can add anything here
+        }
 
-        host = "https://api.ebay.com"
-        identity_host = "https://apiz.ebay.com"
-        if getattr(self.sales_channel, "environment", EbaySalesChannel.PRODUCTION) == EbaySalesChannel.SANDBOX:
-            host = "https://api.sandbox.ebay.com"
-            identity_host = "https://apiz.sandbox.ebay.com"
+        header = {
+            # Use the marketplace of the store, e.g. "EBAY_FR", "EBAY_US", etc.
+            "marketplace_id": "EBAY_US",
+            "accept_language": "en-US",  # or "fr-FR", etc.
+            "content_language": "en-US",
+        }
 
-        configuration = Configuration()
-        configuration.host = host
-        token = getattr(self.sales_channel, "access_token", None)
-        if token:
-            configuration.access_token = token
-        api_client = ApiClient(configuration)
-        api_client.default_headers.update({"Content-Type": "application/json"})
+        # Construct API with dicts (no need for .json file)
+        return API(
+            application=credentials,
+            user=user_info,
+            header=header
+        )
 
-        self.api_host = host
-        self.identity_host = identity_host
-        self.api = api_client
-        return api_client
+    def get_api_client(self) -> ApiClient:
+        config = Configuration()
+        access_token = self.api._user_token.get()
+
+        config.access_token = access_token
+        config.host = "https://api.sandbox.ebay.com"  # ⬅️ Use this for sandbox
+        return ApiClient(configuration=config)
+
+    def get_marketplace_currencies(self, marketplace_id: str) -> str | None:
+        resp = self.api.sell_metadata_get_currencies(marketplace_id=marketplace_id)
+        return resp
 
     def get_marketplace_ids(self) -> list[str]:
-        """Return list of marketplace IDs the account is subscribed to."""
-        resp = self.api.request(
-            "GET",
-            f"{self.api_host}/sell/account/v1/subscription",
-            headers=self.api.default_headers,
-        )
-        if resp.status < 300:
-            data = json.loads(resp.data)
-            return [s.get("marketplaceId") for s in data.get("subscriptions", [])]
-        return []
+        # the ebay_rest doesn't provide endpoints for get subscription (even if it hav account v1 rate_table)
+        # the current method is not ok because it returns status 500
+
+        pass
+        # client = self.get_api_client()
+        #
+        # response = client.call_api(
+        #     resource_path="/sell/account/v1/subscription",
+        #     method="GET",
+        #     auth_settings=["api_auth"],
+        #     header_params={"Content-Type": "application/json"},
+        #     response_type="dict",
+        # )
+        #
+        # return [s["marketplaceId"] for s in response[0].get("subscriptions", [])]
 
     def get_default_marketplace_id(self) -> str | None:
-        """Return the default marketplace ID for the account."""
-        resp = self.api.request(
-            "GET",
-            f"{self.identity_host}/commerce/identity/v1/user",
-            headers=self.api.default_headers,
-        )
-        if resp.status < 300:
-            data = json.loads(resp.data)
-            return data.get("registrationMarketplaceId")
-        return None
-
-    def get_marketplace_currency(self, marketplace_id: str) -> str | None:
-        """Return the default currency code for a marketplace."""
-        url = f"{self.api_host}/sell/metadata/v1/marketplace/{marketplace_id}/get_currencies"
-        resp = self.api.request("GET", url, headers=self.api.default_headers)
-        if resp.status < 300:
-            data = json.loads(resp.data)
-            return data.get("defaultCurrency", {}).get("code")
-        return None
-
-    @staticmethod
-    def marketplace_reference() -> dict:
-        """Return mapping from marketplace id to reference info."""
-        return Reference.get_marketplace_id_values()
+        resp = self.api.commerce_identity_get_user()
+        return resp.get("registration_marketplace_id", None)

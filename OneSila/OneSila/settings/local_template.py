@@ -106,5 +106,6 @@ AMAZON_APP_ID = None
 
 EBAY_CLIENT_ID = None
 EBAY_CLIENT_SECRET = None
+EBAY_DEV_ID = None
 EBAY_APPLICATION_SCOPES = ["https://api.ebay.com/oauth/api_scope"]
 EBAY_RU_NAME = 'Name'
