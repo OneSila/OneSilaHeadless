@@ -652,25 +652,24 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 },
             )
             instance.language = language
+
             try:
                 instance.process()
             except Exception as e:
-                if self.import_process.skip_broken_records:
-                    record = {
-                        "data": structured,
-                        "error": str(e),
-                        "traceback": traceback.format_exc(),
-                        "context": {
-                            "sku": structured.get("sku"),
-                            "asin": structured.get("__asin"),
-                            "region": getattr(view, "api_region_code", None),
-                            "is_variation": is_variation,
-                        },
-                    }
-                    self.broken_records.append(record)
-                    continue
-                else:
-                    raise
+                record = {
+                    "data": structured,
+                    "error": str(e),
+                    "traceback": traceback.format_exc(),
+                    "context": {
+                        "sku": structured.get("sku"),
+                        "asin": structured.get("__asin"),
+                        "region": getattr(view, "api_region_code", None),
+                        "is_variation": is_variation,
+                    },
+                }
+                self.broken_records.append(record)
+                continue
+
 
             self.update_remote_product(instance, product, view, is_variation)
             self.handle_ean_code(instance)

@@ -125,11 +125,10 @@ class AskGPTMixin(OpenAIMixin):
         if not hasattr(self, 'images'):
             self.images = []
 
-        # image_inputs = [{"type": "image_url", "image_url": {"url": url}} for url in self.images]
         image_inputs = [{"type": "input_image", "image_url": url} for url in self.images]
         start_time = time.time()
         response = self.openai.responses.create(
-            model="gpt-4o-mini",
+            model="gpt-4o-mini", # this model does not support images use gpt-4o or similar
             instructions=self.system_prompt,
             temperature=self.temperature,
             max_output_tokens=self.max_tokens,
