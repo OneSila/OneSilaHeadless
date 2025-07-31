@@ -4,7 +4,7 @@ from imports_exports.factories.properties import ImportProductPropertiesRuleInst
 from products.models import Product
 from core.decorators import timeit_and_log
 
-from ..exceptions import SanityCheckError
+from ..exceptions import SanityCheckError, UnsupportedProductTypeError
 from ..mixins import GetWoocommerceAPIMixin
 from .temp_structure import ImportProcessorTempStructureMixin
 from sales_channels.integrations.woocommerce.constants import EAN_CODE_WOOCOMMERCE_FIELD_NAME, \
@@ -91,7 +91,7 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
             local_type = Product.SIMPLE
             is_variation = True
         else:
-            raise NotImplementedError(f"Unknown woocommcerce product type: {ptype}")
+            raise UnsupportedProductTypeError(ptype)
 
         try:
             active = product_data["status"] == "publish" and product_data["catalog_visibility"] == "visible"
@@ -526,7 +526,8 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         }
 
         local_product = None
-        remote_product_instance = WoocommerceProduct.objects.filter(remote_id=variation_id, sales_channel=self.sales_channel, remote_parent_product__remote_id=parent_remote_id).first()
+        remote_product_instance = WoocommerceProduct.objects.filter(
+            remote_id=variation_id, sales_channel=self.sales_channel, remote_parent_product__remote_id=parent_remote_id).first()
         if remote_product_instance:
             local_product = remote_product_instance.local_instance
 
@@ -589,4 +590,8 @@ class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, Sales
         self.update_percentage()
 
         for remote_product in self.product_data:
-            self.process_full_product(remote_product)
+            try:
+                self.process_full_product(remote_product)
+            except UnsupportedProductTypeError as exc:
+                logger.warning(str(exc))
+                continue

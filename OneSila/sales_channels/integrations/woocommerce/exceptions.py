@@ -215,3 +215,12 @@ class NoneValueNotAllowedError(Exception):
     Exception raised when a None value is not allowed.
     """
     pass
+
+
+class UnsupportedProductTypeError(Exception):
+    """Raised when a WooCommerce product type is not supported."""
+
+    def __init__(self, product_type: str):
+        self.product_type = product_type
+        message = f"Unsupported WooCommerce product type: {product_type}"
+        super().__init__(message)
