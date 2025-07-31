@@ -170,7 +170,6 @@ class AmazonProductTestMixin:
         SalesPrice.objects.create(
             product=self.product,
             currency=self.currency,
-            rrp=100,
             price=80,
             multi_tenant_company=self.multi_tenant_company,
         )
@@ -456,6 +455,26 @@ class AmazonProductTestMixin:
             type=Property.TYPES.FLOAT,
         )
 
+        self.gtin_exemption = baker.make(
+            Property,
+            type=Property.TYPES.BOOLEAN,
+            internal_name="supplier_declared_has_product_identifier_exemption",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.gtin_exemption,
+            language=self.multi_tenant_company.language,
+            name="GTIN Exemption",
+        )
+        AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.gtin_exemption,
+            code="supplier_declared_has_product_identifier_exemption",
+            type=Property.TYPES.BOOLEAN,
+        )
+
         for prop in [
             self.color_property,
             self.battery_cell,
@@ -464,6 +483,7 @@ class AmazonProductTestMixin:
             self.batteries_required,
             self.condition_type,
             self.item_weight,
+            self.gtin_exemption,
         ]:
             ProductPropertiesRuleItem.objects.get_or_create(
                 multi_tenant_company=self.multi_tenant_company,
@@ -679,7 +699,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
                     ],
                 }
             ],
-            "list_price": [{"currency": "GBP", "value": 80.0}],
+            "list_price": [{"currency": "GBP", "value_with_tax": 80.0}],
             **expected_images,
             "color": [
                 {
@@ -755,6 +775,65 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             },
             body["patches"]
         )
+
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_update_product_skips_merchant_asin_patch(self, mock_listings, mock_get_images, mock_get_client):
+        """ASIN should never be part of the patch payload."""
+        self.remote_product.created_marketplaces = [self.view.remote_id]
+        self.remote_product.save()
+
+        mock_instance = mock_listings.return_value
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.get_listings_item.return_value = SimpleNamespace(attributes={})
+
+        fac = AmazonProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        paths = [p.get("path") for p in body.get("patches", [])]
+        self.assertNotIn("/attributes/merchant_suggested_asin", paths)
+
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_update_product_skips_external_id_patch(self, mock_listings, mock_get_images, mock_get_client):
+        """External identifiers like EAN should not be patched."""
+        self.remote_product.created_marketplaces = [self.view.remote_id]
+        self.remote_product.ean_code = "1234567890123"
+        self.remote_product.save()
+
+        ProductProperty.objects.filter(
+            product=self.product,
+            property__internal_name="merchant_suggested_asin",
+        ).delete()
+        EanCode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            ean_code="1234567890123",
+        )
+
+        mock_instance = mock_listings.return_value
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.get_listings_item.return_value = SimpleNamespace(attributes={})
+
+        fac = AmazonProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
+        paths = [p.get("path") for p in body.get("patches", [])]
+        self.assertNotIn("/attributes/externally_assigned_product_identifier", paths)
 
     @patch(
         "sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client",
@@ -876,7 +955,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
                     ],
                 }
             ],
-            'list_price': [{'currency': 'GBP', 'value': 80.0}],
+            'list_price': [{'currency': 'GBP', 'value_with_tax': 80.0}],
             **expected_images,
             "color": [
                 {
@@ -930,10 +1009,11 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         )
         fac.run()
 
-        mock_instance.delete_listings_item.assert_called_once()
-        kwargs = mock_instance.delete_listings_item.call_args.kwargs
-        self.assertEqual(kwargs.get("sku"), self.remote_product.remote_sku)
-        self.assertEqual(kwargs.get("marketplace_ids"), [self.view.remote_id])
+        # @TODO: Temporary disable deletes
+        # mock_instance.delete_listings_item.assert_called_once()
+        # kwargs = mock_instance.delete_listings_item.call_args.kwargs
+        # self.assertEqual(kwargs.get("sku"), self.remote_product.remote_sku)
+        # self.assertEqual(kwargs.get("marketplace_ids"), [self.view.remote_id])
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch("sales_channels.integrations.amazon.factories.products.AmazonProductCreateFactory.run")
@@ -1371,6 +1451,66 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         return_value=["https://example.com/img.jpg"],
     )
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_create_product_with_gtin_exemption(self, mock_listings, mock_get_images, mock_get_client):
+        """If GTIN exemption property is true use it instead of EAN."""
+        asin_property = Property.objects.get(
+            internal_name="merchant_suggested_asin",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ProductProperty.objects.filter(
+            product=self.product,
+            property=asin_property,
+        ).delete()
+
+        AmazonProperty.objects.filter(
+            local_instance=asin_property,
+            sales_channel=self.sales_channel,
+        ).delete()
+
+        ProductProperty.objects.create(
+            product=self.product,
+            property=self.gtin_exemption,
+            value_boolean=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        EanCode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            ean_code="1234567890123",
+        )
+
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        body = mock_instance.put_listings_item.call_args.kwargs.get("body")
+        attrs = body.get("attributes", {})
+
+        self.assertEqual(
+            attrs.get("supplier_declared_has_product_identifier_exemption"),
+            [{"value": True}],
+        )
+        self.assertNotIn("externally_assigned_product_identifier", attrs)
+
+    @patch(
+        "sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client",
+        return_value=None,
+    )
+    @patch.object(
+        AmazonMediaProductThroughBase,
+        "_get_images",
+        return_value=["https://example.com/img.jpg"],
+    )
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_existing_remote_property_gets_updated(
         self, mock_listings, mock_get_images, mock_get_client
     ):
@@ -1588,10 +1728,8 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
                 }
             ],
         )
-        self.assertEqual(
-            attrs.get("list_price"),
-            [{"currency": "GBP", "value": 80.0}],
-        )
+
+        self.assertEqual(attrs.get("list_price"),[{"currency": "GBP", "value_with_tax": 80.0}])
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -1617,7 +1755,6 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
 
         self.assertNotIn("purchasable_offer", attrs)
         self.assertNotIn("list_price", attrs)
-        self.assertNotIn("uvp_list_price", attrs)
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -1647,7 +1784,6 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         attrs = body.get("attributes", {})
         self.assertFalse(attrs.get("purchasable_offer"))
         self.assertFalse(attrs.get("list_price"))
-        self.assertFalse(attrs.get("uvp_list_price"))
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
@@ -1670,7 +1806,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
         mock_instance.get_listings_item.return_value = SimpleNamespace(
             attributes={
-                "list_price": [{"currency": "GBP", "value": 89.99}],
+                "list_price": [{"currency": "GBP", "value_with_tax": 89.99}],
                 "purchasable_offer": [
                     {
                         "audience": "ALL",
@@ -1703,7 +1839,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             99.99,
         )
         self.assertEqual(
-            list_price[0]["value"],
+            list_price[0]["value_with_tax"],
             99.99,
         )
 
@@ -1783,7 +1919,6 @@ class AmazonProductCreateRequirementsTest(DisableWooCommerceSignalsMixin, Transa
         ) as mock_listings:
             mock_listings.return_value.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
-
             fac = AmazonProductCreateFactory(
                 sales_channel=self.sales_channel,
                 local_instance=self.product,
@@ -1794,7 +1929,6 @@ class AmazonProductCreateRequirementsTest(DisableWooCommerceSignalsMixin, Transa
             return mock_listings.return_value.put_listings_item.call_args.kwargs.get(
                 "body"
             )
-
 
     def test_listing_owner_uses_listing_requirements(self):
         self.sales_channel.listing_owner = True
@@ -1845,6 +1979,265 @@ class AmazonProductCreateRequirementsTest(DisableWooCommerceSignalsMixin, Transa
 
         body = self._run_factory_and_get_body()
         self.assertEqual(body["requirements"], "LISTING")
+
+
+class AmazonConfigurablePropertySelectionTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonProductTestMixin):
+    """Verify configurable product property detection with remote models."""
+
+    def setUp(self):
+        super().setUp()
+        self.setup_product()
+
+        self.product.type = Product.CONFIGURABLE
+        self.product.save()
+        self.parent = self.product
+
+        self.rule, _ = ProductPropertiesRule.objects.get_or_create(
+            product_type=self.product_type_value,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        AmazonProductType.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.rule,
+            product_type_code="CHAIR",
+        )
+
+        self.color_property, _ = Property.objects.get_or_create(
+            type=Property.TYPES.SELECT,
+            internal_name="color",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.color_property,
+            language=self.multi_tenant_company.language,
+            name="Color",
+        )
+        self.color_red = baker.make(
+            PropertySelectValue,
+            property=self.color_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.color_blue = baker.make(
+            PropertySelectValue,
+            property=self.color_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=self.color_red,
+            language=self.multi_tenant_company.language,
+            value="Red",
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=self.color_blue,
+            language=self.multi_tenant_company.language,
+            value="Blue",
+        )
+
+        self.size_property = baker.make(
+            Property,
+            type=Property.TYPES.SELECT,
+            internal_name="size",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.size_property,
+            language=self.multi_tenant_company.language,
+            name="Size",
+        )
+        self.size_m = baker.make(
+            PropertySelectValue,
+            property=self.size_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.size_l = baker.make(
+            PropertySelectValue,
+            property=self.size_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=self.size_m,
+            language=self.multi_tenant_company.language,
+            value="M",
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=self.size_l,
+            language=self.multi_tenant_company.language,
+            value="L",
+        )
+
+        self.material_property = baker.make(
+            Property,
+            type=Property.TYPES.SELECT,
+            internal_name="material",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.material_property,
+            language=self.multi_tenant_company.language,
+            name="Material",
+        )
+        self.material_textile = baker.make(
+            PropertySelectValue,
+            property=self.material_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.material_plastic = baker.make(
+            PropertySelectValue,
+            property=self.material_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=self.material_textile,
+            language=self.multi_tenant_company.language,
+            value="Textile",
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=self.material_plastic,
+            language=self.multi_tenant_company.language,
+            value="Plastic",
+        )
+
+        self.items_property = baker.make(
+            Property,
+            type=Property.TYPES.INT,
+            internal_name="number_of_items",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=self.items_property,
+            language=self.multi_tenant_company.language,
+            name="Number of items",
+        )
+
+        item_color, _ = ProductPropertiesRuleItem.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=self.rule,
+            property=self.color_property,
+        )
+
+        item_color.type = ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR
+        item_color.save()
+
+        ProductPropertiesRuleItem.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=self.rule,
+            property=self.size_property,
+            type=ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR,
+        )
+        ProductPropertiesRuleItem.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=self.rule,
+            property=self.material_property,
+            type=ProductPropertiesRuleItem.REQUIRED,
+        )
+        ProductPropertiesRuleItem.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=self.rule,
+            property=self.items_property,
+            type=ProductPropertiesRuleItem.OPTIONAL,
+        )
+
+    def create_variation(self, sku, color, size, material, items):
+        variation = baker.make(
+            "products.Product",
+            sku=sku,
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=variation,
+            property=self.product_type_property,
+            value_select=self.product_type_value,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=variation,
+            property=self.color_property,
+            value_select=color,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=variation,
+            property=self.size_property,
+            value_select=size,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=variation,
+            property=self.material_property,
+            value_select=material,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=variation,
+            property=self.items_property,
+            value_int=items,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ConfigurableVariation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            parent=self.parent,
+            variation=variation,
+        )
+        return variation
+
+    def _run_factory(self):
+        fac = AmazonProductSyncFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.parent,
+            view=self.view,
+        )
+        fac.set_rule()
+        fac.set_product_properties()
+        return sorted(pp.property.internal_name for pp in fac.product_properties)
+
+    def test_scenario_one_shared_properties(self):
+        """Scenario 1:
+        - Red / M / Textile / 1
+        - Blue / M / Textile / 2
+
+        -> configurable properties: material, size
+        """
+        self.create_variation("V1", self.color_red, self.size_m, self.material_textile, 1)
+        self.create_variation("V2", self.color_blue, self.size_m, self.material_textile, 2)
+        names = self._run_factory()
+        self.assertEqual(sorted(names), ["material", "size"])
+
+    def test_scenario_two_shared_properties(self):
+        """Scenario 2:
+        - Red / M / Textile / 1
+        - Blue / L /  Plastic / 1
+
+        -> configurable properties: number_of_items
+        """
+        self.create_variation("V1", self.color_red, self.size_m, self.material_textile, 1)
+        self.create_variation("V2", self.color_blue, self.size_l, self.material_plastic, 1)
+        names = self._run_factory()
+        self.assertEqual(sorted(names), ["number_of_items"])
+
+    def test_scenario_three_shared_properties(self):
+        """Scenario 3:
+        - Red / M / Textile / 1
+        - Red / L /  Textile / 1
+
+        -> configurable properties: material, number_of_items
+        """
+        self.create_variation("V1", self.color_red, self.size_m, self.material_textile, 1)
+        self.create_variation("V2", self.color_red, self.size_l, self.material_textile, 1)
+        names = self._run_factory()
+        self.assertEqual(sorted(names), ["material", "number_of_items"])
 
 
 class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonProductTestMixin):

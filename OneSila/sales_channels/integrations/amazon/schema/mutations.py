@@ -15,6 +15,7 @@ from sales_channels.integrations.amazon.schema.types.input import (
     AmazonSalesChannelImportInput,
     AmazonSalesChannelImportPartialInput,
     AmazonDefaultUnitConfiguratorPartialInput,
+    AmazonSalesChannelViewPartialInput,
     AmazonValidateAuthInput,
     BulkAmazonPropertySelectValueLocalInstanceInput,
 )
@@ -27,6 +28,7 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonRedirectUrlType,
     AmazonSalesChannelImportType,
     AmazonDefaultUnitConfiguratorType,
+    AmazonSalesChannelViewType,
     SuggestedAmazonProductType, SuggestedAmazonProductTypeEntry,
 )
 from sales_channels.schema.types.input import (
@@ -94,6 +96,8 @@ class AmazonSalesChannelMutation:
     update_amazon_product_type_item: AmazonProductTypeItemType = update(AmazonProductTypeItemPartialInput)
 
     update_amazon_default_unit_configurator: AmazonDefaultUnitConfiguratorType = update(AmazonDefaultUnitConfiguratorPartialInput)
+
+    update_amazon_sales_channel_view: AmazonSalesChannelViewType = update(AmazonSalesChannelViewPartialInput)
 
     create_amazon_import_process: AmazonSalesChannelImportType = create(AmazonSalesChannelImportInput)
     update_amazon_import_process: AmazonSalesChannelImportType = update(AmazonSalesChannelImportPartialInput)

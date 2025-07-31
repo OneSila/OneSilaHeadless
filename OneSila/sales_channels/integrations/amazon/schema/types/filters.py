@@ -27,6 +27,7 @@ from sales_channels.schema.types.filters import (
     SalesChannelViewFilter,
     RemoteProductFilter,
 )
+from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 
 
 @filter(AmazonSalesChannel)
@@ -34,6 +35,13 @@ class AmazonSalesChannelFilter(SearchFilterMixin):
     id: auto
     active: auto
     hostname: auto
+
+
+@filter(AmazonSalesChannelView)
+class AmazonSalesChannelViewFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    is_default: auto
 
 
 @filter(AmazonProperty)

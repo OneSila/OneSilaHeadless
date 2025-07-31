@@ -1,5 +1,7 @@
 import pprint
 from decimal import Decimal
+import logging
+import traceback
 
 from django.db import IntegrityError
 
@@ -32,8 +34,12 @@ from sales_channels.integrations.amazon.models import (
 from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
 from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
 from sales_channels.models import SalesChannelViewAssign
+from core.helpers import ensure_serializable
 from dateutil.parser import parse
 import datetime
+
+
+logger = logging.getLogger(__name__)
 
 
 class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
@@ -53,6 +59,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         # stored in sets to avoid duplicates when the same parent SKU
         # appears across multiple marketplaces.
         self._configurable_map: dict[str, set[str]] = {}
+        self.broken_records: list[dict] = []
 
     # ------------------------------------------------------------------
     # Helpers
@@ -67,6 +74,9 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         self.sales_channel.is_importing = False
         self.sales_channel.save(update_fields=["active", "is_importing"])
         self._create_configurable_variations()
+        if self.broken_records:
+            self.import_process.broken_records = self.broken_records
+            self.import_process.save(update_fields=["broken_records"])
 
     def _create_configurable_variations(self):
         """Create ConfigurableVariation links after all products are imported."""
@@ -186,6 +196,15 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                         continue
 
                     value = extract_amazon_attribute_value({code: values[0]}, real_code)
+                    if value is None:
+                        logger.error(
+                            "Could not extract value for attribute '%s' (real code '%s') with entry %s",
+                            code,
+                            real_code,
+                            values[0],
+                        )
+                        continue
+
                     if remote_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
                         select_value = AmazonPropertySelectValue.objects.filter(
                             amazon_property=remote_property,
@@ -568,14 +587,37 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         issues = structured_data.get("__issues") or []
         assign.issues = [
-            issue.to_dict() if hasattr(issue, "to_dict") else issue.__dict__
+            ensure_serializable(
+                issue.to_dict() if hasattr(issue, "to_dict") else issue.__dict__
+            )
             for issue in issues
         ]
         assign.save()
 
     def import_products_process(self):
         for product in self.get_products_data():
-            is_variation, parent_skus = get_is_product_variation(product)
+            product_instance = None
+            remote_product = AmazonProduct.objects.filter(
+                remote_sku=product.sku,
+                sales_channel=self.sales_channel,
+                multi_tenant_company=self.import_process.multi_tenant_company
+            ).first()
+
+            if remote_product:
+                product_instance = remote_product.local_instance
+                is_variation = remote_product.is_variation
+
+                if is_variation:
+                    parent_skus = list(
+                        AmazonProduct.objects
+                        .filter(remote_parent_product=remote_product.remote_parent_product)
+                        .values_list("remote_sku", flat=True)
+                    )
+                else:
+                    parent_skus = []
+            else:
+                is_variation, parent_skus = get_is_product_variation(product)
+
             rule = self.get_product_rule(product)
             structured, language, view = self.get__product_data(product)
 
@@ -589,16 +631,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                         children = self._configurable_map.setdefault(parent_sku, set())
                         children.add(structured["sku"])
                         structured["configurable_parent_sku"] = parent_sku
-
-            product_instance = None
-            remote_product = AmazonProduct.objects.filter(
-                asin=structured["sku"],
-                sales_channel=self.sales_channel,
-                multi_tenant_company=self.import_process.multi_tenant_company
-            ).first()
-
-            if remote_product:
-                product_instance = remote_product.local_instance
 
             instance = ImportProductInstance(
                 structured,
@@ -620,7 +652,24 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 },
             )
             instance.language = language
-            instance.process()
+
+            try:
+                instance.process()
+            except Exception as e:
+                record = {
+                    "data": structured,
+                    "error": str(e),
+                    "traceback": traceback.format_exc(),
+                    "context": {
+                        "sku": structured.get("sku"),
+                        "asin": structured.get("__asin"),
+                        "region": getattr(view, "api_region_code", None),
+                        "is_variation": is_variation,
+                    },
+                }
+                self.broken_records.append(record)
+                continue
+
 
             self.update_remote_product(instance, product, view, is_variation)
             self.handle_ean_code(instance)

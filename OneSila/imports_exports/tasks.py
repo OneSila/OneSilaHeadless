@@ -9,7 +9,7 @@ def imports_exports__run_periodic_mapped_imports():
     """
     Periodically run all MappedImports that are due and marked as periodic.
     """
-    to_run = MappedImport.objects.filter(is_periodic=True)
+    to_run = MappedImport.objects.filter(is_periodic=True).exclude(status=MappedImport.STATUS_PROCESSING)
 
     for imp in to_run:
         if imp.should_run():
