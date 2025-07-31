@@ -1,5 +1,5 @@
 from sales_channels.factories.mixins import PullRemoteInstanceMixin
-from sales_channels.integrations.ebay.mixins import GetEbayAPIMixin
+from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
 from sales_channels.integrations.ebay.models import EbaySalesChannelView
 
 

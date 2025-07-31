@@ -5,7 +5,7 @@ from __future__ import annotations
 import requests
 from ebay_rest.reference import Reference
 
-from .models.sales_channels import EbaySalesChannel
+from sales_channels.integrations.ebay.models.sales_channels import EbaySalesChannel
 
 
 class GetEbayAPIMixin:

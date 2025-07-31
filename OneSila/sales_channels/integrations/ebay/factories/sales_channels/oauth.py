@@ -48,8 +48,6 @@ class ValidateEbayAuthFactory:
             ru_name=getattr(settings, "EBAY_RU_NAME", None),
         )
 
-        print('--------------------------------------------------- 1')
-
         try:
             token_obj = oauth.exchange_code_for_access_token(self.code)
             if hasattr(token_obj, "error") and token_obj.error:
