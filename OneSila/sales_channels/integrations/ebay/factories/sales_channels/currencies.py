@@ -14,7 +14,10 @@ class EbayRemoteCurrencyPullFactory(GetEbayAPIMixin, LocalCurrencyMappingMixin, 
         'remote_code': 'code',
     }
     update_field_mapping = field_mapping
-    get_or_create_fields = ['remote_code', 'sales_channel_view']
+    # Only create a single currency per code. Previously the ``sales_channel_view``
+    # was included which resulted in the same currency (e.g. EUR) being created
+    # multiple times when it was present on different marketplaces.
+    get_or_create_fields = ['remote_code']
 
     allow_create = True
     allow_update = True
@@ -51,6 +54,7 @@ class EbayRemoteCurrencyPullFactory(GetEbayAPIMixin, LocalCurrencyMappingMixin, 
         self.add_local_currency()
 
     def update_get_or_create_lookup(self, lookup, remote_data):
+        """Attach the marketplace view but don't use it for lookups."""
         view = EbaySalesChannelView.objects.filter(
             remote_id=remote_data['view_remote_id'],
             sales_channel=self.sales_channel,
