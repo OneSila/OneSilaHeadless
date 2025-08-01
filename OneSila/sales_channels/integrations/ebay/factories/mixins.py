@@ -71,24 +71,8 @@ class GetEbayAPIMixin:
 
     def get_marketplace_ids(self) -> list[str]:
         """Return all available marketplace IDs."""
-        # ``ebay_rest`` does not expose an endpoint that returns the list of
-        # marketplaces an account has access to.  For the pull factories we only
-        # need the list of known marketplace identifiers, which can be obtained
-        # from the ``Reference`` helper shipped with the library.
-
         reference = self.marketplace_reference()
         return list(reference.keys())
-        # client = self.get_api_client()
-        #
-        # response = client.call_api(
-        #     resource_path="/sell/account/v1/subscription",
-        #     method="GET",
-        #     auth_settings=["api_auth"],
-        #     header_params={"Content-Type": "application/json"},
-        #     response_type="dict",
-        # )
-        #
-        # return [s["marketplaceId"] for s in response[0].get("subscriptions", [])]
 
     def get_default_marketplace_id(self) -> str | None:
         resp = self.api.commerce_identity_get_user()

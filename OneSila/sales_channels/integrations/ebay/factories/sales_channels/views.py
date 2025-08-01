@@ -24,13 +24,22 @@ class EbaySalesChannelViewPullFactory(GetEbayAPIMixin, PullRemoteInstanceMixin):
     def fetch_remote_instances(self):
         self.remote_instances = []
         marketplaces = self.get_marketplace_ids()
-        default_marketplace = self.get_default_marketplace_id()
+        try:
+            default_marketplace = self.get_default_marketplace_id()
+        except:
+            # for this api sometimes we get
+            # There was a problem with an eBay internal system or process. Contact eBay developer support for assistance
+            # and this can manually be set so we can ignore it for now
+            default_marketplace = None
+
         reference = self.marketplace_reference()
 
         for marketplace_id in marketplaces:
             info = reference.get(marketplace_id)
+
             if not info:
                 continue
+
             name = info[0]
             languages = info[1]
             url = next(iter(languages.values()))[0] if languages else ""
