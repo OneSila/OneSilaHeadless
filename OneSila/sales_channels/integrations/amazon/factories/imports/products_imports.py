@@ -564,12 +564,15 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 amazon_theme=theme,
             )
         else:
-            RemoteProductConfigurator.objects.create_from_remote_product(
-                remote_product=remote_product,
-                rule=import_instance.rule,
-                variations=None,
-                amazon_theme=theme,
-            )
+            try:
+                RemoteProductConfigurator.objects.create_from_remote_product(
+                    remote_product=remote_product,
+                    rule=import_instance.rule,
+                    variations=None,
+                    amazon_theme=theme,
+                )
+            except ValueError:
+                pass
 
     def handle_sales_channels_views(self, import_instance: ImportProductInstance, structured_data, view):
         if not view:
