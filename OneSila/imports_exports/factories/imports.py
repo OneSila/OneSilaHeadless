@@ -320,23 +320,42 @@ class AsyncProductImportMixin(ImportMixin):
 
     async_task = None  # db_task that processes a single record
 
-    def dispatch_task(self, data, is_last=False):
+    def dispatch_task(self, data, is_last=False, updated_with=None):
         if not self.async_task:
             raise ValueError("async_task is not defined")
 
         from core.helpers import safe_run_task
-        safe_run_task(self.async_task, self.import_process.id, self.sales_channel.id, data, is_last)
+        safe_run_task(
+            self.async_task,
+            self.import_process.id,
+            self.sales_channel.id,
+            data,
+            is_last,
+            updated_with,
+        )
 
     def run(self):
         self.prepare_import_process()
         self.strat_process()
 
         items = list(self.get_products_data()) if self.import_products else []
-        self.import_process.total_records = self.get_total_instances() if self.import_products else 0
+        self.import_process.total_records = (
+            self.get_total_instances() if self.import_products else 0
+        )
         self.import_process.processed_records = 0
         self.import_process.percentage = 0
         self.import_process.save(update_fields=["total_records", "processed_records", "percentage", "status"])
 
+        self.set_threshold_chunk()
+
         for idx, item in enumerate(items, start=1):
             serialized = ensure_serializable(item)
-            self.dispatch_task(serialized, is_last=idx == len(items))
+            update_delta = None
+            if idx % self._threshold_chunk == 0:
+                update_delta = self._threshold_chunk
+            if idx == len(items) and idx % self._threshold_chunk != 0:
+                update_delta = idx % self._threshold_chunk
+
+            self.dispatch_task(
+                serialized, is_last=idx == len(items), updated_with=update_delta
+            )

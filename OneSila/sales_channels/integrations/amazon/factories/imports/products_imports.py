@@ -742,10 +742,19 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 class AmazonProductItemFactory(AmazonProductsImportProcessor):
     """Process a single product in an async task."""
 
-    def __init__(self, product_data, import_process, sales_channel, is_last=False, language=None):
+    def __init__(
+        self,
+        product_data,
+        import_process,
+        sales_channel,
+        is_last=False,
+        updated_with=None,
+        language=None,
+    ):
         super().__init__(import_process=import_process, sales_channel=sales_channel, language=language)
         self.product_data = product_data
         self.is_last = is_last
+        self.updated_with = updated_with
 
     def run(self):
         try:
@@ -758,7 +767,8 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
                 exc=exc,
             )
 
-        increment_processed_records(self.import_process.id)
+        if self.updated_with:
+            increment_processed_records(self.import_process.id, delta=self.updated_with)
         if self.is_last:
             self.mark_success()
             self.process_completed()
