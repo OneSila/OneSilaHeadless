@@ -348,7 +348,7 @@ class AsyncProductImportMixin(ImportMixin):
         self.total_import_instances_cnt = self.import_process.total_records
         self.set_threshold_chunk()
 
-        item = None
+        serialized = None
         idx = 0
 
         for idx, item in enumerate(self.get_products_data(), start=1):
@@ -360,11 +360,10 @@ class AsyncProductImportMixin(ImportMixin):
             serialized = serialize_listing_item(item)
             self.dispatch_task(serialized, is_last=False, updated_with=update_delta)
 
-        if item:
+        if serialized:
             # we will import the last instance twice but we will make it work with both generators and list using
             # self.get_products_data() without needing to adapt the api wrapper to get which one is last
             # and relying it on self.get_total_instances() is dangerous (ex a product is deleted or created while
             # processing when we use generator and this doesn't match anymore)
             update_delta = idx % self._threshold_chunk if idx % self._threshold_chunk != 0 else None
-            serialized = serialize_listing_item(item)
             self.dispatch_task(serialized, is_last=True, updated_with=update_delta)
