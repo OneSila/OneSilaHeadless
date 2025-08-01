@@ -24,7 +24,7 @@ class EbayPropertyFilter(SearchFilterMixin):
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
     allow_multiple: auto
-    type: auto
+    # type: auto
 
 
 @filter(EbayPropertySelectValue)
