@@ -60,6 +60,15 @@ class Import(PolymorphicModel, models.Model):
         help_text="JSON array storing details of records that failed during import."
     )
 
+    total_records = models.PositiveIntegerField(
+        default=0,
+        help_text="Total number of items that this import will process.",
+    )
+    processed_records = models.PositiveIntegerField(
+        default=0,
+        help_text="How many items have been processed so far in async imports.",
+    )
+
     def get_cleaned_errors_from_broken_records(self):
         import re
         from django.core.exceptions import ObjectDoesNotExist
