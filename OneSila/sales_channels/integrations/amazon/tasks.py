@@ -10,12 +10,15 @@ def amazon_import_db_task(import_process, sales_channel):
     from sales_channels.integrations.amazon.factories.imports.schema_imports import AmazonSchemaImportProcessor
     from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonProductsImportProcessor
     from sales_channels.integrations.amazon.models import AmazonSalesChannelImport
+    from sales_channels.integrations.amazon.factories.imports.products_imports import  AmazonProductsAsyncImportProcessor
 
     if import_process.type == AmazonSalesChannelImport.TYPE_SCHEMA:
         fac = AmazonSchemaImportProcessor(import_process=import_process, sales_channel=sales_channel)
         fac.run()
     elif import_process.type == AmazonSalesChannelImport.TYPE_PRODUCTS:
-        fac = AmazonProductsImportProcessor(import_process=import_process, sales_channel=sales_channel)
+
+        AmazonProductsAsyncImportProcessor.async_task = amazon_product_import_item_task
+        fac = AmazonProductsAsyncImportProcessor(import_process=import_process, sales_channel=sales_channel)
         fac.run()
 
 
@@ -38,23 +41,6 @@ def amazon_product_import_item_task(
         updated_with=updated_with,
     )
     fac.run()
-
-
-@remote_task(priority=LOW_PRIORITY)
-@db_task()
-def amazon_async_import_db_task(import_process_id, sales_channel_id):
-    from sales_channels.integrations.amazon.factories.imports.products_imports import (
-        AmazonProductsAsyncImportProcessor,
-    )
-    from imports_exports.models import Import
-    from sales_channels.integrations.amazon.models import AmazonSalesChannel
-
-    process = Import.objects.get(id=import_process_id)
-    channel = AmazonSalesChannel.objects.get(id=sales_channel_id)
-    AmazonProductsAsyncImportProcessor.async_task = amazon_product_import_item_task
-    fac = AmazonProductsAsyncImportProcessor(import_process=process, sales_channel=channel)
-    fac.run()
-
 
 @run_task_after_commit
 @db_task()

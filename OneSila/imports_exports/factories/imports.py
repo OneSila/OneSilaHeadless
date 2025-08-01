@@ -7,6 +7,8 @@ from notifications.factories.email import SendImportReportEmailFactory
 import traceback
 import math
 from core.decorators import timeit_and_log
+from core.helpers import safe_run_task
+
 from core.helpers import ensure_serializable
 
 import logging
@@ -324,7 +326,6 @@ class AsyncProductImportMixin(ImportMixin):
         if not self.async_task:
             raise ValueError("async_task is not defined")
 
-        from core.helpers import safe_run_task
         safe_run_task(
             self.async_task,
             self.import_process.id,

@@ -98,7 +98,9 @@ def sales_channels__amazon_product_type__imported_rule(sender, instance, **kwarg
 
 @receiver(import_success, sender='amazon.AmazonSalesChannelImport')
 def sales_channels__amazon_import_completed(sender, instance, **kwargs):
+
     if instance.type != instance.TYPE_PRODUCTS:
         return
+
     factory = AmazonConfigurableVariationsFactory(import_process=instance)
     factory.run()
