@@ -3,6 +3,7 @@
 import logging
 
 from products.product_types import CONFIGURABLE, SIMPLE
+from core.helpers import ensure_serializable
 
 
 logger = logging.getLogger(__name__)
@@ -97,3 +98,12 @@ def get_is_product_variation(data):
         return True, parent_skus
     else:
         return False, []
+
+
+def serialize_listing_item(item):
+    """Return a serializable dictionary representation of an SP-API listing item."""
+    if hasattr(item, "to_dict"):
+        return item.to_dict()
+    if hasattr(item, "__dict__"):
+        return ensure_serializable(item.__dict__)
+    return ensure_serializable(item)

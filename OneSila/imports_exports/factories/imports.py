@@ -10,6 +10,7 @@ from core.decorators import timeit_and_log
 from core.helpers import safe_run_task
 
 from core.helpers import ensure_serializable
+from sales_channels.integrations.amazon.helpers import serialize_listing_item
 
 import logging
 logger = logging.getLogger(__name__)
@@ -29,7 +30,7 @@ class ImportMixin:
         self.total_imported_instances = 0
         self.current_percent = 0
         self._threshold_chunk = 1
-        self._broken_records =[]
+        self._broken_records = []
 
     def calculate_percentage(self):
         self.total_import_instances_cnt = self.get_total_instances()
@@ -160,7 +161,7 @@ class ImportMixin:
     def update_product_import_instance(self, instance): pass
 
     @handle_import_exception
-    def generic_single_process(self, step_name, data, struct_method, final_data_method,import_cls, log_method, extra_params=None, add_data_to_log_method=False):
+    def generic_single_process(self, step_name, data, struct_method, final_data_method, import_cls, log_method, extra_params=None, add_data_to_log_method=False):
         # Prepare log and final data
         log_instance = struct_method(data)
         final_data = final_data_method(log_instance)
@@ -246,7 +247,7 @@ class ImportMixin:
 
     def process_completed(self):
         pass
-    
+
     def set_broken_records(self):
 
         if len(self._broken_records) > 0:
@@ -310,7 +311,7 @@ class ImportMixin:
 
         finally:
             self.process_completed()
-            
+
             if self.import_process.skip_broken_records:
                 self.set_broken_records()
 
@@ -356,7 +357,8 @@ class AsyncProductImportMixin(ImportMixin):
             if idx % self._threshold_chunk == 0:
                 update_delta = self._threshold_chunk
 
-            self.dispatch_task(item, is_last=False, updated_with=update_delta)
+            serialized = serialize_listing_item(item)
+            self.dispatch_task(serialized, is_last=False, updated_with=update_delta)
 
         if item:
             # we will import the last instance twice but we will make it work with both generators and list using
@@ -364,4 +366,5 @@ class AsyncProductImportMixin(ImportMixin):
             # and relying it on self.get_total_instances() is dangerous (ex a product is deleted or created while
             # processing when we use generator and this doesn't match anymore)
             update_delta = idx % self._threshold_chunk if idx % self._threshold_chunk != 0 else None
-            self.dispatch_task(item, is_last=True, updated_with=update_delta)
+            serialized = serialize_listing_item(item)
+            self.dispatch_task(serialized, is_last=True, updated_with=update_delta)
