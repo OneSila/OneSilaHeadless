@@ -27,7 +27,13 @@ class EbayRemoteCurrencyPullFactory(GetEbayAPIMixin, LocalCurrencyMappingMixin, 
         reference = self.marketplace_reference()
 
         for marketplace_id in marketplaces:
-            currency = self.get_marketplace_currency(marketplace_id)
+            resp = self.get_marketplace_currencies(marketplace_id)
+            currency = None
+            if resp:
+                if hasattr(resp, "to_dict"):
+                    resp = resp.to_dict()
+                if isinstance(resp, dict):
+                    currency = resp.get("default_currency", {}).get("code")
             if not currency:
                 continue
             info = reference.get(marketplace_id)
