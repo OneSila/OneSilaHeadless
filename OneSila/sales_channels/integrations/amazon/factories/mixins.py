@@ -159,25 +159,50 @@ class GetAmazonAPIMixin:
         return getattr(payload, "attributes", {}) or {}
 
     @throttle_safe(max_retries=5, base_delay=1)
-    def _fetch_listing_items_page(self, listings_api, seller_id, marketplace_id, page_token=None, included_data=None, issue_locale=None):
+    def _fetch_listing_items_page(
+            self,
+            listings_api,
+            seller_id,
+            marketplace_id,
+            page_token=None,
+            included_data=None,
+            issue_locale=None,
+            sort_by=None,
+            sort_order=None,
+            created_after=None,
+            created_before=None,
+    ):
         kwargs = {
             "seller_id": seller_id,
             "marketplace_ids": [marketplace_id],
             "page_size": 20,
             "included_data": included_data or ["summaries"],
-            "issue_locale": issue_locale
+            "issue_locale": issue_locale,
         }
+
         if page_token:
             kwargs["page_token"] = page_token
 
+        if sort_by:
+            kwargs["sort_by"] = sort_by
+        if sort_order:
+            kwargs["sort_order"] = sort_order
+        if created_after:
+            kwargs["created_after"] = created_after
+        if created_before:
+            kwargs["created_before"] = created_before
+
         response = listings_api.search_listings_items(**kwargs)
+
         items = response.items or []
         next_token = (
             response.pagination.next_token
             if response.pagination and hasattr(response.pagination, "next_token")
             else None
         )
-        return items, next_token
+        results_number = getattr(response, "number_of_results", None)
+
+        return items, next_token, results_number
 
     def get_product_types(self):
         # @TODO: DON'T FORGET TO REMOVE THAT
@@ -233,6 +258,54 @@ class GetAmazonAPIMixin:
 
         return sorted(product_types)
 
+    def get_all_products_by_marketplace(self, marketplace_id: str, listings_api, seller_id, issue_locale):
+        created_after = None
+        while True:
+            page_token = None
+            last_created_date = None
+            total_results = 0
+
+            print(f"[START CYCLE] created_after={created_after}")
+
+            while True:
+                items, page_token, results_number = self._fetch_listing_items_page(
+                    listings_api,
+                    seller_id,
+                    marketplace_id,
+                    page_token=page_token,
+                    included_data=["summaries", "attributes", "issues", "offers", "relationships"],
+                    issue_locale=issue_locale,
+                    sort_by="createdDate",
+                    sort_order="ASC",
+                    created_after=created_after
+                )
+
+                total_results = results_number or 0
+
+                for item in items:
+                    summaries = getattr(item, "summaries", None)
+                    if summaries:
+                        summary = summaries[0]
+                        created = getattr(summary, "created_date", None)
+                        if created:
+                            last_created_date = created
+
+                    yield item
+
+                if not page_token:
+                    break
+
+            print(f"[END CYCLE] results_number={total_results} | last_created_date={last_created_date}")
+
+            # amazon items results is limited at 1000
+            if total_results < 1000:
+                break
+
+            if not last_created_date:
+                break
+
+            created_after = last_created_date
+
     def get_all_products(self):
         listings_api = ListingsApi(self._get_client())
         seller_id = self.sales_channel.remote_id
@@ -241,31 +314,39 @@ class GetAmazonAPIMixin:
         ).order_by("-is_default")
         marketplace_ids = list(views.values_list("remote_id", flat=True))
         issue_locale = self._get_issue_locale()
-        import pprint
 
         for marketplace_id in marketplace_ids:
-            page_token = None
-            while True:
-                items, page_token = self._fetch_listing_items_page(
-                    listings_api,
-                    seller_id,
-                    marketplace_id,
-                    page_token,
-                    included_data=["summaries", "attributes", "issues", "offers", "relationships"],
-                    issue_locale=issue_locale
-                )
+            yield from self.get_all_products_by_marketplace(
+                marketplace_id,
+                listings_api,
+                seller_id,
+                issue_locale
+            )
 
-                if hasattr(self, "total_import_instances_cnt"):
-                    self.total_import_instances_cnt += len(items)
-                    if hasattr(self, "set_threshold_chunk"):
-                        self.set_threshold_chunk()
+    def get_total_number_of_products(self) -> int:
+        listings_api = ListingsApi(self._get_client())
+        seller_id = self.sales_channel.remote_id
+        views = AmazonSalesChannelView.objects.filter(
+            sales_channel=self.sales_channel
+        ).order_by("-is_default")
+        marketplace_ids = list(views.values_list("remote_id", flat=True))
+        issue_locale = self._get_issue_locale()
 
-                for item in items:
-                    pprint.pprint(item.to_dict())
-                    yield item
+        total = 0
+        for marketplace_id in marketplace_ids:
+            items, _, results_number = self._fetch_listing_items_page(
+                listings_api,
+                seller_id,
+                marketplace_id,
+                page_token=None,
+                included_data=["summaries"],
+                issue_locale=issue_locale,
+                sort_by="createdDate",
+                sort_order="ASC"
+            )
+            total += results_number or 0
 
-                if not page_token:
-                    break
+        return total
 
     def _get_issue_locale(self):
         from sales_channels.integrations.amazon.models import AmazonRemoteLanguage
