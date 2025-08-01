@@ -749,15 +749,17 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
         is_last=False,
         updated_with=None,
         language=None,
+        client=None,
     ):
         super().__init__(import_process=import_process, sales_channel=sales_channel, language=language)
         self.product_data = product_data
         self.is_last = is_last
         self.updated_with = updated_with
+        self.client = client
 
     def run(self):
         try:
-            client = self._get_client()
+            client = self.client or self._get_client()
             deser = getattr(client, "_ApiClient__deserialize")
             product = deser(self.product_data, "ListingsItemSubmissionResponse")
             self.process_product_item(product)
@@ -808,3 +810,27 @@ class AmazonProductsAsyncImportProcessor(AsyncProductImportMixin, AmazonProducts
     """Async variant of the Amazon product importer."""
 
     async_task = None
+
+    def __init__(self, *args, client=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if client is not None:
+            self.client = client
+        else:
+            try:
+                self.client = self._get_client()
+            except Exception:
+                self.client = None
+
+    def dispatch_task(self, data, is_last=False, updated_with=None):
+        if not self.async_task:
+            raise ValueError("async_task is not defined")
+
+        safe_run_task(
+            self.async_task,
+            self.import_process.id,
+            self.sales_channel.id,
+            product_data=data,
+            is_last=is_last,
+            updated_with=updated_with,
+            client=self.client,
+        )
