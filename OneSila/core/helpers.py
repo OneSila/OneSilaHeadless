@@ -1,3 +1,4 @@
+import decimal
 import json
 
 from django.conf import settings
@@ -151,7 +152,11 @@ def ensure_serializable(value):
     if hasattr(value, "__dict__"):
         return ensure_serializable(vars(value))
 
-    # 5) Fallback (primitives, etc.)
+    # 5) If Decimal convert to float
+    if isinstance(value, decimal.Decimal):
+        return float(value)
+
+    # 6) Fallback (primitives, etc.)
     return value
 
 

@@ -578,12 +578,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             ) from e
 
         issues = structured_data.get("__issues") or []
-        assign.issues = [
-            ensure_serializable(
-                issue.to_dict() if hasattr(issue, "to_dict") else issue.__dict__
-            )
-            for issue in issues
-        ]
+        assign.issues = issues
         assign.save()
 
     def process_product_item(self, product):
@@ -803,13 +798,8 @@ class AmazonConfigurableVariationsFactory:
 
 class AmazonProductsAsyncImportProcessor(AsyncProductImportMixin, AmazonProductsImportProcessor):
     """Async variant of the Amazon product importer."""
-    from sales_channels.integrations.amazon.tasks import amazon_product_import_item_task
-
-    async_task = amazon_product_import_item_task
 
     def dispatch_task(self, data, is_last=False, updated_with=None):
-        if not self.async_task:
-            raise ValueError("async_task is not defined")
         from sales_channels.integrations.amazon.tasks import amazon_product_import_item_task
 
         task_kwargs = {
@@ -821,6 +811,3 @@ class AmazonProductsAsyncImportProcessor(AsyncProductImportMixin, AmazonProducts
         }
 
         amazon_product_import_item_task(**task_kwargs)
-        # transaction.on_commit(
-        #     lambda: amazon_product_import_item_task(**task_kwargs)
-        # )
