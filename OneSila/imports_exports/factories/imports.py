@@ -7,6 +7,7 @@ from notifications.factories.email import SendImportReportEmailFactory
 import traceback
 import math
 from core.decorators import timeit_and_log
+from core.helpers import ensure_serializable
 
 import logging
 logger = logging.getLogger(__name__)
@@ -57,6 +58,9 @@ class ImportMixin:
         self.import_process.status = Import.STATUS_SUCCESS
         self.import_process.percentage = 100
         self.import_process.save()
+
+        from imports_exports.signals import import_success
+        import_success.send(sender=self.import_process.__class__, instance=self.import_process)
 
         self.on_success()
 
@@ -309,3 +313,29 @@ class ImportMixin:
                 self.set_broken_records()
 
             self.send_reports()
+
+
+class AsyncProductImportMixin(ImportMixin):
+    """Variant of ImportMixin that dispatches each product to an async task."""
+
+    async_task = None  # db_task that processes a single record
+
+    def dispatch_task(self, data, is_last=False):
+        if not self.async_task:
+            raise ValueError("async_task is not defined")
+        from core.helpers import safe_run_task
+        safe_run_task(self.async_task, self.import_process.id, self.sales_channel.id, data, is_last)
+
+    def run(self):
+        self.prepare_import_process()
+        self.strat_process()
+
+        items = list(self.get_products_data()) if self.import_products else []
+        self.import_process.total_records = self.get_total_instances() if self.import_products else 0
+        self.import_process.processed_records = 0
+        self.import_process.percentage = 0
+        self.import_process.save(update_fields=["total_records", "processed_records", "percentage", "status"])
+
+        for idx, item in enumerate(items, start=1):
+            serialized = ensure_serializable(item)
+            self.dispatch_task(serialized, is_last=idx == len(items))

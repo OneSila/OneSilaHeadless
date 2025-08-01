@@ -19,6 +19,35 @@ def amazon_import_db_task(import_process, sales_channel):
         fac.run()
 
 
+@remote_task(priority=LOW_PRIORITY)
+@db_task()
+def amazon_product_import_item_task(import_process_id, sales_channel_id, product_data, is_last=False):
+    from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonProductItemFactory
+    from imports_exports.models import Import
+    from sales_channels.integrations.amazon.models import AmazonSalesChannel
+
+    process = Import.objects.get(id=import_process_id)
+    channel = AmazonSalesChannel.objects.get(id=sales_channel_id)
+    fac = AmazonProductItemFactory(product_data=product_data, import_process=process, sales_channel=channel, is_last=is_last)
+    fac.run()
+
+
+@remote_task(priority=LOW_PRIORITY)
+@db_task()
+def amazon_async_import_db_task(import_process_id, sales_channel_id):
+    from sales_channels.integrations.amazon.factories.imports.products_imports import (
+        AmazonProductsAsyncImportProcessor,
+    )
+    from imports_exports.models import Import
+    from sales_channels.integrations.amazon.models import AmazonSalesChannel
+
+    process = Import.objects.get(id=import_process_id)
+    channel = AmazonSalesChannel.objects.get(id=sales_channel_id)
+    AmazonProductsAsyncImportProcessor.async_task = amazon_product_import_item_task
+    fac = AmazonProductsAsyncImportProcessor(import_process=process, sales_channel=channel)
+    fac.run()
+
+
 @run_task_after_commit
 @db_task()
 def create_amazon_product_type_rule_task(product_type_code: str, sales_channel_id: int):
