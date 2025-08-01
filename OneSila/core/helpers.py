@@ -134,14 +134,26 @@ def is_json_serializable(value):
 
 
 def ensure_serializable(value):
-    """Recursively converts common non-serializable objects to JSON-friendly types."""
+    """Recursively convert objects to JSON‐friendly types."""
+    # 1) Dates → ISO strings
     if isinstance(value, (datetime.datetime, datetime.date)):
         return value.isoformat()
+
+    # 2) Dict → recurse
     if isinstance(value, dict):
         return {k: ensure_serializable(v) for k, v in value.items()}
+
+    # 3) Sequence → recurse
     if isinstance(value, (list, tuple, set)):
         return [ensure_serializable(v) for v in value]
+
+    # 4) Any object with __dict__ → treat as its own dict
+    if hasattr(value, "__dict__"):
+        return ensure_serializable(vars(value))
+
+    # 5) Fallback (primitives, etc.)
     return value
+
 
 
 def safe_run_task(task_func, *args, **kwargs):
