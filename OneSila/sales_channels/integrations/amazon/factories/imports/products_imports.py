@@ -732,7 +732,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         if not is_variation:
             self.handle_sales_channels_views(instance, structured, view)
 
-
     def import_products_process(self):
         for product in self.get_products_data():
             self.process_product_item(product)
@@ -758,7 +757,10 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
 
     def run(self):
         try:
-            self.process_product_item(self.product_data)
+            client = self._get_client()
+            deser = getattr(client, "_ApiClient__deserialize")
+            product = deser(self.product_data, "ListingsItemSubmissionResponse")
+            self.process_product_item(product)
         except Exception as exc:  # capture unexpected errors
             self._add_broken_record(
                 code="UNKNOWN_ERROR",
@@ -800,6 +802,7 @@ class AmazonConfigurableVariationsFactory:
                     variation=child,
                     multi_tenant_company=mtc,
                 )
+
 
 class AmazonProductsAsyncImportProcessor(AsyncProductImportMixin, AmazonProductsImportProcessor):
     """Async variant of the Amazon product importer."""
