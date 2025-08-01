@@ -50,6 +50,23 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     import_rules = False
     import_products = True
 
+    ERROR_MULTIPLE_ASIN = "MULTIPLE_ASIN"
+    ERROR_MISSING_DATA = "MISSING_DATA"
+    ERROR_NO_MAPPED_PRODUCT_TYPE = "NO_MAPPED_PRODUCT_TYPE"
+    ERROR_PRODUCT_TYPE_MISMATCH = "PRODUCT_TYPE_MISMATCH"
+
+    def _add_broken_record(self, *, code, message, data=None, context=None, exc=None):
+        record = {
+            "data": data or {},
+            "context": context or {},
+            "code": code,
+            "message": message,
+        }
+        if exc is not None:
+            record["error"] = str(exc)
+            record["traceback"] = traceback.format_exc()
+        self.broken_records.append(record)
+
     def __init__(self, import_process, sales_channel, language=None):
         super().__init__(import_process, language)
         self.sales_channel = sales_channel
@@ -597,11 +614,12 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     def import_products_process(self):
         for product in self.get_products_data():
             product_instance = None
-            remote_product = AmazonProduct.objects.filter(
+            qs = AmazonProduct.objects.filter(
                 remote_sku=product.sku,
                 sales_channel=self.sales_channel,
                 multi_tenant_company=self.import_process.multi_tenant_company
-            ).first()
+            )
+            remote_product = qs.first()
 
             if remote_product:
                 product_instance = remote_product.local_instance
@@ -618,8 +636,28 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             else:
                 is_variation, parent_skus = get_is_product_variation(product)
 
+            summary = self._get_summary(product)
             rule = self.get_product_rule(product)
             structured, language, view = self.get__product_data(product)
+            missing_data = (
+                not getattr(product, "attributes", None)
+                or not getattr(product, "summaries", None)
+                or not getattr(summary, "product_type", None)
+            )
+
+            if remote_product and not missing_data:
+                try:
+                    existing_code = remote_product.remote_type
+                except Exception:
+                    existing_code = None
+                incoming_code = getattr(summary, "product_type", None)
+                if existing_code and incoming_code and existing_code != incoming_code:
+                    self._add_broken_record(
+                        code=self.ERROR_PRODUCT_TYPE_MISMATCH,
+                        message="Remote product type mismatch",
+                        data=structured,
+                        context={"sku": structured.get("sku"), "asin": structured.get("__asin")},
+                    )
 
             # Keep track of parent-child relationships to process later
             if is_variation and parent_skus:
@@ -655,6 +693,20 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
             try:
                 instance.process()
+            except IntegrityError as e:
+                self._add_broken_record(
+                    code=self.ERROR_MULTIPLE_ASIN,
+                    message="Multiple ASINs for SKU",
+                    data=structured,
+                    context={
+                        "sku": structured.get("sku"),
+                        "asin": structured.get("__asin"),
+                        "region": getattr(view, "api_region_code", None),
+                        "is_variation": is_variation,
+                    },
+                    exc=e,
+                )
+                continue
             except Exception as e:
                 record = {
                     "data": structured,
@@ -673,13 +725,30 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
             self.update_remote_product(instance, product, view, is_variation)
             self.handle_ean_code(instance)
-            self.handle_attributes(instance)
+            if missing_data:
+                self._add_broken_record(
+                    code=self.ERROR_MISSING_DATA,
+                    message="Missing attributes, summaries or product type",
+                    data=structured,
+                    context={"sku": structured.get("sku"), "asin": structured.get("__asin")},
+                )
+            else:
+                self.handle_attributes(instance)
             self.handle_translations(instance)
             self.handle_prices(instance)
             self.handle_images(instance)
 
             if structured['type'] == CONFIGURABLE:
-                self.handle_variations(instance)
+                try:
+                    self.handle_variations(instance)
+                except ValueError as e:
+                    self._add_broken_record(
+                        code=self.ERROR_NO_MAPPED_PRODUCT_TYPE,
+                        message="No mapped product type",
+                        data=structured,
+                        context={"sku": structured.get("sku"), "asin": structured.get("__asin")},
+                        exc=e,
+                    )
 
             if not is_variation:
                 self.handle_sales_channels_views(instance, structured, view)
