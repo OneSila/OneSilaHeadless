@@ -338,24 +338,29 @@ class AsyncProductImportMixin(ImportMixin):
         self.prepare_import_process()
         self.strat_process()
 
-        items = list(self.get_products_data()) if self.import_products else []
-        self.import_process.total_records = (
-            self.get_total_instances() if self.import_products else 0
-        )
+        self.import_process.total_records = self.get_total_instances()
         self.import_process.processed_records = 0
         self.import_process.percentage = 0
         self.import_process.save(update_fields=["total_records", "processed_records", "percentage", "status"])
 
+        self.total_import_instances_cnt = self.import_process.total_records
         self.set_threshold_chunk()
 
-        for idx, item in enumerate(items, start=1):
-            serialized = ensure_serializable(item)
+        item = None
+        idx = 0
+
+        for idx, item in enumerate(self.get_products_data(), start=1):
+
             update_delta = None
             if idx % self._threshold_chunk == 0:
                 update_delta = self._threshold_chunk
-            if idx == len(items) and idx % self._threshold_chunk != 0:
-                update_delta = idx % self._threshold_chunk
 
-            self.dispatch_task(
-                serialized, is_last=idx == len(items), updated_with=update_delta
-            )
+            self.dispatch_task(item, is_last=False, updated_with=update_delta)
+
+        if item:
+            # we will import the last instance twice but we will make it work with both generators and list using
+            # self.get_products_data() without needing to adapt the api wrapper to get which one is last
+            # and relying it on self.get_total_instances() is dangerous (ex a product is deleted or created while
+            # processing when we use generator and this doesn't match anymore)
+            update_delta = idx % self._threshold_chunk if idx % self._threshold_chunk != 0 else None
+            self.dispatch_task(item, is_last=True, updated_with=update_delta)

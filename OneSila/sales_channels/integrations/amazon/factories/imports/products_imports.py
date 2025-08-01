@@ -805,4 +805,3 @@ class AmazonProductsAsyncImportProcessor(AsyncProductImportMixin, AmazonProducts
     """Async variant of the Amazon product importer."""
 
     async_task = None
-
