@@ -670,6 +670,20 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
             try:
                 instance.process()
+
+                self.update_remote_product(instance, product, view, is_variation)
+                self.handle_ean_code(instance)
+                self.handle_attributes(instance)
+                self.handle_translations(instance)
+                self.handle_prices(instance)
+                self.handle_images(instance)
+
+                if structured['type'] == CONFIGURABLE:
+                    self.handle_variations(instance)
+
+                if not is_variation:
+                    self.handle_sales_channels_views(instance, structured, view)
+
             except Exception as e:
                 record = {
                     "data": structured,
@@ -684,18 +698,5 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 }
                 self.broken_records.append(record)
                 continue
-
-            self.update_remote_product(instance, product, view, is_variation)
-            self.handle_ean_code(instance)
-            self.handle_attributes(instance)
-            self.handle_translations(instance)
-            self.handle_prices(instance)
-            self.handle_images(instance)
-
-            if structured['type'] == CONFIGURABLE:
-                self.handle_variations(instance)
-
-            if not is_variation:
-                self.handle_sales_channels_views(instance, structured, view)
 
             self.update_percentage()
