@@ -31,10 +31,12 @@ class EbayRemoteLanguagePullFactory(GetEbayAPIMixin, PullRemoteInstanceMixin):
             if not info:
                 continue
             languages = info[1]
-            for lang in languages.keys():
+            for code, data in languages.items():
+                url = data[0] if isinstance(data, (list, tuple)) and data else ""
                 self.remote_instances.append({
-                    "code": lang,
+                    "code": code,
                     "view_remote_id": marketplace_id,
+                    "url": url,
                 })
 
     def update_get_or_create_lookup(self, lookup, remote_data):
