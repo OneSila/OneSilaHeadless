@@ -17,7 +17,6 @@ def amazon_import_db_task(import_process, sales_channel):
         fac.run()
     elif import_process.type == AmazonSalesChannelImport.TYPE_PRODUCTS:
 
-        AmazonProductsAsyncImportProcessor.async_task = amazon_product_import_item_task
         fac = AmazonProductsAsyncImportProcessor(import_process=import_process, sales_channel=sales_channel)
         fac.run()
 
@@ -25,7 +24,7 @@ def amazon_import_db_task(import_process, sales_channel):
 @remote_task(priority=LOW_PRIORITY)
 @db_task()
 def amazon_product_import_item_task(
-    import_process_id, sales_channel_id, product_data, is_last=False, updated_with=None, client=None
+    import_process_id, sales_channel_id, product_data, is_last=False, updated_with=None
 ):
     from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonProductItemFactory
     from imports_exports.models import Import
@@ -39,7 +38,6 @@ def amazon_product_import_item_task(
         sales_channel=channel,
         is_last=is_last,
         updated_with=updated_with,
-        client=client,
     )
     fac.run()
 
