@@ -75,9 +75,11 @@ def extract_amazon_attribute_value(entry: dict, code: str) -> str | None:
 
     if isinstance(current, list):
         current = current[0] if current else None
+
     if isinstance(current, dict):
         return current.get("value") if "value" in current else current.get("name")
-    if isinstance(current, str):
+
+    if isinstance(current, (str, int, float, bool)):
         return current
 
     logger.debug(
