@@ -124,7 +124,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     # Data fetching
     # ------------------------------------------------------------------
     def get_total_instances(self):
-        return 100
+        return self.get_total_number_of_products()
 
     def get_products_data(self):
         # Delegate to the mixin helper which yields ListingItem objects
