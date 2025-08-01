@@ -40,3 +40,5 @@ class SerializationHelpersTest(TestCase):
         self.assertIsInstance(first, dict)
         self.assertEqual(first["sku"], "SKU1")
         self.assertEqual(first["product_tpe"], "CHAIR")
+
+
