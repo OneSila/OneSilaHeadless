@@ -706,21 +706,11 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                     },
                     exc=e,
                 )
-                continue
-            except Exception as e:
-                record = {
-                    "data": structured,
-                    "error": str(e),
-                    "traceback": traceback.format_exc(),
-                    "context": {
-                        "sku": structured.get("sku"),
-                        "asin": structured.get("__asin"),
-                        "region": getattr(view, "api_region_code", None),
-                        "is_variation": is_variation,
-                    },
-                }
-                self.broken_records.append(record)
-                continue
+
+                if remote_product:
+                    instance.remote_instance = remote_product
+                else:
+                    continue
 
 
             self.update_remote_product(instance, product, view, is_variation)
@@ -739,6 +729,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             self.handle_images(instance)
 
             if structured['type'] == CONFIGURABLE:
+
                 try:
                     self.handle_variations(instance)
                 except ValueError as e:
