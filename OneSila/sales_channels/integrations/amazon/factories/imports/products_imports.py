@@ -765,7 +765,6 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
                 data=self.product_data,
                 exc=exc,
             )
-            raise
 
         if self.updated_with:
             increment_processed_records(self.import_process.id, delta=self.updated_with)
