@@ -323,6 +323,7 @@ class AsyncProductImportMixin(ImportMixin):
     def dispatch_task(self, data, is_last=False):
         if not self.async_task:
             raise ValueError("async_task is not defined")
+
         from core.helpers import safe_run_task
         safe_run_task(self.async_task, self.import_process.id, self.sales_channel.id, data, is_last)
 

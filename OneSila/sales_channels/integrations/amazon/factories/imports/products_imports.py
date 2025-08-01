@@ -2,8 +2,6 @@ import pprint
 from decimal import Decimal
 import logging
 import traceback
-from types import SimpleNamespace
-
 from django.db import IntegrityError
 
 from imports_exports.factories.imports import ImportMixin, AsyncProductImportMixin
@@ -38,7 +36,8 @@ from sales_channels.models import SalesChannelViewAssign
 from core.helpers import ensure_serializable
 from dateutil.parser import parse
 import datetime
-
+from imports_exports.helpers import append_broken_record, increment_processed_records
+from sales_channels.integrations.amazon.models.imports import AmazonImportRelationship
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +66,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             record["error"] = str(exc)
             record["traceback"] = traceback.format_exc()
         self.broken_records.append(record)
-        from imports_exports.helpers import append_broken_record
+
         append_broken_record(self.import_process.id, record)
 
     def __init__(self, import_process, sales_channel, language=None):
@@ -87,35 +86,10 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     def process_completed(self):
         self.sales_channel.is_importing = False
         self.sales_channel.save(update_fields=["is_importing"])
-        self._create_configurable_variations()
+
         if self.broken_records:
             self.import_process.broken_records = self.broken_records
             self.import_process.save(update_fields=["broken_records"])
-
-    def _create_configurable_variations(self):
-        """Create ConfigurableVariation links after all products are imported."""
-        from products.models import Product, ConfigurableVariation
-        from sales_channels.integrations.amazon.models.imports import AmazonImportRelationship
-
-        mtc = self.import_process.multi_tenant_company
-        mapping = {}
-        for rel in AmazonImportRelationship.objects.filter(import_process=self.import_process):
-            mapping.setdefault(rel.parent_sku, set()).add(rel.child_sku)
-
-        for parent_sku, children_skus in mapping.items():
-            parent = Product.objects.filter(sku=parent_sku, multi_tenant_company=mtc).first()
-            if not parent or not parent.is_configurable():
-                continue
-
-            children = Product.objects.filter(sku__in=list(children_skus), multi_tenant_company=mtc)
-            for child in children:
-                ConfigurableVariation.objects.get_or_create(
-                    parent=parent,
-                    variation=child,
-                    multi_tenant_company=mtc,
-                )
-
-        AmazonImportRelationship.objects.filter(import_process=self.import_process).delete()
 
     # ------------------------------------------------------------------
     # Data fetching
@@ -430,10 +404,13 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         structured["translations"] = self._parse_translations(name, language, product_data.attributes)
         configurator_values, amazon_theme = self._parse_configurator_select_values(product_data)
+
         if configurator_values:
             structured["configurator_select_values"] = configurator_values
+
         if amazon_theme:
             structured["__amazon_theme"] = amazon_theme
+
         structured["__asin"] = asin
         structured["__issues"] = product_data.issues or []
         structured["__marketplace_id"] = marketplace_id
@@ -490,6 +467,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
             for product_property in product_properties:
                 mirror_data = mirror_map.get(product_property.property.id)
+
                 if not mirror_data:
                     continue
 
@@ -648,6 +626,9 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 existing_code = None
             incoming_code = getattr(summary, "product_type", None)
             if existing_code and incoming_code and existing_code != incoming_code:
+                # if the current product type code is different from the original one (main store)
+                # we will add it as a broken record. It will continue the flow and probably override it
+                # but at least we know something was broken here
                 self._add_broken_record(
                     code=self.ERROR_PRODUCT_TYPE_MISMATCH,
                     message="Remote product type mismatch",
@@ -656,7 +637,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 )
 
         if is_variation and parent_skus:
-            from sales_channels.integrations.amazon.models.imports import AmazonImportRelationship
+
             for parent_sku in parent_skus:
                 structured['configurable_parent_sku'] = parent_sku
                 AmazonImportRelationship.objects.get_or_create(
@@ -689,6 +670,11 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         try:
             instance.process()
         except IntegrityError as e:
+            # because we have this:
+            # "remote_id": structured["__asin"],
+            # "asin": structured["__asin"],
+            # in the mirror_model_defaults it will try to create the mirror model with another asin
+            # this is not possible so we will add it as a broken recored instead
             self._add_broken_record(
                 code=self.ERROR_MULTIPLE_ASIN,
                 message="Multiple ASINs for SKU",
@@ -703,13 +689,19 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             )
 
             if remote_product:
+                # if that is already existent we can just continue with the existent one (no need to bre recreated)
+                # instead
                 instance.remote_instance = remote_product
             else:
                 return
 
         self.update_remote_product(instance, product, view, is_variation)
         self.handle_ean_code(instance)
+
         if missing_data:
+            # sometimes the import send absolutely empty products just the sku
+            # we still want to create the variation but that one fail on handle_attributes so we will just not
+            # do that and add as a broken record instead
             self._add_broken_record(
                 code=self.ERROR_MISSING_DATA,
                 message="Missing attributes, summaries or product type",
@@ -718,6 +710,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             )
         else:
             self.handle_attributes(instance)
+
         self.handle_translations(instance)
         self.handle_prices(instance)
         self.handle_images(instance)
@@ -726,6 +719,8 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             try:
                 self.handle_variations(instance)
             except ValueError as e:
+                # if product doesn't have any rule (because it was not mapped and is a new product type)
+                # this will fail here because it need the rule to create the remote configurator
                 self._add_broken_record(
                     code=self.ERROR_NO_MAPPED_PRODUCT_TYPE,
                     message="No mapped product type",
@@ -754,7 +749,7 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
 
     def run(self):
         try:
-            self.process_product_item(SimpleNamespace(**self.product_data))
+            self.process_product_item(self.product_data)
         except Exception as exc:  # capture unexpected errors
             self._add_broken_record(
                 code="UNKNOWN_ERROR",
@@ -762,7 +757,7 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
                 data=self.product_data,
                 exc=exc,
             )
-        from imports_exports.helpers import increment_processed_records
+
         increment_processed_records(self.import_process.id)
         if self.is_last:
             self.mark_success()
@@ -795,9 +790,6 @@ class AmazonConfigurableVariationsFactory:
                     variation=child,
                     multi_tenant_company=mtc,
                 )
-
-        AmazonImportRelationship.objects.filter(import_process=self.import_process).delete()
-
 
 class AmazonProductsAsyncImportProcessor(AsyncProductImportMixin, AmazonProductsImportProcessor):
     """Async variant of the Amazon product importer."""
