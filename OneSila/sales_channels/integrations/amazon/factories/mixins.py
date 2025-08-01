@@ -1,3 +1,6 @@
+from properties.models import Property, PropertyTranslation
+from sales_channels.integrations.amazon.constants import AMAZON_PATCH_SKIP_KEYS
+from sales_channels.integrations.amazon.models.properties import AmazonProperty
 import json
 
 from django.conf import settings
@@ -10,10 +13,8 @@ from sales_channels.models.logs import RemoteLog
 from core.helpers import ensure_serializable
 from deepdiff import DeepDiff
 
-
-from sales_channels.integrations.amazon.models.properties import AmazonProperty
-from sales_channels.integrations.amazon.constants import AMAZON_PATCH_SKIP_KEYS
-from properties.models import Property, PropertyTranslation
+import logging
+logger = logging.getLogger(__name__)
 
 
 class PullAmazonMixin:
@@ -265,7 +266,7 @@ class GetAmazonAPIMixin:
             last_created_date = None
             total_results = 0
 
-            print(f"[START CYCLE] created_after={created_after}")
+            logger.debug(f"[START CYCLE] created_after={created_after}")
 
             while True:
                 items, page_token, results_number = self._fetch_listing_items_page(
@@ -295,7 +296,9 @@ class GetAmazonAPIMixin:
                 if not page_token:
                     break
 
-            print(f"[END CYCLE] results_number={total_results} | last_created_date={last_created_date}")
+            logger.debug(
+                f"[END CYCLE] results_number={total_results} | last_created_date={last_created_date}"
+            )
 
             # amazon items results is limited at 1000
             if total_results < 1000:
