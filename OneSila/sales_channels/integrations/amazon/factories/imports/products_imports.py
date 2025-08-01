@@ -105,19 +105,19 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     # Structuring
     # ------------------------------------------------------------------
     def _get_summary(self, product):
-        summaries = product.summaries or []
+        summaries = product.get("summaries") or []
         return summaries[0] if summaries else {}
 
     def _parse_prices(self, product):
         prices = []
-        for offer in product.offers or []:
+        for offer in product.get("offers", []):
 
-            if offer.offer_type != "B2C":
+            if offer.get("offer_type") != "B2C":
                 continue
 
-            price_info = offer.price or {}
-            amount = price_info.amount
-            currency = price_info.currency_code
+            price_info = offer.get("price") or {}
+            amount = price_info.get("amount")
+            currency = price_info.get("currency_code")
             if amount is not None and currency:
                 prices.append({
                     "price": Decimal(amount),
@@ -139,7 +139,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         ]
 
     def _parse_images(self, product):
-        attrs = product.attributes or {}
+        attrs = product.get("attributes") or {}
         images = []
         index = 0
         for key, values in attrs.items():
@@ -281,14 +281,14 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     def _parse_configurator_select_values(self, product):
         configurator_values = []
         amazon_theme = None
-        relationships = getattr(product, "relationships", []) or []
+        relationships = product.get("relationships") or []
         for relation in relationships:
-            for rel in getattr(relation, "relationships", []) or []:
-                vt = getattr(rel, "variation_theme", None)
+            for rel in relation.get("relationships", []):
+                vt = rel.get("variation_theme")
                 if not vt:
                     continue
-                attrs = getattr(vt, "attributes", None) or []
-                amazon_theme = getattr(vt, "theme", None)
+                attrs = vt.get("attributes") or []
+                amazon_theme = vt.get("theme")
                 for code in attrs:
                     remote_property = AmazonProperty.objects.filter(
                         sales_channel=self.sales_channel,
@@ -304,7 +304,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
     def get_product_rule(self, product_data):
         summary = self._get_summary(product_data)
-        product_type_code = summary.product_type
+        product_type_code = summary.get("product_type")
         rule = None
 
         if product_type_code:
@@ -328,13 +328,13 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
     def get__product_data(self, product_data):
         summary = self._get_summary(product_data)
-        asin = summary.asin
-        status = summary.status or []
-        sku = product_data.sku
+        asin = summary.get("asin")
+        status = summary.get("status") or []
+        sku = product_data.get("sku")
         type = infer_product_type(product_data)
-        marketplace_id = summary.marketplace_id
+        marketplace_id = summary.get("marketplace_id")
 
-        name = summary.item_name
+        name = summary.get("item_name")
 
         # it seems that sometimes the name can be None coming from Amazon. IN that case we fallback to sku
         if name is None:
@@ -358,8 +358,8 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         if type == SIMPLE:
             structured["prices"] = self._parse_prices(product_data)
 
-        product_type_code = summary.product_type
-        product_attrs = product_data.attributes or {}
+        product_type_code = summary.get("product_type")
+        product_attrs = product_data.get("attributes") or {}
         attributes, mirror_map = self._parse_attributes(
             product_attrs, product_type_code, view
         )
@@ -402,7 +402,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             structured["properties"] = attributes
             structured["__mirror_product_properties_map"] = mirror_map
 
-        structured["translations"] = self._parse_translations(name, language, product_data.attributes)
+        structured["translations"] = self._parse_translations(name, language, product_data.get("attributes"))
         configurator_values, amazon_theme = self._parse_configurator_select_values(product_data)
 
         if configurator_values:
@@ -412,7 +412,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             structured["__amazon_theme"] = amazon_theme
 
         structured["__asin"] = asin
-        structured["__issues"] = product_data.issues or []
+        structured["__issues"] = product_data.get("issues") or []
         structured["__marketplace_id"] = marketplace_id
 
         return structured, language, view
@@ -432,7 +432,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         if asin and not remote_product.remote_id:
             remote_product.remote_id = asin
 
-        sku = getattr(product, "sku", None)
+        sku = product.get("sku")
         if sku and not remote_product.remote_sku:
             remote_product.remote_sku = sku
 
@@ -589,7 +589,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     def process_product_item(self, product):
         product_instance = None
         qs = AmazonProduct.objects.filter(
-            remote_sku=product.sku,
+            remote_sku=product.get("sku"),
             sales_channel=self.sales_channel,
             multi_tenant_company=self.import_process.multi_tenant_company
         )
@@ -614,9 +614,9 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         rule = self.get_product_rule(product)
         structured, language, view = self.get__product_data(product)
         missing_data = (
-            not getattr(product, "attributes", None)
-            or not getattr(product, "summaries", None)
-            or not getattr(summary, "product_type", None)
+            not product.get("attributes")
+            or not product.get("summaries")
+            or not summary.get("product_type")
         )
 
         if remote_product and not missing_data:
@@ -624,7 +624,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 existing_code = remote_product.remote_type
             except Exception:
                 existing_code = None
-            incoming_code = getattr(summary, "product_type", None)
+            incoming_code = summary.get("product_type")
             if existing_code and incoming_code and existing_code != incoming_code:
                 # if the current product type code is different from the original one (main store)
                 # we will add it as a broken record. It will continue the flow and probably override it

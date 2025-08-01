@@ -11,11 +11,16 @@ logger = logging.getLogger(__name__)
 
 def infer_product_type(data) -> str:
     """Infer local product type from Amazon relationships data."""
-    relationships = data.relationships
+    if isinstance(data, dict):
+        relationships = data.get("relationships") or []
+    else:
+        relationships = getattr(data, "relationships", []) or []
 
     for relation in relationships:
-        for rel in relation.relationships:
-            if rel.child_skus:
+        rels = relation.get("relationships", []) if isinstance(relation, dict) else getattr(relation, "relationships", []) or []
+        for rel in rels:
+            child_skus = rel.get("child_skus") if isinstance(rel, dict) else getattr(rel, "child_skus", None)
+            if child_skus:
                 return CONFIGURABLE
 
     return SIMPLE
@@ -85,12 +90,16 @@ def extract_amazon_attribute_value(entry: dict, code: str) -> str | None:
 
 def get_is_product_variation(data):
     """Return whether the product is a variation and its parent SKUs if present."""
-    relationships = getattr(data, 'relationships', []) or []
+    if isinstance(data, dict):
+        relationships = data.get("relationships") or []
+    else:
+        relationships = getattr(data, "relationships", []) or []
     parent_skus = []
 
     for relation in relationships:
-        for rel in getattr(relation, 'relationships', []) or []:
-            parent_sku = getattr(rel, 'parent_sku', None)
+        rels = relation.get("relationships", []) if isinstance(relation, dict) else getattr(relation, "relationships", []) or []
+        for rel in rels:
+            parent_sku = rel.get("parent_sku") if isinstance(rel, dict) else getattr(rel, "parent_sku", None)
             if parent_sku:
                 parent_skus.append(parent_sku)
 
