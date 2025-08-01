@@ -15,6 +15,7 @@ from ebay_rest.api.sell_marketing.configuration import Configuration
 
 from ebay_rest.api.commerce_identity.api.user_api import UserApi
 
+
 class GetEbayAPIMixin:
 
     def get_api(self) -> API:
@@ -30,8 +31,8 @@ class GetEbayAPIMixin:
             "refresh_token": self.sales_channel.refresh_token,
             "refresh_token_expiry": self.sales_channel.refresh_token_expiration.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
             "email_or_username": "OneSila",
-            "password": "???" # For some reason username and password are validating even if we provide the
-                              # refresh_token and we can add anything here
+            "password": "???"  # For some reason username and password are validating even if we provide the
+            # refresh_token and we can add anything here
         }
 
         header = {
@@ -53,18 +54,30 @@ class GetEbayAPIMixin:
         access_token = self.api._user_token.get()
 
         config.access_token = access_token
-        config.host = "https://api.sandbox.ebay.com"  # ⬅️ Use this for sandbox
+        if getattr(self.sales_channel, "environment", None) == getattr(self.sales_channel.__class__, "SANDBOX", "sandbox"):
+            config.host = "https://api.sandbox.ebay.com"
+        else:
+            config.host = "https://api.ebay.com"
+
         return ApiClient(configuration=config)
 
     def get_marketplace_currencies(self, marketplace_id: str) -> str | None:
         resp = self.api.sell_metadata_get_currencies(marketplace_id=marketplace_id)
         return resp
 
-    def get_marketplace_ids(self) -> list[str]:
-        # the ebay_rest doesn't provide endpoints for get subscription (even if it hav account v1 rate_table)
-        # the current method is not ok because it returns status 500
+    def marketplace_reference(self) -> dict:
+        """Return eBay marketplace reference information."""
+        return Reference.get_marketplace_id_values()
 
-        pass
+    def get_marketplace_ids(self) -> list[str]:
+        """Return all available marketplace IDs."""
+        # ``ebay_rest`` does not expose an endpoint that returns the list of
+        # marketplaces an account has access to.  For the pull factories we only
+        # need the list of known marketplace identifiers, which can be obtained
+        # from the ``Reference`` helper shipped with the library.
+
+        reference = self.marketplace_reference()
+        return list(reference.keys())
         # client = self.get_api_client()
         #
         # response = client.call_api(
