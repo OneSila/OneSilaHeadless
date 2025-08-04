@@ -80,9 +80,14 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             assign.save()
 
     def preflight_check(self):
+        return True
+
+    def sanity_check(self):
+        """Run pre-sync validations."""
+
         if (
-            not self.sales_channel_allow_duplicate_sku
-            and self.local_instance.is_configurable()
+                not self.sales_channel_allow_duplicate_sku
+                and self.local_instance.is_configurable()
         ):
             variations = self.local_instance.get_configurable_variations(active_only=True)
             variation_ids = [v.id for v in variations]
@@ -102,8 +107,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
                 )
 
         if (
-            not self.sales_channel_allow_duplicate_sku
-            and self.is_variation
+                not self.sales_channel_allow_duplicate_sku
+                and not self.local_instance.is_configurable()
         ):
             parents = list(self.local_instance.configurables.all())
             parent_ids = [p.id for p in parents]
@@ -122,12 +127,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
                     "Remove them before syncing this variation independently."
                 )
 
-        return True
-
-    def sanity_check(self):
-        """Run pre-sync validations."""
-
-        # Validation logic handled in preflight_check.
         return True
 
     def add_field_in_payload(self, field_name, value):
@@ -920,8 +919,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """
         if self.create_product_factory is None:
             raise ValueError("create_product_factory must be specified in the RemoteProductSyncFactory.")
-
-        self.sanity_check()
 
         fac = self.create_product_factory(self.sales_channel, self.local_instance, api=self.api)
         fac.run()

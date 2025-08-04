@@ -21,6 +21,10 @@ class ToUpdateCurrenciesMixin:
         super().__init__(*args, **kwargs)
 
     def sanity_check(self):
+
+        if hasattr(super(), "sanity_check"):
+            super().sanity_check()
+
         if not self.currency:
             raise SanityCheckError("self.currency is not set")
         if not self.currency_iso_code:
