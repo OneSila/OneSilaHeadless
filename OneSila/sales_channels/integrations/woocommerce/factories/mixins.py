@@ -236,7 +236,8 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
 
     def get_configurable_product_attributes(self):
         product = self.get_local_product()
-        return product.get_configurator_properties(public_information_only=False)
+        items = product.get_configurator_properties(public_information_only=False)
+        return [item.property for item in items]
 
     def get_global_attribute(self, prod_prop):
         # We only get a global attribute if the property has add_to_filters set to True.
