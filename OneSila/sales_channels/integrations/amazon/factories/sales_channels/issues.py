@@ -13,6 +13,7 @@ class FetchRemoteIssuesFactory(GetAmazonAPIMixin):
         self.response_data = response_data
 
     def run(self):
+
         if not self.remote_product or not getattr(self.remote_product, 'remote_sku', None):
             return
 
@@ -22,13 +23,18 @@ class FetchRemoteIssuesFactory(GetAmazonAPIMixin):
             is_validation_issue=False,
         ).delete()
 
-        issues_data = self.response_data
-        if issues_data is None:
+        if self.response_data:
+            response = self.response_data
+        else:
             response = self.get_listing_item(
                 self.remote_product.remote_sku,
                 self.view.remote_id,
                 included_data=["issues"],
             )
+
+        if isinstance(response, dict):
+            issues_data = response.get("issues", []) or []
+        else:
             issues_data = getattr(response, "issues", []) or []
 
         for issue in issues_data:
@@ -36,6 +42,7 @@ class FetchRemoteIssuesFactory(GetAmazonAPIMixin):
                 issue.to_dict() if hasattr(issue, "to_dict") else issue
             )
             AmazonProductIssue.objects.create(
+                multi_tenant_company=self.view.multi_tenant_company,
                 remote_product=self.remote_product,
                 view=self.view,
                 code=data.get("code"),
@@ -68,7 +75,9 @@ class FetchRemoteValidationIssueFactory:
             data = ensure_serializable(
                 issue.to_dict() if hasattr(issue, "to_dict") else issue
             )
+
             AmazonProductIssue.objects.create(
+                multi_tenant_company=self.view.multi_tenant_company,
                 remote_product=self.remote_product,
                 view=self.view,
                 code=data.get("code"),

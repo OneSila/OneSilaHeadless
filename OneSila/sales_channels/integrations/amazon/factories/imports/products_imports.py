@@ -585,16 +585,10 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 f"sales_channel_id={self.sales_channel.id}"
             ) from e
 
-        from sales_channels.integrations.amazon.factories.sales_channels.issues import (
-            FetchRemoteIssuesFactory,
-        )
-
-        FetchRemoteIssuesFactory(
-            remote_product=import_instance.remote_instance,
-            view=view,
-        ).run()
 
     def process_product_item(self, product):
+        from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
+
         product_instance = None
         qs = AmazonProduct.objects.filter(
             remote_sku=product.get("sku"),
@@ -739,6 +733,13 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         if not is_variation:
             self.handle_sales_channels_views(instance, structured, view)
+
+
+        FetchRemoteIssuesFactory(
+            remote_product=instance.remote_instance,
+            view=view,
+            response_data=product
+        ).run()
 
     def import_products_process(self):
         for product in self.get_products_data():
