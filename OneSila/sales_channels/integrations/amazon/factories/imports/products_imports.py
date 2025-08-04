@@ -412,7 +412,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             structured["__amazon_theme"] = amazon_theme
 
         structured["__asin"] = asin
-        structured["__issues"] = product_data.get("issues") or []
         structured["__marketplace_id"] = marketplace_id
 
         return structured, language, view
