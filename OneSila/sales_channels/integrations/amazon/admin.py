@@ -20,6 +20,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonImageProductAssociation,
     AmazonTaxCode,
     AmazonDefaultUnitConfigurator,
+    AmazonImportRelationship,
 )
 from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
 from sales_channels.models import SalesChannelViewAssign
@@ -126,6 +127,13 @@ class AmazonTaxCodeAdmin(SalesChannelRemoteAdmin):
 @admin.register(AmazonDefaultUnitConfigurator)
 class AmazonDefaultUnitConfiguratorAdmin(SalesChannelRemoteAdmin):
     pass
+
+
+@admin.register(AmazonImportRelationship)
+class AmazonImportRelationshipAdmin(admin.ModelAdmin):
+    list_display = ("import_process", "parent_sku", "child_sku")
+    search_fields = ("parent_sku", "child_sku")
+    raw_id_fields = ("import_process",)
 
 
 @admin.register(AmazonPublicDefinition)
