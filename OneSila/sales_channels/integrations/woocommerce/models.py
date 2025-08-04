@@ -7,6 +7,7 @@ from sales_channels.models.properties import RemoteProperty, \
     RemotePropertySelectValue, RemoteProductProperty
 from sales_channels.models.products import RemoteImageProductAssociation
 from django.utils.translation import gettext_lazy as _
+from sales_channels.exceptions import VariationAlreadyExistsOnWebsite
 
 
 class WoocommerceSalesChannel(SalesChannel):
@@ -37,6 +38,9 @@ class WoocommerceSalesChannel(SalesChannel):
                 raise Exception(
                     _("Could not connect to the Woocommerce server. Make sure all the details are correctly completed.")
                 )
+
+    class Meta:
+        user_exceptions = (VariationAlreadyExistsOnWebsite,)
 
 
 class WoocommerceSalesChannelView(SalesChannelView):
