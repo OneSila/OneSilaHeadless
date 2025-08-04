@@ -15,6 +15,7 @@ from sales_channels.signals import (
     delete_remote_product,
     update_remote_product,
     sync_remote_product,
+    manual_sync_remote_product,
     create_remote_product_property,
     update_remote_product_property,
     delete_remote_product_property,
@@ -118,6 +119,7 @@ def shopify__product__delete_from_product(sender, instance, **kwargs):
 # 5) Sync product
 #
 @receiver(sync_remote_product, sender='products.Product')
+@receiver(manual_sync_remote_product, sender='products.Product')
 def shopify__product__sync_from_local(sender, instance, **kwargs):
     # number of calls = 1 + variations
     count = 1 + (instance.get_configurable_variations().count()
@@ -133,6 +135,7 @@ def shopify__product__sync_from_local(sender, instance, **kwargs):
 
 
 @receiver(sync_remote_product, sender='shopify.ShopifyProduct')
+@receiver(manual_sync_remote_product, sender='shopify.ShopifyProduct')
 def shopify__product__sync_from_remote(sender, instance, **kwargs):
     product = instance.local_instance
     count = 1 + (getattr(product, 'get_configurable_variations', lambda: [])().count())
