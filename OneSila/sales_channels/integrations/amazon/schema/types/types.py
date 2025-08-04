@@ -20,6 +20,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonDefaultUnitConfigurator,
     AmazonRemoteLog,
     AmazonSalesChannelView,
+    AmazonProductIssue,
 )
 from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelFilter,
@@ -28,7 +29,7 @@ from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonProductTypeFilter,
     AmazonProductTypeItemFilter,
     AmazonSalesChannelImportFilter, AmazonDefaultUnitConfiguratorFilter,
-    AmazonRemoteLogFilter, AmazonSalesChannelViewFilter,
+    AmazonRemoteLogFilter, AmazonSalesChannelViewFilter, AmazonProductIssueFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
@@ -38,7 +39,7 @@ from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonProductTypeItemOrder,
     AmazonSalesChannelImportOrder,
     AmazonDefaultUnitConfiguratorOrder,
-    AmazonRemoteLogOrder, AmazonSalesChannelViewOrder,
+    AmazonRemoteLogOrder, AmazonSalesChannelViewOrder, AmazonProductIssueOrder,
 )
 from sales_channels.schema.types.types import FormattedIssueType
 
@@ -268,6 +269,24 @@ class AmazonRemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):
             )
 
         return formatted
+
+
+@type(
+    AmazonProductIssue,
+    filters=AmazonProductIssueFilter,
+    order=AmazonProductIssueOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonProductIssueType(relay.Node, GetQuerysetMultiTenantMixin):
+    remote_product: Annotated[
+        'RemoteProductType',
+        lazy("sales_channels.schema.types.types")
+    ]
+    view: Annotated[
+        'AmazonSalesChannelViewType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
 
 
 @strawberry_type
