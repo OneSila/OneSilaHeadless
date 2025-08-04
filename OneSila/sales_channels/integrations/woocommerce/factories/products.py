@@ -158,6 +158,9 @@ class WooCommerceProductCreateFactory(WooCommerceProductSyncFactory, Woocommerce
         """
         return self.api.get_product_by_sku(self.local_instance.sku)
 
+    def get_saleschannel_remote_object(self, remote_sku):
+        return self.api.get_product_by_sku(remote_sku)
+
 
 class WooCommerceProductUpdateFactory(WooCommerceProductSyncFactory, WoocommerceProductTypeMixin, RemoteProductUpdateFactory):
     create_factory_class = WooCommerceProductCreateFactory
