@@ -119,6 +119,7 @@ class WooCommerceProductCreateFactory(WooCommerceProductSyncFactory, Woocommerce
     def __init__(self, *args, is_variation_add: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
         self.is_variation_add = is_variation_add
+        self.set_sku()
 
     def perform_non_subclassed_remote_action(self):
         """
