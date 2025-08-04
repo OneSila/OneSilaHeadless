@@ -96,19 +96,24 @@ def get_is_product_variation(data):
         relationships = data.get("relationships") or []
     else:
         relationships = getattr(data, "relationships", []) or []
+
     parent_skus = []
 
     for relation in relationships:
         rels = relation.get("relationships", []) if isinstance(relation, dict) else getattr(relation, "relationships", []) or []
         for rel in rels:
-            parent_sku = rel.get("parent_sku") if isinstance(rel, dict) else getattr(rel, "parent_sku", None)
-            if parent_sku:
-                parent_skus.append(parent_sku)
+            # Handle plural parent_skus list
+            if isinstance(rel, dict):
+                skus = rel.get("parent_skus") or []
+            else:
+                skus = getattr(rel, "parent_skus", []) or []
+            parent_skus.extend(skus)
 
     if parent_skus:
         return True, parent_skus
     else:
         return False, []
+
 
 
 def serialize_listing_item(item):
