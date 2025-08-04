@@ -32,6 +32,7 @@ sales_channel_created = ModelSignal(use_caching=True)
 create_remote_product = ModelSignal(use_caching=True)
 update_remote_product = ModelSignal(use_caching=True)
 sync_remote_product = ModelSignal(use_caching=True)
+manual_sync_remote_product = ModelSignal(use_caching=True)
 delete_remote_product = ModelSignal(use_caching=True)
 
 sales_view_assign_updated = ModelSignal(use_caching=True)

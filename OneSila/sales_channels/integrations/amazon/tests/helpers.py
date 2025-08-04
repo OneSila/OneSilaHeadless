@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+
 class DisableWooCommerceSignalsMixin:
     """Mixin to disable WooCommerce receivers during Amazon tests."""
 
@@ -8,6 +9,7 @@ class DisableWooCommerceSignalsMixin:
         "delete_remote_product",
         "update_remote_product",
         "sync_remote_product",
+        "manual_sync_remote_product",
         "create_remote_product_property",
         "update_remote_product_property",
         "delete_remote_product_property",
