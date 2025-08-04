@@ -1058,6 +1058,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
 
         except Exception as e:  # @TODO: This can be improved to give the type of the exception from the subclasses
             logger.debug(f"Product {self.local_instance.name} doesn't already exists. Ready for create.")
+            logger.error("Exception raised: {}".format(e))
 
     def run_sync_flow(self):
         """
