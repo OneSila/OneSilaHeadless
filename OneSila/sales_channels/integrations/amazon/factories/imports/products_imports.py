@@ -585,9 +585,14 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 f"sales_channel_id={self.sales_channel.id}"
             ) from e
 
-        issues = structured_data.get("__issues") or []
-        assign.issues = issues
-        assign.save()
+        from sales_channels.integrations.amazon.factories.sales_channels.issues import (
+            FetchRemoteIssuesFactory,
+        )
+
+        FetchRemoteIssuesFactory(
+            remote_product=import_instance.remote_instance,
+            view=view,
+        ).run()
 
     def process_product_item(self, product):
         product_instance = None
