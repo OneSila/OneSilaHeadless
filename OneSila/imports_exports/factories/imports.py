@@ -7,6 +7,10 @@ from notifications.factories.email import SendImportReportEmailFactory
 import traceback
 import math
 from core.decorators import timeit_and_log
+from core.helpers import safe_run_task
+
+from core.helpers import ensure_serializable
+from sales_channels.integrations.amazon.helpers import serialize_listing_item
 
 import logging
 logger = logging.getLogger(__name__)
@@ -26,7 +30,7 @@ class ImportMixin:
         self.total_imported_instances = 0
         self.current_percent = 0
         self._threshold_chunk = 1
-        self._broken_records =[]
+        self._broken_records = []
 
     def calculate_percentage(self):
         self.total_import_instances_cnt = self.get_total_instances()
@@ -57,6 +61,9 @@ class ImportMixin:
         self.import_process.status = Import.STATUS_SUCCESS
         self.import_process.percentage = 100
         self.import_process.save()
+
+        from imports_exports.signals import import_success
+        import_success.send(sender=self.import_process.__class__, instance=self.import_process)
 
         self.on_success()
 
@@ -154,7 +161,7 @@ class ImportMixin:
     def update_product_import_instance(self, instance): pass
 
     @handle_import_exception
-    def generic_single_process(self, step_name, data, struct_method, final_data_method,import_cls, log_method, extra_params=None, add_data_to_log_method=False):
+    def generic_single_process(self, step_name, data, struct_method, final_data_method, import_cls, log_method, extra_params=None, add_data_to_log_method=False):
         # Prepare log and final data
         log_instance = struct_method(data)
         final_data = final_data_method(log_instance)
@@ -240,7 +247,7 @@ class ImportMixin:
 
     def process_completed(self):
         pass
-    
+
     def set_broken_records(self):
 
         if len(self._broken_records) > 0:
@@ -304,8 +311,59 @@ class ImportMixin:
 
         finally:
             self.process_completed()
-            
+
             if self.import_process.skip_broken_records:
                 self.set_broken_records()
 
             self.send_reports()
+
+
+class AsyncProductImportMixin(ImportMixin):
+    """Variant of ImportMixin that dispatches each product to an async task."""
+
+    async_task = None  # db_task that processes a single record
+
+    def dispatch_task(self, data, is_last=False, updated_with=None):
+        if not self.async_task:
+            raise ValueError("async_task is not defined")
+
+        safe_run_task(
+            self.async_task,
+            self.import_process.id,
+            self.sales_channel.id,
+            data,
+            is_last,
+            updated_with,
+        )
+
+    def run(self):
+        self.prepare_import_process()
+        self.strat_process()
+
+        self.import_process.total_records = self.get_total_instances()
+        self.import_process.processed_records = 0
+        self.import_process.percentage = 0
+        self.import_process.save(update_fields=["total_records", "processed_records", "percentage", "status"])
+
+        self.total_import_instances_cnt = self.import_process.total_records
+        self.set_threshold_chunk()
+
+        serialized = None
+        idx = 0
+
+        for idx, item in enumerate(self.get_products_data(), start=1):
+
+            update_delta = None
+            if idx % self._threshold_chunk == 0:
+                update_delta = self._threshold_chunk
+
+            serialized = serialize_listing_item(item)
+            self.dispatch_task(serialized, is_last=False, updated_with=update_delta)
+
+        if serialized:
+            # we will import the last instance twice but we will make it work with both generators and list using
+            # self.get_products_data() without needing to adapt the api wrapper to get which one is last
+            # and relying it on self.get_total_instances() is dangerous (ex a product is deleted or created while
+            # processing when we use generator and this doesn't match anymore)
+            update_delta = idx % self._threshold_chunk if idx % self._threshold_chunk != 0 else None
+            self.dispatch_task(serialized, is_last=True, updated_with=update_delta)

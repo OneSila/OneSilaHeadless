@@ -1,3 +1,4 @@
 from core.signals import ModelSignal
 
-# signal_name = ModelSignal(use_caching=True)
+# Emitted when an import process completes successfully
+import_success = ModelSignal(use_caching=True)

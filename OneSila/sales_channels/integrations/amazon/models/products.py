@@ -1,4 +1,5 @@
 from core import models
+from core.helpers import ensure_serializable
 from sales_channels.models.products import (
     RemoteProduct,
     RemoteInventory,
@@ -55,6 +56,30 @@ class AmazonProduct(RemoteProduct):
             local_instance=local_rule,
             sales_channel=self.sales_channel,
         )
+
+    def get_issues(self, view, is_validation=None):
+        """Return serialized issues for this product in a given marketplace."""
+        from sales_channels.integrations.amazon.models import AmazonProductIssue
+
+        qs = AmazonProductIssue.objects.filter(remote_product=self, view=view)
+        if is_validation is not None:
+            qs = qs.filter(is_validation_issue=is_validation)
+
+        issues = []
+        for issue in qs:
+            issues.append(
+                ensure_serializable(
+                    {
+                        "code": issue.code,
+                        "message": issue.message,
+                        "severity": issue.severity,
+                        "is_validation_issue": issue.is_validation_issue,
+                        "raw_data": issue.raw_data,
+                    }
+                )
+            )
+
+        return issues
 
 
 class AmazonInventory(RemoteInventory):

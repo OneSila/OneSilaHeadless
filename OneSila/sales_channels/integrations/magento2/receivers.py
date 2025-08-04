@@ -14,7 +14,7 @@ from sales_channels.signals import create_remote_property, update_remote_propert
     update_remote_product_content, add_remote_product_variation, remove_remote_product_variation, \
     create_remote_image_association, \
     update_remote_image_association, delete_remote_image_association, delete_remote_image, update_remote_product, \
-    sync_remote_product, \
+    sync_remote_product, manual_sync_remote_product, \
     sales_view_assign_updated, delete_remote_product, update_remote_product_eancode, update_remote_vat_rate, \
     create_remote_vat_rate
 
@@ -317,6 +317,7 @@ def sales_channels__magento__product__update(sender, instance, **kwargs):
 
 
 @receiver(sync_remote_product, sender='products.Product')
+@receiver(manual_sync_remote_product, sender='products.Product')
 def sales_channels__magento__product__sync(sender, instance, **kwargs):
     from .tasks import sync_magento_product_db_task
     from products.product_types import CONFIGURABLE
@@ -337,6 +338,8 @@ def sales_channels__magento__product__sync(sender, instance, **kwargs):
 
 @receiver(sync_remote_product, sender='sales_channels.RemoteProduct')
 @receiver(sync_remote_product, sender='magento2.MagentoProduct')
+@receiver(manual_sync_remote_product, sender='sales_channels.RemoteProduct')
+@receiver(manual_sync_remote_product, sender='magento2.MagentoProduct')
 def sales_channels__magento__product__sync(sender, instance, **kwargs):
     from .tasks import sync_magento_product_db_task
     from products.product_types import CONFIGURABLE

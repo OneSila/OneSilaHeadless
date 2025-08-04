@@ -258,6 +258,7 @@ class AmazonRemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):
 
             if not isinstance(issue, dict):
                 continue
+
             formatted.append(
                 FormattedIssueType(
                     message=issue.get("message"),

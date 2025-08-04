@@ -2,7 +2,12 @@ from integrations.models import IntegrationLog
 from media.models import MediaProductThrough, Media
 from products.models import Product
 from properties.models import ProductProperty
-from sales_channels.exceptions import SwitchedToSyncException, SwitchedToCreateException, ConfigurationMissingError
+from sales_channels.exceptions import (
+    SwitchedToSyncException,
+    SwitchedToCreateException,
+    ConfigurationMissingError,
+    VariationAlreadyExistsOnWebsite,
+)
 from sales_channels.factories.mixins import IntegrationInstanceOperationMixin, RemoteInstanceDeleteFactory, \
     EanCodeValueMixin, SyncProgressMixin
 import logging
@@ -33,6 +38,10 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     delete_product_factory = None
     add_variation_factory = None
     accepted_variation_already_exists_error = None
+
+    # Determines whether the sales channel allows duplicate SKUs across
+    # standalone products and variations.
+    sales_channel_allow_duplicate_sku = False
 
     field_mapping = {}  # Mapping of local fields to remote fields, should be overridden in subclasses
 
@@ -71,6 +80,58 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             assign.save()
 
     def preflight_check(self):
+        return True
+
+    def sanity_check(self):
+        """Run pre-sync validations."""
+
+        if (
+                not self.sales_channel_allow_duplicate_sku
+                and self.local_instance.is_configurable()
+        ):
+            variations = self.local_instance.get_configurable_variations(active_only=True)
+            variation_ids = [v.id for v in variations]
+            conflicted_ids = SalesChannelViewAssign.objects.filter(
+                product_id__in=variation_ids,
+                sales_channel=self.sales_channel,
+                remote_product__isnull=False,
+            ).values_list("product_id", flat=True)
+
+            if conflicted_ids:
+                sku_map = {v.id: v.sku for v in variations}
+                conflicted_skus = [sku_map[pid] for pid in conflicted_ids]
+                skus = ", ".join(conflicted_skus)
+                raise VariationAlreadyExistsOnWebsite(
+                    f"Variations with SKU(s) {skus} already exist on this sales channel. "
+                    "Remove them before syncing as a configurable product."
+                )
+
+        if (
+                not self.sales_channel_allow_duplicate_sku
+                and not self.local_instance.is_configurable()
+                and SalesChannelViewAssign.objects.filter(
+                    product=self.local_instance,
+                    sales_channel=self.sales_channel,
+                ).exists()
+        ):
+
+            parents = list(self.local_instance.configurables.all())
+            parent_ids = [p.id for p in parents]
+            conflicted_parent_ids = SalesChannelViewAssign.objects.filter(
+                product_id__in=parent_ids,
+                sales_channel=self.sales_channel,
+                remote_product__isnull=False,
+            ).values_list("product_id", flat=True)
+
+            if conflicted_parent_ids:
+                sku_map = {p.id: p.sku for p in parents}
+                conflicted_skus = [sku_map[pid] for pid in conflicted_parent_ids]
+                skus = ", ".join(conflicted_skus)
+                raise VariationAlreadyExistsOnWebsite(
+                    f"Parent product(s) with SKU(s) {skus} already exist on this sales channel. "
+                    "Remove them before syncing this variation independently."
+                )
+
         return True
 
     def add_field_in_payload(self, field_name, value):
@@ -287,7 +348,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.add_field_in_payload('sku', self.sku)
 
     def get_variation_sku(self):
-        return f"{self.parent_local_instance.sku}-{self.local_instance.sku}"
+        return self.local_instance.sku
 
     def set_variation_sku(self):
         """Sets the SKU for variations, defaulting to parent_sku-child_sku."""
@@ -895,6 +956,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             if self.local_type == Product.CONFIGURABLE:
                 self.get_variations()
 
+            self.sanity_check()
+
             self.precalculate_progress_step_increment(4)
             self.set_local_assigns()
             self.set_rule()  # we put this here since if is not present we will stop the process
@@ -964,6 +1027,7 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
         try:
             self.initialize_remote_product()
             self.set_remote_product_for_logging()
+            self.sanity_check()
             self.precalculate_progress_step_increment(2)
             self.set_rule()
             self.build_payload()

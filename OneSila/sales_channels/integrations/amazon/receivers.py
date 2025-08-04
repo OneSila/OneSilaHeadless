@@ -14,6 +14,8 @@ from sales_channels.integrations.amazon.factories.sync.select_value_sync import 
     AmazonPropertySelectValuesSyncFactory,
 )
 from sales_channels.integrations.amazon.tasks import create_amazon_product_type_rule_task
+from imports_exports.signals import import_success
+from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonConfigurableVariationsFactory
 
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
@@ -92,3 +94,13 @@ def sales_channels__amazon_product_type__imported_rule(sender, instance, **kwarg
             product_type_code=instance.product_type_code,
             sales_channel_id=instance.sales_channel_id,
         )
+
+
+@receiver(import_success, sender='amazon.AmazonSalesChannelImport')
+def sales_channels__amazon_import_completed(sender, instance, **kwargs):
+
+    if instance.type != instance.TYPE_PRODUCTS:
+        return
+
+    factory = AmazonConfigurableVariationsFactory(import_process=instance)
+    factory.run()
