@@ -142,7 +142,7 @@ class AmazonSalesChannelMutation:
         """Refresh listing issues for a specific Amazon listing."""
         from sales_channels.models import SalesChannelViewAssign
         from sales_channels.integrations.amazon.factories.sales_channels.issues import (
-            RefreshLatestIssuesFactory,
+            FetchRemoteIssuesFactory,
         )
 
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
@@ -154,7 +154,10 @@ class AmazonSalesChannelMutation:
             sales_channel__multi_tenant_company=multi_tenant_company,
         )
 
-        factory = RefreshLatestIssuesFactory(assign=assign)
+        factory = FetchRemoteIssuesFactory(
+            remote_product=assign.remote_product,
+            view=assign.sales_channel_view,
+        )
         factory.run()
 
         return assign

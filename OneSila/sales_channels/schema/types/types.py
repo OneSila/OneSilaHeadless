@@ -299,24 +299,3 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
             return self.remote_product.syncing_current_percentage
 
         return 0
-
-    @field(description="List of formatted issues coming from the remote marketplace")
-    def formatted_issues(self, info) -> List[FormattedIssueType]:
-        issues_data = self.issues or []
-        sales_channel_instance = self.sales_channel.get_real_instance()
-
-        formatted: List[FormattedIssueType] = []
-
-        if isinstance(sales_channel_instance, AmazonSalesChannel):
-            for issue in issues_data:
-                if not isinstance(issue, dict):
-                    continue
-                formatted.append(
-                    FormattedIssueType(
-                        message=issue.get("message"),
-                        severity=issue.get("severity"),
-                        validation_issue=issue.get("validation_issue", False),
-                    )
-                )
-
-        return formatted

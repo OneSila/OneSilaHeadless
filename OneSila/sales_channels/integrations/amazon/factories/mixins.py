@@ -8,9 +8,10 @@ from sp_api.base import SellingApiException
 from spapi import SellersApi, SPAPIConfig, SPAPIClient, DefinitionsApi, ListingsApi
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
-from sales_channels.models import SalesChannelViewAssign
 from sales_channels.models.logs import RemoteLog
-from core.helpers import ensure_serializable
+from sales_channels.integrations.amazon.factories.sales_channels.issues import (
+    FetchRemoteValidationIssueFactory,
+)
 from deepdiff import DeepDiff
 
 import logging
@@ -43,39 +44,14 @@ class GetAmazonAPIMixin:
                                                                        AmazonSalesChannelView):
             return
 
-        assign = SalesChannelViewAssign.objects.filter(
-            product=self.remote_product.local_instance,
-            sales_channel_view=self.view,
-        ).first()
-        if not assign:
-            return
-
-        if assign.remote_product_id != self.remote_product.id:
-            assign.remote_product = self.remote_product
-
-        existing_issues = assign.issues or []
-
-        # Ensure each existing issue is a dictionary
-        existing_issues_dicts = [
-            ensure_serializable(issue.to_dict() if hasattr(issue, "to_dict") else issue)
-            for issue in existing_issues
-        ]
-
-        new_issues = []
-        for issue in issues or []:
-            issue_dict = ensure_serializable(
-                issue.to_dict() if hasattr(issue, "to_dict") else issue
-            )
-            issue_dict["validation_issue"] = True
-
-            if issue_dict not in existing_issues_dicts:
-                new_issues.append(issue_dict)
-
-        if new_issues:
-            assign.issues = existing_issues_dicts + new_issues
-            assign.save()
+        FetchRemoteValidationIssueFactory(
+            remote_product=self.remote_product,
+            view=self.view,
+            issues=issues,
+        ).run()
 
         if action_log and log_identifier:
+            stored = self.remote_product.get_issues(self.view)
             self.log_action(
                 action_log,
                 {},
@@ -83,7 +59,7 @@ class GetAmazonAPIMixin:
                 log_identifier,
                 submission_id=submission_id,
                 processing_status=processing_status,
-                issues=assign.issues,
+                issues=stored,
             )
 
     def _get_client(self):
