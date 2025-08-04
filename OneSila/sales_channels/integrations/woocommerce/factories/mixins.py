@@ -461,6 +461,12 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
                 if not isinstance(values, list):
                     values = [values]
 
+                if ga is None:
+                    raise ValueError(
+                        f"Missing global attribute for property ID={prod_prop.id}, "
+                        f"property='{getattr(prod_prop.property, 'name', 'UNKNOWN')}'"
+                    )
+
                 remote_id = int(ga.remote_id)
                 config_payload.append({
                     "id": remote_id,

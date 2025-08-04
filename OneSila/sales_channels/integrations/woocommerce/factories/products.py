@@ -119,6 +119,7 @@ class WooCommerceProductCreateFactory(WooCommerceProductSyncFactory, Woocommerce
     def __init__(self, *args, is_variation_add: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
         self.is_variation_add = is_variation_add
+        self.set_sku()
 
     def perform_non_subclassed_remote_action(self):
         """
@@ -156,6 +157,9 @@ class WooCommerceProductCreateFactory(WooCommerceProductSyncFactory, Woocommerce
         Attempts to fetch an existing product by SKU.
         """
         return self.api.get_product_by_sku(self.local_instance.sku)
+
+    def get_saleschannel_remote_object(self, remote_sku):
+        return self.api.get_product_by_sku(remote_sku)
 
 
 class WooCommerceProductUpdateFactory(WooCommerceProductSyncFactory, WoocommerceProductTypeMixin, RemoteProductUpdateFactory):

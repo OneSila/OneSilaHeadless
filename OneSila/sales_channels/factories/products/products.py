@@ -217,6 +217,11 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         :param existing_remote_property_ids: The list of existing remote property IDs to keep.
         """
+
+        # on create they weren't even created
+        if self.is_create:
+            return
+
         # Find remote product properties that are not in the list of existing IDs
         try:
             remote_properties_to_delete = self.remote_product_property_class.objects.filter(
@@ -1053,6 +1058,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
 
         except Exception as e:  # @TODO: This can be improved to give the type of the exception from the subclasses
             logger.debug(f"Product {self.local_instance.name} doesn't already exists. Ready for create.")
+            logger.error("Exception raised: {}".format(e))
 
     def run_sync_flow(self):
         """

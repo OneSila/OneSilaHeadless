@@ -136,6 +136,9 @@ class WoocommerceApiWrapper:
             if "already in use" in resp.text:
                 raise DuplicateError(e, response=resp) from e
 
+            if "wordt al gebruikt" in resp.text:
+                raise DuplicateError(e, response=resp) from e
+
             logger.error(f"Failed to post to {endpoint} with data: {data} , response: {resp.text} and error: {e}")
             raise FailedToPostError(e, response=resp) from e
 
