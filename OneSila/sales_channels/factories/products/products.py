@@ -111,7 +111,13 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
                 and not self.local_instance.is_configurable()
         ):
             parents = list(self.local_instance.configurables.all())
-            parent_ids = [p.id for p in parents]
+            parent_id = None
+            try:
+                parent_id = self.remote_parent_product.local_instance.id
+            except:
+                pass
+
+            parent_ids = [p.id for p in parents if parent_id is None or p.id != parent_id]
             conflicted_parent_ids = SalesChannelViewAssign.objects.filter(
                 product_id__in=parent_ids,
                 sales_channel=self.sales_channel,
