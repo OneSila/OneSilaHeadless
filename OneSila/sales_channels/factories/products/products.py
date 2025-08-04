@@ -109,15 +109,14 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         if (
                 not self.sales_channel_allow_duplicate_sku
                 and not self.local_instance.is_configurable()
+                and SalesChannelViewAssign.objects.filter(
+                    product=self.local_instance,
+                    sales_channel=self.sales_channel,
+                ).exists()
         ):
-            parents = list(self.local_instance.configurables.all())
-            parent_id = None
-            try:
-                parent_id = self.remote_parent_product.local_instance.id
-            except:
-                pass
 
-            parent_ids = [p.id for p in parents if parent_id is None or p.id != parent_id]
+            parents = list(self.local_instance.configurables.all())
+            parent_ids = [p.id for p in parents]
             conflicted_parent_ids = SalesChannelViewAssign.objects.filter(
                 product_id__in=parent_ids,
                 sales_channel=self.sales_channel,
