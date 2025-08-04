@@ -80,11 +80,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             assign.save()
 
     def preflight_check(self):
-        return True
-
-    def sanity_check(self):
-        """Run pre-sync validations."""
-
         if (
             not self.sales_channel_allow_duplicate_sku
             and self.local_instance.is_configurable()
@@ -106,7 +101,34 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
                     "Remove them before syncing as a configurable product."
                 )
 
-        # Additional sanity checks can be added with new `if` blocks above.
+        if (
+            not self.sales_channel_allow_duplicate_sku
+            and self.is_variation
+        ):
+            parents = list(self.local_instance.configurables.all())
+            parent_ids = [p.id for p in parents]
+            conflicted_parent_ids = SalesChannelViewAssign.objects.filter(
+                product_id__in=parent_ids,
+                sales_channel=self.sales_channel,
+                remote_product__isnull=False,
+            ).values_list("product_id", flat=True)
+
+            if conflicted_parent_ids:
+                sku_map = {p.id: p.sku for p in parents}
+                conflicted_skus = [sku_map[pid] for pid in conflicted_parent_ids]
+                skus = ", ".join(conflicted_skus)
+                raise VariationAlreadyExistsOnWebsite(
+                    f"Parent product(s) with SKU(s) {skus} already exist on this sales channel. "
+                    "Remove them before syncing this variation independently."
+                )
+
+        return True
+
+    def sanity_check(self):
+        """Run pre-sync validations."""
+
+        # Validation logic handled in preflight_check.
+        return True
 
     def add_field_in_payload(self, field_name, value):
         """
