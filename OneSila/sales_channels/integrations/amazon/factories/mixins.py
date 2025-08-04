@@ -9,9 +9,6 @@ from spapi import SellersApi, SPAPIConfig, SPAPIClient, DefinitionsApi, Listings
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 from sales_channels.models.logs import RemoteLog
-from sales_channels.integrations.amazon.factories.sales_channels.issues import (
-    FetchRemoteValidationIssueFactory,
-)
 from deepdiff import DeepDiff
 
 import logging
@@ -43,6 +40,7 @@ class GetAmazonAPIMixin:
         if not getattr(self, "remote_product", None) or not isinstance(getattr(self, "view", None),
                                                                        AmazonSalesChannelView):
             return
+        from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteValidationIssueFactory
 
         FetchRemoteValidationIssueFactory(
             remote_product=self.remote_product,
