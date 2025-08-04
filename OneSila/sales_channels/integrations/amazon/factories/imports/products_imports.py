@@ -479,11 +479,19 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                     sales_channel=self.sales_channel,
                     local_instance=product_property,
                     remote_product=remote_product,
-                    remote_property=remote_property,
                 )
+
+                updated = False
+
+                if remote_product_property.remote_property != remote_property:
+                    remote_product_property.remote_property = remote_property
+                    updated = True
 
                 if not remote_product_property.remote_value:
                     remote_product_property.remote_value = remote_value
+                    updated = True
+
+                if updated:
                     remote_product_property.save()
 
     def handle_translations(self, import_instance: ImportProductInstance):

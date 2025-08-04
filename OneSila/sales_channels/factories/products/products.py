@@ -287,7 +287,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.add_field_in_payload('sku', self.sku)
 
     def get_variation_sku(self):
-        return f"{self.parent_local_instance.sku}-{self.local_instance.sku}"
+        return f"{self.local_instance.sku}"
 
     def set_variation_sku(self):
         """Sets the SKU for variations, defaulting to parent_sku-child_sku."""
