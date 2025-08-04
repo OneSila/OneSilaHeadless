@@ -217,6 +217,11 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         :param existing_remote_property_ids: The list of existing remote property IDs to keep.
         """
+
+        # on create they weren't even created
+        if self.is_create:
+            return
+
         # Find remote product properties that are not in the list of existing IDs
         try:
             remote_properties_to_delete = self.remote_product_property_class.objects.filter(
