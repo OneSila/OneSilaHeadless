@@ -236,8 +236,7 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
 
     def get_configurable_product_attributes(self):
         product = self.get_local_product()
-        items = product.get_configurator_properties(public_information_only=False)
-        return [item.property for item in items]
+        return product.get_configurator_properties(public_information_only=False)
 
     def get_global_attribute(self, prod_prop):
         # We only get a global attribute if the property has add_to_filters set to True.
@@ -455,12 +454,18 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
             # First step, get all of the variations possibilities.
             configurator_attributes = self.get_configurable_product_attributes()
             config_payload = []
-            for prod_prop in configurator_attributes:
+            for prod_prop in configurator_attributes.iterator():
                 ga = self.get_global_attribute(prod_prop)
                 values = self.get_configurator_property_values(prod_prop)
 
                 if not isinstance(values, list):
                     values = [values]
+
+                if ga is None:
+                    raise ValueError(
+                        f"Missing global attribute for property ID={prod_prop.id}, "
+                        f"property='{getattr(prod_prop.property, 'name', 'UNKNOWN')}'"
+                    )
 
                 remote_id = int(ga.remote_id)
                 config_payload.append({
