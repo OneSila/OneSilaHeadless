@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
     remote_model_class = ShopifyProduct
+    sales_channel_allow_duplicate_sku = True
 
     # Sub-factories for images, metafields, EAN, etc.
     remote_image_assign_create_factory = ShopifyMediaProductThroughCreateFactory
