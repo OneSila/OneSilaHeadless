@@ -455,7 +455,7 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
             # First step, get all of the variations possibilities.
             configurator_attributes = self.get_configurable_product_attributes()
             config_payload = []
-            for prod_prop in configurator_attributes.iterator():
+            for prod_prop in configurator_attributes:
                 ga = self.get_global_attribute(prod_prop)
                 values = self.get_configurator_property_values(prod_prop)
 
