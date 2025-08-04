@@ -22,3 +22,9 @@ class PreFlightCheckError(Exception):
     Exception raised when a pre-flight check fails.
     """
     pass
+
+
+class VariationAlreadyExistsOnWebsite(Exception):
+    """Raised when attempting to create a variation that already exists as a
+    standalone product on the remote sales channel."""
+    pass
