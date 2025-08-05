@@ -355,7 +355,7 @@ class AsyncProductImportMixin(ImportMixin):
 
             update_delta = None
             if idx % self._threshold_chunk == 0:
-                update_delta = self._threshold_chunk
+                update_delta = math.floor((idx / self.total_import_instances_cnt) * 100)
 
             serialized = serialize_listing_item(item)
             self.dispatch_task(serialized, is_last=False, updated_with=update_delta)
