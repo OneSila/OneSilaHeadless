@@ -108,6 +108,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     # ------------------------------------------------------------------
     # Structuring
     # ------------------------------------------------------------------
+    @timeit_and_log(logger, "AmazonProductsImportProcessor._get_summary")
     def _get_summary(self, product):
         summaries = product.get("summaries") or []
         return summaries[0] if summaries else {}
@@ -253,12 +254,10 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         return attrs, mirror_map
 
-    @timeit_and_log(logger, "AmazonProductsImportProcessor.get_catalog_api_client")
     def get_catalog_api_client(self):
         return CatalogApi(self._get_client())
 
     @throttle_safe(max_retries=5, base_delay=1)
-    @timeit_and_log(logger, "AmazonProductsImportProcessor._fetch_catalog_attributes")
     def _fetch_catalog_attributes(self, asin, view):
         """Fetch additional catalog attributes for a product."""
         if not asin or not view:
