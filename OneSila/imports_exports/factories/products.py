@@ -146,7 +146,6 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
     def updatable_fields(self):
         return ['active', 'allow_backorder', 'vat_rate']
 
-    @timeit_and_log(logger)
     def validate(self):
         """
         Validate that the 'value' key exists.
@@ -157,7 +156,6 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
         if hasattr(self, 'type') and self.type not in [Product.SIMPLE, Product.CONFIGURABLE, Product.BUNDLE, Product.ALIAS]:
             raise ValueError("Invalid 'type' value.")
 
-    @timeit_and_log(logger)
     def _set_vat_rate(self):
 
         if hasattr(self, 'vat_rate'):
@@ -183,7 +181,6 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
             self.vat_rate = vat_rate_object
             self.vat_rate_instance = self.vat_rate
 
-    @timeit_and_log(logger)
     def update_ean_code(self):
 
         if not hasattr(self, 'ean_code') or not self.ean_code:
@@ -283,7 +280,6 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
 
         self.rule_instance = self.rule
 
-    @timeit_and_log(logger)
     def _set_translations(self):
 
         if not getattr(self, 'translations', []):
@@ -317,7 +313,6 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
         if self.created:
             self.create_translations()
 
-    @timeit_and_log(logger)
     def update_product_rule(self):
 
         if self.rule and self.instance and self.rule != self.instance.get_product_rule():
