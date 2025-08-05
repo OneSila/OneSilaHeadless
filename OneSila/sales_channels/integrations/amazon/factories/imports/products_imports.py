@@ -597,7 +597,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
         # Kickstarting the AddLogTimeentry class settings.
         self._set_logger(logger)
-        self._set_start_time()
+        self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before settings prodduct Instance.")
 
         product_instance = None
         qs = AmazonProduct.objects.filter(
@@ -622,7 +622,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         else:
             is_variation, parent_skus = get_is_product_variation(product)
 
-        self._set_start_time()
+        self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before getting summary")
 
         summary = self._get_summary(product)
         rule = self.get_product_rule(product)
@@ -662,7 +662,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
                     child_sku=structured["sku"],
                 )
 
-        self._set_start_time()
+        self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before creating ImportProductInstance.")
 
         instance = ImportProductInstance(
             structured,
@@ -732,7 +732,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         else:
             self.handle_attributes(instance)
 
-        self._set_start_time()
+        self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before handling translations, prices and images")
 
         self.handle_translations(instance)
         self.handle_prices(instance)
