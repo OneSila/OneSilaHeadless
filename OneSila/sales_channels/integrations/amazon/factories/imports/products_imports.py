@@ -311,6 +311,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 break
         return configurator_values, amazon_theme
 
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.get_product_rule")
     def get_product_rule(self, product_data):
         summary = self._get_summary(product_data)
         product_type_code = summary.get("product_type")
