@@ -11,6 +11,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
     AmazonPropertySelectValue,
+    AmazonProduct,
     AmazonProductType,
     AmazonSalesChannelImport, AmazonProductTypeItem,
     AmazonDefaultUnitConfigurator,
@@ -23,6 +24,7 @@ from properties.schema.types.filters import (
     ProductPropertiesRuleFilter,
     ProductPropertiesRuleItemFilter,
 )
+from products.schema.types.filters import ProductFilter
 from sales_channels.schema.types.filters import (
     SalesChannelFilter,
     SalesChannelViewFilter,
@@ -120,6 +122,13 @@ class AmazonProductTypeItemFilter(SearchFilterMixin):
     local_instance: Optional[ProductPropertiesRuleItemFilter]
     remote_property: Optional[AmazonPropertyFilter]
     remote_type: auto
+
+
+@filter(AmazonProduct)
+class AmazonProductFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: Optional[ProductFilter]
 
 
 @filter(AmazonSalesChannelImport)

@@ -14,6 +14,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
     AmazonPropertySelectValue,
+    AmazonProduct,
     AmazonProductType,
     AmazonProductTypeItem,
     AmazonSalesChannelImport,
@@ -26,6 +27,7 @@ from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelFilter,
     AmazonPropertyFilter,
     AmazonPropertySelectValueFilter,
+    AmazonProductFilter,
     AmazonProductTypeFilter,
     AmazonProductTypeItemFilter,
     AmazonSalesChannelImportFilter, AmazonDefaultUnitConfiguratorFilter,
@@ -35,6 +37,7 @@ from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
     AmazonPropertyOrder,
     AmazonPropertySelectValueOrder,
+    AmazonProductOrder,
     AmazonProductTypeOrder,
     AmazonProductTypeItemOrder,
     AmazonSalesChannelImportOrder,
@@ -223,6 +226,28 @@ class AmazonSalesChannelViewType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def active(self, info) -> bool:
         return self.sales_channel.active
+
+
+@type(
+    AmazonProduct,
+    filters=AmazonProductFilter,
+    order=AmazonProductOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonProductType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]]
+
+    @field()
+    def has_errors(self, info) -> bool | None:
+        return self.has_errors
 
 
 @type(
