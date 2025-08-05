@@ -95,10 +95,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
     # ------------------------------------------------------------------
     # Data fetching
     # ------------------------------------------------------------------
-    @timeit_and_log(logger, "AmazonProductsImportProcessor.get_total_instances")
     def get_total_instances(self):
-        # FIXME/HELP: What is this used for? Return 0 to not have it work at all
-        # for performance?
         return self.get_total_number_of_products()
 
     @timeit_and_log(logger, "AmazonProductsImportProcessor.get_products_data")
@@ -109,7 +106,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
     # ------------------------------------------------------------------
     # Structuring
     # ------------------------------------------------------------------
-    @timeit_and_log(logger, "AmazonProductsImportProcessor._get_summary")
     def _get_summary(self, product):
         summaries = product.get("summaries") or []
         return summaries[0] if summaries else {}
@@ -773,7 +769,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
             response_data=product
         ).run()
 
-    @timeit_and_log(logger, "AmazonProductsImportProcessor.import_products_process")
     def import_products_process(self):
         for product in self.get_products_data():
             self.process_product_item(product)
