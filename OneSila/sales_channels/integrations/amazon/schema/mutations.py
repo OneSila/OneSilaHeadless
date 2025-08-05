@@ -8,6 +8,7 @@ from sales_channels.integrations.amazon.schema.types.input import (
     AmazonPropertyPartialInput,
     AmazonPropertySelectValueInput,
     AmazonPropertySelectValuePartialInput,
+    AmazonProductPartialInput,
     AmazonProductTypeInput,
     AmazonProductTypePartialInput,
     AmazonProductTypeItemInput,
@@ -29,13 +30,10 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonSalesChannelImportType,
     AmazonDefaultUnitConfiguratorType,
     AmazonSalesChannelViewType,
+    AmazonProductType as AmazonProductGraphqlType,
     SuggestedAmazonProductType, SuggestedAmazonProductTypeEntry,
 )
-from sales_channels.schema.types.input import (
-    SalesChannelViewAssignPartialInput,
-    SalesChannelViewPartialInput,
-)
-from sales_channels.schema.types.types import SalesChannelViewAssignType
+from sales_channels.schema.types.input import SalesChannelViewPartialInput
 from core.schema.core.mutations import create, type, List, update, delete
 from strawberry import Info
 import strawberry_django
@@ -137,30 +135,80 @@ class AmazonSalesChannelMutation:
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def refresh_amazon_latest_issues(
-        self, instance: SalesChannelViewAssignPartialInput, info: Info
-    ) -> SalesChannelViewAssignType:
-        """Refresh listing issues for a specific Amazon listing."""
-        from sales_channels.models import SalesChannelViewAssign
+        self,
+        remote_product: AmazonProductPartialInput,
+        view: AmazonSalesChannelViewPartialInput,
+        info: Info,
+    ) -> AmazonProductGraphqlType:
+        """Refresh listing issues for a specific Amazon product."""
+        from sales_channels.integrations.amazon.models import (
+            AmazonProduct,
+            AmazonSalesChannelView,
+        )
         from sales_channels.integrations.amazon.factories.sales_channels.issues import (
             FetchRemoteIssuesFactory,
         )
 
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
 
-        assign = SalesChannelViewAssign.objects.select_related(
-            "remote_product", "sales_channel_view", "sales_channel"
-        ).get(
-            id=instance.id.node_id,
+        remote_product = AmazonProduct.objects.select_related("sales_channel").get(
+            id=remote_product.id.node_id,
+            sales_channel__multi_tenant_company=multi_tenant_company,
+        )
+
+        view = AmazonSalesChannelView.objects.select_related("sales_channel").get(
+            id=view.id.node_id,
             sales_channel__multi_tenant_company=multi_tenant_company,
         )
 
         factory = FetchRemoteIssuesFactory(
-            remote_product=assign.remote_product,
-            view=assign.sales_channel_view,
+            remote_product=remote_product,
+            view=view,
         )
         factory.run()
 
-        return assign
+        return remote_product
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def resync_amazon_product(
+        self,
+        remote_product: AmazonProductPartialInput,
+        view: AmazonSalesChannelViewPartialInput,
+        force_validation_only: bool,
+        info: Info,
+    ) -> AmazonProductGraphqlType:
+        """Trigger a manual sync for an Amazon product."""
+        from sales_channels.integrations.amazon.models import (
+            AmazonProduct,
+            AmazonSalesChannelView,
+        )
+        from sales_channels.signals import manual_sync_remote_product
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        remote_product = AmazonProduct.objects.select_related("sales_channel").get(
+            id=remote_product.id.node_id,
+            sales_channel__multi_tenant_company=multi_tenant_company,
+        )
+
+        view = AmazonSalesChannelView.objects.select_related("sales_channel").get(
+            id=view.id.node_id,
+            sales_channel__multi_tenant_company=multi_tenant_company,
+        )
+
+        if remote_product.syncing_current_percentage != 100:
+            raise ValidationError(
+                _("You can't resync the product because is currently syncing."),
+            )
+
+        manual_sync_remote_product.send(
+            sender=remote_product.__class__,
+            instance=remote_product,
+            view=view,
+            force_validation_only=force_validation_only,
+        )
+
+        return remote_product
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def suggest_amazon_product_type(
