@@ -158,6 +158,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 index += 1
         return images
 
+    @track_time(logger)
     def _parse_attributes(self, attributes, product_type, marketplace):
         attrs = []
         mirror_map = {}
@@ -249,6 +250,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         return attrs, mirror_map
 
+    @track_time(logger)
     @throttle_safe(max_retries=5, base_delay=1)
     def _fetch_catalog_attributes(self, asin, view):
         """Fetch additional catalog attributes for a product."""
@@ -279,6 +281,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         return {}
 
+    @track_time(logger)
     def _parse_configurator_select_values(self, product):
         configurator_values = []
         amazon_theme = None
@@ -327,6 +330,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         remote_lang = view.remote_languages.first()
         return remote_lang.local_instance if remote_lang else None
 
+    @track_time(logger)
     def get__product_data(self, product_data):
         summary = self._get_summary(product_data)
         asin = summary.get("asin")
@@ -771,7 +775,7 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
         self.is_last = is_last
         self.updated_with = updated_with
 
-    @track_time(logger)
+    @track_time(logger, default_msg='AmazonProductItemFactory RUN')
     def run(self):
         try:
             self.process_product_item(self.product_data)
