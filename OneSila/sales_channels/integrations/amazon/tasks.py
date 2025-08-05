@@ -20,7 +20,7 @@ def amazon_import_db_task(import_process, sales_channel):
         fac.run()
 
 
-@db_task()
+@db_task(priority=HIGH_PRIORITY)
 def amazon_product_import_item_task(
     import_process_id, sales_channel_id, product_data, is_last=False, updated_with=None
 ):
