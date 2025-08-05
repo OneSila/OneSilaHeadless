@@ -96,7 +96,8 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     # ------------------------------------------------------------------
     @timeit_and_log(logger, "AmazonProductsImportProcessor.get_total_instances")
     def get_total_instances(self):
-        # FIXME: What is this used for?
+        # FIXME/HELP: What is this used for? Return 0 to not have it work at all
+        # for performance?
         return self.get_total_number_of_products()
 
     @timeit_and_log(logger, "AmazonProductsImportProcessor.get_products_data")
@@ -252,13 +253,18 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         return attrs, mirror_map
 
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.get_catalog_api_client")
+    def get_catalog_api_client(self):
+        return CatalogApi(self._get_client())
+
     @throttle_safe(max_retries=5, base_delay=1)
+    @timeit_and_log(logger, "AmazonProductsImportProcessor._fetch_catalog_attributes")
     def _fetch_catalog_attributes(self, asin, view):
         """Fetch additional catalog attributes for a product."""
         if not asin or not view:
             return {}
 
-        catalog_api = CatalogApi(self._get_client())
+        catalog_api = self.get_catalog_api_client()
         try:
             response = catalog_api.get_catalog_item(
                 asin,
@@ -590,6 +596,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 f"sales_channel_id={self.sales_channel.id}"
             ) from e
 
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.process_product_item")
     def process_product_item(self, product):
         from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
 
