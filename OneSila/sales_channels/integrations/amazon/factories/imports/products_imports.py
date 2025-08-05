@@ -4,7 +4,7 @@ from django.utils import timezone
 import logging
 import traceback
 from django.db import IntegrityError
-from core.decorators import timeit_and_log
+from core.logging_helpers import AddLogTimeentry, timeit_and_log
 from imports_exports.factories.imports import ImportMixin, AsyncProductImportMixin
 from imports_exports.factories.products import ImportProductInstance
 from products.models import Product
@@ -39,7 +39,6 @@ from dateutil.parser import parse
 import datetime
 from imports_exports.helpers import append_broken_record, increment_processed_records
 from sales_channels.integrations.amazon.models.imports import AmazonImportRelationship
-from core.logging_helpers import AddLogTimeentry
 
 logger = logging.getLogger(__name__)
 
