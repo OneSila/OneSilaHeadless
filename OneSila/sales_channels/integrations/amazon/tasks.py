@@ -1,5 +1,5 @@
 from huey.contrib.djhuey import db_task
-from core.huey import LOW_PRIORITY
+from core.huey import LOW_PRIORITY, HIGH_PRIORITY
 from sales_channels.decorators import remote_task
 from core.decorators import run_task_after_commit
 
@@ -10,7 +10,7 @@ def amazon_import_db_task(import_process, sales_channel):
     from sales_channels.integrations.amazon.factories.imports.schema_imports import AmazonSchemaImportProcessor
     from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonProductsImportProcessor
     from sales_channels.integrations.amazon.models import AmazonSalesChannelImport
-    from sales_channels.integrations.amazon.factories.imports.products_imports import  AmazonProductsAsyncImportProcessor
+    from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonProductsAsyncImportProcessor
 
     if import_process.type == AmazonSalesChannelImport.TYPE_SCHEMA:
         fac = AmazonSchemaImportProcessor(import_process=import_process, sales_channel=sales_channel)
@@ -21,7 +21,7 @@ def amazon_import_db_task(import_process, sales_channel):
         fac.run()
 
 
-@remote_task(priority=LOW_PRIORITY)
+@remote_task(priority=HIGH_PRIORITY)
 @db_task()
 def amazon_product_import_item_task(
     import_process_id, sales_channel_id, product_data, is_last=False, updated_with=None
@@ -40,6 +40,7 @@ def amazon_product_import_item_task(
         updated_with=updated_with,
     )
     fac.run()
+
 
 @run_task_after_commit
 @db_task()
