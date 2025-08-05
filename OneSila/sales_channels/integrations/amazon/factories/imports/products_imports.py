@@ -601,6 +601,8 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
     @timeit_and_log(logger, "AmazonProductsImportProcessor.process_product_item")
     def process_product_item(self, product):
         from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
+        # Kickstarting the AddLogTimeentry class settings.
+        self._set_logger(logger)
         self._set_start_time()
 
         product_instance = None

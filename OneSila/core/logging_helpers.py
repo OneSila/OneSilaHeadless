@@ -6,14 +6,18 @@ logger = logging.getLogger(__name__)
 
 
 class AddLogTimeentry:
+    def _set_logger(self, logger):
+        self.add_log_time_entry_logger = logger
+
     def _set_start_time(self):
         self.start_time = timezone.now()
+        self.add_log_time_entry_logger.debug(f"Start timer: {self.start_time}")
 
     def get_log_message(self, message):
         return f"{message} took {timezone.now() - self.start_time}"
 
     def _add_log_entry(self, message):
-        logger.debug(self.get_log_message(message))
+        self.add_log_time_entry_logger.debug(self.get_log_message(message))
 
 
 def timeit_and_log(logger, default_msg='', print_logger=False):
