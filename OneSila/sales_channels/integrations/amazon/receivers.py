@@ -1,6 +1,10 @@
 from core.receivers import receiver
 from core.signals import post_create, post_update
-from sales_channels.signals import refresh_website_pull_models, sales_channel_created
+from sales_channels.signals import (
+    refresh_website_pull_models,
+    sales_channel_created,
+    manual_sync_remote_product,
+)
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
@@ -13,9 +17,13 @@ from sales_channels.integrations.amazon.factories.sync.rule_sync import (
 from sales_channels.integrations.amazon.factories.sync.select_value_sync import (
     AmazonPropertySelectValuesSyncFactory,
 )
-from sales_channels.integrations.amazon.tasks import create_amazon_product_type_rule_task
+from sales_channels.integrations.amazon.tasks import (
+    create_amazon_product_type_rule_task,
+    resync_amazon_product_db_task,
+)
 from imports_exports.signals import import_success
 from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonConfigurableVariationsFactory
+from sales_channels.integrations.amazon.flows.tasks_runner import run_single_amazon_product_task_flow
 
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
@@ -104,3 +112,19 @@ def sales_channels__amazon_import_completed(sender, instance, **kwargs):
 
     factory = AmazonConfigurableVariationsFactory(import_process=instance)
     factory.run()
+
+
+@receiver(manual_sync_remote_product, sender='amazon.AmazonProduct')
+def amazon__product__manual_sync(sender, instance, view, force_validation_only=False, **kwargs):
+    """Queue a task to resync an Amazon product."""
+    product = instance.local_instance
+    count = 1 + (getattr(product, 'get_configurable_variations', lambda: [])().count())
+
+    run_single_amazon_product_task_flow(
+        task_func=resync_amazon_product_db_task,
+        view=view,
+        number_of_remote_requests=count,
+        product_id=product.id,
+        remote_product_id=instance.id,
+        force_validation_only=force_validation_only,
+    )
