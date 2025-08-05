@@ -244,6 +244,10 @@ class AmazonProductType(relay.Node, GetQuerysetMultiTenantMixin):
         'ProductType',
         lazy("products.schema.types.types")
     ]]
+    issues: List[Annotated[
+        'AmazonProductIssueType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]]
 
     @field()
     def has_errors(self, info) -> bool | None:

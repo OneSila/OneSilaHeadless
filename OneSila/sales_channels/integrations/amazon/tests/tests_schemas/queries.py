@@ -9,3 +9,17 @@ query ($localInstance: GlobalID!) {
   }
 }
 """
+
+AMAZON_PRODUCT_WITH_ISSUES = """
+query ($id: GlobalID!) {
+  amazonProduct(id: $id) {
+    id
+    issues {
+      code
+      message
+      severity
+      isValidationIssue
+    }
+  }
+}
+"""
