@@ -1,9 +1,10 @@
 import pprint
 from decimal import Decimal
+from django.utils import timezone
 import logging
 import traceback
 from django.db import IntegrityError
-
+from core.logging_helpers import AddLogTimeentry, timeit_and_log
 from imports_exports.factories.imports import ImportMixin, AsyncProductImportMixin
 from imports_exports.factories.products import ImportProductInstance
 from products.models import Product
@@ -34,7 +35,6 @@ from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERT
 from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
 from sales_channels.models import SalesChannelViewAssign
 from core.helpers import ensure_serializable
-from core.decorators import track_time
 from dateutil.parser import parse
 import datetime
 from imports_exports.helpers import append_broken_record, increment_processed_records
@@ -43,7 +43,7 @@ from sales_channels.integrations.amazon.models.imports import AmazonImportRelati
 logger = logging.getLogger(__name__)
 
 
-class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
+class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeentry):
     """Basic Amazon products import processor."""
 
     import_properties = False
@@ -95,9 +95,13 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     # ------------------------------------------------------------------
     # Data fetching
     # ------------------------------------------------------------------
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.get_total_instances")
     def get_total_instances(self):
+        # FIXME/HELP: What is this used for? Return 0 to not have it work at all
+        # for performance?
         return self.get_total_number_of_products()
 
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.get_products_data")
     def get_products_data(self):
         # Delegate to the mixin helper which yields ListingItem objects
         yield from self.get_all_products()
@@ -105,6 +109,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     # ------------------------------------------------------------------
     # Structuring
     # ------------------------------------------------------------------
+    @timeit_and_log(logger, "AmazonProductsImportProcessor._get_summary")
     def _get_summary(self, product):
         summaries = product.get("summaries") or []
         return summaries[0] if summaries else {}
@@ -158,7 +163,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 index += 1
         return images
 
-    @track_time(logger)
+    @timeit_and_log(logger, "AmazonProductsImportProcessor._parse_attributes")
     def _parse_attributes(self, attributes, product_type, marketplace):
         attrs = []
         mirror_map = {}
@@ -250,14 +255,16 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         return attrs, mirror_map
 
-    @track_time(logger)
+    def get_catalog_api_client(self):
+        return CatalogApi(self._get_client())
+
     @throttle_safe(max_retries=5, base_delay=1)
     def _fetch_catalog_attributes(self, asin, view):
         """Fetch additional catalog attributes for a product."""
         if not asin or not view:
             return {}
 
-        catalog_api = CatalogApi(self._get_client())
+        catalog_api = self.get_catalog_api_client()
         try:
             response = catalog_api.get_catalog_item(
                 asin,
@@ -281,7 +288,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
 
         return {}
 
-    @track_time(logger)
+    @timeit_and_log(logger)
     def _parse_configurator_select_values(self, product):
         configurator_values = []
         amazon_theme = None
@@ -306,6 +313,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 break
         return configurator_values, amazon_theme
 
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.get_product_rule")
     def get_product_rule(self, product_data):
         summary = self._get_summary(product_data)
         product_type_code = summary.get("product_type")
@@ -330,7 +338,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         remote_lang = view.remote_languages.first()
         return remote_lang.local_instance if remote_lang else None
 
-    @track_time(logger)
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.get__product_data")
     def get__product_data(self, product_data):
         summary = self._get_summary(product_data)
         asin = summary.get("asin")
@@ -463,7 +471,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 amazon_ean_code.ean_code = import_instance.ean_code
                 amazon_ean_code.save()
 
-    @track_time(logger)
+    @timeit_and_log(logger)
     def handle_attributes(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, "properties"):
             product_properties = import_instance.product_property_instances
@@ -499,7 +507,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 if updated:
                     remote_product_property.save()
 
-    @track_time(logger)
+    @timeit_and_log(logger)
     def handle_translations(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, "translations"):
             AmazonProductContent.objects.get_or_create(
@@ -508,7 +516,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 remote_product=import_instance.remote_instance,
             )
 
-    @track_time(logger)
+    @timeit_and_log(logger)
     def handle_prices(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, "prices"):
             remote_product = import_instance.remote_instance
@@ -537,7 +545,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 amazon_price.price_data = price_data
                 amazon_price.save()
 
-    @track_time(logger)
+    @timeit_and_log(logger)
     def handle_images(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, "images"):
             for image_ass in import_instance.images_associations_instances:
@@ -548,7 +556,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                     remote_product=import_instance.remote_instance,
                 )
 
-    @track_time(logger)
+    @timeit_and_log(logger)
     def handle_variations(self, import_instance: ImportProductInstance):
         theme = import_instance.data.get("__amazon_theme")
         if not theme:
@@ -594,10 +602,12 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 f"sales_channel_id={self.sales_channel.id}"
             ) from e
 
-
-    @track_time(logger)
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.process_product_item")
     def process_product_item(self, product):
         from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
+        # Kickstarting the AddLogTimeentry class settings.
+        self._set_logger(logger)
+        self._set_start_time()
 
         product_instance = None
         qs = AmazonProduct.objects.filter(
@@ -622,6 +632,8 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         else:
             is_variation, parent_skus = get_is_product_variation(product)
 
+        self._set_start_time()
+
         summary = self._get_summary(product)
         rule = self.get_product_rule(product)
         structured, language, view = self.get__product_data(product)
@@ -630,6 +642,8 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             or not product.get("summaries")
             or not summary.get("product_type")
         )
+
+        self._add_log_entry("getting structured data")
 
         if remote_product and not missing_data:
             try:
@@ -658,6 +672,8 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                     child_sku=structured["sku"],
                 )
 
+        self._set_start_time()
+
         instance = ImportProductInstance(
             structured,
             import_process=self.import_process,
@@ -666,6 +682,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             instance=product_instance,
             update_current_rule=True
         )
+
         instance.prepare_mirror_model_class(
             mirror_model_class=AmazonProduct,
             sales_channel=self.sales_channel,
@@ -707,6 +724,8 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
             else:
                 return
 
+        self._add_log_entry("processing ImportProductInstance")
+
         self.update_remote_product(instance, product, view, is_variation)
         self.handle_ean_code(instance)
 
@@ -723,9 +742,13 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         else:
             self.handle_attributes(instance)
 
+        self._set_start_time()
+
         self.handle_translations(instance)
         self.handle_prices(instance)
         self.handle_images(instance)
+
+        self._add_log_entry("handling translations, prices and images")
 
         if structured['type'] == CONFIGURABLE:
             try:
@@ -744,14 +767,13 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         if not is_variation:
             self.handle_sales_channels_views(instance, structured, view)
 
-
         FetchRemoteIssuesFactory(
             remote_product=instance.remote_instance,
             view=view,
             response_data=product
         ).run()
 
-    @track_time(logger)
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.import_products_process")
     def import_products_process(self):
         for product in self.get_products_data():
             self.process_product_item(product)
@@ -775,7 +797,7 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
         self.is_last = is_last
         self.updated_with = updated_with
 
-    @track_time(logger, default_msg='AmazonProductItemFactory RUN')
+    @timeit_and_log(logger, "AmazonProductItemFactory.run")
     def run(self):
         try:
             self.process_product_item(self.product_data)

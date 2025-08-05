@@ -159,20 +159,21 @@ def products_inspector__inspector__trigger_block_product_properties_change(sende
     if not hasattr(instance.product, 'inspector'):
         return
 
+    # FIXME: The inspector is running as async, for the importer.
     inspector_block_refresh.send(sender=instance.product.inspector.__class__,
                                  instance=instance.product.inspector,
                                  error_code=MISSING_PRODUCT_TYPE_ERROR,
-                                 run_async=False)
+                                 run_async=True)
 
     inspector_block_refresh.send(sender=instance.product.inspector.__class__,
                                  instance=instance.product.inspector,
                                  error_code=MISSING_REQUIRED_PROPERTIES_ERROR,
-                                 run_async=False)
+                                 run_async=True)
 
     inspector_block_refresh.send(sender=instance.product.inspector.__class__,
                                  instance=instance.product.inspector,
                                  error_code=MISSING_OPTIONAL_PROPERTIES_ERROR,
-                                 run_async=False)
+                                 run_async=True)
 
 # MISSING_STOCK_ERROR  --------------------------------------------------
 
@@ -244,6 +245,7 @@ def products_inspector__inspector__trigger_block_product_type_variations_mismatc
     if not hasattr(instance.product, 'inspector'):
         return
 
+    # FIXME: The inspector is running as async, for the importer.
     product = instance.product
     error_codes_to_trigger = [VARIATION_MISMATCH_PRODUCT_TYPE_ERROR,
                               MISSING_EAN_CODE_ERROR,
@@ -254,13 +256,13 @@ def products_inspector__inspector__trigger_block_product_type_variations_mismatc
         inspector_block_refresh.send(sender=product.inspector.__class__,
                                      instance=product.inspector,
                                      error_code=error_code,
-                                     run_async=False)
+                                     run_async=True)
 
     for variation in ConfigurableVariation.objects.filter(variation=product).iterator():
         inspector_block_refresh.send(sender=variation.parent.inspector.__class__,
                                      instance=variation.parent.inspector,
                                      error_code=VARIATION_MISMATCH_PRODUCT_TYPE_ERROR,
-                                     run_async=False)
+                                     run_async=True)
 
 
 @receiver(post_create, sender='products.ConfigurableVariation')
@@ -335,6 +337,7 @@ def products_inspector__inspector__trigger_block_product_inspector_because_of_ac
 def products_inspector__inspector__trigger_block_duplicate_variations_check(sender, instance, **kwargs):
     from products.models import ConfigurableVariation
 
+    # FIXME: The inspector is running as async, for the importer.
     product = instance.product
     for variation in ConfigurableVariation.objects.filter(variation=product).iterator():
         parent = variation.parent
@@ -343,7 +346,7 @@ def products_inspector__inspector__trigger_block_duplicate_variations_check(send
             inspector_block_refresh.send(sender=parent.inspector.__class__,
                                          instance=parent.inspector,
                                          error_code=DUPLICATE_VARIATIONS_ERROR,
-                                         run_async=False)
+                                         run_async=True)
 
 
 @receiver(product_properties_rule_created, sender='properties.ProductPropertiesRule')

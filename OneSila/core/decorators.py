@@ -1,60 +1,10 @@
 from datetime import datetime
 from functools import wraps
 from django.db import transaction
+from core.logging_helpers import timeit_and_log
 
 import logging
 logger = logging.getLogger(__name__)
-
-
-def timeit_and_log(logger, default_msg='', print_logger=False):
-    '''
-    run a timer on a function, and log it, prepending the default_msg.
-    Useful for figuring out performance issues in factories.
-    '''
-    def deco_timeit(f):
-
-        @wraps(f)
-        def f_timeit(*args, **kwargs):
-            # Start the timer before running the function
-            start = datetime.now()
-
-            # Run the function and save the result
-            fn = f(*args, **kwargs)
-
-            # Stop the timer and prep the log message
-            stop = datetime.now()
-            msg = f"{default_msg} {f.__name__} took {stop - start}"
-            logger.info(msg)
-            if print_logger:
-                print(msg)
-
-            return fn
-
-        return f_timeit
-
-    return deco_timeit
-
-
-def track_time(logger, default_msg=''):
-    """
-    Measure execution time of the wrapped function and log it.
-
-    TODO: switch to logger.info once info logs are visible.
-    """
-    def deco_timeit(f):
-
-        @wraps(f)
-        def f_timeit(*args, **kwargs):
-            start = datetime.now()
-            result = f(*args, **kwargs)
-            stop = datetime.now()
-            msg = f"{default_msg} {f.__name__} took {stop - start}" if default_msg else f"{f.__name__} took {stop - start}"
-            logger.error(msg)  # TODO: use logger.info when logging configuration is fixed
-            return result
-
-        return f_timeit
-
-    return deco_timeit
 
 
 def trigger_pre_and_post_save(dirty_field, signal_pre=None, signal_post=None):
