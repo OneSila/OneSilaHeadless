@@ -606,21 +606,9 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
             multi_tenant_company=self.import_process.multi_tenant_company
         )
         remote_product = qs.first()
-
-        # if remote_product:
-        #     product_instance = remote_product.local_instance
-        #     is_variation = remote_product.is_variation
-        #
-        #     if is_variation and remote_product.remote_parent_product:
-        #         parent_skus = list(
-        #             AmazonProduct.objects
-        #             .filter(remote_parent_product=remote_product.remote_parent_product)
-        #             .values_list("remote_sku", flat=True)
-        #         )
-        #     else:
-        #         parent_skus = []
-        # else:
         is_variation, parent_skus = get_is_product_variation(product)
+        if remote_product:
+            is_variation = remote_product.is_variation
 
         self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before getting summary")
 
@@ -655,7 +643,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         self._add_log_entry(f"looked at missing data - {product.get('sku')} - before checking parent skus")
 
         if is_variation and parent_skus:
-
             for parent_sku in parent_skus:
                 structured['configurable_parent_sku'] = parent_sku
                 AmazonImportRelationship.objects.get_or_create(
