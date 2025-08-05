@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
+from django.test import override_settings
 import json
 
 from model_bakery import baker
@@ -656,6 +657,51 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         self.assertIsInstance(body, dict)
+
+    @override_settings(DEBUG=False)
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_create_product_factory_forces_validation_mode(self, mock_listings, mock_client):
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+            force_validation_only=True,
+        )
+        fac.run()
+
+        self.assertEqual(
+            mock_instance.put_listings_item.call_args.kwargs.get("mode"),
+            "VALIDATION_PREVIEW",
+        )
+
+    @override_settings(DEBUG=False)
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_update_product_factory_forces_validation_mode(self, mock_listings, mock_client):
+        mock_instance = mock_listings.return_value
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.get_listings_item.return_value = SimpleNamespace(attributes={})
+        self.remote_product.created_marketplaces = ['GB']
+        self.remote_product.save()
+
+        fac = AmazonProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+            force_validation_only=True,
+        )
+        fac.run()
+
+        self.assertEqual(
+            mock_instance.patch_listings_item.call_args.kwargs.get("mode"),
+            "VALIDATION_PREVIEW",
+        )
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])

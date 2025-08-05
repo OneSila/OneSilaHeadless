@@ -369,7 +369,9 @@ class GetAmazonAPIMixin:
         }
 
     @throttle_safe(max_retries=5, base_delay=1)
-    def create_product(self, sku, marketplace_id, product_type, attributes):
+    def create_product(
+        self, sku, marketplace_id, product_type, attributes, force_validation_only: bool = False
+    ):
         body = self._build_common_body(product_type, attributes)
         listings = ListingsApi(self._get_client())
 
@@ -387,7 +389,7 @@ class GetAmazonAPIMixin:
             marketplace_ids=[marketplace_id],
             body=body,
             issue_locale=self._get_issue_locale(),
-            mode="VALIDATION_PREVIEW" if settings.DEBUG else None,
+            mode="VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
         )
 
         submission_id = getattr(response, "submission_id", None)
@@ -448,6 +450,7 @@ class GetAmazonAPIMixin:
         product_type,
         new_attributes,
         current_attributes=None,
+        force_validation_only: bool = False,
     ):
         if current_attributes is None or current_attributes == {}:
             current_attributes = self.get_listing_attributes(sku, marketplace_id)
@@ -465,7 +468,7 @@ class GetAmazonAPIMixin:
             marketplace_ids=[marketplace_id],
             body=body,
             issue_locale=self._get_issue_locale(),
-            mode="VALIDATION_PREVIEW" if settings.DEBUG else None,
+            mode="VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
         )
         submission_id = getattr(response, "submission_id", None)
         processing_status = getattr(response, "status", None)
