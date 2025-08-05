@@ -3,7 +3,7 @@ from decimal import Decimal
 import logging
 import traceback
 from django.db import IntegrityError
-
+from core.decorators import timeit_and_log
 from imports_exports.factories.imports import ImportMixin, AsyncProductImportMixin
 from imports_exports.factories.products import ImportProductInstance
 from products.models import Product
@@ -94,9 +94,12 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
     # ------------------------------------------------------------------
     # Data fetching
     # ------------------------------------------------------------------
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.get_total_instances")
     def get_total_instances(self):
+        # FIXME: What is this used for?
         return self.get_total_number_of_products()
 
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.get_products_data")
     def get_products_data(self):
         # Delegate to the mixin helper which yields ListingItem objects
         yield from self.get_all_products()
@@ -157,6 +160,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 index += 1
         return images
 
+    @timeit_and_log(logger, "AmazonProductsImportProcessor._parse_attributes")
     def _parse_attributes(self, attributes, product_type, marketplace):
         attrs = []
         mirror_map = {}
@@ -326,6 +330,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         remote_lang = view.remote_languages.first()
         return remote_lang.local_instance if remote_lang else None
 
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.get__product_data")
     def get__product_data(self, product_data):
         summary = self._get_summary(product_data)
         asin = summary.get("asin")
@@ -585,7 +590,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
                 f"sales_channel_id={self.sales_channel.id}"
             ) from e
 
-
     def process_product_item(self, product):
         from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
 
@@ -734,13 +738,13 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin):
         if not is_variation:
             self.handle_sales_channels_views(instance, structured, view)
 
-
         FetchRemoteIssuesFactory(
             remote_product=instance.remote_instance,
             view=view,
             response_data=product
         ).run()
 
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.import_products_process")
     def import_products_process(self):
         for product in self.get_products_data():
             self.process_product_item(product)
@@ -764,6 +768,7 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
         self.is_last = is_last
         self.updated_with = updated_with
 
+    @timeit_and_log(logger, "AmazonProductItemFactory.run")
     def run(self):
         try:
             self.process_product_item(self.product_data)
