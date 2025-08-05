@@ -402,6 +402,22 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[%(asctime)s] %(levelname)s:%(name)s.%(funcName)20s() %(lineno)d: %(message)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+        # 'file': {
+        #     'level': 'DEBUG',
+        #     'class': 'logging.FileHandler',
+        #     'filename': '/var/log/OneSilaHeadless/django.log',
+        #     'formatter': 'verbose',
+        # },
+    },
     'loggers': {
         # The amazon package has a bug that shows you a log of the
         # request x-times every time you do a request.
@@ -426,17 +442,7 @@ LOGGING = {
             'propagate': False,
         },
     },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-        # 'file': {
-        #     'level': 'DEBUG',
-        #     'class': 'logging.FileHandler',
-        #     'filename': '/var/log/OneSilaHeadless/django.log',
-        #     'formatter': 'verbose',
-        # },
-    },
+
     # The amazon package has a bug that shows you a log of the
     # request x-times every time you do a request. The 'root' logger
     # config is for the same purpose of the remarks above in 'loggers'
