@@ -51,6 +51,31 @@ def run_product_amazon_sales_channel_task_flow(
                 )
 
 
+def run_single_amazon_product_task_flow(
+    task_func,
+    view,
+    number_of_remote_requests=None,
+    **kwargs,
+):
+    """Queue a task for a specific Amazon product and view."""
+    sales_channel = view.sales_channel
+
+    task_kwargs = {
+        "sales_channel_id": sales_channel.id,
+        "view_id": view.id,
+        **kwargs,
+    }
+
+    transaction.on_commit(
+        lambda lb_task_kwargs=task_kwargs, integration_id=sales_channel.id: add_task_to_queue(
+            integration_id=integration_id,
+            task_func_path=get_import_path(task_func),
+            task_kwargs=lb_task_kwargs,
+            number_of_remote_requests=number_of_remote_requests,
+        )
+    )
+
+
 def run_delete_product_specific_amazon_sales_channel_task_flow(
     task_func,
     remote_class,
