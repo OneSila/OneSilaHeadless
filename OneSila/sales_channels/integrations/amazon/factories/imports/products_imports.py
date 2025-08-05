@@ -66,6 +66,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         if exc is not None:
             record["error"] = str(exc)
             record["traceback"] = traceback.format_exc()
+
         self.broken_records.append(record)
 
         append_broken_record(self.import_process.id, record)

@@ -20,11 +20,15 @@ from sales_channels.integrations.amazon.models import (
     AmazonImageProductAssociation,
     AmazonTaxCode,
     AmazonDefaultUnitConfigurator,
-    AmazonImportRelationship,
+    AmazonImportRelationship, AmazonImportBrokenRecord,
 )
 from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
-from sales_channels.models import SalesChannelViewAssign
-
+from django.contrib import admin
+from django.utils.safestring import mark_safe
+import json
+from pygments import highlight
+from pygments.lexers import JsonLexer
+from pygments.formatters import HtmlFormatter
 
 @admin.register(AmazonSalesChannel)
 class AmazonSalesChannelAdmin(PolymorphicChildModelAdmin):
@@ -134,6 +138,29 @@ class AmazonImportRelationshipAdmin(admin.ModelAdmin):
     list_display = ("import_process", "parent_sku", "child_sku")
     search_fields = ("parent_sku", "child_sku")
     raw_id_fields = ("import_process",)
+
+
+@admin.register(AmazonImportBrokenRecord)
+class AmazonImportBrokenRecordAdmin(admin.ModelAdmin):
+    list_display = ("import_process",)
+    raw_id_fields = ("import_process",)
+
+    readonly_fields = ['formatted_broken_record']
+    exclude = ('record',)
+
+    def formatted_broken_record(self, instance):
+        if not instance.broken_records:
+            return "—"
+
+        response = json.dumps(instance.record, sort_keys=True, indent=2, ensure_ascii=False)
+        formatter = HtmlFormatter(style='colorful')
+        highlighted = highlight(response, JsonLexer(), formatter)
+
+        # Clean up and apply inline style
+        style = f"<style>{formatter.get_style_defs()}</style><br>"
+        return mark_safe(style + highlighted.replace('\\n', '<br/>'))
+
+    formatted_broken_record.short_description = 'Broken Records'
 
 
 @admin.register(AmazonPublicDefinition)
