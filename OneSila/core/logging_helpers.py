@@ -14,7 +14,7 @@ class AddLogTimeentry:
         self.add_log_time_entry_logger.debug(f"Start timer: {self.start_time}")
 
     def get_log_message(self, message):
-        return f"{message} took {timezone.now() - self.start_time}"
+        return f"{self.__class__.__name__}__{message} took {timezone.now() - self.start_time}"
 
     def _add_log_entry(self, message):
         self.add_log_time_entry_logger.debug(self.get_log_message(message))

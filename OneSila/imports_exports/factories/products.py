@@ -3,6 +3,7 @@ from hashlib import shake_256
 
 import shortuuid
 from django.db import IntegrityError
+from core.logging_helpers import AddLogTimeentry, timeit_and_log
 from currencies.models import Currency, PublicCurrency
 from eancodes.models import EanCode
 from imports_exports.factories.media import ImportImageInstance
@@ -65,7 +66,7 @@ class SalesPriceImport(ImportOperationMixin):
     get_identifiers = ['product', 'currency']
 
 
-class ImportProductInstance(AbstractImportInstance):
+class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
 
     def __init__(self, data: dict, import_process=None, rule=None, translations=None, instance=None, sales_channel=None, update_current_rule=False):
         super().__init__(data, import_process, instance)
@@ -145,6 +146,7 @@ class ImportProductInstance(AbstractImportInstance):
     def updatable_fields(self):
         return ['active', 'allow_backorder', 'vat_rate']
 
+    @timeit_and_log(logger)
     def validate(self):
         """
         Validate that the 'value' key exists.
@@ -155,6 +157,7 @@ class ImportProductInstance(AbstractImportInstance):
         if hasattr(self, 'type') and self.type not in [Product.SIMPLE, Product.CONFIGURABLE, Product.BUNDLE, Product.ALIAS]:
             raise ValueError("Invalid 'type' value.")
 
+    @timeit_and_log(logger)
     def _set_vat_rate(self):
 
         if hasattr(self, 'vat_rate'):
@@ -180,6 +183,7 @@ class ImportProductInstance(AbstractImportInstance):
             self.vat_rate = vat_rate_object
             self.vat_rate_instance = self.vat_rate
 
+    @timeit_and_log(logger)
     def update_ean_code(self):
 
         if not hasattr(self, 'ean_code') or not self.ean_code:
@@ -219,6 +223,7 @@ class ImportProductInstance(AbstractImportInstance):
         self.ean_code_instance.internal = False
         self.ean_code_instance.save()
 
+    @timeit_and_log(logger)
     def _set_rule(self):
 
         if self.rule and self.update_current_rule:
@@ -278,6 +283,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.rule_instance = self.rule
 
+    @timeit_and_log(logger)
     def _set_translations(self):
 
         if not getattr(self, 'translations', []):
@@ -288,11 +294,13 @@ class ImportProductInstance(AbstractImportInstance):
                 'sales_channel': self.sales_channel,
             }]
 
+    @timeit_and_log(logger)
     def pre_process_logic(self):
         self._set_vat_rate()
         self._set_rule()
         self._set_translations()
 
+    @timeit_and_log(logger)
     def process_logic(self):
 
         if self.type == Product.ALIAS:
@@ -309,6 +317,7 @@ class ImportProductInstance(AbstractImportInstance):
         if self.created:
             self.create_translations()
 
+    @timeit_and_log(logger)
     def update_product_rule(self):
 
         if self.rule and self.instance and self.rule != self.instance.get_product_rule():
@@ -332,6 +341,7 @@ class ImportProductInstance(AbstractImportInstance):
             product_property_import_instance.language = self.language
             product_property_import_instance.process()
 
+    @timeit_and_log(logger)
     def set_product_properties(self):
 
         if self.created:
@@ -361,6 +371,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.product_property_instances = ProductProperty.objects.filter(id__in=product_property_ids)
 
+    @timeit_and_log(logger)
     def set_images(self):
 
         images_instances_ids = []
@@ -383,6 +394,7 @@ class ImportProductInstance(AbstractImportInstance):
         self.image_instances = Image.objects.filter(id__in=images_instances_ids)
         self.images_associations_instances = MediaProductThrough.objects.filter(id__in=images_instances_associations_ids)
 
+    @timeit_and_log(logger)
     def set_prices(self):
         sales_price_ids = []
         for price in self.prices:
@@ -393,6 +405,7 @@ class ImportProductInstance(AbstractImportInstance):
                 # if the price is wrong we will skip it
                 pass
 
+    @timeit_and_log(logger)
     def set_variations(self):
         from .variations import ImportConfiguratorVariationsInstance, ImportConfigurableVariationInstance
 
@@ -422,6 +435,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.variations_products_instances = Product.objects.filter(id__in=variation_products_ids)
 
+    @timeit_and_log(logger)
     def set_bundle_variations(self):
         from .variations import ImportBundleVariationInstance
 
@@ -440,6 +454,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.bundle_variations_instances = Product.objects.filter(id__in=variation_products_ids)
 
+    @timeit_and_log(logger)
     def set_alias_variations(self):
         from .variations import ImportAliasVariationInstance
 
@@ -457,6 +472,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.alias_variations_instances = Product.objects.filter(id__in=variation_products_ids)
 
+    @timeit_and_log(logger)
     def set_rule_product_property(self):
         rule_product_property, _ = ProductProperty.objects.get_or_create(
             multi_tenant_company=self.config_product.multi_tenant_company,
@@ -468,6 +484,7 @@ class ImportProductInstance(AbstractImportInstance):
             rule_product_property.value_select = self.rule.product_type
             rule_product_property.save()
 
+    @timeit_and_log(logger)
     def _handle_parent_sku_links(self):
         parent_sku = self.data.get("configurable_parent_sku")
         if parent_sku:
@@ -491,6 +508,7 @@ class ImportProductInstance(AbstractImportInstance):
                 )
                 return
 
+    @timeit_and_log(logger)
     def post_process_logic(self):
         if self.type == Product.SIMPLE:
             self.update_ean_code()
@@ -517,6 +535,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self._handle_parent_sku_links()
 
+    @timeit_and_log(logger)
     def update_translations(self):
         translation_instance_ids = []
 
@@ -539,6 +558,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.translation_instances = ProductTranslation.objects.filter(id__in=translation_instance_ids)
 
+    @timeit_and_log(logger)
     def create_translations(self):
         translation_instance_ids = []
 

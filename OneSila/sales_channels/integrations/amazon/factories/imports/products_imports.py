@@ -613,8 +613,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         )
         remote_product = qs.first()
 
-        self._add_log_entry("getting remote product")
-
         if remote_product:
             product_instance = remote_product.local_instance
             is_variation = remote_product.is_variation
@@ -630,7 +628,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         else:
             is_variation, parent_skus = get_is_product_variation(product)
 
-        self._add_log_entry("getting parent skus")
+        self._set_start_time()
 
         summary = self._get_summary(product)
         rule = self.get_product_rule(product)
@@ -660,8 +658,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
                     context={"sku": structured.get("sku"), "asin": structured.get("__asin")},
                 )
 
-        self._add_log_entry("getting parent skus")
-
         if is_variation and parent_skus:
 
             for parent_sku in parent_skus:
@@ -672,7 +668,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
                     child_sku=structured["sku"],
                 )
 
-        self._add_log_entry("getting parent skus")
+        self._set_start_time()
 
         instance = ImportProductInstance(
             structured,
@@ -682,8 +678,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
             instance=product_instance,
             update_current_rule=True
         )
-
-        self._add_log_entry("preparing ImportProductInstance")
 
         instance.prepare_mirror_model_class(
             mirror_model_class=AmazonProduct,
@@ -697,8 +691,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
             },
         )
         instance.language = language
-
-        self._add_log_entry("preparing ImportProductInstance mirror model")
 
         try:
             instance.process()
@@ -733,8 +725,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         self.update_remote_product(instance, product, view, is_variation)
         self.handle_ean_code(instance)
 
-        self._add_log_entry("updating remote product")
-
         if missing_data:
             # sometimes the import send absolutely empty products just the sku
             # we still want to create the variation but that one fail on handle_attributes so we will just not
@@ -748,7 +738,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         else:
             self.handle_attributes(instance)
 
-        self._add_log_entry("updating remote product")
+        self._set_start_time()
 
         self.handle_translations(instance)
         self.handle_prices(instance)
@@ -770,20 +760,14 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
                     exc=e,
                 )
 
-            self._add_log_entry("handling variations")
-
         if not is_variation:
             self.handle_sales_channels_views(instance, structured, view)
-
-            self._add_log_entry("handling sales channels views")
 
         FetchRemoteIssuesFactory(
             remote_product=instance.remote_instance,
             view=view,
             response_data=product
         ).run()
-
-        self._add_log_entry("fetching remote issues")
 
     @timeit_and_log(logger, "AmazonProductsImportProcessor.import_products_process")
     def import_products_process(self):
