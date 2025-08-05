@@ -411,12 +411,12 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
         },
-        # 'file': {
-        #     'level': 'DEBUG',
-        #     'class': 'logging.FileHandler',
-        #     'filename': '/var/log/OneSilaHeadless/django.log',
-        #     'formatter': 'verbose',
-        # },
+        'amazon_log_file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': '/var/log/OneSilaHeadless/sales_channels_integrations_amazon.log',
+            'formatter': 'verbose',
+        },
     },
     'loggers': {
         # The amazon package has a bug that shows you a log of the
