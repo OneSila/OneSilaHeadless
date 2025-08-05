@@ -662,6 +662,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
                     import_process=self.import_process,
                     parent_sku=parent_sku,
                     child_sku=structured["sku"],
+                    multi_tenant_company=self.import_process.multi_tenant_company,
                 )
 
         self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before creating ImportProductInstance.")

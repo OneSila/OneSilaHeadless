@@ -1,5 +1,5 @@
 from sales_channels.models.imports import SalesChannelImport
-from django.db import models
+from core import models
 
 
 class AmazonSalesChannelImport(SalesChannelImport):
