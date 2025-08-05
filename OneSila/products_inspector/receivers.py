@@ -162,17 +162,17 @@ def products_inspector__inspector__trigger_block_product_properties_change(sende
     inspector_block_refresh.send(sender=instance.product.inspector.__class__,
                                  instance=instance.product.inspector,
                                  error_code=MISSING_PRODUCT_TYPE_ERROR,
-                                 run_async=False)
+                                 run_async=True)
 
     inspector_block_refresh.send(sender=instance.product.inspector.__class__,
                                  instance=instance.product.inspector,
                                  error_code=MISSING_REQUIRED_PROPERTIES_ERROR,
-                                 run_async=False)
+                                 run_async=True)
 
     inspector_block_refresh.send(sender=instance.product.inspector.__class__,
                                  instance=instance.product.inspector,
                                  error_code=MISSING_OPTIONAL_PROPERTIES_ERROR,
-                                 run_async=False)
+                                 run_async=True)
 
 # MISSING_STOCK_ERROR  --------------------------------------------------
 
