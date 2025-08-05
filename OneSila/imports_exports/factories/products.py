@@ -21,6 +21,7 @@ from sales_prices.models import SalesPrice
 from taxes.models import VatRate
 from currencies.currencies import iso_list
 from core.exceptions import ValidationError
+from core.decorators import track_time
 
 import logging
 logger = logging.getLogger(__name__)
@@ -361,6 +362,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.product_property_instances = ProductProperty.objects.filter(id__in=product_property_ids)
 
+    @track_time(logger)
     def set_images(self):
 
         images_instances_ids = []
@@ -383,6 +385,7 @@ class ImportProductInstance(AbstractImportInstance):
         self.image_instances = Image.objects.filter(id__in=images_instances_ids)
         self.images_associations_instances = MediaProductThrough.objects.filter(id__in=images_instances_associations_ids)
 
+    @track_time(logger)
     def set_prices(self):
         sales_price_ids = []
         for price in self.prices:
@@ -393,6 +396,7 @@ class ImportProductInstance(AbstractImportInstance):
                 # if the price is wrong we will skip it
                 pass
 
+    @track_time(logger)
     def set_variations(self):
         from .variations import ImportConfiguratorVariationsInstance, ImportConfigurableVariationInstance
 
@@ -422,6 +426,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.variations_products_instances = Product.objects.filter(id__in=variation_products_ids)
 
+    @track_time(logger)
     def set_bundle_variations(self):
         from .variations import ImportBundleVariationInstance
 
@@ -440,6 +445,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.bundle_variations_instances = Product.objects.filter(id__in=variation_products_ids)
 
+    @track_time(logger)
     def set_alias_variations(self):
         from .variations import ImportAliasVariationInstance
 
