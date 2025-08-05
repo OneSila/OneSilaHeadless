@@ -95,6 +95,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
     # ------------------------------------------------------------------
     # Data fetching
     # ------------------------------------------------------------------
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.get_total_instances")
     def get_total_instances(self):
         return self.get_total_number_of_products()
 
