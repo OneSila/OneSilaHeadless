@@ -410,6 +410,8 @@ LOGGING = {
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+            'level': 'DEBUG',
         },
         'amazon_log_file': {
             'level': 'DEBUG',
