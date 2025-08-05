@@ -18,6 +18,7 @@ class AddLogTimeentry:
 
     def _add_log_entry(self, message):
         self.add_log_time_entry_logger.debug(self.get_log_message(message))
+        self._set_start_time()
 
 
 def timeit_and_log(logger, default_msg='', print_logger=False):
