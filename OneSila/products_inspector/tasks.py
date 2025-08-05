@@ -5,7 +5,7 @@ from products_inspector.factories.inspector import ResyncInspectorFactory
 
 
 # @run_task_after_commit
-@db_task(priority=VERY_LOW_PRIORITY)
+@db_task(priority=0)
 def resync_inspector_task(inspector_id):
     from products_inspector.models import Inspector
     """
@@ -18,7 +18,7 @@ def resync_inspector_task(inspector_id):
 
 
 # @run_task_after_commit
-@db_task(priority=VERY_LOW_PRIORITY)
+@db_task(priority=0)
 def resync_inspector_block_task(block_id):
     from products_inspector.factories.inspector_block import InspectorBlockFactoryRegistry
     from products_inspector.models import InspectorBlock
@@ -31,7 +31,7 @@ def resync_inspector_block_task(block_id):
 
 
 # @run_task_after_commit
-@db_task(priority=VERY_LOW_PRIORITY)
+@db_task(priority=0)
 def trigger_rule_dependent_inspector_blocks_task(rule_id):
     from properties.models import ProductPropertiesRule
     from .flows.inspector_block import trigger_product_inspectors_for_rule_flow
