@@ -2,7 +2,7 @@ from huey.contrib.djhuey import db_task
 from core.decorators import run_task_after_commit
 
 
-@run_task_after_commit
+# @run_task_after_commit
 @db_task()
 def products__generate_variations_task(
     *,
@@ -27,4 +27,3 @@ def products__generate_variations_task(
         language=language,
     )
     factory.run()
-

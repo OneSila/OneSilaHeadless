@@ -40,7 +40,7 @@ def amazon_product_import_item_task(
     fac.run()
 
 
-@run_task_after_commit
+# @run_task_after_commit
 @db_task()
 def create_amazon_product_type_rule_task(product_type_code: str, sales_channel_id: int):
     """Create local properties rule for an imported product type."""
