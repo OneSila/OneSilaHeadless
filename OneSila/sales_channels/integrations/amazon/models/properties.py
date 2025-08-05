@@ -111,16 +111,17 @@ class AmazonProperty(RemoteProperty):
         if self.allow_multiple is not True:
             self.allow_multiple = True
 
-        if self.local_instance and self.local_instance.type != self.type:
-            raise ValidationError(
-                _(
-                    "Amazon property type %(remote)s must match local property type %(local)s."
-                )
-                % {
-                    "remote": self.get_type_display(),
-                    "local": self.local_instance.get_type_display(),
-                }
-            )
+        # @TODO: Temporary remove
+        # if self.local_instance and self.local_instance.type != self.type:
+        #     raise ValidationError(
+        #         _(
+        #             "Amazon property type %(remote)s must match local property type %(local)s."
+        #         )
+        #         % {
+        #             "remote": self.get_type_display(),
+        #             "local": self.local_instance.get_type_display(),
+        #         }
+        #     )
 
         if self.code:
             self.main_code = self.code.split("__", 1)[0]

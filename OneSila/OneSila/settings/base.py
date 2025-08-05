@@ -331,7 +331,7 @@ SALES_CHANNELS_INTEGRATIONS_TEST_STORES = {
 # Huey settings
 #
 HUEY = {
-    'huey_class': 'huey.RedisHuey',
+    'huey_class': 'huey.PriorityRedisHuey',
     'name': 'hueyonesilaheadless',
     'results': True,  # Store return values of tasks.
     'store_none': False,

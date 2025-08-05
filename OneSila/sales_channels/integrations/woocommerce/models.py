@@ -1,4 +1,4 @@
-from django.db import models
+from core import models
 from django.utils.translation import gettext as _
 from sales_channels.models import SalesChannel, SalesChannelView, \
     RemoteProduct, RemoteEanCode, RemoteCurrency, RemoteLanguage, \

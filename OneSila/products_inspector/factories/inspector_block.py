@@ -64,7 +64,6 @@ class InspectorBlockCreateOrUpdateFactory(InspectorCreateOrUpdateFactory):
         else:
             logger.info(f"InspectorBlock (error_code={self.error_code}) already exists for product {self.product.sku}")
 
-    @transaction.atomic
     def run(self):
         self._create_or_update_block()
 
@@ -153,7 +152,6 @@ class InspectorBlockFactory(SaveInspectorMixin):
 
         self.save_inspector()
 
-    @transaction.atomic
     def run(self):
         """
         Runs the inspection block process.
@@ -372,7 +370,6 @@ class VariationMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
         else:
             if variations_product_type_value.first() != product_type_value_id:
                 raise InspectorBlockFailed("Variations product type mismatch")
-
 
 
 @InspectorBlockFactoryRegistry.register(ITEMS_MISSING_MANDATORY_INFORMATION_ERROR)

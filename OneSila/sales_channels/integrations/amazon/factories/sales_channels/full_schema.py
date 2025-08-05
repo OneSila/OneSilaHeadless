@@ -579,11 +579,12 @@ class AmazonProductTypeRuleFactory(
         )
         required_properties = set(schema_data["required"])
 
-        validation_issues = self._run_fake_validation_preview(view)
-
-        for issue in validation_issues:
-            if issue.severity == "ERROR" and "MISSING_ATTRIBUTE" in issue.categories:
-                required_properties.update(issue.attribute_names)
+        # @TODO: Temporary remove
+        # validation_issues = self._run_fake_validation_preview(view)
+        #
+        # for issue in validation_issues:
+        #     if issue.severity == "ERROR" and "MISSING_ATTRIBUTE" in issue.categories:
+        #         required_properties.update(issue.attribute_names)
 
         if is_default:
             # create AmazonProductType the schema_data will have a title

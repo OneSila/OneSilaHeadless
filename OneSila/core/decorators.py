@@ -57,7 +57,8 @@ def run_task_after_commit(task_func):
     """
     @wraps(task_func)
     def wrapper(*args, **kwargs):
-        transaction.on_commit(lambda: task_func(*args, **kwargs))
+        task_func(*args, **kwargs)
+        # transaction.on_commit(lambda: task_func(*args, **kwargs))
 
     return wrapper
 

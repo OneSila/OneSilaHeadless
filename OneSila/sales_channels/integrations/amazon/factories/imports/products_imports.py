@@ -66,6 +66,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         if exc is not None:
             record["error"] = str(exc)
             record["traceback"] = traceback.format_exc()
+
         self.broken_records.append(record)
 
         append_broken_record(self.import_process.id, record)
@@ -95,6 +96,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
     # ------------------------------------------------------------------
     # Data fetching
     # ------------------------------------------------------------------
+    @timeit_and_log(logger, "AmazonProductsImportProcessor.get_total_instances")
     def get_total_instances(self):
         return self.get_total_number_of_products()
 
@@ -309,7 +311,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
                 break
         return configurator_values, amazon_theme
 
-    @timeit_and_log(logger, "AmazonProductsImportProcessor.get_product_rule")
     def get_product_rule(self, product_data):
         summary = self._get_summary(product_data)
         product_type_code = summary.get("product_type")
@@ -603,7 +604,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
         # Kickstarting the AddLogTimeentry class settings.
         self._set_logger(logger)
-        self._set_start_time()
+        self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before settings prodduct Instance.")
 
         product_instance = None
         qs = AmazonProduct.objects.filter(
@@ -612,23 +613,11 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
             multi_tenant_company=self.import_process.multi_tenant_company
         )
         remote_product = qs.first()
-
+        is_variation, parent_skus = get_is_product_variation(product)
         if remote_product:
-            product_instance = remote_product.local_instance
             is_variation = remote_product.is_variation
 
-            if is_variation:
-                parent_skus = list(
-                    AmazonProduct.objects
-                    .filter(remote_parent_product=remote_product.remote_parent_product)
-                    .values_list("remote_sku", flat=True)
-                )
-            else:
-                parent_skus = []
-        else:
-            is_variation, parent_skus = get_is_product_variation(product)
-
-        self._set_start_time()
+        self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before getting summary")
 
         summary = self._get_summary(product)
         rule = self.get_product_rule(product)
@@ -639,7 +628,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
             or not summary.get("product_type")
         )
 
-        self._add_log_entry("getting structured data")
+        self._add_log_entry(f"getting structured data - {product.get('sku')} - before checking remote products")
 
         if remote_product and not missing_data:
             try:
@@ -658,17 +647,19 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
                     context={"sku": structured.get("sku"), "asin": structured.get("__asin")},
                 )
 
-        if is_variation and parent_skus:
+        self._add_log_entry(f"looked at missing data - {product.get('sku')} - before checking parent skus")
 
+        if is_variation and parent_skus:
             for parent_sku in parent_skus:
                 structured['configurable_parent_sku'] = parent_sku
                 AmazonImportRelationship.objects.get_or_create(
                     import_process=self.import_process,
                     parent_sku=parent_sku,
                     child_sku=structured["sku"],
+                    multi_tenant_company=self.import_process.multi_tenant_company,
                 )
 
-        self._set_start_time()
+        self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before creating ImportProductInstance.")
 
         instance = ImportProductInstance(
             structured,
@@ -738,7 +729,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         else:
             self.handle_attributes(instance)
 
-        self._set_start_time()
+        self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before handling translations, prices and images")
 
         self.handle_translations(instance)
         self.handle_prices(instance)

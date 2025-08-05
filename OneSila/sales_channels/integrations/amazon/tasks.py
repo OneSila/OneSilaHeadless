@@ -4,7 +4,6 @@ from sales_channels.decorators import remote_task
 from core.decorators import run_task_after_commit
 
 
-@remote_task(priority=LOW_PRIORITY)
 @db_task()
 def amazon_import_db_task(import_process, sales_channel):
     from sales_channels.integrations.amazon.factories.imports.schema_imports import AmazonSchemaImportProcessor
@@ -21,8 +20,7 @@ def amazon_import_db_task(import_process, sales_channel):
         fac.run()
 
 
-@remote_task(priority=HIGH_PRIORITY)
-@db_task()
+@db_task(priority=HIGH_PRIORITY)
 def amazon_product_import_item_task(
     import_process_id, sales_channel_id, product_data, is_last=False, updated_with=None
 ):
@@ -42,7 +40,7 @@ def amazon_product_import_item_task(
     fac.run()
 
 
-@run_task_after_commit
+# @run_task_after_commit
 @db_task()
 def create_amazon_product_type_rule_task(product_type_code: str, sales_channel_id: int):
     """Create local properties rule for an imported product type."""

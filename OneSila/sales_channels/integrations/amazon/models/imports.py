@@ -1,5 +1,5 @@
 from sales_channels.models.imports import SalesChannelImport
-from django.db import models
+from core import models
 
 
 class AmazonSalesChannelImport(SalesChannelImport):
@@ -31,3 +31,18 @@ class AmazonImportRelationship(models.Model):
         unique_together = ("import_process", "parent_sku", "child_sku")
         verbose_name = "Amazon Import Relationship"
         verbose_name_plural = "Amazon Import Relationships"
+
+
+
+class AmazonImportBrokenRecord(models.Model):
+    """Store parent-child SKU pairs during async product import."""
+
+    import_process = models.ForeignKey('imports_exports.Import', on_delete=models.CASCADE, related_name='amazon_import_broken_records')
+    record = models.JSONField(
+        blank=True,
+        help_text="Store broken record that failed during import."
+    )
+
+    class Meta:
+        verbose_name = "Amazon Import Broken Record"
+        verbose_name_plural = "Amazon Import Broken Records"

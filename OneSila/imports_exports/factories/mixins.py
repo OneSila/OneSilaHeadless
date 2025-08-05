@@ -6,6 +6,8 @@ from core.helpers import get_nested_attr
 from django.conf import settings
 import abc
 
+from core.logging_helpers import timeit_and_log
+
 logger = logging.getLogger(__name__)
 
 
@@ -97,6 +99,7 @@ class AbstractImportInstance(abc.ABC):
     def set_remote_instance(self, remote_instance):
         self.remote_instance = remote_instance
 
+    @timeit_and_log(logger, "AbstractImportInstance.process")
     def process(self):
         """
         Process the validated import data.
