@@ -633,7 +633,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
             or not summary.get("product_type")
         )
 
-        self._add_log_entry("getting structured data")
+        self._add_log_entry(f"getting structured data - {product.get('sku')} - before checking remote products")
 
         if remote_product and not missing_data:
             try:
@@ -651,6 +651,8 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
                     data=structured,
                     context={"sku": structured.get("sku"), "asin": structured.get("__asin")},
                 )
+
+        self._add_log_entry(f"looked at missing data - {product.get('sku')} - before checking parent skus")
 
         if is_variation and parent_skus:
 
