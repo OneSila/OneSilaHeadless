@@ -35,6 +35,28 @@ def timeit_and_log(logger, default_msg='', print_logger=False):
     return deco_timeit
 
 
+def track_time(logger, default_msg=''):
+    """
+    Measure execution time of the wrapped function and log it.
+
+    TODO: switch to logger.info once info logs are visible.
+    """
+    def deco_timeit(f):
+
+        @wraps(f)
+        def f_timeit(*args, **kwargs):
+            start = datetime.now()
+            result = f(*args, **kwargs)
+            stop = datetime.now()
+            msg = f"{default_msg} {f.__name__} took {stop - start}" if default_msg else f"{f.__name__} took {stop - start}"
+            logger.error(msg)  # TODO: use logger.info when logging configuration is fixed
+            return result
+
+        return f_timeit
+
+    return deco_timeit
+
+
 def trigger_pre_and_post_save(dirty_field, signal_pre=None, signal_post=None):
     """
     Trigger a pre-save and post-save signal on the save method.
