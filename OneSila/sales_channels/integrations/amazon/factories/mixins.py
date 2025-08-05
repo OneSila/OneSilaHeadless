@@ -1,3 +1,4 @@
+from core.decorators import track_time
 from properties.models import Property, PropertyTranslation
 from sales_channels.integrations.amazon.constants import AMAZON_PATCH_SKIP_KEYS
 from sales_channels.integrations.amazon.models.properties import AmazonProperty
@@ -133,6 +134,7 @@ class GetAmazonAPIMixin:
 
         return getattr(payload, "attributes", {}) or {}
 
+    @track_time(logger)
     @throttle_safe(max_retries=5, base_delay=1)
     def _fetch_listing_items_page(
             self,
@@ -233,6 +235,7 @@ class GetAmazonAPIMixin:
 
         return sorted(product_types)
 
+    @track_time(logger)
     def get_all_products_by_marketplace(self, marketplace_id: str, listings_api, seller_id, issue_locale):
         created_after = None
         while True:
