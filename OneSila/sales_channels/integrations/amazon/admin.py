@@ -149,7 +149,7 @@ class AmazonImportBrokenRecordAdmin(admin.ModelAdmin):
     exclude = ('record',)
 
     def formatted_broken_record(self, instance):
-        if not instance.broken_records:
+        if not instance.record:
             return "—"
 
         response = json.dumps(instance.record, sort_keys=True, indent=2, ensure_ascii=False)
@@ -160,7 +160,7 @@ class AmazonImportBrokenRecordAdmin(admin.ModelAdmin):
         style = f"<style>{formatter.get_style_defs()}</style><br>"
         return mark_safe(style + highlighted.replace('\\n', '<br/>'))
 
-    formatted_broken_record.short_description = 'Broken Records'
+    formatted_broken_record.short_description = 'Broken Record'
 
 
 @admin.register(AmazonPublicDefinition)
