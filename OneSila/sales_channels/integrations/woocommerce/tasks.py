@@ -1,5 +1,5 @@
 from huey.contrib.djhuey import db_task
-from core.huey import HIGH_PRIORITY, MEDIUM_PRIORITY, LOW_PRIORITY
+from core.huey import HIGH_PRIORITY, MEDIUM_PRIORITY, LOW_PRIORITY, CRUCIAL_PRIORITY
 from currencies.models import Currency
 from products.models import Product
 from media.models import MediaProductThrough, Media
@@ -14,7 +14,8 @@ from sales_channels.integrations.woocommerce.models import WoocommerceSalesChann
 from sales_channels.models import RemoteProduct
 
 
-@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
+# Before: MEDIUM_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def create_woocommerce_product_db_task(task_queue_item_id, sales_channel_id, product_id):
     from .factories.products import WooCommerceProductCreateFactory
@@ -33,7 +34,8 @@ def create_woocommerce_product_db_task(task_queue_item_id, sales_channel_id, pro
     task.execute(actual_task)
 
 
-@remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
+# Before: HIGH_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def create_woocommerce_product_property_db_task(
     task_queue_item_id, sales_channel_id, product_property_id, remote_product_id
@@ -55,7 +57,8 @@ def create_woocommerce_product_property_db_task(
     task.execute(actual_task)
 
 
-@remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
+# Before: HIGH_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def update_woocommerce_product_property_db_task(
     task_queue_item_id, sales_channel_id, product_property_id, remote_product_id
@@ -77,7 +80,8 @@ def update_woocommerce_product_property_db_task(
     task.execute(actual_task)
 
 
-@remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
+# Before: HIGH_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def delete_woocommerce_product_property_db_task(
     task_queue_item_id, sales_channel_id, remote_product_id, remote_instance_id
@@ -102,7 +106,8 @@ def delete_woocommerce_product_property_db_task(
     task.execute(actual_task)
 
 
-@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
+# Before: MEDIUM_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def update_woocommerce_price_db_task(
         task_queue_item_id, sales_channel_id, product_id, remote_product_id, currency_id=None):
@@ -128,7 +133,8 @@ def update_woocommerce_price_db_task(
     task.execute(actual_task)
 
 
-@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
+# Before: MEDIUM_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def update_woocommerce_product_content_db_task(
     task_queue_item_id, sales_channel_id, product_id, remote_product_id, language=None
@@ -158,7 +164,8 @@ def update_woocommerce_product_content_db_task(
     task.execute(actual_task)
 
 
-@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
+# Before: MEDIUM_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def update_woocommerce_product_eancode_db_task(
     task_queue_item_id, sales_channel_id, product_id, remote_product_id
@@ -181,7 +188,8 @@ def update_woocommerce_product_eancode_db_task(
     task.execute(actual_task)
 
 
-@remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=2)
+# Before: HIGH_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=2)
 @db_task()
 def add_woocommerce_product_variation_db_task(
     task_queue_item_id, sales_channel_id, parent_product_id, variation_product_id
@@ -204,7 +212,8 @@ def add_woocommerce_product_variation_db_task(
     task.execute(actual_task)
 
 
-@remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
+# Before: HIGH_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def remove_woocommerce_product_variation_db_task(
     task_queue_item_id, sales_channel_id, parent_product_id, variation_product_id
@@ -238,7 +247,8 @@ def remove_woocommerce_product_variation_db_task(
     task.execute(actual_task)
 
 
-@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
+# Before: MEDIUM_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def create_woocommerce_image_association_db_task(
     task_queue_item_id, sales_channel_id, media_product_through_id, remote_product_id
@@ -260,7 +270,8 @@ def create_woocommerce_image_association_db_task(
     task.execute(actual_task)
 
 
-@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
+# Before: MEDIUM_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def update_woocommerce_image_association_db_task(
     task_queue_item_id, sales_channel_id, media_product_through_id, remote_product_id
@@ -281,8 +292,10 @@ def update_woocommerce_image_association_db_task(
 
     task.execute(actual_task)
 
+# Before: MEDIUM_PRIORITY
 
-@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=2)
+
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=2)
 @db_task()
 def delete_woocommerce_image_association_db_task(
     task_queue_item_id, sales_channel_id, remote_instance_id, remote_product_id
@@ -307,7 +320,8 @@ def delete_woocommerce_image_association_db_task(
     task.execute(actual_task)
 
 
-@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
+# Before: MEDIUM_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def delete_woocommerce_image_db_task(task_queue_item_id, sales_channel_id, image_id):
     from .factories.media import WooCommerceImageDeleteFactory
@@ -326,7 +340,8 @@ def delete_woocommerce_image_db_task(task_queue_item_id, sales_channel_id, image
     task.execute(actual_task)
 
 
-@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
+# Before: MEDIUM_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def update_woocommerce_product_db_task(
     task_queue_item_id, sales_channel_id, product_id, remote_product_id
@@ -346,7 +361,8 @@ def update_woocommerce_product_db_task(
     task.execute(actual_task)
 
 
-@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
+# Before: MEDIUM_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def sync_woocommerce_product_db_task(
     task_queue_item_id, sales_channel_id, product_id, remote_product_id
@@ -366,7 +382,8 @@ def sync_woocommerce_product_db_task(
     task.execute(actual_task)
 
 
-@remote_task(priority=MEDIUM_PRIORITY, number_of_remote_requests=1)
+# Before: MEDIUM_PRIORITY
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def delete_woocommerce_product_db_task(task_queue_item_id, sales_channel_id, remote_instance):
     from .factories.products import WooCommerceProductDeleteFactory
