@@ -344,11 +344,16 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
     @timeit_and_log(logger)
     def set_product_properties(self):
 
+        self._set_logger(logger)
+        self._set_start_time()
+
         if self.created:
             self.update_product_rule()
         else:
             if self.update_current_rule:
                 self.update_product_rule()
+
+        self._add_log_entry(" (set_product_properties) setting or updating product rule")
 
         product_property_ids = []
         if self.type in [Product.SIMPLE, Product.BUNDLE, Product.ALIAS] and hasattr(self, 'properties'):
@@ -370,6 +375,8 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
                     pass
 
         self.product_property_instances = ProductProperty.objects.filter(id__in=product_property_ids)
+
+        self._add_log_entry(f" (set_product_properties) looping through self.properties len=({len(self.properties)})")
 
     @timeit_and_log(logger)
     def set_images(self):
