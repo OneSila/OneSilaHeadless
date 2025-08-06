@@ -335,12 +335,12 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         return remote_lang.local_instance if remote_lang else None
 
     @timeit_and_log(logger, "AmazonProductsImportProcessor.get__product_data")
-    def get__product_data(self, product_data):
+    def get__product_data(self, product_data, is_variation):
         summary = self._get_summary(product_data)
         asin = summary.get("asin")
         status = summary.get("status") or []
         sku = product_data.get("sku")
-        type = infer_product_type(product_data)
+        type = infer_product_type(product_data, is_variation)
         marketplace_id = summary.get("marketplace_id")
 
         name = summary.get("item_name")
@@ -616,7 +616,12 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
 
         summary = self._get_summary(product)
         rule = self.get_product_rule(product)
-        structured, language, view = self.get__product_data(product)
+        structured, language, view = self.get__product_data(product, is_variation)
+
+        # if on the main marketplaces was configurable because the other doesn't have relationships
+        # will return SIMPLE as default which is wrong
+        if remote_product:
+            structured['type'] = remote_product.local_instance.type
 
         missing_data = (
             not product.get("attributes")
