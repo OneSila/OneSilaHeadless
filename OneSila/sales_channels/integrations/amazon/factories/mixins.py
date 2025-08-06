@@ -464,6 +464,14 @@ class GetAmazonAPIMixin:
             "patches": patches,
         }
 
+        # print('--------------------------------------- ARGUMENTS')
+        # print('mode')
+        # print("VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None)
+        # print('body')
+        # import pprint
+        # pprint.pprint(body)
+        # print('-------------------------------------------------')
+
         listings = ListingsApi(self._get_client())
         response = listings.patch_listings_item(
             seller_id=self.sales_channel.remote_id,
