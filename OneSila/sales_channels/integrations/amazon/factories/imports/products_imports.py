@@ -611,6 +611,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         is_variation, parent_skus = get_is_product_variation(product)
         if remote_product:
             is_variation = remote_product.is_variation
+            product_instance = remote_product.local_instance
 
         self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before getting summary")
 
