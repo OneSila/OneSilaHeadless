@@ -617,8 +617,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         summary = self._get_summary(product)
         rule = self.get_product_rule(product)
         structured, language, view = self.get__product_data(product)
-        # Used for logging in the run() method
-        self.product_data_view = view
+
         missing_data = (
             not product.get("attributes")
             or not product.get("summaries")
@@ -782,7 +781,7 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
 
     @timeit_and_log(logger, "AmazonProductItemFactory.run")
     def run(self):
-        logger.debug(F"AmazonProductItemFactory.run - channel: {self.sales_channel.remote_id} {self.sales_channel.country}, view: {self.product_data_view}")
+        logger.debug(F"AmazonProductItemFactory.run - channel: {self.sales_channel.remote_id}")
 
         try:
             self.process_product_item(self.product_data)
