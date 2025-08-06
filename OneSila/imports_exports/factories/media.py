@@ -113,7 +113,7 @@ class ImportImageInstance(AbstractImportInstance):
 
         self.instance = None
         if not self.skip_create:
-            self.instance = Image.objects.create(**self.kwargs)
+            self.instance, _ = Image.objects.get_or_create(**self.kwargs)
 
     def post_process_logic(self):
 
