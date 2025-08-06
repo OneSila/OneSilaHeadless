@@ -780,7 +780,7 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
 
     @timeit_and_log(logger, "AmazonProductItemFactory.run")
     def run(self):
-        self._set_start_time(f"AmazonProductItemFactory.run - channel: {self.sales_channel.name}, lang: {self.language}")
+        self._set_start_time(f"AmazonProductItemFactory.run - channel: {self.sales_channel.remote_id} {self.sales_channel.country}, lang: {self.language}")
         try:
             self.process_product_item(self.product_data)
         except Exception as exc:  # capture unexpected errors
