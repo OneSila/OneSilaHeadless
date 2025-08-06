@@ -9,8 +9,12 @@ from core.helpers import ensure_serializable
 logger = logging.getLogger(__name__)
 
 
-def infer_product_type(data) -> str:
+def infer_product_type(data, is_variation) -> str:
     """Infer local product type from Amazon relationships data."""
+
+    if is_variation:
+        return SIMPLE
+
     if isinstance(data, dict):
         relationships = data.get("relationships") or []
     else:
