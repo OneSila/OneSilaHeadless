@@ -35,16 +35,16 @@ query products($excludeDemoData: Boolean!) {
 """
 
 PRODUCTS_ASSIGNED_TO_VIEW_QUERY = """
-query Products($view: ID!) {
-  products(filters: {assignedToSalesChannelView: $view}) {
+query Products($view: String!) {
+  products(filters: {assignedToSalesChannelViewId: $view}) {
     edges { node { id } }
   }
 }
 """
 
 PRODUCTS_NOT_ASSIGNED_TO_VIEW_QUERY = """
-query Products($view: ID!) {
-  products(filters: {notAssignedToSalesChannelView: $view}) {
+query Products($view: String!) {
+  products(filters: {notAssignedToSalesChannelViewId: $view}) {
     edges { node { id } }
   }
 }

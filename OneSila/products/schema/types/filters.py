@@ -80,7 +80,7 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
         return queryset, Q()
 
     @custom_filter
-    def assigned_to_sales_channel_view(
+    def assigned_to_sales_channel_view_id(
         self,
         queryset: QuerySet,
         value: str,
@@ -100,7 +100,7 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
         return queryset, Q()
 
     @custom_filter
-    def not_assigned_to_sales_channel_view(
+    def not_assigned_to_sales_channel_view_id(
         self,
         queryset: QuerySet,
         value: str,

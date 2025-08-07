@@ -62,6 +62,7 @@ class ProductFilterSalesChannelViewTestCase(TransactionTestCaseMixin, Transactio
         self.assertSetEqual(ids, {self.p1.id})
 
     def test_not_assigned_to_sales_channel_view(self):
+
         ids = self._query_ids(
             PRODUCTS_NOT_ASSIGNED_TO_VIEW_QUERY,
             {"view": self.to_global_id(self.view1)},
