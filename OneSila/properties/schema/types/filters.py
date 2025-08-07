@@ -12,7 +12,7 @@ from properties.models import Property, ProductProperty, \
     ProductProperty, PropertySelectValue, PropertyTranslation, ProductPropertyTextTranslation, PropertySelectValueTranslation, ProductPropertiesRule, \
     ProductPropertiesRuleItem
 from products.schema.types.filters import ProductFilter
-from django.db.models import Q, F, Count
+from django.db.models import Q, F, Count, Exists, OuterRef
 from core.managers import QuerySet
 from strawberry import UNSET
 
@@ -24,6 +24,24 @@ class PropertyFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     is_product_type: auto
     type: auto
     internal_name: auto
+
+    @custom_filter
+    def used_in_products(
+        self,
+        queryset: QuerySet,
+        value: bool,
+        prefix: str,
+    ) -> tuple[QuerySet, Q]:
+        if value not in (None, UNSET):
+            usage_qs = ProductProperty._base_manager.filter(
+                property_id=OuterRef("pk"),
+                multi_tenant_company_id=OuterRef("multi_tenant_company_id"),
+            )
+            queryset = queryset.annotate(
+                has_usage=Exists(usage_qs)
+            ).filter(has_usage=value)
+
+        return queryset, Q()
 
     @custom_filter
     def missing_main_translation(
@@ -79,6 +97,25 @@ class PropertySelectValueFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     property: Optional[PropertyFilter]
     image: Optional[ImageFilter]
+
+    @custom_filter
+    def used_in_products(
+        self,
+        queryset: QuerySet,
+        value: bool,
+        prefix: str,
+    ) -> tuple[QuerySet, Q]:
+        if value not in (None, UNSET):
+            usage_qs = ProductProperty._base_manager.filter(
+                Q(value_select_id=OuterRef("pk"))
+                | Q(value_multi_select=OuterRef("pk")),
+                multi_tenant_company_id=OuterRef("multi_tenant_company_id"),
+            )
+            queryset = queryset.annotate(
+                has_usage=Exists(usage_qs)
+            ).filter(has_usage=value)
+
+        return queryset, Q()
 
     @custom_filter
     def is_product_type(self, queryset, value: bool, prefix: str):
