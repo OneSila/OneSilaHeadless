@@ -135,3 +135,22 @@ class DuplicateProductTestCase(TestCase):
     def test_duplicate_product_existing_sku_error(self):
         with self.assertRaises(Exception):
             SimpleProduct.objects.duplicate_product(self.product, sku=self.product.sku)
+
+
+class ProductTranslationModelTest(TestCase):
+    def test_duplicate_default_translation_not_allowed(self):
+        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        ProductTranslation.objects.create(
+            product=product,
+            language=self.multi_tenant_company.language,
+            name="Original",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        with self.assertRaises(IntegrityError):
+            ProductTranslation.objects.create(
+                product=product,
+                language=self.multi_tenant_company.language,
+                name="Duplicate",
+                multi_tenant_company=self.multi_tenant_company,
+            )
