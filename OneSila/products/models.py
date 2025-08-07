@@ -455,6 +455,7 @@ class Product(TranslatedModelMixin, models.Model):
         super().save(*args, **kwargs)
 
     class Meta:
+        url_detail_page_string = 'products:product_detail'
         search_terms = ['sku', 'translations__name']
         unique_together = ('sku', 'multi_tenant_company')
         constraints = [
