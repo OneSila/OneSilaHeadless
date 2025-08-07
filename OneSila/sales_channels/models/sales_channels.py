@@ -109,6 +109,8 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name = 'Sales Channel View Assign'
         verbose_name_plural = 'Sales Channel View Assigns'
         ordering = ('product_id', 'sales_channel_view__name')
+        search_terms = ['product__translations__name', 'product__sku' ,'sales_channel_view__name']
+
 
     def __str__(self):
         return f"{self.product} @ {self.sales_channel_view}"
