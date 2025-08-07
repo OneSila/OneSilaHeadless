@@ -149,11 +149,11 @@ class AmazonPropertySelectValue(RemoteObjectMixin, models.Model):
         help_text="The Amazon marketplace for this value."
     )
     remote_value = models.CharField(
-        max_length=255,
+        max_length=512,
         help_text="The raw value from Amazon, in the marketplace's locale."
     )
     remote_name = models.CharField(
-        max_length=255,
+        max_length=512,
         null=True,
         blank=True,
         help_text="The display name of the value in the given locale."
