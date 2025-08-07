@@ -455,6 +455,7 @@ class Product(TranslatedModelMixin, models.Model):
         super().save(*args, **kwargs)
 
     class Meta:
+        url_detail_page_string = 'products:product_detail'
         search_terms = ['sku', 'translations__name']
         unique_together = ('sku', 'multi_tenant_company')
         constraints = [
@@ -603,18 +604,13 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
 
     class Meta:
         translated_field = 'product'
-        unique_together = (
-            ('product', 'language', 'sales_channel'),
-        )
-
-        # @TODO: Figure out what we do with this
-        # constraints = [
-        #     UniqueConstraint(
-        #         fields=['url_key', 'multi_tenant_company'],
-        #         condition=Q(sales_channel__isnull=False),
-        #         name='uniq_nonnull_url_key_per_company_for_default'
-        #     )
-        # ]
+        constraints = [
+            UniqueConstraint(
+                fields=['product', 'language', 'sales_channel'],
+                name='uniq_product_language_sales_channel',
+                nulls_distinct=False,
+            ),
+        ]
 
 
 class ProductTranslationBulletPoint(models.Model):

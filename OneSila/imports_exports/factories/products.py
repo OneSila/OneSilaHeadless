@@ -571,36 +571,49 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
             url_key = translation.get('url_key')
             language = translation.get('language') or self.language
 
-            translation_obj, created = ProductTranslation.objects.get_or_create(
-                multi_tenant_company=self.instance.multi_tenant_company,
-                language=language,
-                product=self.instance,
-                name=name,
-                sales_channel=self.sales_channel,
-            )
-
-            # Update other fields if created or if missing
-            updated = False
-            if created or translation_obj.short_description != short_description:
-                translation_obj.short_description = short_description
-                updated = True
-            if created or translation_obj.description != description:
-                translation_obj.description = description
-                updated = True
-            if created or translation_obj.url_key != url_key:
-                translation_obj.url_key = url_key
-                updated = True
-
+            defaults = {
+                "name": name,
+                "short_description": short_description,
+                "description": description,
+                "url_key": url_key,
+            }
             try:
-                if updated:
-                    translation_obj.save()
+                translation_obj, _ = ProductTranslation.objects.get_or_create(
+                    multi_tenant_company=self.instance.multi_tenant_company,
+                    product=self.instance,
+                    language=language,
+                    sales_channel=self.sales_channel,
+                    defaults=defaults,
+                )
             except IntegrityError as e:
                 if "url_key" in str(e):
-                    # Try saving again with a blank/null url_key
-                    translation_obj.url_key = None
-                    translation_obj.save()
+                    defaults_no_url = defaults.copy()
+                    defaults_no_url["url_key"] = None
+                    translation_obj, _ = ProductTranslation.objects.get_or_create(
+                        multi_tenant_company=self.instance.multi_tenant_company,
+                        product=self.instance,
+                        language=language,
+                        sales_channel=self.sales_channel,
+                        defaults=defaults_no_url,
+                    )
                 else:
                     raise
+
+            updated = False
+            for field, value in defaults.items():
+                if getattr(translation_obj, field) != value:
+                    setattr(translation_obj, field, value)
+                    updated = True
+
+            if updated:
+                try:
+                    translation_obj.save()
+                except IntegrityError as e:
+                    if "url_key" in str(e):
+                        translation_obj.url_key = None
+                        translation_obj.save()
+                    else:
+                        raise
 
             bullet_points = translation.get('bullet_points')
             if bullet_points is not None:

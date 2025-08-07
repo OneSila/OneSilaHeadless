@@ -9,8 +9,12 @@ from core.helpers import ensure_serializable
 logger = logging.getLogger(__name__)
 
 
-def infer_product_type(data) -> str:
+def infer_product_type(data, is_variation) -> str:
     """Infer local product type from Amazon relationships data."""
+
+    if is_variation:
+        return SIMPLE
+
     if isinstance(data, dict):
         relationships = data.get("relationships") or []
     else:
@@ -18,12 +22,20 @@ def infer_product_type(data) -> str:
 
     for relation in relationships:
         rels = relation.get("relationships", []) if isinstance(relation, dict) else getattr(relation, "relationships", []) or []
+
         for rel in rels:
+            rel_type = rel.get("type") if isinstance(rel, dict) else getattr(rel, "type", None)
+
+            # we only care about the type VARIATION
+            if rel_type != "VARIATION":
+                continue
+
             child_skus = rel.get("child_skus") if isinstance(rel, dict) else getattr(rel, "child_skus", None)
             if child_skus:
                 return CONFIGURABLE
 
     return SIMPLE
+
 
 
 def extract_description_and_bullets(attributes: dict) -> tuple[str | None, list[str]]:
@@ -102,6 +114,11 @@ def get_is_product_variation(data):
     for relation in relationships:
         rels = relation.get("relationships", []) if isinstance(relation, dict) else getattr(relation, "relationships", []) or []
         for rel in rels:
+
+            rel_type = rel.get("type") if isinstance(rel, dict) else getattr(rel, "type", None)
+            if rel_type != "VARIATION":
+                continue
+
             # Handle plural parent_skus list
             if isinstance(rel, dict):
                 skus = rel.get("parent_skus") or []

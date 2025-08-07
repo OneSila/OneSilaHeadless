@@ -235,13 +235,12 @@ class GetAmazonAPIMixin:
 
         return sorted(product_types)
 
-    @timeit_and_log(logger)
-    def get_all_products_by_marketplace(self, marketplace_id: str, listings_api, seller_id, issue_locale):
-        created_after = None
+    def get_all_products_by_marketplace(self, marketplace_id: str, listings_api, seller_id, issue_locale, given_created_after=None):
+
+        created_after = given_created_after
         while True:
             page_token = None
             last_created_date = None
-            total_results = 0
 
             logger.debug(f"[START CYCLE] created_after={created_after}")
 
