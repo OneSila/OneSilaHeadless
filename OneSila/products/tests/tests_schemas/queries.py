@@ -33,3 +33,19 @@ query products($excludeDemoData: Boolean!) {
   }
 }
 """
+
+PRODUCTS_ASSIGNED_TO_VIEW_QUERY = """
+query Products($view: ID!) {
+  products(filters: {assignedToSalesChannelView: $view}) {
+    edges { node { id } }
+  }
+}
+"""
+
+PRODUCTS_NOT_ASSIGNED_TO_VIEW_QUERY = """
+query Products($view: ID!) {
+  products(filters: {notAssignedToSalesChannelView: $view}) {
+    edges { node { id } }
+  }
+}
+"""
