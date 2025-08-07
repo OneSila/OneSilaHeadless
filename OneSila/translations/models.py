@@ -76,13 +76,6 @@ class TranslatedModelMixin(OldModel):
             else:
                 translation = translations.last()
 
-        # @TODO: Added temporary until we fix the issue at source
-        except MultipleObjectsReturned:
-            translation = translations.filter(**translation_kwargs).first()
-
-            if sales_channel is not None and related_name == 'translations':
-                is_sales_channel_translation = True
-
         if translation:
             translated_value = getattr(translation, field_name, '')
 
