@@ -350,6 +350,9 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         if name is None:
             name = sku
 
+        if marketplace_id is None:
+            raise ValueError("Missing marketplace_id in Amazon summary data.")
+
         view = AmazonSalesChannelView.objects.filter(
             sales_channel=self.sales_channel,
             remote_id=marketplace_id,
