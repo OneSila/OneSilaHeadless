@@ -436,7 +436,7 @@ class GetAmazonAPIMixin:
                     patches.append({"op": "delete", "path": path})
             else:
                 if key not in current_attributes:
-                    patches.append({"op": "add", "path": path, "value": new_value})
+                    patches.append({"op": "replace", "path": path, "value": new_value})
                 else:
                     diff = DeepDiff(current_value, new_value, ignore_order=True)
                     if diff:
