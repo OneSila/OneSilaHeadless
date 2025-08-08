@@ -99,7 +99,12 @@ class AmazonProductContent(RemoteProductContent):
 
 class AmazonImageProductAssociation(RemoteImageProductAssociation):
     """Association between images and Amazon products."""
-    pass
+    imported_url = models.URLField(
+        max_length=1024,
+        blank=True,
+        null=True,
+        help_text="Original URL of the image when imported from Amazon.",
+    )
 
 
 class AmazonCategory(RemoteCategory):

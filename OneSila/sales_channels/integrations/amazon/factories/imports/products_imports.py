@@ -548,13 +548,21 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
     @timeit_and_log(logger)
     def handle_images(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, "images"):
-            for image_ass in import_instance.images_associations_instances:
-                AmazonImageProductAssociation.objects.get_or_create(
+            for index, image_ass in enumerate(import_instance.images_associations_instances):
+                imported_url = None
+                if index < len(import_instance.images):
+                    imported_url = import_instance.images[index].get("image_url")
+
+                instance, _ = AmazonImageProductAssociation.objects.get_or_create(
                     multi_tenant_company=self.import_process.multi_tenant_company,
                     sales_channel=self.sales_channel,
                     local_instance=image_ass,
                     remote_product=import_instance.remote_instance,
                 )
+
+                if imported_url and instance.imported_url != imported_url:
+                    instance.imported_url = imported_url
+                    instance.save(update_fields=["imported_url"])
 
     @timeit_and_log(logger)
     def handle_variations(self, import_instance: ImportProductInstance):
