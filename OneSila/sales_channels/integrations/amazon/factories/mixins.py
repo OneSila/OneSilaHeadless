@@ -444,7 +444,7 @@ class GetAmazonAPIMixin:
 
         return patches
 
-    @throttle_safe(max_retries=5, base_delay=1)
+    @throttle_safe(max_retries=1, base_delay=1)
     def update_product(
         self,
         sku,
@@ -463,11 +463,16 @@ class GetAmazonAPIMixin:
             "patches": patches,
         }
 
+        # import pprint
+        # print('-------------------------------------- CURRENT ATTRIBUTES')
+        # pprint.pprint(current_attributes)
+        # print('-------------------------------------- NEW ATTRIBUTES')
+        # pprint.pprint(new_attributes)
+        #
         # print('--------------------------------------- ARGUMENTS')
         # print('mode')
         # print("VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None)
         # print('body')
-        # import pprint
         # pprint.pprint(body)
         # print('-------------------------------------------------')
 
@@ -491,6 +496,9 @@ class GetAmazonAPIMixin:
             submission_id=submission_id,
             processing_status=processing_status,
         )
+
+        # print('--------------------------------- RESPONSE')
+        # pprint.pprint(response)
 
         return response
 
