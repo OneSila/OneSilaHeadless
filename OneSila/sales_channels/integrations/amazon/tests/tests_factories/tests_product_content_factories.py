@@ -169,11 +169,31 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
             "productType": "CHAIR",
             "requirements": "LISTING",
             "attributes": {
-                "item_name": [{"value": "Chair name"}],
-                "product_description": [{"value": "Chair description"}],
+                "item_name": [
+                    {
+                        "value": "Chair name",
+                        "language_tag": "en",
+                        "marketplace_id": "GB",
+                    }
+                ],
+                "product_description": [
+                    {
+                        "value": "Chair description",
+                        "language_tag": "en",
+                        "marketplace_id": "GB",
+                    }
+                ],
                 "bullet_point": [
-                    {"value": "Point one"},
-                    {"value": "Point two"},
+                    {
+                        "value": "Point one",
+                        "language_tag": "en",
+                        "marketplace_id": "GB",
+                    },
+                    {
+                        "value": "Point two",
+                        "language_tag": "en",
+                        "marketplace_id": "GB",
+                    },
                 ],
             },
         }
@@ -184,18 +204,45 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
         self.assertEqual(body.get("productType"), "CHAIR")
 
         self.assertIn(
-            {'op': 'add', 'path': '/attributes/item_name', 'value': [{'value': 'Chair name'}]},
+            {
+                'op': 'add',
+                'path': '/attributes/item_name',
+                'value': [{
+                    'value': 'Chair name',
+                    'language_tag': 'en',
+                    'marketplace_id': 'GB',
+                }],
+            },
             patches,
         )
         self.assertIn(
-            {'op': 'add', 'path': '/attributes/product_description', 'value': [{'value': 'Chair description'}]},
+            {
+                'op': 'add',
+                'path': '/attributes/product_description',
+                'value': [{
+                    'value': 'Chair description',
+                    'language_tag': 'en',
+                    'marketplace_id': 'GB',
+                }],
+            },
             patches,
         )
         self.assertIn(
             {
                 'op': 'add',
                 'path': '/attributes/bullet_point',
-                'value': [{'value': 'Point one'}, {'value': 'Point two'}],
+                'value': [
+                    {
+                        'value': 'Point one',
+                        'language_tag': 'en',
+                        'marketplace_id': 'GB',
+                    },
+                    {
+                        'value': 'Point two',
+                        'language_tag': 'en',
+                        'marketplace_id': 'GB',
+                    },
+                ],
             },
             patches,
         )

@@ -6,6 +6,7 @@ from django.conf import settings
 from core.helpers import get_languages
 from integrations.models import Integration
 from sales_channels.models.mixins import RemoteObjectMixin
+from sales_channels.managers import SalesChannelViewAssignManager
 
 import logging
 
@@ -104,11 +105,15 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
                                        blank=True, help_text="The remote product associated with this assign.")
     needs_resync = models.BooleanField(default=False, help_text="Indicates if a resync is needed.")
 
+    objects = SalesChannelViewAssignManager()
+
     class Meta:
         unique_together = ('product', 'sales_channel_view')
         verbose_name = 'Sales Channel View Assign'
         verbose_name_plural = 'Sales Channel View Assigns'
         ordering = ('product_id', 'sales_channel_view__name')
+        search_terms = ['product__translations__name', 'product__sku' ,'sales_channel_view__name']
+
 
     def __str__(self):
         return f"{self.product} @ {self.sales_channel_view}"

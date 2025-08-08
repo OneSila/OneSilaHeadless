@@ -4,12 +4,14 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
     AmazonPropertySelectValue,
+    AmazonProduct,
     AmazonProductType,
     AmazonProductTypeItem,
     AmazonSalesChannelImport,
     AmazonDefaultUnitConfigurator,
     AmazonRemoteLog,
     AmazonSalesChannelView,
+    AmazonProductIssue,
 )
 
 
@@ -25,6 +27,11 @@ class AmazonPropertyOrder:
 
 @order(AmazonPropertySelectValue)
 class AmazonPropertySelectValueOrder:
+    id: auto
+
+
+@order(AmazonProduct)
+class AmazonProductOrder:
     id: auto
 
 
@@ -55,4 +62,9 @@ class AmazonSalesChannelViewOrder:
 
 @order(AmazonRemoteLog)
 class AmazonRemoteLogOrder:
+    id: auto
+
+
+@order(AmazonProductIssue)
+class AmazonProductIssueOrder:
     id: auto

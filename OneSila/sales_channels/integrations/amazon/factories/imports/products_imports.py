@@ -286,6 +286,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
 
         return {}
 
+    @timeit_and_log(logger)
     def _parse_configurator_select_values(self, product):
         configurator_values = []
         amazon_theme = None
@@ -348,6 +349,9 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         # it seems that sometimes the name can be None coming from Amazon. IN that case we fallback to sku
         if name is None:
             name = sku
+
+        if marketplace_id is None:
+            raise ValueError("Missing marketplace_id in Amazon summary data.")
 
         view = AmazonSalesChannelView.objects.filter(
             sales_channel=self.sales_channel,
@@ -421,7 +425,6 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
             structured["__amazon_theme"] = amazon_theme
 
         structured["__asin"] = asin
-        structured["__issues"] = product_data.get("issues") or []
         structured["__marketplace_id"] = marketplace_id
 
         return structured, language, view
@@ -468,6 +471,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
                 amazon_ean_code.ean_code = import_instance.ean_code
                 amazon_ean_code.save()
 
+    @timeit_and_log(logger)
     def handle_attributes(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, "properties"):
             product_properties = import_instance.product_property_instances
@@ -503,6 +507,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
                 if updated:
                     remote_product_property.save()
 
+    @timeit_and_log(logger)
     def handle_translations(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, "translations"):
             AmazonProductContent.objects.get_or_create(
@@ -511,6 +516,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
                 remote_product=import_instance.remote_instance,
             )
 
+    @timeit_and_log(logger)
     def handle_prices(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, "prices"):
             remote_product = import_instance.remote_instance
@@ -539,6 +545,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
                 amazon_price.price_data = price_data
                 amazon_price.save()
 
+    @timeit_and_log(logger)
     def handle_images(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, "images"):
             for image_ass in import_instance.images_associations_instances:
@@ -549,6 +556,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
                     remote_product=import_instance.remote_instance,
                 )
 
+    @timeit_and_log(logger)
     def handle_variations(self, import_instance: ImportProductInstance):
         theme = import_instance.data.get("__amazon_theme")
         if not theme:

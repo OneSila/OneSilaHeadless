@@ -11,10 +11,12 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
     AmazonPropertySelectValue,
+    AmazonProduct,
     AmazonProductType,
     AmazonSalesChannelImport, AmazonProductTypeItem,
     AmazonDefaultUnitConfigurator,
     AmazonRemoteLog,
+    AmazonProductIssue,
 )
 from properties.schema.types.filters import (
     PropertyFilter,
@@ -22,6 +24,7 @@ from properties.schema.types.filters import (
     ProductPropertiesRuleFilter,
     ProductPropertiesRuleItemFilter,
 )
+from products.schema.types.filters import ProductFilter
 from sales_channels.schema.types.filters import (
     SalesChannelFilter,
     SalesChannelViewFilter,
@@ -121,6 +124,13 @@ class AmazonProductTypeItemFilter(SearchFilterMixin):
     remote_type: auto
 
 
+@filter(AmazonProduct)
+class AmazonProductFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: Optional[ProductFilter]
+
+
 @filter(AmazonSalesChannelImport)
 class AmazonSalesChannelImportFilter(SearchFilterMixin):
     id: auto
@@ -146,4 +156,11 @@ class AmazonDefaultUnitConfiguratorFilter(SearchFilterMixin):
 @filter(AmazonRemoteLog)
 class AmazonRemoteLogFilter(SearchFilterMixin):
     id: auto
+    remote_product: Optional[RemoteProductFilter]
+
+
+@filter(AmazonProductIssue)
+class AmazonProductIssueFilter(SearchFilterMixin):
+    id: auto
+    view: Optional[SalesChannelViewFilter]
     remote_product: Optional[RemoteProductFilter]

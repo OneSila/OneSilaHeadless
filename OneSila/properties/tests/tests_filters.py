@@ -5,12 +5,16 @@ from properties.models import (
     PropertyTranslation,
     PropertySelectValue,
     PropertySelectValueTranslation,
+    ProductProperty,
 )
+from products.models import SimpleProduct
 from .tests_schemas.queries import (
     PROPERTIES_MISSING_MAIN_TRANSLATION_QUERY,
     PROPERTIES_MISSING_TRANSLATIONS_QUERY,
+    PROPERTIES_USED_IN_PRODUCTS_QUERY,
     PROPERTY_SELECT_VALUES_MISSING_MAIN_TRANSLATION_QUERY,
     PROPERTY_SELECT_VALUES_MISSING_TRANSLATIONS_QUERY,
+    PROPERTY_SELECT_VALUES_USED_IN_PRODUCTS_QUERY,
 )
 
 
@@ -192,3 +196,101 @@ class PropertySelectValueFilterTranslationTestCase(TransactionTestCaseMixin, Tra
             {"missingTranslations": False},
         )
         self.assertSetEqual(ids, {self.v2.id})
+
+
+class PropertyFilterUsedInProductsTestCase(TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.p_used = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        self.p_unused = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company
+        )
+        ProductProperty.objects.create(
+            product=product,
+            property=self.p_used,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+    def _query_ids(self, query, variables):
+        resp = self.strawberry_test_client(query=query, variables=variables)
+        self.assertIsNone(resp.errors)
+        return {
+            int(self.from_global_id(edge["node"]["id"])[1])
+            for edge in resp.data["properties"]["edges"]
+        }
+
+    def test_property_used_in_products_true(self):
+        ids = self._query_ids(
+            PROPERTIES_USED_IN_PRODUCTS_QUERY,
+            {"usedInProducts": True},
+        )
+        self.assertSetEqual(ids, {self.p_used.id})
+
+
+class PropertySelectValueFilterUsedInProductsTestCase(TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.prop_select = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        self.prop_multi = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.MULTISELECT,
+        )
+        self.v_select_used = PropertySelectValue.objects.create(
+            property=self.prop_select,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.v_select_unused = PropertySelectValue.objects.create(
+            property=self.prop_select,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.v_multi_used = PropertySelectValue.objects.create(
+            property=self.prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company
+        )
+        ProductProperty.objects.create(
+            product=product,
+            property=self.prop_select,
+            value_select=self.v_select_used,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        pp_multi = ProductProperty.objects.create(
+            product=product,
+            property=self.prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        pp_multi.value_multi_select.set([self.v_multi_used])
+
+    def _query_ids(self, query, variables):
+        resp = self.strawberry_test_client(query=query, variables=variables)
+        self.assertIsNone(resp.errors)
+        return {
+            int(self.from_global_id(edge["node"]["id"])[1])
+            for edge in resp.data["propertySelectValues"]["edges"]
+        }
+
+    def test_property_select_value_used_in_products_true(self):
+        ids = self._query_ids(
+            PROPERTY_SELECT_VALUES_USED_IN_PRODUCTS_QUERY,
+            {"usedInProducts": True},
+        )
+        self.assertSetEqual(ids, {self.v_select_used.id, self.v_multi_used.id})
+
+    def test_property_select_value_used_in_products_false(self):
+        ids = self._query_ids(
+            PROPERTY_SELECT_VALUES_USED_IN_PRODUCTS_QUERY,
+            {"usedInProducts": False},
+        )
+        self.assertSetEqual(ids, {self.v_select_unused.id})

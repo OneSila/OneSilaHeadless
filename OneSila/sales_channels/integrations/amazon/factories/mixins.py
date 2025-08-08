@@ -1,3 +1,4 @@
+from core.logging_helpers import timeit_and_log
 from properties.models import Property, PropertyTranslation
 from sales_channels.integrations.amazon.constants import AMAZON_PATCH_SKIP_KEYS
 from sales_channels.integrations.amazon.models.properties import AmazonProperty
@@ -133,6 +134,7 @@ class GetAmazonAPIMixin:
 
         return getattr(payload, "attributes", {}) or {}
 
+    @timeit_and_log(logger)
     @throttle_safe(max_retries=5, base_delay=1)
     def _fetch_listing_items_page(
             self,
@@ -369,7 +371,9 @@ class GetAmazonAPIMixin:
         }
 
     @throttle_safe(max_retries=5, base_delay=1)
-    def create_product(self, sku, marketplace_id, product_type, attributes):
+    def create_product(
+        self, sku, marketplace_id, product_type, attributes, force_validation_only: bool = False
+    ):
         body = self._build_common_body(product_type, attributes)
         listings = ListingsApi(self._get_client())
 
@@ -387,7 +391,7 @@ class GetAmazonAPIMixin:
             marketplace_ids=[marketplace_id],
             body=body,
             issue_locale=self._get_issue_locale(),
-            mode="VALIDATION_PREVIEW" if settings.DEBUG else None,
+            mode="VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
         )
 
         submission_id = getattr(response, "submission_id", None)
@@ -440,7 +444,7 @@ class GetAmazonAPIMixin:
 
         return patches
 
-    @throttle_safe(max_retries=5, base_delay=1)
+    @throttle_safe(max_retries=1, base_delay=1)
     def update_product(
         self,
         sku,
@@ -448,6 +452,7 @@ class GetAmazonAPIMixin:
         product_type,
         new_attributes,
         current_attributes=None,
+        force_validation_only: bool = False,
     ):
         if current_attributes is None or current_attributes == {}:
             current_attributes = self.get_listing_attributes(sku, marketplace_id)
@@ -458,6 +463,19 @@ class GetAmazonAPIMixin:
             "patches": patches,
         }
 
+        # import pprint
+        # print('-------------------------------------- CURRENT ATTRIBUTES')
+        # pprint.pprint(current_attributes)
+        # print('-------------------------------------- NEW ATTRIBUTES')
+        # pprint.pprint(new_attributes)
+        #
+        # print('--------------------------------------- ARGUMENTS')
+        # print('mode')
+        # print("VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None)
+        # print('body')
+        # pprint.pprint(body)
+        # print('-------------------------------------------------')
+
         listings = ListingsApi(self._get_client())
         response = listings.patch_listings_item(
             seller_id=self.sales_channel.remote_id,
@@ -465,7 +483,7 @@ class GetAmazonAPIMixin:
             marketplace_ids=[marketplace_id],
             body=body,
             issue_locale=self._get_issue_locale(),
-            mode="VALIDATION_PREVIEW" if settings.DEBUG else None,
+            mode="VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
         )
         submission_id = getattr(response, "submission_id", None)
         processing_status = getattr(response, "status", None)
@@ -478,6 +496,9 @@ class GetAmazonAPIMixin:
             submission_id=submission_id,
             processing_status=processing_status,
         )
+
+        # print('--------------------------------- RESPONSE')
+        # pprint.pprint(response)
 
         return response
 

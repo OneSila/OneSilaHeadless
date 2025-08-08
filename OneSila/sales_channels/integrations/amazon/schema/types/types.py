@@ -14,31 +14,35 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
     AmazonPropertySelectValue,
+    AmazonProduct,
     AmazonProductType,
     AmazonProductTypeItem,
     AmazonSalesChannelImport,
     AmazonDefaultUnitConfigurator,
     AmazonRemoteLog,
     AmazonSalesChannelView,
+    AmazonProductIssue,
 )
 from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelFilter,
     AmazonPropertyFilter,
     AmazonPropertySelectValueFilter,
+    AmazonProductFilter,
     AmazonProductTypeFilter,
     AmazonProductTypeItemFilter,
     AmazonSalesChannelImportFilter, AmazonDefaultUnitConfiguratorFilter,
-    AmazonRemoteLogFilter, AmazonSalesChannelViewFilter,
+    AmazonRemoteLogFilter, AmazonSalesChannelViewFilter, AmazonProductIssueFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
     AmazonPropertyOrder,
     AmazonPropertySelectValueOrder,
+    AmazonProductOrder,
     AmazonProductTypeOrder,
     AmazonProductTypeItemOrder,
     AmazonSalesChannelImportOrder,
     AmazonDefaultUnitConfiguratorOrder,
-    AmazonRemoteLogOrder, AmazonSalesChannelViewOrder,
+    AmazonRemoteLogOrder, AmazonSalesChannelViewOrder, AmazonProductIssueOrder,
 )
 from sales_channels.schema.types.types import FormattedIssueType
 
@@ -225,6 +229,32 @@ class AmazonSalesChannelViewType(relay.Node, GetQuerysetMultiTenantMixin):
 
 
 @type(
+    AmazonProduct,
+    filters=AmazonProductFilter,
+    order=AmazonProductOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonProductType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]]
+    issues: List[Annotated[
+        'AmazonProductIssueType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]]
+
+    @field()
+    def has_errors(self, info) -> bool | None:
+        return self.has_errors
+
+
+@type(
     AmazonRemoteLog,
     filters=AmazonRemoteLogFilter,
     order=AmazonRemoteLogOrder,
@@ -268,6 +298,24 @@ class AmazonRemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):
             )
 
         return formatted
+
+
+@type(
+    AmazonProductIssue,
+    filters=AmazonProductIssueFilter,
+    order=AmazonProductIssueOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonProductIssueType(relay.Node, GetQuerysetMultiTenantMixin):
+    remote_product: Annotated[
+        'RemoteProductType',
+        lazy("sales_channels.schema.types.types")
+    ]
+    view: Annotated[
+        'AmazonSalesChannelViewType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
 
 
 @strawberry_type

@@ -86,12 +86,13 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     create_product_factory = property(get_create_product_factory)
     delete_product_factory = property(get_delete_product_factory)
 
-    def __init__(self, *args, view=None, **kwargs):
+    def __init__(self, *args, view=None, force_validation_only: bool = False, **kwargs):
 
         if view is None:
             raise ValueError("AmazonProduct factories require a view argument")
 
         self.view = view
+        self.force_validation_only = force_validation_only
         super().__init__(*args, **kwargs)
         self.attributes: Dict = {}
         self.image_attributes: Dict = {}
@@ -236,13 +237,30 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             )
 
         attrs = {}
+        language_tag = self.view.language_tag if self.view else None
+        marketplace_id = self.view.remote_id if self.view else None
         if item_name:
-            attrs["item_name"] = [{"value": item_name}]
+            attrs["item_name"] = [{
+                "value": item_name,
+                "language_tag": language_tag,
+                "marketplace_id": marketplace_id,
+            }]
         if is_safe_content(product_description):
-            attrs["product_description"] = [{"value": product_description}]
+            attrs["product_description"] = [{
+                "value": product_description,
+                "language_tag": language_tag,
+                "marketplace_id": marketplace_id,
+            }]
 
         if bullet_points:
-            attrs["bullet_point"] = [{"value": bp} for bp in bullet_points]
+            attrs["bullet_point"] = [
+                {
+                    "value": bp,
+                    "language_tag": language_tag,
+                    "marketplace_id": marketplace_id,
+                }
+                for bp in bullet_points
+            ]
 
         return {k: v for k, v in attrs.items() if v not in (None, "")}
 
@@ -631,6 +649,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             remote_parent_product=self.remote_instance,
             api=self.api,
             view=self.view,
+            force_validation_only=self.force_validation_only,
         )
         factory.run()
         remote_variation = factory.remote_instance
@@ -661,6 +680,7 @@ class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFa
             self.remote_rule,
             self.payload.get("attributes", {}),
             self.current_attrs,
+            force_validation_only=self.force_validation_only,
         )
         return resp
 
@@ -681,6 +701,7 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
             marketplace_id=self.view.remote_id,
             product_type=self.remote_rule,
             attributes=self.payload.get("attributes", {}),
+            force_validation_only=self.force_validation_only,
         )
 
         return resp
@@ -713,6 +734,7 @@ class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactor
             self.remote_rule,
             self.payload.get("attributes", {}),
             self.current_attrs,
+            force_validation_only=self.force_validation_only,
         )
         return resp
 

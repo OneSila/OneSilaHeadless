@@ -103,13 +103,30 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentU
             )
 
         attrs = {}
+        language_tag = self.view.language_tag if self.view else None
+        marketplace_id = self.view.remote_id if self.view else None
         if item_name:
-            attrs["item_name"] = [{"value": item_name}]
+            attrs["item_name"] = [{
+                "value": item_name,
+                "language_tag": language_tag,
+                "marketplace_id": marketplace_id,
+            }]
         if is_safe_content(product_description):
-            attrs["product_description"] = [{"value": product_description}]
+            attrs["product_description"] = [{
+                "value": product_description,
+                "language_tag": language_tag,
+                "marketplace_id": marketplace_id,
+            }]
 
         if bullet_points:
-            attrs["bullet_point"] = [{"value": bp} for bp in bullet_points]
+            attrs["bullet_point"] = [
+                {
+                    "value": bp,
+                    "language_tag": language_tag,
+                    "marketplace_id": marketplace_id,
+                }
+                for bp in bullet_points
+            ]
 
         return {k: v for k, v in attrs.items() if v not in (None, "")}
 
