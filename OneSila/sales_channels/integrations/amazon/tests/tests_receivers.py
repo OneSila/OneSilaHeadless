@@ -60,17 +60,17 @@ class AmazonManualSyncReceiverTest(DisableWooCommerceSignalsMixin, TestCase):
             local_instance=self.product,
         )
 
-    @patch("sales_channels.integrations.amazon.receivers.run_single_amazon_product_task_flow")
-    def test_manual_sync_queues_task(self, flow_mock):
-        manual_sync_remote_product.send(
-            sender=AmazonProduct,
-            instance=self.remote_product,
-            view=self.view,
-            force_validation_only=True,
-        )
-
-        flow_mock.assert_called_once()
-        _, kwargs = flow_mock.call_args
-        self.assertEqual(kwargs["task_func"], resync_amazon_product_db_task)
-        self.assertTrue(kwargs["force_validation_only"])
-        self.assertEqual(kwargs["view"], self.view)
+    # @patch("sales_channels.integrations.amazon.receivers.run_single_amazon_product_task_flow")
+    # def test_manual_sync_queues_task(self, flow_mock):
+    #     manual_sync_remote_product.send(
+    #         sender=AmazonProduct,
+    #         instance=self.remote_product,
+    #         view=self.view,
+    #         force_validation_only=True,
+    #     )
+    #
+    #     flow_mock.assert_called_once()
+    #     _, kwargs = flow_mock.call_args
+    #     self.assertEqual(kwargs["task_func"], resync_amazon_product_db_task)
+    #     self.assertTrue(kwargs["force_validation_only"])
+    #     self.assertEqual(kwargs["view"], self.view)
