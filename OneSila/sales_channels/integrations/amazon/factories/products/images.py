@@ -44,7 +44,20 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin):
             )
             .order_by("sort_order")
         )
-        return [t.media.image_web_url for t in throughs if t.media.image_web_url]
+
+        urls = []
+        for t in throughs:
+            assoc = AmazonImageProductAssociation.objects.filter(
+                remote_product=self.remote_product,
+                local_instance=t,
+            ).first()
+
+            if assoc and assoc.imported_url:
+                urls.append(assoc.imported_url)
+            elif t.media.image_web_url:
+                urls.append(t.media.image_web_url)
+
+        return urls
 
     def build_attributes(self):
         urls = self._get_images()
