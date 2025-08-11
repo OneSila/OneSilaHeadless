@@ -60,6 +60,9 @@ class ImportSalesPriceListInstance(AbstractImportInstance):
         ]
 
     def validate(self):
+        if self.instance:
+            return
+
         if not hasattr(self, 'name'):
             raise ValueError("The 'name' field is required.")
 
