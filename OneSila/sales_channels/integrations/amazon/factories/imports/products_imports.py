@@ -343,6 +343,8 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         sku = product_data.get("sku")
         type = infer_product_type(product_data, is_variation)
         marketplace_id = summary.get("marketplace_id")
+        product_type_code = summary.get("product_type")
+        product_attrs = product_data.get("attributes") or {}
 
         name = summary.get("item_name")
 
@@ -371,8 +373,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         if type == SIMPLE:
             structured["prices"] = self._parse_prices(product_data)
 
-        product_type_code = summary.get("product_type")
-        product_attrs = product_data.get("attributes") or {}
+
         attributes, mirror_map = self._parse_attributes(
             product_attrs, product_type_code, view
         )
