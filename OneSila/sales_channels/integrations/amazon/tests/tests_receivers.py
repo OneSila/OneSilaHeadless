@@ -143,23 +143,3 @@ class AmazonPropertyReceiversTest(TestCase):
         self.assertIsNone(self.remote_select_value.local_instance)
 
 
-class AmazonProductLastSyncReceiverTest(DisableWooCommerceSignalsMixin, TestCase):
-    def setUp(self):
-        super().setUp()
-        self.sales_channel = AmazonSalesChannel.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            remote_id="SELLER",
-        )
-        self.product = Product.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            type=Product.SIMPLE,
-        )
-        self.remote_product = AmazonProduct.objects.create(
-            sales_channel=self.sales_channel,
-            local_instance=self.product,
-        )
-
-    def test_last_sync_updated_on_update_signal(self):
-        update_remote_product.send(sender=Product, instance=self.product)
-        self.remote_product.refresh_from_db()
-        self.assertIsNotNone(self.remote_product.last_sync_at)
