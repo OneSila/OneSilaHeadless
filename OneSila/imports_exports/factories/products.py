@@ -18,7 +18,8 @@ from products.models import (
     BundleVariation,
 )
 from properties.models import Property, ProductPropertiesRuleItem, ProductProperty
-from sales_prices.models import SalesPrice
+from sales_prices.models import SalesPrice, SalesPriceListItem
+from imports_exports.factories.sales_prices import ImportSalesPriceListItemInstance
 from taxes.models import VatRate
 from currencies.currencies import iso_list
 from core.exceptions import ValidationError
@@ -99,6 +100,7 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
 
         self.set_field_if_exists('images')
         self.set_field_if_exists('prices')
+        self.set_field_if_exists('sales_pricelist_items')
 
         self.set_field_if_exists('variations')
         self.set_field_if_exists('bundle_variations')
@@ -137,6 +139,7 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
         self.variations_products_instances = Product.objects.none()
         self.bundle_variations_instances = Product.objects.none()
         self.alias_variations_instances = Product.objects.none()
+        self.sales_pricelist_item_instances = SalesPriceListItem.objects.none()
 
     @property
     def local_class(self):
@@ -408,6 +411,22 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
                 pass
 
     @timeit_and_log(logger)
+    def set_sales_pricelist_items(self):
+        item_ids = []
+        for item in self.sales_pricelist_items:
+            sales_pricelist = item.get('salespricelist') if isinstance(item, dict) else None
+            import_instance = ImportSalesPriceListItemInstance(
+                item,
+                self.import_process,
+                product=self.instance,
+                sales_pricelist=sales_pricelist,
+            )
+            import_instance.process()
+            if import_instance.instance is not None:
+                item_ids.append(import_instance.instance.id)
+        self.sales_pricelist_item_instances = SalesPriceListItem.objects.filter(id__in=item_ids)
+
+    @timeit_and_log(logger)
     def set_variations(self):
         from .variations import ImportConfiguratorVariationsInstance, ImportConfigurableVariationInstance
 
@@ -525,6 +544,9 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
 
         if hasattr(self, 'prices'):
             self.set_prices()
+
+        if hasattr(self, 'sales_pricelist_items'):
+            self.set_sales_pricelist_items()
 
         if (hasattr(self, 'variations') or hasattr(self, 'configurator_select_values')) and self.type == Product.CONFIGURABLE:
             self.set_variations()
