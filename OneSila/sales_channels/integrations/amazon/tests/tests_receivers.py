@@ -8,7 +8,7 @@ from sales_channels.integrations.amazon.models import (
 )
 from sales_channels.integrations.amazon.models.properties import AmazonProductType
 from products.models import Product
-from sales_channels.signals import manual_sync_remote_product
+from sales_channels.signals import manual_sync_remote_product, update_remote_product
 from sales_channels.integrations.amazon.tasks import resync_amazon_product_db_task
 from .helpers import DisableWooCommerceSignalsMixin
 
@@ -74,3 +74,25 @@ class AmazonManualSyncReceiverTest(DisableWooCommerceSignalsMixin, TestCase):
     #     self.assertEqual(kwargs["task_func"], resync_amazon_product_db_task)
     #     self.assertTrue(kwargs["force_validation_only"])
     #     self.assertEqual(kwargs["view"], self.view)
+
+
+class AmazonProductLastSyncReceiverTest(DisableWooCommerceSignalsMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.product = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+        )
+        self.remote_product = AmazonProduct.objects.create(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+        )
+
+    def test_last_sync_updated_on_update_signal(self):
+        update_remote_product.send(sender=Product, instance=self.product)
+        self.remote_product.refresh_from_db()
+        self.assertIsNotNone(self.remote_product.last_sync_at)
