@@ -346,7 +346,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         product_type_code = summary.get("product_type")
         product_attrs = product_data.get("attributes") or {}
 
-        name = summary.get("item_name")
+        name = extract_amazon_attribute_value(product_attrs, "item_name") or summary.get("item_name")
 
         # it seems that sometimes the name can be None coming from Amazon. IN that case we fallback to sku
         if name is None:
