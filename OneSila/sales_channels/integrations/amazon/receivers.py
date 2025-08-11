@@ -131,13 +131,8 @@ def sales_channels__amazon_import_completed(sender, instance, **kwargs):
 @receiver(manual_sync_remote_product, sender='amazon.AmazonProduct')
 def amazon__product__manual_sync(sender, instance, view, force_validation_only=False, **kwargs):
     """Queue a task to resync an Amazon product."""
-    from django.utils import timezone
-
     product = instance.local_instance
     count = 1 + (getattr(product, 'get_configurable_variations', lambda: [])().count())
-
-    instance.last_sync_at = timezone.now()
-    instance.save(update_fields=["last_sync_at"])
 
     run_single_amazon_product_task_flow(
         task_func=resync_amazon_product_db_task,
@@ -149,9 +144,3 @@ def amazon__product__manual_sync(sender, instance, view, force_validation_only=F
     )
 
 
-@receiver(update_remote_product, sender='products.Product')
-def amazon__product__update_last_sync(sender, instance, **kwargs):
-    from django.utils import timezone
-    from sales_channels.integrations.amazon.models import AmazonProduct
-
-    AmazonProduct.objects.filter(local_instance=instance).update(last_sync_at=timezone.now())
