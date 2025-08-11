@@ -6,6 +6,7 @@ from imports_exports.factories.sales_prices import (
 )
 from imports_exports.factories.products import ImportProductInstance
 from products.models import SimpleProduct
+from sales_prices.flows import salespricelistitem__update_prices_flow
 from sales_prices.models import SalesPriceList, SalesPrice
 
 
@@ -37,6 +38,7 @@ class ImportSalesPriceListItemInstanceTests(TestCase):
         )
         inst.process()
         item = inst.instance
+        salespricelistitem__update_prices_flow(item)
         self.assertTrue(pricelist.salespricelistitem_set.filter(product=product).exists())
         self.assertIsNotNone(item.price_auto)
         self.assertIsNotNone(item.discount_auto)
