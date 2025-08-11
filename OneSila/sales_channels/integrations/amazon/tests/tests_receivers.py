@@ -1,12 +1,16 @@
 from unittest.mock import patch
 
+from model_bakery import baker
 from core.tests import TestCase
+from properties.models import Property, PropertySelectValue
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonSalesChannelView,
     AmazonProduct,
+    AmazonProperty,
+    AmazonPropertySelectValue,
+    AmazonProductType,
 )
-from sales_channels.integrations.amazon.models.properties import AmazonProductType
 from products.models import Product
 from sales_channels.signals import manual_sync_remote_product
 from sales_channels.integrations.amazon.tasks import resync_amazon_product_db_task
@@ -74,3 +78,66 @@ class AmazonManualSyncReceiverTest(DisableWooCommerceSignalsMixin, TestCase):
     #     self.assertEqual(kwargs["task_func"], resync_amazon_product_db_task)
     #     self.assertTrue(kwargs["force_validation_only"])
     #     self.assertEqual(kwargs["view"], self.view)
+
+
+class AmazonPropertyReceiversTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.marketplace = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="VIEW",
+        )
+        self.local_property = baker.make(
+            Property,
+            type=Property.TYPES.SELECT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.local_select_value = baker.make(
+            PropertySelectValue,
+            property=self.local_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.remote_property = AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.local_property,
+            code="color",
+            type=Property.TYPES.SELECT,
+        )
+        self.remote_select_value = AmazonPropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            amazon_property=self.remote_property,
+            marketplace=self.marketplace,
+            remote_value="red",
+            remote_name="Red",
+            local_instance=self.local_select_value,
+        )
+
+    def test_unmap_select_values_when_property_unmapped(self):
+        self.assertIsNotNone(self.remote_select_value.local_instance)
+
+        self.remote_property.local_instance = None
+        self.remote_property.save()
+
+        self.remote_select_value.refresh_from_db()
+        self.assertIsNone(self.remote_select_value.local_instance)
+
+    def test_unmap_select_values_when_property_remapped(self):
+        self.assertIsNotNone(self.remote_select_value.local_instance)
+
+        new_local_property = baker.make(
+            Property,
+            type=Property.TYPES.SELECT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.remote_property.local_instance = new_local_property
+        self.remote_property.save()
+
+        self.remote_select_value.refresh_from_db()
+        self.assertIsNone(self.remote_select_value.local_instance)
