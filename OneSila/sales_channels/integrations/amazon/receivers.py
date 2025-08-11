@@ -9,6 +9,7 @@ from sales_channels.signals import (
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
+    AmazonPropertySelectValue,
     AmazonProductType,
 )
 from sales_channels.integrations.amazon.factories.sync.rule_sync import (
@@ -83,6 +84,18 @@ def sales_channels__amazon_property__auto_map_select_values(sender, instance: Am
 
     sync_factory = AmazonPropertySelectValuesSyncFactory(instance)
     sync_factory.run()
+
+
+@receiver(post_update, sender='amazon.AmazonProperty')
+def sales_channels__amazon_property__unmap_select_values(sender, instance: AmazonProperty, **kwargs):
+    """Unmap select values when a property mapping changes."""
+    if not instance.is_dirty_field('local_instance', check_relationship=True):
+        return
+
+    AmazonPropertySelectValue.objects.filter(
+        amazon_property=instance,
+        local_instance__isnull=False,
+    ).update(local_instance=None)
 
 
 @receiver(post_create, sender='amazon.AmazonProductType')
