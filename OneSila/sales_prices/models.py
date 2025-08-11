@@ -126,10 +126,7 @@ class SalesPriceList(models.Model):
     name = models.CharField(max_length=100)
     start_date = models.DateField(_("start date"), blank=True, null=True)
     end_date = models.DateField(_("end date"), blank=True, null=True)
-    customers = models.ManyToManyField('contacts.Company', blank=True)
 
-    # FIXME: What happens if the relevant pricelist doesnt match with the customer currency
-    # Answer: The order should be set the the detected pricelist currency
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
     vat_included = models.BooleanField(_("Price list includes VAT"),
         default=False)
