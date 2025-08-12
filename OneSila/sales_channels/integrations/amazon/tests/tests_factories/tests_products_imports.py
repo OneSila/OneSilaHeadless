@@ -34,7 +34,7 @@ class AmazonProductsImportProcessorNameTest(TestCase):
         }
         with patch.object(AmazonProductsImportProcessor, "get_api", return_value=None), \
              patch.object(AmazonProductsImportProcessor, "_parse_images", return_value=[]), \
-             patch.object(AmazonProductsImportProcessor, "_parse_prices", return_value=[]), \
+             patch.object(AmazonProductsImportProcessor, "_parse_prices", return_value=([], [])), \
              patch.object(AmazonProductsImportProcessor, "_parse_attributes", return_value=([], {})), \
              patch.object(AmazonProductsImportProcessor, "_fetch_catalog_attributes", return_value=None):
             processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
@@ -55,9 +55,46 @@ class AmazonProductsImportProcessorNameTest(TestCase):
         }
         with patch.object(AmazonProductsImportProcessor, "get_api", return_value=None), \
              patch.object(AmazonProductsImportProcessor, "_parse_images", return_value=[]), \
-             patch.object(AmazonProductsImportProcessor, "_parse_prices", return_value=[]), \
+             patch.object(AmazonProductsImportProcessor, "_parse_prices", return_value=([], [])), \
              patch.object(AmazonProductsImportProcessor, "_parse_attributes", return_value=([], {})), \
              patch.object(AmazonProductsImportProcessor, "_fetch_catalog_attributes", return_value=None):
             processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
             structured, _, _ = processor.get__product_data(product_data, False)
         self.assertEqual(structured["name"], "Summary name")
+
+
+class AmazonProductsImportProcessorPriceTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="GB",
+        )
+        self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+    def test_missing_currency_raises_error(self):
+        product_data = {
+            "offers": [
+                {"offer_type": "B2C", "price": {"amount": "10", "currency_code": "USD"}}
+            ]
+        }
+        processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+        with self.assertRaises(ValueError):
+            processor._parse_prices(product_data)
+
+    def test_currency_object_in_salespricelist_data(self):
+        product_data = {
+            "offers": [
+                {"offer_type": "B2C", "price": {"amount": "10", "currency_code": "GBP"}}
+            ]
+        }
+        processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+        _, items = processor._parse_prices(product_data)
+        self.assertEqual(
+            items[0]["salespricelist_data"]["currency_object"], self.currency
+        )

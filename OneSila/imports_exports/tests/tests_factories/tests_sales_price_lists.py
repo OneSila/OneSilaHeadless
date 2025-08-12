@@ -15,7 +15,9 @@ class ImportSalesPriceListInstanceTests(TestCase):
         data = {
             'name': 'Retail',
         }
-        inst = ImportSalesPriceListInstance(data, self.import_process, currency=self.currency)
+        inst = ImportSalesPriceListInstance(
+            data, self.import_process, currency_object=self.currency
+        )
         inst.process()
         self.assertIsNotNone(inst.instance)
         self.assertIsNone(inst.instance.start_date)
@@ -28,7 +30,9 @@ class ImportSalesPriceListInstanceTests(TestCase):
             'start_date': date(2024, 1, 1),
             'end_date': date(2024, 12, 31),
         }
-        inst = ImportSalesPriceListInstance(data, self.import_process, currency=self.currency)
+        inst = ImportSalesPriceListInstance(
+            data, self.import_process, currency_object=self.currency
+        )
         inst.process()
         self.assertEqual(inst.instance.start_date, date(2024, 1, 1))
         self.assertEqual(inst.instance.end_date, date(2024, 12, 31))
@@ -46,7 +50,9 @@ class ImportSalesPriceListInstanceTests(TestCase):
             'vat_included': True,
             'auto_update_prices': False,
         }
-        inst = ImportSalesPriceListInstance(data, self.import_process, currency=self.currency)
+        inst = ImportSalesPriceListInstance(
+            data, self.import_process, currency_object=self.currency
+        )
         inst.process()
         self.assertEqual(inst.instance.id, existing.id)
         self.assertTrue(inst.instance.vat_included)
@@ -65,7 +71,7 @@ class ImportSalesPriceListInstanceTests(TestCase):
             'auto_update_prices': False,
         }
         inst = ImportSalesPriceListInstance(
-            data, self.import_process, currency=self.currency, instance=existing
+            data, self.import_process, currency_object=self.currency, instance=existing
         )
         inst.process()
         self.assertEqual(inst.instance.id, existing.id)

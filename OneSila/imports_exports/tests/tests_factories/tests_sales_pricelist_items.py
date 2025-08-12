@@ -85,7 +85,7 @@ class ImportSalesPriceListWithItemsTests(TestCase):
             "sales_pricelist_items": [{"product": product}],
         }
         inst = ImportSalesPriceListInstance(
-            data, self.import_process, currency=self.currency
+            data, self.import_process, currency_object=self.currency
         )
         inst.process()
         self.assertTrue(inst.instance.salespricelistitem_set.filter(product=product).exists())
