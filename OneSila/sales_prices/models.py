@@ -149,14 +149,13 @@ class SalesPriceList(models.Model):
         ):
             raise ValidationError(
                 {
-                    'start_date': _('Both start_date and end_date must be provided.'),
-                    'end_date': _('Both start_date and end_date must be provided.'),
+                    'date_range': _("Please select both a start and end date for this price list."),
                 }
             )
 
         if self.start_date and self.end_date and self.end_date < self.start_date:
             raise ValidationError(
-                {'end_date': _('End date cannot be before start date.')}
+                {'date_range': _('End date cannot be before start date.')}
             )
 
     def save(self, *args, **kwargs):
