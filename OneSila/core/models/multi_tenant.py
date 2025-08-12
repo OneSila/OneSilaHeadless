@@ -16,6 +16,7 @@ from core.helpers import get_languages
 from core.managers import MultiTenantManager, MultiTenantUserLoginTokenManager
 from core.validators import phone_regex, validate_image_extension, \
     no_dots_in_filename
+from core.upload_paths import tenant_upload_to
 
 from get_absolute_url.helpers import generate_absolute_url
 from hashlib import shake_256
@@ -140,8 +141,12 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     telegram_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
     onboarding_status = models.CharField(max_length=30, choices=ONBOARDING_STATUS_CHOICES, default=ADD_COMPANY)
 
-    avatar = models.ImageField(upload_to='avatars', null=True, blank=True,
-        validators=[validate_image_extension, no_dots_in_filename])
+    avatar = models.ImageField(
+        upload_to=tenant_upload_to('avatars'),
+        null=True,
+        blank=True,
+        validators=[validate_image_extension, no_dots_in_filename],
+    )
     avatar_resized = ImageSpecField(source='avatar',
                             processors=[ResizeToFill(100, 100)],
                             format='JPEG',
