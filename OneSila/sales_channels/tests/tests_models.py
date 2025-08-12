@@ -3,6 +3,7 @@ from datetime import date
 from django.core.exceptions import ValidationError
 
 from core.tests import TestCase
+from sales_channels.integrations.amazon.models import AmazonSalesChannel
 from sales_channels.models import SalesChannel, SalesChannelIntegrationPricelist
 from sales_channels.receivers import sales_channels__sales_channel__post_create_receiver
 from core.signals import post_create
@@ -15,17 +16,8 @@ from currencies.currencies import currencies
 class SalesChannelIntegrationPricelistTestCase(TestCase):
     def setUp(self):
         super().setUp()
-        self.patch_connect = patch(
-            'sales_channels.models.sales_channels.SalesChannel.connect',
-            lambda self: None,
-        )
-        self.patch_connect.start()
-        self.addCleanup(self.patch_connect.stop)
 
-        post_create.disconnect(sales_channels__sales_channel__post_create_receiver, sender=SalesChannel)
-        self.addCleanup(post_create.connect, sales_channels__sales_channel__post_create_receiver, sender=SalesChannel)
-
-        self.channel = SalesChannel.objects.create(
+        self.channel = AmazonSalesChannel.objects.create(
             hostname="https://example.com",
             multi_tenant_company=self.multi_tenant_company,
         )
@@ -127,6 +119,26 @@ class SalesChannelIntegrationPricelistTestCase(TestCase):
         )
         pl2 = self._create_pricelist(
             "pl2", self.eur, date(2025, 9, 2), date(2025, 10, 1)
+        )
+
+        SalesChannelIntegrationPricelist.objects.create(
+            sales_channel=self.channel,
+            price_list=pl1,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        SalesChannelIntegrationPricelist.objects.create(
+            sales_channel=self.channel,
+            price_list=pl2,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+    def test_non_overlapping_same_currency_default_and_with_dates(self):
+        pl1 = self._create_pricelist(
+            "pl1", self.eur, date(2025, 8, 1), date(2025, 9, 1)
+        )
+        pl2 = self._create_pricelist(
+            "pl2", self.eur
         )
 
         SalesChannelIntegrationPricelist.objects.create(
