@@ -414,10 +414,15 @@ LOGGING = {
             'level': 'DEBUG',
         },
         'amazon_log_file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': '/var/log/OneSilaHeadless/sales_channels_integrations_amazon.log',
+            # Fake handler for automated tests.  You should adjust your local
+            # local.py settings file to soemthing like this;
+            # 'class': 'logging.FileHandler',
+            # 'formatter': 'verbose',
+            # 'level': 'DEBUG',
+            # 'filename': '/var/log/OneSilaHeadless/sales_channels_integrations_amazon.log',
+            'class': 'logging.StreamHandler',
             'formatter': 'verbose',
+            'level': 'DEBUG',
         },
     },
     'loggers': {
