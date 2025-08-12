@@ -10,7 +10,7 @@ from get_absolute_url.helpers import generate_absolute_url
 from core.validators import no_dots_in_filename, validate_image_extension, \
     validate_file_extensions
 from .image_specs import ImageWebSpec
-from .managers import ImageManager, VideoManager, FileManager
+from .managers import ImageManager, VideoManager, FileManager, MediaManager
 
 
 import os
@@ -65,7 +65,7 @@ class Media(models.Model):
 
     products = models.ManyToManyField('products.Product', through='MediaProductThrough')
 
-    objects = models.Manager()
+    objects = MediaManager()
     videos = VideoManager()
     images = ImageManager()
 
