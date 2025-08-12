@@ -226,6 +226,7 @@ class RemoteVatType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(SalesChannelIntegrationPricelist, filters=SalesChannelIntegrationPricelistFilter, order=SalesChannelIntegrationPricelistOrder, pagination=True, fields='__all__')
 class SalesChannelIntegrationPricelistType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
+    price_list: Annotated['SalesPriceListType', lazy("sales_prices.schema.types.types")]
 
 
 @type(SalesChannelView, filters=SalesChannelViewFilter, order=SalesChannelViewOrder, pagination=True, fields='__all__')

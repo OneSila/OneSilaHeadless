@@ -68,7 +68,39 @@ class SalesChannelIntegrationPricelist(models.Model):
 
     sales_channel = models.ForeignKey(SalesChannel, on_delete=models.CASCADE)
     price_list = models.ForeignKey('sales_prices.SalesPriceList', on_delete=models.PROTECT)
-    # @TODO: Add save override validation
+
+    def clean(self):
+        """Validate that price lists for a channel do not overlap per currency."""
+        super().clean()
+
+        currency = self.price_list.currency
+        start = self.price_list.start_date
+        end = self.price_list.end_date
+
+        existing = SalesChannelIntegrationPricelist.objects.filter(
+            sales_channel=self.sales_channel,
+            price_list__currency=currency,
+        ).exclude(id=self.id)
+
+        for integration in existing:
+            other_start = integration.price_list.start_date
+            other_end = integration.price_list.end_date
+
+            if (
+                (other_end is None or start is None or start <= other_end)
+                and (end is None or other_start is None or end >= other_start)
+            ):
+                raise ValidationError(
+                    {
+                        'price_list': _(
+                            'Another price list with the same currency overlaps in date range.'
+                        )
+                    }
+                )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
 
     class Meta:
         unique_together = ('sales_channel', 'price_list')
