@@ -77,24 +77,12 @@ class SalesChannelIntegrationPricelistTestCase(TestCase):
                 multi_tenant_company=self.multi_tenant_company,
             )
 
-    def test_open_ended_overlap_not_allowed(self):
-        pl1 = self._create_pricelist("pl1", self.eur, date(2025, 8, 1), None)
-        pl2 = self._create_pricelist(
-            "pl2", self.eur, date(2025, 12, 1), date(2026, 1, 1)
-        )
-
-        SalesChannelIntegrationPricelist.objects.create(
-            sales_channel=self.channel,
-            price_list=pl1,
-            multi_tenant_company=self.multi_tenant_company,
-        )
+    def test_open_ended_pricelist_not_allowed(self):
+        with self.assertRaises(ValidationError):
+            self._create_pricelist("pl1", self.eur, date(2025, 8, 1), None)
 
         with self.assertRaises(ValidationError):
-            SalesChannelIntegrationPricelist.objects.create(
-                sales_channel=self.channel,
-                price_list=pl2,
-                multi_tenant_company=self.multi_tenant_company,
-            )
+            self._create_pricelist("pl2", self.eur, None, date(2026, 1, 1))
 
     def test_multiple_base_pricelists_not_allowed(self):
         pl1 = self._create_pricelist("pl1", self.eur)

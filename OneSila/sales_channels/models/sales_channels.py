@@ -76,6 +76,7 @@ class SalesChannelIntegrationPricelist(models.Model):
         currency = self.price_list.currency
         start = self.price_list.start_date
         end = self.price_list.end_date
+        is_default = start is None and end is None
 
         existing = SalesChannelIntegrationPricelist.objects.filter(
             sales_channel=self.sales_channel,
@@ -85,10 +86,23 @@ class SalesChannelIntegrationPricelist(models.Model):
         for integration in existing:
             other_start = integration.price_list.start_date
             other_end = integration.price_list.end_date
+            other_is_default = other_start is None and other_end is None
 
-            if (
-                (other_end is None or start is None or start <= other_end)
-                and (end is None or other_start is None or end >= other_start)
+            if is_default and other_is_default:
+                raise ValidationError(
+                    {
+                        'price_list': _(
+                            'Another fallback price list with the same currency already exists.'
+                        )
+                    }
+                )
+
+            if is_default or other_is_default:
+                # Default price lists do not overlap with dated ones
+                continue
+
+            if None in [other_start, other_end, start, end] or (
+                other_start <= end and start <= other_end
             ):
                 raise ValidationError(
                     {
