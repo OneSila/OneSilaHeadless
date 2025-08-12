@@ -6,6 +6,7 @@ import traceback
 from django.db import IntegrityError
 from core.logging_helpers import AddLogTimeentry, timeit_and_log
 from imports_exports.factories.imports import ImportMixin, AsyncProductImportMixin
+from core.mixins import TemporaryDisableInspectorSignalsMixin
 from imports_exports.factories.products import ImportProductInstance
 from products.models import Product
 from products.product_types import SIMPLE, CONFIGURABLE
@@ -45,7 +46,7 @@ from sales_channels.integrations.amazon.models.imports import AmazonImportRelati
 logger = logging.getLogger(__name__)
 
 
-class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeentry):
+class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, ImportMixin, GetAmazonAPIMixin, AddLogTimeentry):
     """Basic Amazon products import processor."""
 
     import_properties = False
@@ -860,6 +861,7 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
 
     @timeit_and_log(logger, "AmazonProductItemFactory.run")
     def run(self):
+        self.disable_inspector_signals()
         try:
             self.process_product_item(self.product_data)
         except Exception as exc:  # capture unexpected errors
@@ -869,6 +871,8 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
                 data=self.product_data,
                 exc=exc,
             )
+        finally:
+            self.refresh_inspector_status(run_inspection=False)
 
         if self.updated_with:
             increment_processed_records(self.import_process.id, delta=self.updated_with)

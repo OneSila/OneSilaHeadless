@@ -7,6 +7,7 @@ from mkdocs.config.config_options import Optional
 
 from core.helpers import clean_json_data
 from sales_channels.factories.imports import SalesChannelImportMixin
+from core.mixins import TemporaryDisableInspectorSignalsMixin
 from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.properties import ImportPropertyInstance
 from products.models import Product
@@ -23,7 +24,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class ShopifyImportProcessor(SalesChannelImportMixin, GetShopifyApiMixin):
+class ShopifyImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannelImportMixin, GetShopifyApiMixin):
     remote_ean_code_class = ShopifyEanCode
     remote_product_content_class = ShopifyProductContent
     remote_imageproductassociation_class = ShopifyImageProductAssociation

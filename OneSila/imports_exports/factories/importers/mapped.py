@@ -6,9 +6,10 @@ import requests
 from django.core.exceptions import ValidationError
 from imports_exports.factories.imports import ImportMixin
 from imports_exports.models import MappedImport, TypedImport
+from core.mixins import TemporaryDisableInspectorSignalsMixin
 
 
-class MappedImportRunner(ImportMixin):
+class MappedImportRunner(TemporaryDisableInspectorSignalsMixin, ImportMixin):
     def __init__(self, import_process: MappedImport):
 
         # Set flags based on type

@@ -9,6 +9,7 @@ from core.helpers import clean_json_data
 from currencies.models import Currency
 from sales_channels.factories.imports.decorators import if_allowed_by_saleschannel
 from sales_channels.factories.imports import SalesChannelImportMixin
+from core.mixins import TemporaryDisableInspectorSignalsMixin
 from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.properties import ImportPropertyInstance, ImportPropertySelectValueInstance, \
     ImportProductPropertiesRuleInstance, ImportProductPropertiesRuleItemInstance
@@ -37,7 +38,7 @@ from taxes.models import VatRate
 logger = logging.getLogger(__name__)
 
 
-class MagentoImportProcessor(SalesChannelImportMixin, GetMagentoAPIMixin):
+class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannelImportMixin, GetMagentoAPIMixin):
     remote_ean_code_class = MagentoEanCode
     remote_imageproductassociation_class = MagentoImageProductAssociation
     remote_price_class = MagentoPrice
