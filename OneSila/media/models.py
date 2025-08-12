@@ -9,6 +9,7 @@ from get_absolute_url.helpers import generate_absolute_url
 
 from core.validators import no_dots_in_filename, validate_image_extension, \
     validate_file_extensions
+from core.upload_paths import tenant_upload_to
 from .image_specs import ImageWebSpec
 from .managers import ImageManager, VideoManager, FileManager, MediaManager
 
@@ -47,18 +48,26 @@ class Media(models.Model):
     video_url = models.URLField(null=True, blank=True)
 
     image_type = models.CharField(max_length=5, choices=IMAGE_TYPE_CHOICES, default=PACK_SHOT)
-    image = models.ImageField(_('Image (High resolution)'),
-        upload_to='images/', validators=[validate_image_extension],
-        null=True, blank=True)
+    image = models.ImageField(
+        _('Image (High resolution)'),
+        upload_to=tenant_upload_to('images'),
+        validators=[validate_image_extension],
+        null=True,
+        blank=True,
+    )
     image_web = ImageSpecField(source='image',
         id='mediapp:image:imagewebspec')
     onesila_thumbnail = ImageSpecField(source='image',
         id='mediapp:image:onesilathumbnail')
     image_hash = models.CharField(_('image hash'), max_length=100, blank=True, null=True)
 
-    file = models.FileField(_('File'),
-        upload_to='files/', validators=[validate_file_extensions, no_dots_in_filename],
-        null=True, blank=True)
+    file = models.FileField(
+        _('File'),
+        upload_to=tenant_upload_to('files'),
+        validators=[validate_file_extensions, no_dots_in_filename],
+        null=True,
+        blank=True,
+    )
 
     # can be created by the system
     owner = models.ForeignKey(MultiTenantUser, on_delete=models.CASCADE, blank=True, null=True)
