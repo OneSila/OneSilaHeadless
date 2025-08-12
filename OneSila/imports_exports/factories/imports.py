@@ -286,6 +286,8 @@ class ImportMixin:
     @timeit_and_log(logger, "importing products")
     def run(self):
         self.prepare_import_process()
+        if hasattr(self, "disable_inspector_signals"):
+            self.disable_inspector_signals()
         self.calculate_percentage()
         self.strat_process()
 
@@ -310,6 +312,8 @@ class ImportMixin:
             raise
 
         finally:
+            if hasattr(self, "refresh_inspector_status"):
+                self.refresh_inspector_status()
             self.process_completed()
 
             if self.import_process.skip_broken_records:
@@ -338,6 +342,8 @@ class AsyncProductImportMixin(ImportMixin):
 
     def run(self):
         self.prepare_import_process()
+        if hasattr(self, "disable_inspector_signals"):
+            self.disable_inspector_signals()
         self.strat_process()
 
         self.import_process.total_records = self.get_total_instances()
@@ -347,6 +353,8 @@ class AsyncProductImportMixin(ImportMixin):
 
         self.total_import_instances_cnt = self.import_process.total_records
         self.set_threshold_chunk()
+
+        self.skipped_inspector_sku = getattr(self, "skipped_inspector_sku", set())
 
         serialized = None
         idx = 0
@@ -358,6 +366,9 @@ class AsyncProductImportMixin(ImportMixin):
                 update_delta = math.floor((idx / self.total_import_instances_cnt) * 100)
 
             serialized = serialize_listing_item(item)
+            sku = serialized.get("sku")
+            if sku:
+                self.skipped_inspector_sku.add(sku)
             self.dispatch_task(serialized, is_last=False, updated_with=update_delta)
 
         if serialized:
@@ -367,3 +378,6 @@ class AsyncProductImportMixin(ImportMixin):
             # processing when we use generator and this doesn't match anymore)
             update_delta = idx % self._threshold_chunk if idx % self._threshold_chunk != 0 else None
             self.dispatch_task(serialized, is_last=True, updated_with=update_delta)
+
+        if hasattr(self, "refresh_inspector_status"):
+            self.refresh_inspector_status()

@@ -51,8 +51,8 @@ class TemporaryDisableInspectorSignalsMixin:
         inspector_block_refresh.send = types.MethodType(patched_send, inspector_block_refresh)
         self._original_inspector_send = original_send
 
-    def refresh_inspector_status(self) -> None:
-        """Restore signals and re-run inspection for skipped products."""
+    def refresh_inspector_status(self, run_inspection: bool = True) -> None:
+        """Restore signals and optionally re-run inspection for skipped products."""
         from products_inspector.signals import inspector_block_refresh
         from products_inspector.models import Inspector
         from products.models import Product
@@ -60,6 +60,11 @@ class TemporaryDisableInspectorSignalsMixin:
         if self._original_inspector_send is not None:
             inspector_block_refresh.send = self._original_inspector_send
             self._original_inspector_send = None
+
+        if not run_inspection:
+            # We only needed to restore the signal; skip running the inspector.
+            self.skipped_inspector_sku = getattr(self, 'skipped_inspector_sku', set())
+            return
 
         if hasattr(self, 'skipped_inspector_sku') and self.skipped_inspector_sku:
             products = Product.objects.filter_multi_tenant(self.multi_tenant_company).filter(
