@@ -142,6 +142,27 @@ class SalesPriceList(models.Model):
 
     objects = SalesPriceListManager()
 
+    def clean(self):
+        super().clean()
+        if (self.start_date and not self.end_date) or (
+            self.end_date and not self.start_date
+        ):
+            raise ValidationError(
+                {
+                    'start_date': _('Both start_date and end_date must be provided.'),
+                    'end_date': _('Both start_date and end_date must be provided.'),
+                }
+            )
+
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValidationError(
+                {'end_date': _('End date cannot be before start date.')}
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
+
     def __str__(self):
         return '{} {}'.format(self.name, self.currency)
 
