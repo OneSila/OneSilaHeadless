@@ -23,6 +23,7 @@ from imports_exports.factories.sales_prices import ImportSalesPriceListItemInsta
 from taxes.models import VatRate
 from currencies.currencies import iso_list
 from core.exceptions import ValidationError
+from sales_channels.models import SalesChannelIntegrationPricelist
 
 import logging
 logger = logging.getLogger(__name__)
@@ -424,6 +425,11 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
             import_instance.process()
             if import_instance.instance is not None:
                 item_ids.append(import_instance.instance.id)
+                if self.sales_channel:
+                    SalesChannelIntegrationPricelist.objects.get_or_create(
+                        sales_channel=self.sales_channel,
+                        price_list=import_instance.salespricelist,
+                    )
         self.sales_pricelist_item_instances = SalesPriceListItem.objects.filter(id__in=item_ids)
 
     @timeit_and_log(logger)

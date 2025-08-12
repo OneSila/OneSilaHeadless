@@ -1,7 +1,8 @@
 from core.helpers import get_nested_attr
 from imports_exports.factories.mixins import AbstractImportInstance, ImportOperationMixin
-from currencies.models import Currency
+from currencies.models import Currency, PublicCurrency
 from core.signals import post_create
+from core.exceptions import ValidationError
 from sales_prices.models import SalesPriceList, SalesPriceListItem
 
 
@@ -31,11 +32,23 @@ class SalesPriceListItemImport(ImportOperationMixin):
 class ImportSalesPriceListInstance(AbstractImportInstance):
     """Import instance for SalesPriceList."""
 
-    def __init__(self, data: dict, import_process=None, currency=None, instance=None):
+    def __init__(
+        self,
+        data: dict,
+        import_process=None,
+        currency_object=None,
+        instance=None,
+    ):
         super().__init__(data, import_process, instance)
-        self.currency = currency
 
-        self.set_field_if_exists('currency_data')
+        self.set_field_if_exists('currency')
+        self.set_field_if_exists('currency_object', default_value=currency_object)
+        if hasattr(self, 'currency_object'):
+            self.currency = self.currency_object
+        else:
+            self._set_public_currency()
+            self._set_currency()
+
         self.set_field_if_exists('name')
         self.set_field_if_exists('start_date')
         self.set_field_if_exists('end_date')
@@ -48,7 +61,6 @@ class ImportSalesPriceListInstance(AbstractImportInstance):
         self.set_field_if_exists('sales_pricelist_items')
 
         self.validate()
-        self._set_currency()
         self.created = False
 
     @property
@@ -73,9 +85,8 @@ class ImportSalesPriceListInstance(AbstractImportInstance):
         if not hasattr(self, 'name'):
             raise ValueError("The 'name' field is required.")
 
-        currency_data = getattr(self, 'currency_data', None)
-        if not (self.currency or currency_data):
-            raise ValueError("Either 'currency' or 'currency_data' must be provided.")
+        if not hasattr(self, 'currency'):
+            raise ValueError("The 'currency' field is required.")
 
         if (
             hasattr(self, 'start_date')
@@ -86,18 +97,30 @@ class ImportSalesPriceListInstance(AbstractImportInstance):
         ):
             raise ValueError("start_date cannot be after end_date.")
 
-    def _set_currency(self):
-        if self.currency:
-            return
+    def _set_public_currency(self):
+        try:
+            self.public_currency = PublicCurrency.objects.get(iso_code=self.currency)
+        except AttributeError:
+            pass
+        except PublicCurrency.DoesNotExist:
+            raise ValidationError(f"Currency {self.currency} is unknown in the public currency list.")
 
-        if hasattr(self, 'currency_data'):
+    def _set_currency(self):
+        if not hasattr(self, 'currency'):
             self.currency, _ = Currency.objects.get_or_create(
                 multi_tenant_company=self.multi_tenant_company,
-                **self.currency_data,
+                is_default_currency=True,
             )
             return
 
-        raise ValueError("There is no currency information provided.")
+        if hasattr(self, 'currency') and hasattr(self, 'public_currency'):
+            self.currency, _ = Currency.objects.get_or_create(
+                multi_tenant_company=self.multi_tenant_company,
+                iso_code=self.public_currency.iso_code,
+            )
+            return
+
+        raise ValueError("There is no way to receive the currency.")
 
     def process_logic(self):
         fac = SalesPriceListImport(self, self.import_process, instance=self.instance)
