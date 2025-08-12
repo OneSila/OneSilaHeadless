@@ -1,4 +1,5 @@
-from huey.contrib.djhuey import db_task
+from huey import crontab
+from huey.contrib.djhuey import db_task, db_periodic_task
 from core.huey import LOW_PRIORITY, HIGH_PRIORITY, CRUCIAL_PRIORITY
 from sales_channels.decorators import remote_task
 from core.decorators import run_task_after_commit
@@ -86,3 +87,23 @@ def resync_amazon_product_db_task(
         factory.run()
 
     task.execute(actual_task)
+
+
+@db_periodic_task(crontab(minute='0', hour='0,12'))
+def refresh_amazon_product_issues_cronjob():
+    """Fetch latest listing issues for Amazon products synced in the last 12 hours."""
+    from datetime import timedelta
+    from django.utils import timezone
+    from .models import AmazonProduct, AmazonSalesChannelView
+    from .factories.sales_channels.issues import FetchRemoteIssuesFactory
+
+    cutoff = timezone.now() - timedelta(hours=12)
+    products = AmazonProduct.objects.filter(last_sync_at__gte=cutoff)
+    for product in products.iterator():
+        marketplaces = product.created_marketplaces or []
+        views = AmazonSalesChannelView.objects.filter(
+            sales_channel=product.sales_channel, remote_id__in=marketplaces
+        )
+        for view in views:
+            fac = FetchRemoteIssuesFactory(remote_product=product, view=view)
+            fac.run()
