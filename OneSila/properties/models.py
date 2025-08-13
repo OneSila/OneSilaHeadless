@@ -68,10 +68,11 @@ class Property(TranslatedModelMixin, models.Model):
 
     def delete(self, *args, **kwargs):
 
-        if self.is_product_type:
+        force_delete = kwargs.pop('force_delete', False)
+        if self.is_product_type and not force_delete:
             raise ValidationError(_("Product type cannot be deleted."))
 
-        if self.non_deletable:
+        if self.non_deletable and not force_delete:
             raise ValidationError(_("This property cannot be deleted."))
 
         super().delete(*args, **kwargs)
