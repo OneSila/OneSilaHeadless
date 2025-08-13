@@ -18,16 +18,17 @@ class ImportProductInstanceValidateTest(TestCase):
         super().setUp()
         self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
 
-    def test_missing_name_raises_error(self):
+    def test_missing_name_creates_no_translation(self):
         data = {
             "sku": "SKU123",
             "type": "SIMPLE"
         }
 
-        with self.assertRaises(ValueError) as cm:
-            ImportProductInstance(data, self.import_process)
+        instance = ImportProductInstance(data, self.import_process)
+        instance.pre_process_logic()
 
-        self.assertIn("The 'name' field is required", str(cm.exception))
+        self.assertFalse(hasattr(instance, 'name'))
+        self.assertEqual(instance.translations, [])
 
     def test_valid_with_name_and_sku(self):
         data = {
