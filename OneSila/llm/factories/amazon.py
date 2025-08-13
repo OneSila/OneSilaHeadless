@@ -5,7 +5,7 @@ class AmazonSelectValueTranslationLLM(OpenAIMixin):
     """Translate Amazon property select values using OpenAI."""
     model = "gpt-4.1-nano"
     temperature = 0.3
-    max_tokens = 20
+    max_tokens = 300
 
     def __init__(self, remote_value, from_language_code="auto", to_language_code="en", property_name=None, property_code=None):
         super().__init__()

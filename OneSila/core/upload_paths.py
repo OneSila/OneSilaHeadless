@@ -17,6 +17,6 @@ def _tenant_upload_to(instance, filename, subdir, depth=5, segment_length=2):
     return os.path.join(str(company_id), subdir, *segments, filename)
 
 
-def tenant_upload_to(subdir, depth=5, segment_length=2):
+def tenant_upload_to(subdir, depth=3, segment_length=2):
     """Return a callable suitable for Django's ``upload_to`` argument."""
     return partial(_tenant_upload_to, subdir=subdir, depth=depth, segment_length=segment_length)
