@@ -375,8 +375,6 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
 
         self.product_property_instances = ProductProperty.objects.filter(id__in=product_property_ids)
 
-        self._add_log_entry(f" (set_product_properties) looping through self.properties len=({len(self.properties)})")
-
     @timeit_and_log(logger)
     def set_images(self):
 

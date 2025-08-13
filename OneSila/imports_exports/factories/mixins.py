@@ -31,6 +31,7 @@ class AbstractImportInstance(abc.ABC):
         self.data = data.copy()
 
         self.create_only = getattr(import_process, 'create_only', False)
+        self.update_only = getattr(import_process, 'update_only', False)
 
         self.mirror_model_class = None
         self.mirror_model_map = {}
@@ -201,7 +202,17 @@ class ImportOperationMixin:
         """
         if not self.instance:
 
-            if self.force_created:
+            if self.import_instance.update_only:
+                try:
+                    self.instance = self.import_instance.local_class.objects.get(**self.get_kwargs)
+                    self.created = False
+                except self.import_instance.local_class.DoesNotExist:
+                    kwargs_repr = ", ".join(f"{k}={v}" for k, v in self.get_kwargs.items())
+                    raise self.import_instance.local_class.DoesNotExist(
+                        f"{self.import_instance.local_class.__name__} matching query does not exist. "
+                        f"Looked for {kwargs_repr}"
+                    )
+            elif self.force_created:
                 self.instance = self.import_instance.local_class.objects.create(**self.get_kwargs)
                 self.created = True
             else:
