@@ -108,14 +108,10 @@ AMAZON_PATCH_SKIP_KEYS = {
     'other_product_image_locator_6', 'other_product_image_locator_7', 'other_product_image_locator_8',
     'swatch_product_image_locator', 'image_locator_ps01', 'image_locator_ps02',
     'image_locator_ps03', 'image_locator_ps04', 'image_locator_ps05', 'image_locator_ps06',
-    # 'list_price',
-    # 'language',
-    # 'fit_type',
-    # 'pattern',
-    # 'fit_type',
-    # 'invent',
-    # 'batteries_required',
-    # 'invent',
-    # 'material',
-    # 'educational_objective',
+}
+
+# Amazon property codes for which select value translations should be skipped
+AMAZON_SELECT_VALUE_TRANSLATION_IGNORE_CODES = {
+    'country_of_origin',
+    'language',
 }

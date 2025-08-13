@@ -68,7 +68,53 @@ class SalesChannelIntegrationPricelist(models.Model):
 
     sales_channel = models.ForeignKey(SalesChannel, on_delete=models.CASCADE)
     price_list = models.ForeignKey('sales_prices.SalesPriceList', on_delete=models.PROTECT)
-    # @TODO: Add save override validation
+
+    def clean(self):
+        """Validate that price lists for a channel do not overlap per currency."""
+        super().clean()
+
+        currency = self.price_list.currency
+        start = self.price_list.start_date
+        end = self.price_list.end_date
+        is_default = start is None and end is None
+
+        existing = SalesChannelIntegrationPricelist.objects.filter(
+            sales_channel=self.sales_channel,
+            price_list__currency=currency,
+        ).exclude(id=self.id)
+
+        for integration in existing:
+            other_start = integration.price_list.start_date
+            other_end = integration.price_list.end_date
+            other_is_default = other_start is None and other_end is None
+
+            if is_default and other_is_default:
+                raise ValidationError(
+                    {
+                        'price_list': _(
+                            'Another fallback price list with the same currency already exists.'
+                        )
+                    }
+                )
+
+            if is_default or other_is_default:
+                # Default price lists do not overlap with dated ones
+                continue
+
+            if None in [other_start, other_end, start, end] or (
+                other_start <= end and start <= other_end
+            ):
+                raise ValidationError(
+                    {
+                        'price_list': _(
+                            'Another price list with the same currency overlaps in date range.'
+                        )
+                    }
+                )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
 
     class Meta:
         unique_together = ('sales_channel', 'price_list')

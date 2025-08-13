@@ -41,6 +41,12 @@ class AmazonProduct(RemoteProduct):
         help_text="Indicates if this listing was created by us and we can manage listing level data.",
     )
 
+    last_sync_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp of the last sync with Amazon.",
+    )
+
     @property
     def remote_type(self):
         return self.get_remote_rule().product_type_code
@@ -99,7 +105,12 @@ class AmazonProductContent(RemoteProductContent):
 
 class AmazonImageProductAssociation(RemoteImageProductAssociation):
     """Association between images and Amazon products."""
-    pass
+    imported_url = models.URLField(
+        max_length=1024,
+        blank=True,
+        null=True,
+        help_text="Original URL of the image when imported from Amazon.",
+    )
 
 
 class AmazonCategory(RemoteCategory):

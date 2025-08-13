@@ -205,7 +205,7 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
 
         self.assertIn(
             {
-                'op': 'add',
+                'op': 'replace',
                 'path': '/attributes/item_name',
                 'value': [{
                     'value': 'Chair name',
@@ -217,7 +217,7 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
         )
         self.assertIn(
             {
-                'op': 'add',
+                'op': 'replace',
                 'path': '/attributes/product_description',
                 'value': [{
                     'value': 'Chair description',
@@ -229,7 +229,7 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
         )
         self.assertIn(
             {
-                'op': 'add',
+                'op': 'replace',
                 'path': '/attributes/bullet_point',
                 'value': [
                     {

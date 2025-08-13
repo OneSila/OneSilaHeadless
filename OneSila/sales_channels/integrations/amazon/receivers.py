@@ -4,10 +4,12 @@ from sales_channels.signals import (
     refresh_website_pull_models,
     sales_channel_created,
     manual_sync_remote_product,
+    update_remote_product,
 )
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
+    AmazonPropertySelectValue,
     AmazonProductType,
 )
 from sales_channels.integrations.amazon.factories.sync.rule_sync import (
@@ -21,6 +23,10 @@ from sales_channels.integrations.amazon.tasks import (
     create_amazon_product_type_rule_task,
     resync_amazon_product_db_task,
 )
+from sales_channels.integrations.amazon.constants import (
+    AMAZON_SELECT_VALUE_TRANSLATION_IGNORE_CODES,
+)
+from llm.factories.amazon import AmazonSelectValueTranslationLLM
 from imports_exports.signals import import_success
 from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonConfigurableVariationsFactory
 from sales_channels.integrations.amazon.flows.tasks_runner import run_single_amazon_product_task_flow
@@ -84,6 +90,53 @@ def sales_channels__amazon_property__auto_map_select_values(sender, instance: Am
     sync_factory.run()
 
 
+@receiver(post_update, sender='amazon.AmazonProperty')
+def sales_channels__amazon_property__unmap_select_values(sender, instance: AmazonProperty, **kwargs):
+    """Unmap select values when a property mapping changes."""
+    if not instance.is_dirty_field('local_instance', check_relationship=True):
+        return
+
+    AmazonPropertySelectValue.objects.filter(
+        amazon_property=instance,
+        local_instance__isnull=False,
+    ).update(local_instance=None)
+
+
+@receiver(post_create, sender='amazon.AmazonPropertySelectValue')
+def sales_channels__amazon_property_select_value__translate(sender, instance: AmazonPropertySelectValue, **kwargs):
+    """Translate remote select value names into the company language."""
+    remote_language_obj = instance.marketplace.remote_languages.first()
+    remote_lang = remote_language_obj.local_instance if remote_language_obj else None
+    company_lang = instance.sales_channel.multi_tenant_company.language
+
+    remote_name = instance.remote_name or instance.remote_value
+
+    if instance.amazon_property.code in AMAZON_SELECT_VALUE_TRANSLATION_IGNORE_CODES:
+        instance.translated_remote_name = remote_name
+        instance.save(update_fields=['translated_remote_name'])
+        return
+
+    if not remote_lang or remote_lang == company_lang:
+        instance.translated_remote_name = remote_name
+        instance.save(update_fields=['translated_remote_name'])
+        return
+
+    translator = AmazonSelectValueTranslationLLM(
+        remote_value=remote_name,
+        from_language_code=remote_lang,
+        to_language_code=company_lang,
+        property_name=instance.amazon_property.name,
+        property_code=instance.amazon_property.code,
+    )
+    try:
+        translated = translator.translate()
+    except Exception:
+        translated = remote_name
+
+    instance.translated_remote_name = translated
+    instance.save(update_fields=['translated_remote_name'])
+
+
 @receiver(post_create, sender='amazon.AmazonProductType')
 @receiver(post_update, sender='amazon.AmazonProductType')
 def sales_channels__amazon_product_type__ensure_asin(sender, instance, **kwargs):
@@ -128,3 +181,5 @@ def amazon__product__manual_sync(sender, instance, view, force_validation_only=F
         remote_product_id=instance.id,
         force_validation_only=force_validation_only,
     )
+
+

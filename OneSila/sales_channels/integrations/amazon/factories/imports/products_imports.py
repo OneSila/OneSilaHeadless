@@ -6,6 +6,7 @@ import traceback
 from django.db import IntegrityError
 from core.logging_helpers import AddLogTimeentry, timeit_and_log
 from imports_exports.factories.imports import ImportMixin, AsyncProductImportMixin
+from core.mixins import TemporaryDisableInspectorSignalsMixin
 from imports_exports.factories.products import ImportProductInstance
 from products.models import Product
 from products.product_types import SIMPLE, CONFIGURABLE
@@ -33,9 +34,12 @@ from sales_channels.integrations.amazon.models import (
 
 from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERTIES
 from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
-from sales_channels.models import SalesChannelViewAssign
+from sales_channels.models import SalesChannelViewAssign, SalesChannelIntegrationPricelist
+from sales_prices.models import SalesPrice
+from currencies.models import Currency
 from core.helpers import ensure_serializable
 from dateutil.parser import parse
+from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
 import datetime
 from imports_exports.helpers import append_broken_record, increment_processed_records
 from sales_channels.integrations.amazon.models.imports import AmazonImportRelationship
@@ -43,7 +47,7 @@ from sales_channels.integrations.amazon.models.imports import AmazonImportRelati
 logger = logging.getLogger(__name__)
 
 
-class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeentry):
+class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, ImportMixin, GetAmazonAPIMixin, AddLogTimeentry):
     """Basic Amazon products import processor."""
 
     import_properties = False
@@ -112,8 +116,11 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         summaries = product.get("summaries") or []
         return summaries[0] if summaries else {}
 
-    def _parse_prices(self, product):
+    def _parse_prices(self, product, local_product=None):
         prices = []
+        sales_pricelist_items = []
+        processed = set()
+
         for offer in product.get("offers", []):
 
             if offer.get("offer_type") != "B2C":
@@ -121,14 +128,61 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
 
             price_info = offer.get("price") or {}
             amount = price_info.get("amount")
-            currency = price_info.get("currency_code")
-            if amount is not None and currency:
-                prices.append({
-                    "price": Decimal(amount),
-                    "currency": currency,
+            currency_code = price_info.get("currency_code")
+
+            if amount is None or not currency_code or currency_code in processed:
+                continue
+
+            processed.add(currency_code)
+
+            try:
+                currency = Currency.objects.get(
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
+                    iso_code=currency_code,
+                )
+            except Currency.DoesNotExist as exc:
+                raise ValueError(
+                    f"Currency with ISO code {currency_code} does not exist locally"
+                ) from exc
+
+            scip = SalesChannelIntegrationPricelist.objects.filter(
+                sales_channel=self.sales_channel,
+                price_list__currency=currency,
+            ).select_related("price_list").first()
+
+            price_decimal = Decimal(amount)
+
+            if scip:
+                sales_pricelist_items.append({
+                    "salespricelist": scip.price_list,
+                    "disable_auto_update": True,
+                    "price_auto": price_decimal,
+                })
+            else:
+                sales_pricelist_items.append({
+                    "salespricelist_data": {
+                        "name": f"Amazon {self.sales_channel.hostname} {currency_code}",
+                        "currency_object": currency,
+                    },
+                    "disable_auto_update": True,
+                    "price_auto": price_decimal,
                 })
 
-        return prices
+            has_sales_price = (
+                local_product
+                and SalesPrice.objects.filter(
+                    product=local_product,
+                    currency__iso_code=currency_code,
+                ).exists()
+            )
+
+            if not has_sales_price:
+                prices.append({
+                    "price": price_decimal,
+                    "currency": currency_code,
+                })
+
+        return prices, sales_pricelist_items
 
     def _parse_translations(self, name, language, attributes_dict):
         description, bullets = extract_description_and_bullets(attributes_dict)
@@ -336,15 +390,17 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         return remote_lang.local_instance if remote_lang else None
 
     @timeit_and_log(logger, "AmazonProductsImportProcessor.get__product_data")
-    def get__product_data(self, product_data, is_variation):
+    def get__product_data(self, product_data, is_variation, product_instance=None):
         summary = self._get_summary(product_data)
         asin = summary.get("asin")
         status = summary.get("status") or []
         sku = product_data.get("sku")
         type = infer_product_type(product_data, is_variation)
         marketplace_id = summary.get("marketplace_id")
+        product_type_code = summary.get("product_type")
+        product_attrs = product_data.get("attributes") or {}
 
-        name = summary.get("item_name")
+        name = extract_amazon_attribute_value(product_attrs, "item_name") or summary.get("item_name")
 
         # it seems that sometimes the name can be None coming from Amazon. IN that case we fallback to sku
         if name is None:
@@ -369,10 +425,12 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         structured["images"] = self._parse_images(product_data)
 
         if type == SIMPLE:
-            structured["prices"] = self._parse_prices(product_data)
+            prices, sales_pricelist_items = self._parse_prices(product_data, product_instance)
+            if prices:
+                structured["prices"] = prices
+            if sales_pricelist_items:
+                structured["sales_pricelist_items"] = sales_pricelist_items
 
-        product_type_code = summary.get("product_type")
-        product_attrs = product_data.get("attributes") or {}
         attributes, mirror_map = self._parse_attributes(
             product_attrs, product_type_code, view
         )
@@ -548,13 +606,21 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
     @timeit_and_log(logger)
     def handle_images(self, import_instance: ImportProductInstance):
         if hasattr(import_instance, "images"):
-            for image_ass in import_instance.images_associations_instances:
-                AmazonImageProductAssociation.objects.get_or_create(
+            for index, image_ass in enumerate(import_instance.images_associations_instances):
+                imported_url = None
+                if index < len(import_instance.images):
+                    imported_url = import_instance.images[index].get("image_url")
+
+                instance, _ = AmazonImageProductAssociation.objects.get_or_create(
                     multi_tenant_company=self.import_process.multi_tenant_company,
                     sales_channel=self.sales_channel,
                     local_instance=image_ass,
                     remote_product=import_instance.remote_instance,
                 )
+
+                if imported_url and instance.imported_url != imported_url:
+                    instance.imported_url = imported_url
+                    instance.save(update_fields=["imported_url"])
 
     @timeit_and_log(logger)
     def handle_variations(self, import_instance: ImportProductInstance):
@@ -604,7 +670,7 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
 
     @timeit_and_log(logger, "AmazonProductsImportProcessor.process_product_item")
     def process_product_item(self, product):
-        from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
+
         # Kickstarting the AddLogTimeentry class settings.
         self._set_logger(logger)
         self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before settings prodduct Instance.")
@@ -624,8 +690,21 @@ class AmazonProductsImportProcessor(ImportMixin, GetAmazonAPIMixin, AddLogTimeen
         self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before getting summary")
 
         summary = self._get_summary(product)
-        rule = self.get_product_rule(product)
-        structured, language, view = self.get__product_data(product, is_variation)
+
+        rule = None
+        # Ensure we keep the rule from the default marketplace if the product
+        # already exists. This prevents overriding the initial rule when
+        # importing the product from additional marketplaces with a different
+        # product type.
+        if remote_product and remote_product.local_instance:
+            existing_rule = remote_product.local_instance.get_product_rule()
+            if existing_rule:
+                rule = existing_rule
+
+        if rule is None:
+            rule =  self.get_product_rule(product)
+
+        structured, language, view = self.get__product_data(product, is_variation, product_instance)
 
         # if on the main marketplaces was configurable because the other doesn't have relationships
         # will return SIMPLE as default which is wrong
@@ -795,6 +874,7 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
 
     @timeit_and_log(logger, "AmazonProductItemFactory.run")
     def run(self):
+        self.disable_inspector_signals()
         try:
             self.process_product_item(self.product_data)
         except Exception as exc:  # capture unexpected errors
@@ -804,6 +884,8 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
                 data=self.product_data,
                 exc=exc,
             )
+        finally:
+            self.refresh_inspector_status(run_inspection=False)
 
         if self.updated_with:
             increment_processed_records(self.import_process.id, delta=self.updated_with)

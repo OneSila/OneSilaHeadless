@@ -85,6 +85,16 @@ MULTI_TENANT_LOGIN_LINK_EXPIRES_AFTER_MIN = 60
 #
 HUEY['immediate'] = DEBUG
 
+#
+# Logging
+#
+LOGGING['handlers']['amazon_log_file'] = {
+    'class': 'logging.FileHandler',
+    'formatter': 'verbose',
+    'level': 'DEBUG',
+    'filename': '/var/log/OneSilaHeadless/sales_channels_integrations_amazon.log',
+}
+
 # This will make absolute path to work
 LOCAL_HOST = 'localhost:8080'
 

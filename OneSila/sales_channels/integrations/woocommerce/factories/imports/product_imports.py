@@ -3,6 +3,7 @@ from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.properties import ImportProductPropertiesRuleInstance
 from products.models import Product
 from core.decorators import timeit_and_log
+from core.mixins import TemporaryDisableInspectorSignalsMixin
 
 from ..exceptions import SanityCheckError
 from ..mixins import GetWoocommerceAPIMixin
@@ -27,7 +28,7 @@ from ...exceptions import UnsupportedProductTypeError
 logger = logging.getLogger(__name__)
 
 
-class WoocommerceProductImportProcessor(ImportProcessorTempStructureMixin, SalesChannelImportMixin, GetWoocommerceAPIMixin):
+class WoocommerceProductImportProcessor(TemporaryDisableInspectorSignalsMixin, ImportProcessorTempStructureMixin, SalesChannelImportMixin, GetWoocommerceAPIMixin):
     remote_imageproductassociation_class = WoocommerceMediaThroughProduct
     remote_price_class = WoocommercePrice
     remote_ean_code_class = WoocommerceEanCode

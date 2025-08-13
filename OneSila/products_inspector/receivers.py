@@ -53,13 +53,13 @@ def products_inspector__inspector__inspector_sync_block_by_error_code(sender, in
 @receiver(post_create, sender='media.MediaProductThrough')
 @receiver(post_delete, sender='media.MediaProductThrough')
 def products_inspector__inspector__trigger_block_has_images(sender, instance, **kwargs):
-    inspector_block_refresh.send(sender=instance.product.inspector.__class__, instance=instance.product.inspector, error_code=HAS_IMAGES_ERROR, run_async=True)
+    inspector_block_refresh.send(sender=instance.product.inspector.__class__, instance=instance.product.inspector, error_code=HAS_IMAGES_ERROR, run_async=False)
 
 
 @receiver(post_create, sender='sales_channels.SalesChannelViewAssign')
 @receiver(post_delete, sender='sales_channels.SalesChannelViewAssign')
 def products_inspector__inspector__trigger_block_has_images_assign(sender, instance, **kwargs):
-    inspector_block_refresh.send(sender=instance.product.inspector.__class__, instance=instance.product.inspector, error_code=HAS_IMAGES_ERROR, run_async=True)
+    inspector_block_refresh.send(sender=instance.product.inspector.__class__, instance=instance.product.inspector, error_code=HAS_IMAGES_ERROR, run_async=False)
 
 
 # MISSING_PRICES_ERROR ----------------------------------------------------------
@@ -70,14 +70,14 @@ def products_inspector__inspector__trigger_block_has_images_assign(sender, insta
 @receiver(post_update, sender='products.AliasProduct')
 @trigger_signal_for_dirty_fields('active')
 def products_inspector__inspector__trigger_block_product_active_change(sender, instance, **kwargs):
-    inspector_block_refresh.send(sender=instance.inspector.__class__, instance=instance.inspector, error_code=MISSING_PRICES_ERROR, run_async=True)
+    inspector_block_refresh.send(sender=instance.inspector.__class__, instance=instance.inspector, error_code=MISSING_PRICES_ERROR, run_async=False)
 
 
 @receiver(post_create, sender='sales_prices.SalesPrice')
 @receiver(post_delete, sender='sales_prices.SalesPrice')
 def products_inspector__inspector__trigger_block_missing_prices_sales_price_change(sender, instance, **kwargs):
     inspector_block_refresh.send(sender=instance.product.inspector.__class__, instance=instance.product.inspector, error_code=MISSING_PRICES_ERROR,
-                                 run_async=True)
+                                 run_async=False)
 
 
 # INACTIVE_BUNDLE_ITEMS_ERROR & INACTIVE_BILL_OF_MATERIALS_ERROR ---------------
@@ -93,7 +93,7 @@ def products_inspector__inspector__trigger_block_bom_change(sender, instance, **
     recursively_check_components(instance.parent, add_recursive_bundle=True, add_recursive_bom=True, add_recursive_variations=False, error_codes=error_codes)
 
     inspector_block_refresh.send(sender=instance.parent.inspector.__class__, instance=instance.parent.inspector, error_code=MISSING_BUNDLE_ITEMS_ERROR,
-                                 run_async=True)
+                                 run_async=False)
 
 
 @receiver(post_update, sender='products.Product')
@@ -112,7 +112,7 @@ def products_inspector__inspector__trigger_block_bundle_items_component_active_s
 @receiver(post_delete, sender='products.ConfigurableVariation')
 def products_inspector__inspector__trigger_block_parent_variations_change(sender, instance, **kwargs):
     inspector_block_refresh.send(sender=instance.parent.inspector.__class__, instance=instance.parent.inspector, error_code=MISSING_VARIATION_ERROR,
-                                 run_async=True)
+                                 run_async=False)
 
 
 # MISSING_SUPPLIER_PRODUCTS_ERROR  ---------------------------------------------
@@ -120,7 +120,7 @@ def products_inspector__inspector__trigger_block_parent_variations_change(sender
 # @receiver(mutation_update, sender='products.Product')
 # def products_inspector__inspector__trigger_block_supplier_products_mutation_change(sender, instance, **kwargs):
 #     for base_product in instance.base_products.all().iterator():
-#         inspector_block_refresh.send(sender=base_product.inspector.__class__, instance=base_product.inspector, error_code=MISSING_STOCK_ERROR, run_async=True)
+#         inspector_block_refresh.send(sender=base_product.inspector.__class__, instance=base_product.inspector, error_code=MISSING_STOCK_ERROR, run_async=False)
 
 
 # MISSING_EAN_CODE_ERROR  ------------------------------------------------------
@@ -129,7 +129,7 @@ def products_inspector__inspector__trigger_block_parent_variations_change(sender
 @receiver(ean_code_released_for_product, sender='products.BundleProduct')
 @receiver(ean_code_released_for_product, sender='products.AliasProduct')
 def products_inspector__inspector__trigger_block_ean_code_released(sender, instance, **kwargs):
-    inspector_block_refresh.send(sender=instance.inspector.__class__, instance=instance.inspector, error_code=MISSING_EAN_CODE_ERROR, run_async=True)
+    inspector_block_refresh.send(sender=instance.inspector.__class__, instance=instance.inspector, error_code=MISSING_EAN_CODE_ERROR, run_async=False)
 
 
 @receiver(post_update, sender='eancodes.EanCode')
@@ -137,14 +137,14 @@ def products_inspector__inspector__trigger_block_ean_code_released(sender, insta
 def products_inspector__inspector__trigger_block_ean_product_change(sender, instance, **kwargs):
     if instance.product is not None:
         product = instance.product
-        inspector_block_refresh.send(sender=product.inspector.__class__, instance=product.inspector, error_code=MISSING_EAN_CODE_ERROR, run_async=True)
+        inspector_block_refresh.send(sender=product.inspector.__class__, instance=product.inspector, error_code=MISSING_EAN_CODE_ERROR, run_async=False)
 
 
 @receiver(post_delete, sender='eancodes.EanCode')
 def products_inspector__inspector__trigger_block_ean_product_change_on_delete(sender, instance, **kwargs):
     if instance.product is not None:
         product = instance.product
-        inspector_block_refresh.send(sender=product.inspector.__class__, instance=product.inspector, error_code=MISSING_EAN_CODE_ERROR, run_async=True)
+        inspector_block_refresh.send(sender=product.inspector.__class__, instance=product.inspector, error_code=MISSING_EAN_CODE_ERROR, run_async=False)
 
 # MISSING_PRODUCT_TYPE_ERROR  ------------------------------------------------------
 # MISSING_REQUIRED_PROPERTIES_ERROR  -----------------------------------------------
@@ -163,17 +163,17 @@ def products_inspector__inspector__trigger_block_product_properties_change(sende
     inspector_block_refresh.send(sender=instance.product.inspector.__class__,
                                  instance=instance.product.inspector,
                                  error_code=MISSING_PRODUCT_TYPE_ERROR,
-                                 run_async=True)
+                                 run_async=False)
 
     inspector_block_refresh.send(sender=instance.product.inspector.__class__,
                                  instance=instance.product.inspector,
                                  error_code=MISSING_REQUIRED_PROPERTIES_ERROR,
-                                 run_async=True)
+                                 run_async=False)
 
     inspector_block_refresh.send(sender=instance.product.inspector.__class__,
                                  instance=instance.product.inspector,
                                  error_code=MISSING_OPTIONAL_PROPERTIES_ERROR,
-                                 run_async=True)
+                                 run_async=False)
 
 # MISSING_STOCK_ERROR  --------------------------------------------------
 
@@ -184,7 +184,7 @@ def products_inspector__inspector__trigger_block_product_properties_change(sende
 @receiver(post_update, sender='products.AliasProduct')
 @trigger_signal_for_dirty_fields('active', 'allow_backorder')
 def products_inspector__inspector__trigger_block_product_active_or_allow_backorder_change(sender, instance, **kwargs):
-    inspector_block_refresh.send(sender=instance.inspector.__class__, instance=instance.inspector, error_code=MISSING_STOCK_ERROR, run_async=True)
+    inspector_block_refresh.send(sender=instance.inspector.__class__, instance=instance.inspector, error_code=MISSING_STOCK_ERROR, run_async=False)
 
 
 # @receiver(post_create, sender='inventory.Inventory')
@@ -195,7 +195,7 @@ def products_inspector__inspector__trigger_block_product_active_or_allow_backord
 #
 #     if instance.product.type == SUPPLIER:
 #         for product in instance.product.base_products.all().iterator():
-#             inspector_block_refresh.send(sender=product.inspector.__class__, instance=product.inspector, error_code=MISSING_STOCK_ERROR, run_async=True)
+#             inspector_block_refresh.send(sender=product.inspector.__class__, instance=product.inspector, error_code=MISSING_STOCK_ERROR, run_async=False)
 
 
 # MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR  ----------------------------------
@@ -204,14 +204,14 @@ def products_inspector__inspector__trigger_block_product_active_or_allow_backord
 @receiver(post_delete, sender='sales_prices.SalesPriceListItem')
 def products_inspector__inspector__trigger_block_sales_pricelist_item_create(sender, instance, **kwargs):
     inspector_block_refresh.send(sender=instance.product.inspector.__class__, instance=instance.product.inspector,
-                                 error_code=MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, run_async=True)
+                                 error_code=MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, run_async=False)
 
 
 @receiver(post_update, sender='sales_prices.SalesPriceListItem')
 @trigger_signal_for_dirty_fields('price_override')
 def products_inspector__inspector__trigger_block_sales_pricelist_item_update(sender, instance, **kwargs):
     inspector_block_refresh.send(sender=instance.product.inspector.__class__, instance=instance.product.inspector,
-                                 error_code=MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, run_async=True)
+                                 error_code=MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, run_async=False)
 
 
 @receiver(post_update, sender='sales_prices.SalesPriceList')
@@ -219,14 +219,14 @@ def products_inspector__inspector__trigger_block_sales_pricelist_item_update(sen
 def products_inspector__inspector__trigger_block_sales_pricelist_update(sender, instance, **kwargs):
     for item in instance.salespricelistitem_set.all().iterator():
         inspector_block_refresh.send(sender=item.product.inspector.__class__, instance=item.product.inspector,
-                                     error_code=MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, run_async=True)
+                                     error_code=MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, run_async=False)
 
 
 @receiver(post_delete, sender='sales_prices.SalesPriceList')
 def products_inspector__inspector__trigger_block_sales_pricelist_delete(sender, instance, **kwargs):
     for item in instance.salespricelistitem_set.all().iterator():
         inspector_block_refresh.send(sender=item.product.inspector.__class__, instance=item.product.inspector,
-                                     error_code=MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, run_async=True)
+                                     error_code=MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, run_async=False)
 
 
 # VARIATION_MISMATCH_PRODUCT_TYPE_ERROR  ----------------------------------
@@ -256,13 +256,13 @@ def products_inspector__inspector__trigger_block_product_type_variations_mismatc
         inspector_block_refresh.send(sender=product.inspector.__class__,
                                      instance=product.inspector,
                                      error_code=error_code,
-                                     run_async=True)
+                                     run_async=False)
 
     for variation in ConfigurableVariation.objects.filter(variation=product).iterator():
         inspector_block_refresh.send(sender=variation.parent.inspector.__class__,
                                      instance=variation.parent.inspector,
                                      error_code=VARIATION_MISMATCH_PRODUCT_TYPE_ERROR,
-                                     run_async=True)
+                                     run_async=False)
 
 
 @receiver(post_create, sender='products.ConfigurableVariation')
@@ -273,22 +273,22 @@ def products_inspector__inspector__trigger_block_product_mismatch_variation_chan
     inspector_block_refresh.send(sender=instance.parent.inspector.__class__,
                                  instance=instance.parent.inspector,
                                  error_code=VARIATION_MISMATCH_PRODUCT_TYPE_ERROR,
-                                 run_async=True)
+                                 run_async=False)
 
     inspector_block_refresh.send(sender=instance.parent.inspector.__class__,
                                  instance=instance.parent.inspector,
                                  error_code=ITEMS_MISSING_MANDATORY_INFORMATION_ERROR,
-                                 run_async=True)
+                                 run_async=False)
 
     inspector_block_refresh.send(sender=instance.parent.inspector.__class__,
                                  instance=instance.parent.inspector,
                                  error_code=VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR,
-                                 run_async=True)
+                                 run_async=False)
 
     inspector_block_refresh.send(sender=instance.parent.inspector.__class__,
                                  instance=instance.parent.inspector,
                                  error_code=DUPLICATE_VARIATIONS_ERROR,
-                                 run_async=True)
+                                 run_async=False)
 
 
 @receiver(inspector_missing_info_detected, sender='products.Product')
@@ -306,13 +306,13 @@ def products_inspector__inspector__trigger_block_product_inspector_change(sender
         inspector_block_refresh.send(sender=variation.parent.inspector.__class__,
                                      instance=variation.parent.inspector,
                                      error_code=VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR,
-                                     run_async=True)
+                                     run_async=False)
 
     for item in BundleVariation.objects.filter(variation=instance).iterator():
         inspector_block_refresh.send(sender=item.parent.inspector.__class__,
                                      instance=item.parent.inspector,
                                      error_code=ITEMS_MISSING_MANDATORY_INFORMATION_ERROR,
-                                     run_async=True)
+                                     run_async=False)
 
 
 @receiver(post_update, sender='products.Product')
@@ -328,7 +328,7 @@ def products_inspector__inspector__trigger_block_product_inspector_because_of_ac
         inspector_block_refresh.send(sender=variation.parent.inspector.__class__,
                                      instance=variation.parent.inspector,
                                      error_code=VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR,
-                                     run_async=True)
+                                     run_async=False)
 
 
 @receiver(post_delete, sender='properties.ProductProperty')
@@ -346,7 +346,7 @@ def products_inspector__inspector__trigger_block_duplicate_variations_check(send
             inspector_block_refresh.send(sender=parent.inspector.__class__,
                                          instance=parent.inspector,
                                          error_code=DUPLICATE_VARIATIONS_ERROR,
-                                         run_async=True)
+                                         run_async=False)
 
 
 @receiver(product_properties_rule_created, sender='properties.ProductPropertiesRule')

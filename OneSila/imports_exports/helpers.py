@@ -20,6 +20,7 @@ def increment_processed_records(process_id: int, delta: int = 1) -> None:
                 ),
             ),
             default=F("percentage"),
+            output_field=IntegerField(),
         ),
     )
 

@@ -5,6 +5,7 @@ from sales_channels.integrations.amazon.models.properties import AmazonProperty
 import json
 
 from django.conf import settings
+from django.utils import timezone
 from sp_api.base import SellingApiException
 from spapi import SellersApi, SPAPIConfig, SPAPIClient, DefinitionsApi, ListingsApi
 from sales_channels.integrations.amazon.decorators import throttle_safe
@@ -394,6 +395,10 @@ class GetAmazonAPIMixin:
             mode="VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
         )
 
+        if getattr(self, "remote_product", None):
+            self.remote_product.last_sync_at = timezone.now()
+            self.remote_product.save(update_fields=["last_sync_at"])
+
         submission_id = getattr(response, "submission_id", None)
         processing_status = getattr(response, "status", None)
         log_identifier, _ = self.get_identifiers()
@@ -436,7 +441,7 @@ class GetAmazonAPIMixin:
                     patches.append({"op": "delete", "path": path})
             else:
                 if key not in current_attributes:
-                    patches.append({"op": "add", "path": path, "value": new_value})
+                    patches.append({"op": "replace", "path": path, "value": new_value})
                 else:
                     diff = DeepDiff(current_value, new_value, ignore_order=True)
                     if diff:
@@ -485,6 +490,10 @@ class GetAmazonAPIMixin:
             issue_locale=self._get_issue_locale(),
             mode="VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
         )
+
+        if getattr(self, "remote_product", None):
+            self.remote_product.last_sync_at = timezone.now()
+            self.remote_product.save(update_fields=["last_sync_at"])
         submission_id = getattr(response, "submission_id", None)
         processing_status = getattr(response, "status", None)
         log_identifier, _ = self.get_identifiers()

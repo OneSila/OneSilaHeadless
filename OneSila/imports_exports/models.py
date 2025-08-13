@@ -10,6 +10,7 @@ import mimetypes
 from django.core.exceptions import ValidationError
 
 from core.helpers import get_languages
+from core.upload_paths import tenant_upload_to
 
 
 class Import(PolymorphicModel, models.Model):
@@ -260,7 +261,6 @@ class TypedImport(Import):
 
         super().save(*args, **kwargs)
 
-
     def run(self):
         raise NotImplementedError("Cannot run a TypedImport directly. Use a concrete subclass like MappedImport.")
 
@@ -271,7 +271,7 @@ class MappedImport(TypedImport):
     """
 
     json_file = models.FileField(
-        upload_to="mapped_imports/",
+        upload_to=tenant_upload_to("mapped_imports"),
         null=True,
         blank=True,
         help_text="Optional uploaded mapped JSON file."
@@ -328,4 +328,3 @@ class ImportReport(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
-

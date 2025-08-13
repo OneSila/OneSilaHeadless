@@ -494,27 +494,6 @@ class AmazonProductTypeRuleFactory(
 
         return schema_data, offer_property_keys
 
-    @throttle_safe(max_retries=5, base_delay=1)
-    def _run_fake_validation_preview(self, view):
-        payload = {
-            "productType": self.product_type_code,
-            "requirements": "LISTING",
-            "attributes": {
-                "item_name": [{"value": "Dummy product name"}],
-            },
-        }
-
-        listings_api = ListingsApi(self._get_client())
-        response = listings_api.put_listings_item(
-            seller_id=self.sales_channel.remote_id,
-            sku="dummy-sku-for-validation",
-            marketplace_ids=[view.remote_id],
-            body=payload,
-            issue_locale=self.language,
-            mode="VALIDATION_PREVIEW",
-        )
-        return response.issues
-
     def ensure_asin_item(self):
 
         if not self.merchant_asin_property:
@@ -578,13 +557,6 @@ class AmazonProductTypeRuleFactory(
             view, is_default_marketplace=is_default
         )
         required_properties = set(schema_data["required"])
-
-        # @TODO: Temporary remove
-        # validation_issues = self._run_fake_validation_preview(view)
-        #
-        # for issue in validation_issues:
-        #     if issue.severity == "ERROR" and "MISSING_ATTRIBUTE" in issue.categories:
-        #         required_properties.update(issue.attribute_names)
 
         if is_default:
             # create AmazonProductType the schema_data will have a title

@@ -1,7 +1,7 @@
 from typing import Optional
 
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin
+from core.schema.core.types.filters import filter, SearchFilterMixin, lazy
 from products.schema.types.filters import ProductFilter
 
 from sales_channels.models import (
@@ -139,6 +139,8 @@ class SalesChannelFilter(SearchFilterMixin):
 @filter(SalesChannelIntegrationPricelist)
 class SalesChannelIntegrationPricelistFilter(SearchFilterMixin):
     id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    price_list: Optional[lazy['SalesPriceListFilter', "sales_prices.schema.types.filters"]]
 
 
 @filter(RemoteCurrency)
