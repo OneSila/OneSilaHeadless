@@ -56,6 +56,33 @@ class MediaTestCase(CreateImageMixin, TestCase):
         self.assertEqual(parts[1], 'files')
         self.assertEqual(len(parts), 8)
 
+    def test_shared_file_not_deleted(self):
+        """Test that a shared file is not deleted when one media instance is deleted."""
+        # Create a shared image file
+        shared_image_file = self.get_image_file('red.png')
+
+        # Create two media instances sharing the same file
+        media1 = Media.objects.create(type=Media.IMAGE, image=shared_image_file, multi_tenant_company=self.multi_tenant_company)
+        media2 = Media.objects.create(type=Media.IMAGE, image=shared_image_file, multi_tenant_company=self.multi_tenant_company)
+
+        # Ensure the the files are truly shared
+        shared_image_path1 = media1.image.path
+        shared_image_path2 = media2.image.path
+        self.assertEqual(shared_image_path1, shared_image_path2)
+
+        # And that they exist
+        self.assertTrue(os.path.exists(shared_image_path1))
+        self.assertTrue(os.path.exists(shared_image_path2))
+
+        # Delete one media instance
+        media1.delete()
+
+        # Verify that the shared image file is still present
+        self.assertTrue(os.path.exists(shared_image_path2))
+
+        # Clean up by deleting the second media instance
+        media2.delete()
+
 
 class ImageCleanupTestCase(CreateImageMixin, TestCase):
     def test_image_cleanup(self):

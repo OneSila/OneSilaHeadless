@@ -49,7 +49,7 @@ class CleanupMediaStorageFactory:
             used_by_media_instances = Media.objects.filter(**{field: self.media_instance.image})
 
             if used_by_media_instances.exists():
-                used_by_media_instances_ids = used_by_media_instances.values_list('id', flat=True)
+                used_by_media_instances_ids = [str(i) for i in used_by_media_instances.values_list('id', flat=True)]
                 raise ValidationError(f"{field} path is used by media instances: {', '.join(used_by_media_instances_ids)}.")
 
         logger.debug(f"Media instance {self.media_instance_id} is safe to remove. Unused by other media instances.")
@@ -80,11 +80,9 @@ class CleanupMediaStorageFactory:
         except TypeError:
             # Happens when the file path is None
             logger.debug(f"{field} for {self.media_instance_id} is None. Cannot remove.")
-
-        if file_path and os.path.exists(file_path):
-            raise FailedToCleanupMediaStorage(f"{field} for {self.media_instance_id} at {file_path} still exists in storage.")
-        else:
-            logger.debug(f"{field} for {self.media_instance_id} at {file_path} removed from storage.")
+        except Exception as e:
+            logger.error(f"Error removing {field} for {self.media_instance_id} at {file_path}: {e}")
+            raise FailedToCleanupMediaStorage(f"{field} for {self.media_instance_id} at {file_path} still exists in storage.") from e
 
     def remove_files_from_storage(self):
         """
