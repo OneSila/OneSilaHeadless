@@ -205,6 +205,9 @@ class ImportBundleVariationInstance(AbstractImportInstance):
         self.set_field_if_exists('bundle_product_data')
         self.set_field_if_exists('quantity', default_value=1)
 
+        if 'qty' in data:
+            self.quantity = data.get('qty')
+
         self.validate()
         self._set_products_import_instance()
 
