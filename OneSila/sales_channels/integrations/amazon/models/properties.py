@@ -158,6 +158,12 @@ class AmazonPropertySelectValue(RemoteObjectMixin, models.Model):
         blank=True,
         help_text="The display name of the value in the given locale."
     )
+    translated_remote_name = models.CharField(
+        max_length=512,
+        null=True,
+        blank=True,
+        help_text="Remote name translated into the company language.",
+    )
     local_instance = models.ForeignKey(
         'properties.PropertySelectValue',
         null=True,
@@ -172,6 +178,7 @@ class AmazonPropertySelectValue(RemoteObjectMixin, models.Model):
         unique_together = ('amazon_property', 'marketplace', 'remote_value')
         search_terms = [
             'remote_name',
+            'translated_remote_name',
             'remote_value',
             'amazon_property__name',
             'amazon_property__code',

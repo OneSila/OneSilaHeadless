@@ -10,6 +10,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonProductType,
+    AmazonRemoteLanguage,
 )
 from products.models import Product
 from sales_channels.signals import manual_sync_remote_product, update_remote_product
@@ -141,5 +142,103 @@ class AmazonPropertyReceiversTest(TestCase):
 
         self.remote_select_value.refresh_from_db()
         self.assertIsNone(self.remote_select_value.local_instance)
+
+
+class AmazonSelectValueTranslationReceiverTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.marketplace = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="VIEW",
+        )
+        self.property = baker.make(
+            Property,
+            type=Property.TYPES.SELECT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.remote_property = AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.property,
+            code="color",
+            type=Property.TYPES.SELECT,
+        )
+
+    @patch("sales_channels.integrations.amazon.receivers.AmazonSelectValueTranslationLLM.translate", return_value="Red")
+    def test_translate_when_language_diff(self, translate_mock):
+        AmazonRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            sales_channel_view=self.marketplace,
+            remote_code="de_DE",
+            local_instance="de",
+        )
+
+        val = AmazonPropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            amazon_property=self.remote_property,
+            marketplace=self.marketplace,
+            remote_value="rot",
+            remote_name="Rot",
+        )
+
+        translate_mock.assert_called_once()
+        val.refresh_from_db()
+        self.assertEqual(val.translated_remote_name, "Red")
+
+    @patch("sales_channels.integrations.amazon.receivers.AmazonSelectValueTranslationLLM.translate")
+    def test_no_translation_when_language_same(self, translate_mock):
+        AmazonRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            sales_channel_view=self.marketplace,
+            remote_code="en_US",
+            local_instance="en",
+        )
+
+        val = AmazonPropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            amazon_property=self.remote_property,
+            marketplace=self.marketplace,
+            remote_value="red",
+            remote_name="Red",
+        )
+
+        translate_mock.assert_not_called()
+        val.refresh_from_db()
+        self.assertEqual(val.translated_remote_name, "Red")
+
+    @patch("sales_channels.integrations.amazon.receivers.AmazonSelectValueTranslationLLM.translate")
+    def test_ignored_code_skips_translation(self, translate_mock):
+        AmazonRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            sales_channel_view=self.marketplace,
+            remote_code="de_DE",
+            local_instance="de",
+        )
+
+        self.remote_property.code = "country_of_origin"
+        self.remote_property.save()
+
+        val = AmazonPropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            amazon_property=self.remote_property,
+            marketplace=self.marketplace,
+            remote_value="DE",
+            remote_name="Deutschland",
+        )
+
+        translate_mock.assert_not_called()
+        val.refresh_from_db()
+        self.assertEqual(val.translated_remote_name, "Deutschland")
 
 
