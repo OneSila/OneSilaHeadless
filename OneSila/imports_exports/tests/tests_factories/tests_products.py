@@ -949,6 +949,42 @@ class ImportProductInstanceCreateOnlyTest(TestCase):
         )
 
 
+class ImportProductInstanceUpdateOnlyTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.initial_import = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+        self.update_only_import = Import.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            update_only=True,
+        )
+
+    def test_existing_product_updated_when_update_only(self):
+        first_data = {
+            "name": "Original Product",
+            "sku": "UO-001",
+        }
+        ImportProductInstance(first_data, self.initial_import).process()
+
+        second_data = {
+            "name": "Updated Product",
+            "sku": "UO-001",
+        }
+        ImportProductInstance(second_data, self.update_only_import).process()
+
+        product = Product.objects.get(sku="UO-001")
+        self.assertEqual(product.name, "Updated Product")
+
+    def test_missing_product_raises_error_when_update_only(self):
+        data = {
+            "name": "New Product",
+            "sku": "UO-002",
+        }
+        instance = ImportProductInstance(data, self.update_only_import)
+
+        with self.assertRaises(Product.DoesNotExist):
+            instance.process()
+
+
 class ImportProductWithSameSkuAndDifferentTypeTest(TestCase):
     def setUp(self):
         super().setUp()
@@ -978,4 +1014,3 @@ class ImportProductWithSameSkuAndDifferentTypeTest(TestCase):
         self.assertEqual(instance2.created, False)
         self.assertEqual(instance2.instance.type, product.type)
         self.assertEqual(instance2.instance.type, "SIMPLE")
-

@@ -51,6 +51,10 @@ class Import(PolymorphicModel, models.Model):
         default=False,
         help_text="If True, existing objects fetched during the import will not be updated.",
     )
+    update_only = models.BooleanField(
+        default=False,
+        help_text="If True, the import will only update existing objects and fail if they do not exist.",
+    )
     skip_broken_records = models.BooleanField(
         default=False,
         help_text="If True, the import will skip records that raise errors and continue processing."
