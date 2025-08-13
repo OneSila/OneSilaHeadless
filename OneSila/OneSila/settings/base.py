@@ -169,6 +169,12 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+#
+# Core upload path settings
+#
+
+UPLOAD_TENANT_PATH_DEPTH = 3
+UPLOAD_TENANT_PATH_SEGMENT_LENGTH = 2
 
 # Internationalization of the interfaces
 # https://docs.djangoproject.com/en/4.2/topics/i18n/

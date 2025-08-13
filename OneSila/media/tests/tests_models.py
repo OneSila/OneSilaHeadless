@@ -15,6 +15,15 @@ logger = logging.getLogger(__name__)
 
 
 class MediaTestCase(CreateImageMixin, TestCase):
+
+    def _get_tenant_upload_path_parts(self):
+        """How many parts does this upload path create?"""
+        multi_tenant_company_id = 1
+        real_folder = 1
+        complex_folder = settings.UPLOAD_TENANT_PATH_DEPTH
+        filename = 1
+        return sum([multi_tenant_company_id, real_folder, complex_folder, filename])
+
     def test_image_web_url_none(self):
         image = baker.make(Media, image=None)
         url = image.image_web_url
@@ -50,17 +59,20 @@ class MediaTestCase(CreateImageMixin, TestCase):
     def test_image_upload_path(self):
         image = self.create_image(fname='red.png', multi_tenant_company=self.multi_tenant_company)
         parts = image.image.name.split('/')
+        expected_parts = self._get_tenant_upload_path_parts()
         self.assertEqual(parts[0], str(self.multi_tenant_company.id))
         self.assertEqual(parts[1], 'images')
-        self.assertEqual(len(parts), 8)
+        self.assertEqual(len(parts), expected_parts)
 
     def test_file_upload_path(self):
         media = Media.objects.create(multi_tenant_company=self.multi_tenant_company, type=Media.FILE)
         media.file.save('test.pdf', ContentFile(b'test'))
         parts = media.file.name.split('/')
+        expected_parts = self._get_tenant_upload_path_parts()
         self.assertEqual(parts[0], str(self.multi_tenant_company.id))
         self.assertEqual(parts[1], 'files')
-        self.assertEqual(len(parts), 8)
+        logger.debug(f"Parts look like this: {parts}")
+        self.assertEqual(len(parts), expected_parts)
 
     def test_shared_file_not_deleted(self):
         """Test that a shared file is not deleted when one media instance is deleted."""
