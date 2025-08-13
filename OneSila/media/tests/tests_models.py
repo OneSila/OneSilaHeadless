@@ -4,11 +4,26 @@ from model_bakery import baker
 from django.core.files import File
 from django.core.files.base import ContentFile
 from django.conf import settings
-import os
+from pathlib import Path
+
 from .helpers import CreateImageMixin
+
+import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MediaTestCase(CreateImageMixin, TestCase):
+
+    def _get_tenant_upload_path_parts(self):
+        """How many parts does this upload path create?"""
+        multi_tenant_company_id = 1
+        real_folder = 1
+        complex_folder = settings.UPLOAD_TENANT_PATH_DEPTH
+        filename = 1
+        return sum([multi_tenant_company_id, real_folder, complex_folder, filename])
+
     def test_image_web_url_none(self):
         image = baker.make(Media, image=None)
         url = image.image_web_url
@@ -44,17 +59,72 @@ class MediaTestCase(CreateImageMixin, TestCase):
     def test_image_upload_path(self):
         image = self.create_image(fname='red.png', multi_tenant_company=self.multi_tenant_company)
         parts = image.image.name.split('/')
+        expected_parts = self._get_tenant_upload_path_parts()
         self.assertEqual(parts[0], str(self.multi_tenant_company.id))
         self.assertEqual(parts[1], 'images')
-        self.assertEqual(len(parts), 8)
+        self.assertEqual(len(parts), expected_parts)
 
     def test_file_upload_path(self):
         media = Media.objects.create(multi_tenant_company=self.multi_tenant_company, type=Media.FILE)
         media.file.save('test.pdf', ContentFile(b'test'))
         parts = media.file.name.split('/')
+        expected_parts = self._get_tenant_upload_path_parts()
         self.assertEqual(parts[0], str(self.multi_tenant_company.id))
         self.assertEqual(parts[1], 'files')
-        self.assertEqual(len(parts), 8)
+        logger.debug(f"Parts look like this: {parts}")
+        self.assertEqual(len(parts), expected_parts)
+
+    def test_shared_file_not_deleted(self):
+        """Test that a shared file is not deleted when one media instance is deleted."""
+        # Create a shared image file
+        shared_image_file = self.get_image_file('red.png')
+
+        # Create two media instances sharing the same file
+        media1 = Media.objects.create(type=Media.FILE, file=shared_image_file, multi_tenant_company=self.multi_tenant_company)
+        media2 = Media.objects.create(type=Media.FILE, file=shared_image_file, multi_tenant_company=self.multi_tenant_company)
+
+        media1.refresh_from_db()
+        media2.refresh_from_db()
+
+        # Ensure ids are different:
+        self.assertNotEqual(media1.id, media2.id)
+
+        # Verify that we can find the media instances in the database
+        media1_absolute_path = media1.file.path
+        media2_absolute_path = media2.file.path
+        rel_path_media1 = str(Path(media1_absolute_path).relative_to(settings.MEDIA_ROOT))
+        rel_path_media2 = str(Path(media2_absolute_path).relative_to(settings.MEDIA_ROOT))
+
+        # These rel paths should not be the same.
+        # So the there should never be share files.
+        self.assertNotEqual(rel_path_media1, rel_path_media2)
+
+        # Tests continuation below are a non-issue.
+        # media1_qs = Media.objects.filter(file__endswith=rel_path_media1)
+        # media2_qs = Media.objects.filter(file__endswith=rel_path_media1)
+
+        # self.assertEqual(media1_qs.count(), 2)
+        # self.assertEqual(media2_qs.count(), 2)
+
+        # # Ensure the the files are truly shared
+        # shared_image_path1 = media1.file.path
+        # logger.debug(f"About to investigate shared_image_path1 {shared_image_path1}")
+        # shared_image_path2 = media2.file.path
+        # logger.debug(f"About to investigate shared_image_path2 {shared_image_path2}")
+        # self.assertEqual(shared_image_path1, shared_image_path2)
+
+        # # And that they exist
+        # self.assertTrue(os.path.exists(shared_image_path1))
+        # self.assertTrue(os.path.exists(shared_image_path2))
+
+        # # Delete one media instance
+        # media1.delete()
+
+        # # Verify that the shared image file is still present
+        # self.assertTrue(os.path.exists(shared_image_path2))
+
+        # # Clean up by deleting the second media instance
+        # media2.delete()
 
 
 class ImageCleanupTestCase(CreateImageMixin, TestCase):

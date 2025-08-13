@@ -2,10 +2,14 @@ import os
 import random
 import string
 from functools import partial
+from django.conf import settings
 
 
-def _tenant_upload_to(instance, filename, subdir, depth=5, segment_length=2):
+def _tenant_upload_to(instance, filename, subdir):
     """Build a randomized path rooted at the tenant's company ID."""
+    depth = settings.UPLOAD_TENANT_PATH_DEPTH
+    segment_length = settings.UPLOAD_TENANT_PATH_SEGMENT_LENGTH
+
     company_id = getattr(instance, "multi_tenant_company_id", None)
     if company_id is None:
         company = getattr(instance, "multi_tenant_company", None)
@@ -17,6 +21,6 @@ def _tenant_upload_to(instance, filename, subdir, depth=5, segment_length=2):
     return os.path.join(str(company_id), subdir, *segments, filename)
 
 
-def tenant_upload_to(subdir, depth=3, segment_length=2):
+def tenant_upload_to(subdir):
     """Return a callable suitable for Django's ``upload_to`` argument."""
-    return partial(_tenant_upload_to, subdir=subdir, depth=depth, segment_length=segment_length)
+    return partial(_tenant_upload_to, subdir=subdir)
