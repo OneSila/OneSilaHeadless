@@ -128,7 +128,7 @@ class AmazonProductsImportProcessorRulePreserveTest(TestCase):
         self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
 
         # create product type and rule
-        self.product_type_property = Property.objects.create(
+        self.product_type_property, _ = Property.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             is_product_type=True,
             type=Property.TYPES.SELECT,
@@ -142,7 +142,7 @@ class AmazonProductsImportProcessorRulePreserveTest(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             value="Default",
         )
-        self.rule = ProductPropertiesRule.objects.create(
+        self.rule, _ = ProductPropertiesRule.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             product_type=self.product_type_value,
         )
