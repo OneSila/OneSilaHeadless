@@ -39,6 +39,7 @@ from sales_prices.models import SalesPrice
 from currencies.models import Currency
 from core.helpers import ensure_serializable
 from dateutil.parser import parse
+from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
 import datetime
 from imports_exports.helpers import append_broken_record, increment_processed_records
 from sales_channels.integrations.amazon.models.imports import AmazonImportRelationship
@@ -430,7 +431,6 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             if sales_pricelist_items:
                 structured["sales_pricelist_items"] = sales_pricelist_items
 
-
         attributes, mirror_map = self._parse_attributes(
             product_attrs, product_type_code, view
         )
@@ -670,7 +670,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
     @timeit_and_log(logger, "AmazonProductsImportProcessor.process_product_item")
     def process_product_item(self, product):
-        from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
+
         # Kickstarting the AddLogTimeentry class settings.
         self._set_logger(logger)
         self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before settings prodduct Instance.")
@@ -690,7 +690,20 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before getting summary")
 
         summary = self._get_summary(product)
-        rule = self.get_product_rule(product)
+
+        rule = None
+        # Ensure we keep the rule from the default marketplace if the product
+        # already exists. This prevents overriding the initial rule when
+        # importing the product from additional marketplaces with a different
+        # product type.
+        if remote_product and remote_product.local_instance:
+            existing_rule = remote_product.local_instance.get_product_rule()
+            if existing_rule:
+                rule = existing_rule
+
+        if rule is None:
+            rule =  self.get_product_rule(product)
+
         structured, language, view = self.get__product_data(product, is_variation, product_instance)
 
         # if on the main marketplaces was configurable because the other doesn't have relationships
