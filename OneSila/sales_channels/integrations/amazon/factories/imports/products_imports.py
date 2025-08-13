@@ -689,8 +689,8 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before getting summary")
 
         summary = self._get_summary(product)
-        rule = self.get_product_rule(product)
 
+        rule = None
         # Ensure we keep the rule from the default marketplace if the product
         # already exists. This prevents overriding the initial rule when
         # importing the product from additional marketplaces with a different
@@ -699,6 +699,9 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             existing_rule = remote_product.local_instance.get_product_rule()
             if existing_rule:
                 rule = existing_rule
+
+        if rule is None:
+            rule =  self.get_product_rule(product)
 
         structured, language, view = self.get__product_data(product, is_variation, product_instance)
 

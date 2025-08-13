@@ -1,3 +1,5 @@
+from typing import Optional
+
 from core.schema.core.types.ordering import order
 from core.schema.core.types.types import auto
 from sales_channels.integrations.amazon.models import (
@@ -22,11 +24,6 @@ class AmazonSalesChannelOrder:
 
 @order(AmazonProperty)
 class AmazonPropertyOrder:
-    id: auto
-
-
-@order(AmazonPropertySelectValue)
-class AmazonPropertySelectValueOrder:
     id: auto
 
 
@@ -58,6 +55,7 @@ class AmazonDefaultUnitConfiguratorOrder:
 @order(AmazonSalesChannelView)
 class AmazonSalesChannelViewOrder:
     id: auto
+    is_default: auto
 
 
 @order(AmazonRemoteLog)
@@ -68,3 +66,8 @@ class AmazonRemoteLogOrder:
 @order(AmazonProductIssue)
 class AmazonProductIssueOrder:
     id: auto
+
+@order(AmazonPropertySelectValue)
+class AmazonPropertySelectValueOrder:
+    id: auto
+    marketplace: Optional[AmazonSalesChannelViewOrder]
