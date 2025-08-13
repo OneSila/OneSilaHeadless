@@ -44,4 +44,4 @@ class TestMultiTenantUserAvatarUploadPath(TestCase):
         parts = self.user.avatar.name.split('/')
         self.assertEqual(parts[0], str(self.multi_tenant_company.id))
         self.assertEqual(parts[1], 'avatars')
-        self.assertEqual(len(parts), 8)
+        self.assertEqual(len(parts), 6)

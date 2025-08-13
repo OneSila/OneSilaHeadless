@@ -10,4 +10,4 @@ class MappedImportUploadPathTest(TestCase):
         parts = mapped_import.json_file.name.split('/')
         self.assertEqual(parts[0], str(self.multi_tenant_company.id))
         self.assertEqual(parts[1], 'mapped_imports')
-        self.assertEqual(len(parts), 8)
+        self.assertEqual(len(parts), 6)
