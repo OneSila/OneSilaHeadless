@@ -430,7 +430,6 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             if sales_pricelist_items:
                 structured["sales_pricelist_items"] = sales_pricelist_items
 
-
         attributes, mirror_map = self._parse_attributes(
             product_attrs, product_type_code, view
         )
@@ -691,6 +690,16 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
         summary = self._get_summary(product)
         rule = self.get_product_rule(product)
+
+        # Ensure we keep the rule from the default marketplace if the product
+        # already exists. This prevents overriding the initial rule when
+        # importing the product from additional marketplaces with a different
+        # product type.
+        if remote_product and remote_product.local_instance:
+            existing_rule = remote_product.local_instance.get_product_rule()
+            if existing_rule:
+                rule = existing_rule
+
         structured, language, view = self.get__product_data(product, is_variation, product_instance)
 
         # if on the main marketplaces was configurable because the other doesn't have relationships
