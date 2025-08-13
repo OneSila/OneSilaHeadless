@@ -191,7 +191,7 @@ class AmazonProductsImportProcessorRulePreserveTest(TestCase):
         structured = {"name": "Name", "sku": "SKU123", "__asin": "ASIN1", "type": "SIMPLE"}
 
         with patch.object(AmazonProductsImportProcessor, "get__product_data", return_value=(structured, None, self.view)), \
-                patch("imports_exports.factories.products.ImportProductInstance") as MockImportProductInstance, \
+                patch("sales_channels.integrations.amazon.factories.imports.products_imports.ImportProductInstance") as MockImportProductInstance, \
                 patch.object(AmazonProductsImportProcessor, "update_remote_product"), \
                 patch.object(AmazonProductsImportProcessor, "handle_ean_code"), \
                 patch.object(AmazonProductsImportProcessor, "handle_attributes"), \
