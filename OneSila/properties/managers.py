@@ -100,14 +100,14 @@ class PropertyQuerySet(MultiTenantQuerySet):
             language=language_code,
         ).select_related("property")
 
-        matched_ids = []
+        matched_ids = set()
         for translation in translations:
             processed = slugify(translation.name).replace("-", "").lower()
             ratio = difflib.SequenceMatcher(None, processed_name, processed).ratio()
             if ratio >= threshold:
-                matched_ids.append(translation.property_id)
+                matched_ids.add(translation.property_id)
 
-        return self.filter(id__in=matched_ids).distinct()
+        return self.filter(id__in=matched_ids).order_by('id').distinct('id')
 
 
 class PropertyManager(MultiTenantManager):
@@ -196,14 +196,14 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
             language=language_code,
         ).select_related("propertyselectvalue")
 
-        matched_ids = []
+        matched_ids = set()
         for translation in translations:
             processed = slugify(translation.value).replace("-", "").lower()
             ratio = difflib.SequenceMatcher(None, processed_value, processed).ratio()
             if ratio >= threshold:
-                matched_ids.append(translation.propertyselectvalue_id)
+                matched_ids.add(translation.propertyselectvalue_id)
 
-        return self.filter(id__in=matched_ids).distinct()
+        return self.filter(id__in=matched_ids).order_by('id').distinct('id')
 
 
 class PropertySelectValueManager(MultiTenantManager):

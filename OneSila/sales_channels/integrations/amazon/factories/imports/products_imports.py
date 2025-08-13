@@ -39,6 +39,7 @@ from sales_prices.models import SalesPrice
 from currencies.models import Currency
 from core.helpers import ensure_serializable
 from dateutil.parser import parse
+from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
 import datetime
 from imports_exports.helpers import append_broken_record, increment_processed_records
 from sales_channels.integrations.amazon.models.imports import AmazonImportRelationship
@@ -669,7 +670,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
     @timeit_and_log(logger, "AmazonProductsImportProcessor.process_product_item")
     def process_product_item(self, product):
-        from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
+
         # Kickstarting the AddLogTimeentry class settings.
         self._set_logger(logger)
         self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before settings prodduct Instance.")
