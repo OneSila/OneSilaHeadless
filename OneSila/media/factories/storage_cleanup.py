@@ -1,8 +1,9 @@
 from media.models import Media
 from core.exceptions import ValidationError
+from pathlib import Path
 import os
-from media.exceptions import FailedToCleanupMediaStorage
-
+from media.exceptions import FailedToCleanupMediaStorage, NotSafeToRemoveError
+from django.conf import settings
 import logging
 logger = logging.getLogger(__name__)
 
@@ -44,13 +45,27 @@ class CleanupMediaStorageFactory:
     def validate_paths_unused(self):
         """
         This method will verify if the image or file path is unused across all media instances.
+        This is in theory no possible, but is used as a safety check none the less.
         """
+        exists_in_db = False
         for field in self.NATIVE_DJANGO_FIELD_TYPES:
-            used_by_media_instances = Media.objects.filter(**{field: self.media_instance.image})
+            full_path = getattr(self, f"{field}_path")
 
-            if used_by_media_instances.exists():
-                used_by_media_instances_ids = [str(i) for i in used_by_media_instances.values_list('id', flat=True)]
-                raise ValidationError(f"{field} path is used by media instances: {', '.join(used_by_media_instances_ids)}.")
+            if full_path:
+                rel_path = str(Path(full_path).relative_to(settings.MEDIA_ROOT))
+                used_by_media_instances = Media.objects.filter(**{f"{field}__endswith": rel_path})
+
+                if used_by_media_instances.exists():
+                    exists_in_db = True
+                    used_by_media_instances_ids = [str(i) for i in used_by_media_instances.values_list('id', flat=True)]
+                    logger.debug(f"{field} {full_path} is used by media instances: {', '.join(used_by_media_instances_ids)}.")
+                else:
+                    logger.debug(f"{field} {full_path} is not used by any media instances.")
+            else:
+                logger.debug(f"{field} path is None. Cannot validate. Moving to next field if there is one.")
+
+        if exists_in_db:
+            raise NotSafeToRemoveError(f"Media instance {self.media_instance_id} is not safe to remove. It is used by other media instances.")
 
         logger.debug(f"Media instance {self.media_instance_id} is safe to remove. Unused by other media instances.")
 
@@ -104,6 +119,6 @@ class CleanupMediaStorageFactory:
         This method will run the flow.
         """
         self.set_paths()
-        self.validate_paths_unused()
         self.validate_media_truly_deleted()
+        self.validate_paths_unused()
         self.remove_files_from_storage()
