@@ -4,8 +4,9 @@ from django.db.models.signals import post_save, post_delete, pre_delete
 from django.dispatch import receiver
 from core.schema.core.subscriptions import refresh_subscription_receiver
 from django.utils.translation import gettext_lazy as _
-from media.models import MediaProductThrough, Media, Image
+from media.models import MediaProductThrough, Media, Image, File, Video
 import logging
+from .signals import cleanup_media_storage
 
 logger = logging.getLogger(__name__)
 
@@ -29,3 +30,19 @@ def prevent_media_delete_if_linked(sender, instance, **kwargs):
 
     if PropertySelectValue.objects.filter(image=instance).exists():
         raise ValidationError(_("Cannot delete Media because it is used in Property Select Values."))
+
+
+@receiver(post_delete, sender=Image)
+@receiver(post_delete, sender=Media)
+def cleanup_image_storage_signal_sender(sender, instance, **kwargs):
+    cleanup_media_storage.send(sender, instance=instance)
+
+
+@receiver(cleanup_media_storage, sender=Image)
+@receiver(cleanup_media_storage, sender=Media)
+@receiver(cleanup_media_storage, sender=File)
+@receiver(cleanup_media_storage, sender=Video)
+def cleanup_image_storage_receiver(sender, instance, **kwargs):
+    """ we trigger a task that will clean up the image which was removed from the database."""
+    from .tasks import cleanup_media_storage_task
+    cleanup_media_storage_task(instance)

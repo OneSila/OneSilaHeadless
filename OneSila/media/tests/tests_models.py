@@ -55,3 +55,23 @@ class MediaTestCase(CreateImageMixin, TestCase):
         self.assertEqual(parts[0], str(self.multi_tenant_company.id))
         self.assertEqual(parts[1], 'files')
         self.assertEqual(len(parts), 8)
+
+
+class ImageCleanupTestCase(CreateImageMixin, TestCase):
+    def test_image_cleanup(self):
+        """This test will create and remove an image. Then verify if both the image file and cached files have been removed from storage."""
+        # Create an image
+        image = self.create_image(fname='red.png', multi_tenant_company=self.multi_tenant_company)
+        image_path = image.image.path
+        cached_image_path = image.image_web.path
+
+        # Ensure the image and cached image exist
+        self.assertTrue(os.path.exists(image_path))
+        self.assertTrue(os.path.exists(cached_image_path))
+
+        # Delete the image
+        image.delete()
+
+        # Verify that the image and cached image files are removed
+        self.assertFalse(os.path.exists(image_path))
+        self.assertFalse(os.path.exists(cached_image_path))
