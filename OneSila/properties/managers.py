@@ -107,7 +107,7 @@ class PropertyQuerySet(MultiTenantQuerySet):
             if ratio >= threshold:
                 matched_ids.append(translation.property_id)
 
-        return self.filter(id__in=matched_ids)
+        return self.filter(id__in=matched_ids).distinct()
 
 
 class PropertyManager(MultiTenantManager):
@@ -203,7 +203,7 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
             if ratio >= threshold:
                 matched_ids.append(translation.propertyselectvalue_id)
 
-        return self.filter(id__in=matched_ids)
+        return self.filter(id__in=matched_ids).distinct()
 
 
 class PropertySelectValueManager(MultiTenantManager):
