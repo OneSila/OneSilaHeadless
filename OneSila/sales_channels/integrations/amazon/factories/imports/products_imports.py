@@ -878,14 +878,17 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             response_data=product
         ).run()
 
-        product_obj = product_instance or instance.local_instance
+        product_obj = product_instance or instance.instance
         if product_obj:
-            AmazonImportData.objects.update_or_create(
+            data_obj, _ = AmazonImportData.objects.get_or_create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
                 sales_channel=self.sales_channel,
                 product=product_obj,
                 view=view,
-                defaults={'data': product},
             )
+
+            data_obj.data = product
+            data_obj.save()
 
     def import_products_process(self):
         for product in self.get_products_data():

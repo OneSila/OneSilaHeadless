@@ -275,7 +275,7 @@ class AmazonProductsImportProcessorImportDataTest(TestCase):
             mock_instance = SimpleNamespace(
                 process=lambda: None,
                 prepare_mirror_model_class=lambda *args, **kwargs: None,
-                local_instance=self.product,
+                instance=self.product,
                 remote_instance=None,
             )
             MockImportProductInstance.return_value = mock_instance
