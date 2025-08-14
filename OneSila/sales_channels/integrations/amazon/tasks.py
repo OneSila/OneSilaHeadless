@@ -59,6 +59,18 @@ def create_amazon_product_type_rule_task(product_type_code: str, sales_channel_i
     fac.run()
 
 
+@db_task()
+def amazon_auto_import_select_value_task(select_value_id: int):
+    from sales_channels.integrations.amazon.models import AmazonPropertySelectValue
+    from sales_channels.integrations.amazon.factories.auto_import import (
+        AmazonAutoImportSelectValueFactory,
+    )
+
+    select_value = AmazonPropertySelectValue.objects.get(id=select_value_id)
+    fac = AmazonAutoImportSelectValueFactory(select_value)
+    fac.run()
+
+
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def resync_amazon_product_db_task(

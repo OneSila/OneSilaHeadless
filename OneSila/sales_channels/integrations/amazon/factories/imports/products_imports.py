@@ -273,6 +273,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
                             new_remote_select_value.remote_name = value
                             new_remote_select_value.save()
+                            select_value = new_remote_select_value
 
                         mapped = bool(select_value and select_value.local_instance)
                         if mapped:
@@ -286,6 +287,8 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                             "remote_property": remote_property,
                             "remote_value": value,
                             "is_mapped": mapped,
+                            "remote_select_value": select_value,
+                            "remote_select_values": [select_value] if select_value else [],
                         }
 
                         continue
@@ -309,7 +312,9 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                     mirror_map[remote_property.local_instance.id] = {
                         "remote_property": remote_property,
                         "remote_value": value,
-                        "is_mapped": True
+                        "is_mapped": True,
+                        "remote_select_value": None,
+                        "remote_select_values": [],
                     }
 
         return attrs, mirror_map
@@ -551,6 +556,8 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
                 remote_property = mirror_data["remote_property"]
                 remote_value = mirror_data["remote_value"]
+                remote_select_value = mirror_data.get("remote_select_value")
+                remote_select_values = mirror_data.get("remote_select_values", [])
 
                 remote_product_property, _ = AmazonProductProperty.objects.get_or_create(
                     multi_tenant_company=self.import_process.multi_tenant_company,
@@ -569,9 +576,18 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                     remote_product_property.remote_value = remote_value
                     updated = True
 
+                if remote_product_property.remote_select_value != remote_select_value:
+                    remote_product_property.remote_select_value = remote_select_value
+                    updated = True
+
+                existing_ids = set(remote_product_property.remote_select_values.all().values_list("id", flat=True))
+                new_ids = {v.id for v in remote_select_values}
+                if existing_ids != new_ids:
+                    remote_product_property.save()
+                    remote_product_property.remote_select_values.set(remote_select_values)
+
                 if updated:
                     remote_product_property.save()
-
 
             # Handle unmapped remote properties (those with mapped=False)
             for local_id, mirror_data in mirror_map.items():
@@ -581,8 +597,10 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
                 remote_property = mirror_data["remote_property"]
                 remote_value = mirror_data["remote_value"]
+                remote_select_value = mirror_data.get("remote_select_value")
+                remote_select_values = mirror_data.get("remote_select_values", [])
 
-                AmazonProductProperty.objects.get_or_create(
+                app, created = AmazonProductProperty.objects.get_or_create(
                     multi_tenant_company=self.import_process.multi_tenant_company,
                     sales_channel=self.sales_channel,
                     local_instance=None,
@@ -593,6 +611,11 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                     }
                 )
 
+                if created or app.remote_select_value != remote_select_value:
+                    app.remote_select_value = remote_select_value
+                    app.save()
+                if remote_select_values:
+                    app.remote_select_values.set(remote_select_values)
 
     @timeit_and_log(logger)
     def handle_translations(self, import_instance: ImportProductInstance):
