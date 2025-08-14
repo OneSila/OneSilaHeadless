@@ -71,6 +71,43 @@ def amazon_auto_import_select_value_task(select_value_id: int):
     fac.run()
 
 
+@db_task()
+def amazon_translate_select_value_task(select_value_id: int):
+    from sales_channels.integrations.amazon.models import AmazonPropertySelectValue
+    from sales_channels.integrations.amazon.constants import (
+        AMAZON_SELECT_VALUE_TRANSLATION_IGNORE_CODES,
+    )
+    from llm.factories.amazon import AmazonSelectValueTranslationLLM
+
+    instance = AmazonPropertySelectValue.objects.get(id=select_value_id)
+
+    remote_language_obj = instance.marketplace.remote_languages.first()
+    remote_lang = remote_language_obj.local_instance if remote_language_obj else None
+    company_lang = instance.sales_channel.multi_tenant_company.language
+
+    remote_name = instance.remote_name or instance.remote_value
+
+    if instance.amazon_property.code in AMAZON_SELECT_VALUE_TRANSLATION_IGNORE_CODES:
+        translated = remote_name
+    elif not remote_lang or remote_lang == company_lang:
+        translated = remote_name
+    else:
+        translator = AmazonSelectValueTranslationLLM(
+            remote_name=remote_name,
+            from_language_code=remote_lang,
+            to_language_code=company_lang,
+            property_name=instance.amazon_property.name,
+            property_code=instance.amazon_property.code,
+        )
+        try:
+            translated = translator.translate()
+        except Exception:
+            translated = remote_name
+
+    instance.translated_remote_name = translated
+    instance.save(update_fields=["translated_remote_name"])
+
+
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def resync_amazon_product_db_task(
