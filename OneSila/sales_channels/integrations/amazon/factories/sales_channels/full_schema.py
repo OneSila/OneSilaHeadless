@@ -406,7 +406,6 @@ class AmazonProductTypeRuleFactory(
     EnsureMerchantSuggestedAsinMixin,
     EnsureGtinExemptionMixin,
 ):
-    @timeit_and_log(logger)
     def __init__(
         self,
         product_type_code,
@@ -438,7 +437,6 @@ class AmazonProductTypeRuleFactory(
         else:
             self.api = api
 
-    @timeit_and_log(logger)
     def get_or_create_product_type(self):
         product_type, _ = AmazonProductType.objects.get_or_create(
             product_type_code=self.product_type_code,
@@ -447,7 +445,6 @@ class AmazonProductTypeRuleFactory(
         )
         return product_type
 
-    @timeit_and_log(logger)
     def _download_json(self, url):
         """
         Download the JSON schema from Amazon's URL and save it to disk for inspection.
@@ -501,7 +498,6 @@ class AmazonProductTypeRuleFactory(
 
         return schema_data, offer_property_keys
 
-    @timeit_and_log(logger)
     def ensure_asin_item(self):
 
         if not self.merchant_asin_property:
@@ -537,7 +533,6 @@ class AmazonProductTypeRuleFactory(
                 rule_item.type = ProductPropertiesRuleItem.REQUIRED
                 rule_item.save(update_fields=["type"])
 
-    @timeit_and_log(logger)
     def ensure_gtin_exemption_item(self):
 
         if not self.gtin_exemption_property:
@@ -551,7 +546,6 @@ class AmazonProductTypeRuleFactory(
             defaults={"remote_type": ProductPropertiesRuleItem.OPTIONAL},
         )
 
-    @timeit_and_log(logger)
     def process_views(self):
 
         for view in self.sales_channel_views:
@@ -562,7 +556,6 @@ class AmazonProductTypeRuleFactory(
             )
             self.process_view(view, is_default)
 
-    @timeit_and_log(logger)
     def process_view(self, view, is_default):
         schema_data, offer_allowed_properties = self._get_schema_for_marketplace(
             view, is_default_marketplace=is_default
@@ -588,7 +581,6 @@ class AmazonProductTypeRuleFactory(
                 offer_allowed_properties,
             )
 
-    @timeit_and_log(logger)
     def set_variation_theme(self, properties):
         variation_schema = properties.get("variation_theme")
         if variation_schema:
@@ -602,12 +594,10 @@ class AmazonProductTypeRuleFactory(
                 self.product_type.variation_themes = themes
                 self.product_type.save(update_fields=["variation_themes"])
 
-    @timeit_and_log(logger)
     def create_default_unit_configurator(self, public_definition, view, is_default):
         fac = DefaultUnitConfiguratorFactory(public_definition, self.sales_channel, view, is_default)
         fac.run()
 
-    @timeit_and_log(logger)
     def sync_public_definitions(
         self,
         attr_code,
@@ -659,7 +649,6 @@ class AmazonProductTypeRuleFactory(
 
         return public_def
 
-    @timeit_and_log(logger)
     def _resolve_property_type(self, existing_type: str, new_type: str) -> str:
         """Return the most permissive property type based on the rules provided."""
         if existing_type == new_type:
@@ -799,7 +788,6 @@ class AmazonProductTypeRuleFactory(
         self.create_remote_properties(public_definition, view, is_default)
         self.create_default_unit_configurator(public_definition, view, is_default)
 
-    @timeit_and_log(logger)
     def run(self):
         self.ensure_asin_item()
         self.ensure_gtin_exemption_item()

@@ -22,11 +22,11 @@ from sales_channels.integrations.amazon.factories.sync.select_value_sync import 
 from sales_channels.integrations.amazon.tasks import (
     create_amazon_product_type_rule_task,
     resync_amazon_product_db_task,
+    amazon_translate_select_value_task,
 )
 from sales_channels.integrations.amazon.constants import (
     AMAZON_SELECT_VALUE_TRANSLATION_IGNORE_CODES,
 )
-from llm.factories.amazon import AmazonSelectValueTranslationLLM
 from imports_exports.signals import import_success
 from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonConfigurableVariationsFactory
 from sales_channels.integrations.amazon.flows.tasks_runner import run_single_amazon_product_task_flow
@@ -120,21 +120,7 @@ def sales_channels__amazon_property_select_value__translate(sender, instance: Am
         instance.translated_remote_name = remote_name
         instance.save(update_fields=['translated_remote_name'])
         return
-
-    translator = AmazonSelectValueTranslationLLM(
-        remote_name=remote_name,
-        from_language_code=remote_lang,
-        to_language_code=company_lang,
-        property_name=instance.amazon_property.name,
-        property_code=instance.amazon_property.code,
-    )
-    try:
-        translated = translator.translate()
-    except Exception:
-        translated = remote_name
-
-    instance.translated_remote_name = translated
-    instance.save(update_fields=['translated_remote_name'])
+    amazon_translate_select_value_task(instance.id)
 
 
 @receiver(post_update, sender='amazon.AmazonPropertySelectValue')
