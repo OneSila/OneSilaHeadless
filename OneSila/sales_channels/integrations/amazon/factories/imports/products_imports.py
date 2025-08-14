@@ -81,6 +81,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
     def __init__(self, import_process, sales_channel, language=None):
         super().__init__(import_process, language)
         self.sales_channel = sales_channel
+        self.multi_tenant_company = sales_channel.multi_tenant_company
         self.api = self.get_api()
         self.broken_records: list[dict] = []
 
@@ -596,26 +597,28 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                     continue  # already handled in the mapped loop
 
                 remote_property = mirror_data["remote_property"]
-                remote_value = mirror_data["remote_value"]
                 remote_select_value = mirror_data.get("remote_select_value")
                 remote_select_values = mirror_data.get("remote_select_values", [])
 
                 app, created = AmazonProductProperty.objects.get_or_create(
                     multi_tenant_company=self.import_process.multi_tenant_company,
                     sales_channel=self.sales_channel,
-                    local_instance=None,
                     remote_product=remote_product,
                     remote_property=remote_property,
-                    defaults={
-                        "remote_value": remote_value,
-                    }
                 )
 
                 if created or app.remote_select_value != remote_select_value:
                     app.remote_select_value = remote_select_value
                     app.save()
-                if remote_select_values:
+
+                if created:
                     app.remote_select_values.set(remote_select_values)
+                else:
+                    existing_ids = set(app.remote_select_values.all().values_list("id", flat=True))
+                    new_ids = {v.id for v in remote_select_values}
+                    if existing_ids != new_ids:
+                        app.save()
+                        app.remote_select_values.set(remote_select_values)
 
     @timeit_and_log(logger)
     def handle_translations(self, import_instance: ImportProductInstance):
@@ -770,12 +773,12 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         )
 
         self._add_log_entry(f"getting structured data - {product.get('sku')} - before checking remote products")
-
         if remote_product and not missing_data:
             try:
                 existing_code = remote_product.remote_type
             except Exception:
                 existing_code = None
+
             incoming_code = summary.get("product_type")
             if existing_code and incoming_code and existing_code != incoming_code:
                 # if the current product type code is different from the original one (main store)
@@ -910,7 +913,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                 view=view,
             )
 
-            data_obj.data = product
+            data_obj.data = ensure_serializable(product)
             data_obj.save()
 
     def import_products_process(self):

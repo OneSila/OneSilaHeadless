@@ -425,6 +425,7 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
                 item_ids.append(import_instance.instance.id)
                 if self.sales_channel:
                     SalesChannelIntegrationPricelist.objects.get_or_create(
+                        multi_tenant_company=self.sales_channel.multi_tenant_company,
                         sales_channel=self.sales_channel,
                         price_list=import_instance.salespricelist,
                     )

@@ -122,7 +122,7 @@ def sales_channels__amazon_property_select_value__translate(sender, instance: Am
         return
 
     translator = AmazonSelectValueTranslationLLM(
-        remote_value=remote_name,
+        remote_name=remote_name,
         from_language_code=remote_lang,
         to_language_code=company_lang,
         property_name=instance.amazon_property.name,
