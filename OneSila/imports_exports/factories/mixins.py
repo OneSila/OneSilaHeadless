@@ -212,6 +212,8 @@ class ImportOperationMixin:
                         f"{self.import_instance.local_class.__name__} matching query does not exist. "
                         f"Looked for {kwargs_repr}"
                     )
+                except IntegrityError as e:
+                    self.instance, self.created = self.resolve_get_or_create_integrity_error(e)
             elif self.force_created:
                 self.instance = self.import_instance.local_class.objects.create(**self.get_kwargs)
                 self.created = True

@@ -154,11 +154,11 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
         """
         Validate that the 'value' key exists.
         """
-        if not hasattr(self, 'name'):
-            raise ValueError("The 'name' field is required.")
-
         if hasattr(self, 'type') and self.type not in [Product.SIMPLE, Product.CONFIGURABLE, Product.BUNDLE, Product.ALIAS]:
             raise ValueError("Invalid 'type' value.")
+
+        if hasattr(self, 'sku') and self.sku is None:
+            raise ValueError("Invalid 'sku' value.")
 
     def _set_vat_rate(self):
 
@@ -286,10 +286,10 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
 
     def _set_translations(self):
 
-        if not getattr(self, 'translations', []):
+        if not getattr(self, 'translations', []) and getattr(self, 'name', None):
 
             self.translations = [{
-                'name': getattr(self, 'name', 'Unnamed'),
+                'name': self.name,
                 'language': self.language,
                 'sales_channel': self.sales_channel,
             }]
