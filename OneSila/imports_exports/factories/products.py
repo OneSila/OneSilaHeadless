@@ -157,6 +157,9 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
         if hasattr(self, 'type') and self.type not in [Product.SIMPLE, Product.CONFIGURABLE, Product.BUNDLE, Product.ALIAS]:
             raise ValueError("Invalid 'type' value.")
 
+        if hasattr(self, 'sku') and self.sku is None:
+            raise ValueError("Invalid 'sku' value.")
+
     def _set_vat_rate(self):
 
         if hasattr(self, 'vat_rate'):
