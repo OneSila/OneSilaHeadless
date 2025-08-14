@@ -7,9 +7,9 @@ class AmazonSelectValueTranslationLLM(OpenAIMixin):
     temperature = 0.3
     max_tokens = 300
 
-    def __init__(self, remote_value, from_language_code="auto", to_language_code="en", property_name=None, property_code=None):
+    def __init__(self, remote_name, from_language_code="auto", to_language_code="en", property_name=None, property_code=None):
         super().__init__()
-        self.remote_value = remote_value
+        self.remote_name = remote_name
         self.from_language_code = from_language_code
         self.to_language_code = to_language_code
         self.property_name = property_name
@@ -29,7 +29,7 @@ class AmazonSelectValueTranslationLLM(OpenAIMixin):
         return (
             f"{context_line}"
             f"Translate the following Amazon property select value from {self.from_language_code} to {self.to_language_code}:\n"
-            f"{self.remote_value}\n\n"
+            f"{self.remote_name}\n\n"
             "Only respond with the translated value, no extra text, no explanation, no punctuation. "
             "Just one word or phrase. If the value is numeric or contains numbers, keep the numbers as digits."
         )

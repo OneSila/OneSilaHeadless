@@ -122,7 +122,7 @@ def sales_channels__amazon_property_select_value__translate(sender, instance: Am
         return
 
     translator = AmazonSelectValueTranslationLLM(
-        remote_value=remote_name,
+        remote_name=remote_name,
         from_language_code=remote_lang,
         to_language_code=company_lang,
         property_name=instance.amazon_property.name,
@@ -135,6 +135,17 @@ def sales_channels__amazon_property_select_value__translate(sender, instance: Am
 
     instance.translated_remote_name = translated
     instance.save(update_fields=['translated_remote_name'])
+
+
+@receiver(post_update, sender='amazon.AmazonPropertySelectValue')
+def sales_channels__amazon_property_select_value__auto_import(sender, instance: AmazonPropertySelectValue, **kwargs):
+    """Auto-import mapped select values into product properties."""
+    if not instance.is_dirty_field('local_instance', check_relationship=True):
+        return
+
+    from sales_channels.integrations.amazon.tasks import amazon_auto_import_select_value_task
+
+    amazon_auto_import_select_value_task(instance.id)
 
 
 @receiver(post_create, sender='amazon.AmazonProductType')
@@ -181,5 +192,3 @@ def amazon__product__manual_sync(sender, instance, view, force_validation_only=F
         remote_product_id=instance.id,
         force_validation_only=force_validation_only,
     )
-
-

@@ -191,6 +191,21 @@ class AmazonPropertySelectValue(RemoteObjectMixin, models.Model):
 class AmazonProductProperty(RemoteProductProperty):
     """Amazon specific remote product property."""
 
+    remote_select_value = models.ForeignKey(
+        AmazonPropertySelectValue,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="product_properties",
+        help_text="Reference to the remote select value if applicable.",
+    )
+    remote_select_values = models.ManyToManyField(
+        AmazonPropertySelectValue,
+        blank=True,
+        related_name="product_properties_multi",
+        help_text="References to remote select values for multiselect properties.",
+    )
+
     class Meta:
         verbose_name_plural = _('Amazon Product Properties')
 
@@ -233,15 +248,15 @@ class AmazonProductType(RemoteObjectMixin, models.Model):
                 fields=['local_instance', 'sales_channel'],
                 condition=Q(local_instance__isnull=False),
                 name='unique_amazonproducttype_local_instance_sales_channel_not_null',
-                violation_error_message = _(
-                "An Amazon product type with this local rule already exists for this sales channel."
-            )
+                violation_error_message=_(
+                    "An Amazon product type with this local rule already exists for this sales channel."
+                )
             ),
             UniqueConstraint(
                 fields=['product_type_code', 'sales_channel'],
                 condition=Q(product_type_code__isnull=False),
                 name='unique_amazonproducttype_code_sales_channel_not_null',
-                violation_error_message= _(
+                violation_error_message=_(
                     "An Amazon product type with this product type code already exists for this sales channel."
                 )
             )

@@ -416,9 +416,8 @@ class AmazonProductTypeRuleFactory(
         self.language = language or sales_channel.multi_tenant_company.language
         self.multi_tenant_company = sales_channel.multi_tenant_company
         self.product_type = self.get_or_create_product_type()
-        self.sales_channel_views = AmazonSalesChannelView.objects.filter(
-            sales_channel=sales_channel
-        )
+        self.sales_channel_views = AmazonSalesChannelView.objects.filter(sales_channel=sales_channel).order_by('-is_default')
+
         if merchant_asin_property is None:
             self.merchant_asin_property = self._ensure_merchant_suggested_asin()
         else:
@@ -711,16 +710,23 @@ class AmazonProductTypeRuleFactory(
 
             if remote_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
                 for value in property_data['values']:
-                    remote_select_value, _ = AmazonPropertySelectValue.objects.get_or_create(
-                        multi_tenant_company=self.multi_tenant_company,
-                        sales_channel=self.sales_channel,
-                        marketplace=view,
-                        amazon_property=remote_property,
-                        remote_value=value['value'],
-                    )
-
-                    remote_select_value.remote_name = value['name']
-                    remote_select_value.save()
+                    try:
+                        remote_select_value = AmazonPropertySelectValue.objects.get(
+                            multi_tenant_company=self.multi_tenant_company,
+                            sales_channel=self.sales_channel,
+                            marketplace=view,
+                            amazon_property=remote_property,
+                            remote_value=value['value'],
+                        )
+                    except AmazonPropertySelectValue.DoesNotExist:
+                        remote_select_value = AmazonPropertySelectValue.objects.create(
+                            multi_tenant_company=self.multi_tenant_company,
+                            sales_channel=self.sales_channel,
+                            marketplace=view,
+                            amazon_property=remote_property,
+                            remote_value=value['value'],
+                            remote_name=value['name'],
+                        )
 
             remote_rule_item, created_item = AmazonProductTypeItem.objects.get_or_create(
                 multi_tenant_company=self.multi_tenant_company,

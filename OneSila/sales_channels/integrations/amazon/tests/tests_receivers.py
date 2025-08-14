@@ -240,5 +240,3 @@ class AmazonSelectValueTranslationReceiverTest(TestCase):
         translate_mock.assert_not_called()
         val.refresh_from_db()
         self.assertEqual(val.translated_remote_name, "Deutschland")
-
-

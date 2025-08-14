@@ -16,6 +16,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductType,
     AmazonSalesChannel,
     AmazonSalesChannelView,
+    AmazonImportData,
 )
 
 
@@ -219,3 +220,72 @@ class AmazonProductsImportProcessorRulePreserveTest(TestCase):
             called_rule = MockImportProductInstance.call_args.kwargs["rule"]
             self.assertEqual(called_rule, self.rule)
             self.assertTrue(mock_broken.called)
+
+
+class AmazonProductsImportProcessorImportDataTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="GB",
+        )
+        self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+        self.product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+        )
+
+    def test_import_data_saved(self):
+        product_data = {
+            "sku": "SKU123",
+            "attributes": {"item_name": [{"value": "Name"}]},
+            "summaries": [
+                {
+                    "item_name": "Name",
+                    "asin": "ASIN1",
+                    "marketplace_id": "GB",
+                    "status": ["BUYABLE"],
+                    "product_type": "TYPE",
+                }
+            ],
+        }
+
+        structured = {"name": "Name", "sku": "SKU123", "__asin": "ASIN1", "type": "SIMPLE"}
+
+        with patch.object(AmazonProductsImportProcessor, "get__product_data", return_value=(structured, None, self.view)), \
+                patch("sales_channels.integrations.amazon.factories.imports.products_imports.ImportProductInstance") as MockImportProductInstance, \
+                patch.object(AmazonProductsImportProcessor, "update_remote_product"), \
+                patch.object(AmazonProductsImportProcessor, "handle_ean_code"), \
+                patch.object(AmazonProductsImportProcessor, "handle_attributes"), \
+                patch.object(AmazonProductsImportProcessor, "handle_translations"), \
+                patch.object(AmazonProductsImportProcessor, "handle_prices"), \
+                patch.object(AmazonProductsImportProcessor, "handle_images"), \
+                patch.object(AmazonProductsImportProcessor, "handle_variations"), \
+                patch.object(AmazonProductsImportProcessor, "handle_sales_channels_views"), \
+                patch("sales_channels.integrations.amazon.factories.imports.products_imports.FetchRemoteIssuesFactory") as MockIssuesFactory:
+
+            from types import SimpleNamespace
+
+            mock_instance = SimpleNamespace(
+                process=lambda: None,
+                prepare_mirror_model_class=lambda *args, **kwargs: None,
+                instance=self.product,
+                remote_instance=None,
+            )
+            MockImportProductInstance.return_value = mock_instance
+            MockIssuesFactory.return_value.run.return_value = None
+
+            processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+            processor.process_product_item(product_data)
+
+        saved = AmazonImportData.objects.get()
+        self.assertEqual(saved.sales_channel, self.sales_channel)
+        self.assertEqual(saved.product, self.product)
+        self.assertEqual(saved.view, self.view)
+        self.assertEqual(saved.data["sku"], "SKU123")
