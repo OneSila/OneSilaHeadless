@@ -80,7 +80,6 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
         )
 
     def _get_public_definition(self, product_type: AmazonProductType, main_code: str) -> AmazonPublicDefinition:
-
         try:
             return AmazonPublicDefinition.objects.get(
                 api_region_code=self.view.api_region_code,
@@ -88,7 +87,9 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
                 code=main_code,
             )
         except AmazonPublicDefinition.DoesNotExist:
-            raise AmazonUnsupportedPropertyForProductType("Amazon property is not supported for this product type")
+            raise AmazonUnsupportedPropertyForProductType(
+                "Amazon property is not supported for this product type"
+            )
 
     def _get_unit(self, code: str):
         from sales_channels.integrations.amazon.models.sales_channels import AmazonDefaultUnitConfigurator
@@ -140,6 +141,39 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
             return node
 
         return _walk(data)
+
+    def update_remote_select_fields(self, remote_instance):
+        """Synchronize remote select value fields with local property values."""
+        if self.local_property.type not in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
+            remote_instance.remote_select_value = None
+            remote_instance.save()
+            remote_instance.remote_select_values.clear()
+            return
+
+        if self.local_property.type == Property.TYPES.SELECT:
+            val = self.local_instance.value_select
+            remote_val = None
+            if val:
+                remote_val = AmazonPropertySelectValue.objects.filter(
+                    amazon_property=self.remote_property,
+                    local_instance=val,
+                    marketplace=self.view,
+                ).first()
+            remote_instance.remote_select_value = remote_val
+            remote_instance.save()
+            remote_instance.remote_select_values.clear()
+        else:
+            values = list(self.local_instance.value_multi_select.all())
+            remote_vals = list(
+                AmazonPropertySelectValue.objects.filter(
+                    amazon_property=self.remote_property,
+                    local_instance__in=values,
+                    marketplace=self.view,
+                )
+            )
+            remote_instance.save()
+            remote_instance.remote_select_values.set(remote_vals)
+            remote_instance.remote_select_value = None
 
     # ------------------------------------------------------------------
     def build_payload(self):

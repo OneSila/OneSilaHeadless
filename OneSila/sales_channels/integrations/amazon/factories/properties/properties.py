@@ -55,6 +55,7 @@ class AmazonProductPropertyCreateFactory(AmazonProductPropertyBaseMixin, RemoteP
 
     def post_create_process(self):
         super().post_create_process()
+        self.update_remote_select_fields(self.remote_instance)
 
 
 class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteProductPropertyUpdateFactory):
@@ -136,6 +137,10 @@ class AmazonProductPropertyUpdateFactory(AmazonProductPropertyBaseMixin, RemoteP
         create_factory.run()
 
         self.remote_instance = create_factory.remote_instance
+
+    def post_update_process(self):
+        super().post_update_process()
+        self.update_remote_select_fields(self.remote_instance)
 
 
 class AmazonProductPropertyDeleteFactory(AmazonProductPropertyBaseMixin, RemoteProductPropertyDeleteFactory):
