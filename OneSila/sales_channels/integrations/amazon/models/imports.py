@@ -33,7 +33,6 @@ class AmazonImportRelationship(models.Model):
         verbose_name_plural = "Amazon Import Relationships"
 
 
-
 class AmazonImportBrokenRecord(models.Model):
     """Store parent-child SKU pairs during async product import."""
 
@@ -46,3 +45,29 @@ class AmazonImportBrokenRecord(models.Model):
     class Meta:
         verbose_name = "Amazon Import Broken Record"
         verbose_name_plural = "Amazon Import Broken Records"
+
+
+class AmazonImportData(models.Model):
+    """Stores raw import data for each Amazon product."""
+
+    sales_channel = models.ForeignKey(
+        'amazon.AmazonSalesChannel',
+        on_delete=models.CASCADE,
+        related_name='import_data',
+    )
+    product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.CASCADE,
+        related_name='amazon_import_data',
+    )
+    view = models.ForeignKey(
+        'amazon.AmazonSalesChannelView',
+        on_delete=models.CASCADE,
+        related_name='import_data',
+    )
+    data = models.JSONField(blank=True, default=dict)
+
+    class Meta:
+        unique_together = ('sales_channel', 'product', 'view')
+        verbose_name = 'Amazon Import Data'
+        verbose_name_plural = 'Amazon Import Data'
