@@ -42,7 +42,10 @@ from dateutil.parser import parse
 from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
 import datetime
 from imports_exports.helpers import append_broken_record, increment_processed_records
-from sales_channels.integrations.amazon.models.imports import AmazonImportRelationship
+from sales_channels.integrations.amazon.models.imports import (
+    AmazonImportRelationship,
+    AmazonImportData,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -728,7 +731,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                 rule = existing_rule
 
         if rule is None:
-            rule =  self.get_product_rule(product)
+            rule = self.get_product_rule(product)
 
         structured, language, view = self.get__product_data(product, is_variation, product_instance)
 
@@ -874,6 +877,15 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             view=view,
             response_data=product
         ).run()
+
+        product_obj = product_instance or instance.local_instance
+        if product_obj:
+            AmazonImportData.objects.update_or_create(
+                sales_channel=self.sales_channel,
+                product=product_obj,
+                view=view,
+                defaults={'data': product},
+            )
 
     def import_products_process(self):
         for product in self.get_products_data():
