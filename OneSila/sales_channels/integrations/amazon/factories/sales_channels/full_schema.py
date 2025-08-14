@@ -16,7 +16,11 @@ from sales_channels.integrations.amazon.models.properties import AmazonProductTy
     AmazonProperty, AmazonPropertySelectValue, AmazonProductTypeItem
 import requests
 import json
+import logging
 from properties.models import Property, ProductPropertiesRuleItem
+from core.logging_helpers import timeit_and_log
+
+logger = logging.getLogger(__name__)
 
 
 class ExportDefinitionFactory:
@@ -450,6 +454,7 @@ class AmazonProductTypeRuleFactory(
         data = response.json()
         return data
 
+    @timeit_and_log(logger)
     @throttle_safe(max_retries=5, base_delay=1)
     def _get_schema_for_marketplace(self, view, is_default_marketplace=False):
         """
@@ -672,6 +677,7 @@ class AmazonProductTypeRuleFactory(
         # Default to existing if no special rule matches
         return existing_type
 
+    @timeit_and_log(logger)
     def create_remote_properties(self, public_definition, view, is_default):
 
         for property_data in public_definition.export_definition:
@@ -750,6 +756,7 @@ class AmazonProductTypeRuleFactory(
                 remote_rule_item.remote_type = new_type
                 remote_rule_item.save()
 
+    @timeit_and_log(logger)
     def process_property(
         self,
         code,

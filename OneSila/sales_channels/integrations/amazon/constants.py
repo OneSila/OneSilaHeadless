@@ -114,4 +114,5 @@ AMAZON_PATCH_SKIP_KEYS = {
 AMAZON_SELECT_VALUE_TRANSLATION_IGNORE_CODES = {
     'country_of_origin',
     'language',
+    'team_name'
 }
