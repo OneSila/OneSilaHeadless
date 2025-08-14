@@ -271,16 +271,19 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                             new_remote_select_value.remote_name = value
                             new_remote_select_value.save()
 
-                        if select_value and select_value.local_instance:
+                        mapped = bool(select_value and select_value.local_instance)
+                        if mapped:
                             attrs.append({
                                 "property": remote_property.local_instance,
                                 "value": select_value.local_instance.id,
                                 "value_is_id": True,
                             })
-                            mirror_map[remote_property.local_instance.id] = {
-                                "remote_property": remote_property,
-                                "remote_value": value,
-                            }
+
+                        mirror_map[remote_property.local_instance.id] = {
+                            "remote_property": remote_property,
+                            "remote_value": value,
+                            "is_mapped": mapped,
+                        }
 
                         continue
 
@@ -303,6 +306,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                     mirror_map[remote_property.local_instance.id] = {
                         "remote_property": remote_property,
                         "remote_value": value,
+                        "is_mapped": True
                     }
 
         return attrs, mirror_map
@@ -564,6 +568,28 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
                 if updated:
                     remote_product_property.save()
+
+
+            # Handle unmapped remote properties (those with mapped=False)
+            for local_id, mirror_data in mirror_map.items():
+
+                if mirror_data["is_mapped"]:
+                    continue  # already handled in the mapped loop
+
+                remote_property = mirror_data["remote_property"]
+                remote_value = mirror_data["remote_value"]
+
+                AmazonProductProperty.objects.get_or_create(
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    local_instance=None,
+                    remote_product=remote_product,
+                    remote_property=remote_property,
+                    defaults={
+                        "remote_value": remote_value,
+                    }
+                )
+
 
     @timeit_and_log(logger)
     def handle_translations(self, import_instance: ImportProductInstance):
