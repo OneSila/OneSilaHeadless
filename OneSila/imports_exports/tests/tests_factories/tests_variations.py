@@ -1,10 +1,12 @@
 from core.tests import TestCase
 from imports_exports.factories.variations import (
     ImportConfigurableVariationInstance,
-    ImportConfiguratorVariationsInstance
+    ImportConfiguratorVariationsInstance,
+    ImportBundleVariationInstance,
+    ImportAliasVariationInstance,
 )
 from imports_exports.models import Import
-from products.models import Product
+from products.models import Product, ConfigurableVariation, BundleVariation
 from properties.models import PropertySelectValue, Property
 
 
@@ -118,3 +120,68 @@ class ImportVariationInstanceValidateTest(TestCase):
         with self.assertRaises(ValueError) as cm:
             ImportConfiguratorVariationsInstance(data, self.import_process)
         self.assertIn("select_values", str(cm.exception))
+
+
+class ImportVariationUpdateOnlyTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.import_process = Import.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            update_only=True,
+        )
+
+        self.config_product = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.CONFIGURABLE,
+            sku="CFG-001",
+        )
+
+        self.bundle_product = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.BUNDLE,
+            sku="BND-001",
+        )
+
+        self.parent_product = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+            sku="PRD-001",
+        )
+
+    def test_configurable_variation_created_when_update_only(self):
+        data = {"variation_data": {"name": "Variation A", "sku": "VAR-A"}}
+        instance = ImportConfigurableVariationInstance(
+            data, self.import_process, config_product=self.config_product
+        )
+        instance.process()
+
+        variation = Product.objects.get(sku="VAR-A")
+        self.assertTrue(
+            ConfigurableVariation.objects.filter(
+                parent=self.config_product, variation=variation
+            ).exists()
+        )
+
+    def test_bundle_variation_created_when_update_only(self):
+        data = {"variation_data": {"name": "Bundle Var", "sku": "VAR-B"}}
+        instance = ImportBundleVariationInstance(
+            data, self.import_process, bundle_product=self.bundle_product
+        )
+        instance.process()
+
+        variation = Product.objects.get(sku="VAR-B")
+        self.assertTrue(
+            BundleVariation.objects.filter(
+                parent=self.bundle_product, variation=variation
+            ).exists()
+        )
+
+    def test_alias_variation_created_when_update_only(self):
+        data = {"variation_data": {"name": "Alias Var", "sku": "VAR-C"}}
+        instance = ImportAliasVariationInstance(
+            data, self.import_process, parent_product=self.parent_product
+        )
+        instance.process()
+
+        alias_product = Product.objects.get(sku="VAR-C")
+        self.assertEqual(alias_product.alias_parent_product, self.parent_product)
