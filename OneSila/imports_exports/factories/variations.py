@@ -316,10 +316,11 @@ class ImportAliasVariationInstance(AbstractImportInstance):
             self.alias_product_import_instance.update_only = False
             self.alias_product_import_instance.process()
             self.alias_product = self.alias_product_import_instance.instance
+            self.created = self.alias_product_import_instance.created
 
     def process_logic(self):
 
-        if self.alias_copy_images or self.alias_copy_product_properties:
+        if self.created and (self.alias_copy_images or self.alias_copy_product_properties):
             AliasProduct.objects.copy_from_parent(
                 self.alias_product,
                 copy_images=self.alias_copy_images,

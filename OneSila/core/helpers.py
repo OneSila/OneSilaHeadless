@@ -9,6 +9,8 @@ from get_absolute_url.helpers import reverse_lazy
 from io import BytesIO
 import zipfile
 
+from core.models import Model
+
 
 def get_languages():
     return settings.LANGUAGES
@@ -155,6 +157,9 @@ def ensure_serializable(value):
     # 5) If Decimal convert to float
     if isinstance(value, decimal.Decimal):
         return float(value)
+
+    if isinstance(value, Model):
+        return str(value)
 
     # 6) Fallback (primitives, etc.)
     return value

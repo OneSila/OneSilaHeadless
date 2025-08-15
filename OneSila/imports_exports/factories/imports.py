@@ -251,7 +251,13 @@ class ImportMixin:
     def set_broken_records(self):
 
         if len(self._broken_records) > 0:
-            self.import_process.broken_records = self._broken_records
+
+            records = []
+            for br in self._broken_records:
+                cleaned = ensure_serializable(br)
+                records.append(cleaned)
+
+            self.import_process.broken_records = records
             self.import_process.save(update_fields=['broken_records'])
 
     def send_reports(self):
