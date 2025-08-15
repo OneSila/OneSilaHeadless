@@ -7,6 +7,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonProduct,
+    AmazonProductProperty,
     AmazonProductType,
     AmazonProductTypeItem,
     AmazonSalesChannelImport,
@@ -15,6 +16,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannelView,
     AmazonProductIssue,
 )
+from properties.schema.types.ordering import ProductPropertyOrder
 
 
 @order(AmazonSalesChannel)
@@ -67,7 +69,16 @@ class AmazonRemoteLogOrder:
 class AmazonProductIssueOrder:
     id: auto
 
+
 @order(AmazonPropertySelectValue)
 class AmazonPropertySelectValueOrder:
     id: auto
     marketplace: Optional[AmazonSalesChannelViewOrder]
+
+
+@order(AmazonProductProperty)
+class AmazonProductPropertyOrder:
+    id: auto
+    local_instance: Optional[ProductPropertyOrder]
+    remote_product: Optional[AmazonProductOrder]
+    remote_select_value: Optional[AmazonPropertySelectValueOrder]
