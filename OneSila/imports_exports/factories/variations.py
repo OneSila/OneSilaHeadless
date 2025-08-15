@@ -74,6 +74,7 @@ class ImportConfigurableVariationInstance(AbstractImportInstance):
         self.variation = self.variation_product
 
         fac = ConfigurableVariationImport(self, self.import_process, instance=self.instance)
+        self.update_only = False
         fac.run()
 
         self.instance = fac.instance
@@ -251,6 +252,7 @@ class ImportBundleVariationInstance(AbstractImportInstance):
         self.variation = self.variation_product
 
         fac = BundleVariationImport(self, self.import_process, instance=self.instance)
+        self.update_only = False
         fac.run()
 
         # Add quantity manually (not handled by BundleVariationImport)
