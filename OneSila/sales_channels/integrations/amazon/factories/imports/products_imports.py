@@ -10,7 +10,7 @@ from core.mixins import TemporaryDisableInspectorSignalsMixin
 from imports_exports.factories.products import ImportProductInstance
 from products.models import Product
 from products.product_types import SIMPLE, CONFIGURABLE
-from properties.models import Property, PropertyTranslation
+from properties.models import Property
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from spapi import CatalogApi
@@ -466,22 +466,6 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             for k, v in extra_map.items():
                 if k not in mirror_map:
                     mirror_map[k] = v
-        asin_property = Property.objects.filter(
-            internal_name="merchant_suggested_asin",
-            multi_tenant_company=self.sales_channel.multi_tenant_company,
-        ).first()
-        if asin_property and asin:
-            attributes.append({
-                "property": asin_property,
-                "value": asin,
-                "translations": [
-                    {
-                        "language": self.sales_channel.multi_tenant_company.language,
-                        "value": asin,
-                    }
-                ],
-            })
-
         if attributes:
             structured["properties"] = attributes
             structured["__mirror_product_properties_map"] = mirror_map
@@ -505,19 +489,25 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             mirror_model_class=AmazonProduct,
             sales_channel=self.sales_channel,
             mirror_model_map={"local_instance": "*"},
-            mirror_model_defaults={"asin": instance.data.get("__asin")},
         )
 
     def update_remote_product(self, import_instance: ImportProductInstance, product, view, is_variation: bool):
         remote_product = import_instance.remote_instance
         asin = import_instance.data.get("__asin")
 
-        if asin and not remote_product.remote_id:
-            remote_product.remote_id = asin
-
         sku = product.get("sku")
         if sku and not remote_product.remote_sku:
             remote_product.remote_sku = sku
+
+        if asin and view:
+            from sales_channels.integrations.amazon.models import AmazonMerchantAsin
+
+            AmazonMerchantAsin.objects.update_or_create(
+                product=remote_product.local_instance,
+                view=view,
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                defaults={"asin": asin},
+            )
 
         if remote_product.syncing_current_percentage != 100:
             remote_product.syncing_current_percentage = 100
@@ -819,8 +809,6 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             sales_channel=self.sales_channel,
             mirror_model_map={"local_instance": "*"},
             mirror_model_defaults={
-                "remote_id": structured["__asin"],
-                "asin": structured["__asin"],
                 "remote_sku": structured["sku"],
                 "is_variation": is_variation,
             },
@@ -830,11 +818,6 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         try:
             instance.process()
         except IntegrityError as e:
-            # because we have this:
-            # "remote_id": structured["__asin"],
-            # "asin": structured["__asin"],
-            # in the mirror_model_defaults it will try to create the mirror model with another asin
-            # this is not possible so we will add it as a broken recored instead
             self._add_broken_record(
                 code=self.ERROR_MULTIPLE_ASIN,
                 message="Multiple ASINs for SKU",

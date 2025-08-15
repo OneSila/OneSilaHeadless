@@ -14,13 +14,6 @@ from sales_channels.models.products import (
 class AmazonProduct(RemoteProduct):
     """Amazon specific remote product."""
 
-    asin = models.CharField(
-        max_length=32,
-        null=True,
-        blank=True,
-        help_text="ASIN identifier for the product.",
-    )
-
     # keep track of which marketplace listings have been created
     created_marketplaces = models.JSONField(
         default=list,
@@ -124,3 +117,26 @@ class AmazonEanCode(RemoteEanCode):
     class Meta:
         verbose_name = 'Amazon EAN Code'
         verbose_name_plural = 'Amazon EAN Codes'
+
+
+class AmazonMerchantAsin(models.Model):
+    """Store merchant-provided ASIN per marketplace."""
+
+    product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.CASCADE,
+        related_name='amazon_merchant_asins',
+        help_text='The product this ASIN belongs to.',
+    )
+    view = models.ForeignKey(
+        'amazon.AmazonSalesChannelView',
+        on_delete=models.CASCADE,
+        related_name='product_asins',
+        help_text='Marketplace for this ASIN.',
+    )
+    asin = models.CharField(max_length=32)
+
+    class Meta:
+        unique_together = ("product", "view")
+        verbose_name = 'Amazon Merchant ASIN'
+        verbose_name_plural = 'Amazon Merchant ASINs'

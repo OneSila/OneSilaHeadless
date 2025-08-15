@@ -2,7 +2,7 @@ from .orders import AmazonOrder, AmazonOrderItem
 from .products import (
     AmazonProduct, AmazonInventory, AmazonPrice,
     AmazonProductContent, AmazonImageProductAssociation,
-    AmazonCategory, AmazonEanCode
+    AmazonCategory, AmazonEanCode, AmazonMerchantAsin
 )
 from .properties import (
     AmazonProperty, AmazonPropertySelectValue, AmazonProductProperty, AmazonProductType, AmazonProductTypeItem

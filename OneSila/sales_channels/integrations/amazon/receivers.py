@@ -14,7 +14,6 @@ from sales_channels.integrations.amazon.models import (
 )
 from sales_channels.integrations.amazon.factories.sync.rule_sync import (
     AmazonPropertyRuleItemSyncFactory,
-    AmazonProductTypeAsinSyncFactory,
 )
 from sales_channels.integrations.amazon.factories.sync.select_value_sync import (
     AmazonPropertySelectValuesSyncFactory,
@@ -132,17 +131,6 @@ def sales_channels__amazon_property_select_value__auto_import(sender, instance: 
     from sales_channels.integrations.amazon.tasks import amazon_auto_import_select_value_task
 
     amazon_auto_import_select_value_task(instance.id)
-
-
-@receiver(post_create, sender='amazon.AmazonProductType')
-@receiver(post_update, sender='amazon.AmazonProductType')
-def sales_channels__amazon_product_type__ensure_asin(sender, instance, **kwargs):
-    signal = kwargs.get('signal')
-    if signal == post_update and not instance.is_dirty_field('local_instance', check_relationship=True):
-        return
-
-    sync_factory = AmazonProductTypeAsinSyncFactory(instance)
-    sync_factory.run()
 
 
 @receiver(post_update, sender="amazon.AmazonProductType")
