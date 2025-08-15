@@ -127,13 +127,18 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     # Helpers
     # ------------------------------------------------------------
     def _get_asin(self) -> str | None:
-        asin_property = Property.objects.get(
-            internal_name="merchant_suggested_asin",
-            multi_tenant_company=self.sales_channel.multi_tenant_company,
-        )
+        from sales_channels.integrations.amazon.models import AmazonMerchantAsin
 
-        pp = ProductProperty.objects.filter(product=self.local_instance, property=asin_property).first()
-        return pp.get_value() if pp else None
+        if not getattr(self, 'local_instance', None):
+            return None
+        try:
+            asin_obj = AmazonMerchantAsin.objects.get(
+                product=self.local_instance,
+                view=self.view,
+            )
+        except AmazonMerchantAsin.DoesNotExist:
+            return None
+        return asin_obj.asin
 
     def _get_ean_for_payload(self) -> str | None:
         return self.remote_instance.ean_code or self.get_ean_code_value()
@@ -348,37 +353,14 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         if not self._get_asin():
             asin = self._extract_asin_from_listing(response)
             if asin:
-                update_fields = []
-                if not self.remote_instance.remote_id:
-                    self.remote_instance.remote_id = asin
-                    update_fields.append("remote_id")
-                if not getattr(self.remote_instance, "asin", None):
-                    self.remote_instance.asin = asin
-                    update_fields.append("asin")
-                if update_fields:
-                    self.remote_instance.save(update_fields=update_fields)
+                from sales_channels.integrations.amazon.models import AmazonMerchantAsin
 
-                try:
-                    asin_property = Property.objects.get(
-                        internal_name="merchant_suggested_asin",
-                        multi_tenant_company=self.sales_channel.multi_tenant_company,
-                    )
-                except Property.DoesNotExist:
-                    asin_property = None
-
-                if asin_property:
-                    pp, _ = ProductProperty.objects.get_or_create(
-                        product=self.local_instance,
-                        property=asin_property,
-                        multi_tenant_company=self.sales_channel.multi_tenant_company,
-                    )
-                    from properties.models import ProductPropertyTextTranslation
-
-                    ProductPropertyTextTranslation.objects.update_or_create(
-                        product_property=pp,
-                        language=self.sales_channel.multi_tenant_company.language,
-                        defaults={"value_text": asin},
-                    )
+                AmazonMerchantAsin.objects.update_or_create(
+                    product=self.local_instance,
+                    view=self.view,
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
+                    defaults={"asin": asin},
+                )
 
         return response
 
