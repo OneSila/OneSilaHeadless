@@ -55,6 +55,8 @@ class ImportConfigurableVariationInstance(AbstractImportInstance):
 
         if not self.variation_product and hasattr(self, 'variation_data'):
             self.variation_import_instance = ImportProductInstance(self.variation_data, self.import_process, sales_channel=self.sales_channel)
+            # allow creating variations even when the import is update_only
+            self.variation_import_instance.update_only = False
 
     def pre_process_logic(self):
         if not self.config_product:
@@ -231,6 +233,8 @@ class ImportBundleVariationInstance(AbstractImportInstance):
 
         if not self.variation_product and hasattr(self, 'variation_data'):
             self.variation_import_instance = ImportProductInstance(self.variation_data, self.import_process, sales_channel=self.sales_channel)
+            # allow creating variations even when the import is update_only
+            self.variation_import_instance.update_only = False
 
     def pre_process_logic(self):
         if not self.bundle_product:
@@ -306,6 +310,8 @@ class ImportAliasVariationInstance(AbstractImportInstance):
         if not self.alias_product:
             self.variation_data["alias_parent_product"] = self.parent_product
             self.alias_product_import_instance = ImportProductInstance(self.variation_data, self.import_process, sales_channel=self.sales_channel)
+            # allow creating alias variations even when the import is update_only
+            self.alias_product_import_instance.update_only = False
             self.alias_product_import_instance.process()
             self.alias_product = self.alias_product_import_instance.instance
 
