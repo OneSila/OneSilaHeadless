@@ -17,3 +17,4 @@ from .taxes import AmazonCurrency, AmazonTaxCode
 from .imports import *
 from .logs import AmazonRemoteLog
 from .issues import AmazonProductIssue
+from .recommended_browse_nodes import AmazonBrowseNode
