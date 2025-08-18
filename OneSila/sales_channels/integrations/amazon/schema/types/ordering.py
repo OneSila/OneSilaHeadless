@@ -17,6 +17,9 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductIssue,
     AmazonBrowseNode,
     AmazonProductBrowseNode,
+    AmazonMerchantAsin,
+    AmazonGtinExemption,
+    AmazonVariationTheme,
 )
 from properties.schema.types.ordering import ProductPropertyOrder
 from products.schema.types.ordering import ProductOrder
@@ -98,3 +101,24 @@ class AmazonBrowseNodeOrder:
 class AmazonProductBrowseNodeOrder:
     id: auto
     product: Optional[ProductOrder]
+
+
+@order(AmazonMerchantAsin)
+class AmazonMerchantAsinOrder:
+    id: auto
+    product: Optional[ProductOrder]
+    view: Optional[AmazonSalesChannelViewOrder]
+
+
+@order(AmazonGtinExemption)
+class AmazonGtinExemptionOrder:
+    id: auto
+    product: Optional[ProductOrder]
+    view: Optional[AmazonSalesChannelViewOrder]
+
+
+@order(AmazonVariationTheme)
+class AmazonVariationThemeOrder:
+    id: auto
+    product: Optional[ProductOrder]
+    view: Optional[AmazonSalesChannelViewOrder]

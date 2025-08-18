@@ -21,6 +21,12 @@ from sales_channels.integrations.amazon.schema.types.input import (
     BulkAmazonPropertySelectValueLocalInstanceInput,
     AmazonProductBrowseNodeInput,
     AmazonProductBrowseNodePartialInput,
+    AmazonMerchantAsinInput,
+    AmazonMerchantAsinPartialInput,
+    AmazonGtinExemptionInput,
+    AmazonGtinExemptionPartialInput,
+    AmazonVariationThemeInput,
+    AmazonVariationThemePartialInput,
 )
 from sales_channels.integrations.amazon.schema.types.types import (
     AmazonSalesChannelType,
@@ -35,6 +41,9 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonProductType as AmazonProductGraphqlType,
     SuggestedAmazonProductType, SuggestedAmazonProductTypeEntry,
     AmazonProductBrowseNodeType,
+    AmazonMerchantAsinType,
+    AmazonGtinExemptionType,
+    AmazonVariationThemeType,
 )
 from sales_channels.schema.types.input import SalesChannelViewPartialInput
 from core.schema.core.mutations import create, type, List, update, delete
@@ -290,3 +299,21 @@ class AmazonSalesChannelMutation:
     create_amazon_product_browse_node: AmazonProductBrowseNodeType = create(AmazonProductBrowseNodeInput)
     update_amazon_product_browse_node: AmazonProductBrowseNodeType = update(AmazonProductBrowseNodePartialInput)
     delete_amazon_product_browse_node: AmazonProductBrowseNodeType = delete()
+
+    create_amazon_merchant_asin: AmazonMerchantAsinType = create(AmazonMerchantAsinInput)
+    create_amazon_merchant_asins: List[AmazonMerchantAsinType] = create(AmazonMerchantAsinInput)
+    update_amazon_merchant_asin: AmazonMerchantAsinType = update(AmazonMerchantAsinPartialInput)
+    delete_amazon_merchant_asin: AmazonMerchantAsinType = delete()
+    delete_amazon_merchant_asins: List[AmazonMerchantAsinType] = delete()
+
+    create_amazon_gtin_exemption: AmazonGtinExemptionType = create(AmazonGtinExemptionInput)
+    create_amazon_gtin_exemptions: List[AmazonGtinExemptionType] = create(AmazonGtinExemptionInput)
+    update_amazon_gtin_exemption: AmazonGtinExemptionType = update(AmazonGtinExemptionPartialInput)
+    delete_amazon_gtin_exemption: AmazonGtinExemptionType = delete()
+    delete_amazon_gtin_exemptions: List[AmazonGtinExemptionType] = delete()
+
+    create_amazon_variation_theme: AmazonVariationThemeType = create(AmazonVariationThemeInput)
+    create_amazon_variation_themes: List[AmazonVariationThemeType] = create(AmazonVariationThemeInput)
+    update_amazon_variation_theme: AmazonVariationThemeType = update(AmazonVariationThemePartialInput)
+    delete_amazon_variation_theme: AmazonVariationThemeType = delete()
+    delete_amazon_variation_themes: List[AmazonVariationThemeType] = delete()

@@ -25,6 +25,9 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductIssue,
     AmazonBrowseNode,
     AmazonProductBrowseNode,
+    AmazonMerchantAsin,
+    AmazonGtinExemption,
+    AmazonVariationTheme,
 )
 from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelFilter,
@@ -37,6 +40,7 @@ from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelImportFilter, AmazonDefaultUnitConfiguratorFilter,
     AmazonRemoteLogFilter, AmazonSalesChannelViewFilter, AmazonProductIssueFilter,
     AmazonBrowseNodeFilter, AmazonProductBrowseNodeFilter,
+    AmazonMerchantAsinFilter, AmazonGtinExemptionFilter, AmazonVariationThemeFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
@@ -50,6 +54,7 @@ from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonDefaultUnitConfiguratorOrder,
     AmazonRemoteLogOrder, AmazonSalesChannelViewOrder, AmazonProductIssueOrder,
     AmazonBrowseNodeOrder, AmazonProductBrowseNodeOrder,
+    AmazonMerchantAsinOrder, AmazonGtinExemptionOrder, AmazonVariationThemeOrder,
 )
 from sales_channels.schema.types.types import FormattedIssueType
 
@@ -383,6 +388,60 @@ class AmazonProductBrowseNodeType(relay.Node, GetQuerysetMultiTenantMixin):
         lazy("sales_channels.integrations.amazon.schema.types.types")
     ]
     sales_channel_view: Annotated[
+        'AmazonSalesChannelViewType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+
+
+@type(
+    AmazonMerchantAsin,
+    filters=AmazonMerchantAsinFilter,
+    order=AmazonMerchantAsinOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonMerchantAsinType(relay.Node, GetQuerysetMultiTenantMixin):
+    product: Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]
+    view: Annotated[
+        'AmazonSalesChannelViewType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+
+
+@type(
+    AmazonGtinExemption,
+    filters=AmazonGtinExemptionFilter,
+    order=AmazonGtinExemptionOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonGtinExemptionType(relay.Node, GetQuerysetMultiTenantMixin):
+    product: Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]
+    view: Annotated[
+        'AmazonSalesChannelViewType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+
+
+@type(
+    AmazonVariationTheme,
+    filters=AmazonVariationThemeFilter,
+    order=AmazonVariationThemeOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonVariationThemeType(relay.Node, GetQuerysetMultiTenantMixin):
+    product: Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]
+    view: Annotated[
         'AmazonSalesChannelViewType',
         lazy("sales_channels.integrations.amazon.schema.types.types")
     ]

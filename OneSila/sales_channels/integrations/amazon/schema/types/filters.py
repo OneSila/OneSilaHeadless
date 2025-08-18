@@ -21,6 +21,9 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductIssue,
     AmazonBrowseNode,
     AmazonProductBrowseNode,
+    AmazonMerchantAsin,
+    AmazonGtinExemption,
+    AmazonVariationTheme,
 )
 from properties.schema.types.filters import (
     PropertyFilter,
@@ -197,3 +200,27 @@ class AmazonProductBrowseNodeFilter(SearchFilterMixin):
     sales_channel: Optional[SalesChannelFilter]
     sales_channel_view: Optional[SalesChannelViewFilter]
     recommended_browse_node_id: auto
+
+
+@filter(AmazonMerchantAsin)
+class AmazonMerchantAsinFilter(SearchFilterMixin):
+    id: auto
+    product: Optional[ProductFilter]
+    view: Optional[SalesChannelViewFilter]
+    asin: auto
+
+
+@filter(AmazonGtinExemption)
+class AmazonGtinExemptionFilter(SearchFilterMixin):
+    id: auto
+    product: Optional[ProductFilter]
+    view: Optional[SalesChannelViewFilter]
+    value: auto
+
+
+@filter(AmazonVariationTheme)
+class AmazonVariationThemeFilter(SearchFilterMixin):
+    id: auto
+    product: Optional[ProductFilter]
+    view: Optional[SalesChannelViewFilter]
+    theme: auto

@@ -10,9 +10,13 @@ from sales_channels.integrations.amazon.models import (
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonProductProperty,
+    AmazonMerchantAsin,
+    AmazonGtinExemption,
+    AmazonVariationTheme,
 )
 from products.models import Product
 from properties.models import Property, ProductProperty
+from unittest.mock import patch
 
 from .queries import (
     AMAZON_PRODUCT_FILTER_BY_LOCAL_INSTANCE,
@@ -20,6 +24,9 @@ from .queries import (
     AMAZON_PRODUCT_PROPERTY_FILTER_BY_LOCAL_INSTANCE,
     AMAZON_PRODUCT_PROPERTY_FILTER_BY_REMOTE_SELECT_VALUE,
     AMAZON_PRODUCT_PROPERTY_FILTER_BY_REMOTE_PRODUCT,
+    AMAZON_MERCHANT_ASIN_FILTER_BY_PRODUCT,
+    AMAZON_GTIN_EXEMPTION_FILTER_BY_PRODUCT,
+    AMAZON_VARIATION_THEME_FILTER_BY_PRODUCT,
 )
 
 
@@ -182,3 +189,112 @@ class AmazonProductIssuesQueryTest(TransactionTestCaseMixin, TransactionTestCase
         issues = resp.data["amazonProduct"]["issues"]
         self.assertEqual(len(issues), 1)
         self.assertEqual(issues[0]["code"], self.issue.code)
+
+
+class AmazonMerchantAsinQueryTest(TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = baker.make(
+            AmazonSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+        )
+        self.view = baker.make(
+            AmazonSalesChannelView,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.asin = baker.make(
+            AmazonMerchantAsin,
+            product=self.product,
+            view=self.view,
+            multi_tenant_company=self.multi_tenant_company,
+            asin="ASIN123",
+        )
+
+    def test_filter_by_product(self):
+        resp = self.strawberry_test_client(
+            query=AMAZON_MERCHANT_ASIN_FILTER_BY_PRODUCT,
+            variables={"product": self.to_global_id(self.product)},
+        )
+        self.assertTrue(resp.errors is None)
+        edges = resp.data["amazonMerchantAsins"]["edges"]
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0]["node"]["id"], self.to_global_id(self.asin))
+
+
+class AmazonGtinExemptionQueryTest(TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = baker.make(
+            AmazonSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+        )
+        self.view = baker.make(
+            AmazonSalesChannelView,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.exemption = baker.make(
+            AmazonGtinExemption,
+            product=self.product,
+            view=self.view,
+            multi_tenant_company=self.multi_tenant_company,
+            value=True,
+        )
+
+    def test_filter_by_product(self):
+        resp = self.strawberry_test_client(
+            query=AMAZON_GTIN_EXEMPTION_FILTER_BY_PRODUCT,
+            variables={"product": self.to_global_id(self.product)},
+        )
+        self.assertTrue(resp.errors is None)
+        edges = resp.data["amazonGtinExemptions"]["edges"]
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0]["node"]["id"], self.to_global_id(self.exemption))
+
+
+class AmazonVariationThemeQueryTest(TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = baker.make(
+            AmazonSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type="CONFIGURABLE",
+        )
+        self.view = baker.make(
+            AmazonSalesChannelView,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        with patch("sales_channels.integrations.amazon.models.products.AmazonVariationTheme.full_clean"):
+            self.theme = baker.make(
+                AmazonVariationTheme,
+                product=self.product,
+                view=self.view,
+                multi_tenant_company=self.multi_tenant_company,
+                theme="SizeColor",
+            )
+
+    def test_filter_by_product(self):
+        resp = self.strawberry_test_client(
+            query=AMAZON_VARIATION_THEME_FILTER_BY_PRODUCT,
+            variables={"product": self.to_global_id(self.product)},
+        )
+        self.assertTrue(resp.errors is None)
+        edges = resp.data["amazonVariationThemes"]["edges"]
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0]["node"]["id"], self.to_global_id(self.theme))
