@@ -374,3 +374,87 @@ class AmazonProductsImportProcessorBrowseNodeGtinTest(TestCase):
                 recommended_browse_node_id="BN1",
             ).exists()
         )
+
+
+class AmazonProductsImportProcessorUpdateOnlyTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="GB",
+        )
+        self.import_process = Import.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+    def test_non_configurable_product_update_only(self):
+        product_data = {"sku": "SKU123"}
+        structured = {
+            "name": "Name",
+            "sku": "SKU123",
+            "__asin": "ASIN1",
+            "type": "SIMPLE",
+        }
+
+        with patch.object(
+            AmazonProductsImportProcessor,
+            "get__product_data",
+            return_value=(structured, None, self.view),
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "update_remote_product",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_ean_code",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_attributes",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_translations",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_prices",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_images",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_sales_channels_views",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_gtin_exemption",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_product_browse_node",
+        ), patch(
+            "sales_channels.integrations.amazon.factories.imports.products_imports.FetchRemoteIssuesFactory"
+        ) as MockIssuesFactory, patch(
+            "sales_channels.integrations.amazon.factories.imports.products_imports.ImportProductInstance"
+        ) as MockImportProductInstance, patch(
+            "sales_channels.integrations.amazon.factories.imports.products_imports.get_is_product_variation",
+            return_value=(False, None),
+        ):
+            from types import SimpleNamespace
+
+            mock_instance = SimpleNamespace(
+                process=lambda: None,
+                prepare_mirror_model_class=lambda *args, **kwargs: None,
+                update_only=False,
+                remote_instance=None,
+                instance=None,
+            )
+            MockImportProductInstance.return_value = mock_instance
+            MockIssuesFactory.return_value.run.return_value = None
+
+            processor = AmazonProductsImportProcessor(
+                self.import_process, self.sales_channel
+            )
+            processor.process_product_item(product_data)
+
+            self.assertTrue(mock_instance.update_only)
