@@ -82,9 +82,11 @@ AMAZON_INTERNAL_PROPERTIES = [
     'condition_note', 'list_price', 'max_order_quantity', 'product_description', 'bullet_point',
     'child_parent_sku_relationship', 'variation_theme', 'master_pack_layers_per_pallet_quantity',
     'master_packs_per_layer_quantity', 'is_oem_sourced_product', 'parentage_level',
+    'recommended_browse_nodes',
 
     # Auto-linking/ASIN suggestion
     'merchant_suggested_asin', 'externally_assigned_product_identifier',
+    'supplier_declared_has_product_identifier_exemption',
 
     # Amazon-only compliance metadata (for now)
     'compliance_media', 'gpsr_safety_attestation', 'gpsr_manufacturer_reference',

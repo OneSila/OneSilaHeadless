@@ -479,6 +479,27 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         if amazon_theme:
             structured["__amazon_theme"] = amazon_theme
 
+        gtin_exemption = extract_amazon_attribute_value(
+            product_attrs, "supplier_declared_has_product_identifier_exemption"
+        )
+        if gtin_exemption is not None:
+            structured["__gtin_exemption"] = bool(gtin_exemption)
+
+        browse_nodes = product_attrs.get("recommended_browse_nodes")
+        if not browse_nodes:
+            browse_nodes = product_data.get("recommended_browse_nodes")
+
+        if browse_nodes:
+            first_node = browse_nodes[0] if isinstance(browse_nodes, list) else browse_nodes
+            browse_node_id = None
+            if isinstance(first_node, dict):
+                browse_node_id = first_node.get("value") or first_node.get("id")
+            elif isinstance(first_node, (str, int)):
+                browse_node_id = first_node
+
+            if browse_node_id:
+                structured["__recommended_browse_node_id"] = browse_node_id
+
         structured["__asin"] = asin
         structured["__marketplace_id"] = marketplace_id
 
@@ -696,6 +717,53 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                 defaults={"theme": theme},
             )
 
+    @timeit_and_log(logger)
+    def handle_gtin_exemption(self, import_instance: ImportProductInstance, view):
+        from sales_channels.integrations.amazon.models import AmazonGtinExemption
+
+        if not view:
+            return
+
+        exemption = import_instance.data.get("__gtin_exemption")
+        if exemption is None:
+            AmazonGtinExemption.objects.filter(
+                product=import_instance.instance,
+                view=view,
+                multi_tenant_company=self.import_process.multi_tenant_company,
+            ).delete()
+            return
+
+        AmazonGtinExemption.objects.update_or_create(
+            product=import_instance.instance,
+            view=view,
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            defaults={"value": bool(exemption)},
+        )
+
+    @timeit_and_log(logger)
+    def handle_product_browse_node(self, import_instance: ImportProductInstance, view):
+        from sales_channels.integrations.amazon.models import AmazonProductBrowseNode
+
+        if not view:
+            return
+
+        node_id = import_instance.data.get("__recommended_browse_node_id")
+        if node_id:
+            AmazonProductBrowseNode.objects.update_or_create(
+                product=import_instance.instance,
+                sales_channel=self.sales_channel,
+                sales_channel_view=view,
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                defaults={"recommended_browse_node_id": node_id},
+            )
+        else:
+            AmazonProductBrowseNode.objects.filter(
+                product=import_instance.instance,
+                sales_channel=self.sales_channel,
+                sales_channel_view=view,
+                multi_tenant_company=self.import_process.multi_tenant_company,
+            ).delete()
+
     def handle_sales_channels_views(self, import_instance: ImportProductInstance, structured_data, view):
         if not view:
             return
@@ -885,6 +953,9 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
         if not is_variation:
             self.handle_sales_channels_views(instance, structured, view)
+
+        self.handle_gtin_exemption(instance, view)
+        self.handle_product_browse_node(instance, view)
 
         FetchRemoteIssuesFactory(
             remote_product=instance.remote_instance,
