@@ -58,7 +58,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
     import_rules = False
     import_products = True
 
-    ERROR_MULTIPLE_ASIN = "MULTIPLE_ASIN"
+    ERROR_BROKEN_IMPORT_PROCESS = "BROKEN_IMPORT_PROCESS"
     ERROR_MISSING_DATA = "MISSING_DATA"
     ERROR_NO_MAPPED_PRODUCT_TYPE = "NO_MAPPED_PRODUCT_TYPE"
     ERROR_PRODUCT_TYPE_MISMATCH = "PRODUCT_TYPE_MISMATCH"
@@ -895,12 +895,11 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             instance.process()
         except IntegrityError as e:
             self._add_broken_record(
-                code=self.ERROR_MULTIPLE_ASIN,
-                message="Multiple ASINs for SKU",
+                code=self.ERROR_BROKEN_IMPORT_PROCESS,
+                message="Broken import process for SKU",
                 data=structured,
                 context={
                     "sku": structured.get("sku"),
-                    "asin": structured.get("__asin"),
                     "region": getattr(view, "api_region_code", None),
                     "is_variation": is_variation,
                 },
