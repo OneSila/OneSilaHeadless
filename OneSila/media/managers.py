@@ -45,7 +45,7 @@ class MediaManager(MultiTenantManager):
         and an image file is provided, we compute its hash and check for an existing record.
         Otherwise, we fall back to the normal create behavior.
         """
-        print('---------------------------------------------------- 1')
+
         # Only apply deduplication if we're dealing with an image.
         if kwargs.get('type') != self.model.IMAGE or 'image' not in kwargs:
             return super().create(*args, **kwargs)
