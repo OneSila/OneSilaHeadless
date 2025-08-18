@@ -10,6 +10,9 @@ from sales_channels.integrations.amazon.models import (
     AmazonDefaultUnitConfigurator,
     AmazonSalesChannelView,
     AmazonProductBrowseNode,
+    AmazonMerchantAsin,
+    AmazonGtinExemption,
+    AmazonVariationTheme,
 )
 from properties.schema.types.input import PropertySelectValuePartialInput
 from strawberry.relay import GlobalID
@@ -126,4 +129,34 @@ class AmazonProductBrowseNodeInput:
 
 @partial(AmazonProductBrowseNode, fields="__all__")
 class AmazonProductBrowseNodePartialInput(NodeInput):
+    pass
+
+
+@input(AmazonMerchantAsin, fields="__all__")
+class AmazonMerchantAsinInput:
+    pass
+
+
+@partial(AmazonMerchantAsin, fields="__all__")
+class AmazonMerchantAsinPartialInput(NodeInput):
+    pass
+
+
+@input(AmazonGtinExemption, fields="__all__")
+class AmazonGtinExemptionInput:
+    pass
+
+
+@partial(AmazonGtinExemption, fields="__all__")
+class AmazonGtinExemptionPartialInput(NodeInput):
+    pass
+
+
+@input(AmazonVariationTheme, fields="__all__")
+class AmazonVariationThemeInput:
+    pass
+
+
+@partial(AmazonVariationTheme, fields="__all__")
+class AmazonVariationThemePartialInput(NodeInput):
     pass
