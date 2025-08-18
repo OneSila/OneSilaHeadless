@@ -18,7 +18,10 @@ from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonSalesChannelView,
     AmazonRemoteLanguage,
 )
-from sales_channels.integrations.amazon.models.products import AmazonProduct
+from sales_channels.integrations.amazon.models.products import (
+    AmazonProduct,
+    AmazonVariationTheme,
+)
 from sales_channels.integrations.amazon.models.properties import (
     AmazonProperty,
     AmazonPublicDefinition,
@@ -349,17 +352,6 @@ class AmazonVariationThemeTest(DisableWooCommerceSignalsMixin, TestCase, AmazonP
         )
         self.configurator.properties.set([self.color_property, self.size_property])
 
-    def test_match_amazon_variation_theme(self):
-        fac = AmazonProductSyncFactory(
-            sales_channel=self.sales_channel,
-            local_instance=self.product,
-            remote_instance=self.remote_product,
-            view=self.view,
-        )
-        fac.remote_rule = self.remote_rule
-        theme = fac._match_amazon_variation_theme(self.configurator)
-        self.assertEqual(theme, "COLOR/SIZE")
-
     def test_build_variation_attributes_for_child(self):
         child_product = baker.make(
             "products.Product",
@@ -380,9 +372,6 @@ class AmazonVariationThemeTest(DisableWooCommerceSignalsMixin, TestCase, AmazonP
         self.remote_product.remote_sku = "PARENTSKU"
         self.remote_product.save()
 
-        self.configurator.amazon_theme = "COLOR/SIZE"
-        self.configurator.save()
-
         fac = AmazonProductSyncFactory(
             sales_channel=self.sales_channel,
             local_instance=child_product,
@@ -392,6 +381,12 @@ class AmazonVariationThemeTest(DisableWooCommerceSignalsMixin, TestCase, AmazonP
             view=self.view,
         )
         fac.remote_rule = self.remote_rule
+        AmazonVariationTheme.objects.create(
+            product=self.product,
+            view=self.view,
+            theme="COLOR/SIZE",
+            multi_tenant_company=self.multi_tenant_company,
+        )
         attrs = fac.build_variation_attributes()
 
         expected_theme = [{"value": "COLOR/SIZE", "marketplace_id": self.view.remote_id}]

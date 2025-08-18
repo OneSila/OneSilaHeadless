@@ -9,7 +9,7 @@ from products.models import (
     ProductTranslation,
     ProductTranslationBulletPoint,
 )
-from properties.models import Property, ProductProperty
+from properties.models import ProductProperty
 from sales_channels.factories.products.products import (
     RemoteProductSyncFactory,
     RemoteProductCreateFactory,
@@ -160,15 +160,16 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         return asin
 
     def _get_gtin_exemption(self) -> bool | None:
-        prop = Property.objects.filter(
-            internal_name="supplier_declared_has_product_identifier_exemption",
-            multi_tenant_company=self.sales_channel.multi_tenant_company,
-        ).first()
-        if not prop:
-            return None
+        from sales_channels.integrations.amazon.models import AmazonGtinExemption
 
-        pp = ProductProperty.objects.filter(product=self.local_instance, property=prop).first()
-        return pp.get_value() if pp else None
+        try:
+            exemption = AmazonGtinExemption.objects.get(
+                product=self.local_instance,
+                view=self.view,
+            )
+        except AmazonGtinExemption.DoesNotExist:
+            return None
+        return exemption.value
 
     def build_basic_attributes(self) -> Dict:
         self.set_sku()
@@ -524,60 +525,14 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                     # product type. We will just skip those
                     pass
 
-    def _match_amazon_variation_theme(self, configurator):
-        themes = self.remote_rule.variation_themes or []
-        if not themes:
-            return None
-
-        prop_ids = configurator.properties.values_list("id", flat=True)
-        codes = list(
-            AmazonProperty.objects.filter(
-                sales_channel=self.sales_channel,
-                local_instance_id__in=prop_ids,
-            ).values_list("code", flat=True)
-        )
-        codes = [c.lower() for c in codes]
-
-        best_theme = None
-        best_matches = 0
-
-        for theme in themes:
-            parts = [p.lower() for p in theme.split("/")]
-            matches = 0
-            for part in parts:
-                if any(part in code for code in codes):
-                    matches += 1
-            if matches > best_matches:
-                best_matches = matches
-                best_theme = theme
-
-        return best_theme
-
-    def set_remote_configurator(self):
-        super().set_remote_configurator()
-
-        if not hasattr(self, "configurator"):
-            return
-
-        theme = self.configurator.amazon_theme or self._match_amazon_variation_theme(self.configurator)
-        if theme and self.configurator.amazon_theme != theme:
-            self.configurator.amazon_theme = theme
-            self.configurator.save(update_fields=["amazon_theme"])
-
-        self.amazon_theme = self.configurator.amazon_theme
-
     def build_variation_attributes(self):
         attrs = {}
         theme = None
-        configurator = None
 
         if self.is_variation and self.remote_parent_product:
-            configurator = self.remote_parent_product.configurator
-        elif self.local_type == Product.CONFIGURABLE and hasattr(self, "configurator"):
-            configurator = self.configurator
-
-        if configurator:
-            theme = configurator.amazon_theme or self._match_amazon_variation_theme(configurator)
+            theme = self._get_variation_theme(self.remote_parent_product.local_instance)
+        elif self.local_type == Product.CONFIGURABLE:
+            theme = self._get_variation_theme(self.local_instance)
 
         if theme:
             attrs["variation_theme"] = [{"value": theme, "marketplace_id": self.view.remote_id}]
@@ -599,7 +554,28 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 {"value": "parent", "marketplace_id": self.view.remote_id}
             ]
 
+        if theme:
+            parts = [p.lower() for p in theme.split("/")]
+            for part in parts:
+                base = part.replace("_name", "")
+                base_attr = base
+                name_attr = f"{base_attr}_name"
+                if base_attr in self.attributes and name_attr not in self.attributes:
+                    attrs[name_attr] = self.attributes[base_attr]
+
         return attrs
+
+    def _get_variation_theme(self, product):
+        from sales_channels.integrations.amazon.models import AmazonVariationTheme
+
+        try:
+            obj = AmazonVariationTheme.objects.get(
+                product=product,
+                view=self.view,
+            )
+        except AmazonVariationTheme.DoesNotExist:
+            return None
+        return obj.theme
 
     def customize_payload(self):
         self.attributes.update(self.build_variation_attributes())

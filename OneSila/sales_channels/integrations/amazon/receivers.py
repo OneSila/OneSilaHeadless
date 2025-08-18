@@ -1,5 +1,6 @@
 from core.receivers import receiver
 from core.signals import post_create, post_update
+from django.db.models.signals import post_delete
 from sales_channels.signals import (
     refresh_website_pull_models,
     sales_channel_created,
@@ -166,3 +167,13 @@ def amazon__product__manual_sync(sender, instance, view, force_validation_only=F
         remote_product_id=instance.id,
         force_validation_only=force_validation_only,
     )
+
+
+@receiver(post_update, sender="properties.ProductProperty")
+@receiver(post_delete, sender="properties.ProductProperty")
+def amazon__product_type_changed_clear_variation_theme(sender, instance, **kwargs):
+    if not instance.property.is_product_type:
+        return
+    from sales_channels.integrations.amazon.models import AmazonVariationTheme
+
+    AmazonVariationTheme.objects.filter(product=instance.product).delete()

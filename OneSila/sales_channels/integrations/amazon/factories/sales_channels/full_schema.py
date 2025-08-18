@@ -5,7 +5,6 @@ from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERT
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.factories.mixins import (
     GetAmazonAPIMixin,
-    EnsureGtinExemptionMixin,
 )
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannelView,
@@ -402,13 +401,11 @@ class DefaultUnitConfiguratorFactory:
 
 class AmazonProductTypeRuleFactory(
     GetAmazonAPIMixin,
-    EnsureGtinExemptionMixin,
 ):
     def __init__(
         self,
         product_type_code,
         sales_channel,
-        gtin_exemption_property=None,
         api=None,
         language=None,
     ):
@@ -418,11 +415,6 @@ class AmazonProductTypeRuleFactory(
         self.multi_tenant_company = sales_channel.multi_tenant_company
         self.product_type = self.get_or_create_product_type()
         self.sales_channel_views = AmazonSalesChannelView.objects.filter(sales_channel=sales_channel).order_by('-is_default')
-
-        if gtin_exemption_property is None:
-            self.gtin_exemption_property = self._ensure_gtin_exemption()
-        else:
-            self.gtin_exemption_property = gtin_exemption_property
 
         if api is None:
             self.api = self.get_api()
@@ -489,19 +481,6 @@ class AmazonProductTypeRuleFactory(
             schema_data["title"] = response.display_name
 
         return schema_data, offer_property_keys
-
-    def ensure_gtin_exemption_item(self):
-
-        if not self.gtin_exemption_property:
-            return
-
-        AmazonProductTypeItem.objects.get_or_create(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            amazon_rule=self.product_type,
-            remote_property=self.gtin_exemption_property,
-            defaults={"remote_type": ProductPropertiesRuleItem.OPTIONAL},
-        )
 
     def process_views(self):
 
@@ -746,5 +725,4 @@ class AmazonProductTypeRuleFactory(
         self.create_default_unit_configurator(public_definition, view, is_default)
 
     def run(self):
-        self.ensure_gtin_exemption_item()
         self.process_views()
