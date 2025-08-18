@@ -18,6 +18,7 @@ class AmazonBrowseNodeSyncFactory(GetAmazonAPIMixin):
     def __init__(self, view: AmazonSalesChannelView):
         self.view = view
         self.sales_channel = view.sales_channel
+        self.sales_channel = self.sales_channel.get_real_instance()
         self.marketplace_id = view.remote_id
         self.api = ReportsApi(self._get_client())
 
