@@ -1,6 +1,8 @@
 from core import models
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
+from products.models import Product
+from sales_channels.models import SalesChannel, SalesChannelView
 
 class AmazonBrowseNode(models.SharedModel):
     remote_id = models.CharField(max_length=50, primary_key=True)  # browseNodeId
@@ -50,3 +52,18 @@ class AmazonBrowseNode(models.SharedModel):
 
     def __str__(self):
         return f"{self.name} ({self.remote_id})"
+
+
+class AmazonProductBrowseNode(models.Model):
+    """Link a product and view to a recommended browse node."""
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    sales_channel = models.ForeignKey(SalesChannel, on_delete=models.CASCADE)
+    sales_channel_view = models.ForeignKey(SalesChannelView, on_delete=models.CASCADE)
+    recommended_browse_node_id = models.CharField(max_length=50)
+
+    class Meta:
+        unique_together = ("product", "sales_channel_view")
+
+    def __str__(self):
+        return f"{self.product} @ {self.sales_channel_view}: {self.recommended_browse_node_id}"

@@ -19,6 +19,8 @@ from sales_channels.integrations.amazon.schema.types.input import (
     AmazonSalesChannelViewPartialInput,
     AmazonValidateAuthInput,
     BulkAmazonPropertySelectValueLocalInstanceInput,
+    AmazonProductBrowseNodeInput,
+    AmazonProductBrowseNodePartialInput,
 )
 from sales_channels.integrations.amazon.schema.types.types import (
     AmazonSalesChannelType,
@@ -32,6 +34,7 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonSalesChannelViewType,
     AmazonProductType as AmazonProductGraphqlType,
     SuggestedAmazonProductType, SuggestedAmazonProductTypeEntry,
+    AmazonProductBrowseNodeType,
 )
 from sales_channels.schema.types.input import SalesChannelViewPartialInput
 from core.schema.core.mutations import create, type, List, update, delete
@@ -283,3 +286,7 @@ class AmazonSalesChannelMutation:
             product_types.append(product_type)
 
         return product_types
+
+    create_amazon_product_browse_node: AmazonProductBrowseNodeType = create(AmazonProductBrowseNodeInput)
+    update_amazon_product_browse_node: AmazonProductBrowseNodeType = update(AmazonProductBrowseNodePartialInput)
+    delete_amazon_product_browse_node: AmazonProductBrowseNodeType = delete()

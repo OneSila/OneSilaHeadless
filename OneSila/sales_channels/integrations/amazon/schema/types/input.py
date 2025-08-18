@@ -9,6 +9,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannelImport,
     AmazonDefaultUnitConfigurator,
     AmazonSalesChannelView,
+    AmazonProductBrowseNode,
 )
 from properties.schema.types.input import PropertySelectValuePartialInput
 from strawberry.relay import GlobalID
@@ -116,3 +117,13 @@ class AmazonSalesChannelViewPartialInput(NodeInput):
 class BulkAmazonPropertySelectValueLocalInstanceInput:
     ids: List[GlobalID]
     local_instance_id: Optional[GlobalID] = None
+
+
+@input(AmazonProductBrowseNode, fields="__all__")
+class AmazonProductBrowseNodeInput:
+    pass
+
+
+@partial(AmazonProductBrowseNode, fields="__all__")
+class AmazonProductBrowseNodePartialInput(NodeInput):
+    pass

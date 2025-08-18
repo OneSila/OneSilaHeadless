@@ -12,6 +12,8 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonRemoteLogType,
     AmazonSalesChannelViewType,
     AmazonProductIssueType,
+    AmazonBrowseNodeType,
+    AmazonProductBrowseNodeType,
 )
 
 
@@ -52,3 +54,9 @@ class AmazonSalesChannelsQuery:
 
     amazon_channel_view: AmazonSalesChannelViewType = node()
     amazon_channel_views: DjangoListConnection[AmazonSalesChannelViewType] = connection()
+
+    amazon_browse_node: AmazonBrowseNodeType = node()
+    amazon_browse_nodes: DjangoListConnection[AmazonBrowseNodeType] = connection()
+
+    amazon_product_browse_node: AmazonProductBrowseNodeType = node()
+    amazon_product_browse_nodes: DjangoListConnection[AmazonProductBrowseNodeType] = connection()
