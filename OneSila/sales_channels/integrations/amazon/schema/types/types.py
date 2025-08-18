@@ -23,6 +23,8 @@ from sales_channels.integrations.amazon.models import (
     AmazonRemoteLog,
     AmazonSalesChannelView,
     AmazonProductIssue,
+    AmazonBrowseNode,
+    AmazonProductBrowseNode,
 )
 from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelFilter,
@@ -34,6 +36,7 @@ from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonProductTypeItemFilter,
     AmazonSalesChannelImportFilter, AmazonDefaultUnitConfiguratorFilter,
     AmazonRemoteLogFilter, AmazonSalesChannelViewFilter, AmazonProductIssueFilter,
+    AmazonBrowseNodeFilter, AmazonProductBrowseNodeFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
@@ -46,6 +49,7 @@ from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelImportOrder,
     AmazonDefaultUnitConfiguratorOrder,
     AmazonRemoteLogOrder, AmazonSalesChannelViewOrder, AmazonProductIssueOrder,
+    AmazonBrowseNodeOrder, AmazonProductBrowseNodeOrder,
 )
 from sales_channels.schema.types.types import FormattedIssueType
 
@@ -346,6 +350,39 @@ class AmazonProductIssueType(relay.Node, GetQuerysetMultiTenantMixin):
         lazy("sales_channels.schema.types.types")
     ]
     view: Annotated[
+        'AmazonSalesChannelViewType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+
+
+@type(
+    AmazonBrowseNode,
+    filters=AmazonBrowseNodeFilter,
+    order=AmazonBrowseNodeOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonBrowseNodeType(relay.Node):
+    pass
+
+
+@type(
+    AmazonProductBrowseNode,
+    filters=AmazonProductBrowseNodeFilter,
+    order=AmazonProductBrowseNodeOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonProductBrowseNodeType(relay.Node, GetQuerysetMultiTenantMixin):
+    product: Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    sales_channel_view: Annotated[
         'AmazonSalesChannelViewType',
         lazy("sales_channels.integrations.amazon.schema.types.types")
     ]
