@@ -76,4 +76,4 @@ class AmazonPropertySelectValuesSyncFactory:
             )
 
             val.local_instance = existing_psv
-            val.save(update_fields=["local_instance"])
+            val.save()
