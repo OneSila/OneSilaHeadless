@@ -21,6 +21,10 @@ from sales_channels.integrations.amazon.models import (
     AmazonTaxCode,
     AmazonDefaultUnitConfigurator,
     AmazonImportRelationship, AmazonImportBrokenRecord,
+    AmazonProductBrowseNode,
+    AmazonMerchantAsin,
+    AmazonVariationTheme,
+    AmazonGtinExemption,
 )
 from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
 from django.contrib import admin
@@ -195,4 +199,45 @@ class AmazonPublicDefinitionAdmin(admin.ModelAdmin):
                 "last_fetched",
             )
         }),
+    )
+
+
+@admin.register(AmazonProductBrowseNode)
+class AmazonProductBrowseNodeAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        "product",
+        "sales_channel",
+        "sales_channel_view",
+        "multi_tenant_company",
+        "created_by_multi_tenant_user",
+    )
+
+
+@admin.register(AmazonMerchantAsin)
+class AmazonMerchantAsinAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        "product",
+        "view",
+        "multi_tenant_company",
+        "created_by_multi_tenant_user",
+    )
+
+
+@admin.register(AmazonVariationTheme)
+class AmazonVariationThemeAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        "product",
+        "view",
+        "multi_tenant_company",
+        "created_by_multi_tenant_user",
+    )
+
+
+@admin.register(AmazonGtinExemption)
+class AmazonGtinExemptionAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        "product",
+        "view",
+        "multi_tenant_company",
+        "created_by_multi_tenant_user",
     )
