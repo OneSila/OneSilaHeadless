@@ -1,6 +1,7 @@
 import json
 from model_bakery import baker
 from core.tests import TestCase
+from products.models import Product
 from properties.models import (
     Property,
     PropertyTranslation,
@@ -313,6 +314,9 @@ class AmazonVariationThemeTest(DisableWooCommerceSignalsMixin, TestCase, AmazonP
     def setUp(self):
         super().setUp()
         self.prepare_test()
+
+        self.product.type = Product.CONFIGURABLE
+        self.product.save()
 
         # additional size property used for variation matching
         self.size_property = baker.make(

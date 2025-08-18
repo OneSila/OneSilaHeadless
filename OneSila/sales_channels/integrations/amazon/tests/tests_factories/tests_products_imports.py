@@ -282,6 +282,7 @@ class AmazonProductsImportProcessorImportDataTest(TestCase):
                 prepare_mirror_model_class=lambda *args, **kwargs: None,
                 instance=self.product,
                 remote_instance=None,
+                data={},
             )
             MockImportProductInstance.return_value = mock_instance
             MockIssuesFactory.return_value.run.return_value = None
