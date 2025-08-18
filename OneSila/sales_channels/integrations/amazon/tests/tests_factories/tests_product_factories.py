@@ -956,6 +956,13 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             selected_unit="grams",
         )
 
+        AmazonMerchantAsin.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            view=fr_view,
+            asin="ASIN123",
+        )
+
         mock_instance = mock_listings.return_value
         mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
@@ -1401,13 +1408,8 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_missing_ean_or_asin_raises_exception(self, mock_listings, mock_get_client):
         """This test ensures the factory raises ValueError if no EAN/GTIN or ASIN is provided."""
-        ProductProperty.objects.filter(
+        AmazonMerchantAsin.objects.filter(
             product=self.product,
-            property__internal_name="merchant_suggested_asin",
-        ).delete()
-        AmazonProperty.objects.filter(
-            sales_channel=self.sales_channel,
-            code="merchant_suggested_asin",
         ).delete()
 
         EanCode.objects.filter(product=self.product).delete()
@@ -2408,21 +2410,13 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
             multi_tenant_company=self.multi_tenant_company,
         )
         ConfigurableVariation.objects.create(multi_tenant_company=self.multi_tenant_company, parent=self.product, variation=self.child)
-        asin_prop = Property.objects.get(
-            internal_name="merchant_suggested_asin",
+        AmazonMerchantAsin.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-        )
-        pp = ProductProperty.objects.create(
             product=self.child,
-            property=asin_prop,
-            multi_tenant_company=self.multi_tenant_company,
+            view=self.view,
+            asin="ASINCHILD",
         )
-        ProductPropertyTextTranslation.objects.create(
-            product_property=pp,
-            language=self.multi_tenant_company.language,
-            value_text="ASINCHILD",
-            multi_tenant_company=self.multi_tenant_company,
-        )
+
         self.child_remote = AmazonProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
@@ -2533,20 +2527,11 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
             value_select=self.product_type_value,
             multi_tenant_company=self.multi_tenant_company,
         )
-        asin_prop = Property.objects.get(
-            internal_name="merchant_suggested_asin",
+        AmazonMerchantAsin.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-        )
-        pp = ProductProperty.objects.create(
             product=simple,
-            property=asin_prop,
-            multi_tenant_company=self.multi_tenant_company,
-        )
-        ProductPropertyTextTranslation.objects.create(
-            product_property=pp,
-            language=self.multi_tenant_company.language,
-            value_text="ASINSIMPLE",
-            multi_tenant_company=self.multi_tenant_company,
+            view=self.view,
+            asin="ASINSIMPLE",
         )
         simple_remote = AmazonProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,

@@ -27,6 +27,7 @@ from sales_channels.integrations.amazon.tasks import (
 from sales_channels.integrations.amazon.constants import (
     AMAZON_SELECT_VALUE_TRANSLATION_IGNORE_CODES,
 )
+from llm.factories.amazon import AmazonSelectValueTranslationLLM  # noqa: F401
 from imports_exports.signals import import_success
 from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonConfigurableVariationsFactory
 from sales_channels.integrations.amazon.flows.tasks_runner import run_single_amazon_product_task_flow
@@ -120,6 +121,7 @@ def sales_channels__amazon_property_select_value__translate(sender, instance: Am
         instance.translated_remote_name = remote_name
         instance.save(update_fields=['translated_remote_name'])
         return
+
     amazon_translate_select_value_task(instance.id)
 
 

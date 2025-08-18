@@ -213,6 +213,8 @@ class AmazonProductsImportProcessorRulePreserveTest(TestCase):
                 process=lambda: None,
                 prepare_mirror_model_class=lambda *args, **kwargs: None,
                 remote_instance=self.remote_product,
+                data={},
+                instance=self.remote_product.local_instance,
             )
             MockImportProductInstance.return_value = mock_instance
             MockIssuesFactory.return_value.run.return_value = None

@@ -170,44 +170,6 @@ class AmazonSyncFactoriesTest(TestCase):
         rule_item.refresh_from_db()
         self.assertEqual(rule_item.type, ProductPropertiesRuleItem.REQUIRED)
 
-    def test_product_type_asin_sync_creates_required_items(self):
-        asin_local = Property.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            type=Property.TYPES.TEXT,
-            internal_name="merchant_suggested_asin",
-            non_deletable=True,
-        )
-        PropertyTranslation.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            property=asin_local,
-            language=self.multi_tenant_company.language,
-            name="Amazon Asin",
-        )
-        asin_property = AmazonProperty.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            local_instance=asin_local,
-            code="merchant_suggested_asin",
-            type=Property.TYPES.TEXT,
-        )
-        amazon_rule = AmazonProductType.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            local_instance=self.rule,
-            product_type_code="CHAIR",
-        )
-        AmazonProductTypeAsinSyncFactory(amazon_rule).run()
-
-        item = AmazonProductTypeItem.objects.get(
-            amazon_rule=amazon_rule,
-            remote_property=asin_property,
-        )
-        self.assertEqual(item.remote_type, ProductPropertiesRuleItem.REQUIRED)
-        rule_item = ProductPropertiesRuleItem.objects.get(
-            rule=self.rule,
-            property=asin_local,
-        )
-        self.assertEqual(rule_item.type, ProductPropertiesRuleItem.REQUIRED)
 
     def test_property_select_values_sync_maps_duplicates(self):
         remote_property = AmazonProperty.objects.create(
