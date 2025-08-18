@@ -169,8 +169,8 @@ class AmazonSelectValueTranslationReceiverTest(TestCase):
             type=Property.TYPES.SELECT,
         )
 
-    @patch("sales_channels.integrations.amazon.receivers.AmazonSelectValueTranslationLLM.translate", return_value="Red")
-    def test_translate_when_language_diff(self, translate_mock):
+    @patch("sales_channels.integrations.amazon.receivers.amazon_translate_select_value_task")
+    def test_translate_when_language_diff(self, task_mock):
         AmazonRemoteLanguage.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
@@ -188,12 +188,12 @@ class AmazonSelectValueTranslationReceiverTest(TestCase):
             remote_name="Rot",
         )
 
-        translate_mock.assert_called_once()
+        task_mock.assert_called_once_with(val.id)
         val.refresh_from_db()
-        self.assertEqual(val.translated_remote_name, "Red")
+        self.assertIsNone(val.translated_remote_name)
 
-    @patch("sales_channels.integrations.amazon.receivers.AmazonSelectValueTranslationLLM.translate")
-    def test_no_translation_when_language_same(self, translate_mock):
+    @patch("sales_channels.integrations.amazon.receivers.amazon_translate_select_value_task")
+    def test_no_translation_when_language_same(self, task_mock):
         AmazonRemoteLanguage.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
@@ -211,12 +211,12 @@ class AmazonSelectValueTranslationReceiverTest(TestCase):
             remote_name="Red",
         )
 
-        translate_mock.assert_not_called()
+        task_mock.assert_not_called()
         val.refresh_from_db()
         self.assertEqual(val.translated_remote_name, "Red")
 
-    @patch("sales_channels.integrations.amazon.receivers.AmazonSelectValueTranslationLLM.translate")
-    def test_ignored_code_skips_translation(self, translate_mock):
+    @patch("sales_channels.integrations.amazon.receivers.amazon_translate_select_value_task")
+    def test_ignored_code_skips_translation(self, task_mock):
         AmazonRemoteLanguage.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
@@ -237,6 +237,6 @@ class AmazonSelectValueTranslationReceiverTest(TestCase):
             remote_name="Deutschland",
         )
 
-        translate_mock.assert_not_called()
+        task_mock.assert_not_called()
         val.refresh_from_db()
         self.assertEqual(val.translated_remote_name, "Deutschland")
