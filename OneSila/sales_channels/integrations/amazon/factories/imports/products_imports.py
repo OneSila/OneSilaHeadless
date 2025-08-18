@@ -668,12 +668,11 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                     instance.save(update_fields=["imported_url"])
 
     @timeit_and_log(logger)
-    def handle_variations(self, import_instance: ImportProductInstance):
-        theme = import_instance.data.get("__amazon_theme")
-        if not theme:
-            return
-
+    def handle_variations(self, import_instance: ImportProductInstance, view):
         from sales_channels.models.products import RemoteProductConfigurator
+        from sales_channels.integrations.amazon.models import AmazonVariationTheme
+
+        theme = import_instance.data.get("__amazon_theme")
 
         remote_product = import_instance.remote_instance
         if hasattr(remote_product, "configurator"):
@@ -681,14 +680,20 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             configurator.update_if_needed(
                 rule=import_instance.rule,
                 send_sync_signal=False,
-                amazon_theme=theme,
             )
         else:
             RemoteProductConfigurator.objects.create_from_remote_product(
                 remote_product=remote_product,
                 rule=import_instance.rule,
                 variations=None,
-                amazon_theme=theme,
+            )
+
+        if theme and view:
+            AmazonVariationTheme.objects.update_or_create(
+                product=import_instance.instance,
+                view=view,
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                defaults={"theme": theme},
             )
 
     def handle_sales_channels_views(self, import_instance: ImportProductInstance, structured_data, view):
@@ -866,7 +871,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
         if structured['type'] == CONFIGURABLE:
             try:
-                self.handle_variations(instance)
+                self.handle_variations(instance, view)
             except ValueError as e:
                 # if product doesn't have any rule (because it was not mapped and is a new product type)
                 # this will fail here because it need the rule to create the remote configurator

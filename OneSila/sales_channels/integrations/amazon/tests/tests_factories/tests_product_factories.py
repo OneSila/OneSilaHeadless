@@ -17,7 +17,12 @@ from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonSalesChannelView,
     AmazonRemoteLanguage,
 )
-from sales_channels.integrations.amazon.models.products import AmazonProduct, AmazonMerchantAsin
+from sales_channels.integrations.amazon.models.products import (
+    AmazonProduct,
+    AmazonMerchantAsin,
+    AmazonGtinExemption,
+    AmazonVariationTheme,
+)
 from sales_channels.integrations.amazon.models.properties import (
     AmazonProperty,
     AmazonPublicDefinition,
@@ -435,26 +440,6 @@ class AmazonProductTestMixin:
             type=Property.TYPES.FLOAT,
         )
 
-        self.gtin_exemption = baker.make(
-            Property,
-            type=Property.TYPES.BOOLEAN,
-            internal_name="supplier_declared_has_product_identifier_exemption",
-            multi_tenant_company=self.multi_tenant_company,
-        )
-        PropertyTranslation.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            property=self.gtin_exemption,
-            language=self.multi_tenant_company.language,
-            name="GTIN Exemption",
-        )
-        AmazonProperty.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            local_instance=self.gtin_exemption,
-            code="supplier_declared_has_product_identifier_exemption",
-            type=Property.TYPES.BOOLEAN,
-        )
-
         for prop in [
             self.color_property,
             self.battery_cell,
@@ -463,7 +448,6 @@ class AmazonProductTestMixin:
             self.batteries_required,
             self.condition_type,
             self.item_weight,
-            self.gtin_exemption,
         ]:
             ProductPropertiesRuleItem.objects.get_or_create(
                 multi_tenant_company=self.multi_tenant_company,
@@ -1522,10 +1506,10 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             view=self.view,
         ).delete()
 
-        ProductProperty.objects.create(
+        AmazonGtinExemption.objects.create(
             product=self.product,
-            property=self.gtin_exemption,
-            value_boolean=True,
+            view=self.view,
+            value=True,
             multi_tenant_company=self.multi_tenant_company,
         )
 
@@ -2400,10 +2384,15 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
             remote_product=self.remote_product,
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            amazon_theme="COLOR/SIZE",
         )
         self.configurator.properties.set([self.color_property, self.size_property])
         self.remote_product.save()
+        AmazonVariationTheme.objects.create(
+            product=self.product,
+            view=self.view,
+            theme="COLOR/SIZE",
+            multi_tenant_company=self.multi_tenant_company,
+        )
 
         # child product setup
         self.child = baker.make(
@@ -2473,6 +2462,10 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
         self.assertEqual(parent_body["attributes"].get("parentage_level"),
                          [{"value": "parent", "marketplace_id": self.view.remote_id}])
         self.assertNotIn("child_parent_sku_relationship", parent_body["attributes"])
+        self.assertEqual(
+            parent_body["attributes"].get("color_name"),
+            parent_body["attributes"].get("color"),
+        )
 
         self.assertEqual(child_body["attributes"].get("variation_theme"), expected_theme)
         self.assertEqual(child_body["attributes"].get("parentage_level"),
@@ -2484,6 +2477,10 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
                 "marketplace_id": self.view.remote_id,
                 "parent_sku": self.product.sku,  # or 'TESTSKU' if hardcoded
             }]
+        )
+        self.assertEqual(
+            child_body["attributes"].get("color_name"),
+            child_body["attributes"].get("color"),
         )
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
@@ -2518,6 +2515,7 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
         self.assertEqual(attrs.get("variation_theme"), expected_theme)
         self.assertEqual(attrs.get("parentage_level"), expected_parentage)
         self.assertEqual(attrs.get("child_parent_sku_relationship"), expected_rel)
+        self.assertEqual(attrs.get("color_name"), attrs.get("color"))
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])

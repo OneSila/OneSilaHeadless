@@ -552,33 +552,3 @@ class EnsureMerchantSuggestedAsinMixin:
         return remote_property
 
 
-class EnsureGtinExemptionMixin:
-    """Mixin ensuring the supplier_declared_has_product_identifier_exemption property exists."""
-
-    def _ensure_gtin_exemption(self):
-        remote_property, _ = AmazonProperty.objects.get_or_create(
-            allow_multiple=True,
-            multi_tenant_company=self.sales_channel.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            code="supplier_declared_has_product_identifier_exemption",
-            defaults={"type": Property.TYPES.BOOLEAN},
-        )
-
-        if not remote_property.local_instance:
-            local_property, _ = Property.objects.get_or_create(
-                internal_name="supplier_declared_has_product_identifier_exemption",
-                multi_tenant_company=self.sales_channel.multi_tenant_company,
-                defaults={"type": Property.TYPES.BOOLEAN},
-            )
-
-            PropertyTranslation.objects.get_or_create(
-                property=local_property,
-                language=self.sales_channel.multi_tenant_company.language,
-                multi_tenant_company=self.sales_channel.multi_tenant_company,
-                defaults={"name": "GTIN Exemption"},
-            )
-
-            remote_property.local_instance = local_property
-            remote_property.save()
-
-        return remote_property

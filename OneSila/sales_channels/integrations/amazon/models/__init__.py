@@ -2,7 +2,8 @@ from .orders import AmazonOrder, AmazonOrderItem
 from .products import (
     AmazonProduct, AmazonInventory, AmazonPrice,
     AmazonProductContent, AmazonImageProductAssociation,
-    AmazonCategory, AmazonEanCode, AmazonMerchantAsin
+    AmazonCategory, AmazonEanCode, AmazonMerchantAsin,
+    AmazonGtinExemption, AmazonVariationTheme
 )
 from .properties import (
     AmazonProperty, AmazonPropertySelectValue, AmazonProductProperty, AmazonProductType, AmazonProductTypeItem
