@@ -1,5 +1,6 @@
 from core import models
 from core.helpers import ensure_serializable
+from django.core.exceptions import ValidationError
 from sales_channels.models.products import (
     RemoteProduct,
     RemoteInventory,
@@ -13,13 +14,6 @@ from sales_channels.models.products import (
 
 class AmazonProduct(RemoteProduct):
     """Amazon specific remote product."""
-
-    asin = models.CharField(
-        max_length=32,
-        null=True,
-        blank=True,
-        help_text="ASIN identifier for the product.",
-    )
 
     # keep track of which marketplace listings have been created
     created_marketplaces = models.JSONField(
@@ -124,3 +118,99 @@ class AmazonEanCode(RemoteEanCode):
     class Meta:
         verbose_name = 'Amazon EAN Code'
         verbose_name_plural = 'Amazon EAN Codes'
+
+
+class AmazonMerchantAsin(models.Model):
+    """Store merchant-provided ASIN per marketplace."""
+
+    product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.CASCADE,
+        related_name='amazon_merchant_asins',
+        help_text='The product this ASIN belongs to.',
+    )
+    view = models.ForeignKey(
+        'amazon.AmazonSalesChannelView',
+        on_delete=models.CASCADE,
+        related_name='product_asins',
+        help_text='Marketplace for this ASIN.',
+    )
+    asin = models.CharField(max_length=32)
+
+    class Meta:
+        unique_together = ("product", "view")
+        verbose_name = 'Amazon Merchant ASIN'
+        verbose_name_plural = 'Amazon Merchant ASINs'
+
+
+class AmazonGtinExemption(models.Model):
+    """Store GTIN exemption flag per marketplace."""
+
+    product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.CASCADE,
+        related_name='amazon_gtin_exemptions',
+        help_text='The product this exemption belongs to.',
+    )
+    view = models.ForeignKey(
+        'amazon.AmazonSalesChannelView',
+        on_delete=models.CASCADE,
+        related_name='product_gtin_exemptions',
+        help_text='Marketplace for this exemption.',
+    )
+    value = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ("product", "view")
+        verbose_name = 'Amazon GTIN Exemption'
+        verbose_name_plural = 'Amazon GTIN Exemptions'
+
+
+class AmazonVariationTheme(models.Model):
+    """Store variation theme per marketplace."""
+
+    product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.CASCADE,
+        related_name='amazon_variation_themes',
+        help_text='The product this variation theme belongs to.',
+    )
+    view = models.ForeignKey(
+        'amazon.AmazonSalesChannelView',
+        on_delete=models.CASCADE,
+        related_name='product_variation_themes',
+        help_text='Marketplace for this variation theme.',
+    )
+    theme = models.CharField(max_length=64)
+
+    class Meta:
+        unique_together = ("product", "view")
+        verbose_name = 'Amazon Variation Theme'
+        verbose_name_plural = 'Amazon Variation Themes'
+
+    def clean(self):
+        from products.models import Product as LocalProduct
+        from sales_channels.integrations.amazon.models import AmazonProductType
+
+        if self.product.type != LocalProduct.CONFIGURABLE:
+            raise ValidationError("Variation themes are only allowed for configurable products.")
+
+        rule = self.product.get_product_rule()
+        if rule is None:
+            raise ValidationError("Product type not set.")
+
+        try:
+            remote_rule = AmazonProductType.objects.get(
+                local_instance=rule,
+                sales_channel=self.view.sales_channel,
+            )
+        except AmazonProductType.DoesNotExist as e:
+            raise ValidationError("Amazon product type not found.") from e
+
+        themes = remote_rule.variation_themes or []
+        if self.theme not in themes:
+            raise ValidationError("Invalid variation theme for product type.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)

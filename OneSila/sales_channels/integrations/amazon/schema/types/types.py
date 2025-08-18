@@ -15,6 +15,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonProduct,
+    AmazonProductProperty,
     AmazonProductType,
     AmazonProductTypeItem,
     AmazonSalesChannelImport,
@@ -22,27 +23,33 @@ from sales_channels.integrations.amazon.models import (
     AmazonRemoteLog,
     AmazonSalesChannelView,
     AmazonProductIssue,
+    AmazonBrowseNode,
+    AmazonProductBrowseNode,
 )
 from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelFilter,
     AmazonPropertyFilter,
     AmazonPropertySelectValueFilter,
     AmazonProductFilter,
+    AmazonProductPropertyFilter,
     AmazonProductTypeFilter,
     AmazonProductTypeItemFilter,
     AmazonSalesChannelImportFilter, AmazonDefaultUnitConfiguratorFilter,
     AmazonRemoteLogFilter, AmazonSalesChannelViewFilter, AmazonProductIssueFilter,
+    AmazonBrowseNodeFilter, AmazonProductBrowseNodeFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
     AmazonPropertyOrder,
     AmazonPropertySelectValueOrder,
     AmazonProductOrder,
+    AmazonProductPropertyOrder,
     AmazonProductTypeOrder,
     AmazonProductTypeItemOrder,
     AmazonSalesChannelImportOrder,
     AmazonDefaultUnitConfiguratorOrder,
     AmazonRemoteLogOrder, AmazonSalesChannelViewOrder, AmazonProductIssueOrder,
+    AmazonBrowseNodeOrder, AmazonProductBrowseNodeOrder,
 )
 from sales_channels.schema.types.types import FormattedIssueType
 
@@ -255,6 +262,36 @@ class AmazonProductType(relay.Node, GetQuerysetMultiTenantMixin):
 
 
 @type(
+    AmazonProductProperty,
+    filters=AmazonProductPropertyFilter,
+    order=AmazonProductPropertyOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonProductPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'ProductPropertyType',
+        lazy("properties.schema.types.types")
+    ]]
+    remote_product: Annotated[
+        'AmazonProductType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    remote_select_value: Optional[Annotated[
+        'AmazonPropertySelectValueType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]]
+    remote_select_values: List[Annotated[
+        'AmazonPropertySelectValueType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]]
+
+
+@type(
     AmazonRemoteLog,
     filters=AmazonRemoteLogFilter,
     order=AmazonRemoteLogOrder,
@@ -313,6 +350,39 @@ class AmazonProductIssueType(relay.Node, GetQuerysetMultiTenantMixin):
         lazy("sales_channels.schema.types.types")
     ]
     view: Annotated[
+        'AmazonSalesChannelViewType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+
+
+@type(
+    AmazonBrowseNode,
+    filters=AmazonBrowseNodeFilter,
+    order=AmazonBrowseNodeOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonBrowseNodeType(relay.Node):
+    pass
+
+
+@type(
+    AmazonProductBrowseNode,
+    filters=AmazonProductBrowseNodeFilter,
+    order=AmazonProductBrowseNodeOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonProductBrowseNodeType(relay.Node, GetQuerysetMultiTenantMixin):
+    product: Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    sales_channel_view: Annotated[
         'AmazonSalesChannelViewType',
         lazy("sales_channels.integrations.amazon.schema.types.types")
     ]

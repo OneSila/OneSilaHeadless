@@ -45,6 +45,7 @@ class MediaManager(MultiTenantManager):
         and an image file is provided, we compute its hash and check for an existing record.
         Otherwise, we fall back to the normal create behavior.
         """
+
         # Only apply deduplication if we're dealing with an image.
         if kwargs.get('type') != self.model.IMAGE or 'image' not in kwargs:
             return super().create(*args, **kwargs)
@@ -112,6 +113,15 @@ class ImageManager(MediaManager):
         kwargs.setdefault('type', self.model.IMAGE)
         return super().create(*args, **kwargs)
 
+    def get_or_create(self, defaults=None, **kwargs):
+        kwargs.setdefault("type", self.model.IMAGE)
+
+        # prevent accidental override from defaults
+        if defaults and "type" in defaults and defaults["type"] != self.model.IMAGE:
+            defaults = dict(defaults)
+            defaults["type"] = self.model.IMAGE
+        return super().get_or_create(defaults=defaults, **kwargs)
+
 
 class VideoQuerySet(MediaQuerySet, QuerySetProxyModelMixin):
     pass
@@ -125,6 +135,14 @@ class VideoManager(MediaManager):
         kwargs.setdefault('type', self.model.VIDEO)
         return super().create(*args, **kwargs)
 
+    def get_or_create(self, defaults=None, **kwargs):
+        kwargs.setdefault("type", self.model.VIDEO)
+        # prevent accidental override from defaults
+        if defaults and "type" in defaults and defaults["type"] != self.model.VIDEO:
+            defaults = dict(defaults)
+            defaults["type"] = self.model.VIDEO
+        return super().get_or_create(defaults=defaults, **kwargs)
+
 
 class FileQuerySet(MediaQuerySet, QuerySetProxyModelMixin):
     pass
@@ -137,3 +155,11 @@ class FileManager(MediaManager):
     def create(self, *args, **kwargs):
         kwargs.setdefault('type', self.model.FILE)
         return super().create(*args, **kwargs)
+
+    def get_or_create(self, defaults=None, **kwargs):
+        kwargs.setdefault("type", self.model.FILE)
+        # prevent accidental override from defaults
+        if defaults and "type" in defaults and defaults["type"] != self.model.FILE:
+            defaults = dict(defaults)
+            defaults["type"] = self.model.FILE
+        return super().get_or_create(defaults=defaults, **kwargs)

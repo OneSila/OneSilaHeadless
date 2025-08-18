@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from core.tests import TestCase
 from imports_exports.models import Import
+from imports_exports.factories.products import ImportProductInstance
 from model_bakery import baker
 from properties.models import (
     ProductProperty,
@@ -17,6 +18,8 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonSalesChannelView,
     AmazonImportData,
+    AmazonGtinExemption,
+    AmazonProductBrowseNode,
 )
 
 
@@ -210,6 +213,8 @@ class AmazonProductsImportProcessorRulePreserveTest(TestCase):
                 process=lambda: None,
                 prepare_mirror_model_class=lambda *args, **kwargs: None,
                 remote_instance=self.remote_product,
+                data={},
+                instance=self.remote_product.local_instance,
             )
             MockImportProductInstance.return_value = mock_instance
             MockIssuesFactory.return_value.run.return_value = None
@@ -277,6 +282,7 @@ class AmazonProductsImportProcessorImportDataTest(TestCase):
                 prepare_mirror_model_class=lambda *args, **kwargs: None,
                 instance=self.product,
                 remote_instance=None,
+                data={},
             )
             MockImportProductInstance.return_value = mock_instance
             MockIssuesFactory.return_value.run.return_value = None
@@ -289,3 +295,169 @@ class AmazonProductsImportProcessorImportDataTest(TestCase):
         self.assertEqual(saved.product, self.product)
         self.assertEqual(saved.view, self.view)
         self.assertEqual(saved.data["sku"], "SKU123")
+
+
+class AmazonProductsImportProcessorBrowseNodeGtinTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="GB",
+        )
+        self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+    def test_extracts_browse_node_and_gtin_exemption(self):
+        product_data = {
+            "sku": "SKU123",
+            "attributes": {
+                "item_name": [{"value": "Name"}],
+                "recommended_browse_nodes": [{"value": "BN1"}],
+                "supplier_declared_has_product_identifier_exemption": [{"value": True}],
+            },
+            "summaries": [
+                {
+                    "item_name": "Name",
+                    "asin": "ASIN1",
+                    "marketplace_id": "GB",
+                    "status": ["BUYABLE"],
+                    "product_type": "TYPE",
+                }
+            ],
+        }
+        with patch.object(AmazonProductsImportProcessor, "get_api", return_value=None), \
+                patch.object(AmazonProductsImportProcessor, "_parse_images", return_value=[]), \
+                patch.object(AmazonProductsImportProcessor, "_parse_prices", return_value=([], [])), \
+                patch.object(AmazonProductsImportProcessor, "_parse_attributes", return_value=([], {})), \
+                patch.object(AmazonProductsImportProcessor, "_fetch_catalog_attributes", return_value=None):
+            processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+            structured, _, _ = processor.get__product_data(product_data, False)
+
+        self.assertTrue(structured["__gtin_exemption"])
+        self.assertEqual(structured["__recommended_browse_node_id"], "BN1")
+
+    def test_handlers_persist_models(self):
+        product = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+            type="SIMPLE",
+        )
+        data = {
+            "name": "Name",
+            "sku": "SKU123",
+            "type": "SIMPLE",
+            "__gtin_exemption": True,
+            "__recommended_browse_node_id": "BN1",
+        }
+        import_instance = ImportProductInstance(
+            data,
+            import_process=self.import_process,
+            instance=product,
+            sales_channel=self.sales_channel,
+        )
+        processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+
+        processor.handle_gtin_exemption(import_instance, self.view)
+        processor.handle_product_browse_node(import_instance, self.view)
+
+        self.assertTrue(
+            AmazonGtinExemption.objects.filter(
+                product=product, view=self.view, value=True
+            ).exists()
+        )
+        self.assertTrue(
+            AmazonProductBrowseNode.objects.filter(
+                product=product,
+                sales_channel=self.sales_channel,
+                sales_channel_view=self.view,
+                recommended_browse_node_id="BN1",
+            ).exists()
+        )
+
+
+class AmazonProductsImportProcessorUpdateOnlyTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="GB",
+        )
+        self.import_process = Import.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+    def test_non_configurable_product_update_only(self):
+        product_data = {"sku": "SKU123"}
+        structured = {
+            "name": "Name",
+            "sku": "SKU123",
+            "__asin": "ASIN1",
+            "type": "SIMPLE",
+        }
+
+        with patch.object(
+            AmazonProductsImportProcessor,
+            "get__product_data",
+            return_value=(structured, None, self.view),
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "update_remote_product",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_ean_code",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_attributes",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_translations",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_prices",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_images",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_sales_channels_views",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_gtin_exemption",
+        ), patch.object(
+            AmazonProductsImportProcessor,
+            "handle_product_browse_node",
+        ), patch(
+            "sales_channels.integrations.amazon.factories.imports.products_imports.FetchRemoteIssuesFactory"
+        ) as MockIssuesFactory, patch(
+            "sales_channels.integrations.amazon.factories.imports.products_imports.ImportProductInstance"
+        ) as MockImportProductInstance, patch(
+            "sales_channels.integrations.amazon.factories.imports.products_imports.get_is_product_variation",
+            return_value=(False, None),
+        ):
+            from types import SimpleNamespace
+
+            mock_instance = SimpleNamespace(
+                process=lambda: None,
+                prepare_mirror_model_class=lambda *args, **kwargs: None,
+                update_only=False,
+                remote_instance=None,
+                instance=None,
+            )
+            MockImportProductInstance.return_value = mock_instance
+            MockIssuesFactory.return_value.run.return_value = None
+
+            processor = AmazonProductsImportProcessor(
+                self.import_process, self.sales_channel
+            )
+            processor.process_product_item(product_data)
+
+            self.assertTrue(mock_instance.update_only)

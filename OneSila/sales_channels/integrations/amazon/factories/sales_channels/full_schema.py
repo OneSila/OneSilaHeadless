@@ -5,8 +5,6 @@ from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERT
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.factories.mixins import (
     GetAmazonAPIMixin,
-    EnsureMerchantSuggestedAsinMixin,
-    EnsureGtinExemptionMixin,
 )
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannelView,
@@ -403,15 +401,11 @@ class DefaultUnitConfiguratorFactory:
 
 class AmazonProductTypeRuleFactory(
     GetAmazonAPIMixin,
-    EnsureMerchantSuggestedAsinMixin,
-    EnsureGtinExemptionMixin,
 ):
     def __init__(
         self,
         product_type_code,
         sales_channel,
-        merchant_asin_property=None,
-        gtin_exemption_property=None,
         api=None,
         language=None,
     ):
@@ -421,16 +415,6 @@ class AmazonProductTypeRuleFactory(
         self.multi_tenant_company = sales_channel.multi_tenant_company
         self.product_type = self.get_or_create_product_type()
         self.sales_channel_views = AmazonSalesChannelView.objects.filter(sales_channel=sales_channel).order_by('-is_default')
-
-        if merchant_asin_property is None:
-            self.merchant_asin_property = self._ensure_merchant_suggested_asin()
-        else:
-            self.merchant_asin_property = merchant_asin_property
-
-        if gtin_exemption_property is None:
-            self.gtin_exemption_property = self._ensure_gtin_exemption()
-        else:
-            self.gtin_exemption_property = gtin_exemption_property
 
         if api is None:
             self.api = self.get_api()
@@ -497,54 +481,6 @@ class AmazonProductTypeRuleFactory(
             schema_data["title"] = response.display_name
 
         return schema_data, offer_property_keys
-
-    def ensure_asin_item(self):
-
-        if not self.merchant_asin_property:
-            return
-
-        item, created = AmazonProductTypeItem.objects.get_or_create(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            amazon_rule=self.product_type,
-            remote_property=self.merchant_asin_property,
-        )
-
-        if created or item.remote_type != ProductPropertiesRuleItem.REQUIRED:
-            item.remote_type = ProductPropertiesRuleItem.REQUIRED
-            item.save()
-
-        if (
-                self.product_type.local_instance
-                and self.merchant_asin_property.local_instance
-        ):
-            rule = self.product_type.local_instance
-            max_sort = rule.items.aggregate(max_sort=Max("sort_order")).get("max_sort") or 0
-            rule_item, created_local = ProductPropertiesRuleItem.objects.get_or_create(
-                multi_tenant_company=rule.multi_tenant_company,
-                rule=rule,
-                property=self.merchant_asin_property.local_instance,
-                defaults={
-                    "type": ProductPropertiesRuleItem.REQUIRED,
-                    "sort_order": max_sort + 1,
-                },
-            )
-            if not created_local and rule_item.type != ProductPropertiesRuleItem.REQUIRED:
-                rule_item.type = ProductPropertiesRuleItem.REQUIRED
-                rule_item.save(update_fields=["type"])
-
-    def ensure_gtin_exemption_item(self):
-
-        if not self.gtin_exemption_property:
-            return
-
-        AmazonProductTypeItem.objects.get_or_create(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            amazon_rule=self.product_type,
-            remote_property=self.gtin_exemption_property,
-            defaults={"remote_type": ProductPropertiesRuleItem.OPTIONAL},
-        )
 
     def process_views(self):
 
@@ -789,6 +725,4 @@ class AmazonProductTypeRuleFactory(
         self.create_default_unit_configurator(public_definition, view, is_default)
 
     def run(self):
-        self.ensure_asin_item()
-        self.ensure_gtin_exemption_item()
         self.process_views()

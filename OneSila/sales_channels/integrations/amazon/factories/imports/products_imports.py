@@ -10,7 +10,7 @@ from core.mixins import TemporaryDisableInspectorSignalsMixin
 from imports_exports.factories.products import ImportProductInstance
 from products.models import Product
 from products.product_types import SIMPLE, CONFIGURABLE
-from properties.models import Property, PropertyTranslation
+from properties.models import Property
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from spapi import CatalogApi
@@ -466,22 +466,6 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             for k, v in extra_map.items():
                 if k not in mirror_map:
                     mirror_map[k] = v
-        asin_property = Property.objects.filter(
-            internal_name="merchant_suggested_asin",
-            multi_tenant_company=self.sales_channel.multi_tenant_company,
-        ).first()
-        if asin_property and asin:
-            attributes.append({
-                "property": asin_property,
-                "value": asin,
-                "translations": [
-                    {
-                        "language": self.sales_channel.multi_tenant_company.language,
-                        "value": asin,
-                    }
-                ],
-            })
-
         if attributes:
             structured["properties"] = attributes
             structured["__mirror_product_properties_map"] = mirror_map
@@ -495,6 +479,27 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         if amazon_theme:
             structured["__amazon_theme"] = amazon_theme
 
+        gtin_exemption = extract_amazon_attribute_value(
+            product_attrs, "supplier_declared_has_product_identifier_exemption"
+        )
+        if gtin_exemption is not None:
+            structured["__gtin_exemption"] = bool(gtin_exemption)
+
+        browse_nodes = product_attrs.get("recommended_browse_nodes")
+        if not browse_nodes:
+            browse_nodes = product_data.get("recommended_browse_nodes")
+
+        if browse_nodes:
+            first_node = browse_nodes[0] if isinstance(browse_nodes, list) else browse_nodes
+            browse_node_id = None
+            if isinstance(first_node, dict):
+                browse_node_id = first_node.get("value") or first_node.get("id")
+            elif isinstance(first_node, (str, int)):
+                browse_node_id = first_node
+
+            if browse_node_id:
+                structured["__recommended_browse_node_id"] = browse_node_id
+
         structured["__asin"] = asin
         structured["__marketplace_id"] = marketplace_id
 
@@ -505,19 +510,25 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             mirror_model_class=AmazonProduct,
             sales_channel=self.sales_channel,
             mirror_model_map={"local_instance": "*"},
-            mirror_model_defaults={"asin": instance.data.get("__asin")},
         )
 
     def update_remote_product(self, import_instance: ImportProductInstance, product, view, is_variation: bool):
         remote_product = import_instance.remote_instance
         asin = import_instance.data.get("__asin")
 
-        if asin and not remote_product.remote_id:
-            remote_product.remote_id = asin
-
         sku = product.get("sku")
         if sku and not remote_product.remote_sku:
             remote_product.remote_sku = sku
+
+        if asin and view:
+            from sales_channels.integrations.amazon.models import AmazonMerchantAsin
+
+            AmazonMerchantAsin.objects.update_or_create(
+                product=remote_product.local_instance,
+                view=view,
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                defaults={"asin": asin},
+            )
 
         if remote_product.syncing_current_percentage != 100:
             remote_product.syncing_current_percentage = 100
@@ -678,12 +689,11 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                     instance.save(update_fields=["imported_url"])
 
     @timeit_and_log(logger)
-    def handle_variations(self, import_instance: ImportProductInstance):
-        theme = import_instance.data.get("__amazon_theme")
-        if not theme:
-            return
-
+    def handle_variations(self, import_instance: ImportProductInstance, view):
         from sales_channels.models.products import RemoteProductConfigurator
+        from sales_channels.integrations.amazon.models import AmazonVariationTheme
+
+        theme = import_instance.data.get("__amazon_theme")
 
         remote_product = import_instance.remote_instance
         if hasattr(remote_product, "configurator"):
@@ -691,15 +701,68 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             configurator.update_if_needed(
                 rule=import_instance.rule,
                 send_sync_signal=False,
-                amazon_theme=theme,
             )
         else:
             RemoteProductConfigurator.objects.create_from_remote_product(
                 remote_product=remote_product,
                 rule=import_instance.rule,
                 variations=None,
-                amazon_theme=theme,
             )
+
+        if theme and view:
+            AmazonVariationTheme.objects.update_or_create(
+                product=import_instance.instance,
+                view=view,
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                defaults={"theme": theme},
+            )
+
+    @timeit_and_log(logger)
+    def handle_gtin_exemption(self, import_instance: ImportProductInstance, view):
+        from sales_channels.integrations.amazon.models import AmazonGtinExemption
+
+        if not view:
+            return
+
+        exemption = import_instance.data.get("__gtin_exemption")
+        if exemption is None:
+            AmazonGtinExemption.objects.filter(
+                product=import_instance.instance,
+                view=view,
+                multi_tenant_company=self.import_process.multi_tenant_company,
+            ).delete()
+            return
+
+        AmazonGtinExemption.objects.update_or_create(
+            product=import_instance.instance,
+            view=view,
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            defaults={"value": bool(exemption)},
+        )
+
+    @timeit_and_log(logger)
+    def handle_product_browse_node(self, import_instance: ImportProductInstance, view):
+        from sales_channels.integrations.amazon.models import AmazonProductBrowseNode
+
+        if not view:
+            return
+
+        node_id = import_instance.data.get("__recommended_browse_node_id")
+        if node_id:
+            AmazonProductBrowseNode.objects.update_or_create(
+                product=import_instance.instance,
+                sales_channel=self.sales_channel,
+                sales_channel_view=view,
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                defaults={"recommended_browse_node_id": node_id},
+            )
+        else:
+            AmazonProductBrowseNode.objects.filter(
+                product=import_instance.instance,
+                sales_channel=self.sales_channel,
+                sales_channel_view=view,
+                multi_tenant_company=self.import_process.multi_tenant_company,
+            ).delete()
 
     def handle_sales_channels_views(self, import_instance: ImportProductInstance, structured_data, view):
         if not view:
@@ -814,13 +877,14 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             update_current_rule=True
         )
 
+        if structured.get("type") != CONFIGURABLE:
+            instance.update_only = True
+
         instance.prepare_mirror_model_class(
             mirror_model_class=AmazonProduct,
             sales_channel=self.sales_channel,
             mirror_model_map={"local_instance": "*"},
             mirror_model_defaults={
-                "remote_id": structured["__asin"],
-                "asin": structured["__asin"],
                 "remote_sku": structured["sku"],
                 "is_variation": is_variation,
             },
@@ -830,11 +894,6 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         try:
             instance.process()
         except IntegrityError as e:
-            # because we have this:
-            # "remote_id": structured["__asin"],
-            # "asin": structured["__asin"],
-            # in the mirror_model_defaults it will try to create the mirror model with another asin
-            # this is not possible so we will add it as a broken recored instead
             self._add_broken_record(
                 code=self.ERROR_MULTIPLE_ASIN,
                 message="Multiple ASINs for SKU",
@@ -883,7 +942,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
         if structured['type'] == CONFIGURABLE:
             try:
-                self.handle_variations(instance)
+                self.handle_variations(instance, view)
             except ValueError as e:
                 # if product doesn't have any rule (because it was not mapped and is a new product type)
                 # this will fail here because it need the rule to create the remote configurator
@@ -897,6 +956,9 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
         if not is_variation:
             self.handle_sales_channels_views(instance, structured, view)
+
+        self.handle_gtin_exemption(instance, view)
+        self.handle_product_browse_node(instance, view)
 
         FetchRemoteIssuesFactory(
             remote_product=instance.remote_instance,

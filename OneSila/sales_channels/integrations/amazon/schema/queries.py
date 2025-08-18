@@ -4,6 +4,7 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonPropertyType,
     AmazonPropertySelectValueType,
     AmazonProductType,
+    AmazonProductPropertyType,
     AmazonProductTypeType,
     AmazonProductTypeItemType,
     AmazonSalesChannelImportType,
@@ -11,6 +12,8 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonRemoteLogType,
     AmazonSalesChannelViewType,
     AmazonProductIssueType,
+    AmazonBrowseNodeType,
+    AmazonProductBrowseNodeType,
 )
 
 
@@ -24,6 +27,9 @@ class AmazonSalesChannelsQuery:
 
     amazon_property_select_value: AmazonPropertySelectValueType = node()
     amazon_property_select_values: DjangoListConnection[AmazonPropertySelectValueType] = connection()
+
+    amazon_product_property: AmazonProductPropertyType = node()
+    amazon_product_properties: DjangoListConnection[AmazonProductPropertyType] = connection()
 
     amazon_product: AmazonProductType = node()
     amazon_products: DjangoListConnection[AmazonProductType] = connection()
@@ -48,3 +54,9 @@ class AmazonSalesChannelsQuery:
 
     amazon_channel_view: AmazonSalesChannelViewType = node()
     amazon_channel_views: DjangoListConnection[AmazonSalesChannelViewType] = connection()
+
+    amazon_browse_node: AmazonBrowseNodeType = node()
+    amazon_browse_nodes: DjangoListConnection[AmazonBrowseNodeType] = connection()
+
+    amazon_product_browse_node: AmazonProductBrowseNodeType = node()
+    amazon_product_browse_nodes: DjangoListConnection[AmazonProductBrowseNodeType] = connection()

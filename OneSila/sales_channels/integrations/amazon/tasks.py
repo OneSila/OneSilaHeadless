@@ -156,3 +156,12 @@ def refresh_amazon_product_issues_cronjob():
         for view in views:
             fac = FetchRemoteIssuesFactory(remote_product=product, view=view)
             fac.run()
+
+
+@db_periodic_task(crontab(minute='0', hour='0', day='1'))
+def refresh_amazon_browse_nodes_cronjob():
+    """Refresh Amazon browse nodes for all marketplaces once a month."""
+    from .factories.recommended_browse_nodes import AmazonBrowseNodeRefreshFactory
+
+    fac = AmazonBrowseNodeRefreshFactory()
+    fac.run()

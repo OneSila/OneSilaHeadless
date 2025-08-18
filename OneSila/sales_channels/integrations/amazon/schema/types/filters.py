@@ -12,17 +12,22 @@ from sales_channels.integrations.amazon.models import (
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonProduct,
+    AmazonProductProperty,
     AmazonProductType,
-    AmazonSalesChannelImport, AmazonProductTypeItem,
+    AmazonSalesChannelImport,
+    AmazonProductTypeItem,
     AmazonDefaultUnitConfigurator,
     AmazonRemoteLog,
     AmazonProductIssue,
+    AmazonBrowseNode,
+    AmazonProductBrowseNode,
 )
 from properties.schema.types.filters import (
     PropertyFilter,
     PropertySelectValueFilter,
     ProductPropertiesRuleFilter,
     ProductPropertiesRuleItemFilter,
+    ProductPropertyFilter,
 )
 from products.schema.types.filters import ProductFilter
 from sales_channels.schema.types.filters import (
@@ -131,6 +136,15 @@ class AmazonProductFilter(SearchFilterMixin):
     local_instance: Optional[ProductFilter]
 
 
+@filter(AmazonProductProperty)
+class AmazonProductPropertyFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: Optional[ProductPropertyFilter]
+    remote_select_value: Optional[AmazonPropertySelectValueFilter]
+    remote_product: Optional[AmazonProductFilter]
+
+
 @filter(AmazonSalesChannelImport)
 class AmazonSalesChannelImportFilter(SearchFilterMixin):
     id: auto
@@ -164,3 +178,22 @@ class AmazonProductIssueFilter(SearchFilterMixin):
     id: auto
     view: Optional[SalesChannelViewFilter]
     remote_product: Optional[RemoteProductFilter]
+
+
+@filter(AmazonBrowseNode)
+class AmazonBrowseNodeFilter(SearchFilterMixin):
+    remote_id: auto
+    marketplace_id: auto
+    name: auto
+    context_name: auto
+    path_depth: auto
+    is_root: auto
+
+
+@filter(AmazonProductBrowseNode)
+class AmazonProductBrowseNodeFilter(SearchFilterMixin):
+    id: auto
+    product: Optional[ProductFilter]
+    sales_channel: Optional[SalesChannelFilter]
+    sales_channel_view: Optional[SalesChannelViewFilter]
+    recommended_browse_node_id: auto

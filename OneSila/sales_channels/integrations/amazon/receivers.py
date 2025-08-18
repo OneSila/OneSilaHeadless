@@ -1,5 +1,6 @@
 from core.receivers import receiver
 from core.signals import post_create, post_update
+from django.db.models.signals import post_delete
 from sales_channels.signals import (
     refresh_website_pull_models,
     sales_channel_created,
@@ -14,7 +15,6 @@ from sales_channels.integrations.amazon.models import (
 )
 from sales_channels.integrations.amazon.factories.sync.rule_sync import (
     AmazonPropertyRuleItemSyncFactory,
-    AmazonProductTypeAsinSyncFactory,
 )
 from sales_channels.integrations.amazon.factories.sync.select_value_sync import (
     AmazonPropertySelectValuesSyncFactory,
@@ -27,6 +27,7 @@ from sales_channels.integrations.amazon.tasks import (
 from sales_channels.integrations.amazon.constants import (
     AMAZON_SELECT_VALUE_TRANSLATION_IGNORE_CODES,
 )
+from llm.factories.amazon import AmazonSelectValueTranslationLLM  # noqa: F401
 from imports_exports.signals import import_success
 from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonConfigurableVariationsFactory
 from sales_channels.integrations.amazon.flows.tasks_runner import run_single_amazon_product_task_flow
@@ -120,6 +121,7 @@ def sales_channels__amazon_property_select_value__translate(sender, instance: Am
         instance.translated_remote_name = remote_name
         instance.save(update_fields=['translated_remote_name'])
         return
+
     amazon_translate_select_value_task(instance.id)
 
 
@@ -132,17 +134,6 @@ def sales_channels__amazon_property_select_value__auto_import(sender, instance: 
     from sales_channels.integrations.amazon.tasks import amazon_auto_import_select_value_task
 
     amazon_auto_import_select_value_task(instance.id)
-
-
-@receiver(post_create, sender='amazon.AmazonProductType')
-@receiver(post_update, sender='amazon.AmazonProductType')
-def sales_channels__amazon_product_type__ensure_asin(sender, instance, **kwargs):
-    signal = kwargs.get('signal')
-    if signal == post_update and not instance.is_dirty_field('local_instance', check_relationship=True):
-        return
-
-    sync_factory = AmazonProductTypeAsinSyncFactory(instance)
-    sync_factory.run()
 
 
 @receiver(post_update, sender="amazon.AmazonProductType")
@@ -178,3 +169,13 @@ def amazon__product__manual_sync(sender, instance, view, force_validation_only=F
         remote_product_id=instance.id,
         force_validation_only=force_validation_only,
     )
+
+
+@receiver(post_update, sender="properties.ProductProperty")
+@receiver(post_delete, sender="properties.ProductProperty")
+def amazon__product_type_changed_clear_variation_theme(sender, instance, **kwargs):
+    if not instance.property.is_product_type:
+        return
+    from sales_channels.integrations.amazon.models import AmazonVariationTheme
+
+    AmazonVariationTheme.objects.filter(product=instance.product).delete()
