@@ -826,7 +826,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
         # if on the main marketplaces was configurable because the other doesn't have relationships
         # will return SIMPLE as default which is wrong
-        if remote_product:
+        if remote_product and  remote_product.local_instance:
             structured['type'] = remote_product.local_instance.type
 
         missing_data = (

@@ -1,4 +1,6 @@
 from django.contrib import admin
+
+from core.admin import ModelAdmin
 from sales_channels.admin import SalesChannelRemoteAdmin, SalesChannelRemoteProductAdmin
 from polymorphic.admin import PolymorphicChildModelAdmin
 from sales_channels.integrations.amazon.models import (
@@ -25,7 +27,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductBrowseNode,
     AmazonMerchantAsin,
     AmazonVariationTheme,
-    AmazonGtinExemption,
+    AmazonGtinExemption, AmazonBrowseNode,
 )
 from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
 from django.contrib import admin

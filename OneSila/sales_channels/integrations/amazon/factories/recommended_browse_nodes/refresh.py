@@ -10,7 +10,7 @@ class AmazonBrowseNodeRefreshFactory:
 
     def run(self):
         views = (
-            AmazonSalesChannelView.objects.filter(remote_id__isnull=False)
+            AmazonSalesChannelView.objects.filter(remote_id__isnull=False, sales_channel__active=True)
             .select_related("sales_channel")
             .order_by("remote_id")
         )
