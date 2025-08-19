@@ -164,13 +164,28 @@ class CodeFilter(admin.SimpleListFilter):
 
 @admin.register(AmazonImportBrokenRecord)
 class AmazonImportBrokenRecordAdmin(admin.ModelAdmin):
-    list_display = ("import_process", "code")
+    list_display = ("import_process", "sku", "code")
     raw_id_fields = ("import_process",)
     list_filter = (CodeFilter,)
     search_fields = ("record__code",)
 
     readonly_fields = ["formatted_broken_record"]
     exclude = ("record",)
+
+    def sku(self, instance):
+        if not instance.record:
+            return "-"
+        data = instance.record.get("data", {}) or {}
+        if isinstance(data, dict):
+            sku = data.get("sku")
+            if sku:
+                return sku
+        context = instance.record.get("context", {}) or {}
+        if isinstance(context, dict):
+            sku = context.get("sku")
+            if sku:
+                return sku
+        return "-"
 
     def code(self, instance):
         if not instance.record:
