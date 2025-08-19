@@ -11,6 +11,15 @@ from core.logging_helpers import timeit_and_log
 logger = logging.getLogger(__name__)
 
 
+class UpdateOnlyInstanceNotFound(Exception):
+    """Raised when an update_only import cannot find the local instance."""
+
+    code = "UPDATE_ONLY_NOT_FOUND"
+
+    def __init__(self, message):
+        super().__init__(message)
+
+
 class AbstractImportInstance(abc.ABC):
     """
     Abstract base class for any import instance that processes a data dict.
@@ -196,6 +205,10 @@ class ImportOperationMixin:
         """
         raise error
 
+    def resolve_get_update_only_does_not_exist(self, error):
+        """Override to provide fallback logic when update_only lookups fail."""
+        raise error
+
     def get_or_create_instance(self):
         """
         Attempts to retrieve the local instance using the built kwargs; if not found, create it.
@@ -206,14 +219,16 @@ class ImportOperationMixin:
                 try:
                     self.instance = self.import_instance.local_class.objects.get(**self.get_kwargs)
                     self.created = False
-                except self.import_instance.local_class.DoesNotExist:
-                    kwargs_repr = ", ".join(f"{k}={v}" for k, v in self.get_kwargs.items())
-                    raise self.import_instance.local_class.DoesNotExist(
-                        f"{self.import_instance.local_class.__name__} matching query does not exist. "
-                        f"Looked for {kwargs_repr}"
-                    )
-                except IntegrityError as e:
-                    self.instance, self.created = self.resolve_get_or_create_integrity_error(e)
+                except self.import_instance.local_class.DoesNotExist as e:
+                    try:
+                        self.instance = self.resolve_get_update_only_does_not_exist(e)
+                        self.created = False
+                    except self.import_instance.local_class.DoesNotExist:
+                        kwargs_repr = ", ".join(f"{k}={v}" for k, v in self.get_kwargs.items())
+                        raise UpdateOnlyInstanceNotFound(
+                            f"{self.import_instance.local_class.__name__} matching query does not exist. "
+                            f"Looked for {kwargs_repr}"
+                        )
             elif self.force_created:
                 self.instance = self.import_instance.local_class.objects.create(**self.get_kwargs)
                 self.created = True

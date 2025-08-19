@@ -8,6 +8,7 @@ from core.logging_helpers import AddLogTimeentry, timeit_and_log
 from imports_exports.factories.imports import ImportMixin, AsyncProductImportMixin
 from core.mixins import TemporaryDisableInspectorSignalsMixin
 from imports_exports.factories.products import ImportProductInstance
+from imports_exports.factories.mixins import UpdateOnlyInstanceNotFound
 from products.models import Product
 from products.product_types import SIMPLE, CONFIGURABLE
 from properties.models import Property
@@ -62,6 +63,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
     ERROR_MISSING_DATA = "MISSING_DATA"
     ERROR_NO_MAPPED_PRODUCT_TYPE = "NO_MAPPED_PRODUCT_TYPE"
     ERROR_PRODUCT_TYPE_MISMATCH = "PRODUCT_TYPE_MISMATCH"
+    ERROR_UPDATE_ONLY_NOT_FOUND = "UPDATE_ONLY_NOT_FOUND"
 
     def _add_broken_record(self, *, code, message, data=None, context=None, exc=None):
         record = {
@@ -826,7 +828,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
         # if on the main marketplaces was configurable because the other doesn't have relationships
         # will return SIMPLE as default which is wrong
-        if remote_product and  remote_product.local_instance:
+        if remote_product and remote_product.local_instance:
             structured['type'] = remote_product.local_instance.type
 
         missing_data = (
@@ -1005,6 +1007,12 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
         self.disable_inspector_signals()
         try:
             self.process_product_item(self.product_data)
+        except UpdateOnlyInstanceNotFound as exc:
+            self._add_broken_record(
+                code=self.ERROR_UPDATE_ONLY_NOT_FOUND,
+                message=str(exc),
+                data=self.product_data,
+            )
         except Exception as exc:  # capture unexpected errors
             self._add_broken_record(
                 code="UNKNOWN_ERROR",
