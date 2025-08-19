@@ -52,3 +52,29 @@ class AmazonBrowseNodeSyncFactoryTest(TestCase):
         root = AmazonBrowseNode.objects.get(remote_id="1")
         child = AmazonBrowseNode.objects.get(remote_id="2")
         self.assertEqual(child.parent_node, root)
+
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    def test_marks_root_when_parent_missing(self, _):
+        xml = """
+        <Nodes>
+            <Node>
+                <browseNodeId>573406</browseNodeId>
+                <browseNodeName>DVD &amp; Blu-ray</browseNodeName>
+                <hasChildren>false</hasChildren>
+                <childNodes />
+                <browsePathById>283920,283926,573406</browsePathById>
+                <browsePathByName>DVD &amp; Blu-ray</browsePathByName>
+            </Node>
+        </Nodes>
+        """
+
+        fac = AmazonBrowseNodeSyncFactory(self.view)
+        fac.api.create_report = Mock(return_value=SimpleNamespace(report_id="rid"))
+        fac._wait_for_report = Mock(return_value=SimpleNamespace(report_document_id="doc"))
+        fac._download_document = Mock(return_value=xml)
+
+        fac.run()
+
+        node = AmazonBrowseNode.objects.get(remote_id="573406")
+        self.assertTrue(node.is_root)
+        self.assertIsNone(node.parent_node)

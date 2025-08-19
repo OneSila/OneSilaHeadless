@@ -5,7 +5,7 @@ from products.models import Product
 from sales_channels.models import SalesChannel, SalesChannelView
 
 class AmazonBrowseNode(models.SharedModel):
-    remote_id = models.CharField(max_length=50, primary_key=True)  # browseNodeId
+    remote_id = models.CharField(max_length=50, db_index=True)  # browseNodeId
     marketplace_id = models.CharField(max_length=20, db_index=True)  # e.g., A1F83G8C2ARO7P
 
     name = models.CharField(max_length=512, null=True, blank=True)  # browseNodeName
