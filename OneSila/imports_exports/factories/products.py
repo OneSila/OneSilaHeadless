@@ -55,6 +55,19 @@ class ProductImport(ImportOperationMixin):
 
         raise error
 
+    def resolve_get_update_only_does_not_exist(self, error):
+        sku = getattr(self.import_instance, 'sku', None)
+
+        if not sku:
+            raise error
+
+        existing = Product.objects.filter(sku=sku, multi_tenant_company=self.multi_tenant_company).first()
+
+        if existing:
+            return existing
+
+        raise error
+
 
 class AliasProductImport(ImportOperationMixin):
     get_identifiers = ['sku', 'type', 'alias_parent_product']

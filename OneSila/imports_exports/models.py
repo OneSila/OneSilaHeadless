@@ -42,6 +42,12 @@ class Import(PolymorphicModel, models.Model):
         choices=STATUS_CHOICES,
         default=STATUS_NEW
     )
+    name = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Optional human-readable name for the import process.",
+    )
     error_traceback = models.TextField(
         null=True,
         blank=True,
@@ -151,7 +157,8 @@ class Import(PolymorphicModel, models.Model):
         return cleaned_errors
 
     def __str__(self):
-        return f"ImportProcess - {self.get_status_display()} ({self.percentage}%)"
+        base = f"{self.get_status_display()} ({self.percentage}%)"
+        return f"{self.name or 'ImportProcess'} - {base}"
 
     class Meta:
         ordering = ['-created_at']

@@ -8,6 +8,7 @@ from core.logging_helpers import AddLogTimeentry, timeit_and_log
 from imports_exports.factories.imports import ImportMixin, AsyncProductImportMixin
 from core.mixins import TemporaryDisableInspectorSignalsMixin
 from imports_exports.factories.products import ImportProductInstance
+from imports_exports.factories.mixins import UpdateOnlyInstanceNotFound
 from products.models import Product
 from products.product_types import SIMPLE, CONFIGURABLE
 from properties.models import Property
@@ -58,10 +59,11 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
     import_rules = False
     import_products = True
 
-    ERROR_MULTIPLE_ASIN = "MULTIPLE_ASIN"
+    ERROR_BROKEN_IMPORT_PROCESS = "BROKEN_IMPORT_PROCESS"
     ERROR_MISSING_DATA = "MISSING_DATA"
     ERROR_NO_MAPPED_PRODUCT_TYPE = "NO_MAPPED_PRODUCT_TYPE"
     ERROR_PRODUCT_TYPE_MISMATCH = "PRODUCT_TYPE_MISMATCH"
+    ERROR_UPDATE_ONLY_NOT_FOUND = "UPDATE_ONLY_NOT_FOUND"
 
     def _add_broken_record(self, *, code, message, data=None, context=None, exc=None):
         record = {
@@ -826,7 +828,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
         # if on the main marketplaces was configurable because the other doesn't have relationships
         # will return SIMPLE as default which is wrong
-        if remote_product:
+        if remote_product and remote_product.local_instance:
             structured['type'] = remote_product.local_instance.type
 
         missing_data = (
@@ -895,12 +897,11 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             instance.process()
         except IntegrityError as e:
             self._add_broken_record(
-                code=self.ERROR_MULTIPLE_ASIN,
-                message="Multiple ASINs for SKU",
+                code=self.ERROR_BROKEN_IMPORT_PROCESS,
+                message="Broken import process for SKU",
                 data=structured,
                 context={
                     "sku": structured.get("sku"),
-                    "asin": structured.get("__asin"),
                     "region": getattr(view, "api_region_code", None),
                     "is_variation": is_variation,
                 },
@@ -1006,6 +1007,12 @@ class AmazonProductItemFactory(AmazonProductsImportProcessor):
         self.disable_inspector_signals()
         try:
             self.process_product_item(self.product_data)
+        except UpdateOnlyInstanceNotFound as exc:
+            self._add_broken_record(
+                code=self.ERROR_UPDATE_ONLY_NOT_FOUND,
+                message=str(exc),
+                data=self.product_data,
+            )
         except Exception as exc:  # capture unexpected errors
             self._add_broken_record(
                 code="UNKNOWN_ERROR",

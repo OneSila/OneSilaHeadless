@@ -3,7 +3,7 @@ from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin, \
 import base64
 from hashlib import sha256
 from django.core.files.base import ContentFile
-from django.db import transaction
+from django.db import transaction, IntegrityError
 
 
 class MediaQuerySet(MultiTenantQuerySet):
@@ -70,8 +70,12 @@ class MediaManager(MultiTenantManager):
             instance = self.model(**kwargs)
             # Save the image file using our file content.
             instance.image.save(image_name, ContentFile(content), save=False)
-            instance.save()
-            return instance
+            try:
+                instance.save()
+                return instance
+            except IntegrityError:
+                # Another process created the same image concurrently
+                return self.get(image_hash=image_hash, multi_tenant_company=multi_tenant_company)
 
     @transaction.atomic
     def get_or_create(self, defaults=None, **kwargs):
@@ -97,8 +101,14 @@ class MediaManager(MultiTenantManager):
             kwargs['image_hash'] = image_hash
             instance = self.model(**kwargs)
             instance.image.save(image_name, ContentFile(content), save=False)
-            instance.save()
-            return instance, True
+            try:
+                instance.save()
+                created = True
+            except IntegrityError:
+                # Another process inserted the image in parallel
+                instance = self.get(image_hash=image_hash, multi_tenant_company=multi_tenant_company)
+                created = False
+            return instance, created
 
 
 class ImageQuerySet(MediaQuerySet, QuerySetProxyModelMixin):
@@ -121,7 +131,6 @@ class ImageManager(MediaManager):
             defaults = dict(defaults)
             defaults["type"] = self.model.IMAGE
         return super().get_or_create(defaults=defaults, **kwargs)
-
 
 class VideoQuerySet(MediaQuerySet, QuerySetProxyModelMixin):
     pass

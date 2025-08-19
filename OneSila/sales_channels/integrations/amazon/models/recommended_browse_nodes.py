@@ -14,6 +14,14 @@ class AmazonBrowseNode(models.SharedModel):
     has_children = models.BooleanField(default=False)
     is_root = models.BooleanField(default=False, db_index=True)
 
+    parent_node = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="child_nodes",
+    )
+
     child_node_ids = ArrayField(
         models.CharField(max_length=50),
         default=list,

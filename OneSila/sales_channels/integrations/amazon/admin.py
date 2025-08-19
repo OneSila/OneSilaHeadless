@@ -1,4 +1,6 @@
 from django.contrib import admin
+
+from core.admin import ModelAdmin
 from sales_channels.admin import SalesChannelRemoteAdmin, SalesChannelRemoteProductAdmin
 from polymorphic.admin import PolymorphicChildModelAdmin
 from sales_channels.integrations.amazon.models import (
@@ -21,10 +23,11 @@ from sales_channels.integrations.amazon.models import (
     AmazonTaxCode,
     AmazonDefaultUnitConfigurator,
     AmazonImportRelationship, AmazonImportBrokenRecord,
+    AmazonBrowseNode,
     AmazonProductBrowseNode,
     AmazonMerchantAsin,
     AmazonVariationTheme,
-    AmazonGtinExemption,
+    AmazonGtinExemption, AmazonBrowseNode,
 )
 from sales_channels.integrations.amazon.models.properties import AmazonPublicDefinition
 from django.contrib import admin
@@ -33,6 +36,7 @@ import json
 from pygments import highlight
 from pygments.lexers import JsonLexer
 from pygments.formatters import HtmlFormatter
+
 
 @admin.register(AmazonSalesChannel)
 class AmazonSalesChannelAdmin(PolymorphicChildModelAdmin):
@@ -144,27 +148,63 @@ class AmazonImportRelationshipAdmin(admin.ModelAdmin):
     raw_id_fields = ("import_process",)
 
 
+class CodeFilter(admin.SimpleListFilter):
+    title = "code"
+    parameter_name = "code"
+
+    def lookups(self, request, model_admin):
+        codes = model_admin.model.objects.values_list("record__code", flat=True).distinct()
+        return [(code, code) for code in codes if code]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(record__code=self.value())
+        return queryset
+
+
 @admin.register(AmazonImportBrokenRecord)
 class AmazonImportBrokenRecordAdmin(admin.ModelAdmin):
-    list_display = ("import_process",)
+    list_display = ("import_process", "sku", "code")
     raw_id_fields = ("import_process",)
+    list_filter = (CodeFilter,)
+    search_fields = ("record__code",)
 
-    readonly_fields = ['formatted_broken_record']
-    exclude = ('record',)
+    readonly_fields = ["formatted_broken_record"]
+    exclude = ("record",)
+
+    def sku(self, instance):
+        if not instance.record:
+            return "-"
+        data = instance.record.get("data", {}) or {}
+        if isinstance(data, dict):
+            sku = data.get("sku")
+            if sku:
+                return sku
+        context = instance.record.get("context", {}) or {}
+        if isinstance(context, dict):
+            sku = context.get("sku")
+            if sku:
+                return sku
+        return "-"
+
+    def code(self, instance):
+        if not instance.record:
+            return "—"
+        return instance.record.get("code", "—")
 
     def formatted_broken_record(self, instance):
         if not instance.record:
             return "—"
 
         response = json.dumps(instance.record, sort_keys=True, indent=2, ensure_ascii=False)
-        formatter = HtmlFormatter(style='colorful')
+        formatter = HtmlFormatter(style="colorful")
         highlighted = highlight(response, JsonLexer(), formatter)
 
         # Clean up and apply inline style
         style = f"<style>{formatter.get_style_defs()}</style><br>"
-        return mark_safe(style + highlighted.replace('\\n', '<br/>'))
+        return mark_safe(style + highlighted.replace("\\n", "<br/>"))
 
-    formatted_broken_record.short_description = 'Broken Record'
+    formatted_broken_record.short_description = "Broken Record"
 
 
 @admin.register(AmazonPublicDefinition)
@@ -200,6 +240,21 @@ class AmazonPublicDefinitionAdmin(admin.ModelAdmin):
             )
         }),
     )
+
+
+@admin.register(AmazonBrowseNode)
+class AmazonBrowseNodeAdmin(SalesChannelRemoteAdmin):
+    list_display = (
+        "remote_id",
+        "name",
+        "marketplace_id",
+        "parent_node",
+        "is_root",
+        "has_children",
+    )
+    list_filter = ("is_root", "has_children", "marketplace_id")
+    search_fields = ("remote_id",)
+    raw_id_fields = ("parent_node",)
 
 
 @admin.register(AmazonProductBrowseNode)
