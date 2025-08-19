@@ -188,6 +188,7 @@ class AmazonBrowseNodeFilter(SearchFilterMixin):
     context_name: auto
     path_depth: auto
     is_root: auto
+    parent_node: Optional["AmazonBrowseNodeFilter"]
 
 
 @filter(AmazonProductBrowseNode)
