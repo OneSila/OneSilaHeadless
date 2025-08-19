@@ -57,7 +57,7 @@ class AmazonBrowseNodeSyncFactory(GetAmazonAPIMixin):
             path_by_name = [s.strip() for s in (node_elem.findtext("browsePathByName") or "").split(",") if s.strip()]
             ptd_text = node_elem.findtext("productTypeDefinitions") or ""
             product_type_definitions = [s.strip() for s in ptd_text.split(",") if s.strip()]
-            is_root = len(path_by_id) == 2
+            is_root = len(path_by_id) <= 2
             path_depth = len(path_by_id)
             yield AmazonBrowseNode(
                 remote_id=remote_id,
@@ -87,6 +87,12 @@ class AmazonBrowseNodeSyncFactory(GetAmazonAPIMixin):
         xml_text = self._download_document(report_info.report_document_id)
         new_objs = list(self._parse_nodes(xml_text))
         new_ids = {obj.remote_id for obj in new_objs}
+        parent_map = {}
+        for obj in new_objs:
+            path = obj.browse_path_by_id
+            if len(path) > 2:
+                parent_id = path[-2]
+                parent_map.setdefault(parent_id, []).append(obj.remote_id)
         AmazonBrowseNode.objects.bulk_create(new_objs, ignore_conflicts=True)
         existing_ids = set(
             AmazonBrowseNode.objects.filter(marketplace_id=self.marketplace_id).values_list("remote_id", flat=True)
@@ -96,3 +102,10 @@ class AmazonBrowseNodeSyncFactory(GetAmazonAPIMixin):
             AmazonBrowseNode.objects.filter(
                 marketplace_id=self.marketplace_id, remote_id__in=stale_ids
             ).delete()
+
+        # rebuild parent relationships using browsePathById
+        AmazonBrowseNode.objects.filter(marketplace_id=self.marketplace_id).update(parent_node=None)
+        for parent_id, child_ids in parent_map.items():
+            AmazonBrowseNode.objects.filter(
+                marketplace_id=self.marketplace_id, remote_id__in=child_ids
+            ).update(parent_node_id=parent_id)

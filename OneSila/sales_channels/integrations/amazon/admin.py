@@ -21,6 +21,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonTaxCode,
     AmazonDefaultUnitConfigurator,
     AmazonImportRelationship, AmazonImportBrokenRecord,
+    AmazonBrowseNode,
     AmazonProductBrowseNode,
     AmazonMerchantAsin,
     AmazonVariationTheme,
@@ -200,6 +201,21 @@ class AmazonPublicDefinitionAdmin(admin.ModelAdmin):
             )
         }),
     )
+
+
+@admin.register(AmazonBrowseNode)
+class AmazonBrowseNodeAdmin(SalesChannelRemoteAdmin):
+    list_display = (
+        "remote_id",
+        "name",
+        "marketplace_id",
+        "parent_node",
+        "is_root",
+        "has_children",
+    )
+    list_filter = ("is_root", "has_children", "marketplace_id")
+    search_fields = ("remote_id",)
+    raw_id_fields = ("parent_node",)
 
 
 @admin.register(AmazonProductBrowseNode)

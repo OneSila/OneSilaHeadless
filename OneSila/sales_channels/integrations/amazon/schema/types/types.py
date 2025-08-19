@@ -7,7 +7,7 @@ from core.schema.core.types.types import (
     Annotated,
     lazy,
 )
-from typing import Optional, List
+from typing import Optional, List, Self
 from strawberry.relay import to_base64
 from imports_exports.schema.queries import ImportType
 from sales_channels.integrations.amazon.models import (
@@ -368,7 +368,7 @@ class AmazonProductIssueType(relay.Node, GetQuerysetMultiTenantMixin):
     fields="__all__",
 )
 class AmazonBrowseNodeType(relay.Node):
-    pass
+    parent_node: Self | None
 
 
 @type(
