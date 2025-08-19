@@ -11,7 +11,11 @@ from properties.models import (
     PropertySelectValue,
     PropertySelectValueTranslation,
 )
-from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonProductsImportProcessor
+from sales_channels.integrations.amazon.factories.imports.products_imports import (
+    AmazonProductsImportProcessor,
+    AmazonProductItemFactory,
+)
+from imports_exports.factories.mixins import UpdateOnlyInstanceNotFound
 from sales_channels.integrations.amazon.models import (
     AmazonProduct,
     AmazonProductType,
@@ -461,3 +465,34 @@ class AmazonProductsImportProcessorUpdateOnlyTest(TestCase):
             processor.process_product_item(product_data)
 
             self.assertTrue(mock_instance.update_only)
+
+
+class AmazonProductItemFactoryRunTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+        self.product_data = {"sku": "SKU123"}
+
+    def test_broken_record_when_update_only_product_missing(self):
+        factory = AmazonProductItemFactory(
+            self.product_data,
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+        )
+
+        with patch("imports_exports.helpers.append_broken_record"), patch.object(
+            AmazonProductItemFactory,
+            "process_product_item",
+            side_effect=UpdateOnlyInstanceNotFound("missing"),
+        ):
+            factory.run()
+
+        self.assertEqual(len(factory.broken_records), 1)
+        self.assertEqual(
+            factory.broken_records[0]["code"],
+            factory.ERROR_UPDATE_ONLY_NOT_FOUND,
+        )
