@@ -10,7 +10,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonProductProperty,
-    AmazonMerchantAsin,
+    AmazonExternalProductId,
     AmazonGtinExemption,
     AmazonVariationTheme,
 )
@@ -191,7 +191,7 @@ class AmazonProductIssuesQueryTest(TransactionTestCaseMixin, TransactionTestCase
         self.assertEqual(issues[0]["code"], self.issue.code)
 
 
-class AmazonMerchantAsinQueryTest(TransactionTestCaseMixin, TransactionTestCase):
+class AmazonExternalProductIdQueryTest(TransactionTestCaseMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = baker.make(
@@ -209,7 +209,7 @@ class AmazonMerchantAsinQueryTest(TransactionTestCaseMixin, TransactionTestCase)
             multi_tenant_company=self.multi_tenant_company,
         )
         self.asin = baker.make(
-            AmazonMerchantAsin,
+            AmazonExternalProductId,
             product=self.product,
             view=self.view,
             multi_tenant_company=self.multi_tenant_company,

@@ -25,7 +25,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonImportRelationship, AmazonImportBrokenRecord,
     AmazonBrowseNode,
     AmazonProductBrowseNode,
-    AmazonMerchantAsin,
+    AmazonExternalProductId,
     AmazonVariationTheme,
     AmazonGtinExemption, AmazonBrowseNode,
 )
@@ -268,8 +268,8 @@ class AmazonProductBrowseNodeAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(AmazonMerchantAsin)
-class AmazonMerchantAsinAdmin(admin.ModelAdmin):
+@admin.register(AmazonExternalProductId)
+class AmazonExternalProductIdAdmin(admin.ModelAdmin):
     raw_id_fields = (
         "product",
         "view",

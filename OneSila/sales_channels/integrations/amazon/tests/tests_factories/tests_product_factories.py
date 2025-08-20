@@ -19,7 +19,7 @@ from sales_channels.integrations.amazon.models.sales_channels import (
 )
 from sales_channels.integrations.amazon.models.products import (
     AmazonProduct,
-    AmazonMerchantAsin,
+    AmazonExternalProductId,
     AmazonGtinExemption,
     AmazonVariationTheme,
 )
@@ -123,9 +123,9 @@ class AmazonProductTestMixin:
             remote_sku="TESTSKU",
         )
 
-        from sales_channels.integrations.amazon.models import AmazonMerchantAsin
+        from sales_channels.integrations.amazon.models import AmazonExternalProductId
 
-        AmazonMerchantAsin.objects.create(
+        AmazonExternalProductId.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,
             view=self.view,
@@ -848,7 +848,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         self.remote_product.ean_code = "1234567890123"
         self.remote_product.save()
 
-        AmazonMerchantAsin.objects.filter(
+        AmazonExternalProductId.objects.filter(
             product=self.product,
             view=self.view,
         ).delete()
@@ -956,7 +956,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             selected_unit="grams",
         )
 
-        AmazonMerchantAsin.objects.create(
+        AmazonExternalProductId.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,
             view=fr_view,
@@ -1408,7 +1408,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_missing_ean_or_asin_raises_exception(self, mock_listings, mock_get_client):
         """This test ensures the factory raises ValueError if no EAN/GTIN or ASIN is provided."""
-        AmazonMerchantAsin.objects.filter(
+        AmazonExternalProductId.objects.filter(
             product=self.product,
         ).delete()
 
@@ -1460,7 +1460,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_create_product_with_ean_in_payload(self, mock_listings, mock_get_images, mock_get_client):
         """This test verifies that EAN is included properly in the absence of ASIN."""
-        AmazonMerchantAsin.objects.filter(
+        AmazonExternalProductId.objects.filter(
             product=self.product,
             view=self.view,
         ).delete()
@@ -1503,7 +1503,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_create_product_with_gtin_exemption(self, mock_listings, mock_get_images, mock_get_client):
         """If GTIN exemption property is true use it instead of EAN."""
-        AmazonMerchantAsin.objects.filter(
+        AmazonExternalProductId.objects.filter(
             product=self.product,
             view=self.view,
         ).delete()
@@ -2410,7 +2410,7 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
             multi_tenant_company=self.multi_tenant_company,
         )
         ConfigurableVariation.objects.create(multi_tenant_company=self.multi_tenant_company, parent=self.product, variation=self.child)
-        AmazonMerchantAsin.objects.create(
+        AmazonExternalProductId.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.child,
             view=self.view,
@@ -2527,7 +2527,7 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
             value_select=self.product_type_value,
             multi_tenant_company=self.multi_tenant_company,
         )
-        AmazonMerchantAsin.objects.create(
+        AmazonExternalProductId.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=simple,
             view=self.view,

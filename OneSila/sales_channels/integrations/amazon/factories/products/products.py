@@ -127,16 +127,16 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     # Helpers
     # ------------------------------------------------------------
     def _get_asin(self) -> str | None:
-        from sales_channels.integrations.amazon.models import AmazonMerchantAsin
+        from sales_channels.integrations.amazon.models import AmazonExternalProductId
 
         if not getattr(self, 'local_instance', None):
             return None
         try:
-            asin_obj = AmazonMerchantAsin.objects.get(
+            asin_obj = AmazonExternalProductId.objects.get(
                 product=self.local_instance,
                 view=self.view,
             )
-        except AmazonMerchantAsin.DoesNotExist:
+        except AmazonExternalProductId.DoesNotExist:
             return None
         return asin_obj.asin
 
@@ -354,9 +354,9 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         if not self._get_asin():
             asin = self._extract_asin_from_listing(response)
             if asin:
-                from sales_channels.integrations.amazon.models import AmazonMerchantAsin
+                from sales_channels.integrations.amazon.models import AmazonExternalProductId
 
-                AmazonMerchantAsin.objects.update_or_create(
+                AmazonExternalProductId.objects.update_or_create(
                     product=self.local_instance,
                     view=self.view,
                     multi_tenant_company=self.sales_channel.multi_tenant_company,

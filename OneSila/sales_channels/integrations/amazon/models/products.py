@@ -120,7 +120,7 @@ class AmazonEanCode(RemoteEanCode):
         verbose_name_plural = 'Amazon EAN Codes'
 
 
-class AmazonMerchantAsin(models.Model):
+class AmazonExternalProductId(models.Model):
     """Store merchant-provided ASIN per marketplace."""
 
     product = models.ForeignKey(

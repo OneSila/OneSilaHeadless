@@ -523,9 +523,9 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             remote_product.remote_sku = sku
 
         if asin and view:
-            from sales_channels.integrations.amazon.models import AmazonMerchantAsin
+            from sales_channels.integrations.amazon.models import AmazonExternalProductId
 
-            AmazonMerchantAsin.objects.update_or_create(
+            AmazonExternalProductId.objects.update_or_create(
                 product=remote_product.local_instance,
                 view=view,
                 multi_tenant_company=self.sales_channel.multi_tenant_company,

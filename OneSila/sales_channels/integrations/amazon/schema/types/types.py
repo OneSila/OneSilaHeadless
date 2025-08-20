@@ -25,7 +25,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductIssue,
     AmazonBrowseNode,
     AmazonProductBrowseNode,
-    AmazonMerchantAsin,
+    AmazonExternalProductId,
     AmazonGtinExemption,
     AmazonVariationTheme,
 )
@@ -40,7 +40,7 @@ from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelImportFilter, AmazonDefaultUnitConfiguratorFilter,
     AmazonRemoteLogFilter, AmazonSalesChannelViewFilter, AmazonProductIssueFilter,
     AmazonBrowseNodeFilter, AmazonProductBrowseNodeFilter,
-    AmazonMerchantAsinFilter, AmazonGtinExemptionFilter, AmazonVariationThemeFilter,
+    AmazonExternalProductIdFilter, AmazonGtinExemptionFilter, AmazonVariationThemeFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
@@ -54,7 +54,7 @@ from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonDefaultUnitConfiguratorOrder,
     AmazonRemoteLogOrder, AmazonSalesChannelViewOrder, AmazonProductIssueOrder,
     AmazonBrowseNodeOrder, AmazonProductBrowseNodeOrder,
-    AmazonMerchantAsinOrder, AmazonGtinExemptionOrder, AmazonVariationThemeOrder,
+    AmazonExternalProductIdOrder, AmazonGtinExemptionOrder, AmazonVariationThemeOrder,
 )
 from sales_channels.schema.types.types import FormattedIssueType
 
@@ -394,13 +394,13 @@ class AmazonProductBrowseNodeType(relay.Node, GetQuerysetMultiTenantMixin):
 
 
 @type(
-    AmazonMerchantAsin,
-    filters=AmazonMerchantAsinFilter,
-    order=AmazonMerchantAsinOrder,
+    AmazonExternalProductId,
+    filters=AmazonExternalProductIdFilter,
+    order=AmazonExternalProductIdOrder,
     pagination=True,
     fields="__all__",
 )
-class AmazonMerchantAsinType(relay.Node, GetQuerysetMultiTenantMixin):
+class AmazonExternalProductIdType(relay.Node, GetQuerysetMultiTenantMixin):
     product: Annotated[
         'ProductType',
         lazy("products.schema.types.types")

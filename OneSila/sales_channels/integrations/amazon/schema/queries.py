@@ -14,7 +14,7 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonProductIssueType,
     AmazonBrowseNodeType,
     AmazonProductBrowseNodeType,
-    AmazonMerchantAsinType,
+    AmazonExternalProductIdType,
     AmazonGtinExemptionType,
     AmazonVariationThemeType,
 )
@@ -64,8 +64,8 @@ class AmazonSalesChannelsQuery:
     amazon_product_browse_node: AmazonProductBrowseNodeType = node()
     amazon_product_browse_nodes: DjangoListConnection[AmazonProductBrowseNodeType] = connection()
 
-    amazon_merchant_asin: AmazonMerchantAsinType = node()
-    amazon_merchant_asins: DjangoListConnection[AmazonMerchantAsinType] = connection()
+    amazon_merchant_asin: AmazonExternalProductIdType = node()
+    amazon_merchant_asins: DjangoListConnection[AmazonExternalProductIdType] = connection()
 
     amazon_gtin_exemption: AmazonGtinExemptionType = node()
     amazon_gtin_exemptions: DjangoListConnection[AmazonGtinExemptionType] = connection()
