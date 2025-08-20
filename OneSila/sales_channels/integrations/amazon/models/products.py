@@ -135,7 +135,7 @@ class AmazonExternalProductId(models.Model):
         related_name='product_asins',
         help_text='Marketplace for this ASIN.',
     )
-    asin = models.CharField(max_length=32)
+    value = models.CharField(max_length=32)
 
     class Meta:
         unique_together = ("product", "view")
