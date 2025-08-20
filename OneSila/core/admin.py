@@ -38,6 +38,7 @@ class MultiTenantCompanyAdmin(django_admin.ModelAdmin):
     ordering = ('name',)
     search_fields = ('name',)
     list_filter = ('active',)
+    date_hierarchy = 'created_at'
 
 
 @django_admin.register(MultiTenantUserLoginToken)
