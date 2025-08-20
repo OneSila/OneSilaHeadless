@@ -469,8 +469,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 self.sales_channel.multi_tenant_company
             ).filter(product=self.local_instance, property_id__in=rule_properties_ids)
 
-        self.product_properties = self.product_properties.exclude(property__internal_name='merchant_suggested_asin')
-
     # ------------------------------------------------------------
     # Property handling
     # ------------------------------------------------------------
