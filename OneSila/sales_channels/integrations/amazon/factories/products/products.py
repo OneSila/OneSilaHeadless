@@ -126,6 +126,18 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     # ------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------
+    def _get_default_view(self):
+        from sales_channels.integrations.amazon.models import AmazonSalesChannelView
+
+        if not hasattr(self, "_default_view"):
+            self._default_view = None
+            if getattr(self.view, "is_default", False) is False:
+                self._default_view = AmazonSalesChannelView.objects.filter(
+                    sales_channel=self.view.sales_channel,
+                    is_default=True,
+                ).first()
+        return self._default_view
+
     def _get_external_product_id(self):
         from sales_channels.integrations.amazon.models import AmazonExternalProductId
 
@@ -137,6 +149,15 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 view=self.view,
             )
         except AmazonExternalProductId.DoesNotExist:
+            default_view = self._get_default_view()
+            if default_view:
+                try:
+                    return AmazonExternalProductId.objects.get(
+                        product=self.local_instance,
+                        view=default_view,
+                    )
+                except AmazonExternalProductId.DoesNotExist:
+                    return None
             return None
 
     def _get_ean_for_payload(self) -> str | None:
@@ -167,8 +188,40 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 view=self.view,
             )
         except AmazonGtinExemption.DoesNotExist:
-            return None
+            default_view = self._get_default_view()
+            if default_view:
+                try:
+                    exemption = AmazonGtinExemption.objects.get(
+                        product=self.local_instance,
+                        view=default_view,
+                    )
+                except AmazonGtinExemption.DoesNotExist:
+                    return None
+            else:
+                return None
         return exemption.value
+
+    def _get_recommended_browse_node_id(self) -> str | None:
+        from sales_channels.integrations.amazon.models import AmazonProductBrowseNode
+
+        try:
+            obj = AmazonProductBrowseNode.objects.get(
+                product=self.local_instance,
+                view=self.view,
+            )
+        except AmazonProductBrowseNode.DoesNotExist:
+            default_view = self._get_default_view()
+            if default_view:
+                try:
+                    obj = AmazonProductBrowseNode.objects.get(
+                        product=self.local_instance,
+                        view=default_view,
+                    )
+                except AmazonProductBrowseNode.DoesNotExist:
+                    return None
+            else:
+                return None
+        return obj.recommended_browse_node_id
 
     def build_basic_attributes(self) -> Dict:
         self.set_sku()
@@ -206,6 +259,11 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                     self.force_listing_requirements = True
                 else:
                     self.force_listing_requirements = False
+        browse_node_id = self._get_recommended_browse_node_id()
+        if browse_node_id:
+            attrs["recommended_browse_nodes"] = [
+                {"value": browse_node_id, "marketplace_id": self.view.remote_id}
+            ]
         return attrs
 
     def build_content_attributes(self) -> Dict:
@@ -589,7 +647,17 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 view=self.view,
             )
         except AmazonVariationTheme.DoesNotExist:
-            return None
+            default_view = self._get_default_view()
+            if default_view:
+                try:
+                    obj = AmazonVariationTheme.objects.get(
+                        product=product,
+                        view=default_view,
+                    )
+                except AmazonVariationTheme.DoesNotExist:
+                    return None
+            else:
+                return None
         return obj.theme
 
     def customize_payload(self):

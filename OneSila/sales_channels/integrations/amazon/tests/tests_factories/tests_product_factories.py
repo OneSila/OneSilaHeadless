@@ -32,6 +32,9 @@ from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonDefaultUnitConfigurator,
 )
 from sales_channels.integrations.amazon.models import AmazonCurrency
+from sales_channels.integrations.amazon.models.recommended_browse_nodes import (
+    AmazonProductBrowseNode,
+)
 from eancodes.models import EanCode
 from sales_prices.models import SalesPrice
 from currencies.models import Currency
@@ -54,6 +57,9 @@ from properties.models import (
 from sales_channels.integrations.amazon.factories.products import (
     AmazonProductCreateFactory,
     AmazonProductUpdateFactory,
+)
+from sales_channels.integrations.amazon.factories.products.products import (
+    AmazonProductBaseFactory,
 )
 from sales_channels.integrations.amazon.factories.products.images import (
     AmazonMediaProductThroughBase,
@@ -2557,3 +2563,81 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
         self.assertNotIn("variation_theme", attrs)
         self.assertNotIn("parentage_level", attrs)
         self.assertNotIn("child_parent_sku_relationship", attrs)
+
+
+class AmazonProductFallbackValuesTest(TestCase, AmazonProductTestMixin):
+    def setUp(self):
+        super().setUp()
+        self.setup_product()
+        self.default_view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            name="Default",
+            api_region_code="EU_DE",
+            remote_id="DE",
+            is_default=True,
+        )
+        AmazonRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            sales_channel_view=self.default_view,
+            remote_code="en",
+        )
+        AmazonExternalProductId.objects.filter(
+            product=self.product,
+            view=self.view,
+        ).delete()
+        AmazonGtinExemption.objects.filter(
+            product=self.product,
+            view=self.view,
+        ).delete()
+        AmazonVariationTheme.objects.filter(
+            product=self.product,
+            view=self.view,
+        ).delete()
+        AmazonExternalProductId.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            view=self.default_view,
+            value="ASINDEF",
+        )
+        AmazonGtinExemption.objects.create(
+            product=self.product,
+            view=self.default_view,
+            value=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        with patch(
+            "sales_channels.integrations.amazon.models.products.AmazonVariationTheme.full_clean"
+        ):
+            AmazonVariationTheme.objects.create(
+                product=self.product,
+                view=self.default_view,
+                theme="SIZE",
+                multi_tenant_company=self.multi_tenant_company,
+            )
+        AmazonProductBrowseNode.objects.create(
+            product=self.product,
+            sales_channel=self.sales_channel,
+            view=self.default_view,
+            recommended_browse_node_id="BN1",
+        )
+        self.factory = AmazonProductBaseFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+
+    def test_fallback_to_default_view(self):
+        ext = self.factory._get_external_product_id()
+        self.assertIsNotNone(ext)
+        self.assertEqual(ext.value, "ASINDEF")
+        self.assertTrue(self.factory._get_gtin_exemption())
+        self.assertEqual(self.factory._get_variation_theme(self.product), "SIZE")
+        self.assertEqual(self.factory._get_recommended_browse_node_id(), "BN1")
+        attrs = self.factory.build_basic_attributes()
+        self.assertEqual(
+            attrs.get("recommended_browse_nodes"),
+            [{"value": "BN1", "marketplace_id": self.view.remote_id}],
+        )
