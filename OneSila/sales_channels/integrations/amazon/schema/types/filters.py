@@ -200,7 +200,7 @@ class AmazonProductBrowseNodeFilter(SearchFilterMixin):
     id: auto
     product: Optional[ProductFilter]
     sales_channel: Optional[SalesChannelFilter]
-    sales_channel_view: Optional[SalesChannelViewFilter]
+    view: Optional[SalesChannelViewFilter]
     recommended_browse_node_id: auto
 
 

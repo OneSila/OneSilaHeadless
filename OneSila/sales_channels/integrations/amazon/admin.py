@@ -262,7 +262,7 @@ class AmazonProductBrowseNodeAdmin(admin.ModelAdmin):
     raw_id_fields = (
         "product",
         "sales_channel",
-        "sales_channel_view",
+        "view",
         "multi_tenant_company",
         "created_by_multi_tenant_user",
     )

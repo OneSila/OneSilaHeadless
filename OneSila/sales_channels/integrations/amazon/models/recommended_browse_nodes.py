@@ -67,11 +67,11 @@ class AmazonProductBrowseNode(models.Model):
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     sales_channel = models.ForeignKey(SalesChannel, on_delete=models.CASCADE)
-    sales_channel_view = models.ForeignKey(SalesChannelView, on_delete=models.CASCADE)
+    view = models.ForeignKey(SalesChannelView, on_delete=models.CASCADE)
     recommended_browse_node_id = models.CharField(max_length=50)
 
     class Meta:
-        unique_together = ("product", "sales_channel_view")
+        unique_together = ("product", "view")
 
     def __str__(self):
-        return f"{self.product} @ {self.sales_channel_view}: {self.recommended_browse_node_id}"
+        return f"{self.product} @ {self.view}: {self.recommended_browse_node_id}"
