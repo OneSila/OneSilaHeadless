@@ -21,8 +21,9 @@ class AmazonBrowseNodeSyncFactoryTest(TestCase):
             remote_id="GB",
         )
 
+    @patch("sales_channels.integrations.amazon.factories.recommended_browse_nodes.sync.ReportsApi", return_value=SimpleNamespace())
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
-    def test_sets_parent_node(self, _):
+    def test_sets_parent_node(self, _get_client, _reports_api):
         xml = """
         <Nodes>
             <Node>
@@ -53,8 +54,9 @@ class AmazonBrowseNodeSyncFactoryTest(TestCase):
         child = AmazonBrowseNode.objects.get(remote_id="2")
         self.assertEqual(child.parent_node, root)
 
+    @patch("sales_channels.integrations.amazon.factories.recommended_browse_nodes.sync.ReportsApi", return_value=SimpleNamespace())
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
-    def test_marks_root_when_parent_missing(self, _):
+    def test_marks_root_when_parent_missing(self, _get_client, _reports_api):
         xml = """
         <Nodes>
             <Node>
