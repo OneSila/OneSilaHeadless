@@ -12,6 +12,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonProductType,
+    AmazonProductBrowseNode,
 )
 from sales_channels.integrations.amazon.factories.sync.rule_sync import (
     AmazonPropertyRuleItemSyncFactory,
@@ -179,3 +180,17 @@ def amazon__product_type_changed_clear_variation_theme(sender, instance, **kwarg
     from sales_channels.integrations.amazon.models import AmazonVariationTheme
 
     AmazonVariationTheme.objects.filter(product=instance.product).delete()
+
+
+@receiver(post_create, sender='amazon.AmazonProductBrowseNode')
+def amazon__product_browse_node__propagate_to_variations(sender, instance, **kwargs):
+    if not instance.product.is_configurable():
+        return
+    variations = instance.product.get_configurable_variations(active_only=True)
+    for variation in variations:
+        AmazonProductBrowseNode.objects.get_or_create(
+            product=variation,
+            sales_channel=instance.sales_channel,
+            view=instance.view,
+            defaults={'recommended_browse_node_id': instance.recommended_browse_node_id},
+        )
