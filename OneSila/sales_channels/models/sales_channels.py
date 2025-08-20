@@ -185,7 +185,7 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
                     view=self.sales_channel_view,
                 ).exists():
                     raise ValidationError(
-                        {'sales_channel_view': _('Amazon products require a browse node for the first assignment.')}
+                        {'__all__': _('Amazon products require a browse node for the first assignment.')}
                     )
 
                 if self.product.is_configurable() and not AmazonVariationTheme.objects.filter(
@@ -193,7 +193,7 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
                 ).exists():
                     raise ValidationError(
                         {
-                            'sales_channel_view': _(
+                            '__all__': _(
                                 'Amazon configurable products require a variation theme for the first assignment.'
                             )
                         }
