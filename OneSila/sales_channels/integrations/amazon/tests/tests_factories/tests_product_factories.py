@@ -2609,12 +2609,6 @@ class AmazonProductFallbackValuesTest(TestCase, AmazonProductTestMixin):
             view=self.default_view,
             recommended_browse_node_id="BN1",
         )
-        self.factory = AmazonProductBaseFactory(
-            sales_channel=self.sales_channel,
-            local_instance=self.product,
-            remote_instance=self.remote_product,
-            view=self.view,
-        )
 
     def test_fallback_to_default_view(self):
 
@@ -2623,13 +2617,20 @@ class AmazonProductFallbackValuesTest(TestCase, AmazonProductTestMixin):
             product=self.product,
         ).delete()
 
-        ext = self.factory._get_external_product_id()
+        factory = AmazonProductBaseFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        ext = factory._get_external_product_id()
         self.assertIsNotNone(ext)
         self.assertEqual(ext.value, "ASINDEF")
-        self.assertTrue(self.factory._get_gtin_exemption())
-        self.assertEqual(self.factory._get_variation_theme(self.product), "SIZE")
-        self.assertEqual(self.factory._get_recommended_browse_node_id(), "BN1")
-        attrs = self.factory.build_basic_attributes()
+        self.assertTrue(factory._get_gtin_exemption())
+        self.assertEqual(factory._get_variation_theme(self.product), "SIZE")
+        self.assertEqual(factory._get_recommended_browse_node_id(), "BN1")
+        attrs = factory.build_basic_attributes()
+
         self.assertEqual(
             attrs.get("recommended_browse_nodes"),
             [{"value": "BN1", "marketplace_id": self.view.remote_id}],

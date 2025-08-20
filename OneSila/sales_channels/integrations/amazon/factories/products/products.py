@@ -168,7 +168,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             return None
 
     def _get_ean_for_payload(self) -> str | None:
-        return self.remote_instance.ean_code or self.get_ean_code_value()
+        return self.get_ean_code_value()
 
     def _extract_asin_from_listing(self, response) -> str | None:
         """Return the ASIN from a listing API response if present."""
