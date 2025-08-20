@@ -76,6 +76,7 @@ class SalesChannelViewAssignValidationTest(TestCase):
 
     def test_configurable_requires_variation_theme(self):
         AmazonProductBrowseNode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             product=self.config_product,
             sales_channel=self.channel,
             view=self.view,
@@ -94,9 +95,10 @@ class SalesChannelViewAssignValidationTest(TestCase):
             lambda self: None,
         ):
             AmazonVariationTheme.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
                 product=self.config_product,
                 view=self.view,
-                theme="SizeColor",
+                theme="Size/Color",
             )
             assign = SalesChannelViewAssign.objects.create(
                 multi_tenant_company=self.multi_tenant_company,

@@ -53,6 +53,7 @@ class FetchRemoteIssuesFactory(GetAmazonAPIMixin):
                         ext.save(update_fields=["created_asin"])
                 except AmazonExternalProductId.DoesNotExist:
                     AmazonExternalProductId.objects.create(
+                        multi_tenant_company=self.remote_product.multi_tenant_company,
                         product=product,
                         view=self.view,
                         type=AmazonExternalProductId.TYPE_ASIN,

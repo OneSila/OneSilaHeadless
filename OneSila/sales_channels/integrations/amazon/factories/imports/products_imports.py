@@ -773,7 +773,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             AmazonProductBrowseNode.objects.update_or_create(
                 product=import_instance.instance,
                 sales_channel=self.sales_channel,
-                sales_channel_view=view,
+                view=view,
                 multi_tenant_company=self.import_process.multi_tenant_company,
                 defaults={"recommended_browse_node_id": node_id},
             )
@@ -781,7 +781,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             AmazonProductBrowseNode.objects.filter(
                 product=import_instance.instance,
                 sales_channel=self.sales_channel,
-                sales_channel_view=view,
+                view=view,
                 multi_tenant_company=self.import_process.multi_tenant_company,
             ).delete()
 

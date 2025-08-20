@@ -267,11 +267,12 @@ class AmazonProductBrowseNodeReceiversTest(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             type=Product.SIMPLE,
         )
-        ConfigurableVariation.objects.create(parent=self.parent, variation=self.var1)
-        ConfigurableVariation.objects.create(parent=self.parent, variation=self.var2)
+        ConfigurableVariation.objects.create(parent=self.parent, variation=self.var1, multi_tenant_company=self.multi_tenant_company)
+        ConfigurableVariation.objects.create(parent=self.parent, variation=self.var2, multi_tenant_company=self.multi_tenant_company)
 
     def test_propagates_to_variations(self):
         AmazonProductBrowseNode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             product=self.parent,
             sales_channel=self.sales_channel,
             view=self.view,

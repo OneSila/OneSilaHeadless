@@ -131,8 +131,6 @@ class AmazonProductTestMixin:
         self.remote_product.product_owner = True
         self.remote_product.save()
 
-        from sales_channels.integrations.amazon.models import AmazonExternalProductId
-
         AmazonExternalProductId.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,
@@ -140,6 +138,7 @@ class AmazonProductTestMixin:
             value="ASIN123",
         )
         AmazonProductBrowseNode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             product=self.product,
             sales_channel=self.sales_channel,
             view=self.view,
@@ -604,6 +603,15 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         mock_instance = mock_listings.return_value
         mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
+        # to be LISTING this needs to not have any ASIN on create
+        AmazonExternalProductId.objects.filter(type=AmazonExternalProductId.TYPE_ASIN).delete()
+        EanCode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            ean_code="1234567890123",
+        )
+
+
         fac = AmazonProductCreateFactory(
             sales_channel=self.sales_channel,
             local_instance=self.product,
@@ -687,6 +695,13 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         mock_instance = mock_listings.return_value
         mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
+        AmazonExternalProductId.objects.filter(type=AmazonExternalProductId.TYPE_ASIN).delete()
+        EanCode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            ean_code="1234567890123",
+        )
+
         url = 'https://example.com/img.jpg'
 
         fac = AmazonProductCreateFactory(
@@ -707,7 +722,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         }
 
         expected_attributes = {
-            "merchant_suggested_asin": [{"value": "ASIN123"}],
+            "externally_assigned_product_identifier": [{"type": "ean", "value": "1234567890123"}],
             "item_name": [
                 {
                     "value": "Chair name",
@@ -769,6 +784,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             "item_package_weight": [
                 {"value": 2.5, "unit": "grams", "marketplace_id": "GB"}
             ],
+            "recommended_browse_nodes": [{'marketplace_id': 'GB', 'value': '1'}]
         }
 
         expected_body = {
@@ -1065,7 +1081,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         }
         expected_body = {
             "productType": "CHAIR",
-            "requirements": "LISTING",
+            "requirements": "LISTING_OFFER_ONLY",
             "attributes": expected_attributes,
         }
 
@@ -1528,11 +1544,6 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             multi_tenant_company=self.multi_tenant_company,
         )
 
-        EanCode.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            product=self.product,
-            ean_code="1234567890123",
-        )
 
         mock_instance = mock_listings.return_value
         mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
@@ -2592,6 +2603,7 @@ class AmazonProductFallbackValuesTest(TestCase, AmazonProductTestMixin):
                 multi_tenant_company=self.multi_tenant_company,
             )
         AmazonProductBrowseNode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             product=self.product,
             sales_channel=self.sales_channel,
             view=self.default_view,
@@ -2605,6 +2617,12 @@ class AmazonProductFallbackValuesTest(TestCase, AmazonProductTestMixin):
         )
 
     def test_fallback_to_default_view(self):
+
+        AmazonProductBrowseNode.objects.filter(
+            view=self.view,
+            product=self.product,
+        ).delete()
+
         ext = self.factory._get_external_product_id()
         self.assertIsNotNone(ext)
         self.assertEqual(ext.value, "ASINDEF")

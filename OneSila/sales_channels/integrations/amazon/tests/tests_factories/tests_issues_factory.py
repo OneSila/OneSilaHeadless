@@ -36,6 +36,7 @@ class FetchRemoteIssuesFactoryExternalIdTest(TestCase):
 
     def test_updates_existing_external_product_id(self):
         AmazonExternalProductId.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             product=self.product,
             view=self.view,
             type=AmazonExternalProductId.TYPE_GTIN,

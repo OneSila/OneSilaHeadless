@@ -121,6 +121,7 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
         self.remote_product.product_owner = True
         self.remote_product.save()
         AmazonProductBrowseNode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             product=self.product,
             sales_channel=self.sales_channel,
             view=self.view,

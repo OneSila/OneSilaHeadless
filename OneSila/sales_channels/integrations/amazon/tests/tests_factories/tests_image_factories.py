@@ -99,6 +99,7 @@ class AmazonProductImageFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
             product_type_code="CHAIR",
         )
         AmazonProductBrowseNode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             product=self.product,
             sales_channel=self.sales_channel,
             view=self.view,
