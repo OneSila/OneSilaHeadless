@@ -5,6 +5,7 @@ from sales_channels.models import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonSalesChannelView,
+    AmazonProductBrowseNode,
 )
 from .tests_schemas.queries import (
     PRODUCTS_ASSIGNED_TO_VIEW_QUERY,
@@ -31,11 +32,24 @@ class ProductFilterSalesChannelViewTestCase(TransactionTestCaseMixin, Transactio
         self.p2 = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         self.p3 = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
 
+        AmazonProductBrowseNode.objects.create(
+            product=self.p1,
+            sales_channel=self.sales_channel,
+            view=self.view1,
+            recommended_browse_node_id="1",
+        )
         SalesChannelViewAssign.objects.create(
             product=self.p1,
             sales_channel_view=self.view1,
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
+        )
+
+        AmazonProductBrowseNode.objects.create(
+            product=self.p3,
+            sales_channel=self.sales_channel,
+            view=self.view2,
+            recommended_browse_node_id="1",
         )
         SalesChannelViewAssign.objects.create(
             product=self.p3,

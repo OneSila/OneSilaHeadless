@@ -14,7 +14,12 @@ from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonSalesChannelView,
 )
 from sales_channels.integrations.amazon.models.products import AmazonProduct
-from sales_channels.integrations.amazon.models import AmazonPrice, AmazonCurrency, AmazonProductType
+from sales_channels.integrations.amazon.models import (
+    AmazonPrice,
+    AmazonCurrency,
+    AmazonProductType,
+    AmazonProductBrowseNode,
+)
 from sales_channels.integrations.amazon.factories.prices.prices import AmazonPriceUpdateFactory
 
 
@@ -105,7 +110,12 @@ class AmazonPriceTestMixin:
             local_instance=self.rule,
             product_type_code="CHAIR",
         )
-
+        AmazonProductBrowseNode.objects.create(
+            product=self.product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            recommended_browse_node_id="1",
+        )
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,

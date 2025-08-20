@@ -23,6 +23,7 @@ from sales_channels.integrations.amazon.models.products import (
     AmazonProduct,
     AmazonVariationTheme,
 )
+from sales_channels.integrations.amazon.models import AmazonProductBrowseNode
 from sales_channels.integrations.amazon.models.properties import (
     AmazonProperty,
     AmazonPublicDefinition,
@@ -132,6 +133,12 @@ class AmazonProductPropertyTestSetupMixin:
             sales_channel=self.sales_channel,
             local_instance=self.product,
             remote_sku="AMZSKU",
+        )
+        AmazonProductBrowseNode.objects.create(
+            product=self.product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            recommended_browse_node_id="1",
         )
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
