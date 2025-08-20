@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import get_language_info
-
+from core.models.mixins import TimeStampMixin
 
 from core.validators import phone_regex
 from imagekit.models import ImageSpecField
@@ -23,7 +23,7 @@ from hashlib import shake_256
 import shortuuid
 
 
-class MultiTenantCompany(models.Model):
+class MultiTenantCompany(TimeStampMixin, models.Model):
     '''
     Class that holds company information and sales-conditions.
     '''
@@ -46,6 +46,8 @@ class MultiTenantCompany(models.Model):
     website = models.URLField(blank=True, null=True)
 
     ai_points = models.IntegerField(default=20, help_text="Points allocated for AI processes.")
+    # Active flag has no real logic behind it aside from sorting thins for us somewhat.
+    active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
