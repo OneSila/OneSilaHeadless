@@ -75,7 +75,6 @@ class AmazonProductTestMixin:
         self.sales_channel = AmazonSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             remote_id="SELLER123",
-            listing_owner=True,
         )
         self.view = AmazonSalesChannelView.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -129,6 +128,8 @@ class AmazonProductTestMixin:
             local_instance=self.product,
             remote_sku="TESTSKU",
         )
+        self.remote_product.product_owner = True
+        self.remote_product.save()
 
         from sales_channels.integrations.amazon.models import AmazonExternalProductId
 
@@ -2042,55 +2043,23 @@ class AmazonProductCreateRequirementsTest(DisableWooCommerceSignalsMixin, Transa
                 "body"
             )
 
-    def test_listing_owner_uses_listing_requirements(self):
-        self.sales_channel.listing_owner = True
-        self.sales_channel.save()
+    def test_first_assign_with_asin_uses_listing_offer_only(self):
+        body = self._run_factory_and_get_body()
+        self.assertEqual(body["requirements"], "LISTING_OFFER_ONLY")
+
+    def test_first_assign_without_asin_uses_listing(self):
+        AmazonExternalProductId.objects.filter(
+            product=self.product,
+            view=self.view,
+        ).update(type=AmazonExternalProductId.TYPE_GTIN, value="12345678901231")
         body = self._run_factory_and_get_body()
         self.assertEqual(body["requirements"], "LISTING")
 
-    def test_product_owner_uses_listing_requirements(self):
-        self.sales_channel.listing_owner = False
-        self.sales_channel.save()
-        self.remote_product.product_owner = True
+    def test_not_first_assign_uses_listing_offer_only(self):
+        self.remote_product.created_marketplaces = ["FR"]
         self.remote_product.save()
         body = self._run_factory_and_get_body()
-        self.assertEqual(body["requirements"], "LISTING")
-
-    def test_missing_asin_still_uses_listing_requirements(self):
-        self.sales_channel.listing_owner = False
-        self.sales_channel.save()
-        self.remote_product.product_owner = True
-        self.remote_product.save()
-        ProductProperty.objects.filter(
-            product=self.product,
-            property__internal_name="merchant_suggested_asin",
-        ).delete()
-        EanCode.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            product=self.product,
-            ean_code="EAN",
-        )
-        body = self._run_factory_and_get_body()
-        self.assertEqual(body["requirements"], "LISTING")
-
-    def test_ean_without_asin_uses_listing_requirements(self):
-        """Not listing owner but EAN present should still send LISTING."""
-        self.sales_channel.listing_owner = False
-        self.sales_channel.save()
-        ProductProperty.objects.filter(
-            product=self.product,
-            property__internal_name="merchant_suggested_asin",
-        ).delete()
-        EanCode.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            product=self.product,
-            ean_code="1234567890123",
-        )
-        self.remote_product.ean_code = "1234567890123"
-        self.remote_product.save()
-
-        body = self._run_factory_and_get_body()
-        self.assertEqual(body["requirements"], "LISTING")
+        self.assertEqual(body["requirements"], "LISTING_OFFER_ONLY")
 
 
 class AmazonConfigurablePropertySelectionTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonProductTestMixin):

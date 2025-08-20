@@ -104,11 +104,6 @@ class AmazonSalesChannel(SalesChannel):
         blank=True,
         help_text="Stores the last OAuth connection failure traceback."
     )
-    listing_owner = models.BooleanField(
-        default=False,
-        help_text="Indicates if the sales channel have listing_owner status and can edit or create listings"
-    )
-
     class Meta:
         verbose_name = 'Amazon Sales Channel'
         verbose_name_plural = 'Amazon Sales Channels'
