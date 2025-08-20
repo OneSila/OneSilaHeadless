@@ -31,7 +31,7 @@ from sales_channels.integrations.amazon.models.properties import (
 from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonDefaultUnitConfigurator,
 )
-from sales_channels.integrations.amazon.models import AmazonCurrency
+from sales_channels.integrations.amazon.models import AmazonCurrency, AmazonProductBrowseNode
 from eancodes.models import EanCode
 from sales_prices.models import SalesPrice
 from currencies.models import Currency
@@ -131,7 +131,12 @@ class AmazonProductTestMixin:
             view=self.view,
             value="ASIN123",
         )
-
+        AmazonProductBrowseNode.objects.create(
+            product=self.product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            recommended_browse_node_id="1",
+        )
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,

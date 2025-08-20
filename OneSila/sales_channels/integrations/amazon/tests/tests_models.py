@@ -1,9 +1,16 @@
 from core.tests import TestCase
 from django.core.exceptions import ValidationError
 from model_bakery import baker
+from unittest.mock import patch
 
-from sales_channels.integrations.amazon.models import AmazonSalesChannel
+from sales_channels.integrations.amazon.models import (
+    AmazonSalesChannel,
+    AmazonSalesChannelView,
+    AmazonProductBrowseNode,
+    AmazonVariationTheme,
+)
 from sales_channels.integrations.amazon.models.properties import AmazonProperty
+from sales_channels.models import SalesChannelViewAssign
 from properties.models import Property
 
 
@@ -35,4 +42,67 @@ class AmazonPropertyModelTest(TestCase):
             local_instance=local_property,
         )
         self.assertIsNotNone(amazon_property.pk)
+
+
+class SalesChannelViewAssignValidationTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company
+        )
+        self.view = AmazonSalesChannelView.objects.create(
+            sales_channel=self.channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.simple_product = baker.make(
+            "products.Product",
+            type="SIMPLE",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.config_product = baker.make(
+            "products.Product",
+            type="CONFIGURABLE",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+    def test_first_assign_requires_browse_node(self):
+        with self.assertRaises(ValidationError):
+            SalesChannelViewAssign.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                product=self.simple_product,
+                sales_channel_view=self.view,
+                sales_channel=self.channel,
+            )
+
+    def test_configurable_requires_variation_theme(self):
+        AmazonProductBrowseNode.objects.create(
+            product=self.config_product,
+            sales_channel=self.channel,
+            view=self.view,
+            recommended_browse_node_id="1",
+        )
+        with self.assertRaises(ValidationError):
+            SalesChannelViewAssign.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                product=self.config_product,
+                sales_channel_view=self.view,
+                sales_channel=self.channel,
+            )
+
+        with patch(
+            "sales_channels.integrations.amazon.models.products.AmazonVariationTheme.full_clean",
+            lambda self: None,
+        ):
+            AmazonVariationTheme.objects.create(
+                product=self.config_product,
+                view=self.view,
+                theme="SizeColor",
+            )
+            assign = SalesChannelViewAssign.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                product=self.config_product,
+                sales_channel_view=self.view,
+                sales_channel=self.channel,
+            )
+            self.assertIsNotNone(assign.pk)
 
