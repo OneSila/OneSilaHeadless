@@ -121,26 +121,44 @@ class AmazonEanCode(RemoteEanCode):
 
 
 class AmazonExternalProductId(models.Model):
-    """Store merchant-provided ASIN per marketplace."""
+    """Store merchant-provided product identifiers per marketplace."""
+
+    TYPE_ASIN = "ASIN"
+    TYPE_UPC = "UPC"
+    TYPE_ISBN = "ISBN"
+    TYPE_GCID = "GCID"
+    TYPE_GTIN = "GTIN"
+    TYPE_JAN = "JAN"
+
+    TYPE_CHOICES = [
+        (TYPE_ASIN, "ASIN"),
+        (TYPE_UPC, "UPC"),
+        (TYPE_ISBN, "ISBN"),
+        (TYPE_GCID, "GCID"),
+        (TYPE_GTIN, "GTIN"),
+        (TYPE_JAN, "JAN"),
+    ]
 
     product = models.ForeignKey(
         'products.Product',
         on_delete=models.CASCADE,
         related_name='amazon_merchant_asins',
-        help_text='The product this ASIN belongs to.',
+        help_text='The product this identifier belongs to.',
     )
     view = models.ForeignKey(
         'amazon.AmazonSalesChannelView',
         on_delete=models.CASCADE,
         related_name='product_asins',
-        help_text='Marketplace for this ASIN.',
+        help_text='Marketplace for this identifier.',
     )
+    type = models.CharField(max_length=4, choices=TYPE_CHOICES, default=TYPE_ASIN)
     value = models.CharField(max_length=32)
+    created_asin = models.CharField(max_length=32, null=True, blank=True)
 
     class Meta:
         unique_together = ("product", "view")
-        verbose_name = 'Amazon Merchant ASIN'
-        verbose_name_plural = 'Amazon Merchant ASINs'
+        verbose_name = 'Amazon External Product ID'
+        verbose_name_plural = 'Amazon External Product IDs'
 
 
 class AmazonGtinExemption(models.Model):
