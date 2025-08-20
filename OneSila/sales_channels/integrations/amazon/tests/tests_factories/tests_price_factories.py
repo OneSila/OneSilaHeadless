@@ -251,17 +251,7 @@ class AmazonPriceUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transact
                 "body"
             )
 
-    def test_listing_owner_uses_listing_requirements(self):
-        self.sales_channel.listing_owner = True
-        self.sales_channel.save()
-        body = self._run_factory_and_get_body()
-        patches = body.get("patches", [])
-        list_price = self.get_patch_value(patches, "/attributes/list_price")
-        self.assertIsNotNone(list_price, "list_price patch is missing")
-
     def test_product_owner_uses_price_listing_requirements(self):
-        self.sales_channel.listing_owner = False
-        self.sales_channel.save()
         self.remote_product.product_owner = True
         self.remote_product.save()
         body = self._run_factory_and_get_body()
@@ -272,8 +262,6 @@ class AmazonPriceUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transact
         self.assertEqual(list_price[0]["value_with_tax"], 80.0)
 
     def test_missing_asin_still_uses_listing_requirements(self):
-        self.sales_channel.listing_owner = False
-        self.sales_channel.save()
         self.remote_product.product_owner = True
         self.remote_product.save()
         ProductProperty.objects.filter(

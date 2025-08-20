@@ -35,7 +35,6 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
         self.sales_channel = AmazonSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             remote_id="SELLER123",
-            listing_owner=True
         )
         self.view = AmazonSalesChannelView.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -119,6 +118,8 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
             local_instance=self.product,
             remote_sku="AMZSKU",
         )
+        self.remote_product.product_owner = True
+        self.remote_product.save()
         AmazonProductBrowseNode.objects.create(
             product=self.product,
             sales_channel=self.sales_channel,

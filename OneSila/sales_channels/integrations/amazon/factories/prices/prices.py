@@ -117,10 +117,7 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
 
             purchasable_offer_values.append(offer_entry)
 
-            if (
-                self.sales_channel.listing_owner
-                or self.remote_product.product_owner
-            ) and full_price is not None:
+            if self.remote_product.product_owner and full_price is not None:
                 list_price_values.append({"currency": iso, value_key: full_price})
 
         if self.get_value_only:

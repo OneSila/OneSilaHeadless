@@ -97,7 +97,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         self.attributes: Dict = {}
         self.image_attributes: Dict = {}
         self.prices_data = {}
-        self.force_listing_requirements = False
 
     # ------------------------------------------------------------
     # Preflight & initialization helpers
@@ -113,8 +112,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     def initialize_remote_product(self):
 
         super().initialize_remote_product()
-        if getattr(self, "remote_instance", None):
-            self.force_listing_requirements = getattr(self.remote_instance, "product_owner", False)
         if not hasattr(self, 'current_attrs'):
             self.get_saleschannel_remote_object(self.local_instance.sku)
 
@@ -231,7 +228,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         if external_id:
             if external_id.type == external_id.TYPE_ASIN:
                 attrs["merchant_suggested_asin"] = [{"value": external_id.value}]
-                self.force_listing_requirements = False
             else:
                 attrs["externally_assigned_product_identifier"] = [
                     {
@@ -239,26 +235,24 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                         "value": external_id.value,
                     }
                 ]
-                self.force_listing_requirements = True
+            if external_id.created_asin and external_id.type != external_id.TYPE_ASIN:
+                attrs["merchant_suggested_asin"] = [{"value": external_id.created_asin}]
         else:
-            exemption = self._get_gtin_exemption()
-            if exemption:
-                attrs["supplier_declared_has_product_identifier_exemption"] = [
-                    {"value": True}
+            ean = self._get_ean_for_payload()
+            if ean:
+                attrs["externally_assigned_product_identifier"] = [
+                    {
+                        "type": "ean",
+                        "value": ean,
+                    }
                 ]
-                self.force_listing_requirements = True
-            else:
-                ean = self._get_ean_for_payload()
-                if ean:
-                    attrs["externally_assigned_product_identifier"] = [
-                        {
-                            "type": "ean",
-                            "value": ean,
-                        }
-                    ]
-                    self.force_listing_requirements = True
-                else:
-                    self.force_listing_requirements = False
+
+        exemption = self._get_gtin_exemption()
+        if exemption:
+            attrs["supplier_declared_has_product_identifier_exemption"] = [
+                {"value": True}
+            ]
+
         browse_node_id = self._get_recommended_browse_node_id()
         if browse_node_id:
             attrs["recommended_browse_nodes"] = [
@@ -748,11 +742,13 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
 
     def post_action_process(self):
         if self.view.remote_id not in (self.remote_instance.created_marketplaces or []):
+            first_assign = not (self.remote_instance.created_marketplaces or [])
+            has_asin = bool(self.payload.get("attributes", {}).get("merchant_suggested_asin"))
             self.remote_instance.created_marketplaces.append(self.view.remote_id)
             if not self.remote_instance.ean_code:
                 self.remote_instance.ean_code = self._get_ean_for_payload()
             update_fields = ["created_marketplaces", "ean_code"]
-            if self.force_listing_requirements and not self.remote_instance.product_owner:
+            if first_assign and not has_asin and not self.remote_instance.product_owner:
                 self.remote_instance.product_owner = True
                 update_fields.append("product_owner")
 

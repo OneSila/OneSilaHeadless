@@ -349,13 +349,13 @@ class GetAmazonAPIMixin:
 
         pt_code = product_type.product_type_code
         has_asin = "merchant_suggested_asin" in (attributes or {})
-        force_listing = getattr(self, "force_listing_requirements", False)
         remote_product = getattr(self, "remote_product", getattr(self, "remote_instance", None))
-        product_owner = getattr(remote_product, "product_owner", False)
+        created = getattr(remote_product, "created_marketplaces", []) or []
 
-        is_new_listing = has_asin or force_listing
+        first_assign = not created
+        requirements = "LISTING" if first_assign and not has_asin else "LISTING_OFFER_ONLY"
 
-        if not (self.sales_channel.listing_owner or product_owner) and not is_new_listing:
+        if requirements == "LISTING_OFFER_ONLY":
             region = self.view.api_region_code
             allowed_keys = (
                 product_type.listing_offer_required_properties.get(region, [])
@@ -367,7 +367,7 @@ class GetAmazonAPIMixin:
 
         return {
             "productType": pt_code,
-            "requirements": "LISTING" if (self.sales_channel.listing_owner or product_owner or is_new_listing) else "LISTING_OFFER_ONLY",
+            "requirements": requirements,
             "attributes": clean(attributes),
         }
 
