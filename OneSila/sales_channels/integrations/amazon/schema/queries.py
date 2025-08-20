@@ -64,8 +64,8 @@ class AmazonSalesChannelsQuery:
     amazon_product_browse_node: AmazonProductBrowseNodeType = node()
     amazon_product_browse_nodes: DjangoListConnection[AmazonProductBrowseNodeType] = connection()
 
-    amazon_merchant_asin: AmazonExternalProductIdType = node()
-    amazon_merchant_asins: DjangoListConnection[AmazonExternalProductIdType] = connection()
+    amazon_external_product_id: AmazonExternalProductIdType = node()
+    amazon_external_product_ids: DjangoListConnection[AmazonExternalProductIdType] = connection()
 
     amazon_gtin_exemption: AmazonGtinExemptionType = node()
     amazon_gtin_exemptions: DjangoListConnection[AmazonGtinExemptionType] = connection()

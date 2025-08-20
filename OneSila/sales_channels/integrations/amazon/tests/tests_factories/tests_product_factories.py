@@ -129,7 +129,7 @@ class AmazonProductTestMixin:
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,
             view=self.view,
-            asin="ASIN123",
+            value="ASIN123",
         )
 
         SalesChannelViewAssign.objects.create(
@@ -960,7 +960,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,
             view=fr_view,
-            asin="ASIN123",
+            value="ASIN123",
         )
 
         mock_instance = mock_listings.return_value
@@ -1426,7 +1426,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         with self.assertRaises(ValueError) as ctx:
             fac.run()
 
-        self.assertIn("ASIN or EAN", str(ctx.exception))
+        self.assertIn("external product id or EAN", str(ctx.exception))
         mock_listings.return_value.put_listings_item.assert_not_called()
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
@@ -2414,7 +2414,7 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
             multi_tenant_company=self.multi_tenant_company,
             product=self.child,
             view=self.view,
-            asin="ASINCHILD",
+            value="ASINCHILD",
         )
 
         self.child_remote = AmazonProduct.objects.create(
@@ -2531,7 +2531,7 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
             multi_tenant_company=self.multi_tenant_company,
             product=simple,
             view=self.view,
-            asin="ASINSIMPLE",
+            value="ASINSIMPLE",
         )
         simple_remote = AmazonProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,

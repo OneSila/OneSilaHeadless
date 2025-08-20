@@ -210,6 +210,8 @@ class AmazonExternalProductIdFilter(SearchFilterMixin):
     product: Optional[ProductFilter]
     view: Optional[SalesChannelViewFilter]
     value: auto
+    type: auto
+    created_asin: auto
 
 
 @filter(AmazonGtinExemption)

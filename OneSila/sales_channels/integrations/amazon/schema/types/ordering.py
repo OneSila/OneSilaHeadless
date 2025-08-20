@@ -108,6 +108,9 @@ class AmazonExternalProductIdOrder:
     id: auto
     product: Optional[ProductOrder]
     view: Optional[AmazonSalesChannelViewOrder]
+    value: auto
+    type: auto
+    created_asin: auto
 
 
 @order(AmazonGtinExemption)

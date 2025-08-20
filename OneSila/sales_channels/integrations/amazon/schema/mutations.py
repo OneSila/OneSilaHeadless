@@ -375,11 +375,11 @@ class AmazonSalesChannelMutation:
     update_amazon_product_browse_node: AmazonProductBrowseNodeType = update(AmazonProductBrowseNodePartialInput)
     delete_amazon_product_browse_node: AmazonProductBrowseNodeType = delete()
 
-    create_amazon_merchant_asin: AmazonExternalProductIdType = create(AmazonExternalProductIdInput)
-    create_amazon_merchant_asins: List[AmazonExternalProductIdType] = create(AmazonExternalProductIdInput)
-    update_amazon_merchant_asin: AmazonExternalProductIdType = update(AmazonExternalProductIdPartialInput)
-    delete_amazon_merchant_asin: AmazonExternalProductIdType = delete()
-    delete_amazon_merchant_asins: List[AmazonExternalProductIdType] = delete()
+    create_amazon_external_product_id: AmazonExternalProductIdType = create(AmazonExternalProductIdInput)
+    create_amazon_external_product_ids: List[AmazonExternalProductIdType] = create(AmazonExternalProductIdInput)
+    update_amazon_external_product_id: AmazonExternalProductIdType = update(AmazonExternalProductIdPartialInput)
+    delete_amazon_external_product_id: AmazonExternalProductIdType = delete()
+    delete_amazon_external_product_ids: List[AmazonExternalProductIdType] = delete()
 
     create_amazon_gtin_exemption: AmazonGtinExemptionType = create(AmazonGtinExemptionInput)
     create_amazon_gtin_exemptions: List[AmazonGtinExemptionType] = create(AmazonGtinExemptionInput)

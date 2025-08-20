@@ -529,7 +529,11 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                 product=remote_product.local_instance,
                 view=view,
                 multi_tenant_company=self.sales_channel.multi_tenant_company,
-                defaults={"asin": asin},
+                defaults={
+                    "value": asin,
+                    "type": AmazonExternalProductId.TYPE_ASIN,
+                    "created_asin": asin,
+                },
             )
 
         if remote_product.syncing_current_percentage != 100:
