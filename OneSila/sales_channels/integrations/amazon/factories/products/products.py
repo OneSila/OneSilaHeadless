@@ -628,8 +628,9 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         if theme:
             parts = [p.lower() for p in theme.split("/")]
             for part in parts:
-                base = part.replace("_name", "")
-                base_attr = base
+                if "_name" not in part:
+                    continue
+                base_attr = part.replace("_name", "")
                 name_attr = f"{base_attr}_name"
                 if base_attr in self.attributes and name_attr not in self.attributes:
                     attrs[name_attr] = self.attributes[base_attr]
