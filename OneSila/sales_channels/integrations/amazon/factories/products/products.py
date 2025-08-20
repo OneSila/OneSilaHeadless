@@ -97,6 +97,10 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         self.attributes: Dict = {}
         self.image_attributes: Dict = {}
         self.prices_data = {}
+        self.external_product_id = self._get_external_product_id()
+        self.gtin_exemption = self._get_gtin_exemption()
+        self.ean_for_payload = self._get_ean_for_payload()
+        self.recommended_browse_node_id = self._get_recommended_browse_node_id()
 
     # ------------------------------------------------------------
     # Preflight & initialization helpers
@@ -105,7 +109,11 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         if not super().preflight_check():
             return False
         if self.is_create:
-            if not self._get_external_product_id() and not self.get_ean_code_value():
+            if (
+                not self.gtin_exemption
+                and not self.external_product_id
+                and not self.ean_for_payload
+            ):
                 raise ValueError("Amazon listings require external product id or EAN on create")
         return True
 
@@ -114,6 +122,8 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         super().initialize_remote_product()
         if not hasattr(self, 'current_attrs'):
             self.get_saleschannel_remote_object(self.local_instance.sku)
+            self.external_product_id = self._get_external_product_id()
+            self.ean_for_payload = self._get_ean_for_payload()
 
         if self.is_create and self.view.remote_id in (self.remote_instance.created_marketplaces or []):
             raise SwitchedToSyncException("Listing already created for marketplace")
@@ -224,7 +234,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         self.set_sku()
 
         attrs: Dict = {}
-        external_id = self._get_external_product_id()
+        external_id = self.external_product_id
         if external_id:
             if external_id.type == external_id.TYPE_ASIN:
                 attrs["merchant_suggested_asin"] = [{"value": external_id.value}]
@@ -238,7 +248,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             if external_id.created_asin and external_id.type != external_id.TYPE_ASIN:
                 attrs["merchant_suggested_asin"] = [{"value": external_id.created_asin}]
         else:
-            ean = self._get_ean_for_payload()
+            ean = self.ean_for_payload
             if ean:
                 attrs["externally_assigned_product_identifier"] = [
                     {
@@ -247,13 +257,13 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                     }
                 ]
 
-        exemption = self._get_gtin_exemption()
+        exemption = self.gtin_exemption
         if exemption:
             attrs["supplier_declared_has_product_identifier_exemption"] = [
                 {"value": True}
             ]
 
-        browse_node_id = self._get_recommended_browse_node_id()
+        browse_node_id = self.recommended_browse_node_id
         if browse_node_id:
             attrs["recommended_browse_nodes"] = [
                 {"value": browse_node_id, "marketplace_id": self.view.remote_id}
@@ -746,7 +756,7 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
             has_asin = bool(self.payload.get("attributes", {}).get("merchant_suggested_asin"))
             self.remote_instance.created_marketplaces.append(self.view.remote_id)
             if not self.remote_instance.ean_code:
-                self.remote_instance.ean_code = self._get_ean_for_payload()
+                self.remote_instance.ean_code = self.ean_for_payload
             update_fields = ["created_marketplaces", "ean_code"]
             if first_assign and not has_asin and not self.remote_instance.product_owner:
                 self.remote_instance.product_owner = True
