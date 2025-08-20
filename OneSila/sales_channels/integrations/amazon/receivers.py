@@ -183,12 +183,16 @@ def amazon__product_type_changed_clear_variation_theme(sender, instance, **kwarg
 
 
 @receiver(post_create, sender='amazon.AmazonProductBrowseNode')
+@receiver(post_update, sender='amazon.AmazonProductBrowseNode')
 def amazon__product_browse_node__propagate_to_variations(sender, instance, **kwargs):
+
     if not instance.product.is_configurable():
         return
-    variations = instance.product.get_configurable_variations(active_only=True)
+
+    variations = instance.product.get_configurable_variations(active_only=False)
     for variation in variations:
         AmazonProductBrowseNode.objects.get_or_create(
+            multi_tenant_company=instance.multi_tenant_company,
             product=variation,
             sales_channel=instance.sales_channel,
             view=instance.view,
