@@ -13,6 +13,7 @@ from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 from sales_channels.models.logs import RemoteLog
 from deepdiff import DeepDiff
 
+import pprint
 import logging
 logger = logging.getLogger(__name__)
 
@@ -409,8 +410,7 @@ class GetAmazonAPIMixin:
             processing_status=processing_status,
         )
 
-        print('--------------------------------- RESPONSE')
-        pprint.pprint(response)
+        logger.debug("create_product response:\n%s", pprint.pformat(response))
 
         return response
 
@@ -468,19 +468,19 @@ class GetAmazonAPIMixin:
             "productType": product_type.product_type_code,
             "patches": patches,
         }
-
-        # import pprint
-        # print('-------------------------------------- CURRENT ATTRIBUTES')
-        # pprint.pprint(current_attributes)
-        # print('-------------------------------------- NEW ATTRIBUTES')
-        # pprint.pprint(new_attributes)
-        #
-        # print('--------------------------------------- ARGUMENTS')
-        # print('mode')
-        # print("VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None)
-        # print('body')
-        # pprint.pprint(body)
-        # print('-------------------------------------------------')
+        logger.debug(
+            "update_product current attributes:\n%s",
+            pprint.pformat(current_attributes),
+        )
+        logger.debug(
+            "update_product new attributes:\n%s",
+            pprint.pformat(new_attributes),
+        )
+        logger.debug(
+            "update_product arguments: mode=%s body=%s",
+            "VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
+            pprint.pformat(body),
+        )
 
         listings = ListingsApi(self._get_client())
         response = listings.patch_listings_item(
@@ -507,8 +507,7 @@ class GetAmazonAPIMixin:
             processing_status=processing_status,
         )
 
-        # print('--------------------------------- RESPONSE')
-        # pprint.pprint(response)
+        logger.debug("update_product response:\n%s", pprint.pformat(response))
 
         return response
 
