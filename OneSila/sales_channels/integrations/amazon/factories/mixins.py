@@ -378,14 +378,11 @@ class GetAmazonAPIMixin:
         body = self._build_common_body(product_type, attributes)
         listings = ListingsApi(self._get_client())
 
-        # @TODO: Add proper logger for this
-        print('--------------------------------------- ARGUMENTS')
-        print('mode')
-        print("VALIDATION_PREVIEW" if settings.DEBUG else None)
-        print('body')
-        import pprint
-        pprint.pprint(body)
-        print('-------------------------------------------------')
+        logger.debug(
+            "create_product arguments: mode=%s body=%s",
+            "VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
+            body,
+        )
 
         response = listings.put_listings_item(
             seller_id=self.sales_channel.remote_id,
@@ -554,5 +551,3 @@ class EnsureMerchantSuggestedAsinMixin:
             local_property.save(update_fields=["non_deletable"])
 
         return remote_property
-
-
