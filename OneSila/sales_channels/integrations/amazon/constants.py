@@ -94,7 +94,7 @@ AMAZON_INTERNAL_PROPERTIES = [
     'ghs', 'ghs_chemical_h_code',
 
     # Fulfillment-specific (not PIM core)
-    'fulfillment_availability', 'merchant_shipping_group', 'merchant_release_date',
+    'fulfillment_availability', 'merchant_release_date',
     'skip_offer', 'supplemental_condition_information', 'uvp_list_price'
 ]
 

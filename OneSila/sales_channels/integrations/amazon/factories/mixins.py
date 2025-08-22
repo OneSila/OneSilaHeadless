@@ -378,13 +378,14 @@ class GetAmazonAPIMixin:
         body = self._build_common_body(product_type, attributes)
         listings = ListingsApi(self._get_client())
 
-        # print('--------------------------------------- ARGUMENTS')
-        # print('mode')
-        # print("VALIDATION_PREVIEW" if settings.DEBUG else None)
-        # print('body')
-        # import pprint
-        # pprint.pprint(body)
-        # print('-------------------------------------------------')
+        # @TODO: Add proper logger for this
+        print('--------------------------------------- ARGUMENTS')
+        print('mode')
+        print("VALIDATION_PREVIEW" if settings.DEBUG else None)
+        print('body')
+        import pprint
+        pprint.pprint(body)
+        print('-------------------------------------------------')
 
         response = listings.put_listings_item(
             seller_id=self.sales_channel.remote_id,
@@ -410,6 +411,9 @@ class GetAmazonAPIMixin:
             submission_id=submission_id,
             processing_status=processing_status,
         )
+
+        print('--------------------------------- RESPONSE')
+        pprint.pprint(response)
 
         return response
 

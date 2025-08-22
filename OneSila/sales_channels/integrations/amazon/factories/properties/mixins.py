@@ -194,7 +194,7 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
         payload = self._replace_tokens(usage, self.local_instance.product)
 
         remote_prod = getattr(self, "remote_product", None)
-        if not getattr(remote_prod, "product_owner", False):
+        if not getattr(remote_prod, "product_owner", False): # @TODO: On create we need to pre populate product_owner not after
             allowed_properties = product_type.listing_offer_required_properties.get(self.view.api_region_code, [])
             if main_code not in allowed_properties:
                 return product_type, {}

@@ -440,6 +440,9 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                     defaults=defaults,
                 )
 
+        # @TODO: Add propert logger for this
+        print('-------------------------------------------- RESPONSE')
+        print(response)
         return response
 
     # ------------------------------------------------------------
@@ -729,7 +732,7 @@ class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFa
         return resp
 
     def serialize_response(self, response):
-        return response.payload if hasattr(response, "payload") else True
+        return response
 
 
 class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFactory):
@@ -765,7 +768,7 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
             self.remote_instance.save(update_fields=update_fields)
 
     def serialize_response(self, response):
-        return response.payload if hasattr(response, "payload") else True
+        return response
 
 
 class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactory):
@@ -785,7 +788,7 @@ class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactor
         return resp
 
     def serialize_response(self, response):
-        return response.payload if hasattr(response, "payload") else True
+        return response
 
 
 class AmazonProductDeleteFactory(GetAmazonAPIMixin, RemoteProductDeleteFactory):
