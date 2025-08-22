@@ -37,6 +37,7 @@ from sales_channels.integrations.amazon.factories.products.content import (
 from sales_channels.integrations.amazon.helpers import is_safe_content
 from sales_channels.integrations.amazon.models.products import (
     AmazonProduct,
+    AmazonEanCode,
 )
 from sales_channels.integrations.amazon.models.properties import (
     AmazonProductProperty,
@@ -740,7 +741,23 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
     fixing_identifier_class = AmazonProductBaseFactory
     remote_product_content_class = None
     remote_price_class = None
-    remote_product_eancode_class = None
+    remote_product_eancode_class = AmazonEanCode
+
+    def set_remote_product_for_logging(self):
+        super().set_remote_product_for_logging()
+        if self.view.remote_id not in (self.remote_instance.created_marketplaces or []):
+            first_assign = not (self.remote_instance.created_marketplaces or [])
+            external_id = getattr(self, "external_product_id", None)
+            has_asin = bool(
+                external_id
+                and (
+                    getattr(external_id, "type", None) == external_id.TYPE_ASIN
+                    or getattr(external_id, "created_asin", None)
+                )
+            )
+            if first_assign and not has_asin and not self.remote_instance.product_owner:
+                self.remote_instance.product_owner = True
+                self.remote_instance.save(update_fields=["product_owner"])
 
     def perform_remote_action(self):
         resp = self.create_product(
@@ -755,17 +772,20 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
 
     def post_action_process(self):
         if self.view.remote_id not in (self.remote_instance.created_marketplaces or []):
-            first_assign = not (self.remote_instance.created_marketplaces or [])
-            has_asin = bool(self.payload.get("attributes", {}).get("merchant_suggested_asin"))
-            self.remote_instance.created_marketplaces.append(self.view.remote_id)
-            if not self.remote_instance.ean_code:
-                self.remote_instance.ean_code = self.ean_for_payload
-            update_fields = ["created_marketplaces", "ean_code"]
-            if first_assign and not has_asin and not self.remote_instance.product_owner:
-                self.remote_instance.product_owner = True
-                update_fields.append("product_owner")
+            if not self.remote_instance.get_issues(self.view, is_validation=True):
+                self.remote_instance.created_marketplaces.append(self.view.remote_id)
+                self.remote_instance.save(update_fields=["created_marketplaces"])
 
-            self.remote_instance.save(update_fields=update_fields)
+                if self.ean_for_payload:
+                    amazon_ean_code, _ = AmazonEanCode.objects.get_or_create(
+                        multi_tenant_company=self.sales_channel.multi_tenant_company,
+                        sales_channel=self.sales_channel,
+                        remote_product=self.remote_instance,
+                    )
+
+                    if amazon_ean_code.ean_code != self.ean_for_payload:
+                        amazon_ean_code.ean_code = self.ean_for_payload
+                        amazon_ean_code.save(update_fields=["ean_code"])
 
     def serialize_response(self, response):
         return response
