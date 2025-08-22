@@ -81,6 +81,11 @@ class AmazonProduct(RemoteProduct):
 
         return issues
 
+    def get_error_validation_issues(self, view):
+        """Return only validation issues with severity 'ERROR' for this product in a given marketplace."""
+        issues = self.get_issues(view, is_validation=True)
+        return [i for i in issues if i.get("severity") == "ERROR"]
+
 
 class AmazonInventory(RemoteInventory):
     """Amazon specific remote inventory."""
