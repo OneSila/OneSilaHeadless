@@ -14,7 +14,12 @@ from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonSalesChannelView,
 )
 from sales_channels.integrations.amazon.models.products import AmazonProduct
-from sales_channels.integrations.amazon.models import AmazonPrice, AmazonCurrency, AmazonProductType
+from sales_channels.integrations.amazon.models import (
+    AmazonPrice,
+    AmazonCurrency,
+    AmazonProductType,
+    AmazonProductBrowseNode,
+)
 from sales_channels.integrations.amazon.factories.prices.prices import AmazonPriceUpdateFactory
 
 
@@ -105,7 +110,13 @@ class AmazonPriceTestMixin:
             local_instance=self.rule,
             product_type_code="CHAIR",
         )
-
+        AmazonProductBrowseNode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            recommended_browse_node_id="1",
+        )
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,
@@ -241,17 +252,7 @@ class AmazonPriceUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transact
                 "body"
             )
 
-    def test_listing_owner_uses_listing_requirements(self):
-        self.sales_channel.listing_owner = True
-        self.sales_channel.save()
-        body = self._run_factory_and_get_body()
-        patches = body.get("patches", [])
-        list_price = self.get_patch_value(patches, "/attributes/list_price")
-        self.assertIsNotNone(list_price, "list_price patch is missing")
-
     def test_product_owner_uses_price_listing_requirements(self):
-        self.sales_channel.listing_owner = False
-        self.sales_channel.save()
         self.remote_product.product_owner = True
         self.remote_product.save()
         body = self._run_factory_and_get_body()
@@ -262,8 +263,6 @@ class AmazonPriceUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transact
         self.assertEqual(list_price[0]["value_with_tax"], 80.0)
 
     def test_missing_asin_still_uses_listing_requirements(self):
-        self.sales_channel.listing_owner = False
-        self.sales_channel.save()
         self.remote_product.product_owner = True
         self.remote_product.save()
         ProductProperty.objects.filter(

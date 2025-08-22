@@ -29,13 +29,37 @@ class FetchRemoteIssuesFactory(GetAmazonAPIMixin):
             response = self.get_listing_item(
                 self.remote_product.remote_sku,
                 self.view.remote_id,
-                included_data=["issues"],
+                included_data=["issues", "summaries"],
             )
 
         if isinstance(response, dict):
             issues_data = response.get("issues", []) or []
+            summaries = response.get("summaries", []) or []
         else:
             issues_data = getattr(response, "issues", []) or []
+            summaries = getattr(response, "summaries", []) or []
+
+        if summaries:
+            summary = summaries[0]
+            asin = summary.get("asin") if isinstance(summary, dict) else getattr(summary, "asin", None)
+            if asin and getattr(self.remote_product, "local_instance", None):
+                from sales_channels.integrations.amazon.models import AmazonExternalProductId
+
+                product = self.remote_product.local_instance
+                try:
+                    ext = AmazonExternalProductId.objects.get(product=product, view=self.view)
+                    if ext.created_asin != asin:
+                        ext.created_asin = asin
+                        ext.save(update_fields=["created_asin"])
+                except AmazonExternalProductId.DoesNotExist:
+                    AmazonExternalProductId.objects.create(
+                        multi_tenant_company=self.remote_product.multi_tenant_company,
+                        product=product,
+                        view=self.view,
+                        type=AmazonExternalProductId.TYPE_ASIN,
+                        value=asin,
+                        created_asin=asin,
+                    )
 
         for issue in issues_data:
             data = ensure_serializable(

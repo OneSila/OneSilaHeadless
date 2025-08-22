@@ -161,6 +161,48 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
         search_terms = ['product__translations__name', 'product__sku' ,'sales_channel_view__name']
 
 
+    def clean(self):
+        super().clean()
+
+        sales_channel = self.sales_channel_view.sales_channel.get_real_instance()
+
+        from sales_channels.integrations.amazon.models import (
+            AmazonSalesChannel,
+            AmazonProductBrowseNode,
+            AmazonVariationTheme,
+        )
+
+        if isinstance(sales_channel, AmazonSalesChannel):
+            exists = SalesChannelViewAssign.objects.filter(
+                product=self.product,
+                sales_channel_view__sales_channel=sales_channel,
+            ).exclude(pk=self.pk).exists()
+
+            if not exists:
+                if not AmazonProductBrowseNode.objects.filter(
+                    product=self.product,
+                    sales_channel=sales_channel,
+                    view=self.sales_channel_view,
+                ).exists():
+                    raise ValidationError(
+                        {'__all__': _('Amazon products require a browse node for the first assignment.')}
+                    )
+
+                if self.product.is_configurable() and not AmazonVariationTheme.objects.filter(
+                    product=self.product, view=self.sales_channel_view
+                ).exists():
+                    raise ValidationError(
+                        {
+                            '__all__': _(
+                                'Amazon configurable products require a variation theme for the first assignment.'
+                            )
+                        }
+                    )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.product} @ {self.sales_channel_view}"
 

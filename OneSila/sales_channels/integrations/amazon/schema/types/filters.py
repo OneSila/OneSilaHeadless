@@ -21,7 +21,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductIssue,
     AmazonBrowseNode,
     AmazonProductBrowseNode,
-    AmazonMerchantAsin,
+    AmazonExternalProductId,
     AmazonGtinExemption,
     AmazonVariationTheme,
 )
@@ -107,6 +107,7 @@ class AmazonPropertySelectValueFilter(SearchFilterMixin):
 @filter(AmazonProductType)
 class AmazonProductTypeFilter(SearchFilterMixin):
     id: auto
+    product_type_code: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[ProductPropertiesRuleFilter]
 
@@ -199,16 +200,18 @@ class AmazonProductBrowseNodeFilter(SearchFilterMixin):
     id: auto
     product: Optional[ProductFilter]
     sales_channel: Optional[SalesChannelFilter]
-    sales_channel_view: Optional[SalesChannelViewFilter]
+    view: Optional[SalesChannelViewFilter]
     recommended_browse_node_id: auto
 
 
-@filter(AmazonMerchantAsin)
-class AmazonMerchantAsinFilter(SearchFilterMixin):
+@filter(AmazonExternalProductId)
+class AmazonExternalProductIdFilter(SearchFilterMixin):
     id: auto
     product: Optional[ProductFilter]
     view: Optional[SalesChannelViewFilter]
-    asin: auto
+    value: auto
+    type: auto
+    created_asin: auto
 
 
 @filter(AmazonGtinExemption)

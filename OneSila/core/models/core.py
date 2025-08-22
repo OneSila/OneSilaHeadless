@@ -4,7 +4,7 @@ from dirtyfields import DirtyFieldsMixin
 from core.models.multi_tenant import MultiTenantAwareMixin
 from strawberry.relay import to_base64
 from get_absolute_url.helpers import reverse_lazy
-
+from .mixins import TimeStampMixin
 import logging
 logger = logging.getLogger(__name__)
 
@@ -47,14 +47,6 @@ class OnlySaveOnChangeMixin(DirtyFieldsMixin, OldModel):
 
     def is_any_field_dirty(self, fields: list, check_relationship=False) -> bool:
         return any(self.is_dirty_field(field, check_relationship=check_relationship) for field in fields)
-
-    class Meta:
-        abstract = True
-
-
-class TimeStampMixin(OldModel):
-    created_at = DateTimeField(auto_now_add=True)
-    updated_at = DateTimeField(auto_now=True)
 
     class Meta:
         abstract = True

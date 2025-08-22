@@ -311,6 +311,7 @@ class ImportAliasVariationInstance(AbstractImportInstance):
 
         if not self.alias_product:
             self.variation_data["alias_parent_product"] = self.parent_product
+            self.variation_data["type"] = Product.ALIAS
             self.alias_product_import_instance = ImportProductInstance(self.variation_data, self.import_process, sales_channel=self.sales_channel)
             # allow creating alias variations even when the import is update_only
             self.alias_product_import_instance.update_only = False

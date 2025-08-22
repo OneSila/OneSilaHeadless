@@ -13,7 +13,7 @@ from sales_channels.integrations.amazon.factories.imports.products_imports impor
 )
 from properties.models import PropertySelectValue, PropertySelectValueTranslation, ProductPropertiesRule, Property, \
     ProductProperty
-from sales_channels.integrations.amazon.models import AmazonProductType
+from sales_channels.integrations.amazon.models import AmazonProductType, AmazonProductBrowseNode
 from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
@@ -98,7 +98,13 @@ class AmazonProductImageFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
             local_instance=self.rule,
             product_type_code="CHAIR",
         )
-
+        AmazonProductBrowseNode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            recommended_browse_node_id="1",
+        )
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,

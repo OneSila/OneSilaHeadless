@@ -23,6 +23,7 @@ from sales_channels.integrations.amazon.models.products import (
     AmazonProduct,
     AmazonVariationTheme,
 )
+from sales_channels.integrations.amazon.models import AmazonProductBrowseNode
 from sales_channels.integrations.amazon.models.properties import (
     AmazonProperty,
     AmazonPublicDefinition,
@@ -40,7 +41,6 @@ class AmazonProductPropertyTestSetupMixin:
         self.sales_channel = AmazonSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             remote_id="SELLER123",
-            listing_owner=True
         )
         self.view = AmazonSalesChannelView.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -132,6 +132,15 @@ class AmazonProductPropertyTestSetupMixin:
             sales_channel=self.sales_channel,
             local_instance=self.product,
             remote_sku="AMZSKU",
+        )
+        self.remote_product.product_owner = True
+        self.remote_product.save()
+        AmazonProductBrowseNode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            recommended_browse_node_id="1",
         )
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -265,49 +274,6 @@ class AmazonProductPropertyFactoryTest(DisableWooCommerceSignalsMixin, TestCase,
         with self.assertRaises(ValueError):
             fac.create_body()
 
-
-class AmazonProductPropertyFactoryWithoutListingOwnerTest(DisableWooCommerceSignalsMixin, TestCase, AmazonProductPropertyTestSetupMixin):
-    def setUp(self):
-        super().setUp()
-        self.prepare_test()
-        self.sales_channel.listing_owner = False
-        self.sales_channel.save()
-
-    def test_not_listing_owner_create_factory_value_only(self):
-        fac = AmazonProductPropertyCreateFactory(
-            sales_channel=self.sales_channel,
-            local_instance=self.product_property,
-            remote_product=self.remote_product,
-            view=self.view,
-            remote_property=self.amazon_property,
-            get_value_only=True,
-        )
-
-        body = fac.create_body()
-        self.assertIsNone(body)
-        self.assertEqual(json.loads(fac.remote_value), {})
-
-    def test_not_listing_owner_update_factory_value_only(self):
-        remote_instance = AmazonProductProperty.objects.create(
-            sales_channel=self.sales_channel,
-            local_instance=self.product_property,
-            remote_product=self.remote_product,
-            remote_property=self.amazon_property,
-            remote_value="{}",
-        )
-        fac = AmazonProductPropertyUpdateFactory(
-            sales_channel=self.sales_channel,
-            local_instance=self.product_property,
-            remote_product=self.remote_product,
-            view=self.view,
-            remote_property=self.amazon_property,
-            remote_instance=remote_instance,
-            get_value_only=True,
-        )
-        needs_update = fac.additional_update_check()
-        self.assertFalse(needs_update)
-        remote_instance.refresh_from_db()
-        self.assertEqual(json.loads(remote_instance.remote_value), {})
 
 
 class AmazonVariationThemeTest(DisableWooCommerceSignalsMixin, TestCase, AmazonProductPropertyTestSetupMixin):

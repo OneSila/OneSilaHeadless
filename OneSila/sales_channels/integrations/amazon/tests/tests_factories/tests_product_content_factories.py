@@ -24,6 +24,7 @@ from sales_channels.integrations.amazon.models.products import (
     AmazonProduct,
     AmazonProductContent,
 )
+from sales_channels.integrations.amazon.models import AmazonProductBrowseNode
 from sales_channels.integrations.amazon.models.properties import AmazonProductType
 from sales_channels.integrations.amazon.factories.products import AmazonProductContentUpdateFactory
 
@@ -34,7 +35,6 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
         self.sales_channel = AmazonSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             remote_id="SELLER123",
-            listing_owner=True
         )
         self.view = AmazonSalesChannelView.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -117,6 +117,15 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
             sales_channel=self.sales_channel,
             local_instance=self.product,
             remote_sku="AMZSKU",
+        )
+        self.remote_product.product_owner = True
+        self.remote_product.save()
+        AmazonProductBrowseNode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            recommended_browse_node_id="1",
         )
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,

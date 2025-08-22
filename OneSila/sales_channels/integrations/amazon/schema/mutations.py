@@ -21,8 +21,8 @@ from sales_channels.integrations.amazon.schema.types.input import (
     BulkAmazonPropertySelectValueLocalInstanceInput,
     AmazonProductBrowseNodeInput,
     AmazonProductBrowseNodePartialInput,
-    AmazonMerchantAsinInput,
-    AmazonMerchantAsinPartialInput,
+    AmazonExternalProductIdInput,
+    AmazonExternalProductIdPartialInput,
     AmazonGtinExemptionInput,
     AmazonGtinExemptionPartialInput,
     AmazonVariationThemeInput,
@@ -41,7 +41,7 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonProductType as AmazonProductGraphqlType,
     SuggestedAmazonProductType, SuggestedAmazonProductTypeEntry,
     AmazonProductBrowseNodeType,
-    AmazonMerchantAsinType,
+    AmazonExternalProductIdType,
     AmazonGtinExemptionType,
     AmazonVariationThemeType,
 )
@@ -296,15 +296,90 @@ class AmazonSalesChannelMutation:
 
         return product_types
 
+    @strawberry_django.mutation(
+        handle_django_errors=False, extensions=default_extensions
+    )
+    def create_and_map_amazon_product_type(
+        self,
+        product_type_code: str,
+        sales_channel: AmazonSalesChannelPartialInput,
+        info: Info,
+    ) -> AmazonProductTypeType:
+        """Create an Amazon product type and map it to a new local rule."""
+        from sales_channels.integrations.amazon.models import (
+            AmazonSalesChannel,
+            AmazonProductType,
+        )
+        from properties.models import (
+            Property,
+            PropertySelectValue,
+            PropertySelectValueTranslation,
+            ProductPropertiesRule,
+        )
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        sales_channel_obj = AmazonSalesChannel.objects.get(
+            id=sales_channel.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        if AmazonProductType.objects.filter(
+            sales_channel=sales_channel_obj,
+            product_type_code=product_type_code,
+            multi_tenant_company=multi_tenant_company,
+        ).exists():
+            raise ValidationError(
+                _("This product type already exists for this sales channel."),
+            )
+
+        name = product_type_code.replace("_", " ").title()
+
+        amazon_product_type = AmazonProductType.objects.create(
+            product_type_code=product_type_code,
+            name=name,
+            sales_channel=sales_channel_obj,
+            imported=False,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        product_type_property = Property.objects.get(
+            is_product_type=True,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        local_value = PropertySelectValue.objects.create(
+            property=product_type_property,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        PropertySelectValueTranslation.objects.create(
+            propertyselectvalue=local_value,
+            language=multi_tenant_company.language,
+            value=name,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        rule = ProductPropertiesRule.objects.get(
+            product_type=local_value,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        amazon_product_type.local_instance = rule
+        amazon_product_type.imported = True
+        amazon_product_type.save(update_fields=["local_instance", "imported"])
+
+        return amazon_product_type
+
     create_amazon_product_browse_node: AmazonProductBrowseNodeType = create(AmazonProductBrowseNodeInput)
     update_amazon_product_browse_node: AmazonProductBrowseNodeType = update(AmazonProductBrowseNodePartialInput)
     delete_amazon_product_browse_node: AmazonProductBrowseNodeType = delete()
 
-    create_amazon_merchant_asin: AmazonMerchantAsinType = create(AmazonMerchantAsinInput)
-    create_amazon_merchant_asins: List[AmazonMerchantAsinType] = create(AmazonMerchantAsinInput)
-    update_amazon_merchant_asin: AmazonMerchantAsinType = update(AmazonMerchantAsinPartialInput)
-    delete_amazon_merchant_asin: AmazonMerchantAsinType = delete()
-    delete_amazon_merchant_asins: List[AmazonMerchantAsinType] = delete()
+    create_amazon_external_product_id: AmazonExternalProductIdType = create(AmazonExternalProductIdInput)
+    create_amazon_external_product_ids: List[AmazonExternalProductIdType] = create(AmazonExternalProductIdInput)
+    update_amazon_external_product_id: AmazonExternalProductIdType = update(AmazonExternalProductIdPartialInput)
+    delete_amazon_external_product_id: AmazonExternalProductIdType = delete()
+    delete_amazon_external_product_ids: List[AmazonExternalProductIdType] = delete()
 
     create_amazon_gtin_exemption: AmazonGtinExemptionType = create(AmazonGtinExemptionInput)
     create_amazon_gtin_exemptions: List[AmazonGtinExemptionType] = create(AmazonGtinExemptionInput)

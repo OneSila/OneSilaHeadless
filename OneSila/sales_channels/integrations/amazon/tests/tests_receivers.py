@@ -11,8 +11,9 @@ from sales_channels.integrations.amazon.models import (
     AmazonPropertySelectValue,
     AmazonProductType,
     AmazonRemoteLanguage,
+    AmazonProductBrowseNode,
 )
-from products.models import Product
+from products.models import Product, ConfigurableVariation
 from sales_channels.signals import manual_sync_remote_product, update_remote_product
 from sales_channels.integrations.amazon.tasks import resync_amazon_product_db_task
 from .helpers import DisableWooCommerceSignalsMixin
@@ -240,3 +241,54 @@ class AmazonSelectValueTranslationReceiverTest(TestCase):
         task_mock.assert_not_called()
         val.refresh_from_db()
         self.assertEqual(val.translated_remote_name, "Deutschland")
+
+
+class AmazonProductBrowseNodeReceiversTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="VIEW",
+        )
+        self.parent = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.CONFIGURABLE,
+        )
+        self.var1 = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+        )
+        self.var2 = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+        )
+        ConfigurableVariation.objects.create(parent=self.parent, variation=self.var1, multi_tenant_company=self.multi_tenant_company)
+        ConfigurableVariation.objects.create(parent=self.parent, variation=self.var2, multi_tenant_company=self.multi_tenant_company)
+
+    def test_propagates_to_variations(self):
+        AmazonProductBrowseNode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.parent,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            recommended_browse_node_id="BN1",
+        )
+        self.assertTrue(
+            AmazonProductBrowseNode.objects.filter(
+                product=self.var1,
+                view=self.view,
+                recommended_browse_node_id="BN1",
+            ).exists()
+        )
+        self.assertTrue(
+            AmazonProductBrowseNode.objects.filter(
+                product=self.var2,
+                view=self.view,
+                recommended_browse_node_id="BN1",
+            ).exists()
+        )

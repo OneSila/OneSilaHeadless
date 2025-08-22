@@ -13,6 +13,7 @@ from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 from sales_channels.models.logs import RemoteLog
 from deepdiff import DeepDiff
 
+import pprint
 import logging
 logger = logging.getLogger(__name__)
 
@@ -349,13 +350,13 @@ class GetAmazonAPIMixin:
 
         pt_code = product_type.product_type_code
         has_asin = "merchant_suggested_asin" in (attributes or {})
-        force_listing = getattr(self, "force_listing_requirements", False)
         remote_product = getattr(self, "remote_product", getattr(self, "remote_instance", None))
-        product_owner = getattr(remote_product, "product_owner", False)
+        created = getattr(remote_product, "created_marketplaces", []) or []
 
-        is_new_listing = has_asin or force_listing
+        first_assign = not created
+        requirements = "LISTING" if first_assign and not has_asin else "LISTING_OFFER_ONLY"
 
-        if not (self.sales_channel.listing_owner or product_owner) and not is_new_listing:
+        if requirements == "LISTING_OFFER_ONLY":
             region = self.view.api_region_code
             allowed_keys = (
                 product_type.listing_offer_required_properties.get(region, [])
@@ -367,7 +368,7 @@ class GetAmazonAPIMixin:
 
         return {
             "productType": pt_code,
-            "requirements": "LISTING" if (self.sales_channel.listing_owner or product_owner or is_new_listing) else "LISTING_OFFER_ONLY",
+            "requirements": requirements,
             "attributes": clean(attributes),
         }
 
@@ -378,13 +379,11 @@ class GetAmazonAPIMixin:
         body = self._build_common_body(product_type, attributes)
         listings = ListingsApi(self._get_client())
 
-        # print('--------------------------------------- ARGUMENTS')
-        # print('mode')
-        # print("VALIDATION_PREVIEW" if settings.DEBUG else None)
-        # print('body')
-        # import pprint
-        # pprint.pprint(body)
-        # print('-------------------------------------------------')
+        logger.debug(
+            "create_product arguments: mode=%s body=%s",
+            "VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
+            body,
+        )
 
         response = listings.put_listings_item(
             seller_id=self.sales_channel.remote_id,
@@ -410,6 +409,8 @@ class GetAmazonAPIMixin:
             submission_id=submission_id,
             processing_status=processing_status,
         )
+
+        logger.debug("create_product response:\n%s", pprint.pformat(response))
 
         return response
 
@@ -467,19 +468,19 @@ class GetAmazonAPIMixin:
             "productType": product_type.product_type_code,
             "patches": patches,
         }
-
-        # import pprint
-        # print('-------------------------------------- CURRENT ATTRIBUTES')
-        # pprint.pprint(current_attributes)
-        # print('-------------------------------------- NEW ATTRIBUTES')
-        # pprint.pprint(new_attributes)
-        #
-        # print('--------------------------------------- ARGUMENTS')
-        # print('mode')
-        # print("VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None)
-        # print('body')
-        # pprint.pprint(body)
-        # print('-------------------------------------------------')
+        logger.debug(
+            "update_product current attributes:\n%s",
+            pprint.pformat(current_attributes),
+        )
+        logger.debug(
+            "update_product new attributes:\n%s",
+            pprint.pformat(new_attributes),
+        )
+        logger.debug(
+            "update_product arguments: mode=%s body=%s",
+            "VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
+            pprint.pformat(body),
+        )
 
         listings = ListingsApi(self._get_client())
         response = listings.patch_listings_item(
@@ -506,8 +507,7 @@ class GetAmazonAPIMixin:
             processing_status=processing_status,
         )
 
-        # print('--------------------------------- RESPONSE')
-        # pprint.pprint(response)
+        logger.debug("update_product response:\n%s", pprint.pformat(response))
 
         return response
 
@@ -550,5 +550,3 @@ class EnsureMerchantSuggestedAsinMixin:
             local_property.save(update_fields=["non_deletable"])
 
         return remote_property
-
-

@@ -17,7 +17,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductIssue,
     AmazonBrowseNode,
     AmazonProductBrowseNode,
-    AmazonMerchantAsin,
+    AmazonExternalProductId,
     AmazonGtinExemption,
     AmazonVariationTheme,
 )
@@ -103,11 +103,14 @@ class AmazonProductBrowseNodeOrder:
     product: Optional[ProductOrder]
 
 
-@order(AmazonMerchantAsin)
-class AmazonMerchantAsinOrder:
+@order(AmazonExternalProductId)
+class AmazonExternalProductIdOrder:
     id: auto
     product: Optional[ProductOrder]
     view: Optional[AmazonSalesChannelViewOrder]
+    value: auto
+    type: auto
+    created_asin: auto
 
 
 @order(AmazonGtinExemption)

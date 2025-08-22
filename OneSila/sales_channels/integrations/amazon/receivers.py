@@ -6,12 +6,15 @@ from sales_channels.signals import (
     sales_channel_created,
     manual_sync_remote_product,
     update_remote_product,
+    create_remote_product,
+    sales_view_assign_updated,
 )
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
     AmazonPropertySelectValue,
     AmazonProductType,
+    AmazonProductBrowseNode,
 )
 from sales_channels.integrations.amazon.factories.sync.rule_sync import (
     AmazonPropertyRuleItemSyncFactory,
@@ -179,3 +182,51 @@ def amazon__product_type_changed_clear_variation_theme(sender, instance, **kwarg
     from sales_channels.integrations.amazon.models import AmazonVariationTheme
 
     AmazonVariationTheme.objects.filter(product=instance.product).delete()
+
+
+@receiver(post_create, sender='amazon.AmazonProductBrowseNode')
+@receiver(post_update, sender='amazon.AmazonProductBrowseNode')
+def amazon__product_browse_node__propagate_to_variations(sender, instance, **kwargs):
+
+    if not instance.product.is_configurable():
+        return
+
+    variations = instance.product.get_configurable_variations(active_only=False)
+    for variation in variations:
+        AmazonProductBrowseNode.objects.get_or_create(
+            multi_tenant_company=instance.multi_tenant_company,
+            product=variation,
+            sales_channel=instance.sales_channel,
+            view=instance.view,
+            defaults={'recommended_browse_node_id': instance.recommended_browse_node_id},
+        )
+
+
+@receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
+def amazon__product__create_from_assign(sender, instance, view, **kwargs):
+    sales_channel = instance.sales_channel.get_real_instance()
+    if not isinstance(sales_channel, AmazonSalesChannel) or not sales_channel.active:
+        return
+    from sales_channels.integrations.amazon.factories.products import AmazonProductCreateFactory
+    fac = AmazonProductCreateFactory(
+        sales_channel=sales_channel,
+        local_instance=instance.product,
+        view=view,
+        force_validation_only=True,
+    )
+    fac.run()
+
+
+@receiver(sales_view_assign_updated, sender='products.Product')
+def amazon__assign__update(sender, instance, sales_channel, view, **kwargs):
+    sales_channel = sales_channel.get_real_instance()
+    if not isinstance(sales_channel, AmazonSalesChannel) or not sales_channel.active:
+        return
+    from sales_channels.integrations.amazon.factories.products import AmazonProductCreateFactory
+    fac = AmazonProductCreateFactory(
+        sales_channel=sales_channel,
+        local_instance=instance,
+        view=view,
+        force_validation_only=True,
+    )
+    fac.run()

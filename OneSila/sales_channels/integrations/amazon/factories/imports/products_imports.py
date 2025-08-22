@@ -415,7 +415,16 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         product_type_code = summary.get("product_type")
         product_attrs = product_data.get("attributes") or {}
 
-        name = extract_amazon_attribute_value(product_attrs, "item_name") or summary.get("item_name")
+        name_entry = product_attrs.get("item_name")
+        if isinstance(name_entry, list):
+            name_entry = name_entry[0] if name_entry else None
+        if isinstance(name_entry, dict):
+            name = name_entry.get("value") or name_entry.get("name")
+        else:
+            name = None
+
+        if not name:
+            name = summary.get("item_name")
 
         # it seems that sometimes the name can be None coming from Amazon. IN that case we fallback to sku
         if name is None:
@@ -481,9 +490,15 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         if amazon_theme:
             structured["__amazon_theme"] = amazon_theme
 
-        gtin_exemption = extract_amazon_attribute_value(
-            product_attrs, "supplier_declared_has_product_identifier_exemption"
+        gtin_entry = product_attrs.get(
+            "supplier_declared_has_product_identifier_exemption"
         )
+        if isinstance(gtin_entry, list):
+            gtin_entry = gtin_entry[0] if gtin_entry else None
+        if isinstance(gtin_entry, dict):
+            gtin_exemption = gtin_entry.get("value")
+        else:
+            gtin_exemption = None
         if gtin_exemption is not None:
             structured["__gtin_exemption"] = bool(gtin_exemption)
 
@@ -523,13 +538,17 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             remote_product.remote_sku = sku
 
         if asin and view:
-            from sales_channels.integrations.amazon.models import AmazonMerchantAsin
+            from sales_channels.integrations.amazon.models import AmazonExternalProductId
 
-            AmazonMerchantAsin.objects.update_or_create(
+            AmazonExternalProductId.objects.update_or_create(
                 product=remote_product.local_instance,
                 view=view,
                 multi_tenant_company=self.sales_channel.multi_tenant_company,
-                defaults={"asin": asin},
+                defaults={
+                    "value": asin,
+                    "type": AmazonExternalProductId.TYPE_ASIN,
+                    "created_asin": asin,
+                },
             )
 
         if remote_product.syncing_current_percentage != 100:
@@ -754,7 +773,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             AmazonProductBrowseNode.objects.update_or_create(
                 product=import_instance.instance,
                 sales_channel=self.sales_channel,
-                sales_channel_view=view,
+                view=view,
                 multi_tenant_company=self.import_process.multi_tenant_company,
                 defaults={"recommended_browse_node_id": node_id},
             )
@@ -762,7 +781,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             AmazonProductBrowseNode.objects.filter(
                 product=import_instance.instance,
                 sales_channel=self.sales_channel,
-                sales_channel_view=view,
+                view=view,
                 multi_tenant_company=self.import_process.multi_tenant_company,
             ).delete()
 

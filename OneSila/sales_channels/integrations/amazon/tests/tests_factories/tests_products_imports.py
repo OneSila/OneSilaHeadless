@@ -377,7 +377,7 @@ class AmazonProductsImportProcessorBrowseNodeGtinTest(TestCase):
             AmazonProductBrowseNode.objects.filter(
                 product=product,
                 sales_channel=self.sales_channel,
-                sales_channel_view=self.view,
+                view=self.view,
                 recommended_browse_node_id="BN1",
             ).exists()
         )

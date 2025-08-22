@@ -44,7 +44,7 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentU
         )
 
     def preflight_check(self):
-        if not self.sales_channel.listing_owner and not self.remote_product.product_owner:
+        if not self.remote_product.product_owner:
             return False
 
         return super().preflight_check()

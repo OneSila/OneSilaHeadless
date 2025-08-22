@@ -10,7 +10,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonDefaultUnitConfigurator,
     AmazonSalesChannelView,
     AmazonProductBrowseNode,
-    AmazonMerchantAsin,
+    AmazonExternalProductId,
     AmazonGtinExemption,
     AmazonVariationTheme,
 )
@@ -132,13 +132,13 @@ class AmazonProductBrowseNodePartialInput(NodeInput):
     pass
 
 
-@input(AmazonMerchantAsin, fields="__all__")
-class AmazonMerchantAsinInput:
+@input(AmazonExternalProductId, fields="__all__")
+class AmazonExternalProductIdInput:
     pass
 
 
-@partial(AmazonMerchantAsin, fields="__all__")
-class AmazonMerchantAsinPartialInput(NodeInput):
+@partial(AmazonExternalProductId, fields="__all__")
+class AmazonExternalProductIdPartialInput(NodeInput):
     pass
 
 

@@ -37,6 +37,7 @@ from sales_channels.integrations.amazon.factories.products.content import (
 from sales_channels.integrations.amazon.helpers import is_safe_content
 from sales_channels.integrations.amazon.models.products import (
     AmazonProduct,
+    AmazonEanCode,
 )
 from sales_channels.integrations.amazon.models.properties import (
     AmazonProductProperty,
@@ -97,7 +98,10 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         self.attributes: Dict = {}
         self.image_attributes: Dict = {}
         self.prices_data = {}
-        self.force_listing_requirements = False
+        self.external_product_id = self._get_external_product_id()
+        self.gtin_exemption = self._get_gtin_exemption()
+        self.ean_for_payload = self._get_ean_for_payload()
+        self.recommended_browse_node_id = self._get_recommended_browse_node_id()
 
     # ------------------------------------------------------------
     # Preflight & initialization helpers
@@ -106,19 +110,24 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         if not super().preflight_check():
             return False
         if self.is_create:
-            if not self._get_asin() and not self.get_ean_code_value():
-                raise ValueError("Amazon listings require ASIN or EAN on create")
+            if (
+                not self.gtin_exemption
+                and not self.external_product_id
+                and not self.ean_for_payload
+            ):
+                raise ValueError("Amazon listings require external product id or EAN on create")
         return True
 
     def initialize_remote_product(self):
 
         super().initialize_remote_product()
-        if getattr(self, "remote_instance", None):
-            self.force_listing_requirements = getattr(self.remote_instance, "product_owner", False)
         if not hasattr(self, 'current_attrs'):
             self.get_saleschannel_remote_object(self.local_instance.sku)
+            self.external_product_id = self._get_external_product_id()
+            self.ean_for_payload = self._get_ean_for_payload()
 
-        if self.is_create and self.view.remote_id in (self.remote_instance.created_marketplaces or []):
+
+        if self.is_create and self.view.remote_id in (self.remote_instance.created_marketplaces or []) and len(self.remote_instance.get_error_validation_issues(self.view)) == 0:
             raise SwitchedToSyncException("Listing already created for marketplace")
         if not self.is_create and self.view.remote_id not in (self.remote_instance.created_marketplaces or []):
             raise SwitchedToCreateException("Listing missing for marketplace")
@@ -126,22 +135,42 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     # ------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------
-    def _get_asin(self) -> str | None:
-        from sales_channels.integrations.amazon.models import AmazonMerchantAsin
+    def _get_default_view(self):
+        from sales_channels.integrations.amazon.models import AmazonSalesChannelView
+
+        if not hasattr(self, "_default_view"):
+            self._default_view = None
+            if getattr(self.view, "is_default", False) is False:
+                self._default_view = AmazonSalesChannelView.objects.filter(
+                    sales_channel=self.view.sales_channel,
+                    is_default=True,
+                ).first()
+        return self._default_view
+
+    def _get_external_product_id(self):
+        from sales_channels.integrations.amazon.models import AmazonExternalProductId
 
         if not getattr(self, 'local_instance', None):
             return None
         try:
-            asin_obj = AmazonMerchantAsin.objects.get(
+            return AmazonExternalProductId.objects.get(
                 product=self.local_instance,
                 view=self.view,
             )
-        except AmazonMerchantAsin.DoesNotExist:
+        except AmazonExternalProductId.DoesNotExist:
+            default_view = self._get_default_view()
+            if default_view:
+                try:
+                    return AmazonExternalProductId.objects.get(
+                        product=self.local_instance,
+                        view=default_view,
+                    )
+                except AmazonExternalProductId.DoesNotExist:
+                    return None
             return None
-        return asin_obj.asin
 
     def _get_ean_for_payload(self) -> str | None:
-        return self.remote_instance.ean_code or self.get_ean_code_value()
+        return self.get_ean_code_value()
 
     def _extract_asin_from_listing(self, response) -> str | None:
         """Return the ASIN from a listing API response if present."""
@@ -168,36 +197,79 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 view=self.view,
             )
         except AmazonGtinExemption.DoesNotExist:
-            return None
+            default_view = self._get_default_view()
+            if default_view:
+                try:
+                    exemption = AmazonGtinExemption.objects.get(
+                        product=self.local_instance,
+                        view=default_view,
+                    )
+                except AmazonGtinExemption.DoesNotExist:
+                    return None
+            else:
+                return None
         return exemption.value
+
+    def _get_recommended_browse_node_id(self) -> str | None:
+        from sales_channels.integrations.amazon.models import AmazonProductBrowseNode
+
+        try:
+            obj = AmazonProductBrowseNode.objects.get(
+                product=self.local_instance,
+                view=self.view,
+            )
+        except AmazonProductBrowseNode.DoesNotExist:
+            default_view = self._get_default_view()
+            if default_view:
+                try:
+                    obj = AmazonProductBrowseNode.objects.get(
+                        product=self.local_instance,
+                        view=default_view,
+                    )
+                except AmazonProductBrowseNode.DoesNotExist:
+                    return None
+            else:
+                return None
+        return obj.recommended_browse_node_id
 
     def build_basic_attributes(self) -> Dict:
         self.set_sku()
 
         attrs: Dict = {}
-        asin = self._get_asin()
-        if asin:
-            attrs["merchant_suggested_asin"] = [{"value": asin}]
-            self.force_listing_requirements = False
-        else:
-            exemption = self._get_gtin_exemption()
-            if exemption:
-                attrs["supplier_declared_has_product_identifier_exemption"] = [
-                    {"value": True}
-                ]
-                self.force_listing_requirements = True
+        external_id = self.external_product_id
+        if external_id:
+            if external_id.type == external_id.TYPE_ASIN:
+                attrs["merchant_suggested_asin"] = [{"value": external_id.value}]
             else:
-                ean = self._get_ean_for_payload()
-                if ean:
-                    attrs["externally_assigned_product_identifier"] = [
-                        {
-                            "type": "ean",
-                            "value": ean,
-                        }
-                    ]
-                    self.force_listing_requirements = True
-                else:
-                    self.force_listing_requirements = False
+                attrs["externally_assigned_product_identifier"] = [
+                    {
+                        "type": external_id.type.lower(),
+                        "value": external_id.value,
+                    }
+                ]
+            if external_id.created_asin and external_id.type != external_id.TYPE_ASIN:
+                attrs["merchant_suggested_asin"] = [{"value": external_id.created_asin}]
+        else:
+            ean = self.ean_for_payload
+            if ean:
+                attrs["externally_assigned_product_identifier"] = [
+                    {
+                        "type": "ean",
+                        "value": ean,
+                    }
+                ]
+
+        exemption = self.gtin_exemption
+        if exemption:
+            attrs["supplier_declared_has_product_identifier_exemption"] = [
+                {"value": True}
+            ]
+
+        browse_node_id = self.recommended_browse_node_id
+        if browse_node_id:
+            attrs["recommended_browse_nodes"] = [
+                {"value": browse_node_id, "marketplace_id": self.view.remote_id}
+            ]
         return attrs
 
     def build_content_attributes(self) -> Dict:
@@ -351,16 +423,23 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
 
         self.current_attrs = getattr(response, "attributes", {}) or {}
 
-        if not self._get_asin():
+        external_id = self._get_external_product_id()
+        if not external_id or not external_id.created_asin:
             asin = self._extract_asin_from_listing(response)
             if asin:
-                from sales_channels.integrations.amazon.models import AmazonMerchantAsin
+                from sales_channels.integrations.amazon.models import AmazonExternalProductId
 
-                AmazonMerchantAsin.objects.update_or_create(
+                defaults = {"created_asin": asin}
+                if not external_id:
+                    defaults.update({
+                        "value": asin,
+                        "type": AmazonExternalProductId.TYPE_ASIN,
+                    })
+                AmazonExternalProductId.objects.update_or_create(
                     product=self.local_instance,
                     view=self.view,
                     multi_tenant_company=self.sales_channel.multi_tenant_company,
-                    defaults={"asin": asin},
+                    defaults=defaults,
                 )
 
         return response
@@ -413,7 +492,8 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                                           api=self.api,
                                           view=self.view,
                                           parent_local_instance=self.parent_local_instance,
-                                          remote_parent_product=self.remote_parent_product)
+                                          remote_parent_product=self.remote_parent_product,
+                                          force_validation_only=self.force_validation_only)
         fac.run()
         self.remote_instance = fac.remote_instance
 
@@ -453,8 +533,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             self.product_properties = ProductProperty.objects.filter_multi_tenant(
                 self.sales_channel.multi_tenant_company
             ).filter(product=self.local_instance, property_id__in=rule_properties_ids)
-
-        self.product_properties = self.product_properties.exclude(property__internal_name='merchant_suggested_asin')
 
     # ------------------------------------------------------------
     # Property handling
@@ -557,8 +635,9 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         if theme:
             parts = [p.lower() for p in theme.split("/")]
             for part in parts:
-                base = part.replace("_name", "")
-                base_attr = base
+                if "_name" not in part:
+                    continue
+                base_attr = part.replace("_name", "")
                 name_attr = f"{base_attr}_name"
                 if base_attr in self.attributes and name_attr not in self.attributes:
                     attrs[name_attr] = self.attributes[base_attr]
@@ -574,7 +653,17 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 view=self.view,
             )
         except AmazonVariationTheme.DoesNotExist:
-            return None
+            default_view = self._get_default_view()
+            if default_view:
+                try:
+                    obj = AmazonVariationTheme.objects.get(
+                        product=product,
+                        view=default_view,
+                    )
+                except AmazonVariationTheme.DoesNotExist:
+                    return None
+            else:
+                return None
         return obj.theme
 
     def customize_payload(self):
@@ -643,7 +732,7 @@ class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFa
         return resp
 
     def serialize_response(self, response):
-        return response.payload if hasattr(response, "payload") else True
+        return response
 
 
 class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFactory):
@@ -651,7 +740,20 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
     fixing_identifier_class = AmazonProductBaseFactory
     remote_product_content_class = None
     remote_price_class = None
-    remote_product_eancode_class = None
+    remote_product_eancode_class = AmazonEanCode
+
+    def set_remote_product_for_logging(self):
+        super().set_remote_product_for_logging()
+        first_assign = not (self.remote_instance.created_marketplaces or [])
+        external_id = getattr(self, "external_product_id", None)
+        has_asin = bool(
+            external_id
+            and getattr(external_id, "type", None) == external_id.TYPE_ASIN
+        )
+
+        if first_assign and not has_asin and not self.remote_instance.product_owner:
+            self.remote_instance.product_owner = True
+            self.remote_instance.save(update_fields=["product_owner"])
 
     def perform_remote_action(self):
         resp = self.create_product(
@@ -667,17 +769,21 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
     def post_action_process(self):
         if self.view.remote_id not in (self.remote_instance.created_marketplaces or []):
             self.remote_instance.created_marketplaces.append(self.view.remote_id)
-            if not self.remote_instance.ean_code:
-                self.remote_instance.ean_code = self._get_ean_for_payload()
-            update_fields = ["created_marketplaces", "ean_code"]
-            if self.force_listing_requirements and not self.remote_instance.product_owner:
-                self.remote_instance.product_owner = True
-                update_fields.append("product_owner")
+            self.remote_instance.save(update_fields=["created_marketplaces"])
 
-            self.remote_instance.save(update_fields=update_fields)
+            if self.ean_for_payload:
+                amazon_ean_code, _ = AmazonEanCode.objects.get_or_create(
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    remote_product=self.remote_instance,
+                )
+
+                if amazon_ean_code.ean_code != self.ean_for_payload:
+                    amazon_ean_code.ean_code = self.ean_for_payload
+                    amazon_ean_code.save(update_fields=["ean_code"])
 
     def serialize_response(self, response):
-        return response.payload if hasattr(response, "payload") else True
+        return response
 
 
 class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactory):
@@ -697,7 +803,7 @@ class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactor
         return resp
 
     def serialize_response(self, response):
-        return response.payload if hasattr(response, "payload") else True
+        return response
 
 
 class AmazonProductDeleteFactory(GetAmazonAPIMixin, RemoteProductDeleteFactory):

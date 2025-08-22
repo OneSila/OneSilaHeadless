@@ -60,9 +60,9 @@ query ($remoteProduct: GlobalID!) {
 }
 """
 
-AMAZON_MERCHANT_ASIN_FILTER_BY_PRODUCT = """
+AMAZON_EXTERNAL_PRODUCT_ID_FILTER_BY_PRODUCT = """
 query ($product: GlobalID!) {
-  amazonMerchantAsins(filters: {product: {id: {exact: $product}}}) {
+  amazonExternalProductIds(filters: {product: {id: {exact: $product}}}) {
     edges {
       node {
         id
