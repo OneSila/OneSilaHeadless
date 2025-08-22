@@ -262,7 +262,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         exemption = self.gtin_exemption
         if exemption:
             attrs["supplier_declared_has_product_identifier_exemption"] = [
-                {"value": True}
+                {"value": True, "marketplace_id": self.view.remote_id}
             ]
 
         browse_node_id = self.recommended_browse_node_id
