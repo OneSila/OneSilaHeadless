@@ -244,7 +244,7 @@ class GetAmazonAPIMixin:
             page_token = None
             last_created_date = None
 
-            logger.debug(f"[START CYCLE] created_after={created_after}")
+            logger.info(f"[START CYCLE] created_after={created_after}")
 
             while True:
                 items, page_token, results_number = self._fetch_listing_items_page(
@@ -274,7 +274,7 @@ class GetAmazonAPIMixin:
                 if not page_token:
                     break
 
-            logger.debug(
+            logger.info(
                 f"[END CYCLE] results_number={total_results} | last_created_date={last_created_date}"
             )
 
@@ -393,7 +393,7 @@ class GetAmazonAPIMixin:
         body = self._build_common_body(product_type, attributes)
         listings = ListingsApi(self._get_client())
 
-        logger.debug(
+        logger.info(
             "create_product arguments: mode=%s body=%s",
             "VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
             body,
@@ -418,7 +418,7 @@ class GetAmazonAPIMixin:
             processing_status=processing_status,
         )
 
-        logger.debug("create_product response:\n%s", pprint.pformat(response))
+        logger.info("create_product response:\n%s", pprint.pformat(response))
 
         return response
 
@@ -476,15 +476,15 @@ class GetAmazonAPIMixin:
             "productType": product_type.product_type_code,
             "patches": patches,
         }
-        logger.debug(
+        logger.info(
             "update_product current attributes:\n%s",
             pprint.pformat(current_attributes),
         )
-        logger.debug(
+        logger.info(
             "update_product new attributes:\n%s",
             pprint.pformat(new_attributes),
         )
-        logger.debug(
+        logger.info(
             "update_product arguments: mode=%s body=%s",
             "VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
             pprint.pformat(body),
@@ -509,7 +509,7 @@ class GetAmazonAPIMixin:
             processing_status=processing_status,
         )
 
-        logger.debug("update_product response:\n%s", pprint.pformat(response))
+        logger.info("update_product response:\n%s", pprint.pformat(response))
 
         return response
 
