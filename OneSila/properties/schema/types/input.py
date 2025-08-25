@@ -102,3 +102,15 @@ class BulkProductPropertyInput:
     language_code: Optional[str] = None
     translated_value: Optional[str] = None
     override_if_exists: Optional[bool] = False
+
+
+@strawberry.input
+class BulkProductPropertyTranslationInput:
+    language_code: str
+    value_text: Optional[str] = None
+    value_description: Optional[str] = None
+
+
+@strawberry.input
+class BulkProductPropertyPartialInput(ProductPropertyPartialInput):
+    translation: Optional[BulkProductPropertyTranslationInput] = None

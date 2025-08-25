@@ -4,7 +4,7 @@ import strawberry_django
 from core.schema.core.extensions import default_extensions
 from core.schema.core.helpers import get_multi_tenant_company
 from .fields import complete_create_product_properties_rule, complete_update_product_properties_rule, \
-    bulk_create_product_properties, create_property, create_property_select_value
+    bulk_create_product_properties, bulk_update_product_properties, create_property, create_property_select_value
 from ..types.types import PropertyType, PropertyTranslationType, PropertySelectValueType, ProductPropertyType, ProductPropertyTextTranslationType, \
     PropertySelectValueTranslationType, ProductPropertiesRuleType, ProductPropertiesRuleItemType, PropertyDuplicatesType, PropertySelectValueDuplicatesType
 from properties.models import Property, PropertySelectValue
@@ -37,6 +37,7 @@ class PropertiesMutation:
     create_product_property: ProductPropertyType = create(ProductPropertyInput)
     create_product_properties: List[ProductPropertyType] = create(ProductPropertyInput)
     bulk_create_product_properties: List[ProductPropertyType] = bulk_create_product_properties()
+    bulk_update_product_properties: List[ProductPropertyType] = bulk_update_product_properties()
     update_product_property: ProductPropertyType = update(ProductPropertyPartialInput)
     delete_product_property: ProductPropertyType = delete()
     delete_product_properties: List[ProductPropertyType] = delete()
