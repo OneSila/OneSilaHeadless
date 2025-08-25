@@ -372,6 +372,20 @@ class GetAmazonAPIMixin:
             "attributes": clean(attributes),
         }
 
+    def _build_listing_kwargs(self, sku, marketplace_id, body, force_validation_only=False):
+        kwargs = {
+            "seller_id": self.sales_channel.remote_id,
+            "sku": sku,
+            "marketplace_ids": [marketplace_id],
+            "body": body,
+            "issue_locale": self._get_issue_locale(),
+        }
+
+        if settings.DEBUG or force_validation_only:
+            kwargs["mode"] = "VALIDATION_PREVIEW"
+
+        return kwargs
+
     @throttle_safe(max_retries=5, base_delay=1)
     def create_product(
         self, sku, marketplace_id, product_type, attributes, force_validation_only: bool = False
@@ -386,13 +400,7 @@ class GetAmazonAPIMixin:
         )
 
         response = listings.put_listings_item(
-            seller_id=self.sales_channel.remote_id,
-            sku=sku,
-            marketplace_ids=[marketplace_id],
-            body=body,
-            issue_locale=self._get_issue_locale(),
-            mode="VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
-        )
+            **self._build_listing_kwargs(sku, marketplace_id, body, force_validation_only))
 
         if getattr(self, "remote_product", None):
             self.remote_product.last_sync_at = timezone.now()
@@ -483,14 +491,8 @@ class GetAmazonAPIMixin:
         )
 
         listings = ListingsApi(self._get_client())
-        response = listings.patch_listings_item(
-            seller_id=self.sales_channel.remote_id,
-            sku=sku,
-            marketplace_ids=[marketplace_id],
-            body=body,
-            issue_locale=self._get_issue_locale(),
-            mode="VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
-        )
+        response = listings.patch_listings_item(**self._build_listing_kwargs(sku, marketplace_id, body, force_validation_only))
+
 
         if getattr(self, "remote_product", None):
             self.remote_product.last_sync_at = timezone.now()
