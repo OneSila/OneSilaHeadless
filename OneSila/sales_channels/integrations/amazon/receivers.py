@@ -205,14 +205,18 @@ def amazon__product_browse_node__propagate_to_variations(sender, instance, **kwa
 @receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
 def amazon__product__create_from_assign(sender, instance, view, **kwargs):
     sales_channel = instance.sales_channel.get_real_instance()
+
     if not isinstance(sales_channel, AmazonSalesChannel) or not sales_channel.active:
         return
+
     from sales_channels.integrations.amazon.factories.products import AmazonProductCreateFactory
+    from django.conf import settings
+
     fac = AmazonProductCreateFactory(
         sales_channel=sales_channel,
         local_instance=instance.product,
         view=view,
-        force_validation_only=True,
+        force_validation_only=settings.DEBUG,
     )
     fac.run()
 
@@ -220,13 +224,17 @@ def amazon__product__create_from_assign(sender, instance, view, **kwargs):
 @receiver(sales_view_assign_updated, sender='products.Product')
 def amazon__assign__update(sender, instance, sales_channel, view, **kwargs):
     sales_channel = sales_channel.get_real_instance()
+
     if not isinstance(sales_channel, AmazonSalesChannel) or not sales_channel.active:
         return
+
     from sales_channels.integrations.amazon.factories.products import AmazonProductCreateFactory
+    from django.conf import settings
+
     fac = AmazonProductCreateFactory(
         sales_channel=sales_channel,
         local_instance=instance,
         view=view,
-        force_validation_only=True,
+        force_validation_only=settings.DEBUG,
     )
     fac.run()
