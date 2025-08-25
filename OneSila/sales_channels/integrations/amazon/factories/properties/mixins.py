@@ -52,7 +52,7 @@ class AmazonRemoteValueMixin:
         if ptype in [Property.TYPES.INT, Property.TYPES.FLOAT]:
             return value
         if ptype == Property.TYPES.BOOLEAN:
-            return True if value in [True, "true", "1", 1] else False
+            return True if value in [True, "true", "True", "1", 1] else False
         if ptype in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
             return self._get_select_remote_value(prop_instance, remote_property)
 
