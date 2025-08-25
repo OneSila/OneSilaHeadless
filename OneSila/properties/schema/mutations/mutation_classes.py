@@ -161,3 +161,59 @@ class BulkCreateProductProperties(CreateMutation):
             return obj
 
 
+class BulkUpdateProductProperties(UpdateMutation):
+    def update(self, info: Info, instance: ProductProperty, data: dict[str, Any]):
+        with DjangoOptimizerExtension.disabled():
+            translation_data = data.pop("translation", None)
+            value_multi_select = data.pop("value_multi_select", UNSET)
+            value_select = data.pop("value_select", UNSET)
+
+            obj = super().update(info=info, instance=instance, data=data)
+
+            if value_select is not UNSET:
+                if value_select is None:
+                    obj.value_select = None
+                else:
+                    obj.value_select_id = value_select.pk.id
+                obj.save()
+
+            if value_multi_select is not UNSET:
+                values: list[int] = []
+                if value_multi_select is not None:
+                    values = [v.pk.id for v in value_multi_select]
+                obj.value_multi_select.set(values)
+
+            if translation_data:
+                multi_tenant_company = self.get_multi_tenant_company(info, fail_silently=False)
+                multi_tenant_user = self.get_current_user(info, fail_silently=False)
+                extra_kwargs = {
+                    'multi_tenant_company': multi_tenant_company,
+                    'created_by_multi_tenant_user': multi_tenant_user,
+                    'last_update_by_multi_tenant_user': multi_tenant_user,
+                }
+
+                language_code = translation_data.language_code
+
+                try:
+                    translation = ProductPropertyTextTranslation.objects.get(
+                        product_property=obj,
+                        language=language_code,
+                    )
+                    translation.last_update_by_multi_tenant_user = multi_tenant_user
+                except ProductPropertyTextTranslation.DoesNotExist:
+                    translation = ProductPropertyTextTranslation(
+                        product_property=obj,
+                        language=language_code,
+                        **extra_kwargs,
+                    )
+
+                if translation_data.value_text is not None:
+                    translation.value_text = translation_data.value_text
+                if translation_data.value_description is not None:
+                    translation.value_description = translation_data.value_description
+
+                translation.save()
+
+            return obj
+
+
