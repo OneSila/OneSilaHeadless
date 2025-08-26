@@ -14,8 +14,17 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductBrowseNode,
 )
 from products.models import Product, ConfigurableVariation
-from sales_channels.signals import manual_sync_remote_product, update_remote_product
-from sales_channels.integrations.amazon.tasks import resync_amazon_product_db_task
+from sales_channels.models import SalesChannelViewAssign
+from sales_channels.signals import (
+    manual_sync_remote_product,
+    update_remote_product,
+    create_remote_product,
+    sales_view_assign_updated,
+)
+from sales_channels.integrations.amazon.tasks import (
+    resync_amazon_product_db_task,
+    create_amazon_product_db_task,
+)
 from .helpers import DisableWooCommerceSignalsMixin
 
 
@@ -80,6 +89,66 @@ class AmazonManualSyncReceiverTest(DisableWooCommerceSignalsMixin, TestCase):
     #     self.assertEqual(kwargs["task_func"], resync_amazon_product_db_task)
     #     self.assertTrue(kwargs["force_validation_only"])
     #     self.assertEqual(kwargs["view"], self.view)
+
+
+class AmazonAssignReceiversTest(DisableWooCommerceSignalsMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="VIEW",
+        )
+        self.product = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+        )
+        AmazonProductBrowseNode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            recommended_browse_node_id="1",
+        )
+        self.assign = SalesChannelViewAssign.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            sales_channel=self.sales_channel,
+            sales_channel_view=self.view,
+        )
+
+    @patch("sales_channels.integrations.amazon.receivers.run_single_amazon_product_task_flow")
+    def test_create_from_assign_queues_task(self, flow_mock):
+        create_remote_product.send(
+            sender=SalesChannelViewAssign,
+            instance=self.assign,
+            view=self.view,
+        )
+
+        flow_mock.assert_called_once()
+        _, kwargs = flow_mock.call_args
+        self.assertEqual(kwargs["task_func"], create_amazon_product_db_task)
+        self.assertEqual(kwargs["product_id"], self.product.id)
+        self.assertEqual(kwargs["view"], self.view)
+
+    @patch("sales_channels.integrations.amazon.receivers.run_single_amazon_product_task_flow")
+    def test_assign_update_queues_task(self, flow_mock):
+        sales_view_assign_updated.send(
+            sender=Product,
+            instance=self.product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+        )
+
+        flow_mock.assert_called_once()
+        _, kwargs = flow_mock.call_args
+        self.assertEqual(kwargs["task_func"], create_amazon_product_db_task)
+        self.assertEqual(kwargs["product_id"], self.product.id)
+        self.assertEqual(kwargs["view"], self.view)
 
 
 class AmazonPropertyReceiversTest(TestCase):
