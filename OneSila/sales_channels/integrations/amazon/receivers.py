@@ -26,6 +26,7 @@ from sales_channels.integrations.amazon.tasks import (
     create_amazon_product_type_rule_task,
     resync_amazon_product_db_task,
     amazon_translate_select_value_task,
+    create_amazon_product_db_task,
 )
 from sales_channels.integrations.amazon.constants import (
     AMAZON_SELECT_VALUE_TRANSLATION_IGNORE_CODES,
@@ -209,16 +210,17 @@ def amazon__product__create_from_assign(sender, instance, view, **kwargs):
     if not isinstance(sales_channel, AmazonSalesChannel) or not sales_channel.active:
         return
 
-    from sales_channels.integrations.amazon.factories.products import AmazonProductCreateFactory
     from django.conf import settings
+    product = instance.product
+    count = 1 + getattr(product, 'get_configurable_variations', lambda: [])().count()
 
-    fac = AmazonProductCreateFactory(
-        sales_channel=sales_channel,
-        local_instance=instance.product,
+    run_single_amazon_product_task_flow(
+        task_func=create_amazon_product_db_task,
         view=view,
+        number_of_remote_requests=count,
+        product_id=product.id,
         force_validation_only=settings.DEBUG,
     )
-    fac.run()
 
 
 @receiver(sales_view_assign_updated, sender='products.Product')
@@ -229,13 +231,13 @@ def amazon__assign__update(sender, instance, sales_channel, view, **kwargs):
     if not isinstance(sales_channel, AmazonSalesChannel) or not sales_channel.active or is_delete:
         return
 
-    from sales_channels.integrations.amazon.factories.products import AmazonProductCreateFactory
     from django.conf import settings
+    count = 1 + getattr(instance, 'get_configurable_variations', lambda: [])().count()
 
-    fac = AmazonProductCreateFactory(
-        sales_channel=sales_channel,
-        local_instance=instance,
+    run_single_amazon_product_task_flow(
+        task_func=create_amazon_product_db_task,
         view=view,
+        number_of_remote_requests=count,
+        product_id=instance.id,
         force_validation_only=settings.DEBUG,
     )
-    fac.run()

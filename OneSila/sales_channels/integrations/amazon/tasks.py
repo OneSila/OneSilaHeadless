@@ -110,6 +110,34 @@ def amazon_translate_select_value_task(select_value_id: int):
 
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
+def create_amazon_product_db_task(
+    task_queue_item_id,
+    sales_channel_id,
+    product_id,
+    view_id,
+    force_validation_only=False,
+):
+    """Run the create factory for an Amazon product."""
+    from products.models import Product
+    from .models import AmazonSalesChannel, AmazonSalesChannelView
+    from .factories.products import AmazonProductCreateFactory
+
+    task = BaseRemoteTask(task_queue_item_id)
+
+    def actual_task():
+        factory = AmazonProductCreateFactory(
+            sales_channel=AmazonSalesChannel.objects.get(id=sales_channel_id),
+            local_instance=Product.objects.get(id=product_id),
+            view=AmazonSalesChannelView.objects.get(id=view_id),
+            force_validation_only=force_validation_only,
+        )
+        factory.run()
+
+    task.execute(actual_task)
+
+
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
+@db_task()
 def resync_amazon_product_db_task(
     task_queue_item_id,
     sales_channel_id,
