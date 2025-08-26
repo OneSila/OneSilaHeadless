@@ -41,7 +41,7 @@ class PropertiesMutation:
     bulk_create_product_properties: List[ProductPropertyType] = bulk_create_product_properties()
     update_product_property: ProductPropertyType = update(ProductPropertyPartialInput)
     delete_product_property: ProductPropertyType = delete()
-    delete_product_properties: List[ProductPropertyType] = delete()
+    delete_product_properties: List[ProductPropertyType] = delete(is_bulk=True)
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def bulk_update_product_properties(
