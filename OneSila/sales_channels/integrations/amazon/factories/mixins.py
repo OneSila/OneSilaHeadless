@@ -359,8 +359,14 @@ class GetAmazonAPIMixin:
         remote_product = getattr(self, "remote_product", getattr(self, "remote_instance", None))
         created = getattr(remote_product, "created_marketplaces", []) or []
 
-        first_assign = not created
-        requirements = "LISTING" if (first_assign and not has_asin) or remote_product.product_owner else "LISTING_OFFER_ONLY"
+        # Determine requirements
+        if len(created) > 1:
+            requirements = "LISTING_OFFER_ONLY"
+        else:
+            if has_asin:
+                requirements = "LISTING_OFFER_ONLY"
+            else:
+                requirements = "LISTING"
 
         if requirements == "LISTING_OFFER_ONLY":
             region = self.view.api_region_code

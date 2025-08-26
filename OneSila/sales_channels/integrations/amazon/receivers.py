@@ -224,8 +224,9 @@ def amazon__product__create_from_assign(sender, instance, view, **kwargs):
 @receiver(sales_view_assign_updated, sender='products.Product')
 def amazon__assign__update(sender, instance, sales_channel, view, **kwargs):
     sales_channel = sales_channel.get_real_instance()
+    is_delete = kwargs.get('is_delete', False)
 
-    if not isinstance(sales_channel, AmazonSalesChannel) or not sales_channel.active:
+    if not isinstance(sales_channel, AmazonSalesChannel) or not sales_channel.active or is_delete:
         return
 
     from sales_channels.integrations.amazon.factories.products import AmazonProductCreateFactory
