@@ -214,6 +214,11 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
         from sales_channels.integrations.shopify.models import ShopifySalesChannel
         from sales_channels.integrations.magento2.models import MagentoSalesChannel
         from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
+        from sales_channels.integrations.amazon.models import (
+            AmazonExternalProductId,
+            AmazonSalesChannel,
+            AmazonSalesChannelView,
+        )
 
         sales_channel = self.sales_channel.get_real_instance()
 
@@ -223,6 +228,30 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
             return f"{self.sales_channel_view.url}{self.product.url_key}.html"
         elif isinstance(sales_channel, WoocommerceSalesChannel):
             return f"{self.sales_channel_view.url}/products/{self.product.url_key}"
+        elif isinstance(sales_channel, AmazonSalesChannel):
+            try:
+                asin = AmazonExternalProductId.objects.get(
+                    product=self.product,
+                    view=self.sales_channel_view,
+                    type=AmazonExternalProductId.TYPE_ASIN,
+                ).value
+                return f"{self.sales_channel_view.url}/dp/{asin}"
+            except AmazonExternalProductId.DoesNotExist:
+                default_view = AmazonSalesChannelView.objects.filter(
+                    sales_channel=sales_channel,
+                    is_default=True,
+                ).first()
+                if default_view:
+                    try:
+                        asin = AmazonExternalProductId.objects.get(
+                            product=self.product,
+                            view=default_view,
+                            type=AmazonExternalProductId.TYPE_ASIN,
+                        ).value
+                        return f"{default_view.url}/dp/{asin}"
+                    except AmazonExternalProductId.DoesNotExist:
+                        pass
+            return None
 
         return f"{self.sales_channel_view.url}{self.product.url_key}.html"
 
