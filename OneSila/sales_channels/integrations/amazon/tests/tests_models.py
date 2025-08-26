@@ -10,6 +10,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonVariationTheme,
 )
 from sales_channels.integrations.amazon.models.properties import AmazonProperty
+from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
 from sales_channels.models import SalesChannelViewAssign
 from properties.models import Property
 
@@ -44,7 +45,7 @@ class AmazonPropertyModelTest(TestCase):
         self.assertIsNotNone(amazon_property.pk)
 
 
-class SalesChannelViewAssignValidationTest(TestCase):
+class SalesChannelViewAssignValidationTest(DisableWooCommerceSignalsMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.channel = AmazonSalesChannel.objects.create(

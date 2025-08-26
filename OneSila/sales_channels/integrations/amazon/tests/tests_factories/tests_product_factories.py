@@ -1561,7 +1561,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
 
         self.assertEqual(
             attrs.get("supplier_declared_has_product_identifier_exemption"),
-            [{"value": True}],
+            [{"value": True, "marketplace_id": self.view.remote_id}],
         )
         self.assertNotIn("externally_assigned_product_identifier", attrs)
 
@@ -2442,7 +2442,7 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
         child_body = next(b for b in bodies if b["attributes"].get("parentage_level", [{}])[0]["value"] == "child")
 
         # Shared expectations
-        expected_theme = [{"value": "COLOR/SIZE", "marketplace_id": self.view.remote_id}]
+        expected_theme = [{"name": "COLOR/SIZE", "marketplace_id": self.view.remote_id}]
 
         self.assertEqual(parent_body["attributes"].get("variation_theme"), expected_theme)
         self.assertEqual(parent_body["attributes"].get("parentage_level"),
@@ -2488,7 +2488,7 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
 
         body = mock_instance.put_listings_item.call_args.kwargs.get("body")
         attrs = body.get("attributes", {})
-        expected_theme = [{"value": "COLOR/SIZE", "marketplace_id": self.view.remote_id}]
+        expected_theme = [{"name": "COLOR/SIZE", "marketplace_id": self.view.remote_id}]
         expected_parentage = [{"value": "child", "marketplace_id": self.view.remote_id}]
         expected_rel = [
             {
@@ -2551,7 +2551,7 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
         self.assertNotIn("child_parent_sku_relationship", attrs)
 
 
-class AmazonProductFallbackValuesTest(TestCase, AmazonProductTestMixin):
+class AmazonProductFallbackValuesTest(DisableWooCommerceSignalsMixin, TestCase, AmazonProductTestMixin):
     def setUp(self):
         super().setUp()
         self.setup_product()

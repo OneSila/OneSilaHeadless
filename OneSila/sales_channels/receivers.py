@@ -652,8 +652,11 @@ def sales_channel_view_assign__post_delete_receiver(sender, instance, **kwargs):
         delete_remote_product.send(sender=instance.__class__, instance=instance, is_variation=is_variation)
     else:
         # Otherwise, send sales_view_assign_updated signal
-        sales_view_assign_updated.send(sender=instance.product.__class__, instance=instance.product,
-                                       sales_channel=instance.sales_channel, view=instance.sales_channel_view)
+        sales_view_assign_updated.send(sender=instance.product.__class__,
+                                       instance=instance.product,
+                                       sales_channel=instance.sales_channel,
+                                       view=instance.sales_channel_view,
+                                       is_delete=True)
 
 
 @receiver(post_update, sender='products.Product')

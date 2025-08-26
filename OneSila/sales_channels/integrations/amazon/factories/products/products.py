@@ -114,6 +114,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 not self.gtin_exemption
                 and not self.external_product_id
                 and not self.ean_for_payload
+                and not self.local_instance.is_configurable()
             ):
                 raise ValueError("Amazon listings require external product id or EAN on create")
         return True
@@ -126,6 +127,10 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             self.external_product_id = self._get_external_product_id()
             self.ean_for_payload = self._get_ean_for_payload()
 
+        # we don't wanna switch to other factory if is validation only because this can create an infinite loop
+        # since the product will show as created_marketplaces but is not actually created
+        if self.force_validation_only:
+            return
 
         if self.is_create and self.view.remote_id in (self.remote_instance.created_marketplaces or []) and len(self.remote_instance.get_error_validation_issues(self.view)) == 0:
             raise SwitchedToSyncException("Listing already created for marketplace")
@@ -613,7 +618,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             theme = self._get_variation_theme(self.local_instance)
 
         if theme:
-            attrs["variation_theme"] = [{"value": theme, "marketplace_id": self.view.remote_id}]
+            attrs["variation_theme"] = [{"name": theme, "marketplace_id": self.view.remote_id}]
 
         if self.is_variation:
             attrs["parentage_level"] = [
@@ -632,15 +637,16 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 {"value": "parent", "marketplace_id": self.view.remote_id}
             ]
 
-        if theme:
-            parts = [p.lower() for p in theme.split("/")]
-            for part in parts:
-                if "_name" not in part:
-                    continue
-                base_attr = part.replace("_name", "")
-                name_attr = f"{base_attr}_name"
-                if base_attr in self.attributes and name_attr not in self.attributes:
-                    attrs[name_attr] = self.attributes[base_attr]
+        # @TODO: come back to this
+        # if theme:
+        #     parts = [p.lower() for p in theme.split("/")]
+        #     for part in parts:
+        #         if "_name" not in part:
+        #             continue
+        #         base_attr = part.replace("_name", "")
+        #         name_attr = f"{base_attr}_name"
+        #         if base_attr in self.attributes and name_attr not in self.attributes:
+        #             attrs[name_attr] = self.attributes[base_attr]
 
         return attrs
 
@@ -682,6 +688,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             remote_instance=remote_variation,
             api=self.api,
             view=self.view,
+            force_validation_only=self.force_validation_only,
         )
         factory.run()
 

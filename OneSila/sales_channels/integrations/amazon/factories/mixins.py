@@ -39,11 +39,17 @@ class GetAmazonAPIMixin:
         submission_id=None,
         processing_status=None,
     ):
+        from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteValidationIssueFactory
+
         """Update assign issues and optionally log the action."""
         if not getattr(self, "remote_product", None) or not isinstance(getattr(self, "view", None),
                                                                        AmazonSalesChannelView):
             return
-        from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteValidationIssueFactory
+
+        if getattr(self, "remote_instance", None) and isinstance(self.remote_instance, type(self.remote_product)):
+            if self.remote_product.id != self.remote_instance.id:
+                self.remote_product = self.remote_instance
+
 
         FetchRemoteValidationIssueFactory(
             remote_product=self.remote_product,
@@ -353,8 +359,14 @@ class GetAmazonAPIMixin:
         remote_product = getattr(self, "remote_product", getattr(self, "remote_instance", None))
         created = getattr(remote_product, "created_marketplaces", []) or []
 
-        first_assign = not created
-        requirements = "LISTING" if (first_assign and not has_asin) or remote_product.product_owner else "LISTING_OFFER_ONLY"
+        # Determine requirements
+        if len(created) > 1:
+            requirements = "LISTING_OFFER_ONLY"
+        else:
+            if has_asin:
+                requirements = "LISTING_OFFER_ONLY"
+            else:
+                requirements = "LISTING"
 
         if requirements == "LISTING_OFFER_ONLY":
             region = self.view.api_region_code
@@ -396,7 +408,7 @@ class GetAmazonAPIMixin:
         logger.info(
             "create_product arguments: mode=%s body=%s",
             "VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
-            body,
+            pprint.pformat(body),
         )
 
         response = listings.put_listings_item(
