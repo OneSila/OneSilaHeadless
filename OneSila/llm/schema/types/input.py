@@ -23,6 +23,7 @@ class ContentAiGenerateType(Enum):
     DESCRIPTION = "description"
     SHORT_DESCRIPTION = "short_description"
     NAME = "name"
+    BULLET_POINTS = "bullet_points"
 
 
 class SalesChannelIntegrationType(Enum):
