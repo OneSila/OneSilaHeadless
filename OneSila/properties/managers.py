@@ -205,6 +205,36 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
 
         return self.filter(id__in=matched_ids).order_by('id').distinct('id')
 
+    def merge(self, target):
+        from .models import PropertySelectValue
+
+        if isinstance(target, (int, str)):
+            target = PropertySelectValue.objects.get(pk=target)
+
+        sources = self.exclude(pk=target.pk)
+
+        if sources.exclude(property_id=target.property_id).exists():
+            raise ValidationError(_("Property select values must belong to the same property."))
+
+        with transaction.atomic():
+            for source in sources:
+                for relation in PropertySelectValue._meta.related_objects:
+                    if relation.one_to_many or relation.one_to_one:
+                        relation.related_model._default_manager.filter(
+                            **{relation.field.name: source}
+                        ).update(**{relation.field.name: target})
+                    elif relation.many_to_many:
+                        through = relation.through._default_manager
+                        source_field = relation.field.m2m_reverse_field_name()
+                        for through_obj in through.filter(**{source_field: source.pk}):
+                            setattr(through_obj, source_field, target.pk)
+                            try:
+                                through_obj.save()
+                            except IntegrityError:
+                                through_obj.delete()
+                source.delete(force_delete=True)
+            return target
+
 
 class PropertySelectValueManager(MultiTenantManager):
     def get_queryset(self):
@@ -221,6 +251,12 @@ class PropertySelectValueManager(MultiTenantManager):
             language_code=multi_tenant_company.language,
             threshold=threshold,
         )
+
+    def merge(self, sources, target):
+        if hasattr(sources, "merge"):
+            return sources.merge(target)
+        ids = [s if isinstance(s, (int, str)) else s.pk for s in sources]
+        return self.filter(id__in=ids).merge(target)
 
 
 class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):

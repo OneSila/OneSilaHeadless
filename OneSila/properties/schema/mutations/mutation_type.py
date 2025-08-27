@@ -36,6 +36,25 @@ class PropertiesMutation:
     delete_property_select_value: PropertySelectValueType = delete()
     delete_property_select_values: List[PropertySelectValueType] = delete(is_bulk=True)
 
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def merge_property_select_value(
+        self,
+        info: Info,
+        sources: TypingList[PropertySelectValuePartialInput],
+        target: PropertySelectValuePartialInput,
+    ) -> PropertySelectValueType:
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        source_ids = [s.id.node_id for s in sources]
+        source_qs = PropertySelectValue.objects.filter(
+            id__in=source_ids,
+            multi_tenant_company=multi_tenant_company,
+        )
+        target_instance = PropertySelectValue.objects.get(
+            id=target.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+        return source_qs.merge(target_instance)
+
     create_product_property: ProductPropertyType = create(ProductPropertyInput)
     create_product_properties: List[ProductPropertyType] = create(ProductPropertyInput)
     bulk_create_product_properties: List[ProductPropertyType] = bulk_create_product_properties()
