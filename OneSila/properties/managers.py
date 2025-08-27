@@ -219,6 +219,8 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
         with transaction.atomic():
             for source in sources:
                 for relation in PropertySelectValue._meta.related_objects:
+                    if relation.related_model.__name__ == "PropertySelectValueTranslation":
+                        continue
                     if relation.one_to_many or relation.one_to_one:
                         relation.related_model._default_manager.filter(
                             **{relation.field.name: source}
