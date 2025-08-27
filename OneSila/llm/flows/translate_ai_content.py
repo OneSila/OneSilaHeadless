@@ -6,6 +6,9 @@ from products.models import Product, ProductTranslation
 from properties.models import Property, PropertySelectValue, PropertyTranslation, PropertySelectValueTranslation
 
 
+BULLET_POINT_SEPARATOR = "__BULLET_SEPARATOR__"
+
+
 class AITranslateContentFlow:
     def __init__(self, to_translate, from_language_code, to_language_code, multi_tenant_company,
                  product=None, content_type=None, sales_channel=None):
@@ -48,10 +51,17 @@ class AITranslateContentFlow:
                 if self.content_type == ContentAiGenerateType.NAME:
                     self.to_translate = self._get_safe_translation(translation, 'name')
 
+                if self.content_type == ContentAiGenerateType.BULLET_POINTS:
+                    self.to_translate = list(
+                        translation.bullet_points.order_by('sort_order').values_list('text', flat=True)
+                    )
+
                 self.from_language_code = translation.language
 
     def _validate(self):
-        if self.to_translate == '' or self.to_translate == '<p><br></p>':
+        if not self.to_translate:
+            raise ValidationError(_("There is no source to translate"))
+        if isinstance(self.to_translate, str) and self.to_translate == '<p><br></p>':
             raise ValidationError(_("There is no source to translate"))
 
     def _set_factory(self):
@@ -71,9 +81,25 @@ class AITranslateContentFlow:
 
     def flow(self):
         self._set_product_translation()
-        self._set_factory()
-        self._validate()
-        self.translate_content()
+        if self.content_type == ContentAiGenerateType.BULLET_POINTS:
+            bullet_points = self.to_translate or []
+            if isinstance(bullet_points, str):
+                bullet_points = [bp.strip() for bp in bullet_points.split("\n") if bp.strip()]
+            translated = []
+            total_points = 0
+            for bp in bullet_points:
+                self.to_translate = bp
+                self._set_factory()
+                self._validate()
+                self.translate_content()
+                translated.append(self.translated_content)
+                total_points += self.used_points
+            self.translated_content = BULLET_POINT_SEPARATOR.join(translated)
+            self.used_points = total_points
+        else:
+            self._set_factory()
+            self._validate()
+            self.translate_content()
         return self.translated_content
 
 
