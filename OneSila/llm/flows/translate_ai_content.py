@@ -7,13 +7,15 @@ from properties.models import Property, PropertySelectValue, PropertyTranslation
 
 
 class AITranslateContentFlow:
-    def __init__(self, to_translate, from_language_code, to_language_code, multi_tenant_company, product=None, content_type=None):
+    def __init__(self, to_translate, from_language_code, to_language_code, multi_tenant_company,
+                 product=None, content_type=None, sales_channel=None):
         self.to_translate = to_translate
         self.from_language_code = from_language_code
         self.to_language_code = to_language_code
         self.multi_tenant_company = multi_tenant_company
         self.product = product
         self.content_type = content_type
+        self.sales_channel = sales_channel
         self.translated_content = ''
         self.used_points = 0
 
@@ -23,7 +25,18 @@ class AITranslateContentFlow:
 
     def _set_product_translation(self):
         if self.product:
-            translation = self.product.translations.exclude(language=self.to_language_code).first()
+            qs = self.product.translations.exclude(language=self.to_language_code)
+            default_lang = self.multi_tenant_company.language
+
+            translation = None
+            if self.sales_channel:
+                translation = qs.filter(language=default_lang, sales_channel=self.sales_channel).first()
+
+            if not translation:
+                translation = qs.filter(language=default_lang, sales_channel__isnull=True).first()
+
+            if not translation:
+                translation = qs.first()
 
             if translation:
                 if self.content_type == ContentAiGenerateType.DESCRIPTION:
@@ -46,7 +59,8 @@ class AITranslateContentFlow:
             to_translate=self.to_translate,
             from_language_code=self.from_language_code,
             to_language_code=self.to_language_code,
-            multi_tenant_company=self.multi_tenant_company)
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel)
 
     def translate_content(self):
         translated_str = self.factory.translate()
