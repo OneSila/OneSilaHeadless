@@ -1,6 +1,5 @@
 from django.db import transaction
 from django.db.models import Q
-from django.forms.models import model_to_dict
 
 from integrations.tasks import add_task_to_queue
 from webhooks.constants import ACTION_UPDATE, TOPIC_MAP
@@ -22,9 +21,6 @@ class SendIntegrationsWebhooksFactory:
         else:
             self.dirty_fields = {}
 
-    def set_payload(self):
-        self.payload = model_to_dict(self.instance)
-
     def set_subject(self):
         self.subject_type = self.instance._meta.label_lower
         self.subject_id = str(self.instance.pk)
@@ -43,7 +39,7 @@ class SendIntegrationsWebhooksFactory:
                 action=self.action,
                 subject_type=self.subject_type,
                 subject_id=self.subject_id,
-                payload=self.payload,
+                payload={},
                 multi_tenant_company=self.multi_tenant_company,
             )
 
@@ -76,7 +72,6 @@ class SendIntegrationsWebhooksFactory:
         if not self.topic:
             return
         self.set_dirty_fields()
-        self.set_payload()
         self.set_subject()
         self.set_integrations()
         self.create_outboxes()
