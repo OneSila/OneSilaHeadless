@@ -3,6 +3,7 @@ import secrets
 
 from django.conf import settings
 from django.db.models import Q
+from django.core.exceptions import ValidationError
 
 from core import models
 from integrations.models import Integration
@@ -50,6 +51,11 @@ class WebhookIntegration(Integration):
 
     def clean(self):
         models.Model.clean(self)
+
+    def save(self, *args, force_save=False, **kwargs):
+        if self.requests_per_minute > 120:
+            raise ValidationError({"requests_per_minute": "Ensure this value is less than or equal to 120."})
+        super().save(*args, force_save=force_save, **kwargs)
 
     def regenerate_secret(self):
         self.secret = generate_secret()
