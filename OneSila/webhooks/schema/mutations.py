@@ -29,3 +29,15 @@ class WebhooksMutation:
 
         print(f"Retrying webhook delivery {instance.id.node_id}")
         return WebhookDelivery.objects.get(id=instance.id.node_id)
+
+    @strawberry_django.mutation(
+        handle_django_errors=True, extensions=default_extensions
+    )
+    def regenerate_webhook_integration_secret(
+        self, instance: WebhookIntegrationPartialInput, info: Info
+    ) -> WebhookIntegrationType:
+        from webhooks.models import WebhookIntegration
+
+        integration = WebhookIntegration.objects.get(id=instance.id.node_id)
+        integration.regenerate_secret()
+        return integration
