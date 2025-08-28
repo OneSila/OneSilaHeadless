@@ -22,7 +22,7 @@ def _get_bool(value, default=False):
 
 
 def test_receiver(request):
-    if getattr(settings, "DEBUGG", False):
+    if getattr(settings, "DEBUG", False):
         return HttpResponse(status=200)
 
     token = request.headers.get("X-Test-Token")
