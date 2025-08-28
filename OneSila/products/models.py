@@ -264,7 +264,10 @@ class Product(TranslatedModelMixin, models.Model):
         seen_keys = set()
         unique_variations_ids = set()
         for variation in configurable_variations:
-            key = tuple(sorted(getattr(prop, 'value_select_id', None) for prop in variation.relevant_properties))
+            key = tuple(sorted(
+                (getattr(prop, 'value_select_id', None) for prop in variation.relevant_properties),
+                key=lambda v: (v is None, v),
+            ))
 
             if key not in seen_keys or attributes_len != len(key):
                 seen_keys.add(key)
