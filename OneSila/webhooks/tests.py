@@ -2,11 +2,12 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 from unittest.mock import patch
+from datetime import timedelta
 
 from core.models import MultiTenantCompany
-from .models import WebhookIntegration, WebhookOutbox, WebhookDelivery
-from .constants import ACTION_CREATE
-from .factories import ReplayDelivery
+from .models import WebhookIntegration, WebhookOutbox, WebhookDelivery, WebhookDeliveryAttempt
+from .constants import ACTION_CREATE, RETENTION_3M
+from .factories import ReplayDelivery, WebhookPruneFactory
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 
 
@@ -107,3 +108,72 @@ class ReplayWebhookDeliveryTests(TestCase):
         self.assertEqual(last_attempt.number, 2)
         self.assertEqual(last_attempt.delivery_id, delivery.id)
         mock_queue.assert_called_once()
+
+
+class WebhookPruneFactoryTests(TestCase):
+    def setUp(self):
+        self.company = MultiTenantCompany.objects.create(name="TestCo")
+        self.integration = WebhookIntegration.objects.create(
+            multi_tenant_company=self.company,
+            hostname="https://example.com",
+            topic="product",
+            url="https://webhook.example.com",
+            retention_policy=RETENTION_3M,
+        )
+
+    def _create_delivery(self, *, status, sent_at, subject_id):
+        outbox = WebhookOutbox.objects.create(
+            multi_tenant_company=self.company,
+            webhook_integration=self.integration,
+            topic="product",
+            action=ACTION_CREATE,
+            subject_type="product",
+            subject_id=subject_id,
+            payload={},
+        )
+        delivery = WebhookDelivery.objects.create(
+            multi_tenant_company=self.company,
+            outbox=outbox,
+            webhook_integration=self.integration,
+            status=status,
+            sent_at=sent_at,
+        )
+        WebhookDeliveryAttempt.objects.create(
+            multi_tenant_company=self.company,
+            delivery=delivery,
+            number=1,
+            sent_at=sent_at,
+        )
+        return outbox, delivery
+
+    def test_prune_old_deliveries(self):
+        now = timezone.now()
+        old_outbox, old_delivery = self._create_delivery(
+            status=WebhookDelivery.DELIVERED,
+            sent_at=now - timedelta(days=91),
+            subject_id="old",
+        )
+        _, fresh_delivery = self._create_delivery(
+            status=WebhookDelivery.DELIVERED,
+            sent_at=now - timedelta(days=10),
+            subject_id="fresh",
+        )
+        self._create_delivery(
+            status=WebhookDelivery.PENDING,
+            sent_at=now - timedelta(days=91),
+            subject_id="pending",
+        )
+
+        counts = WebhookPruneFactory(integration=self.integration).run()
+
+        self.assertEqual(counts["deliveries"], 1)
+        self.assertEqual(counts["attempts"], 1)
+        self.assertEqual(counts["outboxes"], 1)
+        self.assertFalse(
+            WebhookDelivery.objects.filter(id=old_delivery.id).exists()
+        )
+        self.assertFalse(
+            WebhookDeliveryAttempt.objects.filter(delivery_id=old_delivery.id).exists()
+        )
+        self.assertFalse(WebhookOutbox.objects.filter(id=old_outbox.id).exists())
+        self.assertTrue(WebhookDelivery.objects.filter(id=fresh_delivery.id).exists())
