@@ -1,3 +1,18 @@
+from products.models import Product
+from eancodes.models import EanCode
+from sales_prices.models import SalesPriceList, SalesPriceListItem
+from media.models import Media, MediaProductThrough
+from properties.models import (
+    Property,
+    PropertyTranslation,
+    PropertySelectValue,
+    PropertySelectValueTranslation,
+    ProductPropertiesRule,
+    ProductPropertiesRuleItem,
+    ProductProperty,
+)
+from sales_channels.models.sales_channels import SalesChannelViewAssign
+
 TOPIC_CHOICES = [
     ("product", "product"),
     ("ean_code", "ean_code"),
@@ -13,6 +28,23 @@ TOPIC_CHOICES = [
     ("sales_channel_view_assign", "sales_channel_view_assign"),
     ("all", "all"),
 ]
+
+TOPIC_MAP = {
+    Product: "product",
+    EanCode: "ean_code",
+    SalesPriceList: "price_list",
+    SalesPriceListItem: "price_list_item",
+    Media: "media",
+    MediaProductThrough: "media_through",
+    Property: "property",
+    PropertyTranslation: "property",
+    PropertySelectValue: "select_value",
+    PropertySelectValueTranslation: "select_value",
+    ProductPropertiesRule: "property_rule",
+    ProductPropertiesRuleItem: "property_rule_item",
+    ProductProperty: "product_property",
+    SalesChannelViewAssign: "sales_channel_view_assign",
+}
 
 ACTION_CREATE = "CREATE"
 ACTION_UPDATE = "UPDATE"
