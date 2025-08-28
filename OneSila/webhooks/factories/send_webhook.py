@@ -49,7 +49,7 @@ class SendWebhookDeliveryFactory:
             return
         try:
             model = apps.get_model(self.outbox.subject_type)
-            instance = model.objects.filter(pk=self.outbox.subject_id).first()
+            instance = model.objects.filter(id=self.outbox.subject_id).first()
             if instance is not None:
                 self.payload = model_to_dict(instance)
             else:
@@ -108,6 +108,7 @@ class SendWebhookDeliveryFactory:
     def _record_attempt(self) -> None:
         self.attempt_number = self.delivery.attempt + 1
         WebhookDeliveryAttempt.objects.create(
+            multi_tenant_company=self.integration.multi_tenant_company,
             delivery=self.delivery,
             number=self.attempt_number,
             sent_at=self.sent_at,

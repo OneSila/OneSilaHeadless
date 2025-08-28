@@ -106,7 +106,7 @@ class WebhookDelivery(models.Model):
         default=DELIVERY_PENDING,
         db_index=True,
     )
-    attempt = models.IntegerField(default=0, db_index=True)
+    attempt = models.IntegerField(default=1, db_index=True)
     response_code = models.IntegerField(null=True, blank=True, db_index=True)
     response_ms = models.IntegerField(null=True, blank=True)
     response_body_snippet = models.TextField(null=True, blank=True)
