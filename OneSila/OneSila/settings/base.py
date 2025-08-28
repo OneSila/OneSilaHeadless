@@ -69,6 +69,7 @@ INSTALLED_LOCAL_APPS = [
     'orders',
 
     'huey.contrib.djhuey',
+    'webhooks'
 ]
 
 INSTALLED_APPS += INSTALLED_LOCAL_APPS
@@ -464,3 +465,8 @@ LOGGING = {
         'level': 'WARNING',
     },
 }
+
+
+WEBHOOKS_SIGNATURE_SKEW_SECONDS = 300
+WEBHOOKS_GZIP_THRESHOLD_BYTES = 16384
+WEBHOOKS_DEFAULT_TIMEOUT_MS = 10000
