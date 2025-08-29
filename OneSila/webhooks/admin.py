@@ -2,7 +2,12 @@ from django.contrib import admin
 
 from core.admin import ModelAdmin
 
-from .models import WebhookIntegration, WebhookOutbox, WebhookDelivery
+from .models import (
+    WebhookDelivery,
+    WebhookDeliveryAttempt,
+    WebhookIntegration,
+    WebhookOutbox,
+)
 
 
 @admin.register(WebhookIntegration)
@@ -39,6 +44,20 @@ def replay_deliveries(modeladmin, request, queryset):
     )
 
 
+class WebhookDeliveryAttemptInline(admin.TabularInline):
+    model = WebhookDeliveryAttempt
+    extra = 0
+    readonly_fields = [
+        "number",
+        "sent_at",
+        "response_code",
+        "response_ms",
+        "response_body_snippet",
+        "error_text",
+        "error_traceback",
+    ]
+
+
 @admin.register(WebhookDelivery)
 class WebhookDeliveryAdmin(ModelAdmin):
     list_display = [
@@ -51,3 +70,10 @@ class WebhookDeliveryAdmin(ModelAdmin):
     ]
     list_filter = ["status", "webhook_integration", "response_code"]
     actions = [replay_deliveries]
+    inlines = [WebhookDeliveryAttemptInline]
+
+
+@admin.register(WebhookDeliveryAttempt)
+class WebhookDeliveryAttemptAdmin(ModelAdmin):
+    list_display = ["delivery", "number", "sent_at", "response_code"]
+    list_filter = ["response_code"]
