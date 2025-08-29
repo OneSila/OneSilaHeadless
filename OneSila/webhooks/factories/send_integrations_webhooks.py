@@ -1,5 +1,7 @@
 from django.db import transaction
 from django.db.models import Q
+import json
+from django.core.serializers.json import DjangoJSONEncoder
 
 from integrations.tasks import add_task_to_queue
 from webhooks.constants import ACTION_UPDATE, TOPIC_MAP
@@ -17,7 +19,9 @@ class SendIntegrationsWebhooksFactory:
 
     def set_dirty_fields(self):
         if self.action == ACTION_UPDATE:
-            self.dirty_fields = self.instance.get_dirty_fields()
+            self.dirty_fields = json.loads(
+                json.dumps(self.instance.get_dirty_fields(), cls=DjangoJSONEncoder)
+            )
         else:
             self.dirty_fields = {}
 
