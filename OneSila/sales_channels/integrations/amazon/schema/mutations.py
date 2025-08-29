@@ -157,8 +157,8 @@ class AmazonSalesChannelMutation:
             AmazonProduct,
             AmazonSalesChannelView,
         )
-        from sales_channels.integrations.amazon.factories.sales_channels.issues import (
-            FetchRemoteIssuesFactory,
+        from sales_channels.integrations.amazon.factories.sales_channels.recently_synced_products import (
+            FetchRecentlySyncedProductFactory,
         )
 
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
@@ -173,7 +173,7 @@ class AmazonSalesChannelMutation:
             sales_channel__multi_tenant_company=multi_tenant_company,
         )
 
-        factory = FetchRemoteIssuesFactory(
+        factory = FetchRecentlySyncedProductFactory(
             remote_product=remote_product,
             view=view,
         )

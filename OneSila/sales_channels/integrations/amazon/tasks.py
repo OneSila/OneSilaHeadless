@@ -166,24 +166,12 @@ def resync_amazon_product_db_task(
     task.execute(actual_task)
 
 
-@db_periodic_task(crontab(minute='0', hour='0,12'))
-def refresh_amazon_product_issues_cronjob():
-    """Fetch latest listing issues for Amazon products synced in the last 12 hours."""
-    from datetime import timedelta
-    from django.utils import timezone
-    from .models import AmazonProduct, AmazonSalesChannelView
-    from .factories.sales_channels.issues import FetchRemoteIssuesFactory
+@db_periodic_task(crontab(minute='*/15'))
+def refresh_recent_amazon_products_cronjob():
+    """Refresh data for Amazon products synced in the last 15 minutes."""
+    from .flows.recently_synced_products import refresh_recent_amazon_products_flow
 
-    cutoff = timezone.now() - timedelta(hours=12)
-    products = AmazonProduct.objects.filter(last_sync_at__gte=cutoff)
-    for product in products.iterator():
-        marketplaces = product.created_marketplaces or []
-        views = AmazonSalesChannelView.objects.filter(
-            sales_channel=product.sales_channel, remote_id__in=marketplaces
-        )
-        for view in views:
-            fac = FetchRemoteIssuesFactory(remote_product=product, view=view)
-            fac.run()
+    refresh_recent_amazon_products_flow()
 
 
 @db_periodic_task(crontab(minute='0', hour='0', day='1'))

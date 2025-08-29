@@ -50,7 +50,6 @@ class GetAmazonAPIMixin:
             if self.remote_product.id != self.remote_instance.id:
                 self.remote_product = self.remote_instance
 
-
         FetchRemoteValidationIssueFactory(
             remote_product=self.remote_product,
             view=self.view,
@@ -512,7 +511,6 @@ class GetAmazonAPIMixin:
 
         listings = ListingsApi(self._get_client())
         response = listings.patch_listings_item(**self._build_listing_kwargs(sku, marketplace_id, body, force_validation_only))
-
 
         if getattr(self, "remote_product", None):
             self.remote_product.last_sync_at = timezone.now()

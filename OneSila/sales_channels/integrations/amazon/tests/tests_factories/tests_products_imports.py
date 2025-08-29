@@ -209,7 +209,7 @@ class AmazonProductsImportProcessorRulePreserveTest(TestCase):
                 patch.object(AmazonProductsImportProcessor, "handle_variations"), \
                 patch.object(AmazonProductsImportProcessor, "handle_sales_channels_views"), \
                 patch.object(AmazonProductsImportProcessor, "_add_broken_record") as mock_broken, \
-                patch("sales_channels.integrations.amazon.factories.imports.products_imports.FetchRemoteIssuesFactory") as MockIssuesFactory:
+                patch("sales_channels.integrations.amazon.factories.imports.products_imports.FetchRecentlySyncedProductFactory") as MockIssuesFactory:
 
             from types import SimpleNamespace
 
@@ -277,7 +277,7 @@ class AmazonProductsImportProcessorImportDataTest(TestCase):
                 patch.object(AmazonProductsImportProcessor, "handle_images"), \
                 patch.object(AmazonProductsImportProcessor, "handle_variations"), \
                 patch.object(AmazonProductsImportProcessor, "handle_sales_channels_views"), \
-                patch("sales_channels.integrations.amazon.factories.imports.products_imports.FetchRemoteIssuesFactory") as MockIssuesFactory:
+                patch("sales_channels.integrations.amazon.factories.imports.products_imports.FetchRecentlySyncedProductFactory") as MockIssuesFactory:
 
             from types import SimpleNamespace
 
@@ -440,7 +440,7 @@ class AmazonProductsImportProcessorUpdateOnlyTest(TestCase):
             AmazonProductsImportProcessor,
             "handle_product_browse_node",
         ), patch(
-            "sales_channels.integrations.amazon.factories.imports.products_imports.FetchRemoteIssuesFactory"
+            "sales_channels.integrations.amazon.factories.imports.products_imports.FetchRecentlySyncedProductFactory"
         ) as MockIssuesFactory, patch(
             "sales_channels.integrations.amazon.factories.imports.products_imports.ImportProductInstance"
         ) as MockImportProductInstance, patch(
