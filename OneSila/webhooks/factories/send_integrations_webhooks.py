@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.forms.models import model_to_dict
 import json
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db.models import Q, Max
 
 from integrations.tasks import add_task_to_queue
 from webhooks.constants import ACTION_UPDATE, ACTION_DELETE, TOPIC_MAP
@@ -38,6 +39,14 @@ class SendIntegrationsWebhooksFactory:
 
     def create_outboxes(self):
         for integration in self.integrations:
+            sequence = (
+                WebhookOutbox.objects.filter(
+                    webhook_integration=integration,
+                    topic=self.topic,
+                    action=self.action,
+                ).aggregate(Max("sequence"))["sequence__max"]
+                or 0
+            ) + 1
             payload = (
                 model_to_dict(self.instance)
                 if self.action == ACTION_DELETE
@@ -50,6 +59,7 @@ class SendIntegrationsWebhooksFactory:
                 subject_type=self.subject_type,
                 subject_id=self.subject_id,
                 payload=payload,
+                sequence=sequence,
                 multi_tenant_company=self.multi_tenant_company,
             )
 
