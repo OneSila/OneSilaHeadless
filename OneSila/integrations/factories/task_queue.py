@@ -1,9 +1,11 @@
 import logging
 from datetime import datetime
+import json
 from typing import Optional, Tuple, Dict
 
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
+from django.core.serializers.json import DjangoJSONEncoder
 
 from core.huey import DEFAULT_PRIORITY
 from integrations.helpers import resolve_function
@@ -86,6 +88,9 @@ class TaskQueueFactory:
         """
         return IntegrationTaskQueue.PROCESSING if self.process_now else IntegrationTaskQueue.PENDING
 
+    def _serialize(self, data):
+        return json.loads(json.dumps(data, cls=DjangoJSONEncoder))
+
     def create_task_queue_item(self):
         """
         Create the IntegrationTaskQueue entry and set it as a class attribute.
@@ -100,8 +105,8 @@ class TaskQueueFactory:
         self.task_queue_item = IntegrationTaskQueue.objects.create(
             integration=self.integration,
             task_name=self.task_func_path,
-            task_args=self.task_args,
-            task_kwargs=self.task_kwargs,
+            task_args=self._serialize(self.task_args),
+            task_kwargs=self._serialize(self.task_kwargs),
             status=task_status,
             number_of_remote_requests=self.remote_requests,
             priority=task_priority,

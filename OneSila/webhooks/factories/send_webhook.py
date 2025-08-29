@@ -8,6 +8,7 @@ from django.apps import apps
 from django.db import transaction
 from django.forms.models import model_to_dict
 from django.utils import timezone
+from django.core.serializers.json import DjangoJSONEncoder
 
 from webhooks.models import WebhookDelivery, WebhookDeliveryAttempt
 from webhooks.utils import signing
@@ -53,7 +54,9 @@ class SendWebhookDeliveryFactory:
             model = apps.get_model(self.outbox.subject_type)
             instance = model.objects.filter(id=self.outbox.subject_id).first()
             if instance is not None:
-                self.payload = model_to_dict(instance)
+                self.payload = json.loads(
+                    json.dumps(model_to_dict(instance), cls=DjangoJSONEncoder)
+                )
             else:
                 self.payload = {}
         except Exception:  # noqa: BLE001
