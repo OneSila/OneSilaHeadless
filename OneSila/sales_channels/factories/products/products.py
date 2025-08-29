@@ -57,7 +57,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     fixing_identifier_class = None
 
     def __init__(self, sales_channel: SalesChannel, local_instance: Product,
-                 api=None, remote_instance=None, parent_local_instance=None, remote_parent_product=None):
+                 api=None, remote_instance=None, parent_local_instance=None, remote_parent_product=None, is_switched=False):
         self.local_instance = local_instance  # Instance of the Product model
         self.sales_channel = sales_channel   # Sales channel associated with the sync
         self.integration = sales_channel  # to make it work with other mixins
@@ -70,6 +70,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.remote_product_properties = []
         self.local_type = self.local_instance.type
         self.is_create = False
+        self.is_switched = is_switched
 
     def set_local_assigns(self):
         to_assign = SalesChannelViewAssign.objects.filter(product=self.local_instance, sales_channel=self.sales_channel, remote_product__isnull=True)
@@ -925,7 +926,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         if self.create_product_factory is None:
             raise ValueError("create_product_factory must be specified in the RemoteProductSyncFactory.")
 
-        fac = self.create_product_factory(self.sales_channel, self.local_instance, api=self.api)
+        fac = self.create_product_factory(self.sales_channel, self.local_instance, api=self.api, is_switched=True)
         fac.run()
         self.remote_instance = fac.remote_instance
 
@@ -998,10 +999,16 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         except SwitchedToCreateException as stc:
             logger.debug(stc)
+            if self.is_switched:
+                raise stc
+            self.is_switched = True
             self.run_create_flow()
 
         except SwitchedToSyncException as sts:
             logger.debug(sts)
+            if self.is_switched:
+                raise sts
+            self.is_switched = True
             self.run_sync_flow()
 
         except Exception as e:
@@ -1044,6 +1051,9 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
 
         except SwitchedToCreateException as stc:
             logger.debug(stc)
+            if self.is_switched:
+                raise stc
+            self.is_switched = True
             self.run_create_flow()
 
         except Exception as e:
@@ -1139,6 +1149,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
             parent_local_instance=self.parent_local_instance,
             remote_parent_product=self.remote_parent_product,
             api=self.api,
+            is_switched=True,
         )
         sync_factory.run()
 
