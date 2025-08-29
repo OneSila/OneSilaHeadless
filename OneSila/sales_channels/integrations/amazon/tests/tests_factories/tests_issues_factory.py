@@ -1,6 +1,6 @@
 from core.tests import TestCase
 from model_bakery import baker
-from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
+from sales_channels.integrations.amazon.factories.sales_channels.recently_synced_products import FetchRecentlySyncedProductFactory
 from sales_channels.integrations.amazon.models import (
     AmazonExternalProductId,
     AmazonProduct,
@@ -9,7 +9,7 @@ from sales_channels.integrations.amazon.models import (
 )
 
 
-class FetchRemoteIssuesFactoryExternalIdTest(TestCase):
+class FetchRecentlySyncedProductFactoryExternalIdTest(TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = AmazonSalesChannel.objects.create(
@@ -43,7 +43,7 @@ class FetchRemoteIssuesFactoryExternalIdTest(TestCase):
             value="EAN123",
         )
         response = {"summaries": [{"asin": "ASIN123"}], "issues": []}
-        FetchRemoteIssuesFactory(
+        FetchRecentlySyncedProductFactory(
             remote_product=self.remote_product, view=self.view, response_data=response
         ).run()
         ext = AmazonExternalProductId.objects.get(product=self.product, view=self.view)
@@ -51,7 +51,7 @@ class FetchRemoteIssuesFactoryExternalIdTest(TestCase):
 
     def test_creates_external_product_id_if_missing(self):
         response = {"summaries": [{"asin": "ASIN999"}], "issues": []}
-        FetchRemoteIssuesFactory(
+        FetchRecentlySyncedProductFactory(
             remote_product=self.remote_product, view=self.view, response_data=response
         ).run()
         ext = AmazonExternalProductId.objects.get(product=self.product, view=self.view)
