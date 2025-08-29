@@ -1,8 +1,9 @@
 from django.db import transaction
 from django.db.models import Q
+from django.forms.models import model_to_dict
 
 from integrations.tasks import add_task_to_queue
-from webhooks.constants import ACTION_UPDATE, TOPIC_MAP
+from webhooks.constants import ACTION_UPDATE, ACTION_DELETE, TOPIC_MAP
 from webhooks.models import WebhookIntegration, WebhookOutbox, WebhookDelivery
 
 
@@ -33,13 +34,18 @@ class SendIntegrationsWebhooksFactory:
 
     def create_outboxes(self):
         for integration in self.integrations:
+            payload = (
+                model_to_dict(self.instance)
+                if self.action == ACTION_DELETE
+                else {}
+            )
             outbox = WebhookOutbox.objects.create(
                 webhook_integration=integration,
                 topic=self.topic,
                 action=self.action,
                 subject_type=self.subject_type,
                 subject_id=self.subject_id,
-                payload={},
+                payload=payload,
                 multi_tenant_company=self.multi_tenant_company,
             )
 
