@@ -34,6 +34,8 @@ class SendWebhookDeliveryFactory:
             self._send_request()
             self._record_attempt()
             self._update_delivery()
+        if not self.success:
+            raise Exception(self.error_text or f"HTTP {self.response_code}")
 
     # Internal helpers
     def _get_delivery(self) -> None:
@@ -120,7 +122,7 @@ class SendWebhookDeliveryFactory:
         )
 
     def _update_delivery(self) -> None:
-        success = self.response_code is not None and 200 <= self.response_code < 300
+        self.success = self.response_code is not None and 200 <= self.response_code < 300
         self.delivery.attempt = self.attempt_number
         self.delivery.sent_at = self.sent_at
         self.delivery.response_code = self.response_code
@@ -130,7 +132,7 @@ class SendWebhookDeliveryFactory:
         self.delivery.error_traceback = self.error_tb
         self.delivery.status = (
             WebhookDelivery.DELIVERED
-            if success
+            if self.success
             else (
                 WebhookDelivery.PENDING
                 if self.attempt_number < self.integration.max_retries
@@ -138,5 +140,3 @@ class SendWebhookDeliveryFactory:
             )
         )
         self.delivery.save()
-        if not success:
-            raise Exception(self.error_text or f"HTTP {self.response_code}")
