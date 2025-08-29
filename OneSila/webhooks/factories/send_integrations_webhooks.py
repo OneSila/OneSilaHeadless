@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Max
 
 from integrations.tasks import add_task_to_queue
 from webhooks.constants import ACTION_UPDATE, TOPIC_MAP
@@ -33,12 +33,21 @@ class SendIntegrationsWebhooksFactory:
 
     def create_outboxes(self):
         for integration in self.integrations:
+            sequence = (
+                WebhookOutbox.objects.filter(
+                    webhook_integration=integration,
+                    topic=self.topic,
+                    action=self.action,
+                ).aggregate(Max("sequence"))["sequence__max"]
+                or 0
+            ) + 1
             outbox = WebhookOutbox.objects.create(
                 webhook_integration=integration,
                 topic=self.topic,
                 action=self.action,
                 subject_type=self.subject_type,
                 subject_id=self.subject_id,
+                sequence=sequence,
                 payload={},
                 multi_tenant_company=self.multi_tenant_company,
             )
