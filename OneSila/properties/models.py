@@ -307,10 +307,6 @@ class ProductPropertiesRuleItem(models.Model):
         if self.type in [self.REQUIRED_IN_CONFIGURATOR, self.OPTIONAL_IN_CONFIGURATOR] and self.property.type != Property.TYPES.SELECT:
             raise ValidationError(_(f"Property {self.property.name} ({self.property.type}) must be of type SELECT."))
 
-        # Ensure rule cannot have OPTIONAL_IN_CONFIGURATOR without a REQUIRED_IN_CONFIGURATOR
-        if self.type == self.OPTIONAL_IN_CONFIGURATOR and not self.rule.items.filter(type=self.REQUIRED_IN_CONFIGURATOR).exists():
-            raise ValidationError(_("Cannot have optional in configurator without a required in configurator."))
-
         super().save(*args, **kwargs)
 
     def __str__(self):

@@ -422,10 +422,16 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
 
         except SwitchedToCreateException as stc:
             logger.debug(stc)
+            if self.is_switched:
+                raise stc
+            self.is_switched = True
             self.run_create_flow()
 
         except SwitchedToSyncException as sts:
             logger.debug(sts)
+            if self.is_switched:
+                raise sts
+            self.is_switched = True
             self.run_sync_flow()
 
         except Exception as e:

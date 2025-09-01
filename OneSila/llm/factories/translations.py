@@ -7,12 +7,13 @@ class StringTranslationLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMix
     The from_language_code is given for guardrails.
     """
 
-    def __init__(self, to_translate, from_language_code, to_language_code, multi_tenant_company=None):
+    def __init__(self, to_translate, from_language_code, to_language_code, multi_tenant_company=None, sales_channel=None):
         super().__init__()
         self.to_translate = to_translate
         self.from_language_code = from_language_code
         self.to_language_code = to_language_code
         self.multi_tenant_company = multi_tenant_company
+        self.sales_channel = sales_channel
 
     @property
     def system_prompt(self):

@@ -9,6 +9,7 @@ from products.models import (
     BundleVariation,
     AliasProduct,
     ProductTranslation,
+    Product,
 )
 from media.models import Media, MediaProductThrough
 from properties.models import Property, PropertyTranslation, ProductProperty, ProductPropertyTextTranslation
@@ -135,6 +136,13 @@ class DuplicateProductTestCase(TestCase):
     def test_duplicate_product_existing_sku_error(self):
         with self.assertRaises(Exception):
             SimpleProduct.objects.duplicate_product(self.product, sku=self.product.sku)
+
+    def test_duplicate_product_manager_as_alias(self):
+        duplicate = SimpleProduct.objects.duplicate_product(
+            self.product, create_as_alias=True
+        )
+        self.assertEqual(duplicate.type, Product.ALIAS)
+        self.assertEqual(duplicate.alias_parent_product, self.product)
 
 
 class ProductTranslationModelTest(TestCase):

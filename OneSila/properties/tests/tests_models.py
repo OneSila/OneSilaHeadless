@@ -1,5 +1,12 @@
 from core.tests import TestCase
-from properties.models import Property
+from django.core.exceptions import ValidationError
+from properties.models import (
+    ProductProperty,
+    Property,
+    PropertySelectValue,
+    PropertySelectValueTranslation,
+)
+from products.models import Product
 
 
 class PropertyManagerGetOrCreateTestCase(TestCase):
@@ -27,3 +34,79 @@ class PropertyManagerGetOrCreateTestCase(TestCase):
         )
         self.assertFalse(created2)
         self.assertEqual(prop2.internal_name, "color_1")
+
+
+class PropertySelectValueMergeTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.prop = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        self.value1 = PropertySelectValue.objects.create(
+            property=self.prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.value2 = PropertySelectValue.objects.create(
+            property=self.prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.target = PropertySelectValue.objects.create(
+            property=self.prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            propertyselectvalue=self.value1,
+            language=self.multi_tenant_company.language,
+            value="Red",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            propertyselectvalue=self.value2,
+            language=self.multi_tenant_company.language,
+            value="Blue",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.product = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+        )
+        self.product_property = ProductProperty.objects.create(
+            product=self.product,
+            property=self.prop,
+            multi_tenant_company=self.multi_tenant_company,
+            value_select=self.value1,
+        )
+        self.product_property.value_multi_select.add(self.value1, self.value2)
+
+    def test_merge(self):
+        PropertySelectValue.objects.filter(id__in=[self.value1.id, self.value2.id]).merge(self.target)
+
+        self.assertFalse(
+            PropertySelectValue.objects.filter(id__in=[self.value1.id, self.value2.id]).exists()
+        )
+        self.product_property.refresh_from_db()
+        self.assertEqual(self.product_property.value_select_id, self.target.id)
+        self.assertListEqual(list(self.product_property.value_multi_select.all()), [self.target])
+        self.assertTrue(
+            PropertySelectValueTranslation.objects.filter(
+                propertyselectvalue=self.target, value="Red"
+            ).exists()
+        )
+        self.assertTrue(
+            PropertySelectValueTranslation.objects.filter(
+                propertyselectvalue=self.target, value="Blue"
+            ).exists()
+        )
+
+    def test_merge_different_property(self):
+        other_prop = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        other_value = PropertySelectValue.objects.create(
+            property=other_prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        with self.assertRaises(ValidationError):
+            PropertySelectValue.objects.filter(id=self.value1.id).merge(other_value)

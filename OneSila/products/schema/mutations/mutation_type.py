@@ -133,11 +133,18 @@ class ProductsMutation:
         return ProductVariationsTaskResponse(success=True)
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
-    def duplicate_product(self, info: Info, product: ProductPartialInput, sku: str | None = None) -> ProductType:
+    def duplicate_product(
+        self,
+        info: Info,
+        product: ProductPartialInput,
+        sku: str | None = None,
+        create_as_alias: bool = False,
+    ) -> ProductType:
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        instance =  Product.objects.get(id=product.id.node_id)
+        instance = Product.objects.get(id=product.id.node_id)
         if instance.multi_tenant_company != multi_tenant_company:
             raise PermissionError("Invalid company")
-        duplicated = Product.objects.duplicate_product(instance, sku=sku)
+        duplicated = Product.objects.duplicate_product(
+            instance, sku=sku, create_as_alias=create_as_alias
+        )
         return duplicated
-
