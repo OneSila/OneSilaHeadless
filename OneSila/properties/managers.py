@@ -6,7 +6,7 @@ import difflib
 from django.utils.translation import gettext_lazy as _
 from core.managers import MultiTenantManager, MultiTenantQuerySet
 from django.db import transaction, IntegrityError
-from .helpers import generate_unique_internal_name
+from .helpers import generate_unique_internal_name, _is_code_like, _norm_code, _tokens
 
 
 class PropertyQuerySet(MultiTenantQuerySet):
@@ -182,28 +182,60 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
             )
         )
 
-    def find_duplicates(self, value, property_instance, language_code=None, threshold=0.8):
-        """Return property select values with a value similar to the given one."""
+    def find_duplicates(self, value, property_instance, language_code=None, threshold=0.88):
+        """
+        Return property select values with a value similar to `value` within the same property.
+
+        Rules:
+          - If EITHER side looks code-like (any token has letters+digits), require exact match
+            after collapsing non-alnum (prevents ath_s700bt ~ ath_s200bt).
+          - Otherwise, compare as labels using token sets (order/sep-insensitive), with an
+            optional fuzzy ratio on the token-keys to catch small typos (grey/gray, poliester/polyester).
+        """
         from .models import PropertySelectValueTranslation
 
         if language_code is None:
             language_code = settings.LANGUAGE_CODE
 
-        processed_value = slugify(value).replace("-", "").lower()
-        translations = PropertySelectValueTranslation.objects.filter(
-            propertyselectvalue__in=self,
-            propertyselectvalue__property=property_instance,
-            language=language_code,
-        ).select_related("propertyselectvalue")
+        probe_is_code = _is_code_like(value)
+        probe_code_key = _norm_code(value) if probe_is_code else None
+        probe_tokens = sorted(set(_tokens(value))) if not probe_is_code else None
+        probe_key = " ".join(probe_tokens) if probe_tokens is not None else None
+
+        translations = (
+            PropertySelectValueTranslation.objects
+            .filter(
+                propertyselectvalue__in=self,
+                propertyselectvalue__property=property_instance,
+                language=language_code,
+            )
+            .select_related("propertyselectvalue")
+        )
 
         matched_ids = set()
-        for translation in translations:
-            processed = slugify(translation.value).replace("-", "").lower()
-            ratio = difflib.SequenceMatcher(None, processed_value, processed).ratio()
-            if ratio >= threshold:
-                matched_ids.add(translation.propertyselectvalue_id)
 
-        return self.filter(id__in=matched_ids).order_by('id').distinct('id')
+        for t in translations:
+            raw = t.value or ""
+            cand_is_code = _is_code_like(raw)
+
+            if probe_is_code or cand_is_code:
+                # CODE COMPARATOR: strict equality after collapsing
+                if probe_code_key and probe_code_key == _norm_code(raw):
+                    matched_ids.add(t.propertyselectvalue_id)
+                continue
+
+            # LABEL COMPARATOR: order/sep-insensitive
+            cand_tokens = sorted(set(_tokens(raw)))
+            if probe_tokens == cand_tokens:
+                matched_ids.add(t.propertyselectvalue_id)
+                continue
+
+            # Optional conservative fuzzy on token-keys
+            cand_key = " ".join(cand_tokens)
+            if difflib.SequenceMatcher(None, probe_key, cand_key).ratio() >= threshold:
+                matched_ids.add(t.propertyselectvalue_id)
+
+        return self.filter(id__in=matched_ids).order_by("id").distinct("id")
 
     def merge(self, target):
         from .models import PropertySelectValue
