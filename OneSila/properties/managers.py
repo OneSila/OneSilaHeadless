@@ -226,6 +226,7 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
                             **{relation.field.name: source}
                         ).update(**{relation.field.name: target})
                     elif relation.many_to_many:
+                        # @TODO: Seems that the many_to_many merge doesn't work
                         through = relation.through._default_manager
                         source_field = relation.field.m2m_reverse_field_name()
                         for through_obj in through.filter(**{source_field: source.pk}):
