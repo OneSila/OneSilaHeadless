@@ -1,3 +1,40 @@
+import re
+import unicodedata
+
+SEP_REGEX = re.compile(r"[\s\-_./]+")
+ALNUM_REGEX = re.compile(r"[a-z0-9]+")
+CODE_TOKEN_REGEX = re.compile(r"^(?=.*[a-z])(?=.*\d)[a-z0-9]+$")  # any token mixing letters+digits
+
+
+def _strip_accents(s: str) -> str:
+    return "".join(ch for ch in unicodedata.normalize("NFKD", s or "") if not unicodedata.combining(ch))
+
+
+def _tokens(s: str):
+    """Lowercase, strip accents, split on separators; normalize numeric tokens (e.g., '02' -> '2')."""
+    s = _strip_accents(s or "").lower()
+    s = SEP_REGEX.sub(" ", s)
+    toks = ALNUM_REGEX.findall(s)
+    out = []
+    for t in toks:
+        if t.isdigit():
+            out.append(str(int(t)))  # drop leading zeros
+        else:
+            out.append(t)
+    return out
+
+
+def _is_code_like(s: str) -> bool:
+    """True if ANY token mixes letters+digits (e.g., 's700bt', 'a54', 'mk2')."""
+    return any(CODE_TOKEN_REGEX.match(t) for t in _tokens(s))
+
+
+def _norm_code(s: str) -> str:
+    """Collapse to alnum only (lowercased, accents stripped)."""
+    s = _strip_accents(s or "").lower()
+    return re.sub(r"[^a-z0-9]", "", s)
+
+
 def get_product_properties_dict(product) -> dict[str, list[str]]:
     """
     Fetch all properties and their values for a given product.
