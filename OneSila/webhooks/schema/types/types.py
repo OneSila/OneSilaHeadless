@@ -1,6 +1,6 @@
 from typing import Optional
 
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin
+from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, List, Annotated, lazy
 
 from webhooks.models import (
     WebhookIntegration,
@@ -55,6 +55,7 @@ class WebhookOutboxType(relay.Node, GetQuerysetMultiTenantMixin):
 class WebhookDeliveryType(relay.Node, GetQuerysetMultiTenantMixin):
     outbox: Optional[WebhookOutboxType]
     webhook_integration: Optional[WebhookIntegrationType]
+    attempts: List[Annotated['WebhookDeliveryAttemptType', lazy("webhooks.schema.types.types")]]
 
 
 @type(
