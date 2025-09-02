@@ -47,7 +47,7 @@ def replay_deliveries(modeladmin, request, queryset):
 class WebhookDeliveryAttemptInline(admin.TabularInline):
     model = WebhookDeliveryAttempt
     extra = 0
-    readonly_fields = [
+    fields = readonly_fields = [
         "number",
         "sent_at",
         "response_code",
