@@ -498,7 +498,8 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                                           view=self.view,
                                           parent_local_instance=self.parent_local_instance,
                                           remote_parent_product=self.remote_parent_product,
-                                          force_validation_only=self.force_validation_only)
+                                          force_validation_only=self.force_validation_only,
+                                          is_switched=True)
         fac.run()
         self.remote_instance = fac.remote_instance
 
@@ -517,7 +518,8 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             parent_local_instance=self.parent_local_instance,
             remote_parent_product=self.remote_parent_product,
             api=self.api,
-            view=self.view
+            view=self.view,
+            is_switched=True
         )
         sync_factory.run()
 

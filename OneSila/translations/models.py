@@ -58,7 +58,7 @@ class TranslatedModelMixin(OldModel):
             translation_kwargs['sales_channel'] = sales_channel
 
         try:
-            translation = translations.get(**translation_kwargs)
+            translation = translations.filter(**translation_kwargs).first() # @TODO: Temporary added to fix something
 
             if sales_channel is not None and related_name == 'translations':
                 is_sales_channel_translation = True

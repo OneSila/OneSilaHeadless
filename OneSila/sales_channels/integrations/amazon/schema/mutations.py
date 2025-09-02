@@ -213,15 +213,12 @@ class AmazonSalesChannelMutation:
                 _("You can't resync the product because is currently syncing."),
             )
 
-        # @TODO: remove force once full resync support is implemented
-        force_validation_only = True
-        if force_validation_only:
-            manual_sync_remote_product.send(
-                sender=remote_product.__class__,
-                instance=remote_product,
-                view=view,
-                force_validation_only=force_validation_only,
-            )
+        manual_sync_remote_product.send(
+            sender=remote_product.__class__,
+            instance=remote_product,
+            view=view,
+            force_validation_only=force_validation_only,
+        )
 
         return remote_product
 

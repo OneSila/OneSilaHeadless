@@ -243,14 +243,15 @@ class GetAmazonAPIMixin:
 
         return sorted(product_types)
 
-    def get_all_products_by_marketplace(self, marketplace_id: str, listings_api, seller_id, issue_locale, given_created_after=None):
+    def get_all_products_by_marketplace(self, marketplace_id: str, listings_api, seller_id, issue_locale, given_created_after=None, given_created_before=None, sort_order="ASC"):
 
         created_after = given_created_after
+        created_before = given_created_before
         while True:
             page_token = None
             last_created_date = None
 
-            logger.info(f"[START CYCLE] created_after={created_after}")
+            logger.info(f"[START CYCLE] created_after={created_after} | created_before={created_before}")
 
             while True:
                 items, page_token, results_number = self._fetch_listing_items_page(
@@ -261,8 +262,9 @@ class GetAmazonAPIMixin:
                     included_data=["summaries", "attributes", "issues", "offers", "relationships"],
                     issue_locale=issue_locale,
                     sort_by="createdDate",
-                    sort_order="ASC",
-                    created_after=created_after
+                    sort_order=sort_order,
+                    created_after=created_after,
+                    created_before=created_before
                 )
 
                 total_results = results_number or 0
@@ -291,9 +293,12 @@ class GetAmazonAPIMixin:
             if not last_created_date:
                 break
 
-            created_after = last_created_date
+            if sort_order == "ASC":
+                created_after = last_created_date
+            else:
+                created_before = last_created_date
 
-    def get_all_products(self):
+    def get_all_products(self, sort_order="ASC", given_created_after=None, given_created_before=None):
         listings_api = ListingsApi(self._get_client())
         seller_id = self.sales_channel.remote_id
         views = AmazonSalesChannelView.objects.filter(
@@ -307,7 +312,10 @@ class GetAmazonAPIMixin:
                 marketplace_id,
                 listings_api,
                 seller_id,
-                issue_locale
+                issue_locale,
+                given_created_after=given_created_after,
+                given_created_before=given_created_before,
+                sort_order=sort_order
             )
 
     def get_total_number_of_products(self) -> int:

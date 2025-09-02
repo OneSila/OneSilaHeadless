@@ -91,7 +91,7 @@ class AmazonManualSyncReceiverTest(DisableWooCommerceSignalsMixin, TestCase):
     #     self.assertEqual(kwargs["view"], self.view)
 
 
-class AmazonAssignReceiversTest(DisableWooCommerceSignalsMixin, TestCase):
+class AmazonAssignReceiversTest(TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = AmazonSalesChannel.objects.create(

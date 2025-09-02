@@ -17,7 +17,12 @@ class AmazonSelectValueTranslationLLM(OpenAIMixin):
 
     @property
     def system_prompt(self):
-        return "You are translating e-commerce property values. Output only the translated value."
+        return (
+            "You are translating e-commerce property values. "
+            "Do not translate product codes, model numbers, color codes, or other alphanumeric identifiers. "
+            "If the input appears to be such a code, return the string exactly as it was provided. "
+            "If you are less than 90% confident in the translation, return the original value. Output only the final value."
+        )
 
     @property
     def prompt(self):
@@ -30,7 +35,10 @@ class AmazonSelectValueTranslationLLM(OpenAIMixin):
             f"{context_line}"
             f"Translate the following Amazon property select value from {self.from_language_code} to {self.to_language_code}:\n"
             f"{self.remote_name}\n\n"
-            "Only respond with the translated value, no extra text, no explanation, no punctuation. "
+            "Rules:\n"
+            "- Do not translate product codes, model numbers, color codes, or any alphanumeric values; output the input exactly as provided.\n"
+            "- Only translate if you are at least 90% confident the translation is correct; otherwise return the original value.\n"
+            "Respond with only the final value, no extra text, no explanation, no punctuation. "
             "Just one word or phrase. If the value is numeric or contains numbers, keep the numbers as digits."
         )
 

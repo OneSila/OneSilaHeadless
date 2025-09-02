@@ -6,7 +6,7 @@ import difflib
 from django.utils.translation import gettext_lazy as _
 from core.managers import MultiTenantManager, MultiTenantQuerySet
 from django.db import transaction, IntegrityError
-from .helpers import generate_unique_internal_name
+from .helpers import generate_unique_internal_name, _is_code_like, _norm_code, _tokens
 
 
 class PropertyQuerySet(MultiTenantQuerySet):
@@ -182,26 +182,73 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
             )
         )
 
-    def find_duplicates(self, value, property_instance, language_code=None, threshold=0.8):
-        """Return property select values with a value similar to the given one."""
+    def find_duplicates(self, value, property_instance, language_code=None, threshold=0.88):
+        """
+        Return property select values similar to `value` within the same property.
+
+        Rules:
+          - If EITHER side looks code-like (any token has letters+digits), require exact match
+            after collapsing non-alnum (prevents ath_s700bt ~ ath_s200bt).
+          - Otherwise (labels), require EXACT equality of numeric token sets; only then:
+              * match if token sets are equal (order/sep-insensitive), or
+              * fall back to fuzzy on TEXT tokens only (numbers already matched).
+        """
         from .models import PropertySelectValueTranslation
 
         if language_code is None:
             language_code = settings.LANGUAGE_CODE
 
-        processed_value = slugify(value).replace("-", "").lower()
-        translations = PropertySelectValueTranslation.objects.filter(
-            propertyselectvalue__in=self,
-            propertyselectvalue__property=property_instance,
-            language=language_code,
-        ).select_related("propertyselectvalue")
+        probe_is_code = _is_code_like(value)
+        probe_code_key = _norm_code(value) if probe_is_code else None
+
+        # Precompute probe tokens & split into numeric/text
+        probe_all_tokens = _tokens(value)
+        probe_num_set = {t for t in probe_all_tokens if t.isdigit()}
+        probe_text_set = set(t for t in probe_all_tokens if not t.isdigit())
+        probe_tokens_sorted = sorted(probe_text_set | probe_num_set)  # for exact set compare when needed
+        probe_text_key = " ".join(sorted(probe_text_set))  # for fuzzy on text only
+
+        translations = (
+            PropertySelectValueTranslation.objects
+            .filter(
+                propertyselectvalue__in=self,
+                propertyselectvalue__property=property_instance,
+                language=language_code,
+            )
+            .select_related("propertyselectvalue")
+        )
 
         matched_ids = set()
-        for translation in translations:
-            processed = slugify(translation.value).replace("-", "").lower()
-            ratio = difflib.SequenceMatcher(None, processed_value, processed).ratio()
-            if ratio >= threshold:
-                matched_ids.add(translation.propertyselectvalue_id)
+
+        for t in translations:
+            raw = t.value or ""
+            cand_is_code = _is_code_like(raw)
+
+            if probe_is_code or cand_is_code:
+                # CODE COMPARATOR: strict equality after collapsing
+                if probe_code_key and probe_code_key == _norm_code(raw):
+                    matched_ids.add(t.propertyselectvalue_id)
+                continue
+
+            # LABEL COMPARATOR
+            cand_all_tokens = _tokens(raw)
+            cand_num_set = {x for x in cand_all_tokens if x.isdigit()}
+            cand_text_set = set(x for x in cand_all_tokens if not x.isdigit())
+
+            # 1) Different numeric tokens => NOT a duplicate (e.g., 50 vs 60 Hertz)
+            if probe_num_set != cand_num_set:
+                continue
+
+            # 2) Exact token set equality (numbers + text), order/sep-insensitive
+            cand_tokens_sorted = sorted(cand_text_set | cand_num_set)
+            if probe_tokens_sorted == cand_tokens_sorted:
+                matched_ids.add(t.propertyselectvalue_id)
+                continue
+
+            # 3) Conservative fuzzy on TEXT ONLY (numbers already proven equal)
+            cand_text_key = " ".join(sorted(cand_text_set))
+            if difflib.SequenceMatcher(None, probe_text_key, cand_text_key).ratio() >= threshold:
+                matched_ids.add(t.propertyselectvalue_id)
 
         return self.filter(id__in=matched_ids).order_by('id').distinct('id')
 
@@ -226,6 +273,7 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
                             **{relation.field.name: source}
                         ).update(**{relation.field.name: target})
                     elif relation.many_to_many:
+                        # @TODO: Seems that the many_to_many merge doesn't work
                         through = relation.through._default_manager
                         source_field = relation.field.m2m_reverse_field_name()
                         for through_obj in through.filter(**{source_field: source.pk}):
