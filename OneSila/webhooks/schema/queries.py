@@ -122,17 +122,17 @@ def webhook_reports_kpi_resolver(
     )
 
     return WebhookReportsKPIType(
-        total_deliveries=total,
+        deliveries=total,
         delivered=delivered,
         failed=failed,
         success_rate=success_rate,
-        latency_p50=int(p50),
-        latency_p95=int(p95),
-        latency_p99=int(p99),
-        latency_avg=int(avg_latency),
+        p50_latency=int(p50),
+        p95_latency=int(p95),
+        p99_latency=int(p99),
         rate_429=rate_429,
         rate_5xx=rate_5xx,
         avg_attempts=avg_attempts,
+        avg_solve_ms=int(avg_latency),
     )
 
 
