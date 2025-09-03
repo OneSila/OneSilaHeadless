@@ -86,3 +86,15 @@ class WebhookReportsKPIType:
     rate_429: float
     rate_5xx: float
     avg_attempts: float
+
+
+@strawberry_type
+class WebhookDeliveryStatsType:
+    deliveries: int
+    delivered: int
+    failed: int
+    success_rate: float
+    median_latency: int
+    p95_latency: int
+    rate_429: float
+    queue_depth: int

@@ -20,6 +20,8 @@ from django.db.models.functions import (
     ExtractWeekDay,
     ExtractHour,
 )
+from strawberry_django.filters import apply as apply_filters
+from core.schema.core.helpers import get_multi_tenant_company
 
 from webhooks.models import WebhookDelivery, WebhookIntegration
 from .types.reports import (
@@ -33,8 +35,10 @@ from .types.reports import (
     HeatmapEntry,
     TopOffender,
     QueuePressureEntry,
+    WebhookDeliveryStatsType,
 )
 from .types.input import WebhookIntegrationPartialInput
+from .types.filters import WebhookDeliveryFilter
 
 from .types.types import (
     WebhookIntegrationType,
@@ -319,6 +323,47 @@ def webhook_reports_series_resolver(
     )
 
 
+def webhook_delivery_stats_resolver(
+    info: Info,
+    filters: Optional[WebhookDeliveryFilter] = None,
+) -> WebhookDeliveryStatsType:
+    multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+    qs = WebhookDelivery.objects.filter(multi_tenant_company=multi_tenant_company)
+    qs = apply_filters(filters, qs, info)
+
+    total = qs.count()
+    delivered = qs.filter(status=WebhookDelivery.DELIVERED).count()
+    failed = qs.filter(status=WebhookDelivery.FAILED).count()
+    success_rate = delivered / total * 100 if total else 0.0
+
+    latencies = list(
+        qs.filter(response_ms__isnull=False).values_list("response_ms", flat=True)
+    )
+    latencies.sort()
+    if latencies:
+        median_latency = int(median(latencies))
+        if len(latencies) == 1:
+            p95_latency = latencies[0]
+        else:
+            p95_latency = int(quantiles(latencies, n=100)[94])
+    else:
+        median_latency = p95_latency = 0
+
+    rate_429 = qs.filter(response_code=429).count() / total * 100 if total else 0.0
+    queue_depth = qs.filter(status=WebhookDelivery.PENDING).count()
+
+    return WebhookDeliveryStatsType(
+        deliveries=total,
+        delivered=delivered,
+        failed=failed,
+        success_rate=success_rate,
+        median_latency=median_latency,
+        p95_latency=p95_latency,
+        rate_429=rate_429,
+        queue_depth=queue_depth,
+    )
+
+
 @type(name="Query")
 class WebhooksQuery:
     webhook_integration: WebhookIntegrationType = node()
@@ -332,6 +377,10 @@ class WebhooksQuery:
 
     webhook_delivery_attempt: WebhookDeliveryAttemptType = node()
     webhook_delivery_attempts: DjangoListConnection[WebhookDeliveryAttemptType] = connection()
+
+    webhook_delivery_stats: WebhookDeliveryStatsType = field(
+        resolver=webhook_delivery_stats_resolver
+    )
 
     webhook_reports_kpi: WebhookReportsKPIType = field(
         resolver=webhook_reports_kpi_resolver
