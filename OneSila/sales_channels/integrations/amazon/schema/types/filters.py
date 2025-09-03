@@ -238,6 +238,12 @@ class AmazonImportBrokenRecordFilter(SearchFilterMixin):
     import_process: Optional[ImportFilter]
 
     @custom_filter
+    def code(self, queryset, value: str, prefix: str) -> tuple[QuerySet, Q]:
+        if value not in (None, UNSET):
+            queryset = queryset.filter(record__code=value)
+        return queryset, Q()
+
+    @custom_filter
     def exclude_unknown_issues(
         self, queryset, value: bool, prefix: str
     ) -> tuple[QuerySet, Q]:
