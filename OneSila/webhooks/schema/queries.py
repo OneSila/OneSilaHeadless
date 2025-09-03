@@ -9,16 +9,12 @@ from core.schema.core.queries import (
 from statistics import quantiles, median
 from typing import Optional
 from collections import defaultdict
-from datetime import datetime
 from urllib.parse import urlparse
-from strawberry.relay import from_base64
 from django.db.models import Count, Avg, Q, Case, When, Value, CharField, F
 from django.db.models.functions import (
     TruncHour,
     TruncDay,
     TruncWeek,
-    ExtractWeekDay,
-    ExtractHour,
 )
 from strawberry_django.filters import apply as apply_filters
 from core.schema.core.helpers import get_multi_tenant_company
@@ -37,7 +33,6 @@ from .types.reports import (
     QueuePressureEntry,
     WebhookDeliveryStatsType,
 )
-from .types.input import WebhookIntegrationPartialInput
 from .types.filters import WebhookDeliveryFilter
 
 from .types.types import (
@@ -48,46 +43,13 @@ from .types.types import (
 )
 
 
-def _decode_id(global_id: str) -> int:
-    _, pk = from_base64(global_id)
-    return pk
-
-
-def _apply_filters(
-    qs,
-    integration: WebhookIntegrationPartialInput,
-    time_from: datetime,
-    time_to: datetime,
-    topic: Optional[str] = None,
-    action: Optional[str] = None,
-    status: Optional[str] = None,
-):
-    qs = qs.filter(
-        webhook_integration_id=_decode_id(integration.id),
-        created_at__gte=time_from,
-        created_at__lte=time_to,
-    ).select_related("outbox")
-    if topic:
-        qs = qs.filter(outbox__topic=topic)
-    if action:
-        qs = qs.filter(outbox__action=action)
-    if status:
-        qs = qs.filter(status=status)
-    return qs
-
-
 def webhook_reports_kpi_resolver(
     info: Info,
-    integration: WebhookIntegrationPartialInput,
-    time_from: datetime,
-    time_to: datetime,
-    topic: Optional[str] = None,
-    action: Optional[str] = None,
-    status: Optional[str] = None,
+    filters: Optional[WebhookDeliveryFilter] = None,
 ) -> WebhookReportsKPIType:
-    qs = _apply_filters(
-        WebhookDelivery.objects.all(), integration, time_from, time_to, topic, action, status
-    )
+    multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+    qs = WebhookDelivery.objects.filter(multi_tenant_company=multi_tenant_company)
+    qs = apply_filters(filters, qs, info)
 
     total = qs.count()
     delivered = qs.filter(status=WebhookDelivery.DELIVERED).count()
@@ -138,24 +100,19 @@ def webhook_reports_kpi_resolver(
 
 def webhook_reports_series_resolver(
     info: Info,
-    integration: WebhookIntegrationPartialInput,
-    time_from: datetime,
-    time_to: datetime,
-    topic: Optional[str] = None,
-    action: Optional[str] = None,
-    status: Optional[str] = None,
+    filters: Optional[WebhookDeliveryFilter] = None,
     bucket: str = "day",
 ) -> WebhookReportsSeriesType:
-    qs = _apply_filters(
-        WebhookDelivery.objects.all(), integration, time_from, time_to, topic, action, status
-    )
+    multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+    qs = WebhookDelivery.objects.filter(multi_tenant_company=multi_tenant_company)
+    qs = apply_filters(filters, qs, info)
 
     trunc_map = {
         "hour": TruncHour,
         "week": TruncWeek,
         "day": TruncDay,
     }
-    trunc = trunc_map.get(bucket, TruncDay)("created_at")
+    trunc = trunc_map.get(bucket, TruncDay)("sent_at")
 
     delivery_qs = (
         qs.annotate(ts=trunc)
@@ -247,9 +204,11 @@ def webhook_reports_series_resolver(
     ]
 
     heatmap_dict: dict = defaultdict(lambda: {"failures": 0, "latencies": []})
-    for d in qs.only("created_at", "status", "response_ms"):
-        weekday = d.created_at.isoweekday()
-        hour = d.created_at.hour
+    for d in qs.only("sent_at", "status", "response_ms"):
+        if d.sent_at is None:
+            continue
+        weekday = d.sent_at.isoweekday()
+        hour = d.sent_at.hour
         key = (weekday, hour)
         if d.status == WebhookDelivery.FAILED:
             heatmap_dict[key]["failures"] += 1
