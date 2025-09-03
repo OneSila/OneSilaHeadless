@@ -198,6 +198,11 @@ class AmazonSalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
     def import_id(self, info) -> str:
         return to_base64(ImportType, self.pk)
 
+    @field()
+    def proxy_id(self, info) -> str:
+        from sales_channels.schema.types.types import SalesChannelImportType
+
+        return to_base64(SalesChannelImportType, self.pk)
 
 @type(
     AmazonProductTypeItem,
