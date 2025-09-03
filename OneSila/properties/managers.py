@@ -275,7 +275,8 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
                         for obj in qs:
                             setattr(obj, relation.field.name, target)
                             try:
-                                obj.save()
+                                with transaction.atomic():
+                                    obj.save()
                             except IntegrityError:
                                 obj.delete()
                     elif relation.many_to_many:
@@ -285,7 +286,8 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
                         for through_obj in through.filter(**{source_field: source.pk}):
                             setattr(through_obj, source_field, target.pk)
                             try:
-                                through_obj.save()
+                                with transaction.atomic():
+                                    through_obj.save()
                             except IntegrityError:
                                 through_obj.delete()
                 source.delete(force_delete=True)
