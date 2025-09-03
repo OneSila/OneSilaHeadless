@@ -204,6 +204,7 @@ class AmazonSalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
 
         return to_base64(SalesChannelImportType, self.pk)
 
+
 @type(
     AmazonProductTypeItem,
     filters=AmazonProductTypeItemFilter,
@@ -478,6 +479,14 @@ class AmazonImportBrokenRecordType(relay.Node, GetQuerysetMultiTenantMixin):
         'ImportType',
         lazy("imports_exports.schema.queries")
     ]
+
+    @field()
+    def code(self, info) -> str | None:
+        return self.record.get('code')
+
+    @field()
+    def message(self, info) -> str | None:
+        return self.record.get('message')
 
 
 @strawberry_type
