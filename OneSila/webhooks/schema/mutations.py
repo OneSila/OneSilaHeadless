@@ -20,7 +20,7 @@ class WebhooksMutation:
     delete_webhook_integrations: List[WebhookIntegrationType] = delete()
 
     @strawberry_django.mutation(
-        handle_django_errors=True, extensions=default_extensions
+        handle_django_errors=False, extensions=default_extensions
     )
     def retry_webhook_delivery(
         self, instance: WebhookDeliveryPartialInput, info: Info
