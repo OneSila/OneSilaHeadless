@@ -25,10 +25,18 @@ class WebhooksMutation:
     def retry_webhook_delivery(
         self, instance: WebhookDeliveryPartialInput, info: Info
     ) -> WebhookDeliveryType:
+        from webhooks.factories import SendWebhookDeliveryFactory
         from webhooks.models import WebhookDelivery
 
-        print(f"Retrying webhook delivery {instance.id.node_id}")
-        return WebhookDelivery.objects.get(id=instance.id.node_id)
+        delivery = WebhookDelivery.objects.select_related("webhook_integration", "outbox").get(
+            id=instance.id.node_id
+        )
+        factory = SendWebhookDeliveryFactory(
+            outbox_id=delivery.outbox_id, delivery_id=delivery.pk
+        )
+        factory.run()
+        delivery.refresh_from_db()
+        return delivery
 
     @strawberry_django.mutation(
         handle_django_errors=True, extensions=default_extensions
