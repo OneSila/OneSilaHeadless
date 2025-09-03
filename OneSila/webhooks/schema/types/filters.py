@@ -37,6 +37,7 @@ class WebhookDeliveryFilter(SearchFilterMixin):
     outbox: Optional[WebhookOutboxFilter]
     webhook_integration: Optional[WebhookIntegrationFilter]
     status: auto
+    sent_at: auto
     attempt: auto
     response_code: auto
 
