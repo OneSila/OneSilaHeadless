@@ -116,6 +116,10 @@ def webhook_reports_kpi_resolver(
         else 0.0
     )
     avg_attempts = qs.aggregate(avg_attempts=Avg("attempt"))["avg_attempts"] or 0.0
+    avg_latency = (
+        qs.filter(response_ms__isnull=False).aggregate(avg_latency=Avg("response_ms"))["avg_latency"]
+        or 0.0
+    )
 
     return WebhookReportsKPIType(
         total_deliveries=total,
@@ -125,6 +129,7 @@ def webhook_reports_kpi_resolver(
         latency_p50=int(p50),
         latency_p95=int(p95),
         latency_p99=int(p99),
+        latency_avg=int(avg_latency),
         rate_429=rate_429,
         rate_5xx=rate_5xx,
         avg_attempts=avg_attempts,
@@ -343,13 +348,25 @@ def webhook_delivery_stats_resolver(
     if latencies:
         median_latency = int(median(latencies))
         if len(latencies) == 1:
-            p95_latency = latencies[0]
+            p95_latency = p99_latency = latencies[0]
         else:
-            p95_latency = int(quantiles(latencies, n=100)[94])
+            qs_percentiles = quantiles(latencies, n=100)
+            p95_latency = int(qs_percentiles[94])
+            p99_latency = int(qs_percentiles[98])
     else:
-        median_latency = p95_latency = 0
+        median_latency = p95_latency = p99_latency = 0
 
     rate_429 = qs.filter(response_code=429).count() / total * 100 if total else 0.0
+    rate_5xx = (
+        qs.filter(response_code__gte=500, response_code__lt=600).count() / total * 100
+        if total
+        else 0.0
+    )
+    avg_attempts = qs.aggregate(avg_attempts=Avg("attempt"))["avg_attempts"] or 0.0
+    avg_response_ms = (
+        qs.filter(response_ms__isnull=False).aggregate(avg_response_ms=Avg("response_ms"))["avg_response_ms"]
+        or 0.0
+    )
     queue_depth = qs.filter(status=WebhookDelivery.PENDING).count()
 
     return WebhookDeliveryStatsType(
@@ -359,7 +376,11 @@ def webhook_delivery_stats_resolver(
         success_rate=success_rate,
         median_latency=median_latency,
         p95_latency=p95_latency,
+        p99_latency=p99_latency,
         rate_429=rate_429,
+        rate_5xx=rate_5xx,
+        avg_attempts=avg_attempts,
+        avg_response_ms=int(avg_response_ms),
         queue_depth=queue_depth,
     )
 
