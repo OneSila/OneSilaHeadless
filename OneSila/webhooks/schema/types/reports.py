@@ -83,6 +83,7 @@ class WebhookReportsKPIType:
     latency_p50: int
     latency_p95: int
     latency_p99: int
+    latency_avg: int
     rate_429: float
     rate_5xx: float
     avg_attempts: float
@@ -96,5 +97,9 @@ class WebhookDeliveryStatsType:
     success_rate: float
     median_latency: int
     p95_latency: int
+    p99_latency: int
     rate_429: float
+    rate_5xx: float
+    avg_attempts: float
+    avg_response_ms: int
     queue_depth: int
