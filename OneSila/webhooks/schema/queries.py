@@ -7,7 +7,7 @@ from core.schema.core.queries import (
     Info,
 )
 from statistics import quantiles, median
-from typing import List, Optional
+from typing import Optional
 from collections import defaultdict
 from datetime import datetime
 from urllib.parse import urlparse
@@ -58,21 +58,21 @@ def _apply_filters(
     integration: WebhookIntegrationPartialInput,
     time_from: datetime,
     time_to: datetime,
-    topics: Optional[List[str]] = None,
-    actions: Optional[List[str]] = None,
-    statuses: Optional[List[str]] = None,
+    topic: Optional[str] = None,
+    action: Optional[str] = None,
+    status: Optional[str] = None,
 ):
     qs = qs.filter(
         webhook_integration_id=_decode_id(integration.id),
         created_at__gte=time_from,
         created_at__lte=time_to,
     ).select_related("outbox")
-    if topics:
-        qs = qs.filter(outbox__topic__in=topics)
-    if actions:
-        qs = qs.filter(outbox__action__in=actions)
-    if statuses:
-        qs = qs.filter(status__in=statuses)
+    if topic:
+        qs = qs.filter(outbox__topic=topic)
+    if action:
+        qs = qs.filter(outbox__action=action)
+    if status:
+        qs = qs.filter(status=status)
     return qs
 
 
@@ -81,12 +81,12 @@ def webhook_reports_kpi_resolver(
     integration: WebhookIntegrationPartialInput,
     time_from: datetime,
     time_to: datetime,
-    topics: Optional[List[str]] = None,
-    actions: Optional[List[str]] = None,
-    statuses: Optional[List[str]] = None,
+    topic: Optional[str] = None,
+    action: Optional[str] = None,
+    status: Optional[str] = None,
 ) -> WebhookReportsKPIType:
     qs = _apply_filters(
-        WebhookDelivery.objects.all(), integration, time_from, time_to, topics, actions, statuses
+        WebhookDelivery.objects.all(), integration, time_from, time_to, topic, action, status
     )
 
     total = qs.count()
@@ -141,13 +141,13 @@ def webhook_reports_series_resolver(
     integration: WebhookIntegrationPartialInput,
     time_from: datetime,
     time_to: datetime,
-    topics: Optional[List[str]] = None,
-    actions: Optional[List[str]] = None,
-    statuses: Optional[List[str]] = None,
+    topic: Optional[str] = None,
+    action: Optional[str] = None,
+    status: Optional[str] = None,
     bucket: str = "day",
 ) -> WebhookReportsSeriesType:
     qs = _apply_filters(
-        WebhookDelivery.objects.all(), integration, time_from, time_to, topics, actions, statuses
+        WebhookDelivery.objects.all(), integration, time_from, time_to, topic, action, status
     )
 
     trunc_map = {
