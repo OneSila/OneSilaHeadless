@@ -38,9 +38,7 @@ class WebhooksMutation:
         delivery.refresh_from_db()
         return delivery
 
-    @strawberry_django.mutation(
-        handle_django_errors=True, extensions=default_extensions
-    )
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def regenerate_webhook_integration_secret(
         self, instance: WebhookIntegrationPartialInput, info: Info
     ) -> WebhookIntegrationType:
