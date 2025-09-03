@@ -76,17 +76,17 @@ class WebhookReportsSeriesType:
 
 @strawberry_type
 class WebhookReportsKPIType:
-    total_deliveries: int
+    deliveries: int
     delivered: int
     failed: int
     success_rate: float
-    latency_p50: int
-    latency_p95: int
-    latency_p99: int
-    latency_avg: int
+    p50_latency: int
+    p95_latency: int
+    p99_latency: int
     rate_429: float
     rate_5xx: float
     avg_attempts: float
+    avg_solve_ms: int
 
 
 @strawberry_type
