@@ -24,6 +24,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonExternalProductId,
     AmazonGtinExemption,
     AmazonVariationTheme,
+    AmazonImportBrokenRecord,
 )
 from properties.schema.types.filters import (
     PropertyFilter,
@@ -38,6 +39,7 @@ from sales_channels.schema.types.filters import (
     SalesChannelViewFilter,
     RemoteProductFilter,
 )
+from imports_exports.schema.types.filters import ImportFilter
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 
 
@@ -228,3 +230,17 @@ class AmazonVariationThemeFilter(SearchFilterMixin):
     product: Optional[ProductFilter]
     view: Optional[SalesChannelViewFilter]
     theme: auto
+
+
+@filter(AmazonImportBrokenRecord)
+class AmazonImportBrokenRecordFilter(SearchFilterMixin):
+    id: auto
+    import_process: Optional[ImportFilter]
+
+    @custom_filter
+    def exclude_unknown_issues(
+        self, queryset, value: bool, prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value not in (None, UNSET, False):
+            queryset = queryset.exclude(record__code="UNKNOWN_ERROR")
+        return queryset, Q()
