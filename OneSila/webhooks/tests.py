@@ -32,6 +32,28 @@ class WebhookIntegrationModelTests(TestCase):
         integration.save(force_save=True)
         self.assertIsNotNone(integration.id)
 
+    def test_timeout_ms_cannot_exceed_10000(self):
+        integration = WebhookIntegration(
+            multi_tenant_company=self.company,
+            hostname="https://example.com",
+            topic="product",
+            url="https://webhook.example.com",
+            timeout_ms=10001,
+        )
+        with self.assertRaises(ValidationError):
+            integration.full_clean()
+
+    def test_timeout_ms_allows_10000(self):
+        integration = WebhookIntegration(
+            multi_tenant_company=self.company,
+            hostname="https://example.com",
+            topic="product",
+            url="https://webhook.example.com",
+            timeout_ms=10000,
+        )
+        integration.full_clean()
+        integration.save(force_save=True)
+
 
 class WebhookIntegrationMutationTests(TransactionTestCaseMixin, TransactionTestCase):
     def test_regenerate_secret(self):
