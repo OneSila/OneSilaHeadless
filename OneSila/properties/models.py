@@ -113,6 +113,9 @@ class PropertyTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         translated_field = 'property'
         search_terms = ['name']
+        indexes = [
+            models.Index(fields=['property', 'language']),
+        ]
 
 
 class PropertySelectValue(TranslatedModelMixin, models.Model):
@@ -150,6 +153,9 @@ class PropertySelectValueTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         translated_field = 'propertyselectvalue'
         search_terms = ['value']
+        indexes = [
+            models.Index(fields=['propertyselectvalue', 'language']),
+        ]
         # added language as well because some words translates the same in different languages
         # the issue with that is that we also kinda need to do propertyselectvalue__property but this is not possible because we can have the same translation
         # on the value but for different properties
@@ -240,6 +246,9 @@ class ProductPropertyTextTranslation(TranslationFieldsMixin, models.Model):
         translated_field = 'product_property'
         search_terms = ['value_text', 'value_description']
         unique_together = ("product_property", "language")
+        indexes = [
+            models.Index(fields=['product_property', 'language']),
+        ]
 
 
 class ProductPropertiesRule(models.Model):
