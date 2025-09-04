@@ -324,7 +324,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         Sets the name for the product or variation in the payload.
         For variations, it delegates to set_variation_name.
         """
-        self.name = self.local_instance.name
+        self.name = self.local_instance._get_translated_value(
+            field_name='name', related_name='translations', sales_channel=self.sales_channel)
 
         if self.is_variation:
             self.set_variation_name()
@@ -337,7 +338,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         This method can be overridden for custom naming logic for variations.
         """
         if self.is_variation and self.sales_channel.use_configurable_name:
-            self.name = self.parent_local_instance.name
+            self.name = self.parent_local_instance._get_translated_value(
+                field_name='name', related_name='translations', sales_channel=self.sales_channel)
 
     def set_sku(self):
         """Sets the SKU for the product or variation in the payload."""
