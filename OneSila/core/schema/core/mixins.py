@@ -21,6 +21,20 @@ class GetQuerysetMultiTenantMixin:
         return queryset.filter(multi_tenant_company=multi_tenant_company).order_by(*ordering)
 
 
+class GetProductQuerysetMultiTenantMixin:
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        multi_tenant_company = get_multi_tenant_company(info)
+        queryset = queryset.filter(multi_tenant_company=multi_tenant_company)
+
+        if hasattr(queryset, "with_translated_name"):
+            queryset = queryset.with_translated_name(language_code=multi_tenant_company.language).order_by("translated_name")
+        else:
+            queryset = queryset.order_by(*queryset.model._meta.ordering)
+
+        return queryset
+
+
 class GetPropertyQuerysetMultiTenantMixin:
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):

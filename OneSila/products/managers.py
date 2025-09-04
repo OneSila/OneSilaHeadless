@@ -17,10 +17,10 @@ class ProductQuerySet(MultiTenantQuerySet):
     def filter_has_prices(self):
         return self.filter(type__in=self.model.HAS_PRICES_TYPES)
 
-    def with_translated_name(self):
+    def with_translated_name(self, language_code=None):
         from .models import ProductTranslation
 
-        language_field = OuterRef('multi_tenant_company__language')
+        language_field = language_code if language_code is not None else OuterRef('multi_tenant_company__language')
         name_in_language = ProductTranslation.objects.filter(
             product=OuterRef('pk'),
             language=language_field,

@@ -73,10 +73,10 @@ class PropertyQuerySet(MultiTenantQuerySet):
 
         super().delete(*args, **kwargs)
 
-    def with_translated_name(self):
+    def with_translated_name(self, language_code=None):
         from .models import PropertyTranslation
 
-        language_field = OuterRef('multi_tenant_company__language')
+        language_field = language_code if language_code is not None else OuterRef('multi_tenant_company__language')
         name_in_language = PropertyTranslation.objects.filter(
             property=OuterRef('pk'),
             language=language_field,
@@ -174,10 +174,10 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
 
         return super().delete(*args, **kwargs)
 
-    def with_translated_value(self):
+    def with_translated_value(self, language_code=None):
         from .models import PropertySelectValueTranslation
 
-        language_field = OuterRef('property__multi_tenant_company__language')
+        language_field = language_code if language_code is not None else OuterRef('property__multi_tenant_company__language')
         value_in_language = PropertySelectValueTranslation.objects.filter(
             propertyselectvalue=OuterRef('pk'),
             language=language_field,
