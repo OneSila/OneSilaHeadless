@@ -28,6 +28,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonExternalProductId,
     AmazonGtinExemption,
     AmazonVariationTheme,
+    AmazonImportBrokenRecord,
 )
 from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelFilter,
@@ -37,10 +38,17 @@ from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonProductPropertyFilter,
     AmazonProductTypeFilter,
     AmazonProductTypeItemFilter,
-    AmazonSalesChannelImportFilter, AmazonDefaultUnitConfiguratorFilter,
-    AmazonRemoteLogFilter, AmazonSalesChannelViewFilter, AmazonProductIssueFilter,
-    AmazonBrowseNodeFilter, AmazonProductBrowseNodeFilter,
-    AmazonExternalProductIdFilter, AmazonGtinExemptionFilter, AmazonVariationThemeFilter,
+    AmazonSalesChannelImportFilter,
+    AmazonDefaultUnitConfiguratorFilter,
+    AmazonRemoteLogFilter,
+    AmazonSalesChannelViewFilter,
+    AmazonProductIssueFilter,
+    AmazonBrowseNodeFilter,
+    AmazonProductBrowseNodeFilter,
+    AmazonExternalProductIdFilter,
+    AmazonGtinExemptionFilter,
+    AmazonVariationThemeFilter,
+    AmazonImportBrokenRecordFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
@@ -52,9 +60,15 @@ from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonProductTypeItemOrder,
     AmazonSalesChannelImportOrder,
     AmazonDefaultUnitConfiguratorOrder,
-    AmazonRemoteLogOrder, AmazonSalesChannelViewOrder, AmazonProductIssueOrder,
-    AmazonBrowseNodeOrder, AmazonProductBrowseNodeOrder,
-    AmazonExternalProductIdOrder, AmazonGtinExemptionOrder, AmazonVariationThemeOrder,
+    AmazonRemoteLogOrder,
+    AmazonSalesChannelViewOrder,
+    AmazonProductIssueOrder,
+    AmazonBrowseNodeOrder,
+    AmazonProductBrowseNodeOrder,
+    AmazonExternalProductIdOrder,
+    AmazonGtinExemptionOrder,
+    AmazonVariationThemeOrder,
+    AmazonImportBrokenRecordOrder,
 )
 from sales_channels.schema.types.types import FormattedIssueType
 
@@ -183,6 +197,12 @@ class AmazonSalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def import_id(self, info) -> str:
         return to_base64(ImportType, self.pk)
+
+    @field()
+    def proxy_id(self, info) -> str:
+        from sales_channels.schema.types.types import SalesChannelImportType
+
+        return to_base64(SalesChannelImportType, self.pk)
 
 
 @type(
@@ -445,6 +465,28 @@ class AmazonVariationThemeType(relay.Node, GetQuerysetMultiTenantMixin):
         'AmazonSalesChannelViewType',
         lazy("sales_channels.integrations.amazon.schema.types.types")
     ]
+
+
+@type(
+    AmazonImportBrokenRecord,
+    filters=AmazonImportBrokenRecordFilter,
+    order=AmazonImportBrokenRecordOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonImportBrokenRecordType(relay.Node, GetQuerysetMultiTenantMixin):
+    import_process: Annotated[
+        'ImportType',
+        lazy("imports_exports.schema.queries")
+    ]
+
+    @field()
+    def code(self, info) -> str | None:
+        return self.record.get('code')
+
+    @field()
+    def message(self, info) -> str | None:
+        return self.record.get('message')
 
 
 @strawberry_type

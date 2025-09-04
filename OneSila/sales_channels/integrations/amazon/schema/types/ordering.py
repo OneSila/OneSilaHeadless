@@ -20,9 +20,11 @@ from sales_channels.integrations.amazon.models import (
     AmazonExternalProductId,
     AmazonGtinExemption,
     AmazonVariationTheme,
+    AmazonImportBrokenRecord,
 )
 from properties.schema.types.ordering import ProductPropertyOrder
 from products.schema.types.ordering import ProductOrder
+from imports_exports.schema.types.ordering import ImportOrder
 
 
 @order(AmazonSalesChannel)
@@ -125,3 +127,9 @@ class AmazonVariationThemeOrder:
     id: auto
     product: Optional[ProductOrder]
     view: Optional[AmazonSalesChannelViewOrder]
+
+
+@order(AmazonImportBrokenRecord)
+class AmazonImportBrokenRecordOrder:
+    id: auto
+    import_process: Optional[ImportOrder]

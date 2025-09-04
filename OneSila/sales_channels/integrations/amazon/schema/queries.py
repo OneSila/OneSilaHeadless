@@ -17,6 +17,7 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonExternalProductIdType,
     AmazonGtinExemptionType,
     AmazonVariationThemeType,
+    AmazonImportBrokenRecordType,
 )
 
 
@@ -72,3 +73,6 @@ class AmazonSalesChannelsQuery:
 
     amazon_variation_theme: AmazonVariationThemeType = node()
     amazon_variation_themes: DjangoListConnection[AmazonVariationThemeType] = connection()
+
+    amazon_import_broken_record: AmazonImportBrokenRecordType = node()
+    amazon_import_broken_records: DjangoListConnection[AmazonImportBrokenRecordType] = connection()

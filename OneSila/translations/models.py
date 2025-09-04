@@ -13,7 +13,7 @@ class TranslationFieldsMixin(models.Model):
     """
     LANGUAGES = get_languages()
 
-    language = models.CharField(max_length=7, choices=LANGUAGES, default=settings.LANGUAGE_CODE)
+    language = models.CharField(max_length=7, choices=LANGUAGES, default=settings.LANGUAGE_CODE, db_index=True)
 
     class Meta:
         abstract = True
@@ -32,7 +32,6 @@ class TranslationFieldsMixin(models.Model):
         super().save(*args, **kwargs)
 
 
-# @TODO: This maybe should inherit models.Model?
 class TranslatedModelMixin(OldModel):
     def _get_translated_value(self, *, field_name, language=None, related_name='translations', fallback=None, sales_channel=None):
         # we use '' (empty string) instead of None here because some of the translated values severs as __str__
@@ -58,7 +57,7 @@ class TranslatedModelMixin(OldModel):
             translation_kwargs['sales_channel'] = sales_channel
 
         try:
-            translation = translations.filter(**translation_kwargs).first() # @TODO: Temporary added to fix something
+            translation = translations.get(**translation_kwargs)
 
             if sales_channel is not None and related_name == 'translations':
                 is_sales_channel_translation = True

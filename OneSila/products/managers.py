@@ -1,6 +1,7 @@
 from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin, \
     QuerySetProxyModelMixin, MultiTenantQuerySet, MultiTenantManager
-from django.db.models import Subquery, OuterRef
+from django.db.models import Subquery, OuterRef, Value, CharField
+from django.db.models.functions import Coalesce
 
 
 class ProductQuerySet(MultiTenantQuerySet):
@@ -19,15 +20,21 @@ class ProductQuerySet(MultiTenantQuerySet):
     def with_translated_name(self, language_code=None):
         from .models import ProductTranslation
 
+        language_field = language_code if language_code is not None else OuterRef('multi_tenant_company__language')
+        name_in_language = ProductTranslation.objects.filter(
+            product=OuterRef('pk'),
+            language=language_field,
+        ).values('name')[:1]
+
+        any_name = ProductTranslation.objects.filter(
+            product=OuterRef('pk'),
+        ).values('name')[:1]
+
         return self.annotate(
-            translated_name=Subquery(
-                ProductTranslation.objects
-                .filter(
-                    product=OuterRef('pk'),
-                    language=language_code
-                )
-                .order_by('name')
-                .values('name')[:1]
+            translated_name=Coalesce(
+                Subquery(name_in_language, output_field=CharField()),
+                Subquery(any_name, output_field=CharField()),
+                Value('No Name Set'),
             )
         )
 

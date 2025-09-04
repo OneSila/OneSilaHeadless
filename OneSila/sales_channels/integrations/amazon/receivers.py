@@ -15,6 +15,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonPropertySelectValue,
     AmazonProductType,
     AmazonProductBrowseNode,
+    AmazonGtinExemption,
 )
 from sales_channels.integrations.amazon.factories.sync.rule_sync import (
     AmazonPropertyRuleItemSyncFactory,
@@ -200,6 +201,23 @@ def amazon__product_browse_node__propagate_to_variations(sender, instance, **kwa
             sales_channel=instance.sales_channel,
             view=instance.view,
             defaults={'recommended_browse_node_id': instance.recommended_browse_node_id},
+        )
+
+
+@receiver(post_create, sender='amazon.AmazonGtinExemption')
+@receiver(post_update, sender='amazon.AmazonGtinExemption')
+def amazon__gtin_exemption__propagate_to_variations(sender, instance, **kwargs):
+
+    if not instance.product.is_configurable():
+        return
+
+    variations = instance.product.get_configurable_variations(active_only=False)
+    for variation in variations:
+        AmazonGtinExemption.objects.get_or_create(
+            multi_tenant_company=instance.multi_tenant_company,
+            product=variation,
+            view=instance.view,
+            defaults={'value': instance.value},
         )
 
 

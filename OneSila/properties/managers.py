@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Subquery, OuterRef
+from django.db.models import Subquery, OuterRef, Value, CharField
+from django.db.models.functions import Coalesce
 from django.utils.text import slugify
 from django.conf import settings
 import difflib
@@ -75,15 +76,21 @@ class PropertyQuerySet(MultiTenantQuerySet):
     def with_translated_name(self, language_code=None):
         from .models import PropertyTranslation
 
+        language_field = language_code if language_code is not None else OuterRef('multi_tenant_company__language')
+        name_in_language = PropertyTranslation.objects.filter(
+            property=OuterRef('pk'),
+            language=language_field,
+        ).values('name')[:1]
+
+        any_name = PropertyTranslation.objects.filter(
+            property=OuterRef('pk'),
+        ).values('name')[:1]
+
         return self.annotate(
-            translated_name=Subquery(
-                PropertyTranslation.objects
-                .filter(
-                    property=OuterRef('pk'),
-                    language=language_code
-                )
-                .order_by('name')
-                .values('name')[:1]
+            translated_name=Coalesce(
+                Subquery(name_in_language, output_field=CharField()),
+                Subquery(any_name, output_field=CharField()),
+                Value('No Name Set'),
             )
         )
 
@@ -170,15 +177,21 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
     def with_translated_value(self, language_code=None):
         from .models import PropertySelectValueTranslation
 
+        language_field = language_code if language_code is not None else OuterRef('property__multi_tenant_company__language')
+        value_in_language = PropertySelectValueTranslation.objects.filter(
+            propertyselectvalue=OuterRef('pk'),
+            language=language_field,
+        ).values('value')[:1]
+
+        any_value = PropertySelectValueTranslation.objects.filter(
+            propertyselectvalue=OuterRef('pk'),
+        ).values('value')[:1]
+
         return self.annotate(
-            translated_value=Subquery(
-                PropertySelectValueTranslation.objects
-                .filter(
-                    propertyselectvalue=OuterRef('pk'),
-                    language=language_code,
-                )
-                .order_by('value')
-                .values('value')[:1]
+            translated_value=Coalesce(
+                Subquery(value_in_language, output_field=CharField()),
+                Subquery(any_value, output_field=CharField()),
+                Value('No Value Set'),
             )
         )
 
@@ -269,9 +282,16 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
                     if relation.related_model.__name__ == "PropertySelectValueTranslation":
                         continue
                     if relation.one_to_many or relation.one_to_one:
-                        relation.related_model._default_manager.filter(
+                        qs = relation.related_model._default_manager.filter(
                             **{relation.field.name: source}
-                        ).update(**{relation.field.name: target})
+                        )
+                        for obj in qs:
+                            setattr(obj, relation.field.name, target)
+                            try:
+                                with transaction.atomic():
+                                    obj.save()
+                            except IntegrityError:
+                                obj.delete()
                     elif relation.many_to_many:
                         # @TODO: Seems that the many_to_many merge doesn't work
                         through = relation.through._default_manager
@@ -279,7 +299,8 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
                         for through_obj in through.filter(**{source_field: source.pk}):
                             setattr(through_obj, source_field, target.pk)
                             try:
-                                through_obj.save()
+                                with transaction.atomic():
+                                    through_obj.save()
                             except IntegrityError:
                                 through_obj.delete()
                 source.delete(force_delete=True)

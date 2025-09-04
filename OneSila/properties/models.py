@@ -64,7 +64,9 @@ class Property(TranslatedModelMixin, models.Model):
 
     @django_property
     def name(self):
-        return self._get_translated_value(field_name='name', related_name='propertytranslation_set')
+        if hasattr(self, 'translated_name'):
+            return self.translated_name
+        return self._get_translated_value(field_name='name', related_name='propertytranslation_set', fallback='No Name Set')
 
     def delete(self, *args, **kwargs):
 
@@ -113,6 +115,9 @@ class PropertyTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         translated_field = 'property'
         search_terms = ['name']
+        indexes = [
+            models.Index(fields=['property', 'language']),
+        ]
 
 
 class PropertySelectValue(TranslatedModelMixin, models.Model):
@@ -123,7 +128,9 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
 
     @django_property
     def value(self, language=None):
-        return self._get_translated_value(field_name='value', related_name='propertyselectvaluetranslation_set', language=language)
+        if language is None and hasattr(self, 'translated_value'):
+            return self.translated_value
+        return self._get_translated_value(field_name='value', related_name='propertyselectvaluetranslation_set', language=language, fallback='No Value Set')
 
     def __str__(self):
         return f"{self.value} <{self.property}>"
@@ -150,6 +157,9 @@ class PropertySelectValueTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         translated_field = 'propertyselectvalue'
         search_terms = ['value']
+        indexes = [
+            models.Index(fields=['propertyselectvalue', 'language']),
+        ]
         # added language as well because some words translates the same in different languages
         # the issue with that is that we also kinda need to do propertyselectvalue__property but this is not possible because we can have the same translation
         # on the value but for different properties
@@ -240,6 +250,9 @@ class ProductPropertyTextTranslation(TranslationFieldsMixin, models.Model):
         translated_field = 'product_property'
         search_terms = ['value_text', 'value_description']
         unique_together = ("product_property", "language")
+        indexes = [
+            models.Index(fields=['product_property', 'language']),
+        ]
 
 
 class ProductPropertiesRule(models.Model):

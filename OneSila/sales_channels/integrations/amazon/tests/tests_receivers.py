@@ -12,6 +12,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductType,
     AmazonRemoteLanguage,
     AmazonProductBrowseNode,
+    AmazonGtinExemption,
 )
 from products.models import Product, ConfigurableVariation
 from sales_channels.models import SalesChannelViewAssign
@@ -359,5 +360,55 @@ class AmazonProductBrowseNodeReceiversTest(TestCase):
                 product=self.var2,
                 view=self.view,
                 recommended_browse_node_id="BN1",
+            ).exists()
+        )
+
+
+class AmazonGtinExemptionReceiversTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="VIEW",
+        )
+        self.parent = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.CONFIGURABLE,
+        )
+        self.var1 = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+        )
+        self.var2 = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+        )
+        ConfigurableVariation.objects.create(parent=self.parent, variation=self.var1, multi_tenant_company=self.multi_tenant_company)
+        ConfigurableVariation.objects.create(parent=self.parent, variation=self.var2, multi_tenant_company=self.multi_tenant_company)
+
+    def test_propagates_to_variations(self):
+        AmazonGtinExemption.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.parent,
+            view=self.view,
+            value=True,
+        )
+        self.assertTrue(
+            AmazonGtinExemption.objects.filter(
+                product=self.var1,
+                view=self.view,
+                value=True,
+            ).exists()
+        )
+        self.assertTrue(
+            AmazonGtinExemption.objects.filter(
+                product=self.var2,
+                view=self.view,
+                value=True,
             ).exists()
         )
