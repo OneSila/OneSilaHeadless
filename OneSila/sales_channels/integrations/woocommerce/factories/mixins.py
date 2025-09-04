@@ -528,14 +528,14 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
     remote_id_map = 'id'
 
     def __init__(self, *args, **kwargs):
-        self.set_currency()
         super().__init__(*args, **kwargs)
+        self.set_currency()
 
     def get_local_product(self):
         return self.remote_product.local_instance
 
     def set_currency(self):
-        if not hasattr(self, 'currency'):
+        if not hasattr(self, 'currency') and self.currency is not None:
             self.currency = WoocommerceCurrency.objects.get(sales_channel=self.sales_channel).local_instance
             self.currency_iso_code = self.currency.iso_code
 
