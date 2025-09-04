@@ -4,6 +4,7 @@ import secrets
 from django.conf import settings
 from django.db.models import Q
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator
 
 from core import models
 from integrations.models import Integration
@@ -40,7 +41,9 @@ class WebhookIntegration(Integration):
     url = models.URLField()
     secret = models.CharField(max_length=128, default=generate_secret)
     user_agent = models.CharField(max_length=64, default="OneSila-Webhook/1.0")
-    timeout_ms = models.IntegerField(default=default_timeout_ms)
+    timeout_ms = models.IntegerField(
+        default=default_timeout_ms, validators=[MaxValueValidator(10000)]
+    )
     mode = models.CharField(max_length=5, choices=MODE_CHOICES, default=MODE_FULL)
     extra_headers = models.JSONField(default=dict, blank=True)
     config = models.JSONField(default=dict, blank=True)
