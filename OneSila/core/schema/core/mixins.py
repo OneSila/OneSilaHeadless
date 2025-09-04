@@ -28,7 +28,7 @@ class GetProductQuerysetMultiTenantMixin:
         queryset = queryset.filter(multi_tenant_company=multi_tenant_company)
 
         if hasattr(queryset, "with_translated_name"):
-            queryset = queryset.with_translated_name(language_code=multi_tenant_company.language).order_by("translated_name")
+            queryset = queryset.with_translated_name(language_code=multi_tenant_company.language)
         else:
             queryset = queryset.order_by(*queryset.model._meta.ordering)
 

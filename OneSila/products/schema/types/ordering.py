@@ -36,8 +36,6 @@ class ProductOrder:
         value: Ordering,
         prefix: str,
     ) -> tuple[models.QuerySet, list[str]]:
-        multi_tenant_company = get_multi_tenant_company(info)
-        queryset = queryset.with_translated_name(language_code=multi_tenant_company.language)
         return queryset, [value.resolve(f"{prefix}translated_name")]
 
 
