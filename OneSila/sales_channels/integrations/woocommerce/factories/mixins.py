@@ -528,8 +528,8 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
     remote_id_map = 'id'
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self.set_currency()
+        super().__init__(*args, **kwargs)
 
     def get_local_product(self):
         return self.remote_product.local_instance
