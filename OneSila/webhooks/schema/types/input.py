@@ -3,7 +3,7 @@ from core.schema.core.types.input import NodeInput, input, partial
 from webhooks.models import WebhookIntegration, WebhookDelivery
 
 
-@input(WebhookIntegration, fields="__all__")
+@input(WebhookIntegration,  exclude=['integration_ptr', 'secret'])
 class WebhookIntegrationInput:
     pass
 

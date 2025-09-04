@@ -17,11 +17,10 @@ from .constants import (
     DELIVERY_STATUS_CHOICES,
     MODE_CHOICES,
     MODE_FULL,
-    RETENTION_6M,
     RETENTION_CHOICES,
     TOPIC_CHOICES,
     VERSION_2025_08_01,
-    VERSION_CHOICES,
+    VERSION_CHOICES, RETENTION_3M,
 )
 
 
@@ -46,7 +45,7 @@ class WebhookIntegration(Integration):
     extra_headers = models.JSONField(default=dict, blank=True)
     config = models.JSONField(default=dict, blank=True)
     retention_policy = models.CharField(
-        max_length=3, choices=RETENTION_CHOICES, default=RETENTION_6M
+        max_length=3, choices=RETENTION_CHOICES, default=RETENTION_3M
     )
 
     def clean(self):
