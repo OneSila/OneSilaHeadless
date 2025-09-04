@@ -269,9 +269,16 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
                     if relation.related_model.__name__ == "PropertySelectValueTranslation":
                         continue
                     if relation.one_to_many or relation.one_to_one:
-                        relation.related_model._default_manager.filter(
+                        qs = relation.related_model._default_manager.filter(
                             **{relation.field.name: source}
-                        ).update(**{relation.field.name: target})
+                        )
+                        for obj in qs:
+                            setattr(obj, relation.field.name, target)
+                            try:
+                                with transaction.atomic():
+                                    obj.save()
+                            except IntegrityError:
+                                obj.delete()
                     elif relation.many_to_many:
                         # @TODO: Seems that the many_to_many merge doesn't work
                         through = relation.through._default_manager
@@ -279,7 +286,8 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
                         for through_obj in through.filter(**{source_field: source.pk}):
                             setattr(through_obj, source_field, target.pk)
                             try:
-                                through_obj.save()
+                                with transaction.atomic():
+                                    through_obj.save()
                             except IntegrityError:
                                 through_obj.delete()
                 source.delete(force_delete=True)

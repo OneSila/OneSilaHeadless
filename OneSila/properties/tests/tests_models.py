@@ -7,6 +7,8 @@ from properties.models import (
     PropertySelectValueTranslation,
 )
 from products.models import Product
+from sales_channels.integrations.amazon.models.sales_channels import AmazonSalesChannel
+from sales_channels.models.properties import RemoteProperty, RemotePropertySelectValue
 
 
 class PropertyManagerGetOrCreateTestCase(TestCase):
@@ -110,3 +112,54 @@ class PropertySelectValueMergeTestCase(TestCase):
         )
         with self.assertRaises(ValidationError):
             PropertySelectValue.objects.filter(id=self.value1.id).merge(other_value)
+
+
+class PropertySelectValueMergeRemoteTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.prop = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        self.value1 = PropertySelectValue.objects.create(
+            property=self.prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.target = PropertySelectValue.objects.create(
+            property=self.prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            hostname="https://example.com",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.remote_property = RemoteProperty.objects.create(
+            sales_channel=self.sales_channel,
+            local_instance=self.prop,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.remote_value_source = RemotePropertySelectValue.objects.create(
+            sales_channel=self.sales_channel,
+            remote_property=self.remote_property,
+            local_instance=self.value1,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.remote_value_target = RemotePropertySelectValue.objects.create(
+            sales_channel=self.sales_channel,
+            remote_property=self.remote_property,
+            local_instance=self.target,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+    def test_merge_when_remote_select_value_exists(self):
+        PropertySelectValue.objects.filter(id=self.value1.id).merge(self.target)
+
+        self.assertFalse(
+            RemotePropertySelectValue.objects.filter(id=self.remote_value_source.id).exists()
+        )
+        self.assertEqual(
+            RemotePropertySelectValue.objects.filter(
+                sales_channel=self.sales_channel, local_instance=self.target
+            ).count(),
+            1,
+        )

@@ -29,7 +29,7 @@ class MultiTenantUserAdmin(BaseUserAdmin):
     list_display = ('username', 'multi_tenant_company', 'is_active')
     ordering = ('username',)
     search_fields = ('first_name', 'last_name', 'email')
-    readonly_fields = ('multi_tenant_company',)
+    raw_id_fields = ('multi_tenant_company',)
 
 
 @django_admin.register(MultiTenantCompany)
