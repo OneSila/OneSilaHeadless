@@ -30,7 +30,8 @@ class PropertyQuerySetTest(TestCase):
         with self.assertNumQueries(1):
             names = [p.name for p in qs]
 
-        self.assertEqual(set(names), {"Prop 0", "Prop 1"})
+        # "Brand", "Product Type" are created by default with the mtc
+        self.assertEqual(set(names), {"Brand", "Product Type", "Prop 0", "Prop 1"})
 
     def test_all_translated_name_multiple_queries(self):
         props = []
@@ -51,10 +52,12 @@ class PropertyQuerySetTest(TestCase):
             multi_tenant_company=self.multi_tenant_company
         ).all()
 
-        with self.assertNumQueries(1 + len(props)):
+        # +2 because of brand and product type
+        props_len = len(props) + 2
+        with self.assertNumQueries(1 + (props_len * 3)):
             names = [p.name for p in qs]
 
-        self.assertEqual(set(names), {"Prop 0", "Prop 1"})
+        self.assertEqual(set(names), {"Brand", "Product Type", "Prop 0", "Prop 1"})
 
 
 class PropertySelectValueQuerySetTest(TestCase):
@@ -121,7 +124,7 @@ class PropertySelectValueQuerySetTest(TestCase):
 
         qs = PropertySelectValue.objects.filter(property=prop).all()
 
-        with self.assertNumQueries(1 + len(values)):
+        with self.assertNumQueries(1 + (len(values) * 3)):
             vals = [v.value for v in qs]
 
         self.assertEqual(set(vals), {"Val 0", "Val 1"})

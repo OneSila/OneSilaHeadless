@@ -39,8 +39,13 @@ class GetProductQuerysetMultiTenantMixinTest(TestCase):
             products.append(product)
 
         qs = Product.objects.all()
+        with self.assertNumQueries((len(products) * 3) + 1):
+            names = [p.name for p in qs]
 
-        with self.assertNumQueries(1 + len(products)):
+        # when we use use with_translated_name for ex in frontend we have 1 query
+        info = SimpleNamespace(context=SimpleNamespace(request=SimpleNamespace(user=self.user)))
+        qs = GetProductQuerysetMultiTenantMixin.get_queryset(Product.objects.all(), info)
+        with self.assertNumQueries(1):
             names = [p.name for p in qs]
 
         self.assertEqual(set(names), {"Product 0", "Product 1"})
