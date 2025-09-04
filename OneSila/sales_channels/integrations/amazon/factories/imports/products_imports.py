@@ -40,7 +40,7 @@ from sales_prices.models import SalesPrice
 from currencies.models import Currency
 from core.helpers import ensure_serializable
 from dateutil.parser import parse
-from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
+from sales_channels.integrations.amazon.factories.sales_channels.recently_synced_products import FetchRecentlySyncedProductFactory
 import datetime
 from imports_exports.helpers import append_broken_record, increment_processed_records
 from sales_channels.integrations.amazon.models.imports import (
@@ -980,10 +980,11 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         self.handle_gtin_exemption(instance, view)
         self.handle_product_browse_node(instance, view)
 
-        FetchRemoteIssuesFactory(
+        FetchRecentlySyncedProductFactory(
             remote_product=instance.remote_instance,
             view=view,
-            response_data=product
+            response_data=product,
+            match_images=False,
         ).run()
 
         product_obj = product_instance or instance.instance

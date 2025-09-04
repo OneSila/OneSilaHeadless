@@ -54,3 +54,4 @@ shopifyapi
 amzn-sp-api
 python-amazon-sp-api
 deepdiff
+imagehash
