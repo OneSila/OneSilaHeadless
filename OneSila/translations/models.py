@@ -13,7 +13,7 @@ class TranslationFieldsMixin(models.Model):
     """
     LANGUAGES = get_languages()
 
-    language = models.CharField(max_length=7, choices=LANGUAGES, default=settings.LANGUAGE_CODE)
+    language = models.CharField(max_length=7, choices=LANGUAGES, default=settings.LANGUAGE_CODE, db_index=True)
 
     class Meta:
         abstract = True
