@@ -64,7 +64,9 @@ class Property(TranslatedModelMixin, models.Model):
 
     @django_property
     def name(self):
-        return self._get_translated_value(field_name='name', related_name='propertytranslation_set')
+        if hasattr(self, 'translated_name'):
+            return self.translated_name
+        return self._get_translated_value(field_name='name', related_name='propertytranslation_set', fallback='No Name Set')
 
     def delete(self, *args, **kwargs):
 
@@ -126,7 +128,9 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
 
     @django_property
     def value(self, language=None):
-        return self._get_translated_value(field_name='value', related_name='propertyselectvaluetranslation_set', language=language)
+        if language is None and hasattr(self, 'translated_value'):
+            return self.translated_value
+        return self._get_translated_value(field_name='value', related_name='propertyselectvaluetranslation_set', language=language, fallback='No Value Set')
 
     def __str__(self):
         return f"{self.value} <{self.property}>"

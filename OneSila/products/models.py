@@ -54,6 +54,8 @@ class Product(TranslatedModelMixin, models.Model):
 
     @property
     def name(self):
+        if hasattr(self, 'translated_name'):
+            return self.translated_name
         return self._get_translated_value(field_name='name', related_name='translations', fallback='No Name Set')
 
     @property

@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Subquery, OuterRef
+from django.db.models import Subquery, OuterRef, Value, CharField
+from django.db.models.functions import Coalesce
 from django.utils.text import slugify
 from django.conf import settings
 import difflib
@@ -72,18 +73,24 @@ class PropertyQuerySet(MultiTenantQuerySet):
 
         super().delete(*args, **kwargs)
 
-    def with_translated_name(self, language_code=None):
+    def with_translated_name(self):
         from .models import PropertyTranslation
 
+        language_field = OuterRef('multi_tenant_company__language')
+        name_in_language = PropertyTranslation.objects.filter(
+            property=OuterRef('pk'),
+            language=language_field,
+        ).values('name')[:1]
+
+        any_name = PropertyTranslation.objects.filter(
+            property=OuterRef('pk'),
+        ).values('name')[:1]
+
         return self.annotate(
-            translated_name=Subquery(
-                PropertyTranslation.objects
-                .filter(
-                    property=OuterRef('pk'),
-                    language=language_code
-                )
-                .order_by('name')
-                .values('name')[:1]
+            translated_name=Coalesce(
+                Subquery(name_in_language, output_field=CharField()),
+                Subquery(any_name, output_field=CharField()),
+                Value('No Name Set'),
             )
         )
 
@@ -167,18 +174,24 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
 
         return super().delete(*args, **kwargs)
 
-    def with_translated_value(self, language_code=None):
+    def with_translated_value(self):
         from .models import PropertySelectValueTranslation
 
+        language_field = OuterRef('property__multi_tenant_company__language')
+        value_in_language = PropertySelectValueTranslation.objects.filter(
+            propertyselectvalue=OuterRef('pk'),
+            language=language_field,
+        ).values('value')[:1]
+
+        any_value = PropertySelectValueTranslation.objects.filter(
+            propertyselectvalue=OuterRef('pk'),
+        ).values('value')[:1]
+
         return self.annotate(
-            translated_value=Subquery(
-                PropertySelectValueTranslation.objects
-                .filter(
-                    propertyselectvalue=OuterRef('pk'),
-                    language=language_code,
-                )
-                .order_by('value')
-                .values('value')[:1]
+            translated_value=Coalesce(
+                Subquery(value_in_language, output_field=CharField()),
+                Subquery(any_value, output_field=CharField()),
+                Value('No Value Set'),
             )
         )
 
