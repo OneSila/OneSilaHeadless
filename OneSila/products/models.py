@@ -614,6 +614,9 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
                 nulls_distinct=False,
             ),
         ]
+        indexes = [
+            models.Index(fields=['product', 'language', 'sales_channel']),
+        ]
 
 
 class ProductTranslationBulletPoint(models.Model):
