@@ -564,11 +564,18 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         remote_product.save()
 
     def handle_ean_code(self, import_instance: ImportProductInstance):
-        amazon_ean_code, _ = AmazonEanCode.objects.get_or_create(
+        ean_qs = AmazonEanCode.objects.filter(
             multi_tenant_company=self.import_process.multi_tenant_company,
             sales_channel=self.sales_channel,
             remote_product=import_instance.remote_instance,
         )
+        amazon_ean_code = ean_qs.first()
+        if amazon_ean_code is None:
+            amazon_ean_code = AmazonEanCode.objects.create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                remote_product=import_instance.remote_instance,
+            )
 
         if hasattr(import_instance, "ean_code") and import_instance.ean_code:
             if amazon_ean_code.ean_code != import_instance.ean_code:
