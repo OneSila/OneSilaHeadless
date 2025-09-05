@@ -230,6 +230,10 @@ class AmazonVariationTheme(models.Model):
         except AmazonProductType.DoesNotExist as e:
             raise ValidationError("Amazon product type not found.") from e
 
+        # broken / default product type for Amazon
+        if remote_rule.product_type_code == 'PRODUCT':
+            return
+
         themes = remote_rule.variation_themes or []
         if self.theme not in themes:
             raise ValidationError("Invalid variation theme for product type.")

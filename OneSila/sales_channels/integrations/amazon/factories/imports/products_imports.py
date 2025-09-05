@@ -11,7 +11,7 @@ from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.mixins import UpdateOnlyInstanceNotFound
 from products.models import Product
 from products.product_types import SIMPLE, CONFIGURABLE
-from properties.models import Property
+from properties.models import Property, ProductProperty
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from spapi import CatalogApi
@@ -61,9 +61,11 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
     ERROR_BROKEN_IMPORT_PROCESS = "BROKEN_IMPORT_PROCESS"
     ERROR_MISSING_DATA = "MISSING_DATA"
+    ERROR_MISSING_API_DATA = "MISSING_API_DATA"
     ERROR_NO_MAPPED_PRODUCT_TYPE = "NO_MAPPED_PRODUCT_TYPE"
     ERROR_PRODUCT_TYPE_MISMATCH = "PRODUCT_TYPE_MISMATCH"
     ERROR_UPDATE_ONLY_NOT_FOUND = "UPDATE_ONLY_NOT_FOUND"
+    ERROR_NAME_TOO_LONG = "NAME_TOO_LONG"
 
     def _add_broken_record(self, *, code, message, data=None, context=None, exc=None):
         record = {
@@ -259,6 +261,11 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                         continue
 
                     if remote_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
+                        max_len = AmazonPropertySelectValue._meta.get_field("remote_value").max_length
+                        val_str = str(value) if value is not None else ""
+                        if not val_str or len(val_str) > max_len:
+                            continue
+
                         select_value = AmazonPropertySelectValue.objects.filter(
                             amazon_property=remote_property,
                             remote_value=value,
@@ -430,6 +437,15 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         if name is None:
             name = sku
 
+        max_name_len = Product._meta.get_field("name").max_length
+        if name and len(name) > max_name_len:
+            self._add_broken_record(
+                code=self.ERROR_NAME_TOO_LONG,
+                message="Product name exceeds maximum length",
+                data={"sku": sku, "name": name[:max_name_len]},
+            )
+            name = name[:max_name_len]
+
         if marketplace_id is None:
             raise ValueError("Missing marketplace_id in Amazon summary data.")
 
@@ -563,11 +579,18 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         remote_product.save()
 
     def handle_ean_code(self, import_instance: ImportProductInstance):
-        amazon_ean_code, _ = AmazonEanCode.objects.get_or_create(
+        ean_qs = AmazonEanCode.objects.filter(
             multi_tenant_company=self.import_process.multi_tenant_company,
             sales_channel=self.sales_channel,
             remote_product=import_instance.remote_instance,
         )
+        amazon_ean_code = ean_qs.first()
+        if amazon_ean_code is None:
+            amazon_ean_code = AmazonEanCode.objects.create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                remote_product=import_instance.remote_instance,
+            )
 
         if hasattr(import_instance, "ean_code") and import_instance.ean_code:
             if amazon_ean_code.ean_code != import_instance.ean_code:
@@ -632,11 +655,19 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                 remote_select_value = mirror_data.get("remote_select_value")
                 remote_select_values = mirror_data.get("remote_select_values", [])
 
+                local_instance = None
+                if remote_product.local_instance and remote_property.local_instance:
+                    local_instance = ProductProperty.objects.filter(
+                        product=remote_product.local_instance,
+                        property=remote_property.local_instance,
+                    ).first()
+
                 app, created = AmazonProductProperty.objects.get_or_create(
                     multi_tenant_company=self.import_process.multi_tenant_company,
                     sales_channel=self.sales_channel,
                     remote_product=remote_product,
                     remote_property=remote_property,
+                    local_instance=local_instance,
                 )
 
                 if created or app.remote_select_value != remote_select_value:
@@ -829,6 +860,15 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before getting summary")
 
         summary = self._get_summary(product)
+
+        if not product.get("summaries"):
+            self._add_broken_record(
+                code=self.ERROR_MISSING_API_DATA,
+                message="Missing summary data from Amazon API",
+                data=product,
+                context={"sku": product.get("sku")},
+            )
+            return
 
         rule = None
         # Ensure we keep the rule from the default marketplace if the product
