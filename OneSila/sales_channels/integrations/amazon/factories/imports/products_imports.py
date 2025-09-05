@@ -11,7 +11,7 @@ from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.mixins import UpdateOnlyInstanceNotFound
 from products.models import Product
 from products.product_types import SIMPLE, CONFIGURABLE
-from properties.models import Property
+from properties.models import Property, ProductProperty
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from spapi import CatalogApi
@@ -633,11 +633,19 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                 remote_select_value = mirror_data.get("remote_select_value")
                 remote_select_values = mirror_data.get("remote_select_values", [])
 
+                local_instance = None
+                if remote_product.local_instance and remote_property.local_instance:
+                    local_instance = ProductProperty.objects.filter(
+                        product=remote_product.local_instance,
+                        property=remote_property.local_instance,
+                    ).first()
+
                 app, created = AmazonProductProperty.objects.get_or_create(
                     multi_tenant_company=self.import_process.multi_tenant_company,
                     sales_channel=self.sales_channel,
                     remote_product=remote_product,
                     remote_property=remote_property,
+                    local_instance=local_instance,
                 )
 
                 if created or app.remote_select_value != remote_select_value:
