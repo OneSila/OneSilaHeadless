@@ -9,7 +9,7 @@ from imports_exports.factories.imports import ImportMixin, AsyncProductImportMix
 from core.mixins import TemporaryDisableInspectorSignalsMixin
 from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.mixins import UpdateOnlyInstanceNotFound
-from products.models import Product
+from products.models import Product, ProductTranslation
 from products.product_types import SIMPLE, CONFIGURABLE
 from properties.models import Property, ProductProperty
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
@@ -436,7 +436,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         if name is None:
             name = sku
 
-        max_name_len = Product._meta.get_field("name").max_length
+        max_name_len = ProductTranslation._meta.get_field("name").max_length
         if name and len(name) > max_name_len:
             self._add_broken_record(
                 code=self.ERROR_NAME_TOO_LONG,
