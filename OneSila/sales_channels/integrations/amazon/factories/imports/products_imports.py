@@ -65,6 +65,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
     ERROR_NO_MAPPED_PRODUCT_TYPE = "NO_MAPPED_PRODUCT_TYPE"
     ERROR_PRODUCT_TYPE_MISMATCH = "PRODUCT_TYPE_MISMATCH"
     ERROR_UPDATE_ONLY_NOT_FOUND = "UPDATE_ONLY_NOT_FOUND"
+    ERROR_NAME_TOO_LONG = "NAME_TOO_LONG"
 
     def _add_broken_record(self, *, code, message, data=None, context=None, exc=None):
         record = {
@@ -260,6 +261,11 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                         continue
 
                     if remote_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
+                        max_len = AmazonPropertySelectValue._meta.get_field("remote_value").max_length
+                        val_str = str(value) if value is not None else ""
+                        if not val_str or len(val_str) > max_len:
+                            continue
+
                         select_value = AmazonPropertySelectValue.objects.filter(
                             amazon_property=remote_property,
                             remote_value=value,
@@ -430,6 +436,15 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         # it seems that sometimes the name can be None coming from Amazon. IN that case we fallback to sku
         if name is None:
             name = sku
+
+        max_name_len = Product._meta.get_field("name").max_length
+        if name and len(name) > max_name_len:
+            self._add_broken_record(
+                code=self.ERROR_NAME_TOO_LONG,
+                message="Product name exceeds maximum length",
+                data={"sku": sku, "name": name[:max_name_len]},
+            )
+            name = name[:max_name_len]
 
         if marketplace_id is None:
             raise ValueError("Missing marketplace_id in Amazon summary data.")
