@@ -61,6 +61,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
     ERROR_BROKEN_IMPORT_PROCESS = "BROKEN_IMPORT_PROCESS"
     ERROR_MISSING_DATA = "MISSING_DATA"
+    ERROR_MISSING_API_DATA = "MISSING_API_DATA"
     ERROR_NO_MAPPED_PRODUCT_TYPE = "NO_MAPPED_PRODUCT_TYPE"
     ERROR_PRODUCT_TYPE_MISMATCH = "PRODUCT_TYPE_MISMATCH"
     ERROR_UPDATE_ONLY_NOT_FOUND = "UPDATE_ONLY_NOT_FOUND"
@@ -829,6 +830,15 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         self._set_start_time(f"process_product_item for sku: {product.get('sku')} - before getting summary")
 
         summary = self._get_summary(product)
+
+        if not product.get("summaries"):
+            self._add_broken_record(
+                code=self.ERROR_MISSING_API_DATA,
+                message="Missing summary data from Amazon API",
+                data=product,
+                context={"sku": product.get("sku")},
+            )
+            return
 
         rule = None
         # Ensure we keep the rule from the default marketplace if the product
