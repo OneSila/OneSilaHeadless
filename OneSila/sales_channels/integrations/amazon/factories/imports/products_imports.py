@@ -4,6 +4,7 @@ from django.utils import timezone
 import logging
 import traceback
 from django.db import IntegrityError
+from django.core.exceptions import ValidationError
 from core.logging_helpers import AddLogTimeentry, timeit_and_log
 from imports_exports.factories.imports import ImportMixin, AsyncProductImportMixin
 from core.mixins import TemporaryDisableInspectorSignalsMixin
@@ -65,6 +66,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
     ERROR_PRODUCT_TYPE_MISMATCH = "PRODUCT_TYPE_MISMATCH"
     ERROR_UPDATE_ONLY_NOT_FOUND = "UPDATE_ONLY_NOT_FOUND"
     ERROR_NAME_TOO_LONG = "NAME_TOO_LONG"
+    ERROR_INVALID_VARIATION_THEME = "INVALID_VARIATION_THEME"
 
     def _add_broken_record(self, *, code, message, data=None, context=None, exc=None):
         record = {
@@ -742,7 +744,10 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
     @timeit_and_log(logger)
     def handle_variations(self, import_instance: ImportProductInstance, view):
         from sales_channels.models.products import RemoteProductConfigurator
-        from sales_channels.integrations.amazon.models import AmazonVariationTheme
+        from sales_channels.integrations.amazon.models import (
+            AmazonVariationTheme,
+            AmazonProductType,
+        )
 
         theme = import_instance.data.get("__amazon_theme")
 
@@ -761,12 +766,38 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             )
 
         if theme and view:
-            AmazonVariationTheme.objects.update_or_create(
-                product=import_instance.instance,
-                view=view,
-                multi_tenant_company=self.import_process.multi_tenant_company,
-                defaults={"theme": theme},
-            )
+            try:
+                AmazonVariationTheme.objects.update_or_create(
+                    product=import_instance.instance,
+                    view=view,
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    defaults={"theme": theme},
+                )
+            except ValidationError as e:
+                product_type = None
+                allowed = []
+                try:
+                    rule = import_instance.instance.get_product_rule()
+                    remote_rule = AmazonProductType.objects.get(
+                        local_instance=rule,
+                        sales_channel=view.sales_channel,
+                    )
+                    product_type = remote_rule.product_type_code
+                    allowed = remote_rule.variation_themes or []
+                except Exception:
+                    pass
+                self._add_broken_record(
+                    code=self.ERROR_INVALID_VARIATION_THEME,
+                    message="Invalid variation theme for product type",
+                    data={"theme": theme},
+                    context={
+                        "sku": import_instance.data.get("sku"),
+                        "asin": import_instance.data.get("__asin"),
+                        "product_type": product_type,
+                        "allowed_variation_themes": allowed,
+                    },
+                    exc=e,
+                )
 
     @timeit_and_log(logger)
     def handle_gtin_exemption(self, import_instance: ImportProductInstance, view):
