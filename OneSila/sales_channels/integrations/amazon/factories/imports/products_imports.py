@@ -450,10 +450,10 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         if marketplace_id is None:
             raise ValueError("Missing marketplace_id in Amazon summary data.")
 
-        view = AmazonSalesChannelView.objects.filter(
+        view = AmazonSalesChannelView.objects.get(
             sales_channel=self.sales_channel,
             remote_id=marketplace_id,
-        ).first()
+        )
         language = self._get_language_for_marketplace(view)
 
         structured = {
