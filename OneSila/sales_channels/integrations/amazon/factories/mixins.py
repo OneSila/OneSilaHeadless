@@ -193,6 +193,7 @@ class GetAmazonAPIMixin:
 
         return items, next_token, results_number
 
+    # @TODO: THis needs refactored
     def get_product_types(self):
 
         listings_api = ListingsApi(self._get_client())
