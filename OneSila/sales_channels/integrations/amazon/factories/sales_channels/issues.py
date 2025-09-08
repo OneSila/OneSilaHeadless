@@ -1,6 +1,8 @@
 from core.helpers import ensure_serializable
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.models import AmazonProductIssue
+from products_inspector.signals import inspector_block_refresh
+from products_inspector.constants import AMAZON_VALIDATION_ISSUES_ERROR, AMAZON_REMOTE_ISSUES_ERROR
 
 
 class FetchRemoteIssuesFactory(GetAmazonAPIMixin):
@@ -76,6 +78,14 @@ class FetchRemoteIssuesFactory(GetAmazonAPIMixin):
                 is_validation_issue=False,
             )
 
+        if getattr(self.remote_product, "local_instance", None):
+            inspector_block_refresh.send(
+                sender=self.remote_product.local_instance.inspector.__class__,
+                instance=self.remote_product.local_instance.inspector,
+                error_code=AMAZON_REMOTE_ISSUES_ERROR,
+                run_async=False,
+            )
+
 
 class FetchRemoteValidationIssueFactory:
     """Persist validation issues returned from API submissions."""
@@ -109,4 +119,12 @@ class FetchRemoteValidationIssueFactory:
                 severity=data.get("severity"),
                 raw_data=data,
                 is_validation_issue=True,
+            )
+
+        if getattr(self.remote_product, "local_instance", None):
+            inspector_block_refresh.send(
+                sender=self.remote_product.local_instance.inspector.__class__,
+                instance=self.remote_product.local_instance.inspector,
+                error_code=AMAZON_VALIDATION_ISSUES_ERROR,
+                run_async=False,
             )

@@ -102,3 +102,9 @@ inspector_duplicate_variations_success = ModelSignal(use_caching=True)
 # signals for configurable product with wrong rule
 inspector_non_configurable_rule_success = ModelSignal(use_caching=True)
 inspector_non_configurable_rule_failed = ModelSignal(use_caching=True)
+
+# signals for amazon issues
+inspector_amazon_validation_issues_failed = ModelSignal(use_caching=True)
+inspector_amazon_validation_issues_success = ModelSignal(use_caching=True)
+inspector_amazon_remote_issues_failed = ModelSignal(use_caching=True)
+inspector_amazon_remote_issues_success = ModelSignal(use_caching=True)

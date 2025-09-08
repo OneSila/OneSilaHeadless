@@ -10,7 +10,7 @@ from products_inspector.constants import HAS_IMAGES_ERROR, MISSING_PRICES_ERROR,
     MISSING_PRODUCT_TYPE_ERROR, MISSING_REQUIRED_PROPERTIES_ERROR, MISSING_OPTIONAL_PROPERTIES_ERROR, MISSING_STOCK_ERROR, \
     MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, \
     ITEMS_MISSING_MANDATORY_INFORMATION_ERROR, VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR, \
-    DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR
+    DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR, AMAZON_VALIDATION_ISSUES_ERROR, AMAZON_REMOTE_ISSUES_ERROR
 from products_inspector.models import InspectorBlock
 from products_inspector.signals import *
 from ..constants import blocks
@@ -451,3 +451,43 @@ class NonConfigurableRuleInspectorBlockFactory(InspectorBlockFactory):
 
         if configurator_properties_count == 0:
             raise InspectorBlockFailed("Configurable product has no applicable configurator rules.")
+
+
+@InspectorBlockFactoryRegistry.register(AMAZON_VALIDATION_ISSUES_ERROR)
+class AmazonValidationIssuesInspectorBlockFactory(InspectorBlockFactory):
+    def __init__(self, block, save_inspector=True):
+        super().__init__(
+            block,
+            success_signal=inspector_amazon_validation_issues_success,
+            failure_signal=inspector_amazon_validation_issues_failed,
+            save_inspector=save_inspector,
+        )
+
+    def _check(self):
+        from sales_channels.integrations.amazon.models import AmazonProductIssue
+
+        if AmazonProductIssue.objects.filter_multi_tenant(self.multi_tenant_company).filter(
+            remote_product__local_instance=self.product,
+            is_validation_issue=True,
+        ).exists():
+            raise InspectorBlockFailed("Product has amazon validation issues.")
+
+
+@InspectorBlockFactoryRegistry.register(AMAZON_REMOTE_ISSUES_ERROR)
+class AmazonRemoteIssuesInspectorBlockFactory(InspectorBlockFactory):
+    def __init__(self, block, save_inspector=True):
+        super().__init__(
+            block,
+            success_signal=inspector_amazon_remote_issues_success,
+            failure_signal=inspector_amazon_remote_issues_failed,
+            save_inspector=save_inspector,
+        )
+
+    def _check(self):
+        from sales_channels.integrations.amazon.models import AmazonProductIssue
+
+        if AmazonProductIssue.objects.filter_multi_tenant(self.multi_tenant_company).filter(
+            remote_product__local_instance=self.product,
+            is_validation_issue=False,
+        ).exists():
+            raise InspectorBlockFailed("Product on amazon has remote issues.")
