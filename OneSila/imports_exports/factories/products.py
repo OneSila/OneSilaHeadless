@@ -417,6 +417,7 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
         for price in self.prices:
             try:
                 image_import_instance = ImportSalesPriceInstance(price, product=self.instance, import_process=self.import_process)
+                image_import_instance.update_only = False
                 image_import_instance.process()
             except IntegrityError:
                 # if the price is wrong we will skip it

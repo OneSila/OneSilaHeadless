@@ -181,7 +181,7 @@ items_missing_mandatory_information_block = {
     'simple_product_applicability': NONE,
     'configurable_product_applicability': NONE,
     'manufacturable_product_applicability': NONE,
-    'bundle_product_applicability': REQUIRED,
+    'bundle_product_applicability': OPTIONAL,
     'dropship_product_applicability': NONE,
     'supplier_product_applicability': NONE,
 }
