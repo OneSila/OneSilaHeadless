@@ -326,9 +326,14 @@ class GetAmazonAPIMixin:
         from sales_channels.integrations.amazon.models import AmazonRemoteLanguage
 
         lang = self.sales_channel.multi_tenant_company.language
-        remote_lang = AmazonRemoteLanguage.objects.filter(
-            local_instance=lang, sales_channel_view__sales_channel=self.sales_channel
-        ).first()
+        remote_lang = (
+            AmazonRemoteLanguage.objects.filter(
+                local_instance=lang,
+                sales_channel_view__sales_channel=self.sales_channel,
+            )
+            .order_by("-sales_channel_view__is_default")
+            .first()
+        )
         return remote_lang.remote_code if remote_lang else None
 
     def _build_common_body(self, product_type, attributes):
