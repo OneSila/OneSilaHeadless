@@ -47,7 +47,7 @@ class MediaMutation:
     delete_mediaproducthrough: MediaProductThroughType = delete()
     delete_mediaproducthroughs: List[MediaProductThroughType] = delete()
 
-    @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def upload_images_from_urls(self, urls: List[ImageUrlInput], info: Info) -> List[ImageType]:
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
         user = get_current_user(info)

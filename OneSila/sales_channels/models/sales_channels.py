@@ -247,7 +247,7 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
                             view=default_view,
                             type=AmazonExternalProductId.TYPE_ASIN,
                         ).value
-                        return f"{default_view.url}/dp/{asin}"
+                        return f"{self.sales_channel_view.url}/dp/{asin}"
                     except AmazonExternalProductId.DoesNotExist:
                         pass
             return None
