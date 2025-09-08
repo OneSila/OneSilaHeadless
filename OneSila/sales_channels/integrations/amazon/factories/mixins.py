@@ -157,6 +157,10 @@ class GetAmazonAPIMixin:
             created_after=None,
             created_before=None,
     ):
+
+        if issue_locale is None:
+            issue_locale = self._get_issue_locale()
+
         kwargs = {
             "seller_id": seller_id,
             "marketplace_ids": [marketplace_id],
@@ -199,6 +203,7 @@ class GetAmazonAPIMixin:
         marketplace_ids = list(views.values_list("remote_id", flat=True))
 
         product_types = set()
+        issue_locale = self._get_issue_locale()
 
         for marketplace_id in marketplace_ids:
             page_token = None
@@ -207,7 +212,8 @@ class GetAmazonAPIMixin:
                     listings_api=listings_api,
                     seller_id=seller_id,
                     marketplace_id=marketplace_id,
-                    page_token=page_token
+                    page_token=page_token,
+                    issue_locale=issue_locale,
                 )
 
                 for item in items:
