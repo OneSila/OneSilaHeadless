@@ -9,8 +9,8 @@ class UploadImagesFromUrlsTestCase(TransactionTestCaseMixin, TransactionTestCase
     def test_upload_images_from_urls(self):
         url = "https://example.com/test.png"
         mutation = """
-            mutation($urls: [String!]!) {
-              uploadImagesFromUrls(urls: $urls) { id }
+            mutation($imageUrls: [ImageUrlInput!]!) {
+              uploadImagesFromUrls(urls: $imageUrls) { id }
             }
         """
         img_data = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=")
@@ -19,7 +19,7 @@ class UploadImagesFromUrlsTestCase(TransactionTestCaseMixin, TransactionTestCase
         mock_response.headers = {"Content-Type": "image/png"}
         mock_response.raise_for_status = lambda: None
         with patch("imports_exports.factories.media.requests.get", return_value=mock_response):
-            resp = self.strawberry_test_client(query=mutation, variables={"urls": [url]})
+            resp = self.strawberry_test_client(query=mutation, variables={"imageUrls": [{"url": url, "type": Image.PACK_SHOT}]})
         self.assertIsNone(resp.errors)
         self.assertEqual(len(resp.data["uploadImagesFromUrls"]), 1)
         self.assertEqual(Image.objects.filter(owner=self.user).count(), 1)

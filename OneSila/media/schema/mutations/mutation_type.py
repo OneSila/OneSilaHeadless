@@ -5,7 +5,7 @@ from ..types.types import MediaType, ImageType, VideoType, MediaProductThroughTy
     FileType
 from ..types.input import MediaInput, ImageInput, VideoInput, MediaProductThroughInput, \
     FileInput, FilePartialInput, MediaPartialInput, ImagePartialInput, \
-    VideoPartialInput, MediaProductThroughPartialInput
+    VideoPartialInput, MediaProductThroughPartialInput, ImageUrlInput
 import strawberry_django
 from strawberry.types import Info
 from core.schema.core.extensions import default_extensions
@@ -48,13 +48,16 @@ class MediaMutation:
     delete_mediaproducthroughs: List[MediaProductThroughType] = delete()
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
-    def upload_images_from_urls(self, urls: List[str], info: Info) -> List[ImageType]:
+    def upload_images_from_urls(self, urls: List[ImageUrlInput], info: Info) -> List[ImageType]:
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
         user = get_current_user(info)
         import_process = SimpleNamespace(multi_tenant_company=multi_tenant_company)
         images = []
-        for url in urls:
-            importer = ImportImageInstance({'image_url': url}, import_process=import_process)
+        for image_url in urls:
+            importer = ImportImageInstance(
+                {'image_url': image_url.url, 'type': image_url.type},
+                import_process=import_process,
+            )
             importer.process()
             if importer.instance:
                 importer.instance.owner = user
