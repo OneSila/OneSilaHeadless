@@ -9,6 +9,7 @@ from .fields import complete_create_product_properties_rule, complete_update_pro
 from ..types.types import PropertyType, PropertyTranslationType, PropertySelectValueType, ProductPropertyType, ProductPropertyTextTranslationType, \
     PropertySelectValueTranslationType, ProductPropertiesRuleType, ProductPropertiesRuleItemType, PropertyDuplicatesType, PropertySelectValueDuplicatesType
 from properties.models import Property, PropertySelectValue, ProductProperty, ProductPropertyTextTranslation
+from properties.tasks import merge_property_select_value_db_task
 from ..types.input import PropertyInput, PropertyTranslationInput, PropertySelectValueInput, ProductPropertyInput, \
     PropertyPartialInput, PropertyTranslationPartialInput, PropertySelectValuePartialInput, ProductPropertyPartialInput, ProductPropertyTextTranslationInput, \
     PropertySelectValueTranslationInput, PropertySelectValueTranslationPartialInput, ProductPropertyTextTranslationPartialInput, ProductPropertiesRuleInput, \
@@ -45,15 +46,12 @@ class PropertiesMutation:
     ) -> PropertySelectValueType:
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
         source_ids = [s.id.node_id for s in sources]
-        source_qs = PropertySelectValue.objects.filter(
-            id__in=source_ids,
-            multi_tenant_company=multi_tenant_company,
+        target_id = target.id.node_id
+        return merge_property_select_value_db_task(
+            multi_tenant_company_id=multi_tenant_company.id,
+            source_ids=source_ids,
+            target_id=target_id,
         )
-        target_instance = PropertySelectValue.objects.get(
-            id=target.id.node_id,
-            multi_tenant_company=multi_tenant_company,
-        )
-        return source_qs.merge(target_instance)
 
     create_product_property: ProductPropertyType = create(ProductPropertyInput)
     create_product_properties: List[ProductPropertyType] = create(ProductPropertyInput)
