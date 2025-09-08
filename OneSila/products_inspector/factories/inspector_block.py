@@ -469,6 +469,7 @@ class AmazonValidationIssuesInspectorBlockFactory(InspectorBlockFactory):
         if AmazonProductIssue.objects.filter_multi_tenant(self.multi_tenant_company).filter(
             remote_product__local_instance=self.product,
             is_validation_issue=True,
+            severity="ERROR",
         ).exists():
             raise InspectorBlockFailed("Product has amazon validation issues.")
 
@@ -489,5 +490,6 @@ class AmazonRemoteIssuesInspectorBlockFactory(InspectorBlockFactory):
         if AmazonProductIssue.objects.filter_multi_tenant(self.multi_tenant_company).filter(
             remote_product__local_instance=self.product,
             is_validation_issue=False,
+            severity="ERROR",
         ).exists():
             raise InspectorBlockFailed("Product on amazon has remote issues.")
