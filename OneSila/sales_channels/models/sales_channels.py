@@ -2,7 +2,6 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from core import models
 from polymorphic.models import PolymorphicModel
-from django.conf import settings
 from core.helpers import get_languages
 from integrations.models import Integration
 from sales_channels.models.mixins import RemoteObjectMixin
@@ -266,7 +265,8 @@ class RemoteLanguage(PolymorphicModel, RemoteObjectMixin, models.Model):
     local_instance = models.CharField(
         max_length=7,
         choices=LANGUAGE_CHOICES,
-        default=settings.LANGUAGE_CODE,
+        null=True,
+        blank=True,
         help_text="The local language code associated with this remote language."
     )
     remote_code = models.CharField(max_length=64, help_text="The language code in the remote system.")
