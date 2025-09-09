@@ -611,7 +611,6 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             ean_code="1234567890123",
         )
 
-
         fac = AmazonProductCreateFactory(
             sales_channel=self.sales_channel,
             local_instance=self.product,
@@ -641,6 +640,22 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         self.assertIsInstance(body, dict)
+
+    def test_build_patches_adds_value_for_delete(self):
+        mixin = GetAmazonAPIMixin()
+        current = {
+            "other_product_image_locator_1": [
+                {"marketplace_id": "GB", "media_location": "https://example.com/img.jpg"}
+            ]
+        }
+        new = {"other_product_image_locator_1": None}
+        patches = mixin._build_patches(current, new)
+        expected = {
+            "op": "delete",
+            "path": "/attributes/other_product_image_locator_1",
+            "value": current["other_product_image_locator_1"],
+        }
+        self.assertIn(expected, patches)
 
     @override_settings(DEBUG=False)
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
@@ -1543,7 +1558,6 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             value=True,
             multi_tenant_company=self.multi_tenant_company,
         )
-
 
         mock_instance = mock_listings.return_value
         mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
