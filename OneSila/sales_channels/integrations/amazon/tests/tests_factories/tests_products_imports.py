@@ -121,6 +121,62 @@ class AmazonProductsImportProcessorPriceTest(TestCase):
         )
 
 
+class AmazonProductsImportProcessorImagesTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+    def test_fallback_to_summary_main_image(self):
+        product_data = {
+            "attributes": {},
+            "summaries": [
+                {"main_image": {"link": "https://example.com/image.jpg"}}
+            ],
+        }
+        with patch.object(AmazonProductsImportProcessor, "get_api", return_value=None):
+            processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+            images = processor._parse_images(product_data)
+        self.assertEqual(
+            images,
+            [
+                {
+                    "image_url": "https://example.com/image.jpg",
+                    "sort_order": 0,
+                    "is_main_image": True,
+                }
+            ],
+        )
+
+    def test_no_fallback_when_attributes_present(self):
+        product_data = {
+            "attributes": {
+                "main_product_image_locator": [
+                    {"media_location": "https://example.com/attr.jpg"}
+                ]
+            },
+            "summaries": [
+                {"main_image": {"link": "https://example.com/summary.jpg"}}
+            ],
+        }
+        with patch.object(AmazonProductsImportProcessor, "get_api", return_value=None):
+            processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+            images = processor._parse_images(product_data)
+        self.assertEqual(
+            images,
+            [
+                {
+                    "image_url": "https://example.com/attr.jpg",
+                    "sort_order": 0,
+                    "is_main_image": True,
+                }
+            ],
+        )
+
+
 class AmazonProductsImportProcessorRulePreserveTest(TestCase):
     def setUp(self):
         super().setUp()

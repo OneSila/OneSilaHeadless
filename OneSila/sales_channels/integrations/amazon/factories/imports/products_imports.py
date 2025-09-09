@@ -222,6 +222,17 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                     "is_main_image": index == 0,
                 })
                 index += 1
+        if index == 0:
+            summaries = product.get("summaries") or []
+            if summaries:
+                main_image = summaries[0].get("main_image") or {}
+                link = main_image.get("link")
+                if link:
+                    images.append({
+                        "image_url": link,
+                        "sort_order": index,
+                        "is_main_image": index == 0,
+                    })
         return images
 
     @timeit_and_log(logger, "AmazonProductsImportProcessor._parse_attributes")
