@@ -129,7 +129,7 @@ class SalesPriceList(models.Model):
 
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
     vat_included = models.BooleanField(_("Price list includes VAT"),
-        default=False)
+        default=True)
     auto_update_prices = models.BooleanField(_("Auto Update Price and Discount Price"),
         default=True)
     auto_add_products = models.BooleanField(_("Auto add all products"),

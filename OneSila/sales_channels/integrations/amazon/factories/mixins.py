@@ -50,7 +50,6 @@ class GetAmazonAPIMixin:
             if self.remote_product.id != self.remote_instance.id:
                 self.remote_product = self.remote_instance
 
-
         FetchRemoteValidationIssueFactory(
             remote_product=self.remote_product,
             view=self.view,
@@ -193,6 +192,7 @@ class GetAmazonAPIMixin:
 
         return items, next_token, results_number
 
+    # @TODO: THis needs refactored
     def get_product_types(self):
 
         listings_api = ListingsApi(self._get_client())
@@ -457,7 +457,8 @@ class GetAmazonAPIMixin:
 
             if new_value is None:
                 if key in current_attributes:
-                    patches.append({"op": "delete", "path": path})
+                    current_value = clean(current_value)
+                    patches.append({"op": "delete", "path": path, "value": current_value})
             else:
                 if key not in current_attributes:
                     patches.append({"op": "replace", "path": path, "value": new_value})
@@ -502,7 +503,6 @@ class GetAmazonAPIMixin:
 
         listings = ListingsApi(self._get_client())
         response = listings.patch_listings_item(**self._build_listing_kwargs(sku, marketplace_id, body, force_validation_only))
-
 
         if getattr(self, "remote_product", None):
             self.remote_product.last_sync_at = timezone.now()
