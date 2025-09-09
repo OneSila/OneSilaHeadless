@@ -45,5 +45,13 @@ class AmazonAutoImportSelectValueFactory:
                 if self.select_value.local_instance not in pp.value_multi_select.all():
                     pp.value_multi_select.add(self.select_value.local_instance)
 
+            duplicates = AmazonProductProperty.objects.filter(
+                remote_product=app.remote_product,
+                local_instance=pp,
+            ).exclude(id=app.id)
+
+            if duplicates.exists():
+                duplicates.delete()
+
             app.local_instance = pp
             app.save(update_fields=["local_instance"])
