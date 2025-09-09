@@ -38,7 +38,8 @@ class InspectorBlockHasImageTestCase(TestCase):
         media = Media.objects.create(
             type=Media.IMAGE,
             image=image,
-            owner=self.user
+            owner=self.user,
+            multi_tenant_company=self.multi_tenant_company
         )
 
         MediaProductThrough.objects.create(
@@ -90,10 +91,12 @@ class InspectorBlockHasImageTestCase(TestCase):
         self.assertFalse(inspector_block.successfully_checked)
 
         image = SimpleUploadedFile('img.jpg', b'img', content_type='image/jpeg')
+
         media = Media.objects.create(
             type=Media.IMAGE,
             image=image,
-            owner=self.user
+            owner=self.user,
+            multi_tenant_company=self.multi_tenant_company
         )
 
         MediaProductThrough.objects.create(

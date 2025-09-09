@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
+
+from django.templatetags.i18n import language
 from django.test import override_settings
 import json
 
@@ -88,6 +90,7 @@ class AmazonProductTestMixin:
             sales_channel=self.sales_channel,
             sales_channel_view=self.view,
             remote_code="en",
+            local_instance="en"
         )
         self.product = baker.make(
             "products.Product",
@@ -709,7 +712,6 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         """This test checks if the CreateFactory gives the expected payload including attributes, prices, and content."""
         mock_instance = mock_listings.return_value
         mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
-
         AmazonExternalProductId.objects.filter(type=AmazonExternalProductId.TYPE_ASIN).delete()
         EanCode.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -963,11 +965,26 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             api_region_code=self.view.api_region_code,
             remote_id="FR",
         )
+        translation = ProductTranslation.objects.create(
+            product=self.product,
+            sales_channel=self.sales_channel,
+            language="fr",
+            name="Chair name fr",
+            description="Chair description fr",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductTranslationBulletPoint.objects.create(
+            product_translation=translation,
+            multi_tenant_company=self.multi_tenant_company,
+            text="First bullet fr",
+            sort_order=0,
+        )
         AmazonRemoteLanguage.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             sales_channel_view=fr_view,
             remote_code="fr",
+            local_instance='fr'
         )
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -1034,21 +1051,21 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             "merchant_suggested_asin": [{"value": "ASIN123"}],
             "item_name": [
                 {
-                    "value": "Chair name",
+                    "value": "Chair name fr",
                     "language_tag": "fr",
                     "marketplace_id": "FR",
                 }
             ],
             "product_description": [
                 {
-                    "value": "Chair description",
+                    "value": "Chair description fr",
                     "language_tag": "fr",
                     "marketplace_id": "FR",
                 }
             ],
             "bullet_point": [
                 {
-                    "value": "First bullet",
+                    "value": "First bullet fr",
                     "language_tag": "fr",
                     "marketplace_id": "FR",
                 }
@@ -1687,7 +1704,6 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         self, mock_listings, mock_get_images, mock_get_client
     ):
         """This test checks that product content is pulled from sales channel translations if available."""
-
         baker.make(
             ProductTranslation,
             product=self.product,
@@ -1745,7 +1761,6 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     def test_translation_fallbacks_to_global_if_not_in_channel(self, mock_listings, mock_get_images, mock_get_client):
         """This test ensures fallback to global translation when channel-specific translation is missing."""
         ProductTranslation.objects.filter(product=self.product).delete()
-
         baker.make(
             ProductTranslation,
             product=self.product,

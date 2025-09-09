@@ -981,7 +981,6 @@ class ImportProductInstanceUpdateOnlyTest(TestCase):
             "sku": "UO-002",
         }
         instance = ImportProductInstance(data, self.update_only_import)
-
         with self.assertRaises(Product.DoesNotExist):
             instance.process()
 

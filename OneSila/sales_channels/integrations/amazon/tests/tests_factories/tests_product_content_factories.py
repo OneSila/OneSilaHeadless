@@ -170,9 +170,7 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
             view=self.view,
             remote_instance=self.remote_content,
         )
-
-        with self.assertRaises(Exception):
-            fac.run()
+        fac.run()
 
         expected_body = {
             "productType": "CHAIR",
@@ -281,9 +279,7 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
             view=self.view,
             remote_instance=self.remote_content,
         )
-
-        with self.assertRaises(Exception):
-            fac.run()
+        fac.run()
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         patches = body.get("patches", [])

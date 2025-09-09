@@ -67,6 +67,7 @@ class SalesChannelViewAssignValidationTest(DisableWooCommerceSignalsMixin, TestC
         )
 
     def test_first_assign_requires_browse_node(self):
+        # @TODO: TO FIX
         with self.assertRaises(ValidationError):
             SalesChannelViewAssign.objects.create(
                 multi_tenant_company=self.multi_tenant_company,
@@ -76,6 +77,7 @@ class SalesChannelViewAssignValidationTest(DisableWooCommerceSignalsMixin, TestC
             )
 
     def test_configurable_requires_variation_theme(self):
+        # @TODO: TO FIX
         AmazonProductBrowseNode.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.config_product,

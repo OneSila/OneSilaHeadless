@@ -400,6 +400,7 @@ class AmazonProductsImportProcessorUpdateOnlyTest(TestCase):
         )
 
     def test_non_configurable_product_update_only(self):
+        # @TODO: TO FIX
         product_data = {"sku": "SKU123"}
         structured = {
             "name": "Name",

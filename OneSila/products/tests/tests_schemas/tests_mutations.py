@@ -50,9 +50,10 @@ class DuplicateProductMutationTestCase(TransactionTestCaseMixin, TransactionTest
             query=DUPLICATE_PRODUCT_MUTATION,
             variables={"product": {"id": self.to_global_id(self.product)}, "sku": None, "createAsAlias": True},
         )
-
         self.assertIsNone(resp.errors)
         data = resp.data["duplicateProduct"]
-        new_product = Product.objects.get(id=self.from_global_id(data["id"]))
+        _, id = self.from_global_id(data["id"])
+
+        new_product = Product.objects.get(id=id)
         self.assertEqual(new_product.type, Product.ALIAS)
         self.assertEqual(new_product.alias_parent_product, self.product)
