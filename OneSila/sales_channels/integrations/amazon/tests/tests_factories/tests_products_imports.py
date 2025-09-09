@@ -400,8 +400,11 @@ class AmazonProductsImportProcessorUpdateOnlyTest(TestCase):
         )
 
     def test_non_configurable_product_update_only(self):
-        # @TODO: TO FIX
-        product_data = {"sku": "SKU123"}
+        product_data = {
+            "sku": "SKU123",
+            "attributes": {"name": [{"value": "Name"}]},
+            "summaries": [{"product_type": "TYPE"}],
+        }
         structured = {
             "name": "Name",
             "sku": "SKU123",
@@ -465,7 +468,7 @@ class AmazonProductsImportProcessorUpdateOnlyTest(TestCase):
             )
             processor.process_product_item(product_data)
 
-            self.assertTrue(mock_instance.update_only)
+            self.assertTrue(MockImportProductInstance.return_value.update_only)
 
 
 class AmazonProductItemFactoryRunTest(TestCase):

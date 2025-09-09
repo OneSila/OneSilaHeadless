@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 from model_bakery import baker
@@ -48,6 +49,7 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
             sales_channel=self.sales_channel,
             sales_channel_view=self.view,
             remote_code="en",
+            local_instance="en"
         )
 
         # Product type property, value and rule
@@ -156,12 +158,24 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
 
         return None
 
+    def get_put_and_patch_item_listing_mock_response(self, attributes=None):
+        mock_response = MagicMock(spec=["submissionId", "processingStatus", "issues", "status"])
+        mock_response.submissionId = "mock-submission-id"
+        mock_response.processingStatus = "VALID"
+        mock_response.status = "VALID"
+        mock_response.issues = []
+
+        if attributes:
+            mock_response.attributes = attributes
+
+        return mock_response
+
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     def test_update_content_builds_correct_body(self, mock_client, mock_listings):
         mock_instance = mock_listings.return_value
-        mock_instance.patch_listings_item.side_effect = Exception("no amazon")
-        mock_instance.get_listings_item.return_value = MagicMock(payload={"attributes": {}})
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.get_listings_item.return_value = SimpleNamespace(attributes={})
 
         fac = AmazonProductContentUpdateFactory(
             sales_channel=self.sales_channel,
@@ -171,39 +185,6 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
             remote_instance=self.remote_content,
         )
         fac.run()
-
-        expected_body = {
-            "productType": "CHAIR",
-            "requirements": "LISTING",
-            "attributes": {
-                "item_name": [
-                    {
-                        "value": "Chair name",
-                        "language_tag": "en",
-                        "marketplace_id": "GB",
-                    }
-                ],
-                "product_description": [
-                    {
-                        "value": "Chair description",
-                        "language_tag": "en",
-                        "marketplace_id": "GB",
-                    }
-                ],
-                "bullet_point": [
-                    {
-                        "value": "Point one",
-                        "language_tag": "en",
-                        "marketplace_id": "GB",
-                    },
-                    {
-                        "value": "Point two",
-                        "language_tag": "en",
-                        "marketplace_id": "GB",
-                    },
-                ],
-            },
-        }
 
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         patches = body.get("patches", [])
@@ -258,8 +239,8 @@ class AmazonProductContentUpdateFactoryTest(DisableWooCommerceSignalsMixin, Test
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     def test_update_content_skips_empty_description(self, mock_client, mock_listings):
         mock_instance = mock_listings.return_value
-        mock_instance.patch_listings_item.side_effect = Exception("no amazon")
-        mock_instance.get_listings_item.return_value = MagicMock(payload={"attributes": {}})
+        mock_instance.patch_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        mock_instance.get_listings_item.return_value = SimpleNamespace(attributes={})
 
         self.translation.description = "<p><br></p>"
         self.translation.save()

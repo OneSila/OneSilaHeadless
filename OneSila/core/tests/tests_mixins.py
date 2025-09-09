@@ -36,7 +36,7 @@ class TemporaryDisableInspectorSignalsMixinTestCase(TestCase):
 
         other_product.active = True
         other_product.save()
-        # @TODO: TO FIX
+
         block.refresh_from_db()
         other_block.refresh_from_db()
         self.assertTrue(block.successfully_checked)

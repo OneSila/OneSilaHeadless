@@ -163,7 +163,6 @@ class CheckPropertySelectValueForDuplicatesTestCase(TransactionTestCaseMixin, Tr
         )
 
     def test_duplicate_found(self):
-        # @TODO: TO FIX
         mutation = """
             mutation($property: PropertyPartialInput!, $value: String!) {
               checkPropertySelectValueForDuplicates(property: $property, value: $value) {

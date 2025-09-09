@@ -41,7 +41,7 @@ class TemporaryDisableInspectorSignalsMixin:
             product = getattr(inspector, 'product', None)
             company = getattr(product, 'multi_tenant_company', None)
 
-            if hasattr(self, 'self.multi_tenant_company') and company == self.multi_tenant_company:
+            if hasattr(self, 'multi_tenant_company') and company == self.multi_tenant_company:
                 # Record the SKU so we can re-run inspection later.
                 if product and product.sku:
                     self.skipped_inspector_sku.add(product.sku)

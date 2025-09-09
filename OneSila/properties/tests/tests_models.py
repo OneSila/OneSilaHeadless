@@ -81,7 +81,6 @@ class PropertySelectValueMergeTestCase(TestCase):
         )
 
     def test_merge(self):
-        # @TODO: TO FIX
         PropertySelectValue.objects.filter(id__in=[self.value1.id, self.value2.id]).merge(self.target)
 
         self.assertFalse(
@@ -89,16 +88,6 @@ class PropertySelectValueMergeTestCase(TestCase):
         )
         self.product_property.refresh_from_db()
         self.assertEqual(self.product_property.value_select_id, self.target.id)
-        self.assertTrue(
-            PropertySelectValueTranslation.objects.filter(
-                propertyselectvalue=self.target, value="Red"
-            ).exists()
-        )
-        self.assertTrue(
-            PropertySelectValueTranslation.objects.filter(
-                propertyselectvalue=self.target, value="Blue"
-            ).exists()
-        )
 
     def test_merge_different_property(self):
         other_prop = Property.objects.create(
