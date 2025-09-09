@@ -140,7 +140,28 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
                 return _resolve(node)
             return node
 
-        return _walk(data)
+        def _clean(node):
+            if isinstance(node, dict):
+                cleaned = {k: _clean(v) for k, v in node.items()}
+                cleaned = {k: v for k, v in cleaned.items() if v not in (None, "", [], {})}
+                return cleaned or None
+            if isinstance(node, list):
+                cleaned_list = []
+                for item in node:
+                    cleaned_item = _clean(item)
+                    if isinstance(cleaned_item, dict):
+                        meaningful = [
+                            k for k in cleaned_item.keys() if k not in ("language_tag", "marketplace_id")
+                        ]
+                        if not meaningful:
+                            continue
+                        cleaned_list.append(cleaned_item)
+                    elif cleaned_item not in (None, "", [], {}):
+                        cleaned_list.append(cleaned_item)
+                return cleaned_list or None
+            return node
+
+        return _clean(_walk(data)) or {}
 
     def update_remote_select_fields(self, remote_instance):
         """Synchronize remote select value fields with local property values."""
