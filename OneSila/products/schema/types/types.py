@@ -140,7 +140,7 @@ class ProductType(relay.Node, GetProductQuerysetMultiTenantMixin):
 
     @field()
     def has_parents(self, info) -> bool:
-        return ConfigurableVariation.objects.filter(variation_id=self.id).exists()
+        return ConfigurableVariation.objects.filter(variation_id=self.id).exists() or BundleVariation.objects.filter(variation_id=self.id).exists()
 
 
 @type(ProductTranslation, filters=ProductTranslationFilter, order=ProductTranslationOrder, pagination=True, fields="__all__")
@@ -169,7 +169,10 @@ class SimpleProductType(relay.Node, GetProductQuerysetMultiTenantMixin):
 class ConfigurableVariationType(relay.Node, GetQuerysetMultiTenantMixin):
     parent: Optional[ProductType]
     variation: Optional[ProductType]
-    configurator_value: Optional[str]
+
+    @field()
+    def configurator_value(self, info) -> str | None:
+        return self.configurator_value
 
 
 @type(BundleVariation, filters=BundleVariationFilter, order=BundleVariationOrder, pagination=True, fields="__all__")
