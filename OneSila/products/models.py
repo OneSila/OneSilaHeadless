@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db.models import Q, Value, CheckConstraint, UniqueConstraint
 from django.utils.text import slugify
+from django.conf import settings
 
 from core import models
 from django.db import IntegrityError, transaction
@@ -539,6 +540,45 @@ class ConfigurableVariation(models.Model):
             )
 
         super().save(*args, **kwargs)
+
+    @property
+    def configurator_value(self):
+        from properties.models import ProductProperty, ProductPropertiesRuleItem
+
+        language = (
+            self.multi_tenant_company.language
+            if getattr(self, "multi_tenant_company", None)
+            else settings.LANGUAGE_CODE
+        )
+        items = list(self.parent.get_configurator_properties(public_information_only=False))
+        if not items:
+            return ""
+
+        variation_ids = self.__class__.objects.filter(parent=self.parent).values_list(
+            "variation_id", flat=True
+        )
+        values = []
+        for item in items:
+            if item.type == ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR:
+                qs = ProductProperty.objects.filter(
+                    product_id__in=variation_ids, property=item.property
+                ).values_list("value_select_id", flat=True).distinct()
+                if qs.count() <= 1:
+                    continue
+
+            pp = ProductProperty.objects.filter(
+                product=self.variation, property=item.property
+            ).select_related("value_select").first()
+            if pp and pp.value_select:
+                values.append(
+                    pp.value_select._get_translated_value(
+                        field_name="value",
+                        language=language,
+                        related_name="propertyselectvaluetranslation_set",
+                    )
+                )
+
+        return " x ".join(values)
 
     def __str__(self):
         return f"{self.parent} x {self.variation}"
