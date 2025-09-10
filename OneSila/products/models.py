@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Q, Value, CheckConstraint, UniqueConstraint
+from django.db.models import Q, Value, CheckConstraint, UniqueConstraint, Count
 from django.utils.text import slugify
 from django.conf import settings
 
@@ -541,34 +541,57 @@ class ConfigurableVariation(models.Model):
 
         super().save(*args, **kwargs)
 
-    @property
-    def configurator_value(self):
-        from properties.models import ProductProperty, ProductPropertiesRuleItem
-
-        language = (
+    def _get_language(self):
+        return (
             self.multi_tenant_company.language
             if getattr(self, "multi_tenant_company", None)
             else settings.LANGUAGE_CODE
         )
+
+    def _get_distinct_value_counts(self, variation_ids, property_ids):
+        from properties.models import ProductProperty
+
+        return {
+            row["property"]: row["value_count"]
+            for row in ProductProperty.objects.filter(
+                product_id__in=variation_ids, property_id__in=property_ids
+            )
+            .values("property")
+            .annotate(value_count=Count("value_select", distinct=True))
+        }
+
+    def _get_properties_for_variation(self, property_ids):
+        from properties.models import ProductProperty
+
+        return {
+            pp.property_id: pp
+            for pp in ProductProperty.objects.filter(
+                product=self.variation, property_id__in=property_ids
+            ).select_related("value_select")
+        }
+
+    @property
+    def configurator_value(self):
+        from properties.models import ProductPropertiesRuleItem
+
+        language = self._get_language()
         items = list(self.parent.get_configurator_properties(public_information_only=False))
         if not items:
             return ""
 
+        property_ids = [item.property_id for item in items]
         variation_ids = self.__class__.objects.filter(parent=self.parent).values_list(
             "variation_id", flat=True
         )
+        value_counts = self._get_distinct_value_counts(variation_ids, property_ids)
+        variation_properties = self._get_properties_for_variation(property_ids)
+
         values = []
         for item in items:
-            if item.type == ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR:
-                qs = ProductProperty.objects.filter(
-                    product_id__in=variation_ids, property=item.property
-                ).values_list("value_select_id", flat=True).distinct()
-                if qs.count() <= 1:
-                    continue
+            if item.type == ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR and value_counts.get(item.property_id, 0) <= 1:
+                continue
 
-            pp = ProductProperty.objects.filter(
-                product=self.variation, property=item.property
-            ).select_related("value_select").first()
+            pp = variation_properties.get(item.property_id)
             if pp and pp.value_select:
                 values.append(
                     pp.value_select._get_translated_value(
