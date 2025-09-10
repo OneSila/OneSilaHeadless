@@ -169,6 +169,7 @@ class SimpleProductType(relay.Node, GetProductQuerysetMultiTenantMixin):
 class ConfigurableVariationType(relay.Node, GetQuerysetMultiTenantMixin):
     parent: Optional[ProductType]
     variation: Optional[ProductType]
+    configurator_value: Optional[str]
 
 
 @type(BundleVariation, filters=BundleVariationFilter, order=BundleVariationOrder, pagination=True, fields="__all__")
