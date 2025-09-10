@@ -116,7 +116,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
     @timeit_and_log(logger, "AmazonProductsImportProcessor.get_products_data")
     def get_products_data(self):
         # Delegate to the mixin helper which yields ListingItem objects
-        yield from self.get_all_products()
+        yield from self.get_all_products(sort_order="DESC")
 
     # ------------------------------------------------------------------
     # Structuring
