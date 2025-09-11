@@ -10,10 +10,6 @@ def validate_sku_conflicts(data, info):
     product = data['product'].pk
     view = data['sales_channel_view'].pk
 
-    print('-----------------------------')
-    print(view)
-    print(data)
-
     sales_channel = view.sales_channel.get_real_instance()
 
     if isinstance(sales_channel, ShopifySalesChannel):
@@ -37,26 +33,21 @@ def validate_sku_conflicts(data, info):
                 "Remove them before syncing as a configurable product."
             )
     else:
-        if SalesChannelViewAssign.objects.filter(
-            product=product,
+        parents = list(product.configurables.all())
+        parent_ids = [p.id for p in parents]
+        conflicted_parent_ids = SalesChannelViewAssign.objects.filter(
+            product_id__in=parent_ids,
             sales_channel=sales_channel,
-        ).exists():
-            parents = list(product.configurables.all())
-            parent_ids = [p.id for p in parents]
-            conflicted_parent_ids = SalesChannelViewAssign.objects.filter(
-                product_id__in=parent_ids,
-                sales_channel=sales_channel,
-                remote_product__isnull=False,
-            ).values_list("product_id", flat=True)
+        ).values_list("product_id", flat=True)
 
-            if conflicted_parent_ids:
-                sku_map = {p.id: p.sku for p in parents}
-                conflicted_skus = [sku_map[pid] for pid in conflicted_parent_ids]
-                skus = ", ".join(conflicted_skus)
-                raise VariationAlreadyExistsOnWebsite(
-                    f"Parent product(s) with SKU(s) {skus} already exist on this sales channel. "
-                    "Remove them before syncing this variation independently."
-                )
+        if conflicted_parent_ids:
+            sku_map = {p.id: p.sku for p in parents}
+            conflicted_skus = [sku_map[pid] for pid in conflicted_parent_ids]
+            skus = ", ".join(conflicted_skus)
+            raise VariationAlreadyExistsOnWebsite(
+                f"Parent product(s) with SKU(s) {skus} already exist on this sales channel. "
+                "Remove them before syncing this variation independently."
+            )
 
 
 def validate_amazon_first_assignment(data, info):
