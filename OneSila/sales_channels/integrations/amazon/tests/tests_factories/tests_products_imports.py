@@ -176,6 +176,44 @@ class AmazonProductsImportProcessorImagesTest(TestCase):
             ],
         )
 
+    def test_image_order_with_gaps(self):
+        product_data = {
+            "attributes": {
+                "main_product_image_locator": [
+                    {"media_location": "https://example.com/main.jpg"}
+                ],
+                "other_product_image_locator_1": [
+                    {"media_location": "https://example.com/1.jpg"}
+                ],
+                "other_product_image_locator_3": [
+                    {"media_location": "https://example.com/3.jpg"}
+                ],
+            }
+        }
+        with patch.object(AmazonProductsImportProcessor, "get_api", return_value=None):
+            processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+            images = processor._parse_images(product_data)
+        self.assertEqual(
+            images,
+            [
+                {
+                    "image_url": "https://example.com/main.jpg",
+                    "sort_order": 0,
+                    "is_main_image": True,
+                },
+                {
+                    "image_url": "https://example.com/1.jpg",
+                    "sort_order": 1,
+                    "is_main_image": False,
+                },
+                {
+                    "image_url": "https://example.com/3.jpg",
+                    "sort_order": 2,
+                    "is_main_image": False,
+                },
+            ],
+        )
+
 
 class AmazonProductsImportProcessorRulePreserveTest(TestCase):
     def setUp(self):

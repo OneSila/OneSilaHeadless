@@ -209,10 +209,21 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         attrs = product.get("attributes") or {}
         images = []
         index = 0
-        for key, values in attrs.items():
-            if not key.startswith("main_product_image_locator") and not key.startswith("other_product_image_locator"):
+
+        for value in attrs.get("main_product_image_locator", []):
+            url = value.get("media_location")
+            if not url:
                 continue
-            for value in values:
+            images.append({
+                "image_url": url,
+                "sort_order": index,
+                "is_main_image": index == 0,
+            })
+            index += 1
+
+        for i in range(1, 9):
+            key = f"other_product_image_locator_{i}"
+            for value in attrs.get(key, []):
                 url = value.get("media_location")
                 if not url:
                     continue
@@ -222,6 +233,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                     "is_main_image": index == 0,
                 })
                 index += 1
+
         if index == 0:
             summaries = product.get("summaries") or []
             if summaries:
@@ -233,6 +245,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                         "sort_order": index,
                         "is_main_image": index == 0,
                     })
+
         return images
 
     @timeit_and_log(logger, "AmazonProductsImportProcessor._parse_attributes")
