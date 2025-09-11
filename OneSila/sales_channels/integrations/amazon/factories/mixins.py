@@ -440,6 +440,12 @@ class GetAmazonAPIMixin:
                 return {k: clean(v) for k, v in data.items() if v is not None}
             if isinstance(data, list):
                 return [clean(v) for v in data if v is not None]
+            if isinstance(data, str):
+                lower = data.lower()
+                if lower == "true":
+                    return True
+                if lower == "false":
+                    return False
             return data
 
         patches = []
@@ -452,12 +458,11 @@ class GetAmazonAPIMixin:
             if key in skip_keys:
                 continue
             new_value = clean(new_value)
-            current_value = current_attributes.get(key)
+            current_value = clean(current_attributes.get(key))
             path = f"/attributes/{key}"
 
             if new_value is None:
                 if key in current_attributes:
-                    current_value = clean(current_value)
                     patches.append({"op": "delete", "path": path, "value": current_value})
             else:
                 if key not in current_attributes:
