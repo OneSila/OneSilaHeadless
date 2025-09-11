@@ -261,6 +261,7 @@ class AmazonPriceUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transact
         list_price = self.get_patch_value(patches, "/attributes/list_price")
         self.assertIsNotNone(list_price, "list_price patch is missing")
         self.assertEqual(list_price[0]["value_with_tax"], 80.0)
+        self.assertEqual(list_price[0]["marketplace_id"], self.view.remote_id)
 
     def test_missing_asin_still_uses_listing_requirements(self):
         self.remote_product.product_owner = True
@@ -274,3 +275,4 @@ class AmazonPriceUpdateRequirementsTest(DisableWooCommerceSignalsMixin, Transact
 
         list_price = self.get_patch_value(patches, "/attributes/list_price")
         self.assertIsNotNone(list_price, "list_price patch is missing")
+        self.assertEqual(list_price[0]["marketplace_id"], self.view.remote_id)
