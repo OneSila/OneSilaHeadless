@@ -173,7 +173,7 @@ class CheckPropertySelectValueForDuplicatesTestCase(TransactionTestCaseMixin, Tr
         """
         resp = self.strawberry_test_client(
             query=mutation,
-            variables={"property": {"id": self.to_global_id(self.prop)}, "value": "Red2"},
+            variables={"property": {"id": self.to_global_id(self.prop)}, "value": "Redd"},
         )
 
         self.assertIsNone(resp.errors)

@@ -31,12 +31,12 @@ class ProductFilterSalesChannelViewTestCase(TransactionTestCaseMixin, Transactio
         self.p1 = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         self.p2 = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
         self.p3 = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-
         AmazonProductBrowseNode.objects.create(
             product=self.p1,
             sales_channel=self.sales_channel,
             view=self.view1,
             recommended_browse_node_id="1",
+            multi_tenant_company=self.multi_tenant_company,
         )
         SalesChannelViewAssign.objects.create(
             product=self.p1,
@@ -50,6 +50,7 @@ class ProductFilterSalesChannelViewTestCase(TransactionTestCaseMixin, Transactio
             sales_channel=self.sales_channel,
             view=self.view2,
             recommended_browse_node_id="1",
+            multi_tenant_company=self.multi_tenant_company,
         )
         SalesChannelViewAssign.objects.create(
             product=self.p3,

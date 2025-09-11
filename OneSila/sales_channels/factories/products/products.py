@@ -6,7 +6,6 @@ from sales_channels.exceptions import (
     SwitchedToSyncException,
     SwitchedToCreateException,
     ConfigurationMissingError,
-    VariationAlreadyExistsOnWebsite,
 )
 from sales_channels.factories.mixins import IntegrationInstanceOperationMixin, RemoteInstanceDeleteFactory, \
     EanCodeValueMixin, SyncProgressMixin
@@ -85,54 +84,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
     def sanity_check(self):
         """Run pre-sync validations."""
-
-        if (
-                not self.sales_channel_allow_duplicate_sku
-                and self.local_instance.is_configurable()
-        ):
-            variations = self.local_instance.get_configurable_variations(active_only=True)
-            variation_ids = [v.id for v in variations]
-            conflicted_ids = SalesChannelViewAssign.objects.filter(
-                product_id__in=variation_ids,
-                sales_channel=self.sales_channel,
-                remote_product__isnull=False,
-            ).values_list("product_id", flat=True)
-
-            if conflicted_ids:
-                sku_map = {v.id: v.sku for v in variations}
-                conflicted_skus = [sku_map[pid] for pid in conflicted_ids]
-                skus = ", ".join(conflicted_skus)
-                raise VariationAlreadyExistsOnWebsite(
-                    f"Variations with SKU(s) {skus} already exist on this sales channel. "
-                    "Remove them before syncing as a configurable product."
-                )
-
-        if (
-                not self.sales_channel_allow_duplicate_sku
-                and not self.local_instance.is_configurable()
-                and SalesChannelViewAssign.objects.filter(
-                    product=self.local_instance,
-                    sales_channel=self.sales_channel,
-                ).exists()
-        ):
-
-            parents = list(self.local_instance.configurables.all())
-            parent_ids = [p.id for p in parents]
-            conflicted_parent_ids = SalesChannelViewAssign.objects.filter(
-                product_id__in=parent_ids,
-                sales_channel=self.sales_channel,
-                remote_product__isnull=False,
-            ).values_list("product_id", flat=True)
-
-            if conflicted_parent_ids:
-                sku_map = {p.id: p.sku for p in parents}
-                conflicted_skus = [sku_map[pid] for pid in conflicted_parent_ids]
-                skus = ", ".join(conflicted_skus)
-                raise VariationAlreadyExistsOnWebsite(
-                    f"Parent product(s) with SKU(s) {skus} already exist on this sales channel. "
-                    "Remove them before syncing this variation independently."
-                )
-
         return True
 
     def add_field_in_payload(self, field_name, value):

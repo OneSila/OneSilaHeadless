@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
+
+from django.templatetags.i18n import language
 from django.test import override_settings
 import json
 
@@ -88,6 +90,7 @@ class AmazonProductTestMixin:
             sales_channel=self.sales_channel,
             sales_channel_view=self.view,
             remote_code="en",
+            local_instance="en"
         )
         self.product = baker.make(
             "products.Product",
@@ -709,7 +712,6 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         """This test checks if the CreateFactory gives the expected payload including attributes, prices, and content."""
         mock_instance = mock_listings.return_value
         mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
-
         AmazonExternalProductId.objects.filter(type=AmazonExternalProductId.TYPE_ASIN).delete()
         EanCode.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -729,15 +731,22 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
 
         body = mock_instance.put_listings_item.call_args.kwargs.get("body")
 
-        keys = list(AmazonMediaProductThroughBase.OFFER_KEYS) + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+        # keys = (
+        #     list(AmazonMediaProductThroughBase.OFFER_KEYS)
+        #     + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+        # )
+        keys = list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+
         expected_images = {
-            key: [{"media_location": url}]
+            key: [{"marketplace_id": "GB", "media_location": url}]
             for key in keys
             if key in ("main_offer_image_locator", "main_product_image_locator")
         }
 
         expected_attributes = {
-            "externally_assigned_product_identifier": [{"type": "ean", "value": "1234567890123"}],
+            "externally_assigned_product_identifier": [
+                {"type": "ean", "value": "1234567890123", "marketplace_id": "GB"}
+            ],
             "item_name": [
                 {
                     "value": "Chair name",
@@ -963,11 +972,26 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             api_region_code=self.view.api_region_code,
             remote_id="FR",
         )
+        translation = ProductTranslation.objects.create(
+            product=self.product,
+            sales_channel=self.sales_channel,
+            language="fr",
+            name="Chair name fr",
+            description="Chair description fr",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductTranslationBulletPoint.objects.create(
+            product_translation=translation,
+            multi_tenant_company=self.multi_tenant_company,
+            text="First bullet fr",
+            sort_order=0,
+        )
         AmazonRemoteLanguage.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             sales_channel_view=fr_view,
             remote_code="fr",
+            local_instance='fr'
         )
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -1024,31 +1048,38 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         self.assertEqual(kwargs.get("marketplace_ids"), ["FR"])
 
         body = kwargs.get("body")
-        keys = list(AmazonMediaProductThroughBase.OFFER_KEYS) + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+        # keys = (
+        #     list(AmazonMediaProductThroughBase.OFFER_KEYS)
+        #     + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+        # )
+        keys = list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+
         expected_images = {
-            key: [{"media_location": "https://example.com/img.jpg"}]
+            key: [{"marketplace_id": "FR", "media_location": "https://example.com/img.jpg"}]
             for key in keys
             if key in ("main_offer_image_locator", "main_product_image_locator")
         }
         expected_attributes = {
-            "merchant_suggested_asin": [{"value": "ASIN123"}],
+            "merchant_suggested_asin": [
+                {"value": "ASIN123", "marketplace_id": "FR"}
+            ],
             "item_name": [
                 {
-                    "value": "Chair name",
+                    "value": "Chair name fr",
                     "language_tag": "fr",
                     "marketplace_id": "FR",
                 }
             ],
             "product_description": [
                 {
-                    "value": "Chair description",
+                    "value": "Chair description fr",
                     "language_tag": "fr",
                     "marketplace_id": "FR",
                 }
             ],
             "bullet_point": [
                 {
-                    "value": "First bullet",
+                    "value": "First bullet fr",
                     "language_tag": "fr",
                     "marketplace_id": "FR",
                 }
@@ -1168,7 +1199,10 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         mock_instance.get_listings_item.return_value = SimpleNamespace(
             attributes={
                 "main_product_image_locator": [
-                    {"media_location": "https://example.com/img-old.jpg"}
+                    {
+                        "marketplace_id": "GB",
+                        "media_location": "https://example.com/img-old.jpg",
+                    }
                 ]
             }
         )
@@ -1187,7 +1221,12 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             {
                 "op": "replace",
                 "path": "/attributes/main_product_image_locator",
-                "value": [{"media_location": "https://example.com/img-new.jpg"}],
+                "value": [
+                    {
+                        "marketplace_id": "GB",
+                        "media_location": "https://example.com/img-new.jpg",
+                    }
+                ],
             },
             body["patches"]
         )
@@ -1496,7 +1535,10 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         body = mock_instance.put_listings_item.call_args.kwargs.get("body")
         attrs = body.get("attributes", {})
 
-        self.assertEqual(attrs.get("merchant_suggested_asin"), [{"value": "ASIN123"}])
+        self.assertEqual(
+            attrs.get("merchant_suggested_asin"),
+            [{"value": "ASIN123", "marketplace_id": self.view.remote_id}],
+        )
         self.assertNotIn("externally_assigned_product_identifier", attrs)
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
@@ -1531,7 +1573,13 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
 
         self.assertEqual(
             attrs.get("externally_assigned_product_identifier"),
-            [{"type": "ean", "value": "1234567890123"}],
+            [
+                {
+                    "type": "ean",
+                    "value": "1234567890123",
+                    "marketplace_id": self.view.remote_id,
+                }
+            ],
         )
         self.assertNotIn("merchant_suggested_asin", attrs)
 
@@ -1687,7 +1735,6 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         self, mock_listings, mock_get_images, mock_get_client
     ):
         """This test checks that product content is pulled from sales channel translations if available."""
-
         baker.make(
             ProductTranslation,
             product=self.product,
@@ -1745,7 +1792,6 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     def test_translation_fallbacks_to_global_if_not_in_channel(self, mock_listings, mock_get_images, mock_get_client):
         """This test ensures fallback to global translation when channel-specific translation is missing."""
         ProductTranslation.objects.filter(product=self.product).delete()
-
         baker.make(
             ProductTranslation,
             product=self.product,

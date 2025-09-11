@@ -141,10 +141,26 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             raise SwitchedToSyncException("Listing already created for marketplace")
         if not self.is_create and self.view.remote_id not in (self.remote_instance.created_marketplaces or []):
             raise SwitchedToCreateException("Listing missing for marketplace")
+        if not self.is_create:
+            self.remote_parent_product = self.get_remote_parent_product_for_view(self.remote_parent_product)
+            self.parent_local_instance = self.remote_parent_product.local_instance if self.remote_parent_product else None
 
     # ------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------
+    def get_remote_parent_product_for_view(self, remote_parent_product):
+        if not remote_parent_product or self.view.remote_id in (remote_parent_product.created_marketplaces or []):
+            return remote_parent_product
+        qs = self.remote_model_class.objects.filter(
+            local_instance=self.parent_local_instance,
+            sales_channel=self.sales_channel,
+            remote_parent_product__isnull=True,
+        )
+        for candidate in qs:
+            if self.view.remote_id in (candidate.created_marketplaces or []):
+                return candidate
+        return remote_parent_product
+
     def _get_default_view(self):
         from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 
@@ -249,16 +265,21 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         external_id = self.external_product_id
         if external_id:
             if external_id.type == external_id.TYPE_ASIN:
-                attrs["merchant_suggested_asin"] = [{"value": external_id.value}]
+                attrs["merchant_suggested_asin"] = [
+                    {"value": external_id.value, "marketplace_id": self.view.remote_id}
+                ]
             else:
                 attrs["externally_assigned_product_identifier"] = [
                     {
                         "type": external_id.type.lower(),
                         "value": external_id.value,
+                        "marketplace_id": self.view.remote_id,
                     }
                 ]
             if external_id.created_asin and external_id.type != external_id.TYPE_ASIN:
-                attrs["merchant_suggested_asin"] = [{"value": external_id.created_asin}]
+                attrs["merchant_suggested_asin"] = [
+                    {"value": external_id.created_asin, "marketplace_id": self.view.remote_id}
+                ]
         else:
             ean = self.ean_for_payload
             if ean:
@@ -266,6 +287,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                     {
                         "type": "ean",
                         "value": ean,
+                        "marketplace_id": self.view.remote_id,
                     }
                 ]
 

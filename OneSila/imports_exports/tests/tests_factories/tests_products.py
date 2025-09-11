@@ -1,6 +1,7 @@
 from core.tests import TestCase
 from currencies.models import PublicCurrency, Currency
 from eancodes.models import EanCode
+from imports_exports.factories.mixins import UpdateOnlyInstanceNotFound
 from imports_exports.factories.products import ImportProductInstance, ImportProductTranslationInstance, \
     ImportSalesPriceInstance
 from imports_exports.models import Import
@@ -981,8 +982,7 @@ class ImportProductInstanceUpdateOnlyTest(TestCase):
             "sku": "UO-002",
         }
         instance = ImportProductInstance(data, self.update_only_import)
-
-        with self.assertRaises(Product.DoesNotExist):
+        with self.assertRaises(UpdateOnlyInstanceNotFound):
             instance.process()
 
 

@@ -121,6 +121,100 @@ class AmazonProductsImportProcessorPriceTest(TestCase):
         )
 
 
+class AmazonProductsImportProcessorImagesTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+
+    def test_fallback_to_summary_main_image(self):
+        product_data = {
+            "attributes": {},
+            "summaries": [
+                {"main_image": {"link": "https://example.com/image.jpg"}}
+            ],
+        }
+        with patch.object(AmazonProductsImportProcessor, "get_api", return_value=None):
+            processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+            images = processor._parse_images(product_data)
+        self.assertEqual(
+            images,
+            [
+                {
+                    "image_url": "https://example.com/image.jpg",
+                    "sort_order": 0,
+                    "is_main_image": True,
+                }
+            ],
+        )
+
+    def test_no_fallback_when_attributes_present(self):
+        product_data = {
+            "attributes": {
+                "main_product_image_locator": [
+                    {"media_location": "https://example.com/attr.jpg"}
+                ]
+            },
+            "summaries": [
+                {"main_image": {"link": "https://example.com/summary.jpg"}}
+            ],
+        }
+        with patch.object(AmazonProductsImportProcessor, "get_api", return_value=None):
+            processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+            images = processor._parse_images(product_data)
+        self.assertEqual(
+            images,
+            [
+                {
+                    "image_url": "https://example.com/attr.jpg",
+                    "sort_order": 0,
+                    "is_main_image": True,
+                }
+            ],
+        )
+
+    def test_image_order_with_gaps(self):
+        product_data = {
+            "attributes": {
+                "main_product_image_locator": [
+                    {"media_location": "https://example.com/main.jpg"}
+                ],
+                "other_product_image_locator_1": [
+                    {"media_location": "https://example.com/1.jpg"}
+                ],
+                "other_product_image_locator_3": [
+                    {"media_location": "https://example.com/3.jpg"}
+                ],
+            }
+        }
+        with patch.object(AmazonProductsImportProcessor, "get_api", return_value=None):
+            processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+            images = processor._parse_images(product_data)
+        self.assertEqual(
+            images,
+            [
+                {
+                    "image_url": "https://example.com/main.jpg",
+                    "sort_order": 0,
+                    "is_main_image": True,
+                },
+                {
+                    "image_url": "https://example.com/1.jpg",
+                    "sort_order": 1,
+                    "is_main_image": False,
+                },
+                {
+                    "image_url": "https://example.com/3.jpg",
+                    "sort_order": 2,
+                    "is_main_image": False,
+                },
+            ],
+        )
+
+
 class AmazonProductsImportProcessorRulePreserveTest(TestCase):
     def setUp(self):
         super().setUp()
@@ -400,7 +494,11 @@ class AmazonProductsImportProcessorUpdateOnlyTest(TestCase):
         )
 
     def test_non_configurable_product_update_only(self):
-        product_data = {"sku": "SKU123"}
+        product_data = {
+            "sku": "SKU123",
+            "attributes": {"name": [{"value": "Name"}]},
+            "summaries": [{"product_type": "TYPE"}],
+        }
         structured = {
             "name": "Name",
             "sku": "SKU123",
@@ -464,7 +562,7 @@ class AmazonProductsImportProcessorUpdateOnlyTest(TestCase):
             )
             processor.process_product_item(product_data)
 
-            self.assertTrue(mock_instance.update_only)
+            self.assertTrue(MockImportProductInstance.return_value.update_only)
 
 
 class AmazonProductItemFactoryRunTest(TestCase):

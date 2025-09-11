@@ -132,13 +132,22 @@ class AmazonProductImageFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
     def test_image_create_factory_value_only(self):
         urls = ["https://example.com/img1.jpg", "https://example.com/img2.jpg"]
         expected_attrs = {}
-        for idx, key in enumerate(AmazonMediaProductThroughBase.OFFER_KEYS):
-            expected_attrs[key] = (
-                [{"media_location": urls[idx]}] if idx < len(urls) else None
-            )
+        # for idx, key in enumerate(AmazonMediaProductThroughBase.OFFER_KEYS):
+        #     expected_attrs[key] = (
+        #         [{"marketplace_id": self.view.remote_id, "media_location": urls[idx]}]
+        #         if idx < len(urls)
+        #         else None
+        #     )
         for idx, key in enumerate(AmazonMediaProductThroughBase.PRODUCT_KEYS):
             expected_attrs[key] = (
-                [{"media_location": urls[idx]}] if idx < len(urls) else None
+                [
+                    {
+                        "marketplace_id": self.view.remote_id,
+                        "media_location": urls[idx],
+                    }
+                ]
+                if idx < len(urls)
+                else None
             )
 
         with patch.object(
@@ -180,13 +189,22 @@ class AmazonProductImageFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
 
         urls = ["https://example.com/updated1.jpg", "https://example.com/updated2.jpg"]
         expected_attrs = {}
-        for idx, key in enumerate(AmazonMediaProductThroughBase.OFFER_KEYS):
-            expected_attrs[key] = (
-                [{"media_location": urls[idx]}] if idx < len(urls) else None
-            )
+        # for idx, key in enumerate(AmazonMediaProductThroughBase.OFFER_KEYS):
+        #     expected_attrs[key] = (
+        #         [{"marketplace_id": self.view.remote_id, "media_location": urls[idx]}]
+        #         if idx < len(urls)
+        #         else None
+        #     )
         for idx, key in enumerate(AmazonMediaProductThroughBase.PRODUCT_KEYS):
             expected_attrs[key] = (
-                [{"media_location": urls[idx]}] if idx < len(urls) else None
+                [
+                    {
+                        "marketplace_id": self.view.remote_id,
+                        "media_location": urls[idx],
+                    }
+                ]
+                if idx < len(urls)
+                else None
             )
 
         with patch.object(
@@ -217,10 +235,11 @@ class AmazonProductImageFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
             remote_product=self.remote_product,
         )
 
-        keys = (
-            list(AmazonMediaProductThroughBase.OFFER_KEYS)
-            + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
-        )
+        # keys = (
+        #     list(AmazonMediaProductThroughBase.OFFER_KEYS)
+        #     + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+        # )
+        keys = list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
         expected_attrs = {key: None for key in keys}
 
         with patch.object(
