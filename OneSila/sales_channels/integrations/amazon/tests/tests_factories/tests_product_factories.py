@@ -731,7 +731,12 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
 
         body = mock_instance.put_listings_item.call_args.kwargs.get("body")
 
-        keys = list(AmazonMediaProductThroughBase.OFFER_KEYS) + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+        # keys = (
+        #     list(AmazonMediaProductThroughBase.OFFER_KEYS)
+        #     + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+        # )
+        keys = list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+
         expected_images = {
             key: [{"media_location": url}]
             for key in keys
@@ -1043,7 +1048,12 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         self.assertEqual(kwargs.get("marketplace_ids"), ["FR"])
 
         body = kwargs.get("body")
-        keys = list(AmazonMediaProductThroughBase.OFFER_KEYS) + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+        # keys = (
+        #     list(AmazonMediaProductThroughBase.OFFER_KEYS)
+        #     + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+        # )
+        keys = list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+
         expected_images = {
             key: [{"media_location": "https://example.com/img.jpg"}]
             for key in keys

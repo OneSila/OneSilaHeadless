@@ -19,10 +19,10 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin):
 
     remote_model_class = AmazonImageProductAssociation
 
-    OFFER_KEYS = [
-        "main_offer_image_locator",
-        *[f"other_offer_image_locator_{i}" for i in range(1, 6)],
-    ]
+    # OFFER_KEYS = [
+    #     "main_offer_image_locator",
+    #     *[f"other_offer_image_locator_{i}" for i in range(1, 6)],
+    # ]
     PRODUCT_KEYS = [
         "main_product_image_locator",
         *[f"other_product_image_locator_{i}" for i in range(1, 9)],
@@ -62,8 +62,8 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin):
     def build_attributes(self):
         urls = self._get_images()
         attrs = {}
-        for idx, key in enumerate(self.OFFER_KEYS):
-            attrs[key] = [{"media_location": urls[idx]}] if idx < len(urls) else None
+        # for idx, key in enumerate(self.OFFER_KEYS):
+        #     attrs[key] = [{"media_location": urls[idx]}] if idx < len(urls) else None
         for idx, key in enumerate(self.PRODUCT_KEYS):
             attrs[key] = [{"media_location": urls[idx]}] if idx < len(urls) else None
         return attrs
