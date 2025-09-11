@@ -244,16 +244,21 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         external_id = self.external_product_id
         if external_id:
             if external_id.type == external_id.TYPE_ASIN:
-                attrs["merchant_suggested_asin"] = [{"value": external_id.value}]
+                attrs["merchant_suggested_asin"] = [
+                    {"value": external_id.value, "marketplace_id": self.view.remote_id}
+                ]
             else:
                 attrs["externally_assigned_product_identifier"] = [
                     {
                         "type": external_id.type.lower(),
                         "value": external_id.value,
+                        "marketplace_id": self.view.remote_id,
                     }
                 ]
             if external_id.created_asin and external_id.type != external_id.TYPE_ASIN:
-                attrs["merchant_suggested_asin"] = [{"value": external_id.created_asin}]
+                attrs["merchant_suggested_asin"] = [
+                    {"value": external_id.created_asin, "marketplace_id": self.view.remote_id}
+                ]
         else:
             ean = self.ean_for_payload
             if ean:
@@ -261,6 +266,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                     {
                         "type": "ean",
                         "value": ean,
+                        "marketplace_id": self.view.remote_id,
                     }
                 ]
 
