@@ -62,10 +62,19 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin):
     def build_attributes(self):
         urls = self._get_images()
         attrs = {}
+        marketplace_id = self.view.remote_id if self.view else None
         # for idx, key in enumerate(self.OFFER_KEYS):
-        #     attrs[key] = [{"media_location": urls[idx]}] if idx < len(urls) else None
+        #     attrs[key] = (
+        #         [{"marketplace_id": marketplace_id, "media_location": urls[idx]}]
+        #         if idx < len(urls)
+        #         else None
+        #     )
         for idx, key in enumerate(self.PRODUCT_KEYS):
-            attrs[key] = [{"media_location": urls[idx]}] if idx < len(urls) else None
+            attrs[key] = (
+                [{"marketplace_id": marketplace_id, "media_location": urls[idx]}]
+                if idx < len(urls)
+                else None
+            )
         return attrs
 
     def build_body(self):

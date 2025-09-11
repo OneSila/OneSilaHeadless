@@ -134,11 +134,20 @@ class AmazonProductImageFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
         expected_attrs = {}
         # for idx, key in enumerate(AmazonMediaProductThroughBase.OFFER_KEYS):
         #     expected_attrs[key] = (
-        #         [{"media_location": urls[idx]}] if idx < len(urls) else None
+        #         [{"marketplace_id": self.view.remote_id, "media_location": urls[idx]}]
+        #         if idx < len(urls)
+        #         else None
         #     )
         for idx, key in enumerate(AmazonMediaProductThroughBase.PRODUCT_KEYS):
             expected_attrs[key] = (
-                [{"media_location": urls[idx]}] if idx < len(urls) else None
+                [
+                    {
+                        "marketplace_id": self.view.remote_id,
+                        "media_location": urls[idx],
+                    }
+                ]
+                if idx < len(urls)
+                else None
             )
 
         with patch.object(
@@ -182,11 +191,20 @@ class AmazonProductImageFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
         expected_attrs = {}
         # for idx, key in enumerate(AmazonMediaProductThroughBase.OFFER_KEYS):
         #     expected_attrs[key] = (
-        #         [{"media_location": urls[idx]}] if idx < len(urls) else None
+        #         [{"marketplace_id": self.view.remote_id, "media_location": urls[idx]}]
+        #         if idx < len(urls)
+        #         else None
         #     )
         for idx, key in enumerate(AmazonMediaProductThroughBase.PRODUCT_KEYS):
             expected_attrs[key] = (
-                [{"media_location": urls[idx]}] if idx < len(urls) else None
+                [
+                    {
+                        "marketplace_id": self.view.remote_id,
+                        "media_location": urls[idx],
+                    }
+                ]
+                if idx < len(urls)
+                else None
             )
 
         with patch.object(
