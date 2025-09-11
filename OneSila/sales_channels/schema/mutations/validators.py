@@ -14,7 +14,6 @@ def validate_sku_conflicts(data, info):
     print(view)
     print(data)
 
-
     sales_channel = view.sales_channel.get_real_instance()
 
     if isinstance(sales_channel, ShopifySalesChannel):
@@ -67,6 +66,7 @@ def validate_amazon_first_assignment(data, info):
 
     from sales_channels.integrations.amazon.models import (
         AmazonSalesChannel,
+        AmazonSalesChannelView,
         AmazonProductBrowseNode,
         AmazonVariationTheme,
     )
@@ -78,17 +78,26 @@ def validate_amazon_first_assignment(data, info):
         ).exists()
 
         if not exists:
+            default_view = AmazonSalesChannelView.objects.filter(
+                sales_channel=sales_channel,
+                is_default=True,
+            ).first()
+            views = [view]
+            if default_view and default_view != view:
+                views.append(default_view)
+
             if not AmazonProductBrowseNode.objects.filter(
                 product=product,
                 sales_channel=sales_channel,
-                view=view,
+                view__in=views,
             ).exists():
                 raise ValidationError(
                     {'__all__': _('Amazon products require a browse node for the first assignment.')}
                 )
 
             if product.is_configurable() and not AmazonVariationTheme.objects.filter(
-                product=product, view=view
+                product=product,
+                view__in=views,
             ).exists():
                 raise ValidationError(
                     {
