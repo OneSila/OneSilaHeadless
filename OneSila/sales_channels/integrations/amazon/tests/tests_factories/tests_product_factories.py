@@ -738,7 +738,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         keys = list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
 
         expected_images = {
-            key: [{"media_location": url}]
+            key: [{"marketplace_id": "GB", "media_location": url}]
             for key in keys
             if key in ("main_offer_image_locator", "main_product_image_locator")
         }
@@ -1055,7 +1055,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         keys = list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
 
         expected_images = {
-            key: [{"media_location": "https://example.com/img.jpg"}]
+            key: [{"marketplace_id": "FR", "media_location": "https://example.com/img.jpg"}]
             for key in keys
             if key in ("main_offer_image_locator", "main_product_image_locator")
         }
@@ -1199,7 +1199,10 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         mock_instance.get_listings_item.return_value = SimpleNamespace(
             attributes={
                 "main_product_image_locator": [
-                    {"media_location": "https://example.com/img-old.jpg"}
+                    {
+                        "marketplace_id": "GB",
+                        "media_location": "https://example.com/img-old.jpg",
+                    }
                 ]
             }
         )
@@ -1218,7 +1221,12 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             {
                 "op": "replace",
                 "path": "/attributes/main_product_image_locator",
-                "value": [{"media_location": "https://example.com/img-new.jpg"}],
+                "value": [
+                    {
+                        "marketplace_id": "GB",
+                        "media_location": "https://example.com/img-new.jpg",
+                    }
+                ],
             },
             body["patches"]
         )
