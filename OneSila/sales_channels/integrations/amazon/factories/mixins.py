@@ -432,6 +432,22 @@ class GetAmazonAPIMixin:
 
         return response
 
+    def _merge_purchasable_offer(self, new_value, current_value, clean_func):
+        current_list = current_value if isinstance(current_value, list) else []
+        existing = {(o.get("audience"), o.get("currency")) for o in new_value}
+        for offer in current_list:
+            key = (offer.get("audience"), offer.get("currency"))
+            if key not in existing:
+                new_value.append(offer)
+                existing.add(key)
+            else:
+                for item in new_value:
+                    if (item.get("audience"), item.get("currency")) == key:
+                        if "start_at" in offer and "start_at" not in item:
+                            item["start_at"] = offer["start_at"]
+                        break
+        return clean_func(new_value), clean_func(current_list)
+
     def _build_patches(self, current_attributes, new_attributes):
         """Generate JSON patches from current and new attributes."""
 
@@ -440,6 +456,12 @@ class GetAmazonAPIMixin:
                 return {k: clean(v) for k, v in data.items() if v is not None}
             if isinstance(data, list):
                 return [clean(v) for v in data if v is not None]
+            if isinstance(data, str):
+                lower = data.lower()
+                if lower == "true":
+                    return True
+                if lower == "false":
+                    return False
             return data
 
         patches = []
@@ -451,9 +473,14 @@ class GetAmazonAPIMixin:
         for key, new_value in new_attributes.items():
             if key in skip_keys:
                 continue
-            new_value = clean(new_value)
             current_value = current_attributes.get(key)
+            new_value = clean(new_value)
             path = f"/attributes/{key}"
+
+            if key == "purchasable_offer" and isinstance(new_value, list):
+                new_value, current_value = self._merge_purchasable_offer(
+                    new_value, current_value, clean
+                )
 
             if new_value is None:
                 if key in current_attributes:

@@ -11,6 +11,9 @@ from core.tests import TestCase
 from core.tests import TransactionTestCase
 from sales_channels.integrations.amazon.factories import AmazonProductDeleteFactory, AmazonProductSyncFactory
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
+from sales_channels.integrations.amazon.factories.properties.mixins import (
+    AmazonProductPropertyBaseMixin,
+)
 from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
 
 from sales_channels.models.sales_channels import SalesChannelViewAssign
@@ -659,6 +662,35 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             "value": current["other_product_image_locator_1"],
         }
         self.assertIn(expected, patches)
+
+    def test_build_patches_keeps_non_all_audiences(self):
+        mixin = GetAmazonAPIMixin()
+        current = {
+            "purchasable_offer": [
+                {"audience": "ALL", "currency": "GBP"},
+                {"audience": "B2B", "currency": "GBP"},
+            ]
+        }
+        new = {
+            "purchasable_offer": [
+                {"audience": "ALL", "currency": "GBP"}
+            ]
+        }
+        patches = mixin._build_patches(current, new)
+        self.assertEqual(patches, [])
+
+    def test_replace_tokens_drops_empty_units(self):
+        mixin = AmazonProductPropertyBaseMixin()
+        data = {
+            "battery": [
+                {
+                    "marketplace_id": "A1F83G8C2ARO7P",
+                    "weight": [{"unit": "grams", "value": None}],
+                }
+            ]
+        }
+        cleaned = mixin._replace_tokens(data, None)
+        self.assertEqual(cleaned, {})
 
     @override_settings(DEBUG=False)
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
