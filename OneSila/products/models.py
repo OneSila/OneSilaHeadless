@@ -289,6 +289,13 @@ class Product(TranslatedModelMixin, models.Model):
 
         today = date.today()
 
+        def _validate_prices(price, discount):
+            if price == 0 or discount == 0:
+                raise ValueError("Price or discount cannot be zero")
+            if discount is not None and price is not None and discount >= price:
+                return price, None
+            return price, discount
+
         # Step 1: Check for Periodic Pricelist
         periodic_pricelist = SalesChannelIntegrationPricelist.objects.filter(
             sales_channel=sales_channel,
@@ -305,7 +312,7 @@ class Product(TranslatedModelMixin, models.Model):
             ).annotate_prices().first()
 
             if price_item:
-                return price_item.price, price_item.discount
+                return _validate_prices(price_item.price, price_item.discount)
 
         # Step 2: Check for Non-Periodic Pricelist
         non_periodic_pricelist = SalesChannelIntegrationPricelist.objects.filter(
@@ -322,7 +329,7 @@ class Product(TranslatedModelMixin, models.Model):
             ).annotate_prices().first()
 
             if price_item:
-                return price_item.price, price_item.discount
+                return _validate_prices(price_item.price, price_item.discount)
 
         # Step 3: Use Default Product Price
         sales_price = SalesPrice.objects.filter(product=self, currency=currency).first()
@@ -330,13 +337,13 @@ class Product(TranslatedModelMixin, models.Model):
         if sales_price:
             # Handle Case 1: Both RRP and price are available (and not None)
             if sales_price.rrp is not None and sales_price.price is not None:
-                return sales_price.rrp, sales_price.price
+                return _validate_prices(sales_price.rrp, sales_price.price)
             # Handle Case 2: Only RRP is available (price is None)
             elif sales_price.rrp is not None and sales_price.price is None:
-                return sales_price.rrp, None
+                return _validate_prices(sales_price.rrp, None)
             # Handle Case 3: Only price is available (rrp is None)
             elif sales_price.price is not None and sales_price.rrp is None:
-                return sales_price.price, None
+                return _validate_prices(sales_price.price, None)
 
         # Fallback if no price information is available
         return None, None
