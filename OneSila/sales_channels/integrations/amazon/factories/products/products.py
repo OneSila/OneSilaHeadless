@@ -7,7 +7,7 @@ from django.utils import timezone
 from products.models import (
     Product,
     ProductTranslation,
-    ProductTranslationBulletPoint,
+    ProductTranslationBulletPoint, ConfigurableVariation,
 )
 from properties.models import ProductProperty
 from sales_channels.factories.products.products import (
@@ -141,6 +141,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             raise SwitchedToSyncException("Listing already created for marketplace")
         if not self.is_create and self.view.remote_id not in (self.remote_instance.created_marketplaces or []):
             raise SwitchedToCreateException("Listing missing for marketplace")
+
         if not self.is_create:
             self.remote_parent_product = self.get_remote_parent_product_for_view(self.remote_parent_product)
             self.parent_local_instance = self.remote_parent_product.local_instance if self.remote_parent_product else None
@@ -149,16 +150,26 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     # Helpers
     # ------------------------------------------------------------
     def get_remote_parent_product_for_view(self, remote_parent_product):
-        if not remote_parent_product or self.view.remote_id in (remote_parent_product.created_marketplaces or []):
+
+        if remote_parent_product is None:
             return remote_parent_product
-        qs = self.remote_model_class.objects.filter(
-            local_instance=self.parent_local_instance,
+
+        if  self.view.remote_id in remote_parent_product.created_marketplaces:
+            return remote_parent_product
+
+        if not self.is_variation:
+            return remote_parent_product
+
+        potential_parent_ids = ConfigurableVariation.objects.filter(variation=self.local_instance).values_list('parent_id', flat=True)
+        qs = AmazonProduct.objects.filter(
+            local_instance_id__in=potential_parent_ids,
             sales_channel=self.sales_channel,
             remote_parent_product__isnull=True,
         )
         for candidate in qs:
-            if self.view.remote_id in (candidate.created_marketplaces or []):
+            if self.view.remote_id in candidate.created_marketplaces:
                 return candidate
+
         return remote_parent_product
 
     def _get_default_view(self):
