@@ -739,7 +739,9 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         }
 
         expected_attributes = {
-            "externally_assigned_product_identifier": [{"type": "ean", "value": "1234567890123"}],
+            "externally_assigned_product_identifier": [
+                {"type": "ean", "value": "1234567890123", "marketplace_id": "GB"}
+            ],
             "item_name": [
                 {
                     "value": "Chair name",
@@ -1048,7 +1050,9 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             if key in ("main_offer_image_locator", "main_product_image_locator")
         }
         expected_attributes = {
-            "merchant_suggested_asin": [{"value": "ASIN123"}],
+            "merchant_suggested_asin": [
+                {"value": "ASIN123", "marketplace_id": "FR"}
+            ],
             "item_name": [
                 {
                     "value": "Chair name fr",
@@ -1513,7 +1517,10 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         body = mock_instance.put_listings_item.call_args.kwargs.get("body")
         attrs = body.get("attributes", {})
 
-        self.assertEqual(attrs.get("merchant_suggested_asin"), [{"value": "ASIN123"}])
+        self.assertEqual(
+            attrs.get("merchant_suggested_asin"),
+            [{"value": "ASIN123", "marketplace_id": self.view.remote_id}],
+        )
         self.assertNotIn("externally_assigned_product_identifier", attrs)
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
@@ -1548,7 +1555,13 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
 
         self.assertEqual(
             attrs.get("externally_assigned_product_identifier"),
-            [{"type": "ean", "value": "1234567890123"}],
+            [
+                {
+                    "type": "ean",
+                    "value": "1234567890123",
+                    "marketplace_id": self.view.remote_id,
+                }
+            ],
         )
         self.assertNotIn("merchant_suggested_asin", attrs)
 
