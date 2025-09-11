@@ -7,6 +7,7 @@ from ..types.input import SalesChannelImportInput, SalesChannelImportPartialInpu
     SalesChannelIntegrationPricelistInput, SalesChannelIntegrationPricelistPartialInput, SalesChannelViewInput, \
     SalesChannelViewPartialInput, SalesChannelViewAssignInput, SalesChannelViewAssignPartialInput, \
     RemoteLanguagePartialInput, RemoteCurrencyPartialInput, ImportPropertyInput
+from .validators import validate_sku_conflicts, validate_amazon_first_assignment
 
 
 @type(name='Mutation')
@@ -42,9 +43,15 @@ class SalesChannelsMutation:
 
     create_import_properties: List[ImportPropertyType] = create(List[ImportPropertyInput])
 
-    create_sales_channel_view_assign: SalesChannelViewAssignType = create(SalesChannelViewAssignInput)
+    create_sales_channel_view_assign: SalesChannelViewAssignType = create(
+        SalesChannelViewAssignInput,
+        validators=[validate_sku_conflicts, validate_amazon_first_assignment],
+    )
     resync_sales_channel_view_assign: SalesChannelViewAssignType = resync_sales_channel_assign()
-    create_sales_channel_view_assigns: List[SalesChannelViewAssignType] = create(SalesChannelViewAssignInput)
+    create_sales_channel_view_assigns: List[SalesChannelViewAssignType] = create(
+        SalesChannelViewAssignInput,
+        validators=[validate_sku_conflicts, validate_amazon_first_assignment],
+    )
     update_sales_channel_view_assign: SalesChannelViewAssignType = update(SalesChannelViewAssignPartialInput)
     delete_sales_channel_view_assign: SalesChannelViewAssignType = delete()
     delete_sales_channel_view_assigns: List[SalesChannelViewAssignType] = delete()
