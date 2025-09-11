@@ -7,8 +7,14 @@ from sales_channels.integrations.shopify.models import ShopifySalesChannel
 
 
 def validate_sku_conflicts(data, info):
-    product = data['product']
-    view = data['sales_channel_view']
+    product = data['product'].pk
+    view = data['sales_channel_view'].pk
+
+    print('-----------------------------')
+    print(view)
+    print(data)
+
+
     sales_channel = view.sales_channel.get_real_instance()
 
     if isinstance(sales_channel, ShopifySalesChannel):
@@ -55,8 +61,8 @@ def validate_sku_conflicts(data, info):
 
 
 def validate_amazon_first_assignment(data, info):
-    product = data['product']
-    view = data['sales_channel_view']
+    product = data['product'].pk
+    view = data['sales_channel_view'].pk
     sales_channel = view.sales_channel.get_real_instance()
 
     from sales_channels.integrations.amazon.models import (
