@@ -9,6 +9,7 @@ from sales_channels.integrations.woocommerce.constants import API_ATTRIBUTE_PREF
 from properties.models import Property, ProductProperty
 from django.db.models import Q
 from sales_channels.factories.prices.prices import ToUpdateCurrenciesMixin
+from django.utils.translation import gettext as _
 
 import logging
 logger = logging.getLogger(__name__)
@@ -120,9 +121,9 @@ class WoocommerceRemoteValueConversionMixin:
         """Handles float value types."""
         return value
 
-    def get_boolean_value(self, value: bool) -> int:
-        """Converts boolean values to 1 (True) or 0 (False) as required by Magento."""
-        return value
+    def get_boolean_value(self, value: bool) -> str:
+        """Converts boolean values to translated strings for WooCommerce."""
+        return _("Yes") if value else _("No")
 
     def get_select_value(self, value):
         """Handles select and multiselect values."""
