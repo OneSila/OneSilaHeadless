@@ -119,6 +119,11 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                 raise ValueError("Amazon listings require external product id or EAN on create")
         return True
 
+    def sanity_check(self):
+        # allow variations to be added separately from the configurable product
+        # in amazon we can add in different vierws
+        pass
+
     def initialize_remote_product(self):
 
         super().initialize_remote_product()
