@@ -158,6 +158,16 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
                     if cleaned_item is not None:
                         cleaned_list.append(cleaned_item)
                 return cleaned_list or None
+            if isinstance(node, str):
+                lower = node.lower()
+                if lower == "true":
+                    return True
+                if lower == "false":
+                    return False
+                try:
+                    return int(node) if node.isdigit() else float(node)
+                except ValueError:
+                    return node
             return node
 
         return _clean(_walk(data)) or {}

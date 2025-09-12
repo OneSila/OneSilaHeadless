@@ -462,6 +462,10 @@ class GetAmazonAPIMixin:
                     return True
                 if lower == "false":
                     return False
+                try:
+                    return int(data) if data.isdigit() else float(data)
+                except ValueError:
+                    return data
             return data
 
         patches = []
@@ -481,6 +485,8 @@ class GetAmazonAPIMixin:
                 new_value, current_value = self._merge_purchasable_offer(
                     new_value, current_value, clean
                 )
+            else:
+                current_value = clean(current_value)
 
             if new_value is None:
                 if key in current_attributes:
