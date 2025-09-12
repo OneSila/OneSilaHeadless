@@ -47,11 +47,13 @@ class PropertiesMutation:
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
         source_ids = [s.id.node_id for s in sources]
         target_id = target.id.node_id
-        return merge_property_select_value_db_task(
+        merge_property_select_value_db_task(
             multi_tenant_company_id=multi_tenant_company.id,
             source_ids=source_ids,
             target_id=target_id,
         )
+
+        return PropertySelectValue.objects.get(id=target_id)
 
     create_product_property: ProductPropertyType = create(ProductPropertyInput)
     create_product_properties: List[ProductPropertyType] = create(ProductPropertyInput)
