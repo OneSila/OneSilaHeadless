@@ -15,7 +15,7 @@ from ebay_rest.api.sell_marketing.configuration import Configuration
 
 from ebay_rest.api.commerce_identity.api.user_api import UserApi
 
-from sales_channels.integrations.ebay.models import EbaySalesChannel
+from sales_channels.integrations.ebay.models import EbaySalesChannel, EbaySalesChannelView
 
 
 class GetEbayAPIMixin:
@@ -38,11 +38,40 @@ class GetEbayAPIMixin:
         }
 
         header = {
-            # Use the marketplace of the store, e.g. "EBAY_FR", "EBAY_US", etc.
-            "marketplace_id": "EBAY_GB",
-            "accept_language": "en-GB",  # or "fr-FR", etc.
-            "content_language": "en-GB",
+            "marketplace_id": "EBAY_US",
+            "accept_language": "en-US",
+            "content_language": "en-US",
         }
+
+        view = getattr(self, "view", None)
+
+        if isinstance(view, EbaySalesChannelView):
+            selected_view = view
+        else:
+            selected_view = None
+            if view is not None:
+                real_instance_getter = getattr(view, "get_real_instance", None)
+                if callable(real_instance_getter):
+                    candidate = real_instance_getter()
+                    if isinstance(candidate, EbaySalesChannelView):
+                        selected_view = candidate
+                if selected_view is None:
+                    selected_view = EbaySalesChannelView.objects.filter(pk=getattr(view, "pk", None)).first()
+            if selected_view is None:
+                selected_view = EbaySalesChannelView.objects.filter(
+                    sales_channel=self.sales_channel,
+                    is_default=True,
+                ).first()
+
+        if selected_view is not None:
+            if selected_view.remote_id:
+                header["marketplace_id"] = selected_view.remote_id
+
+            remote_language = selected_view.remote_languages.first()
+            if remote_language and remote_language.remote_code:
+                language_code = remote_language.remote_code.replace("_", "-")
+                header["accept_language"] = language_code
+                header["content_language"] = language_code
 
         # Construct API with dicts (no need for .json file)
         return API(
