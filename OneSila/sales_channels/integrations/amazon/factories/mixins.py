@@ -468,6 +468,17 @@ class GetAmazonAPIMixin:
                     return data
             return data
 
+        def remove_marketplace_id(data):
+            if isinstance(data, dict):
+                return {
+                    k: remove_marketplace_id(v)
+                    for k, v in data.items()
+                    if k != "marketplace_id"
+                }
+            if isinstance(data, list):
+                return [remove_marketplace_id(v) for v in data]
+            return data
+
         patches = []
         current_attributes = current_attributes or {}
         new_attributes = new_attributes or {}
@@ -496,7 +507,11 @@ class GetAmazonAPIMixin:
                 if key not in current_attributes:
                     patches.append({"op": "replace", "path": path, "value": new_value})
                 else:
-                    diff = DeepDiff(current_value, new_value, ignore_order=True)
+                    diff = DeepDiff(
+                        remove_marketplace_id(current_value),
+                        remove_marketplace_id(new_value),
+                        ignore_order=True,
+                    )
                     if diff:
                         patches.append({"op": "replace", "path": path, "value": new_value})
 

@@ -679,6 +679,16 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         patches = mixin._build_patches(current, new)
         self.assertEqual(patches, [])
 
+    def test_build_patches_ignores_marketplace_id(self):
+        mixin = GetAmazonAPIMixin()
+        current = {"attr": [{"marketplace_id": "GB", "value": "foo"}]}
+        new = {"attr": [{"value": "foo"}]}
+        self.assertEqual(mixin._build_patches(current, new), [])
+        self.assertEqual(
+            mixin._build_patches({"attr": [{"value": "foo"}]}, {"attr": [{"marketplace_id": "GB", "value": "foo"}]}),
+            [],
+        )
+
     def test_replace_tokens_drops_empty_units(self):
         mixin = AmazonProductPropertyBaseMixin()
         data = {
