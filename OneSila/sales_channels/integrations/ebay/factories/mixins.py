@@ -77,3 +77,43 @@ class GetEbayAPIMixin:
     def get_default_marketplace_id(self) -> str | None:
         resp = self.api.commerce_identity_get_user()
         return resp.get("registration_marketplace_id", None)
+
+    def _get_account_api_base_url(self) -> str:
+        if getattr(self.sales_channel, "environment", None) == getattr(self.sales_channel.__class__, "SANDBOX", "sandbox"):
+            return "https://api.sandbox.ebay.com/sell/account/v1"
+        return "https://api.ebay.com/sell/account/v1"
+
+    def _get_account_headers(self) -> dict[str, str]:
+        api = getattr(self, "api", None)
+        if api is None:
+            api = self.get_api()
+            self.api = api
+        access_token = api._user_token.get()
+        if not access_token:
+            raise ValueError("Unable to retrieve eBay access token.")
+        return {
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        }
+
+    def _request_account_policy(self, endpoint: str, view_remote_id: str) -> dict:
+        url = f"{self._get_account_api_base_url()}/{endpoint}"
+        headers = self._get_account_headers()
+        response = requests.get(url, headers=headers, params={"marketplace_id": view_remote_id})
+        response.raise_for_status()
+        try:
+            return response.json()
+        except ValueError:
+            return {}
+
+    def get_fulfillment_policies(self, view_remote_id: str) -> dict:
+        return self._request_account_policy("fulfillment_policy", view_remote_id)
+
+    def get_fullfilment_policies(self, view_remote_id: str) -> dict:
+        return self.get_fulfillment_policies(view_remote_id)
+
+    def get_payment_policies(self, view_remote_id: str) -> dict:
+        return self._request_account_policy("payment_policy", view_remote_id)
+
+    def get_return_policies(self, view_remote_id: str) -> dict:
+        return self._request_account_policy("return_policy", view_remote_id)
