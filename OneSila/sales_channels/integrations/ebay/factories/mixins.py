@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from typing import Any
+
 import requests
 from django.conf import settings
 
@@ -168,5 +171,207 @@ class GetEbayAPIMixin:
                 marketplace_used_ids.add(marketplace_id)
 
         return list(marketplace_used_ids)
+
+    def _extract_paginated_records(
+        self,
+        response: Any,
+        *,
+        record_key: str,
+        records_key: str | None = None,
+    ) -> tuple[list[Any], int | None, int | None]:
+        """Normalize paginated eBay responses into records and pagination info."""
+
+        def _as_int(value: Any) -> int | None:
+            if isinstance(value, int):
+                return value
+            if isinstance(value, str):
+                try:
+                    return int(value)
+                except ValueError:
+                    return None
+            return None
+
+        records: list[Any] = []
+        total_available: int | None = None
+        records_yielded: int | None = None
+
+        if response is None:
+            return records, total_available, records_yielded
+
+        if isinstance(response, (list, tuple)):
+            for item in response:
+                if not isinstance(item, dict):
+                    continue
+                if record_key in item:
+                    value = item[record_key]
+                    if isinstance(value, list):
+                        records.extend(value)
+                    elif value is not None:
+                        records.append(value)
+                total_data = item.get("total")
+                if isinstance(total_data, dict):
+                    available = _as_int(total_data.get("records_available"))
+                    if available is not None:
+                        total_available = available
+                    yielded = _as_int(total_data.get("records_yielded"))
+                    if yielded is not None:
+                        records_yielded = yielded
+            if records_yielded is None:
+                records_yielded = len(records)
+            return records, total_available, records_yielded
+
+        if isinstance(response, dict):
+            container: Any = None
+            if records_key and records_key in response:
+                container = response.get(records_key)
+            elif record_key in response:
+                container = response.get(record_key)
+            else:
+                for key in (
+                    records_key,
+                    record_key,
+                    "records",
+                    "inventory_items",
+                    "inventoryItems",
+                    "offers",
+                    "items",
+                    "data",
+                ):
+                    if key and key in response:
+                        container = response.get(key)
+                        break
+
+            if isinstance(container, list):
+                records.extend(container)
+            elif container is not None:
+                records.append(container)
+
+            total_section = response.get("total") or response.get("pagination") or response.get("page")
+            if isinstance(total_section, dict):
+                available = (
+                    _as_int(total_section.get("records_available"))
+                    or _as_int(total_section.get("total_entries"))
+                    or _as_int(total_section.get("total"))
+                    or _as_int(total_section.get("total_count"))
+                    or _as_int(total_section.get("matched_records"))
+                )
+                if available is not None:
+                    total_available = available
+                yielded = (
+                    _as_int(total_section.get("records_yielded"))
+                    or _as_int(total_section.get("returned_entries"))
+                    or _as_int(total_section.get("returned"))
+                    or _as_int(total_section.get("size"))
+                    or _as_int(total_section.get("returned_count"))
+                )
+                if yielded is not None:
+                    records_yielded = yielded
+
+            if records_yielded is None:
+                records_yielded = len(records)
+
+            return records, total_available, records_yielded
+
+        return records, total_available, records_yielded
+
+    def _paginate_api_results(
+        self,
+        fetcher,
+        *,
+        limit: int,
+        record_key: str,
+        records_key: str | None = None,
+        **kwargs,
+    ) -> Iterator[Any]:
+        """Yield records from paginated eBay endpoints."""
+
+        offset = kwargs.pop("offset", 0) or 0
+
+        while True:
+            response = fetcher(limit=limit, offset=offset, **kwargs)
+            records, total_available, records_yielded = self._extract_paginated_records(
+                response,
+                record_key=record_key,
+                records_key=records_key,
+            )
+
+            if not records:
+                break
+
+            for record in records:
+                yield record
+
+            increment = records_yielded if records_yielded is not None else len(records)
+            if increment <= 0:
+                break
+
+            offset += increment
+
+            if total_available is not None and offset >= total_available:
+                break
+
+    def get_all_products(self, limit: int = 200) -> Iterator[dict[str, Any]]:
+        """Yield all inventory items for the configured sales channel."""
+
+        api = getattr(self, "api", None)
+        if api is None:
+            api = self.get_api()
+            self.api = api
+
+        yield from self._paginate_api_results(
+            api.sell_inventory_get_inventory_items,
+            limit=limit,
+            record_key="record",
+            records_key="inventory_items",
+        )
+
+    def get_all_category_ids(
+        self,
+        *,
+        products_limit: int = 200,
+        offers_limit: int = 200,
+    ) -> dict[str, set[str]]:
+        """Return category IDs associated with all offers for the channel inventory."""
+
+        api = getattr(self, "api", None)
+        if api is None:
+            api = self.get_api()
+            self.api = api
+
+        category_ids_by_marketplace: dict[str, set[str]] = {}
+
+        for product in self.get_all_products(limit=products_limit):
+            if not isinstance(product, dict):
+                continue
+
+            sku = product.get("sku") or product.get("inventoryItemSku")
+            if not sku:
+                continue
+
+            for offer in self._paginate_api_results(
+                api.sell_inventory_get_offers,
+                limit=offers_limit,
+                record_key="record",
+                records_key="offers",
+                sku=sku,
+            ):
+                if not isinstance(offer, dict):
+                    continue
+
+                marketplace_id = offer.get("marketplace_id") or offer.get("marketplaceId")
+                if not marketplace_id:
+                    continue
+
+                category_id = offer.get("category_id") or offer.get("categoryId")
+                if not category_id:
+                    continue
+
+                marketplace_key = str(marketplace_id)
+                if marketplace_key not in category_ids_by_marketplace:
+                    category_ids_by_marketplace[marketplace_key] = set()
+
+                category_ids_by_marketplace[marketplace_key].add(str(category_id))
+
+        return category_ids_by_marketplace
 
 
