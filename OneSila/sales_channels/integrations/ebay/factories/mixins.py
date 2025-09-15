@@ -15,6 +15,8 @@ from ebay_rest.api.sell_marketing.configuration import Configuration
 
 from ebay_rest.api.commerce_identity.api.user_api import UserApi
 
+from sales_channels.integrations.ebay.models import EbaySalesChannel
+
 
 class GetEbayAPIMixin:
 
@@ -37,9 +39,9 @@ class GetEbayAPIMixin:
 
         header = {
             # Use the marketplace of the store, e.g. "EBAY_FR", "EBAY_US", etc.
-            "marketplace_id": "EBAY_US",
-            "accept_language": "en-US",  # or "fr-FR", etc.
-            "content_language": "en-US",
+            "marketplace_id": "EBAY_GB",
+            "accept_language": "en-GB",  # or "fr-FR", etc.
+            "content_language": "en-GB",
         }
 
         # Construct API with dicts (no need for .json file)
@@ -79,8 +81,9 @@ class GetEbayAPIMixin:
         return resp.get("registration_marketplace_id", None)
 
     def _get_account_api_base_url(self) -> str:
-        if getattr(self.sales_channel, "environment", None) == getattr(self.sales_channel.__class__, "SANDBOX", "sandbox"):
+        if  self.sales_channel.environment == EbaySalesChannel.SANDBOX:
             return "https://api.sandbox.ebay.com/sell/account/v1"
+
         return "https://api.ebay.com/sell/account/v1"
 
     def _get_account_headers(self) -> dict[str, str]:
@@ -99,6 +102,7 @@ class GetEbayAPIMixin:
     def _request_account_policy(self, endpoint: str, view_remote_id: str) -> dict:
         url = f"{self._get_account_api_base_url()}/{endpoint}"
         headers = self._get_account_headers()
+
         response = requests.get(url, headers=headers, params={"marketplace_id": view_remote_id})
         response.raise_for_status()
         try:
@@ -106,14 +110,34 @@ class GetEbayAPIMixin:
         except ValueError:
             return {}
 
-    def get_fulfillment_policies(self, view_remote_id: str) -> dict:
-        return self._request_account_policy("fulfillment_policy", view_remote_id)
+    def get_fulfillment_policies(self) -> dict:
+        return self._request_account_policy("fulfillment_policy", self.view.remote_id)
 
-    def get_fullfilment_policies(self, view_remote_id: str) -> dict:
-        return self.get_fulfillment_policies(view_remote_id)
+    def get_payment_policies(self) -> dict:
+        return self._request_account_policy("payment_policy", self.view.remote_id)
 
-    def get_payment_policies(self, view_remote_id: str) -> dict:
-        return self._request_account_policy("payment_policy", view_remote_id)
+    def get_return_policies(self) -> dict:
+        return self._request_account_policy("return_policy", self.view.remote_id)
 
-    def get_return_policies(self, view_remote_id: str) -> dict:
-        return self._request_account_policy("return_policy", view_remote_id)
+    def get_subscription_marketplace_ids(self) -> list[str] | None:
+        url = f"{self._get_account_api_base_url()}/subscription"
+        headers = self._get_account_headers()
+
+        try:
+            response = requests.get(url, headers=headers)
+            if not response.ok:
+                return None
+            data = response.json()
+        except Exception:
+            return None
+
+        marketplace_used_ids = set()
+
+        for sub in data.get("subscriptions", []):
+            marketplace_id = sub.get("marketplaceId")
+            if marketplace_id:
+                marketplace_used_ids.add(marketplace_id)
+
+        return list(marketplace_used_ids)
+
+

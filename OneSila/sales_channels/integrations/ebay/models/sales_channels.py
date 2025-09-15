@@ -86,6 +86,64 @@ class EbaySalesChannelView(SalesChannelView):
         help_text="Marks the default marketplace for this eBay store.",
     )
 
+    # --- Policies ---
+    fulfillment_policy_id = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="Selected Fulfillment Policy ID",
+    )
+    fulfillment_policy_choices = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of fulfillment policies (as returned from eBay API).",
+    )
+
+    payment_policy_id = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="Selected Payment Policy ID",
+    )
+    payment_policy_choices = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of payment policies.",
+    )
+
+    return_policy_id = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="Selected Return Policy ID",
+    )
+    return_policy_choices = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of return policies.",
+    )
+
+    # --- Inventory Location ---
+    merchant_location_key = models.CharField(
+        max_length=128,
+        null=True,
+        blank=True,
+        help_text="Selected inventory location key.",
+    )
+    merchant_location_choices = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of available inventory locations.",
+    )
+
+    # --- Category Tree ---
+    default_category_tree_id = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="Default category tree ID for this marketplace.",
+    )
+
 
 class EbayRemoteLanguage(RemoteLanguage):
     """eBay remote language model."""
