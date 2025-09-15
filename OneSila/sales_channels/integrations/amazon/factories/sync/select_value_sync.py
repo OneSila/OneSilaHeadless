@@ -43,6 +43,29 @@ class AmazonPropertySelectValuesSyncFactory:
 
         return [vals for vals in remote_value_map.values() if len(vals) > 1]
 
+
+    def _get_duplicate_groups_by_remote_name(self) -> list:
+        """Return groups of select values sharing the same remote_name. Helper method. Not used inside the class."""
+        remote_select_values = self.amazon_property.select_values.all()
+        name_map = defaultdict(list)
+        for val in remote_select_values:
+            if val.remote_name:
+                key = val.remote_name.strip().lower()
+                name_map[key].append(val)
+
+        return [vals for vals in name_map.values() if len(vals) > 1]
+
+    def _get_duplicate_groups_by_translated_name(self) -> list:
+        """Return groups of select values sharing the same translated_remote_name. Helper method. Not used inside the class."""
+        remote_select_values = self.amazon_property.select_values.all()
+        translated_map = defaultdict(list)
+        for val in remote_select_values:
+            if val.translated_remote_name:
+                key = val.translated_remote_name.strip().lower()
+                translated_map[key].append(val)
+
+        return [vals for vals in translated_map.values() if len(vals) > 1]
+
     def _link_duplicate_values(self, values: list) -> None:
         """Create/link a local PropertySelectValue for each provided remote value."""
         existing_psv = None
@@ -76,4 +99,4 @@ class AmazonPropertySelectValuesSyncFactory:
             )
 
             val.local_instance = existing_psv
-            val.save(update_fields=["local_instance"])
+            val.save()

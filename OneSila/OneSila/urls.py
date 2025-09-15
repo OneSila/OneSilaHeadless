@@ -20,6 +20,7 @@ from django.urls import include, path
 from strawberry.django.views import AsyncGraphQLView
 from .schema import schema
 from django.conf.urls.static import static
+from webhooks.views import test_receiver
 
 urlpatterns = [
     path('', include('core.urls')),
@@ -40,6 +41,7 @@ urlpatterns = [
     path('direct/integrations/shopify/', include('sales_channels.integrations.shopify.urls')),
     path('direct/integrations/amazon/', include('sales_channels.integrations.amazon.urls')),
     path('integrations/', include('integrations.urls')),
+    path('webhooks/test-receiver/', test_receiver),
     path('graphql/',
         AsyncGraphQLView.as_view(
             schema=schema,

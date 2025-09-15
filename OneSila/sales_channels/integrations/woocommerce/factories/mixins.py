@@ -9,6 +9,7 @@ from sales_channels.integrations.woocommerce.constants import API_ATTRIBUTE_PREF
 from properties.models import Property, ProductProperty
 from django.db.models import Q
 from sales_channels.factories.prices.prices import ToUpdateCurrenciesMixin
+from django.utils.translation import gettext as _
 
 import logging
 logger = logging.getLogger(__name__)
@@ -120,9 +121,9 @@ class WoocommerceRemoteValueConversionMixin:
         """Handles float value types."""
         return value
 
-    def get_boolean_value(self, value: bool) -> int:
-        """Converts boolean values to 1 (True) or 0 (False) as required by Magento."""
-        return value
+    def get_boolean_value(self, value: bool) -> str:
+        """Converts boolean values to translated strings for WooCommerce."""
+        return _("Yes") if value else _("No")
 
     def get_select_value(self, value):
         """Handles select and multiselect values."""
@@ -259,6 +260,12 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
 
         return ga
 
+    def get_serialised_woocommerce_value(self, prod_prop):
+        value = prod_prop.get_serialised_value(language=self.sales_channel_assign_language)
+        if prod_prop.property.type == Property.TYPES.BOOLEAN:
+            value = self.get_boolean_value(value)
+        return value
+
     def get_common_properties(self):
         product = self.get_local_product()
         variations = product.get_configurable_variations(active_only=True)
@@ -293,7 +300,7 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
         # set() on a nested list. Instead convert into tuples.
         from itertools import chain
 
-        raw_values = [i.get_serialised_value(language=self.sales_channel_assign_language) for i in properties]
+        raw_values = [self.get_serialised_woocommerce_value(i) for i in properties]
 
         # Flatten all nested lists one level
         flattened = list(chain.from_iterable(
@@ -388,7 +395,7 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
                     attribute_payload.append({
                         'id': ga.remote_id,
                         'visible': True,
-                        'option': prod_prop.get_serialised_value(language=self.sales_channel_assign_language),
+                        'option': self.get_serialised_woocommerce_value(prod_prop),
                     })
                 else:
                     # NOTE: This does not support multi-values.
@@ -399,7 +406,7 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
                     variant_payload.append({
                         'name': prod_prop.property.name,
                         'visible': True,
-                        'option': prod_prop.get_serialised_value(language=self.sales_channel_assign_language),
+                        'option': self.get_serialised_woocommerce_value(prod_prop),
                     })
             logger.debug(f"Variant payload: {variant_payload}")
             attribute_payload.extend(variant_payload)
@@ -421,7 +428,7 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
                 # The simple product takes its own property values.
                 # The configurable takes them from the varisations.
                 if self.is_woocommerce_simple_product:
-                    values = prod_prop.get_serialised_value(language=self.sales_channel_assign_language)
+                    values = self.get_serialised_woocommerce_value(prod_prop)
                 elif self.is_woocommerce_configurable_product:
                     values = self.get_variation_product_property_values(prod_prop)
 
@@ -460,6 +467,12 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
 
                 if not isinstance(values, list):
                     values = [values]
+
+                if ga is None:
+                    raise ValueError(
+                        f"Missing global attribute for property ID={prod_prop.id}, "
+                        f"property='{getattr(prod_prop.property, 'name', 'UNKNOWN')}'"
+                    )
 
                 remote_id = int(ga.remote_id)
                 config_payload.append({

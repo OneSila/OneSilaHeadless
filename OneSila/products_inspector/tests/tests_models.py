@@ -38,7 +38,8 @@ class InspectorBlockHasImageTestCase(TestCase):
         media = Media.objects.create(
             type=Media.IMAGE,
             image=image,
-            owner=self.user
+            owner=self.user,
+            multi_tenant_company=self.multi_tenant_company
         )
 
         MediaProductThrough.objects.create(
@@ -90,10 +91,12 @@ class InspectorBlockHasImageTestCase(TestCase):
         self.assertFalse(inspector_block.successfully_checked)
 
         image = SimpleUploadedFile('img.jpg', b'img', content_type='image/jpeg')
+
         media = Media.objects.create(
             type=Media.IMAGE,
             image=image,
-            owner=self.user
+            owner=self.user,
+            multi_tenant_company=self.multi_tenant_company
         )
 
         MediaProductThrough.objects.create(
@@ -1247,4 +1250,96 @@ class InspectorBlockDuplicateVariationsTest(TestCase):
         inspector_block.refresh_from_db()
 
         # The inspector block should now pass since there is only one variation left
+        self.assertTrue(inspector_block.successfully_checked)
+
+
+class AmazonValidationIssuesInspectorBlockTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        from sales_channels.integrations.amazon.models import (
+            AmazonSalesChannel,
+            AmazonSalesChannelView,
+            AmazonProduct,
+        )
+
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="GB",
+        )
+        self.product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.remote_product = AmazonProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_sku="SKU1",
+        )
+
+    def test_validation_issue_block(self):
+        from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteValidationIssueFactory
+        from products_inspector.constants import AMAZON_VALIDATION_ISSUES_ERROR
+
+        inspector_block = self.product.inspector.blocks.get(error_code=AMAZON_VALIDATION_ISSUES_ERROR)
+        self.assertTrue(inspector_block.successfully_checked)
+
+        issues = [{"code": "V", "message": "bad", "severity": "ERROR"}]
+        FetchRemoteValidationIssueFactory(remote_product=self.remote_product, view=self.view, issues=issues).run()
+
+        inspector_block.refresh_from_db()
+        self.assertFalse(inspector_block.successfully_checked)
+
+        FetchRemoteValidationIssueFactory(remote_product=self.remote_product, view=self.view, issues=[]).run()
+        inspector_block.refresh_from_db()
+        self.assertTrue(inspector_block.successfully_checked)
+
+
+class AmazonRemoteIssuesInspectorBlockTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        from sales_channels.integrations.amazon.models import (
+            AmazonSalesChannel,
+            AmazonSalesChannelView,
+            AmazonProduct,
+        )
+
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="GB",
+        )
+        self.product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.remote_product = AmazonProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_sku="SKU1",
+        )
+
+    def test_remote_issue_block(self):
+        from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
+        from products_inspector.constants import AMAZON_REMOTE_ISSUES_ERROR
+
+        inspector_block = self.product.inspector.blocks.get(error_code=AMAZON_REMOTE_ISSUES_ERROR)
+        self.assertTrue(inspector_block.successfully_checked)
+
+        response = {"issues": [{"code": "X", "message": "bad", "severity": "ERROR"}]}
+        FetchRemoteIssuesFactory(remote_product=self.remote_product, view=self.view, response_data=response).run()
+        inspector_block.refresh_from_db()
+        self.assertFalse(inspector_block.successfully_checked)
+
+        response = {"issues": []}
+        FetchRemoteIssuesFactory(remote_product=self.remote_product, view=self.view, response_data=response).run()
+        inspector_block.refresh_from_db()
         self.assertTrue(inspector_block.successfully_checked)

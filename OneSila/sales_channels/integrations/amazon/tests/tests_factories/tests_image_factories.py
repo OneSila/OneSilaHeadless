@@ -1,13 +1,19 @@
 import json
+import base64
 from unittest.mock import patch
 
 from model_bakery import baker
 
 from core.tests import TestCase
 from media.models import Media, MediaProductThrough
+from imports_exports.models import Import
+from imports_exports.factories.products import ImportProductInstance
+from sales_channels.integrations.amazon.factories.imports.products_imports import (
+    AmazonProductsImportProcessor,
+)
 from properties.models import PropertySelectValue, PropertySelectValueTranslation, ProductPropertiesRule, Property, \
     ProductProperty
-from sales_channels.integrations.amazon.models import AmazonProductType
+from sales_channels.integrations.amazon.models import AmazonProductType, AmazonProductBrowseNode
 from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
@@ -92,7 +98,13 @@ class AmazonProductImageFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
             local_instance=self.rule,
             product_type_code="CHAIR",
         )
-
+        AmazonProductBrowseNode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            recommended_browse_node_id="1",
+        )
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,
@@ -120,13 +132,22 @@ class AmazonProductImageFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
     def test_image_create_factory_value_only(self):
         urls = ["https://example.com/img1.jpg", "https://example.com/img2.jpg"]
         expected_attrs = {}
-        for idx, key in enumerate(AmazonMediaProductThroughBase.OFFER_KEYS):
-            expected_attrs[key] = (
-                [{"media_location": urls[idx]}] if idx < len(urls) else None
-            )
+        # for idx, key in enumerate(AmazonMediaProductThroughBase.OFFER_KEYS):
+        #     expected_attrs[key] = (
+        #         [{"marketplace_id": self.view.remote_id, "media_location": urls[idx]}]
+        #         if idx < len(urls)
+        #         else None
+        #     )
         for idx, key in enumerate(AmazonMediaProductThroughBase.PRODUCT_KEYS):
             expected_attrs[key] = (
-                [{"media_location": urls[idx]}] if idx < len(urls) else None
+                [
+                    {
+                        "marketplace_id": self.view.remote_id,
+                        "media_location": urls[idx],
+                    }
+                ]
+                if idx < len(urls)
+                else None
             )
 
         with patch.object(
@@ -168,13 +189,22 @@ class AmazonProductImageFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
 
         urls = ["https://example.com/updated1.jpg", "https://example.com/updated2.jpg"]
         expected_attrs = {}
-        for idx, key in enumerate(AmazonMediaProductThroughBase.OFFER_KEYS):
-            expected_attrs[key] = (
-                [{"media_location": urls[idx]}] if idx < len(urls) else None
-            )
+        # for idx, key in enumerate(AmazonMediaProductThroughBase.OFFER_KEYS):
+        #     expected_attrs[key] = (
+        #         [{"marketplace_id": self.view.remote_id, "media_location": urls[idx]}]
+        #         if idx < len(urls)
+        #         else None
+        #     )
         for idx, key in enumerate(AmazonMediaProductThroughBase.PRODUCT_KEYS):
             expected_attrs[key] = (
-                [{"media_location": urls[idx]}] if idx < len(urls) else None
+                [
+                    {
+                        "marketplace_id": self.view.remote_id,
+                        "media_location": urls[idx],
+                    }
+                ]
+                if idx < len(urls)
+                else None
             )
 
         with patch.object(
@@ -205,10 +235,11 @@ class AmazonProductImageFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
             remote_product=self.remote_product,
         )
 
-        keys = (
-            list(AmazonMediaProductThroughBase.OFFER_KEYS)
-            + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
-        )
+        # keys = (
+        #     list(AmazonMediaProductThroughBase.OFFER_KEYS)
+        #     + list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
+        # )
+        keys = list(AmazonMediaProductThroughBase.PRODUCT_KEYS)
         expected_attrs = {key: None for key in keys}
 
         with patch.object(
@@ -228,3 +259,59 @@ class AmazonProductImageFactoryTest(DisableWooCommerceSignalsMixin, TestCase):
 
         exists = AmazonImageProductAssociation.objects.filter(id=remote_instance.id).exists()
         self.assertFalse(exists)
+
+    def test_get_images_prefers_imported_url(self):
+        urls = ["https://amazon.com/img1.jpg", "https://amazon.com/img2.jpg"]
+        for idx, through in enumerate(self.throughs):
+            AmazonImageProductAssociation.objects.create(
+                sales_channel=self.sales_channel,
+                local_instance=through,
+                remote_product=self.remote_product,
+                imported_url=urls[idx],
+            )
+
+        fac = AmazonMediaProductThroughCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.throughs[0],
+            remote_product=self.remote_product,
+            view=self.view,
+        )
+
+        self.assertEqual(fac._get_images(), urls)
+
+    def test_handle_images_sets_imported_url(self):
+        img_b64 = (
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAOaoSn0AAAAASUVORK5CYII="
+        )
+
+        import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+        data = {
+            "name": "Prod",
+            "sku": "TESTSKU2",
+            "type": "SIMPLE",
+            "images": [
+                {
+                    "image_url": "https://amazon.com/original.jpg",
+                    "image_content": img_b64,
+                    "sort_order": 0,
+                    "is_main_image": True,
+                }
+            ],
+        }
+
+        import_instance = ImportProductInstance(data, import_process=import_process)
+        import_instance.instance = self.product
+        import_instance.set_images()
+        import_instance.remote_instance = self.remote_product
+
+        with patch.object(AmazonProductsImportProcessor, "get_api", return_value=None):
+            processor = AmazonProductsImportProcessor(import_process, self.sales_channel)
+
+        processor.handle_images(import_instance)
+
+        assoc = AmazonImageProductAssociation.objects.get(
+            local_instance=import_instance.images_associations_instances[0],
+            remote_product=self.remote_product,
+        )
+
+        self.assertEqual(assoc.imported_url, "https://amazon.com/original.jpg")

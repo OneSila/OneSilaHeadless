@@ -85,6 +85,16 @@ MULTI_TENANT_LOGIN_LINK_EXPIRES_AFTER_MIN = 60
 #
 HUEY['immediate'] = DEBUG
 
+#
+# Logging
+#
+LOGGING['handlers']['amazon_log_file'] = {
+    'class': 'logging.FileHandler',
+    'formatter': 'verbose',
+    'level': 'DEBUG',
+    'filename': '/var/log/OneSilaHeadless/sales_channels_integrations_amazon.log',
+}
+
 # This will make absolute path to work
 LOCAL_HOST = 'localhost:8080'
 
@@ -109,3 +119,5 @@ EBAY_CLIENT_SECRET = None
 EBAY_DEV_ID = None
 EBAY_APPLICATION_SCOPES = ["https://api.ebay.com/oauth/api_scope"]
 EBAY_RU_NAME = 'Name'
+
+TEST_WEBHOOK_SECRET = "test-secret"

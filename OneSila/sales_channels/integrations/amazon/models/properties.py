@@ -111,16 +111,17 @@ class AmazonProperty(RemoteProperty):
         if self.allow_multiple is not True:
             self.allow_multiple = True
 
-        if self.local_instance and self.local_instance.type != self.type:
-            raise ValidationError(
-                _(
-                    "Amazon property type %(remote)s must match local property type %(local)s."
-                )
-                % {
-                    "remote": self.get_type_display(),
-                    "local": self.local_instance.get_type_display(),
-                }
-            )
+        # @TODO: Temporary remove
+        # if self.local_instance and self.local_instance.type != self.type:
+        #     raise ValidationError(
+        #         _(
+        #             "Amazon property type %(remote)s must match local property type %(local)s."
+        #         )
+        #         % {
+        #             "remote": self.get_type_display(),
+        #             "local": self.local_instance.get_type_display(),
+        #         }
+        #     )
 
         if self.code:
             self.main_code = self.code.split("__", 1)[0]
@@ -148,14 +149,20 @@ class AmazonPropertySelectValue(RemoteObjectMixin, models.Model):
         help_text="The Amazon marketplace for this value."
     )
     remote_value = models.CharField(
-        max_length=255,
+        max_length=512,
         help_text="The raw value from Amazon, in the marketplace's locale."
     )
     remote_name = models.CharField(
-        max_length=255,
+        max_length=512,
         null=True,
         blank=True,
         help_text="The display name of the value in the given locale."
+    )
+    translated_remote_name = models.CharField(
+        max_length=512,
+        null=True,
+        blank=True,
+        help_text="Remote name translated into the company language.",
     )
     local_instance = models.ForeignKey(
         'properties.PropertySelectValue',
@@ -171,6 +178,7 @@ class AmazonPropertySelectValue(RemoteObjectMixin, models.Model):
         unique_together = ('amazon_property', 'marketplace', 'remote_value')
         search_terms = [
             'remote_name',
+            'translated_remote_name',
             'remote_value',
             'amazon_property__name',
             'amazon_property__code',
@@ -182,6 +190,21 @@ class AmazonPropertySelectValue(RemoteObjectMixin, models.Model):
 
 class AmazonProductProperty(RemoteProductProperty):
     """Amazon specific remote product property."""
+
+    remote_select_value = models.ForeignKey(
+        AmazonPropertySelectValue,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="product_properties",
+        help_text="Reference to the remote select value if applicable.",
+    )
+    remote_select_values = models.ManyToManyField(
+        AmazonPropertySelectValue,
+        blank=True,
+        related_name="product_properties_multi",
+        help_text="References to remote select values for multiselect properties.",
+    )
 
     class Meta:
         verbose_name_plural = _('Amazon Product Properties')
@@ -225,15 +248,15 @@ class AmazonProductType(RemoteObjectMixin, models.Model):
                 fields=['local_instance', 'sales_channel'],
                 condition=Q(local_instance__isnull=False),
                 name='unique_amazonproducttype_local_instance_sales_channel_not_null',
-                violation_error_message = _(
-                "An Amazon product type with this local rule already exists for this sales channel."
-            )
+                violation_error_message=_(
+                    "An Amazon product type with this local rule already exists for this sales channel."
+                )
             ),
             UniqueConstraint(
                 fields=['product_type_code', 'sales_channel'],
                 condition=Q(product_type_code__isnull=False),
                 name='unique_amazonproducttype_code_sales_channel_not_null',
-                violation_error_message= _(
+                violation_error_message=_(
                     "An Amazon product type with this product type code already exists for this sales channel."
                 )
             )

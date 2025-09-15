@@ -16,6 +16,7 @@ from .types.types import BrandCustomPromptType
 from .types.input import BrandCustomPromptInput, BrandCustomPromptPartialInput
 from core.schema.core.helpers import get_multi_tenant_company
 from products.models import Product
+from sales_channels.models import SalesChannel
 
 
 @type(name="Mutation")
@@ -69,6 +70,11 @@ class LlmMutation:
         if instance.product:
             product = Product.objects.get(id=instance.product.id.node_id, multi_tenant_company=multi_tenant_company)
 
+        sales_channel = None
+        if instance.sales_channel:
+            sales_channel = SalesChannel.objects.get(id=instance.sales_channel.id.node_id,
+                                                     multi_tenant_company=multi_tenant_company)
+
         content_type = instance.product_content_type
 
         content_generator = AITranslateContentFlow(multi_tenant_company=multi_tenant_company,
@@ -76,7 +82,8 @@ class LlmMutation:
                                                    from_language_code=instance.from_language_code,
                                                    to_language_code=instance.to_language_code,
                                                    product=product,
-                                                   content_type=content_type)
+                                                   content_type=content_type,
+                                                   sales_channel=sales_channel)
         content_generator.flow()
 
         return AiContent(content=content_generator.translated_content, points=content_generator.used_points)

@@ -5,12 +5,14 @@ from sales_channels.integrations.magento2.models import MagentoSalesChannel
 from sales_channels.integrations.shopify.models import ShopifySalesChannel
 from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
+from webhooks.models import WebhookIntegration
 
 MAGENTO_INTEGRATION = 'magento'
 SHOPIFY_INTEGRATION = 'shopify'
 WOOCOMMERCE_INTEGRATION = 'woocommerce'
 AMAZON_INTEGRATION = 'amazon'
 EBAY_INTEGRATION = 'ebay'
+WEBHOOK_INTEGRATION = 'webhook'
 
 INTEGRATIONS_TYPES = (
     (MAGENTO_INTEGRATION, _('Magento')),
@@ -18,6 +20,7 @@ INTEGRATIONS_TYPES = (
     (WOOCOMMERCE_INTEGRATION, _('WooCommerce')),
     (AMAZON_INTEGRATION, _('Amazon')),
     (EBAY_INTEGRATION, _('Ebay')),
+    (WEBHOOK_INTEGRATION, _('Webhook')),
 )
 
 INTEGRATIONS_TYPES_MAP = {
@@ -26,4 +29,5 @@ INTEGRATIONS_TYPES_MAP = {
     WoocommerceSalesChannel: WOOCOMMERCE_INTEGRATION,
     AmazonSalesChannel: AMAZON_INTEGRATION,
     EbaySalesChannel: EBAY_INTEGRATION,
+    WebhookIntegration: WEBHOOK_INTEGRATION,
 }

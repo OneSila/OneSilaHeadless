@@ -3,7 +3,7 @@ from collections import defaultdict
 from properties.models import Property, ProductPropertyTextTranslation
 from sales_channels.integrations.magento2.models.properties import MagentoAttributeSet, MagentoAttributeSetAttribute, MagentoProperty
 from magento.models import AttributeSet
-
+from django.conf import settings
 from sales_channels.integrations.magento2.models.sales_channels import MagentoRemoteLanguage
 from sales_channels.models.sales_channels import RemoteLanguage, SalesChannelViewAssign
 
@@ -19,7 +19,7 @@ class GetMagentoAPIMixin:
             password=self.sales_channel.host_api_key,
             api_key=self.sales_channel.host_api_key,
             local=not self.sales_channel.verify_ssl,
-            user_agent=None,
+            user_agent=settings.ONESILA_DEFAULT_USER_AGENT,
             authentication_method=self.sales_channel.authentication_method,
             strict_mode=True
         )

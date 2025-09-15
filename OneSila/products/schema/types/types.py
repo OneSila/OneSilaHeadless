@@ -42,7 +42,7 @@ from decimal import Decimal
 from strawberry.relay.utils import to_base64
 from contacts.schema.types.types import CompanyType
 from core.schema.core.types.types import relay, type, field, Annotated, lazy, strawberry_type
-from core.schema.core.mixins import GetQuerysetMultiTenantMixin
+from core.schema.core.mixins import GetQuerysetMultiTenantMixin, GetProductQuerysetMultiTenantMixin
 
 from typing import List, Optional
 
@@ -61,7 +61,7 @@ class InspectorCompletionType:
 
 
 @type(Product, filters=ProductFilter, order=ProductOrder, pagination=True, fields="__all__")
-class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
+class ProductType(relay.Node, GetProductQuerysetMultiTenantMixin):
     vat_rate: Optional[VatRateType]
     inspector: Optional[Annotated['InspectorType', lazy('products_inspector.schema.types.types')]]
     saleschannelviewassign_set: List[Annotated['SalesChannelViewAssignType', lazy("sales_channels.schema.types.types")]]
@@ -140,7 +140,7 @@ class ProductType(relay.Node, GetQuerysetMultiTenantMixin):
 
     @field()
     def has_parents(self, info) -> bool:
-        return ConfigurableVariation.objects.filter(variation_id=self.id).exists()
+        return ConfigurableVariation.objects.filter(variation_id=self.id).exists() or BundleVariation.objects.filter(variation_id=self.id).exists()
 
 
 @type(ProductTranslation, filters=ProductTranslationFilter, order=ProductTranslationOrder, pagination=True, fields="__all__")
@@ -149,17 +149,17 @@ class ProductTranslationType(relay.Node, GetQuerysetMultiTenantMixin):
 
 
 @type(BundleProduct, filters=BundleProductFilter, order=BundleProductOrder, pagination=True, fields="__all__")
-class BundleProductType(relay.Node, GetQuerysetMultiTenantMixin):
+class BundleProductType(relay.Node, GetProductQuerysetMultiTenantMixin):
     pass
 
 
 @type(ConfigurableProduct, filters=ConfigurableProductFilter, order=ConfigurableProductOrder, pagination=True, fields="__all__")
-class ConfigurableProductType(relay.Node, GetQuerysetMultiTenantMixin):
+class ConfigurableProductType(relay.Node, GetProductQuerysetMultiTenantMixin):
     pass
 
 
 @type(SimpleProduct, filters=SimpleProductFilter, order=SimpleProductOrder, pagination=True, fields="__all__")
-class SimpleProductType(relay.Node, GetQuerysetMultiTenantMixin):
+class SimpleProductType(relay.Node, GetProductQuerysetMultiTenantMixin):
     @field()
     def name(self, info) -> str | None:
         return self.name
@@ -170,6 +170,10 @@ class ConfigurableVariationType(relay.Node, GetQuerysetMultiTenantMixin):
     parent: Optional[ProductType]
     variation: Optional[ProductType]
 
+    @field()
+    def configurator_value(self, info) -> str | None:
+        return self.configurator_value
+
 
 @type(BundleVariation, filters=BundleVariationFilter, order=BundleVariationOrder, pagination=True, fields="__all__")
 class BundleVariationType(relay.Node, GetQuerysetMultiTenantMixin):
@@ -178,7 +182,7 @@ class BundleVariationType(relay.Node, GetQuerysetMultiTenantMixin):
 
 
 @type(AliasProduct, filters=AliasProductFilter, order=AliasProductOrder, pagination=True, fields="__all__")
-class AliasProductType(relay.Node, GetQuerysetMultiTenantMixin):
+class AliasProductType(relay.Node, GetProductQuerysetMultiTenantMixin):
 
     @field()
     def name(self, info) -> str | None:

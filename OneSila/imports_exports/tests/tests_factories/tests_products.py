@@ -1,6 +1,7 @@
 from core.tests import TestCase
 from currencies.models import PublicCurrency, Currency
 from eancodes.models import EanCode
+from imports_exports.factories.mixins import UpdateOnlyInstanceNotFound
 from imports_exports.factories.products import ImportProductInstance, ImportProductTranslationInstance, \
     ImportSalesPriceInstance
 from imports_exports.models import Import
@@ -18,16 +19,17 @@ class ImportProductInstanceValidateTest(TestCase):
         super().setUp()
         self.import_process = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
 
-    def test_missing_name_raises_error(self):
+    def test_missing_name_creates_no_translation(self):
         data = {
             "sku": "SKU123",
             "type": "SIMPLE"
         }
 
-        with self.assertRaises(ValueError) as cm:
-            ImportProductInstance(data, self.import_process)
+        instance = ImportProductInstance(data, self.import_process)
+        instance.pre_process_logic()
 
-        self.assertIn("The 'name' field is required", str(cm.exception))
+        self.assertFalse(hasattr(instance, 'name'))
+        self.assertEqual(instance.translations, [])
 
     def test_valid_with_name_and_sku(self):
         data = {
@@ -949,6 +951,41 @@ class ImportProductInstanceCreateOnlyTest(TestCase):
         )
 
 
+class ImportProductInstanceUpdateOnlyTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.initial_import = Import.objects.create(multi_tenant_company=self.multi_tenant_company)
+        self.update_only_import = Import.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            update_only=True,
+        )
+
+    def test_existing_product_updated_when_update_only(self):
+        first_data = {
+            "name": "Original Product",
+            "sku": "UO-001",
+        }
+        ImportProductInstance(first_data, self.initial_import).process()
+
+        second_data = {
+            "name": "Updated Product",
+            "sku": "UO-001",
+        }
+        ImportProductInstance(second_data, self.update_only_import).process()
+
+        product = Product.objects.get(sku="UO-001")
+        self.assertEqual(product.name, "Updated Product")
+
+    def test_missing_product_raises_error_when_update_only(self):
+        data = {
+            "name": "New Product",
+            "sku": "UO-002",
+        }
+        instance = ImportProductInstance(data, self.update_only_import)
+        with self.assertRaises(UpdateOnlyInstanceNotFound):
+            instance.process()
+
+
 class ImportProductWithSameSkuAndDifferentTypeTest(TestCase):
     def setUp(self):
         super().setUp()
@@ -978,4 +1015,3 @@ class ImportProductWithSameSkuAndDifferentTypeTest(TestCase):
         self.assertEqual(instance2.created, False)
         self.assertEqual(instance2.instance.type, product.type)
         self.assertEqual(instance2.instance.type, "SIMPLE")
-

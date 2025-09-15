@@ -5,8 +5,6 @@ from sales_channels.integrations.amazon.constants import AMAZON_INTERNAL_PROPERT
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from sales_channels.integrations.amazon.factories.mixins import (
     GetAmazonAPIMixin,
-    EnsureMerchantSuggestedAsinMixin,
-    EnsureGtinExemptionMixin,
 )
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannelView,
@@ -16,7 +14,11 @@ from sales_channels.integrations.amazon.models.properties import AmazonProductTy
     AmazonProperty, AmazonPropertySelectValue, AmazonProductTypeItem
 import requests
 import json
+import logging
 from properties.models import Property, ProductPropertiesRuleItem
+from core.logging_helpers import timeit_and_log
+
+logger = logging.getLogger(__name__)
 
 
 class ExportDefinitionFactory:
@@ -399,15 +401,11 @@ class DefaultUnitConfiguratorFactory:
 
 class AmazonProductTypeRuleFactory(
     GetAmazonAPIMixin,
-    EnsureMerchantSuggestedAsinMixin,
-    EnsureGtinExemptionMixin,
 ):
     def __init__(
         self,
         product_type_code,
         sales_channel,
-        merchant_asin_property=None,
-        gtin_exemption_property=None,
         api=None,
         language=None,
     ):
@@ -416,18 +414,7 @@ class AmazonProductTypeRuleFactory(
         self.language = language or sales_channel.multi_tenant_company.language
         self.multi_tenant_company = sales_channel.multi_tenant_company
         self.product_type = self.get_or_create_product_type()
-        self.sales_channel_views = AmazonSalesChannelView.objects.filter(
-            sales_channel=sales_channel
-        )
-        if merchant_asin_property is None:
-            self.merchant_asin_property = self._ensure_merchant_suggested_asin()
-        else:
-            self.merchant_asin_property = merchant_asin_property
-
-        if gtin_exemption_property is None:
-            self.gtin_exemption_property = self._ensure_gtin_exemption()
-        else:
-            self.gtin_exemption_property = gtin_exemption_property
+        self.sales_channel_views = AmazonSalesChannelView.objects.filter(sales_channel=sales_channel).order_by('-is_default')
 
         if api is None:
             self.api = self.get_api()
@@ -451,6 +438,7 @@ class AmazonProductTypeRuleFactory(
         data = response.json()
         return data
 
+    @timeit_and_log(logger)
     @throttle_safe(max_retries=5, base_delay=1)
     def _get_schema_for_marketplace(self, view, is_default_marketplace=False):
         """
@@ -494,75 +482,6 @@ class AmazonProductTypeRuleFactory(
 
         return schema_data, offer_property_keys
 
-    @throttle_safe(max_retries=5, base_delay=1)
-    def _run_fake_validation_preview(self, view):
-        payload = {
-            "productType": self.product_type_code,
-            "requirements": "LISTING",
-            "attributes": {
-                "item_name": [{"value": "Dummy product name"}],
-            },
-        }
-
-        listings_api = ListingsApi(self._get_client())
-        response = listings_api.put_listings_item(
-            seller_id=self.sales_channel.remote_id,
-            sku="dummy-sku-for-validation",
-            marketplace_ids=[view.remote_id],
-            body=payload,
-            issue_locale=self.language,
-            mode="VALIDATION_PREVIEW",
-        )
-        return response.issues
-
-    def ensure_asin_item(self):
-
-        if not self.merchant_asin_property:
-            return
-
-        item, created = AmazonProductTypeItem.objects.get_or_create(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            amazon_rule=self.product_type,
-            remote_property=self.merchant_asin_property,
-        )
-
-        if created or item.remote_type != ProductPropertiesRuleItem.REQUIRED:
-            item.remote_type = ProductPropertiesRuleItem.REQUIRED
-            item.save()
-
-        if (
-                self.product_type.local_instance
-                and self.merchant_asin_property.local_instance
-        ):
-            rule = self.product_type.local_instance
-            max_sort = rule.items.aggregate(max_sort=Max("sort_order")).get("max_sort") or 0
-            rule_item, created_local = ProductPropertiesRuleItem.objects.get_or_create(
-                multi_tenant_company=rule.multi_tenant_company,
-                rule=rule,
-                property=self.merchant_asin_property.local_instance,
-                defaults={
-                    "type": ProductPropertiesRuleItem.REQUIRED,
-                    "sort_order": max_sort + 1,
-                },
-            )
-            if not created_local and rule_item.type != ProductPropertiesRuleItem.REQUIRED:
-                rule_item.type = ProductPropertiesRuleItem.REQUIRED
-                rule_item.save(update_fields=["type"])
-
-    def ensure_gtin_exemption_item(self):
-
-        if not self.gtin_exemption_property:
-            return
-
-        AmazonProductTypeItem.objects.get_or_create(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            amazon_rule=self.product_type,
-            remote_property=self.gtin_exemption_property,
-            defaults={"remote_type": ProductPropertiesRuleItem.OPTIONAL},
-        )
-
     def process_views(self):
 
         for view in self.sales_channel_views:
@@ -578,12 +497,6 @@ class AmazonProductTypeRuleFactory(
             view, is_default_marketplace=is_default
         )
         required_properties = set(schema_data["required"])
-
-        validation_issues = self._run_fake_validation_preview(view)
-
-        for issue in validation_issues:
-            if issue.severity == "ERROR" and "MISSING_ATTRIBUTE" in issue.categories:
-                required_properties.update(issue.attribute_names)
 
         if is_default:
             # create AmazonProductType the schema_data will have a title
@@ -700,6 +613,7 @@ class AmazonProductTypeRuleFactory(
         # Default to existing if no special rule matches
         return existing_type
 
+    @timeit_and_log(logger)
     def create_remote_properties(self, public_definition, view, is_default):
 
         for property_data in public_definition.export_definition:
@@ -738,16 +652,23 @@ class AmazonProductTypeRuleFactory(
 
             if remote_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
                 for value in property_data['values']:
-                    remote_select_value, _ = AmazonPropertySelectValue.objects.get_or_create(
-                        multi_tenant_company=self.multi_tenant_company,
-                        sales_channel=self.sales_channel,
-                        marketplace=view,
-                        amazon_property=remote_property,
-                        remote_value=value['value'],
-                    )
-
-                    remote_select_value.remote_name = value['name']
-                    remote_select_value.save()
+                    try:
+                        remote_select_value = AmazonPropertySelectValue.objects.get(
+                            multi_tenant_company=self.multi_tenant_company,
+                            sales_channel=self.sales_channel,
+                            marketplace=view,
+                            amazon_property=remote_property,
+                            remote_value=value['value'],
+                        )
+                    except AmazonPropertySelectValue.DoesNotExist:
+                        remote_select_value = AmazonPropertySelectValue.objects.create(
+                            multi_tenant_company=self.multi_tenant_company,
+                            sales_channel=self.sales_channel,
+                            marketplace=view,
+                            amazon_property=remote_property,
+                            remote_value=value['value'],
+                            remote_name=value['name'],
+                        )
 
             remote_rule_item, created_item = AmazonProductTypeItem.objects.get_or_create(
                 multi_tenant_company=self.multi_tenant_company,
@@ -771,6 +692,7 @@ class AmazonProductTypeRuleFactory(
                 remote_rule_item.remote_type = new_type
                 remote_rule_item.save()
 
+    @timeit_and_log(logger)
     def process_property(
         self,
         code,
@@ -803,6 +725,4 @@ class AmazonProductTypeRuleFactory(
         self.create_default_unit_configurator(public_definition, view, is_default)
 
     def run(self):
-        self.ensure_asin_item()
-        self.ensure_gtin_exemption_item()
         self.process_views()

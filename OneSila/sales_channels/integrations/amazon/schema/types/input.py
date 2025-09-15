@@ -3,11 +3,16 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
     AmazonPropertySelectValue,
+    AmazonProduct,
     AmazonProductType,
     AmazonProductTypeItem,
     AmazonSalesChannelImport,
     AmazonDefaultUnitConfigurator,
     AmazonSalesChannelView,
+    AmazonProductBrowseNode,
+    AmazonExternalProductId,
+    AmazonGtinExemption,
+    AmazonVariationTheme,
 )
 from properties.schema.types.input import PropertySelectValuePartialInput
 from strawberry.relay import GlobalID
@@ -71,6 +76,16 @@ class AmazonProductTypeItemPartialInput(NodeInput):
     pass
 
 
+@input(AmazonProduct, fields="__all__")
+class AmazonProductInput:
+    pass
+
+
+@partial(AmazonProduct, fields="__all__")
+class AmazonProductPartialInput(NodeInput):
+    pass
+
+
 @input(AmazonSalesChannelImport, exclude=['saleschannelimport_ptr', 'import_ptr'])
 class AmazonSalesChannelImportInput:
     pass
@@ -105,3 +120,43 @@ class AmazonSalesChannelViewPartialInput(NodeInput):
 class BulkAmazonPropertySelectValueLocalInstanceInput:
     ids: List[GlobalID]
     local_instance_id: Optional[GlobalID] = None
+
+
+@input(AmazonProductBrowseNode, fields="__all__")
+class AmazonProductBrowseNodeInput:
+    pass
+
+
+@partial(AmazonProductBrowseNode, fields="__all__")
+class AmazonProductBrowseNodePartialInput(NodeInput):
+    pass
+
+
+@input(AmazonExternalProductId, fields="__all__")
+class AmazonExternalProductIdInput:
+    pass
+
+
+@partial(AmazonExternalProductId, fields="__all__")
+class AmazonExternalProductIdPartialInput(NodeInput):
+    pass
+
+
+@input(AmazonGtinExemption, fields="__all__")
+class AmazonGtinExemptionInput:
+    pass
+
+
+@partial(AmazonGtinExemption, fields="__all__")
+class AmazonGtinExemptionPartialInput(NodeInput):
+    pass
+
+
+@input(AmazonVariationTheme, fields="__all__")
+class AmazonVariationThemeInput:
+    pass
+
+
+@partial(AmazonVariationTheme, fields="__all__")
+class AmazonVariationThemePartialInput(NodeInput):
+    pass

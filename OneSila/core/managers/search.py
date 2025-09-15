@@ -34,6 +34,8 @@ class SearchQuerySetMixin:
         if fed the search_fields instead af grabbing them through the request which has been removed.
         """
         queryset = self
+        if search_term:
+            search_term = search_term[:100]
 
         # Apply keyword searches.
         def construct_search(field_name):
@@ -90,6 +92,8 @@ class SearchQuerySetMixin:
         return queryset, may_have_duplicates
 
     def search(self, search_term, multi_tenant_company=None):
+        if search_term:
+            search_term = search_term[:100]
         try:
             search_fields = self.model._meta.search_terms
         except AttributeError:

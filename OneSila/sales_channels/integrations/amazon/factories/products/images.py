@@ -19,10 +19,10 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin):
 
     remote_model_class = AmazonImageProductAssociation
 
-    OFFER_KEYS = [
-        "main_offer_image_locator",
-        *[f"other_offer_image_locator_{i}" for i in range(1, 6)],
-    ]
+    # OFFER_KEYS = [
+    #     "main_offer_image_locator",
+    #     *[f"other_offer_image_locator_{i}" for i in range(1, 6)],
+    # ]
     PRODUCT_KEYS = [
         "main_product_image_locator",
         *[f"other_product_image_locator_{i}" for i in range(1, 9)],
@@ -44,15 +44,37 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin):
             )
             .order_by("sort_order")
         )
-        return [t.media.image_web_url for t in throughs if t.media.image_web_url]
+
+        urls = []
+        for t in throughs:
+            assoc = AmazonImageProductAssociation.objects.filter(
+                remote_product=self.remote_product,
+                local_instance=t,
+            ).first()
+
+            if assoc and assoc.imported_url:
+                urls.append(assoc.imported_url)
+            elif t.media.image_web_url:
+                urls.append(t.media.image_web_url)
+
+        return urls
 
     def build_attributes(self):
         urls = self._get_images()
         attrs = {}
-        for idx, key in enumerate(self.OFFER_KEYS):
-            attrs[key] = [{"media_location": urls[idx]}] if idx < len(urls) else None
+        marketplace_id = self.view.remote_id if self.view else None
+        # for idx, key in enumerate(self.OFFER_KEYS):
+        #     attrs[key] = (
+        #         [{"marketplace_id": marketplace_id, "media_location": urls[idx]}]
+        #         if idx < len(urls)
+        #         else None
+        #     )
         for idx, key in enumerate(self.PRODUCT_KEYS):
-            attrs[key] = [{"media_location": urls[idx]}] if idx < len(urls) else None
+            attrs[key] = (
+                [{"marketplace_id": marketplace_id, "media_location": urls[idx]}]
+                if idx < len(urls)
+                else None
+            )
         return attrs
 
     def build_body(self):

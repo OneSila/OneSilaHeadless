@@ -5,6 +5,10 @@ from django.apps import AppConfig
 import django.db.models.options as options
 options.DEFAULT_NAMES = (*options.DEFAULT_NAMES, 'search_terms',)
 
+# We added a url_detail_page_string setting to all models.
+# One the Meta Fields, we should set this.
+options.DEFAULT_NAMES = (*options.DEFAULT_NAMES, 'url_detail_page_string',)
+
 
 class CoreConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'

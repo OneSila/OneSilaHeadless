@@ -29,11 +29,17 @@ class MultiTenantUserAdmin(BaseUserAdmin):
     list_display = ('username', 'multi_tenant_company', 'is_active')
     ordering = ('username',)
     search_fields = ('first_name', 'last_name', 'email')
+    raw_id_fields = ('multi_tenant_company',)
 
 
 @django_admin.register(MultiTenantCompany)
 class MultiTenantCompanyAdmin(django_admin.ModelAdmin):
-    pass
+    readonly_fields = ('created_at', 'updated_at')
+    list_display = ('name', 'active')
+    ordering = ('name',)
+    search_fields = ('name',)
+    list_filter = ('active',)
+    date_hierarchy = 'created_at'
 
 
 @django_admin.register(MultiTenantUserLoginToken)

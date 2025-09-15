@@ -3,6 +3,7 @@ from hashlib import shake_256
 
 import shortuuid
 from django.db import IntegrityError
+from core.logging_helpers import AddLogTimeentry, timeit_and_log
 from currencies.models import Currency, PublicCurrency
 from eancodes.models import EanCode
 from imports_exports.factories.media import ImportImageInstance
@@ -17,10 +18,12 @@ from products.models import (
     BundleVariation,
 )
 from properties.models import Property, ProductPropertiesRuleItem, ProductProperty
-from sales_prices.models import SalesPrice
+from sales_prices.models import SalesPrice, SalesPriceListItem
+from imports_exports.factories.sales_prices import ImportSalesPriceListItemInstance
 from taxes.models import VatRate
 from currencies.currencies import iso_list
 from core.exceptions import ValidationError
+from sales_channels.models import SalesChannelIntegrationPricelist
 
 import logging
 logger = logging.getLogger(__name__)
@@ -52,6 +55,19 @@ class ProductImport(ImportOperationMixin):
 
         raise error
 
+    def resolve_get_update_only_does_not_exist(self, error):
+        sku = getattr(self.import_instance, 'sku', None)
+
+        if not sku:
+            raise error
+
+        existing = Product.objects.filter(sku=sku, multi_tenant_company=self.multi_tenant_company).first()
+
+        if existing:
+            return existing
+
+        raise error
+
 
 class AliasProductImport(ImportOperationMixin):
     get_identifiers = ['sku', 'type', 'alias_parent_product']
@@ -65,7 +81,7 @@ class SalesPriceImport(ImportOperationMixin):
     get_identifiers = ['product', 'currency']
 
 
-class ImportProductInstance(AbstractImportInstance):
+class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
 
     def __init__(self, data: dict, import_process=None, rule=None, translations=None, instance=None, sales_channel=None, update_current_rule=False):
         super().__init__(data, import_process, instance)
@@ -98,6 +114,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.set_field_if_exists('images')
         self.set_field_if_exists('prices')
+        self.set_field_if_exists('sales_pricelist_items')
 
         self.set_field_if_exists('variations')
         self.set_field_if_exists('bundle_variations')
@@ -136,6 +153,7 @@ class ImportProductInstance(AbstractImportInstance):
         self.variations_products_instances = Product.objects.none()
         self.bundle_variations_instances = Product.objects.none()
         self.alias_variations_instances = Product.objects.none()
+        self.sales_pricelist_item_instances = SalesPriceListItem.objects.none()
 
     @property
     def local_class(self):
@@ -149,11 +167,11 @@ class ImportProductInstance(AbstractImportInstance):
         """
         Validate that the 'value' key exists.
         """
-        if not hasattr(self, 'name'):
-            raise ValueError("The 'name' field is required.")
-
         if hasattr(self, 'type') and self.type not in [Product.SIMPLE, Product.CONFIGURABLE, Product.BUNDLE, Product.ALIAS]:
             raise ValueError("Invalid 'type' value.")
+
+        if hasattr(self, 'sku') and self.sku is None:
+            raise ValueError("Invalid 'sku' value.")
 
     def _set_vat_rate(self):
 
@@ -219,6 +237,7 @@ class ImportProductInstance(AbstractImportInstance):
         self.ean_code_instance.internal = False
         self.ean_code_instance.save()
 
+    @timeit_and_log(logger)
     def _set_rule(self):
 
         if self.rule and self.update_current_rule:
@@ -280,19 +299,21 @@ class ImportProductInstance(AbstractImportInstance):
 
     def _set_translations(self):
 
-        if not getattr(self, 'translations', []):
+        if not getattr(self, 'translations', []) and getattr(self, 'name', None):
 
             self.translations = [{
-                'name': getattr(self, 'name', 'Unnamed'),
+                'name': self.name,
                 'language': self.language,
                 'sales_channel': self.sales_channel,
             }]
 
+    @timeit_and_log(logger)
     def pre_process_logic(self):
         self._set_vat_rate()
         self._set_rule()
         self._set_translations()
 
+    @timeit_and_log(logger)
     def process_logic(self):
 
         if self.type == Product.ALIAS:
@@ -332,13 +353,19 @@ class ImportProductInstance(AbstractImportInstance):
             product_property_import_instance.language = self.language
             product_property_import_instance.process()
 
+    @timeit_and_log(logger)
     def set_product_properties(self):
+
+        self._set_logger(logger)
+        self._set_start_time()
 
         if self.created:
             self.update_product_rule()
         else:
             if self.update_current_rule:
                 self.update_product_rule()
+
+        self._add_log_entry(" (set_product_properties) setting or updating product rule")
 
         product_property_ids = []
         if self.type in [Product.SIMPLE, Product.BUNDLE, Product.ALIAS] and hasattr(self, 'properties'):
@@ -361,6 +388,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.product_property_instances = ProductProperty.objects.filter(id__in=product_property_ids)
 
+    @timeit_and_log(logger)
     def set_images(self):
 
         images_instances_ids = []
@@ -383,16 +411,41 @@ class ImportProductInstance(AbstractImportInstance):
         self.image_instances = Image.objects.filter(id__in=images_instances_ids)
         self.images_associations_instances = MediaProductThrough.objects.filter(id__in=images_instances_associations_ids)
 
+    @timeit_and_log(logger)
     def set_prices(self):
         sales_price_ids = []
         for price in self.prices:
             try:
                 image_import_instance = ImportSalesPriceInstance(price, product=self.instance, import_process=self.import_process)
+                image_import_instance.update_only = False
                 image_import_instance.process()
             except IntegrityError:
                 # if the price is wrong we will skip it
                 pass
 
+    @timeit_and_log(logger)
+    def set_sales_pricelist_items(self):
+        item_ids = []
+        for item in self.sales_pricelist_items:
+            sales_pricelist = item.get('salespricelist') if isinstance(item, dict) else None
+            import_instance = ImportSalesPriceListItemInstance(
+                item,
+                self.import_process,
+                product=self.instance,
+                sales_pricelist=sales_pricelist,
+            )
+            import_instance.process()
+            if import_instance.instance is not None:
+                item_ids.append(import_instance.instance.id)
+                if self.sales_channel:
+                    SalesChannelIntegrationPricelist.objects.get_or_create(
+                        multi_tenant_company=self.sales_channel.multi_tenant_company,
+                        sales_channel=self.sales_channel,
+                        price_list=import_instance.salespricelist,
+                    )
+        self.sales_pricelist_item_instances = SalesPriceListItem.objects.filter(id__in=item_ids)
+
+    @timeit_and_log(logger)
     def set_variations(self):
         from .variations import ImportConfiguratorVariationsInstance, ImportConfigurableVariationInstance
 
@@ -422,6 +475,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.variations_products_instances = Product.objects.filter(id__in=variation_products_ids)
 
+    @timeit_and_log(logger)
     def set_bundle_variations(self):
         from .variations import ImportBundleVariationInstance
 
@@ -440,6 +494,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.bundle_variations_instances = Product.objects.filter(id__in=variation_products_ids)
 
+    @timeit_and_log(logger)
     def set_alias_variations(self):
         from .variations import ImportAliasVariationInstance
 
@@ -457,6 +512,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.alias_variations_instances = Product.objects.filter(id__in=variation_products_ids)
 
+    @timeit_and_log(logger)
     def set_rule_product_property(self):
         rule_product_property, _ = ProductProperty.objects.get_or_create(
             multi_tenant_company=self.config_product.multi_tenant_company,
@@ -468,6 +524,7 @@ class ImportProductInstance(AbstractImportInstance):
             rule_product_property.value_select = self.rule.product_type
             rule_product_property.save()
 
+    @timeit_and_log(logger)
     def _handle_parent_sku_links(self):
         parent_sku = self.data.get("configurable_parent_sku")
         if parent_sku:
@@ -491,6 +548,7 @@ class ImportProductInstance(AbstractImportInstance):
                 )
                 return
 
+    @timeit_and_log(logger)
     def post_process_logic(self):
         if self.type == Product.SIMPLE:
             self.update_ean_code()
@@ -506,6 +564,9 @@ class ImportProductInstance(AbstractImportInstance):
         if hasattr(self, 'prices'):
             self.set_prices()
 
+        if hasattr(self, 'sales_pricelist_items'):
+            self.set_sales_pricelist_items()
+
         if (hasattr(self, 'variations') or hasattr(self, 'configurator_select_values')) and self.type == Product.CONFIGURABLE:
             self.set_variations()
 
@@ -517,6 +578,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self._handle_parent_sku_links()
 
+    @timeit_and_log(logger)
     def update_translations(self):
         translation_instance_ids = []
 
@@ -539,6 +601,7 @@ class ImportProductInstance(AbstractImportInstance):
 
         self.translation_instances = ProductTranslation.objects.filter(id__in=translation_instance_ids)
 
+    @timeit_and_log(logger)
     def create_translations(self):
         translation_instance_ids = []
 
@@ -549,36 +612,49 @@ class ImportProductInstance(AbstractImportInstance):
             url_key = translation.get('url_key')
             language = translation.get('language') or self.language
 
-            translation_obj, created = ProductTranslation.objects.get_or_create(
-                multi_tenant_company=self.instance.multi_tenant_company,
-                language=language,
-                product=self.instance,
-                name=name,
-                sales_channel=self.sales_channel,
-            )
-
-            # Update other fields if created or if missing
-            updated = False
-            if created or translation_obj.short_description != short_description:
-                translation_obj.short_description = short_description
-                updated = True
-            if created or translation_obj.description != description:
-                translation_obj.description = description
-                updated = True
-            if created or translation_obj.url_key != url_key:
-                translation_obj.url_key = url_key
-                updated = True
-
+            defaults = {
+                "name": name,
+                "short_description": short_description,
+                "description": description,
+                "url_key": url_key,
+            }
             try:
-                if updated:
-                    translation_obj.save()
+                translation_obj, _ = ProductTranslation.objects.get_or_create(
+                    multi_tenant_company=self.instance.multi_tenant_company,
+                    product=self.instance,
+                    language=language,
+                    sales_channel=self.sales_channel,
+                    defaults=defaults,
+                )
             except IntegrityError as e:
                 if "url_key" in str(e):
-                    # Try saving again with a blank/null url_key
-                    translation_obj.url_key = None
-                    translation_obj.save()
+                    defaults_no_url = defaults.copy()
+                    defaults_no_url["url_key"] = None
+                    translation_obj, _ = ProductTranslation.objects.get_or_create(
+                        multi_tenant_company=self.instance.multi_tenant_company,
+                        product=self.instance,
+                        language=language,
+                        sales_channel=self.sales_channel,
+                        defaults=defaults_no_url,
+                    )
                 else:
                     raise
+
+            updated = False
+            for field, value in defaults.items():
+                if getattr(translation_obj, field) != value:
+                    setattr(translation_obj, field, value)
+                    updated = True
+
+            if updated:
+                try:
+                    translation_obj.save()
+                except IntegrityError as e:
+                    if "url_key" in str(e):
+                        translation_obj.url_key = None
+                        translation_obj.save()
+                    else:
+                        raise
 
             bullet_points = translation.get('bullet_points')
             if bullet_points is not None:

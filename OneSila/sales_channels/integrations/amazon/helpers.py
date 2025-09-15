@@ -3,21 +3,39 @@
 import logging
 
 from products.product_types import CONFIGURABLE, SIMPLE
+from core.helpers import ensure_serializable
 
 
 logger = logging.getLogger(__name__)
 
 
-def infer_product_type(data) -> str:
+def infer_product_type(data, is_variation) -> str:
     """Infer local product type from Amazon relationships data."""
-    relationships = data.relationships
+
+    if is_variation:
+        return SIMPLE
+
+    if isinstance(data, dict):
+        relationships = data.get("relationships") or []
+    else:
+        relationships = getattr(data, "relationships", []) or []
 
     for relation in relationships:
-        for rel in relation.relationships:
-            if rel.child_skus:
+        rels = relation.get("relationships", []) if isinstance(relation, dict) else getattr(relation, "relationships", []) or []
+
+        for rel in rels:
+            rel_type = rel.get("type") if isinstance(rel, dict) else getattr(rel, "type", None)
+
+            # we only care about the type VARIATION
+            if rel_type != "VARIATION":
+                continue
+
+            child_skus = rel.get("child_skus") if isinstance(rel, dict) else getattr(rel, "child_skus", None)
+            if child_skus:
                 return CONFIGURABLE
 
     return SIMPLE
+
 
 
 def extract_description_and_bullets(attributes: dict) -> tuple[str | None, list[str]]:
@@ -69,9 +87,11 @@ def extract_amazon_attribute_value(entry: dict, code: str) -> str | None:
 
     if isinstance(current, list):
         current = current[0] if current else None
+
     if isinstance(current, dict):
         return current.get("value") if "value" in current else current.get("name")
-    if isinstance(current, str):
+
+    if isinstance(current, (str, int, float, bool)):
         return current
 
     logger.debug(
@@ -84,16 +104,39 @@ def extract_amazon_attribute_value(entry: dict, code: str) -> str | None:
 
 def get_is_product_variation(data):
     """Return whether the product is a variation and its parent SKUs if present."""
-    relationships = getattr(data, 'relationships', []) or []
+    if isinstance(data, dict):
+        relationships = data.get("relationships") or []
+    else:
+        relationships = getattr(data, "relationships", []) or []
+
     parent_skus = []
 
     for relation in relationships:
-        for rel in getattr(relation, 'relationships', []) or []:
-            parent_sku = getattr(rel, 'parent_sku', None)
-            if parent_sku:
-                parent_skus.append(parent_sku)
+        rels = relation.get("relationships", []) if isinstance(relation, dict) else getattr(relation, "relationships", []) or []
+        for rel in rels:
+
+            rel_type = rel.get("type") if isinstance(rel, dict) else getattr(rel, "type", None)
+            if rel_type != "VARIATION":
+                continue
+
+            # Handle plural parent_skus list
+            if isinstance(rel, dict):
+                skus = rel.get("parent_skus") or []
+            else:
+                skus = getattr(rel, "parent_skus", []) or []
+            parent_skus.extend(skus)
 
     if parent_skus:
         return True, parent_skus
     else:
         return False, []
+
+
+
+def serialize_listing_item(item):
+    """Return a serializable dictionary representation of an SP-API listing item."""
+    if hasattr(item, "to_dict"):
+        return item.to_dict()
+    if hasattr(item, "__dict__"):
+        return ensure_serializable(item.__dict__)
+    return ensure_serializable(item)

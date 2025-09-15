@@ -1,12 +1,13 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Subquery, OuterRef
+from django.db.models import Subquery, OuterRef, Value, CharField
+from django.db.models.functions import Coalesce
 from django.utils.text import slugify
 from django.conf import settings
 import difflib
 from django.utils.translation import gettext_lazy as _
 from core.managers import MultiTenantManager, MultiTenantQuerySet
 from django.db import transaction, IntegrityError
-from .helpers import generate_unique_internal_name
+from .helpers import generate_unique_internal_name, _is_code_like, _norm_code, _tokens
 
 
 class PropertyQuerySet(MultiTenantQuerySet):
@@ -75,15 +76,21 @@ class PropertyQuerySet(MultiTenantQuerySet):
     def with_translated_name(self, language_code=None):
         from .models import PropertyTranslation
 
+        language_field = language_code if language_code is not None else OuterRef('multi_tenant_company__language')
+        name_in_language = PropertyTranslation.objects.filter(
+            property=OuterRef('pk'),
+            language=language_field,
+        ).values('name')[:1]
+
+        any_name = PropertyTranslation.objects.filter(
+            property=OuterRef('pk'),
+        ).values('name')[:1]
+
         return self.annotate(
-            translated_name=Subquery(
-                PropertyTranslation.objects
-                .filter(
-                    property=OuterRef('pk'),
-                    language=language_code
-                )
-                .order_by('name')
-                .values('name')[:1]
+            translated_name=Coalesce(
+                Subquery(name_in_language, output_field=CharField()),
+                Subquery(any_name, output_field=CharField()),
+                Value('No Name Set'),
             )
         )
 
@@ -100,14 +107,14 @@ class PropertyQuerySet(MultiTenantQuerySet):
             language=language_code,
         ).select_related("property")
 
-        matched_ids = []
+        matched_ids = set()
         for translation in translations:
             processed = slugify(translation.name).replace("-", "").lower()
             ratio = difflib.SequenceMatcher(None, processed_name, processed).ratio()
             if ratio >= threshold:
-                matched_ids.append(translation.property_id)
+                matched_ids.add(translation.property_id)
 
-        return self.filter(id__in=matched_ids)
+        return self.filter(id__in=matched_ids).order_by('id').distinct('id')
 
 
 class PropertyManager(MultiTenantManager):
@@ -170,40 +177,134 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
     def with_translated_value(self, language_code=None):
         from .models import PropertySelectValueTranslation
 
+        language_field = language_code if language_code is not None else OuterRef('property__multi_tenant_company__language')
+        value_in_language = PropertySelectValueTranslation.objects.filter(
+            propertyselectvalue=OuterRef('pk'),
+            language=language_field,
+        ).values('value')[:1]
+
+        any_value = PropertySelectValueTranslation.objects.filter(
+            propertyselectvalue=OuterRef('pk'),
+        ).values('value')[:1]
+
         return self.annotate(
-            translated_value=Subquery(
-                PropertySelectValueTranslation.objects
-                .filter(
-                    propertyselectvalue=OuterRef('pk'),
-                    language=language_code,
-                )
-                .order_by('value')
-                .values('value')[:1]
+            translated_value=Coalesce(
+                Subquery(value_in_language, output_field=CharField()),
+                Subquery(any_value, output_field=CharField()),
+                Value('No Value Set'),
             )
         )
 
-    def find_duplicates(self, value, property_instance, language_code=None, threshold=0.8):
-        """Return property select values with a value similar to the given one."""
+    def find_duplicates(self, value, property_instance, language_code=None, threshold=0.88):
+        """
+        Return property select values similar to `value` within the same property.
+
+        Rules:
+          - If EITHER side looks code-like (any token has letters+digits), require exact match
+            after collapsing non-alnum (prevents ath_s700bt ~ ath_s200bt).
+          - Otherwise (labels), require EXACT equality of numeric token sets; only then:
+              * match if token sets are equal (order/sep-insensitive), or
+              * fall back to fuzzy on TEXT tokens only (numbers already matched).
+        """
         from .models import PropertySelectValueTranslation
 
         if language_code is None:
             language_code = settings.LANGUAGE_CODE
 
-        processed_value = slugify(value).replace("-", "").lower()
-        translations = PropertySelectValueTranslation.objects.filter(
-            propertyselectvalue__in=self,
-            propertyselectvalue__property=property_instance,
-            language=language_code,
-        ).select_related("propertyselectvalue")
+        probe_is_code = _is_code_like(value)
+        probe_code_key = _norm_code(value) if probe_is_code else None
 
-        matched_ids = []
-        for translation in translations:
-            processed = slugify(translation.value).replace("-", "").lower()
-            ratio = difflib.SequenceMatcher(None, processed_value, processed).ratio()
-            if ratio >= threshold:
-                matched_ids.append(translation.propertyselectvalue_id)
+        # Precompute probe tokens & split into numeric/text
+        probe_all_tokens = _tokens(value)
+        probe_num_set = {t for t in probe_all_tokens if t.isdigit()}
+        probe_text_set = set(t for t in probe_all_tokens if not t.isdigit())
+        probe_tokens_sorted = sorted(probe_text_set | probe_num_set)  # for exact set compare when needed
+        probe_text_key = " ".join(sorted(probe_text_set))  # for fuzzy on text only
 
-        return self.filter(id__in=matched_ids)
+        translations = (
+            PropertySelectValueTranslation.objects
+            .filter(
+                propertyselectvalue__in=self,
+                propertyselectvalue__property=property_instance,
+                language=language_code,
+            )
+            .select_related("propertyselectvalue")
+        )
+
+        matched_ids = set()
+
+        for t in translations:
+            raw = t.value or ""
+            cand_is_code = _is_code_like(raw)
+
+            if probe_is_code or cand_is_code:
+                # CODE COMPARATOR: strict equality after collapsing
+                if probe_code_key and probe_code_key == _norm_code(raw):
+                    matched_ids.add(t.propertyselectvalue_id)
+                continue
+
+            # LABEL COMPARATOR
+            cand_all_tokens = _tokens(raw)
+            cand_num_set = {x for x in cand_all_tokens if x.isdigit()}
+            cand_text_set = set(x for x in cand_all_tokens if not x.isdigit())
+
+            # 1) Different numeric tokens => NOT a duplicate (e.g., 50 vs 60 Hertz)
+            if probe_num_set != cand_num_set:
+                continue
+
+            # 2) Exact token set equality (numbers + text), order/sep-insensitive
+            cand_tokens_sorted = sorted(cand_text_set | cand_num_set)
+            if probe_tokens_sorted == cand_tokens_sorted:
+                matched_ids.add(t.propertyselectvalue_id)
+                continue
+
+            # 3) Conservative fuzzy on TEXT ONLY (numbers already proven equal)
+            cand_text_key = " ".join(sorted(cand_text_set))
+            if difflib.SequenceMatcher(None, probe_text_key, cand_text_key).ratio() >= threshold:
+                matched_ids.add(t.propertyselectvalue_id)
+
+        return self.filter(id__in=matched_ids).order_by('id').distinct('id')
+
+    def merge(self, target):
+        from .models import PropertySelectValue
+
+        if isinstance(target, (int, str)):
+            target = PropertySelectValue.objects.get(pk=target)
+
+        sources = self.exclude(pk=target.pk)
+
+        if sources.exclude(property_id=target.property_id).exists():
+            raise ValidationError(_("Property select values must belong to the same property."))
+
+        with transaction.atomic():
+            for source in sources:
+                for relation in PropertySelectValue._meta.related_objects:
+                    if relation.related_model.__name__ == "PropertySelectValueTranslation":
+                        continue
+                    if relation.one_to_many or relation.one_to_one:
+                        qs = relation.related_model._default_manager.filter(
+                            **{relation.field.name: source}
+                        )
+                        for obj in qs:
+                            setattr(obj, relation.field.name, target)
+                            try:
+                                with transaction.atomic():
+                                    obj.save()
+                            except IntegrityError:
+                                obj.delete()
+                    elif relation.many_to_many:
+                        # @TODO: Seems that the many_to_many merge doesn't work
+                        through = relation.through._default_manager
+                        source_field = relation.field.m2m_reverse_field_name()
+                        for through_obj in through.filter(**{source_field: source.pk}):
+                            setattr(through_obj, source_field, target.pk)
+                            try:
+                                with transaction.atomic():
+                                    through_obj.save()
+                            except IntegrityError:
+                                through_obj.delete()
+                source.delete(force_delete=True)
+            return target
 
 
 class PropertySelectValueManager(MultiTenantManager):
@@ -221,6 +322,12 @@ class PropertySelectValueManager(MultiTenantManager):
             language_code=multi_tenant_company.language,
             threshold=threshold,
         )
+
+    def merge(self, sources, target):
+        if hasattr(sources, "merge"):
+            return sources.merge(target)
+        ids = [s if isinstance(s, (int, str)) else s.pk for s in sources]
+        return self.filter(id__in=ids).merge(target)
 
 
 class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):

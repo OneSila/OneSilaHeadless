@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import get_language_info
-
+from core.models.mixins import TimeStampMixin
 
 from core.validators import phone_regex
 from imagekit.models import ImageSpecField
@@ -16,13 +16,14 @@ from core.helpers import get_languages
 from core.managers import MultiTenantManager, MultiTenantUserLoginTokenManager
 from core.validators import phone_regex, validate_image_extension, \
     no_dots_in_filename
+from core.upload_paths import tenant_upload_to
 
 from get_absolute_url.helpers import generate_absolute_url
 from hashlib import shake_256
 import shortuuid
 
 
-class MultiTenantCompany(models.Model):
+class MultiTenantCompany(TimeStampMixin, models.Model):
     '''
     Class that holds company information and sales-conditions.
     '''
@@ -45,6 +46,8 @@ class MultiTenantCompany(models.Model):
     website = models.URLField(blank=True, null=True)
 
     ai_points = models.IntegerField(default=20, help_text="Points allocated for AI processes.")
+    # Active flag has no real logic behind it aside from sorting thins for us somewhat.
+    active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -140,8 +143,12 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     telegram_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
     onboarding_status = models.CharField(max_length=30, choices=ONBOARDING_STATUS_CHOICES, default=ADD_COMPANY)
 
-    avatar = models.ImageField(upload_to='avatars', null=True, blank=True,
-        validators=[validate_image_extension, no_dots_in_filename])
+    avatar = models.ImageField(
+        upload_to=tenant_upload_to('avatars'),
+        null=True,
+        blank=True,
+        validators=[validate_image_extension, no_dots_in_filename],
+    )
     avatar_resized = ImageSpecField(source='avatar',
                             processors=[ResizeToFill(100, 100)],
                             format='JPEG',

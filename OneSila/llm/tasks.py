@@ -3,7 +3,7 @@ from core.decorators import run_task_after_commit
 from llm.flows.translate_ai_content import BulkAiTranslateContentFlow
 
 
-@run_task_after_commit
+# @run_task_after_commit
 @db_task()
 def llm__ai_translate__run_bulk_ai_translation_flow(
     multi_tenant_company_id: int,

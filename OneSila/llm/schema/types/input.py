@@ -16,12 +16,14 @@ from properties.schema.types.input import (
     PropertySelectValuePartialInput,
 )
 from llm.models import BrandCustomPrompt
+from sales_channels.schema.types.input import SalesChannelPartialInput
 
 
 class ContentAiGenerateType(Enum):
     DESCRIPTION = "description"
     SHORT_DESCRIPTION = "short_description"
     NAME = "name"
+    BULLET_POINTS = "bullet_points"
 
 
 class SalesChannelIntegrationType(Enum):
@@ -45,6 +47,7 @@ class AITranslationInput:
     to_language_code: str
     product: Optional[ProductPartialInput] = None
     product_content_type: Optional[ContentAiGenerateType] = None
+    sales_channel: Optional[SalesChannelPartialInput] = None
 
 
 @strawberry_input

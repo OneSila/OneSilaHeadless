@@ -2,7 +2,11 @@ from integrations.models import IntegrationLog
 from media.models import MediaProductThrough, Media
 from products.models import Product
 from properties.models import ProductProperty
-from sales_channels.exceptions import SwitchedToSyncException, SwitchedToCreateException, ConfigurationMissingError
+from sales_channels.exceptions import (
+    SwitchedToSyncException,
+    SwitchedToCreateException,
+    ConfigurationMissingError,
+)
 from sales_channels.factories.mixins import IntegrationInstanceOperationMixin, RemoteInstanceDeleteFactory, \
     EanCodeValueMixin, SyncProgressMixin
 import logging
@@ -34,6 +38,10 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     add_variation_factory = None
     accepted_variation_already_exists_error = None
 
+    # Determines whether the sales channel allows duplicate SKUs across
+    # standalone products and variations.
+    sales_channel_allow_duplicate_sku = False
+
     field_mapping = {}  # Mapping of local fields to remote fields, should be overridden in subclasses
 
     api_package_name = 'products'  # The package name (e.g., 'products')
@@ -48,7 +56,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     fixing_identifier_class = None
 
     def __init__(self, sales_channel: SalesChannel, local_instance: Product,
-                 api=None, remote_instance=None, parent_local_instance=None, remote_parent_product=None):
+                 api=None, remote_instance=None, parent_local_instance=None, remote_parent_product=None, is_switched=False):
         self.local_instance = local_instance  # Instance of the Product model
         self.sales_channel = sales_channel   # Sales channel associated with the sync
         self.integration = sales_channel  # to make it work with other mixins
@@ -61,6 +69,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.remote_product_properties = []
         self.local_type = self.local_instance.type
         self.is_create = False
+        self.is_switched = is_switched
 
     def set_local_assigns(self):
         to_assign = SalesChannelViewAssign.objects.filter(product=self.local_instance, sales_channel=self.sales_channel, remote_product__isnull=True)
@@ -71,6 +80,10 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             assign.save()
 
     def preflight_check(self):
+        return True
+
+    def sanity_check(self):
+        """Run pre-sync validations."""
         return True
 
     def add_field_in_payload(self, field_name, value):
@@ -217,6 +230,11 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         :param existing_remote_property_ids: The list of existing remote property IDs to keep.
         """
+
+        # on create they weren't even created
+        if self.is_create:
+            return
+
         # Find remote product properties that are not in the list of existing IDs
         try:
             remote_properties_to_delete = self.remote_product_property_class.objects.filter(
@@ -257,7 +275,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         Sets the name for the product or variation in the payload.
         For variations, it delegates to set_variation_name.
         """
-        self.name = self.local_instance.name
+        self.name = self.local_instance._get_translated_value(
+            field_name='name', related_name='translations', sales_channel=self.sales_channel)
 
         if self.is_variation:
             self.set_variation_name()
@@ -270,7 +289,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         This method can be overridden for custom naming logic for variations.
         """
         if self.is_variation and self.sales_channel.use_configurable_name:
-            self.name = self.parent_local_instance.name
+            self.name = self.parent_local_instance._get_translated_value(
+                field_name='name', related_name='translations', sales_channel=self.sales_channel)
 
     def set_sku(self):
         """Sets the SKU for the product or variation in the payload."""
@@ -282,7 +302,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.add_field_in_payload('sku', self.sku)
 
     def get_variation_sku(self):
-        return f"{self.parent_local_instance.sku}-{self.local_instance.sku}"
+        return self.local_instance.sku
 
     def set_variation_sku(self):
         """Sets the SKU for variations, defaulting to parent_sku-child_sku."""
@@ -859,7 +879,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         if self.create_product_factory is None:
             raise ValueError("create_product_factory must be specified in the RemoteProductSyncFactory.")
 
-        fac = self.create_product_factory(self.sales_channel, self.local_instance, api=self.api)
+        fac = self.create_product_factory(self.sales_channel, self.local_instance, api=self.api, is_switched=True)
         fac.run()
         self.remote_instance = fac.remote_instance
 
@@ -889,6 +909,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
             if self.local_type == Product.CONFIGURABLE:
                 self.get_variations()
+
+            self.sanity_check()
 
             self.precalculate_progress_step_increment(4)
             self.set_local_assigns()
@@ -930,10 +952,16 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         except SwitchedToCreateException as stc:
             logger.debug(stc)
+            if self.is_switched:
+                raise stc
+            self.is_switched = True
             self.run_create_flow()
 
         except SwitchedToSyncException as sts:
             logger.debug(sts)
+            if self.is_switched:
+                raise sts
+            self.is_switched = True
             self.run_sync_flow()
 
         except Exception as e:
@@ -959,6 +987,7 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
         try:
             self.initialize_remote_product()
             self.set_remote_product_for_logging()
+            self.sanity_check()
             self.precalculate_progress_step_increment(2)
             self.set_rule()
             self.build_payload()
@@ -975,6 +1004,9 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
 
         except SwitchedToCreateException as stc:
             logger.debug(stc)
+            if self.is_switched:
+                raise stc
+            self.is_switched = True
             self.run_create_flow()
 
         except Exception as e:
@@ -1053,6 +1085,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
 
         except Exception as e:  # @TODO: This can be improved to give the type of the exception from the subclasses
             logger.debug(f"Product {self.local_instance.name} doesn't already exists. Ready for create.")
+            logger.error("Exception raised: {}".format(e))
 
     def run_sync_flow(self):
         """
@@ -1069,6 +1102,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
             parent_local_instance=self.parent_local_instance,
             remote_parent_product=self.remote_parent_product,
             api=self.api,
+            is_switched=True,
         )
         sync_factory.run()
 

@@ -1,5 +1,6 @@
 from django.db.utils import IntegrityError
 from django.core.exceptions import ValidationError
+from datetime import date
 from core.tests import TestCase
 from products.models import SimpleProduct
 from sales_prices.models import SalesPriceList, SalesPriceListItem
@@ -150,3 +151,29 @@ class SalesPriceListItemQuerySetTestCase(TestCase):
         self.assertFalse(price_list_price.salespricelist.auto_update_prices)
         self.assertEqual(price_list_price.price, price_list_price.price_override)
         self.assertEqual(price_list_price.discount, price_list_price.discount_override)
+
+
+class SalesPriceListValidationTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.currency, _ = Currency.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company, **currencies['GB']
+        )
+
+    def test_start_without_end_not_allowed(self):
+        with self.assertRaises(ValidationError):
+            SalesPriceList.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                name='pl',
+                currency=self.currency,
+                start_date=date(2025, 1, 1),
+            )
+
+    def test_end_without_start_not_allowed(self):
+        with self.assertRaises(ValidationError):
+            SalesPriceList.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                name='pl',
+                currency=self.currency,
+                end_date=date(2025, 1, 1),
+            )

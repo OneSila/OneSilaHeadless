@@ -52,7 +52,7 @@ class AmazonRemoteValueMixin:
         if ptype in [Property.TYPES.INT, Property.TYPES.FLOAT]:
             return value
         if ptype == Property.TYPES.BOOLEAN:
-            return True if value in [True, "true", "1", 1] else False
+            return True if value in [True, "true", "True", "1", 1] else False
         if ptype in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
             return self._get_select_remote_value(prop_instance, remote_property)
 
@@ -80,7 +80,6 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
         )
 
     def _get_public_definition(self, product_type: AmazonProductType, main_code: str) -> AmazonPublicDefinition:
-
         try:
             return AmazonPublicDefinition.objects.get(
                 api_region_code=self.view.api_region_code,
@@ -88,7 +87,9 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
                 code=main_code,
             )
         except AmazonPublicDefinition.DoesNotExist:
-            raise AmazonUnsupportedPropertyForProductType("Amazon property is not supported for this product type")
+            raise AmazonUnsupportedPropertyForProductType(
+                "Amazon property is not supported for this product type"
+            )
 
     def _get_unit(self, code: str):
         from sales_channels.integrations.amazon.models.sales_channels import AmazonDefaultUnitConfigurator
@@ -139,7 +140,70 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
                 return _resolve(node)
             return node
 
-        return _walk(data)
+        def _clean(node):
+            if isinstance(node, dict):
+                cleaned = {k: _clean(v) for k, v in node.items()}
+                cleaned = {k: v for k, v in cleaned.items() if v not in (None, "", [], {})}
+                if "unit" in cleaned and "value" not in cleaned:
+                    cleaned.pop("unit")
+                if not cleaned:
+                    return None
+                if all(k in ("language_tag", "marketplace_id") for k in cleaned):
+                    return None
+                return cleaned
+            if isinstance(node, list):
+                cleaned_list = []
+                for item in node:
+                    cleaned_item = _clean(item)
+                    if cleaned_item is not None:
+                        cleaned_list.append(cleaned_item)
+                return cleaned_list or None
+            if isinstance(node, str):
+                lower = node.lower()
+                if lower == "true":
+                    return True
+                if lower == "false":
+                    return False
+                try:
+                    return int(node) if node.isdigit() else float(node)
+                except ValueError:
+                    return node
+            return node
+
+        return _clean(_walk(data)) or {}
+
+    def update_remote_select_fields(self, remote_instance):
+        """Synchronize remote select value fields with local property values."""
+        if self.local_property.type not in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
+            remote_instance.remote_select_value = None
+            remote_instance.save()
+            remote_instance.remote_select_values.clear()
+            return
+
+        if self.local_property.type == Property.TYPES.SELECT:
+            val = self.local_instance.value_select
+            remote_val = None
+            if val:
+                remote_val = AmazonPropertySelectValue.objects.filter(
+                    amazon_property=self.remote_property,
+                    local_instance=val,
+                    marketplace=self.view,
+                ).first()
+            remote_instance.remote_select_value = remote_val
+            remote_instance.save()
+            remote_instance.remote_select_values.clear()
+        else:
+            values = list(self.local_instance.value_multi_select.all())
+            remote_vals = list(
+                AmazonPropertySelectValue.objects.filter(
+                    amazon_property=self.remote_property,
+                    local_instance__in=values,
+                    marketplace=self.view,
+                )
+            )
+            remote_instance.save()
+            remote_instance.remote_select_values.set(remote_vals)
+            remote_instance.remote_select_value = None
 
     # ------------------------------------------------------------------
     def build_payload(self):
@@ -160,7 +224,7 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
         payload = self._replace_tokens(usage, self.local_instance.product)
 
         remote_prod = getattr(self, "remote_product", None)
-        if not self.sales_channel.listing_owner and not getattr(remote_prod, "product_owner", False):
+        if not getattr(remote_prod, "product_owner", False):
             allowed_properties = product_type.listing_offer_required_properties.get(self.view.api_region_code, [])
             if main_code not in allowed_properties:
                 return product_type, {}

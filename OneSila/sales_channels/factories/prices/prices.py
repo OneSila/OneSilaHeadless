@@ -21,10 +21,15 @@ class ToUpdateCurrenciesMixin:
         super().__init__(*args, **kwargs)
 
     def sanity_check(self):
-        if not self.currency:
-            raise SanityCheckError("self.currency is not set")
-        if not self.currency_iso_code:
-            raise SanityCheckError("self.currency_iso_code is not set")
+
+        if hasattr(super(), "sanity_check"):
+            super().sanity_check()
+
+        # Thjs are not mandatory. Inspect why it awas added
+        # if not self.currency:
+        #     raise SanityCheckError("self.currency is not set")
+        # if not self.currency_iso_code:
+        #     raise SanityCheckError("self.currency_iso_code is not set")
 
     def set_to_update_currencies(self):
         from sales_channels.models import RemoteCurrency

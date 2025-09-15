@@ -10,6 +10,7 @@ import mimetypes
 from django.core.exceptions import ValidationError
 
 from core.helpers import get_languages
+from core.upload_paths import tenant_upload_to
 
 
 class Import(PolymorphicModel, models.Model):
@@ -41,6 +42,12 @@ class Import(PolymorphicModel, models.Model):
         choices=STATUS_CHOICES,
         default=STATUS_NEW
     )
+    name = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Optional human-readable name for the import process.",
+    )
     error_traceback = models.TextField(
         null=True,
         blank=True,
@@ -50,6 +57,10 @@ class Import(PolymorphicModel, models.Model):
         default=False,
         help_text="If True, existing objects fetched during the import will not be updated.",
     )
+    update_only = models.BooleanField(
+        default=False,
+        help_text="If True, the import will only update existing objects and fail if they do not exist.",
+    )
     skip_broken_records = models.BooleanField(
         default=False,
         help_text="If True, the import will skip records that raise errors and continue processing."
@@ -58,6 +69,15 @@ class Import(PolymorphicModel, models.Model):
         default=list,
         blank=True,
         help_text="JSON array storing details of records that failed during import."
+    )
+
+    total_records = models.PositiveIntegerField(
+        default=0,
+        help_text="Total number of items that this import will process.",
+    )
+    processed_records = models.PositiveIntegerField(
+        default=0,
+        help_text="How many items have been processed so far in async imports.",
     )
 
     def get_cleaned_errors_from_broken_records(self):
@@ -137,7 +157,8 @@ class Import(PolymorphicModel, models.Model):
         return cleaned_errors
 
     def __str__(self):
-        return f"ImportProcess - {self.get_status_display()} ({self.percentage}%)"
+        base = f"{self.get_status_display()} ({self.percentage}%)"
+        return f"{self.name or 'ImportProcess'} - {base}"
 
     class Meta:
         ordering = ['-created_at']
@@ -251,7 +272,6 @@ class TypedImport(Import):
 
         super().save(*args, **kwargs)
 
-
     def run(self):
         raise NotImplementedError("Cannot run a TypedImport directly. Use a concrete subclass like MappedImport.")
 
@@ -262,7 +282,7 @@ class MappedImport(TypedImport):
     """
 
     json_file = models.FileField(
-        upload_to="mapped_imports/",
+        upload_to=tenant_upload_to("mapped_imports"),
         null=True,
         blank=True,
         help_text="Optional uploaded mapped JSON file."
@@ -319,4 +339,3 @@ class ImportReport(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
-

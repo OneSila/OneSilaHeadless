@@ -64,14 +64,17 @@ class Property(TranslatedModelMixin, models.Model):
 
     @django_property
     def name(self):
-        return self._get_translated_value(field_name='name', related_name='propertytranslation_set')
+        if hasattr(self, 'translated_name'):
+            return self.translated_name
+        return self._get_translated_value(field_name='name', related_name='propertytranslation_set', fallback='No Name Set')
 
     def delete(self, *args, **kwargs):
 
-        if self.is_product_type:
+        force_delete = kwargs.pop('force_delete', False)
+        if self.is_product_type and not force_delete:
             raise ValidationError(_("Product type cannot be deleted."))
 
-        if self.non_deletable:
+        if self.non_deletable and not force_delete:
             raise ValidationError(_("This property cannot be deleted."))
 
         super().delete(*args, **kwargs)
@@ -112,6 +115,9 @@ class PropertyTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         translated_field = 'property'
         search_terms = ['name']
+        indexes = [
+            models.Index(fields=['property', 'language']),
+        ]
 
 
 class PropertySelectValue(TranslatedModelMixin, models.Model):
@@ -122,7 +128,9 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
 
     @django_property
     def value(self, language=None):
-        return self._get_translated_value(field_name='value', related_name='propertyselectvaluetranslation_set', language=language)
+        if language is None and hasattr(self, 'translated_value'):
+            return self.translated_value
+        return self._get_translated_value(field_name='value', related_name='propertyselectvaluetranslation_set', language=language, fallback='No Value Set')
 
     def __str__(self):
         return f"{self.value} <{self.property}>"
@@ -149,6 +157,9 @@ class PropertySelectValueTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         translated_field = 'propertyselectvalue'
         search_terms = ['value']
+        indexes = [
+            models.Index(fields=['propertyselectvalue', 'language']),
+        ]
         # added language as well because some words translates the same in different languages
         # the issue with that is that we also kinda need to do propertyselectvalue__property but this is not possible because we can have the same translation
         # on the value but for different properties
@@ -239,6 +250,9 @@ class ProductPropertyTextTranslation(TranslationFieldsMixin, models.Model):
         translated_field = 'product_property'
         search_terms = ['value_text', 'value_description']
         unique_together = ("product_property", "language")
+        indexes = [
+            models.Index(fields=['product_property', 'language']),
+        ]
 
 
 class ProductPropertiesRule(models.Model):
@@ -305,10 +319,6 @@ class ProductPropertiesRuleItem(models.Model):
         # Ensure that if type is REQUIRED_IN_CONFIGURATOR, property type must be SELECT or MULTISELECT
         if self.type in [self.REQUIRED_IN_CONFIGURATOR, self.OPTIONAL_IN_CONFIGURATOR] and self.property.type != Property.TYPES.SELECT:
             raise ValidationError(_(f"Property {self.property.name} ({self.property.type}) must be of type SELECT."))
-
-        # Ensure rule cannot have OPTIONAL_IN_CONFIGURATOR without a REQUIRED_IN_CONFIGURATOR
-        if self.type == self.OPTIONAL_IN_CONFIGURATOR and not self.rule.items.filter(type=self.REQUIRED_IN_CONFIGURATOR).exists():
-            raise ValidationError(_("Cannot have optional in configurator without a required in configurator."))
 
         super().save(*args, **kwargs)
 

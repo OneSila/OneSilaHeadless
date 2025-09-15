@@ -7,38 +7,68 @@ from core.schema.core.types.types import (
     Annotated,
     lazy,
 )
-from typing import Optional, List
+from typing import Optional, List, Self
 from strawberry.relay import to_base64
 from imports_exports.schema.queries import ImportType
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonProperty,
     AmazonPropertySelectValue,
+    AmazonProduct,
+    AmazonProductProperty,
     AmazonProductType,
     AmazonProductTypeItem,
     AmazonSalesChannelImport,
     AmazonDefaultUnitConfigurator,
     AmazonRemoteLog,
     AmazonSalesChannelView,
+    AmazonProductIssue,
+    AmazonBrowseNode,
+    AmazonProductBrowseNode,
+    AmazonExternalProductId,
+    AmazonGtinExemption,
+    AmazonVariationTheme,
+    AmazonImportBrokenRecord,
 )
 from sales_channels.integrations.amazon.schema.types.filters import (
     AmazonSalesChannelFilter,
     AmazonPropertyFilter,
     AmazonPropertySelectValueFilter,
+    AmazonProductFilter,
+    AmazonProductPropertyFilter,
     AmazonProductTypeFilter,
     AmazonProductTypeItemFilter,
-    AmazonSalesChannelImportFilter, AmazonDefaultUnitConfiguratorFilter,
-    AmazonRemoteLogFilter, AmazonSalesChannelViewFilter,
+    AmazonSalesChannelImportFilter,
+    AmazonDefaultUnitConfiguratorFilter,
+    AmazonRemoteLogFilter,
+    AmazonSalesChannelViewFilter,
+    AmazonProductIssueFilter,
+    AmazonBrowseNodeFilter,
+    AmazonProductBrowseNodeFilter,
+    AmazonExternalProductIdFilter,
+    AmazonGtinExemptionFilter,
+    AmazonVariationThemeFilter,
+    AmazonImportBrokenRecordFilter,
 )
 from sales_channels.integrations.amazon.schema.types.ordering import (
     AmazonSalesChannelOrder,
     AmazonPropertyOrder,
     AmazonPropertySelectValueOrder,
+    AmazonProductOrder,
+    AmazonProductPropertyOrder,
     AmazonProductTypeOrder,
     AmazonProductTypeItemOrder,
     AmazonSalesChannelImportOrder,
     AmazonDefaultUnitConfiguratorOrder,
-    AmazonRemoteLogOrder, AmazonSalesChannelViewOrder,
+    AmazonRemoteLogOrder,
+    AmazonSalesChannelViewOrder,
+    AmazonProductIssueOrder,
+    AmazonBrowseNodeOrder,
+    AmazonProductBrowseNodeOrder,
+    AmazonExternalProductIdOrder,
+    AmazonGtinExemptionOrder,
+    AmazonVariationThemeOrder,
+    AmazonImportBrokenRecordOrder,
 )
 from sales_channels.schema.types.types import FormattedIssueType
 
@@ -168,6 +198,12 @@ class AmazonSalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
     def import_id(self, info) -> str:
         return to_base64(ImportType, self.pk)
 
+    @field()
+    def proxy_id(self, info) -> str:
+        from sales_channels.schema.types.types import SalesChannelImportType
+
+        return to_base64(SalesChannelImportType, self.pk)
+
 
 @type(
     AmazonProductTypeItem,
@@ -225,6 +261,62 @@ class AmazonSalesChannelViewType(relay.Node, GetQuerysetMultiTenantMixin):
 
 
 @type(
+    AmazonProduct,
+    filters=AmazonProductFilter,
+    order=AmazonProductOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonProductType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]]
+    issues: List[Annotated[
+        'AmazonProductIssueType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]]
+
+    @field()
+    def has_errors(self, info) -> bool | None:
+        return self.has_errors
+
+
+@type(
+    AmazonProductProperty,
+    filters=AmazonProductPropertyFilter,
+    order=AmazonProductPropertyOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonProductPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'ProductPropertyType',
+        lazy("properties.schema.types.types")
+    ]]
+    remote_product: Annotated[
+        'AmazonProductType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    remote_select_value: Optional[Annotated[
+        'AmazonPropertySelectValueType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]]
+    remote_select_values: List[Annotated[
+        'AmazonPropertySelectValueType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]]
+
+
+@type(
     AmazonRemoteLog,
     filters=AmazonRemoteLogFilter,
     order=AmazonRemoteLogOrder,
@@ -258,6 +350,7 @@ class AmazonRemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):
 
             if not isinstance(issue, dict):
                 continue
+
             formatted.append(
                 FormattedIssueType(
                     message=issue.get("message"),
@@ -267,6 +360,133 @@ class AmazonRemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):
             )
 
         return formatted
+
+
+@type(
+    AmazonProductIssue,
+    filters=AmazonProductIssueFilter,
+    order=AmazonProductIssueOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonProductIssueType(relay.Node, GetQuerysetMultiTenantMixin):
+    remote_product: Annotated[
+        'RemoteProductType',
+        lazy("sales_channels.schema.types.types")
+    ]
+    view: Annotated[
+        'AmazonSalesChannelViewType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+
+
+@type(
+    AmazonBrowseNode,
+    filters=AmazonBrowseNodeFilter,
+    order=AmazonBrowseNodeOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonBrowseNodeType(relay.Node):
+    parent_node: Self | None
+
+
+@type(
+    AmazonProductBrowseNode,
+    filters=AmazonProductBrowseNodeFilter,
+    order=AmazonProductBrowseNodeOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonProductBrowseNodeType(relay.Node, GetQuerysetMultiTenantMixin):
+    product: Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]
+    sales_channel: Annotated[
+        'AmazonSalesChannelType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+    sales_channel_view: Annotated[
+        'AmazonSalesChannelViewType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+
+
+@type(
+    AmazonExternalProductId,
+    filters=AmazonExternalProductIdFilter,
+    order=AmazonExternalProductIdOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonExternalProductIdType(relay.Node, GetQuerysetMultiTenantMixin):
+    product: Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]
+    view: Annotated[
+        'AmazonSalesChannelViewType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+
+
+@type(
+    AmazonGtinExemption,
+    filters=AmazonGtinExemptionFilter,
+    order=AmazonGtinExemptionOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonGtinExemptionType(relay.Node, GetQuerysetMultiTenantMixin):
+    product: Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]
+    view: Annotated[
+        'AmazonSalesChannelViewType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+
+
+@type(
+    AmazonVariationTheme,
+    filters=AmazonVariationThemeFilter,
+    order=AmazonVariationThemeOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonVariationThemeType(relay.Node, GetQuerysetMultiTenantMixin):
+    product: Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]
+    view: Annotated[
+        'AmazonSalesChannelViewType',
+        lazy("sales_channels.integrations.amazon.schema.types.types")
+    ]
+
+
+@type(
+    AmazonImportBrokenRecord,
+    filters=AmazonImportBrokenRecordFilter,
+    order=AmazonImportBrokenRecordOrder,
+    pagination=True,
+    fields="__all__",
+)
+class AmazonImportBrokenRecordType(relay.Node, GetQuerysetMultiTenantMixin):
+    import_process: Annotated[
+        'ImportType',
+        lazy("imports_exports.schema.queries")
+    ]
+
+    @field()
+    def code(self, info) -> str | None:
+        return self.record.get('code')
+
+    @field()
+    def message(self, info) -> str | None:
+        return self.record.get('message')
 
 
 @strawberry_type

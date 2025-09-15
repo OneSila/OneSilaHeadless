@@ -2,10 +2,10 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from core import models
 from polymorphic.models import PolymorphicModel
-from django.conf import settings
 from core.helpers import get_languages
 from integrations.models import Integration
 from sales_channels.models.mixins import RemoteObjectMixin
+from sales_channels.managers import SalesChannelViewAssignManager
 
 import logging
 
@@ -67,7 +67,53 @@ class SalesChannelIntegrationPricelist(models.Model):
 
     sales_channel = models.ForeignKey(SalesChannel, on_delete=models.CASCADE)
     price_list = models.ForeignKey('sales_prices.SalesPriceList', on_delete=models.PROTECT)
-    # @TODO: Add save override validation
+
+    def clean(self):
+        """Validate that price lists for a channel do not overlap per currency."""
+        super().clean()
+
+        currency = self.price_list.currency
+        start = self.price_list.start_date
+        end = self.price_list.end_date
+        is_default = start is None and end is None
+
+        existing = SalesChannelIntegrationPricelist.objects.filter(
+            sales_channel=self.sales_channel,
+            price_list__currency=currency,
+        ).exclude(id=self.id)
+
+        for integration in existing:
+            other_start = integration.price_list.start_date
+            other_end = integration.price_list.end_date
+            other_is_default = other_start is None and other_end is None
+
+            if is_default and other_is_default:
+                raise ValidationError(
+                    {
+                        'price_list': _(
+                            'Another fallback price list with the same currency already exists.'
+                        )
+                    }
+                )
+
+            if is_default or other_is_default:
+                # Default price lists do not overlap with dated ones
+                continue
+
+            if None in [other_start, other_end, start, end] or (
+                other_start <= end and start <= other_end
+            ):
+                raise ValidationError(
+                    {
+                        'price_list': _(
+                            'Another price list with the same currency overlaps in date range.'
+                        )
+                    }
+                )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
 
     class Meta:
         unique_together = ('sales_channel', 'price_list')
@@ -103,13 +149,15 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.SET_NULL, null=True,
                                        blank=True, help_text="The remote product associated with this assign.")
     needs_resync = models.BooleanField(default=False, help_text="Indicates if a resync is needed.")
-    issues = models.JSONField(default=list, null=True, blank=True)
+
+    objects = SalesChannelViewAssignManager()
 
     class Meta:
         unique_together = ('product', 'sales_channel_view')
         verbose_name = 'Sales Channel View Assign'
         verbose_name_plural = 'Sales Channel View Assigns'
         ordering = ('product_id', 'sales_channel_view__name')
+        search_terms = ['product__translations__name', 'product__sku', 'sales_channel_view__name']
 
     def __str__(self):
         return f"{self.product} @ {self.sales_channel_view}"
@@ -122,6 +170,11 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
         from sales_channels.integrations.shopify.models import ShopifySalesChannel
         from sales_channels.integrations.magento2.models import MagentoSalesChannel
         from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
+        from sales_channels.integrations.amazon.models import (
+            AmazonExternalProductId,
+            AmazonSalesChannel,
+            AmazonSalesChannelView,
+        )
 
         sales_channel = self.sales_channel.get_real_instance()
 
@@ -131,6 +184,30 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
             return f"{self.sales_channel_view.url}{self.product.url_key}.html"
         elif isinstance(sales_channel, WoocommerceSalesChannel):
             return f"{self.sales_channel_view.url}/products/{self.product.url_key}"
+        elif isinstance(sales_channel, AmazonSalesChannel):
+            try:
+                asin = AmazonExternalProductId.objects.get(
+                    product=self.product,
+                    view=self.sales_channel_view,
+                    type=AmazonExternalProductId.TYPE_ASIN,
+                ).value
+                return f"{self.sales_channel_view.url}/dp/{asin}"
+            except AmazonExternalProductId.DoesNotExist:
+                default_view = AmazonSalesChannelView.objects.filter(
+                    sales_channel=sales_channel,
+                    is_default=True,
+                ).first()
+                if default_view:
+                    try:
+                        asin = AmazonExternalProductId.objects.get(
+                            product=self.product,
+                            view=default_view,
+                            type=AmazonExternalProductId.TYPE_ASIN,
+                        ).value
+                        return f"{self.sales_channel_view.url}/dp/{asin}"
+                    except AmazonExternalProductId.DoesNotExist:
+                        pass
+            return None
 
         return f"{self.sales_channel_view.url}{self.product.url_key}.html"
 
@@ -145,7 +222,8 @@ class RemoteLanguage(PolymorphicModel, RemoteObjectMixin, models.Model):
     local_instance = models.CharField(
         max_length=7,
         choices=LANGUAGE_CHOICES,
-        default=settings.LANGUAGE_CODE,
+        null=True,
+        blank=True,
         help_text="The local language code associated with this remote language."
     )
     remote_code = models.CharField(max_length=64, help_text="The language code in the remote system.")

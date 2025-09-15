@@ -70,6 +70,7 @@ INSTALLED_LOCAL_APPS = [
     'orders',
 
     'huey.contrib.djhuey',
+    'webhooks'
 ]
 
 INSTALLED_APPS += INSTALLED_LOCAL_APPS
@@ -170,6 +171,12 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+#
+# Core upload path settings
+#
+
+UPLOAD_TENANT_PATH_DEPTH = 3
+UPLOAD_TENANT_PATH_SEGMENT_LENGTH = 2
 
 # Internationalization of the interfaces
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
@@ -332,7 +339,7 @@ SALES_CHANNELS_INTEGRATIONS_TEST_STORES = {
 # Huey settings
 #
 HUEY = {
-    'huey_class': 'huey.RedisHuey',
+    'huey_class': 'huey.PriorityRedisHuey',
     'name': 'hueyonesilaheadless',
     'results': True,  # Store return values of tasks.
     'store_none': False,
@@ -403,6 +410,29 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[%(asctime)s] %(levelname)s:%(name)s.%(funcName)20s() %(lineno)d: %(message)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+            'level': 'DEBUG',
+        },
+        'amazon_log_file': {
+            # Fake handler for automated tests.  You should adjust your local
+            # local.py settings file to soemthing like this;
+            # 'class': 'logging.FileHandler',
+            # 'formatter': 'verbose',
+            # 'level': 'DEBUG',
+            # 'filename': '/var/log/OneSilaHeadless/sales_channels_integrations_amazon.log',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+            'level': 'DEBUG',
+        },
+    },
     'loggers': {
         # The amazon package has a bug that shows you a log of the
         # request x-times every time you do a request.
@@ -427,17 +457,7 @@ LOGGING = {
             'propagate': False,
         },
     },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-        # 'file': {
-        #     'level': 'DEBUG',
-        #     'class': 'logging.FileHandler',
-        #     'filename': '/var/log/OneSilaHeadless/django.log',
-        #     'formatter': 'verbose',
-        # },
-    },
+
     # The amazon package has a bug that shows you a log of the
     # request x-times every time you do a request. The 'root' logger
     # config is for the same purpose of the remarks above in 'loggers'
@@ -446,3 +466,8 @@ LOGGING = {
         'level': 'WARNING',
     },
 }
+
+
+WEBHOOKS_SIGNATURE_SKEW_SECONDS = 300
+WEBHOOKS_GZIP_THRESHOLD_BYTES = 16384
+WEBHOOKS_DEFAULT_TIMEOUT_MS = 10000

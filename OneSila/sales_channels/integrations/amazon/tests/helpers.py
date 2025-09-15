@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+
 class DisableWooCommerceSignalsMixin:
     """Mixin to disable WooCommerce receivers during Amazon tests."""
 
@@ -8,6 +9,7 @@ class DisableWooCommerceSignalsMixin:
         "delete_remote_product",
         "update_remote_product",
         "sync_remote_product",
+        "manual_sync_remote_product",
         "create_remote_product_property",
         "update_remote_product_property",
         "delete_remote_product_property",
@@ -20,9 +22,12 @@ class DisableWooCommerceSignalsMixin:
         "update_remote_image_association",
         "delete_remote_image_association",
         "delete_remote_image",
+        "sales_view_assign_updated",
     ]
 
     def setUp(self):
+        from sales_channels.integrations.amazon import receivers as amazon_receivers
+
         super().setUp()
         from sales_channels import signals as sc_signals
 
@@ -32,6 +37,11 @@ class DisableWooCommerceSignalsMixin:
         ]
         for patcher in self._signal_patchers:
             patcher.start()
+
+        # Disconnect Amazon receivers
+        sc_signals.create_remote_product.disconnect(amazon_receivers.amazon__product__create_from_assign)
+        sc_signals.sales_view_assign_updated.disconnect(amazon_receivers.amazon__assign__update)
+
         self.addCleanup(self._stop_signal_patchers)
 
     def _stop_signal_patchers(self):

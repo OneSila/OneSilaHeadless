@@ -35,6 +35,7 @@ from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
 from translations.schema import TranslationsQuery
 from integrations.schema import IntegrationsQuery, IntegrationsMutation
 from llm.schema import LlmMutation, LlmQuery
+from webhooks.schema import WebhooksQuery, WebhooksMutation
 
 
 #
@@ -64,6 +65,7 @@ class Query(
         TimeZoneQuery,
         TranslationsQuery,
         LlmQuery,
+        WebhooksQuery,
 ):
     pass
 
@@ -87,6 +89,7 @@ class Mutation(
         SalesChannelsMutation,
         MagentoSalesChannelMutation,
         TaxesMutation,
+        WebhooksMutation,
 ):
     pass
 
@@ -120,5 +123,5 @@ schema = strawberry.Schema(
     query=Query,
     mutation=Mutation,
     subscription=Subscription,
-    extensions=[DjangoOptimizerExtension()]
+    extensions=[DjangoOptimizerExtension]
 )

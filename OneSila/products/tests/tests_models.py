@@ -9,10 +9,13 @@ from products.models import (
     BundleVariation,
     AliasProduct,
     ProductTranslation,
+    Product,
 )
 from media.models import Media, MediaProductThrough
 from properties.models import Property, PropertyTranslation, ProductProperty, ProductPropertyTextTranslation
-from sales_prices.models import SalesPrice
+from sales_prices.models import SalesPrice, SalesPriceList, SalesPriceListItem
+from sales_channels.integrations.amazon.models import AmazonSalesChannel
+from sales_channels.models import SalesChannelIntegrationPricelist
 
 
 class AlasProductTestCase(TestCase):
@@ -135,3 +138,89 @@ class DuplicateProductTestCase(TestCase):
     def test_duplicate_product_existing_sku_error(self):
         with self.assertRaises(Exception):
             SimpleProduct.objects.duplicate_product(self.product, sku=self.product.sku)
+
+    def test_duplicate_product_manager_as_alias(self):
+        duplicate = SimpleProduct.objects.duplicate_product(
+            self.product, create_as_alias=True
+        )
+        self.assertEqual(duplicate.type, Product.ALIAS)
+        self.assertEqual(duplicate.alias_parent_product, self.product)
+
+
+class ProductTranslationModelTest(TestCase):
+    def test_duplicate_default_translation_not_allowed(self):
+        product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        ProductTranslation.objects.create(
+            product=product,
+            language=self.multi_tenant_company.language,
+            name="Original",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        with self.assertRaises(IntegrityError):
+            ProductTranslation.objects.create(
+                product=product,
+                language=self.multi_tenant_company.language,
+                name="Duplicate",
+                multi_tenant_company=self.multi_tenant_company,
+            )
+
+
+class ProductPriceValidationTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.channel = AmazonSalesChannel.objects.create(
+            hostname="https://example.com",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company
+        )
+        self.price_list = SalesPriceList.objects.create(
+            name="pl",
+            currency=self.currency,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        SalesChannelIntegrationPricelist.objects.create(
+            sales_channel=self.channel,
+            price_list=self.price_list,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+    def _create_item(self, price, discount):
+        return SalesPriceListItem.objects.create(
+            salespricelist=self.price_list,
+            product=self.product,
+            price_override=price,
+            discount_override=discount,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+    def test_discount_greater_or_equal_returns_full_price_only(self):
+        self._create_item(100, 120)
+        full_price, discount = self.product.get_price_for_sales_channel(
+            self.channel, self.currency
+        )
+        self.assertEqual(full_price, 100)
+        self.assertIsNone(discount)
+
+    def test_zero_price_raises_error(self):
+        SalesPriceListItem.objects.create(
+            salespricelist=self.price_list,
+            product=self.product,
+            price_auto=0,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        with self.assertRaises(ValueError):
+            self.product.get_price_for_sales_channel(self.channel, self.currency)
+
+    def test_zero_discount_raises_error(self):
+        SalesPriceListItem.objects.create(
+            salespricelist=self.price_list,
+            product=self.product,
+            price_override=100,
+            discount_auto=0,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        with self.assertRaises(ValueError):
+            self.product.get_price_for_sales_channel(self.channel, self.currency)

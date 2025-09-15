@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
     remote_model_class = ShopifyProduct
+    sales_channel_allow_duplicate_sku = True
 
     # Sub-factories for images, metafields, EAN, etc.
     remote_image_assign_create_factory = ShopifyMediaProductThroughCreateFactory
@@ -421,10 +422,16 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
 
         except SwitchedToCreateException as stc:
             logger.debug(stc)
+            if self.is_switched:
+                raise stc
+            self.is_switched = True
             self.run_create_flow()
 
         except SwitchedToSyncException as sts:
             logger.debug(sts)
+            if self.is_switched:
+                raise sts
+            self.is_switched = True
             self.run_sync_flow()
 
         except Exception as e:

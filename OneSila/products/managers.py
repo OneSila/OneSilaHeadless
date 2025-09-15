@@ -1,6 +1,7 @@
 from core.managers import QuerySet, Manager, MultiTenantCompanyCreateMixin, \
     QuerySetProxyModelMixin, MultiTenantQuerySet, MultiTenantManager
-from django.db.models import Subquery, OuterRef
+from django.db.models import Subquery, OuterRef, Value, CharField
+from django.db.models.functions import Coalesce
 
 
 class ProductQuerySet(MultiTenantQuerySet):
@@ -19,15 +20,21 @@ class ProductQuerySet(MultiTenantQuerySet):
     def with_translated_name(self, language_code=None):
         from .models import ProductTranslation
 
+        language_field = language_code if language_code is not None else OuterRef('multi_tenant_company__language')
+        name_in_language = ProductTranslation.objects.filter(
+            product=OuterRef('pk'),
+            language=language_field,
+        ).values('name')[:1]
+
+        any_name = ProductTranslation.objects.filter(
+            product=OuterRef('pk'),
+        ).values('name')[:1]
+
         return self.annotate(
-            translated_name=Subquery(
-                ProductTranslation.objects
-                .filter(
-                    product=OuterRef('pk'),
-                    language=language_code
-                )
-                .order_by('name')
-                .values('name')[:1]
+            translated_name=Coalesce(
+                Subquery(name_in_language, output_field=CharField()),
+                Subquery(any_name, output_field=CharField()),
+                Value('No Name Set'),
             )
         )
 
@@ -41,7 +48,7 @@ class ProductQuerySet(MultiTenantQuerySet):
         product_ids = ProductProperty.objects.filter(value_select=product_type).values_list('product_id', flat=True)
         return self.filter_multi_tenant(multi_tenant_company=product_type.multi_tenant_company).filter(id__in=product_ids)
 
-    def duplicate_product(self, product, *, sku=None):
+    def duplicate_product(self, product, *, sku=None, create_as_alias=False):
         from django.db import transaction
         from django.core.exceptions import ValidationError
         from .models import (
@@ -66,15 +73,18 @@ class ProductQuerySet(MultiTenantQuerySet):
         ).exists():
             raise ValidationError("SKU already exists")
 
+        if create_as_alias and product.is_configurable():
+            raise ValidationError("Cannot create alias for configurable products")
+
         with transaction.atomic():
             new_product = Product.objects.create(
                 multi_tenant_company=multi_tenant_company,
                 sku=sku,
                 active=product.active,
-                type=product.type,
+                type=Product.ALIAS if create_as_alias else product.type,
                 vat_rate=product.vat_rate,
                 allow_backorder=product.allow_backorder,
-                alias_parent_product=product.alias_parent_product,
+                alias_parent_product=product if create_as_alias else product.alias_parent_product,
                 created_by_multi_tenant_user=product.created_by_multi_tenant_user,
                 last_update_by_multi_tenant_user=product.last_update_by_multi_tenant_user,
             )

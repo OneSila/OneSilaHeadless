@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Q, Value, CheckConstraint, UniqueConstraint
+from django.db.models import Q, Value, CheckConstraint, UniqueConstraint, Count
 from django.utils.text import slugify
+from django.conf import settings
 
 from core import models
 from django.db import IntegrityError, transaction
@@ -54,6 +55,8 @@ class Product(TranslatedModelMixin, models.Model):
 
     @property
     def name(self):
+        if hasattr(self, 'translated_name'):
+            return self.translated_name
         return self._get_translated_value(field_name='name', related_name='translations', fallback='No Name Set')
 
     @property
@@ -264,7 +267,10 @@ class Product(TranslatedModelMixin, models.Model):
         seen_keys = set()
         unique_variations_ids = set()
         for variation in configurable_variations:
-            key = tuple(sorted(getattr(prop, 'value_select_id', None) for prop in variation.relevant_properties))
+            key = tuple(sorted(
+                (getattr(prop, 'value_select_id', None) for prop in variation.relevant_properties),
+                key=lambda v: (v is None, v),
+            ))
 
             if key not in seen_keys or attributes_len != len(key):
                 seen_keys.add(key)
@@ -283,6 +289,13 @@ class Product(TranslatedModelMixin, models.Model):
 
         today = date.today()
 
+        def _validate_prices(price, discount):
+            if price == 0 or discount == 0:
+                raise ValueError("Price or discount cannot be zero")
+            if discount is not None and price is not None and discount >= price:
+                return price, None
+            return price, discount
+
         # Step 1: Check for Periodic Pricelist
         periodic_pricelist = SalesChannelIntegrationPricelist.objects.filter(
             sales_channel=sales_channel,
@@ -299,7 +312,7 @@ class Product(TranslatedModelMixin, models.Model):
             ).annotate_prices().first()
 
             if price_item:
-                return price_item.price, price_item.discount
+                return _validate_prices(price_item.price, price_item.discount)
 
         # Step 2: Check for Non-Periodic Pricelist
         non_periodic_pricelist = SalesChannelIntegrationPricelist.objects.filter(
@@ -316,7 +329,7 @@ class Product(TranslatedModelMixin, models.Model):
             ).annotate_prices().first()
 
             if price_item:
-                return price_item.price, price_item.discount
+                return _validate_prices(price_item.price, price_item.discount)
 
         # Step 3: Use Default Product Price
         sales_price = SalesPrice.objects.filter(product=self, currency=currency).first()
@@ -324,13 +337,13 @@ class Product(TranslatedModelMixin, models.Model):
         if sales_price:
             # Handle Case 1: Both RRP and price are available (and not None)
             if sales_price.rrp is not None and sales_price.price is not None:
-                return sales_price.rrp, sales_price.price
+                return _validate_prices(sales_price.rrp, sales_price.price)
             # Handle Case 2: Only RRP is available (price is None)
             elif sales_price.rrp is not None and sales_price.price is None:
-                return sales_price.rrp, None
+                return _validate_prices(sales_price.rrp, None)
             # Handle Case 3: Only price is available (rrp is None)
             elif sales_price.price is not None and sales_price.rrp is None:
-                return sales_price.price, None
+                return _validate_prices(sales_price.price, None)
 
         # Fallback if no price information is available
         return None, None
@@ -455,6 +468,7 @@ class Product(TranslatedModelMixin, models.Model):
         super().save(*args, **kwargs)
 
     class Meta:
+        url_detail_page_string = 'products:product_detail'
         search_terms = ['sku', 'translations__name']
         unique_together = ('sku', 'multi_tenant_company')
         constraints = [
@@ -534,6 +548,68 @@ class ConfigurableVariation(models.Model):
 
         super().save(*args, **kwargs)
 
+    def _get_language(self):
+        return (
+            self.multi_tenant_company.language
+            if getattr(self, "multi_tenant_company", None)
+            else settings.LANGUAGE_CODE
+        )
+
+    def _get_distinct_value_counts(self, variation_ids, property_ids):
+        from properties.models import ProductProperty
+
+        return {
+            row["property"]: row["value_count"]
+            for row in ProductProperty.objects.filter(
+                product_id__in=variation_ids, property_id__in=property_ids
+            )
+            .values("property")
+            .annotate(value_count=Count("value_select", distinct=True))
+        }
+
+    def _get_properties_for_variation(self, property_ids):
+        from properties.models import ProductProperty
+
+        return {
+            pp.property_id: pp
+            for pp in ProductProperty.objects.filter(
+                product=self.variation, property_id__in=property_ids
+            ).select_related("value_select")
+        }
+
+    @property
+    def configurator_value(self):
+        from properties.models import ProductPropertiesRuleItem
+
+        language = self._get_language()
+        items = list(self.parent.get_configurator_properties(public_information_only=False))
+        if not items:
+            return ""
+
+        property_ids = [item.property_id for item in items]
+        variation_ids = self.__class__.objects.filter(parent=self.parent).values_list(
+            "variation_id", flat=True
+        )
+        value_counts = self._get_distinct_value_counts(variation_ids, property_ids)
+        variation_properties = self._get_properties_for_variation(property_ids)
+
+        values = []
+        for item in items:
+            if item.type == ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR and value_counts.get(item.property_id, 0) <= 1:
+                continue
+
+            pp = variation_properties.get(item.property_id)
+            if pp and pp.value_select:
+                values.append(
+                    pp.value_select._get_translated_value(
+                        field_name="value",
+                        language=language,
+                        related_name="propertyselectvaluetranslation_set",
+                    )
+                )
+
+        return " x ".join(values)
+
     def __str__(self):
         return f"{self.parent} x {self.variation}"
 
@@ -603,18 +679,16 @@ class ProductTranslation(TranslationFieldsMixin, models.Model):
 
     class Meta:
         translated_field = 'product'
-        unique_together = (
-            ('product', 'language', 'sales_channel'),
-        )
-
-        # @TODO: Figure out what we do with this
-        # constraints = [
-        #     UniqueConstraint(
-        #         fields=['url_key', 'multi_tenant_company'],
-        #         condition=Q(sales_channel__isnull=False),
-        #         name='uniq_nonnull_url_key_per_company_for_default'
-        #     )
-        # ]
+        constraints = [
+            UniqueConstraint(
+                fields=['product', 'language', 'sales_channel'],
+                name='uniq_product_language_sales_channel',
+                nulls_distinct=False,
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['product', 'language', 'sales_channel']),
+        ]
 
 
 class ProductTranslationBulletPoint(models.Model):
@@ -623,7 +697,7 @@ class ProductTranslationBulletPoint(models.Model):
         on_delete=models.CASCADE,
         related_name='bullet_points'
     )
-    text = models.CharField(max_length=512)
+    text = models.CharField(max_length=1024)
     sort_order = models.PositiveIntegerField(default=0, help_text="Display order of the bullet point")
 
     def __str__(self):

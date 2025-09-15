@@ -55,6 +55,8 @@ class ImportConfigurableVariationInstance(AbstractImportInstance):
 
         if not self.variation_product and hasattr(self, 'variation_data'):
             self.variation_import_instance = ImportProductInstance(self.variation_data, self.import_process, sales_channel=self.sales_channel)
+            # allow creating variations even when the import is update_only
+            self.variation_import_instance.update_only = False
 
     def pre_process_logic(self):
         if not self.config_product:
@@ -72,6 +74,7 @@ class ImportConfigurableVariationInstance(AbstractImportInstance):
         self.variation = self.variation_product
 
         fac = ConfigurableVariationImport(self, self.import_process, instance=self.instance)
+        self.update_only = False
         fac.run()
 
         self.instance = fac.instance
@@ -205,6 +208,9 @@ class ImportBundleVariationInstance(AbstractImportInstance):
         self.set_field_if_exists('bundle_product_data')
         self.set_field_if_exists('quantity', default_value=1)
 
+        if 'qty' in data:
+            self.quantity = data.get('qty')
+
         self.validate()
         self._set_products_import_instance()
 
@@ -228,6 +234,8 @@ class ImportBundleVariationInstance(AbstractImportInstance):
 
         if not self.variation_product and hasattr(self, 'variation_data'):
             self.variation_import_instance = ImportProductInstance(self.variation_data, self.import_process, sales_channel=self.sales_channel)
+            # allow creating variations even when the import is update_only
+            self.variation_import_instance.update_only = False
 
     def pre_process_logic(self):
         if not self.bundle_product:
@@ -244,6 +252,7 @@ class ImportBundleVariationInstance(AbstractImportInstance):
         self.variation = self.variation_product
 
         fac = BundleVariationImport(self, self.import_process, instance=self.instance)
+        self.update_only = False
         fac.run()
 
         # Add quantity manually (not handled by BundleVariationImport)
@@ -302,13 +311,17 @@ class ImportAliasVariationInstance(AbstractImportInstance):
 
         if not self.alias_product:
             self.variation_data["alias_parent_product"] = self.parent_product
+            self.variation_data["type"] = Product.ALIAS
             self.alias_product_import_instance = ImportProductInstance(self.variation_data, self.import_process, sales_channel=self.sales_channel)
+            # allow creating alias variations even when the import is update_only
+            self.alias_product_import_instance.update_only = False
             self.alias_product_import_instance.process()
             self.alias_product = self.alias_product_import_instance.instance
+            self.created = self.alias_product_import_instance.created
 
     def process_logic(self):
 
-        if self.alias_copy_images or self.alias_copy_product_properties:
+        if self.created and (self.alias_copy_images or self.alias_copy_product_properties):
             AliasProduct.objects.copy_from_parent(
                 self.alias_product,
                 copy_images=self.alias_copy_images,

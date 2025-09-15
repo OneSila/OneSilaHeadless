@@ -3,9 +3,15 @@ import os
 from django.conf import settings
 from model_bakery import baker
 from django.core.files import File
+from django.core.files.base import ContentFile
 
 
 class CreateImageMixin:
+    def get_image_file(self, fname='red.png'):
+        image_path = os.path.join(settings.BASE_DIR.parent, 'core', 'tests', 'image_files', fname)
+        with open(image_path, 'rb') as f:
+            return ContentFile(f.read(), name=fname)
+
     def create_image(self, multi_tenant_company, fname='red.png'):
         image_path = os.path.join(settings.BASE_DIR.parent, 'core', 'tests', 'image_files', fname)
         image = Image.objects.create(
