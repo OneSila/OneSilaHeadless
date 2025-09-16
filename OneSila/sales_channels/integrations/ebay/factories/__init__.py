@@ -4,7 +4,9 @@ from .sales_channels import (
     EbayRemoteCurrencyPullFactory,
     EbayRemoteLanguagePullFactory,
     EbaySalesChannelViewPullFactory,
+    EbayProductTypeRuleFactory,
 )
+from .imports import EbaySchemaImportProcessor
 
 __all__ = [
     'GetEbayRedirectUrlFactory',
@@ -12,4 +14,6 @@ __all__ = [
     'EbayRemoteCurrencyPullFactory',
     'EbayRemoteLanguagePullFactory',
     'EbaySalesChannelViewPullFactory',
+    'EbayProductTypeRuleFactory',
+    'EbaySchemaImportProcessor',
 ]
