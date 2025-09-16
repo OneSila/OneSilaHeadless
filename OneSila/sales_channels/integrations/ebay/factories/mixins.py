@@ -278,7 +278,7 @@ class GetEbayAPIMixin:
         self,
         fetcher,
         *,
-        limit: int,
+        limit: int | None,
         record_key: str,
         records_key: str | None = None,
         **kwargs,
@@ -289,7 +289,8 @@ class GetEbayAPIMixin:
 
         while True:
             request_kwargs = dict(kwargs)
-            request_kwargs["limit"] = limit
+            if limit is not None and limit > 0:
+                request_kwargs["limit"] = limit
             if offset:
                 request_kwargs["offset"] = offset
 
@@ -297,6 +298,18 @@ class GetEbayAPIMixin:
 
             is_iterator_response = isinstance(response, Iterator)
             response_items = response if is_iterator_response else (response,)
+
+            if is_iterator_response:
+                # ebay-rest methods that return iterators perform pagination
+                # internally and treat the ``limit`` parameter as the maximum
+                # number of records to yield overall. Re-fetch without the
+                # explicit limit so that we always process the complete result
+                # set and rely on the iterator to manage pagination.
+                if limit is not None and limit > 0 and "limit" in request_kwargs:
+                    response = fetcher(**dict(kwargs))
+                    response_items = response
+                else:
+                    response_items = response
 
             yielded_any = False
 
@@ -332,7 +345,7 @@ class GetEbayAPIMixin:
             if not yielded_any:
                 break
 
-    def get_all_products(self, limit: int = 200) -> Iterator[dict[str, Any]]:
+    def get_all_products(self, limit: int | None = None) -> Iterator[dict[str, Any]]:
         """Yield all inventory items for the configured sales channel."""
 
         api = getattr(self, "api", None)
@@ -350,8 +363,8 @@ class GetEbayAPIMixin:
     def get_all_category_ids(
         self,
         *,
-        products_limit: int = 200,
-        offers_limit: int = 200,
+        products_limit: int | None = None,
+        offers_limit: int | None = None,
     ) -> dict[str, set[str]]:
         """Return category IDs associated with all offers for the channel inventory."""
 
