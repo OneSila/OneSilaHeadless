@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from typing import Any
 
 import requests
@@ -198,7 +198,7 @@ class GetEbayAPIMixin:
         if response is None:
             return records, total_available, records_yielded
 
-        if isinstance(response, (list, tuple)):
+        if isinstance(response, Iterable) and not isinstance(response, (dict, str, bytes)):
             for item in response:
                 if not isinstance(item, dict):
                     continue
@@ -289,25 +289,42 @@ class GetEbayAPIMixin:
 
         while True:
             response = fetcher(limit=limit, offset=offset, **kwargs)
-            records, total_available, records_yielded = self._extract_paginated_records(
-                response,
-                record_key=record_key,
-                records_key=records_key,
-            )
 
-            if not records:
+            is_iterator_response = isinstance(response, Iterator)
+            response_items = response if is_iterator_response else (response,)
+
+            yielded_any = False
+
+            for item in response_items:
+                records, total_available, records_yielded = self._extract_paginated_records(
+                    item,
+                    record_key=record_key,
+                    records_key=records_key,
+                )
+
+                if not records:
+                    continue
+
+                yielded_any = True
+
+                for record in records:
+                    yield record
+
+                increment = records_yielded if records_yielded is not None else len(records)
+                if increment <= 0:
+                    if not is_iterator_response:
+                        return
+                    continue
+
+                if not is_iterator_response:
+                    offset += increment
+                    if total_available is not None and offset >= total_available:
+                        return
+
+            if is_iterator_response:
                 break
 
-            for record in records:
-                yield record
-
-            increment = records_yielded if records_yielded is not None else len(records)
-            if increment <= 0:
-                break
-
-            offset += increment
-
-            if total_available is not None and offset >= total_available:
+            if not yielded_any:
                 break
 
     def get_all_products(self, limit: int = 200) -> Iterator[dict[str, Any]]:
