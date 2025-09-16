@@ -2,6 +2,7 @@ from .oauth import GetEbayRedirectUrlFactory, ValidateEbayAuthFactory
 from .currencies import EbayRemoteCurrencyPullFactory
 from .languages import EbayRemoteLanguagePullFactory
 from .views import EbaySalesChannelViewPullFactory
+from .full_schema import EbayProductTypeRuleFactory
 
 __all__ = [
     'GetEbayRedirectUrlFactory',
@@ -9,4 +10,5 @@ __all__ = [
     'EbayRemoteCurrencyPullFactory',
     'EbayRemoteLanguagePullFactory',
     'EbaySalesChannelViewPullFactory',
+    'EbayProductTypeRuleFactory',
 ]
