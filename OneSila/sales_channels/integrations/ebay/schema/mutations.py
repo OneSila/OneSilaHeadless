@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 
+from sales_channels.integrations.ebay.factories.sales_channels import EbayCategorySuggestionFactory
 from sales_channels.integrations.ebay.schema.types.input import (
     EbaySalesChannelInput,
     EbaySalesChannelPartialInput,
@@ -14,7 +15,10 @@ from sales_channels.integrations.ebay.schema.types.types import (
     EbayPropertyType,
     EbayPropertySelectValueType,
     EbaySalesChannelViewType,
+    SuggestedEbayCategory,
+    SuggestedEbayCategoryEntry,
 )
+from sales_channels.schema.types.input import SalesChannelViewPartialInput
 from core.schema.core.mutations import create, type, List, update
 from strawberry import Info
 import strawberry_django
@@ -71,3 +75,38 @@ class EbaySalesChannelMutation:
         factory.run()
 
         return sales_channel
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def suggest_ebay_category(
+        self,
+        name: str | None,
+        marketplace: SalesChannelViewPartialInput,
+        info: Info,
+    ) -> SuggestedEbayCategory:
+        """Return suggested eBay categories for a given marketplace."""
+        from sales_channels.models import SalesChannelView
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        query = (name or "").strip()
+
+        view = SalesChannelView.objects.select_related("sales_channel").get(
+            id=marketplace.id.node_id,
+            sales_channel__multi_tenant_company=multi_tenant_company,
+        )
+
+        factory = EbayCategorySuggestionFactory(view=view, query=query)
+        factory.run()
+
+        return SuggestedEbayCategory(
+            category_tree_id=factory.category_tree_id,
+            categories=[
+                SuggestedEbayCategoryEntry(
+                    category_id=entry["category_id"],
+                    category_name=entry["category_name"],
+                    category_path=entry["category_path"],
+                    leaf=entry["leaf"],
+                )
+                for entry in factory.categories
+            ],
+        )

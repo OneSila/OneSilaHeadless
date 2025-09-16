@@ -106,3 +106,17 @@ class EbaySalesChannelViewType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def active(self, info) -> bool:
         return self.sales_channel.active
+
+
+@strawberry_type
+class SuggestedEbayCategoryEntry:
+    category_id: str
+    category_name: str
+    category_path: str
+    leaf: bool
+
+
+@strawberry_type
+class SuggestedEbayCategory:
+    category_tree_id: str
+    categories: List[SuggestedEbayCategoryEntry]
