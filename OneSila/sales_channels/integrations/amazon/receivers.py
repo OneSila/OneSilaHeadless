@@ -32,7 +32,6 @@ from sales_channels.integrations.amazon.tasks import (
 from sales_channels.integrations.amazon.constants import (
     AMAZON_SELECT_VALUE_TRANSLATION_IGNORE_CODES,
 )
-from llm.factories.amazon import RemoteSelectValueTranslationLLM  # noqa: F401
 from imports_exports.signals import import_success
 from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonConfigurableVariationsFactory
 from sales_channels.integrations.amazon.flows.tasks_runner import run_single_amazon_product_task_flow

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Iterable, Sequence
 
-from llm.factories.amazon import (
+from llm.factories.remote_taxonomy_translator import (
     RemotePropertyTranslationLLM,
     RemoteSelectValueTranslationLLM,
 )

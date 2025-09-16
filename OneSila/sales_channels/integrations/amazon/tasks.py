@@ -77,7 +77,7 @@ def amazon_translate_select_value_task(select_value_id: int):
     from sales_channels.integrations.amazon.constants import (
         AMAZON_SELECT_VALUE_TRANSLATION_IGNORE_CODES,
     )
-    from llm.factories.amazon import RemoteSelectValueTranslationLLM
+    from llm.factories.remote_taxonomy_translator import RemoteSelectValueTranslationLLM
 
     instance = AmazonPropertySelectValue.objects.get(id=select_value_id)
 
