@@ -7,6 +7,7 @@ from .sales_channels import (
     EbayProductTypeRuleFactory,
 )
 from .imports import EbaySchemaImportProcessor
+from .sync import EbayPropertyRuleItemSyncFactory
 
 __all__ = [
     'GetEbayRedirectUrlFactory',
@@ -16,4 +17,5 @@ __all__ = [
     'EbaySalesChannelViewPullFactory',
     'EbayProductTypeRuleFactory',
     'EbaySchemaImportProcessor',
+    'EbayPropertyRuleItemSyncFactory',
 ]

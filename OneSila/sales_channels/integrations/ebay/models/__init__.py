@@ -11,3 +11,4 @@ from .sales_channels import (
     EbaySalesChannel, EbaySalesChannelView, EbayRemoteLanguage
 )
 from .taxes import EbayCurrency
+from .imports import EbaySalesChannelImport
