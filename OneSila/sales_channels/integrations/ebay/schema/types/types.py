@@ -11,16 +11,19 @@ from core.schema.core.types.types import (
 from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
     EbayProperty,
+    EbayPropertySelectValue,
     EbaySalesChannelView,
 )
 from sales_channels.integrations.ebay.schema.types.filters import (
     EbaySalesChannelFilter,
     EbayPropertyFilter,
+    EbayPropertySelectValueFilter,
     EbaySalesChannelViewFilter,
 )
 from sales_channels.integrations.ebay.schema.types.ordering import (
     EbaySalesChannelOrder,
     EbayPropertyOrder,
+    EbayPropertySelectValueOrder,
     EbaySalesChannelViewOrder,
 )
 
@@ -58,33 +61,33 @@ class EbayPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
         'PropertyType',
         lazy("properties.schema.types.types")
     ]]
-    # select_values: List[Annotated[
-    #     'EbayPropertySelectValueType',
-    #     lazy("sales_channels.integrations.ebay.schema.types.types")
-    # ]]
+    select_values: List[Annotated[
+        'EbayPropertySelectValueType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]]
 
 
-# @type(
-#     EbayPropertySelectValue,
-#     filters=EbayPropertySelectValueFilter,
-#     order=EbayPropertySelectValueOrder,
-#     pagination=True,
-#     fields="__all__",
-# )
-# class EbayPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
-#     sales_channel: Annotated[
-#         'EbaySalesChannelType',
-#         lazy("sales_channels.integrations.ebay.schema.types.types")
-#     ]
-#     ebay_property: EbayPropertyType
-#     marketplace: Annotated[
-#         'SalesChannelViewType',
-#         lazy("sales_channels.schema.types.types")
-#     ]
-#     local_instance: Optional[Annotated[
-#         'PropertySelectValueType',
-#         lazy("properties.schema.types.types")
-#     ]]
+@type(
+    EbayPropertySelectValue,
+    filters=EbayPropertySelectValueFilter,
+    order=EbayPropertySelectValueOrder,
+    pagination=True,
+    fields="__all__",
+)
+class EbayPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'EbaySalesChannelType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+    ebay_property: EbayPropertyType
+    marketplace: Annotated[
+        'SalesChannelViewType',
+        lazy("sales_channels.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'PropertySelectValueType',
+        lazy("properties.schema.types.types")
+    ]]
 
 
 @type(

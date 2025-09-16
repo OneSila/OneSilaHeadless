@@ -3,6 +3,7 @@ from core.schema.core.types.types import auto
 from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
     EbayProperty,
+    EbayPropertySelectValue,
     EbaySalesChannelView,
 )
 
@@ -17,9 +18,9 @@ class EbayPropertyOrder:
     id: auto
 
 
-# @order(EbayPropertySelectValue)
-# class EbayPropertySelectValueOrder:
-#     id: auto
+@order(EbayPropertySelectValue)
+class EbayPropertySelectValueOrder:
+    id: auto
 
 
 @order(EbaySalesChannelView)
