@@ -10,7 +10,6 @@ from sales_channels.models.mixins import RemoteObjectMixin
 from sales_channels.models.properties import (
     RemoteProductProperty,
     RemoteProperty,
-    RemotePropertySelectValue,
 )
 
 
@@ -70,14 +69,26 @@ class EbayProperty(RemoteProperty):
         search_terms = ['localized_name', 'translated_name', 'remote_id']
 
 
-class EbayPropertySelectValue(RemotePropertySelectValue):
+class EbayPropertySelectValue(RemoteObjectMixin, models.Model):
     """eBay attribute value model with localization support."""
 
+    ebay_property = models.ForeignKey(
+        EbayProperty,
+        on_delete=models.CASCADE,
+        related_name='select_values',
+        help_text="eBay property this value belongs to.",
+    )
     marketplace = models.ForeignKey(
         'ebay.EbaySalesChannelView',
         on_delete=models.CASCADE,
         related_name='property_values',
         help_text="Marketplace in which this aspect value applies.",
+    )
+    local_instance = models.ForeignKey(
+        'properties.PropertySelectValue',
+        on_delete=models.SET_NULL,
+        null=True,
+        help_text="Optional link to the local PropertySelectValue.",
     )
     localized_value = models.CharField(
         max_length=512,
@@ -93,8 +104,11 @@ class EbayPropertySelectValue(RemotePropertySelectValue):
     class Meta:
         verbose_name = _("eBay Property Value")
         verbose_name_plural = _("eBay Property Values")
-        unique_together = ('remote_property', 'marketplace', 'localized_value')
-        search_terms = ['localized_value', 'translated_value', 'remote_property__localized_name']
+        unique_together = ('ebay_property', 'marketplace', 'localized_value')
+        search_terms = ['localized_value', 'translated_value', 'ebay_property__localized_name']
+
+    def __str__(self):
+        return f"{self.localized_value} ({self.marketplace})"
 
 
 class EbayProductType(RemoteObjectMixin, models.Model):
