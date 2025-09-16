@@ -5,14 +5,12 @@ from sales_channels.integrations.ebay.schema.types.input import (
     EbaySalesChannelPartialInput,
     EbayValidateAuthInput,
     EbayPropertyPartialInput,
-    EbayPropertySelectValuePartialInput,
     EbaySalesChannelViewPartialInput,
 )
 from sales_channels.integrations.ebay.schema.types.types import (
     EbaySalesChannelType,
     EbayRedirectUrlType,
     EbayPropertyType,
-    EbayPropertySelectValueType,
     EbaySalesChannelViewType,
 )
 from core.schema.core.mutations import create, type, List, update
@@ -31,7 +29,7 @@ class EbaySalesChannelMutation:
     update_ebay_sales_channel: EbaySalesChannelType = update(EbaySalesChannelPartialInput)
 
     update_ebay_property: EbayPropertyType = update(EbayPropertyPartialInput)
-    update_ebay_property_select_value: EbayPropertySelectValueType = update(EbayPropertySelectValuePartialInput)
+    # update_ebay_property_select_value: EbayPropertySelectValueType = update(EbayPropertySelectValuePartialInput)
     update_ebay_sales_channel_view: EbaySalesChannelViewType = update(EbaySalesChannelViewPartialInput)
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)

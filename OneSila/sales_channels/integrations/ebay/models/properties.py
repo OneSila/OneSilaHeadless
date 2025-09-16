@@ -59,13 +59,7 @@ class EbayProperty(RemoteProperty):
     class Meta:
         verbose_name = _("eBay Property")
         verbose_name_plural = _("eBay Properties")
-        constraints = [
-            models.UniqueConstraint(
-                fields=['sales_channel', 'marketplace', 'remote_id'],
-                condition=models.Q(remote_id__isnull=False),
-                name='unique_ebayproperty_remote_id_per_marketplace',
-            )
-        ]
+        unique_together = ('marketplace', 'localized_name')
         search_terms = ['localized_name', 'translated_name', 'remote_id']
 
 

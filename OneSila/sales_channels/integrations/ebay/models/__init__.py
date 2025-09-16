@@ -4,7 +4,7 @@ from .products import (
     EbayMediaThroughProduct, EbayEanCode
 )
 from .properties import (
-    EbayProperty, EbayPropertySelectValue, EbayProductProperty,
+    EbayProperty, EbayProductProperty,
     EbayProductType, EbayProductTypeItem,
 )
 from .sales_channels import (
