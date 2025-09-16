@@ -66,20 +66,16 @@ EBAY_INTERNAL_PROPERTY_DEFAULTS = [
     },
 ]
 
+LENGTH_UNIT_CHOICES = [
+    ("INCH", _("Inch")),
+    ("FEET", _("Feet")),
+    ("CENTIMETER", _("Centimeter")),
+    ("METER", _("Meter")),
+]
 
-def default_length_unit_choices():
-    return [
-        {"value": "INCH", "label": _("Inch")},
-        {"value": "FEET", "label": _("Feet")},
-        {"value": "CENTIMETER", "label": _("Centimeter")},
-        {"value": "METER", "label": _("Meter")},
-    ]
-
-
-def default_weight_unit_choices():
-    return [
-        {"value": "POUND", "label": _("Pound")},
-        {"value": "KILOGRAM", "label": _("Kilogram")},
-        {"value": "OUNCE", "label": _("Ounce")},
-        {"value": "GRAM", "label": _("Gram")},
-    ]
+WEIGHT_UNIT_CHOICES = [
+    ("POUND", _("Pound")),
+    ("KILOGRAM", _("Kilogram")),
+    ("OUNCE", _("Ounce")),
+    ("GRAM", _("Gram")),
+]
