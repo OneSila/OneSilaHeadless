@@ -5,6 +5,7 @@ from .sales_channels import (
     EbayRemoteLanguagePullFactory,
     EbaySalesChannelViewPullFactory,
     EbayProductTypeRuleFactory,
+    EbayCategorySuggestionFactory,
 )
 from .imports import EbaySchemaImportProcessor
 from .sync import EbayPropertyRuleItemSyncFactory
@@ -16,6 +17,7 @@ __all__ = [
     'EbayRemoteLanguagePullFactory',
     'EbaySalesChannelViewPullFactory',
     'EbayProductTypeRuleFactory',
+    'EbayCategorySuggestionFactory',
     'EbaySchemaImportProcessor',
     'EbayPropertyRuleItemSyncFactory',
 ]
