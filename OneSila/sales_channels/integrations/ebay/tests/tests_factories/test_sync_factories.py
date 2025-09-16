@@ -150,7 +150,7 @@ class EbaySyncFactoriesTest(TestCase):
         )
         self.assertEqual(rule_item.type, ProductPropertiesRuleItem.REQUIRED)
 
-    @patch("sales_channels.integrations.ebay.tasks.StringTranslationLLM")
+    @patch("llm.flows.remote_translations.RemotePropertyTranslationLLM")
     def test_translate_property_task_translates_when_languages_differ(self, mock_translator) -> None:
         mock_translator.return_value.translate.return_value = "Color"
         remote_property = self._create_remote_property()
@@ -161,7 +161,7 @@ class EbaySyncFactoriesTest(TestCase):
         remote_property.refresh_from_db()
         self.assertEqual(remote_property.translated_name, "Color")
 
-    @patch("sales_channels.integrations.ebay.tasks.StringTranslationLLM")
+    @patch("llm.flows.remote_translations.RemotePropertyTranslationLLM")
     def test_translate_property_task_copies_when_language_matches(self, mock_translator) -> None:
         remote_language = self.view.remote_languages.first()
         remote_language.local_instance = "en"
@@ -175,7 +175,7 @@ class EbaySyncFactoriesTest(TestCase):
         remote_property.refresh_from_db()
         self.assertEqual(remote_property.translated_name, "Color")
 
-    @patch("sales_channels.integrations.ebay.tasks.StringTranslationLLM")
+    @patch("llm.flows.remote_translations.RemoteSelectValueTranslationLLM")
     def test_translate_select_value_task_translates(self, mock_translator) -> None:
         mock_translator.return_value.translate.return_value = "Black"
         remote_property = self._create_remote_property()
