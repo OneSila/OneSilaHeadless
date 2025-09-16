@@ -4,6 +4,7 @@ from core.schema.core.types.filters import filter, SearchFilterMixin
 from core.schema.core.types.types import auto
 from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
+    EbayInternalProperty,
     EbayProperty,
     EbayPropertySelectValue,
     EbaySalesChannelView,
@@ -25,6 +26,15 @@ class EbayPropertyFilter(SearchFilterMixin):
     local_instance: Optional[PropertyFilter]
     allow_multiple: auto
     # type: auto
+
+
+@filter(EbayInternalProperty)
+class EbayInternalPropertyFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: Optional[PropertyFilter]
+    code: auto
+    is_root: auto
 
 
 @filter(EbayPropertySelectValue)

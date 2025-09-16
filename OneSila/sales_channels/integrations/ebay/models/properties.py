@@ -11,6 +11,9 @@ from sales_channels.models.properties import (
     RemoteProductProperty,
     RemoteProperty,
 )
+from sales_channels.integrations.ebay.constants import (
+    EBAY_INTERNAL_PROPERTY_DEFAULTS,
+)
 
 
 class EbayProperty(RemoteProperty):
@@ -62,6 +65,48 @@ class EbayProperty(RemoteProperty):
         unique_together = ('marketplace', 'localized_name')
         search_terms = ['localized_name', 'translated_name', 'remote_id']
 
+
+class EbayInternalProperty(RemoteObjectMixin, models.Model):
+    """Static eBay property definitions used to build payloads."""
+
+    local_instance = models.ForeignKey(
+        'properties.Property',
+        on_delete=models.SET_NULL,
+        null=True,
+        help_text="Local property associated with this internal eBay field.",
+    )
+    code = models.CharField(
+        max_length=255,
+        help_text="Field code used when building eBay requests.",
+    )
+    label = models.CharField(
+        max_length=255,
+        help_text="Human readable label for the internal field.",
+    )
+    type = models.CharField(
+        max_length=16,
+        choices=Property.TYPES.ALL,
+        default=Property.TYPES.TEXT,
+        help_text="Mapped internal property type for this field.",
+    )
+    is_root = models.BooleanField(
+        default=False,
+        help_text="Defines if the value belongs to the inventory item payload root.",
+    )
+
+    class Meta:
+        verbose_name = _("eBay Internal Property")
+        verbose_name_plural = _("eBay Internal Properties")
+        constraints = [
+            models.UniqueConstraint(
+                fields=['sales_channel', 'code'],
+                name='unique_ebay_internal_property_code_per_channel',
+            )
+        ]
+        search_terms = ['code', 'label']
+
+    def __str__(self):
+        return f"{self.code} ({self.sales_channel})"
 
 class EbayPropertySelectValue(RemoteObjectMixin, models.Model):
     """eBay attribute value model with localization support."""

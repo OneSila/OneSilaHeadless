@@ -6,6 +6,9 @@ from sales_channels.integrations.ebay.models import (
     EbayProperty,
     EbayPropertySelectValue,
 )
+from sales_channels.integrations.ebay.flows.internal_properties import (
+    ensure_internal_properties_flow,
+)
 from sales_channels.integrations.ebay.factories.sync import (
     EbayPropertyRuleItemSyncFactory,
 )
@@ -40,6 +43,8 @@ def sales_channels__ebay__handle_pull(sender, instance, **kwargs):
     currencies_factory = EbayRemoteCurrencyPullFactory(sales_channel=instance)
     currencies_factory.run()
 
+    ensure_internal_properties_flow(instance)
+
 
 @receiver(post_create, sender='ebay.EbayProperty')
 @receiver(post_update, sender='ebay.EbayProperty')
@@ -71,8 +76,6 @@ def _get_remote_language_code(view):
 
     remote_language = view.remote_languages.first()
     return remote_language.local_instance if remote_language else None
-
-
 @receiver(post_create, sender='ebay.EbayProperty')
 @receiver(post_update, sender='ebay.EbayProperty')
 def sales_channels__ebay_property__translate(sender, instance: EbayProperty, **kwargs):

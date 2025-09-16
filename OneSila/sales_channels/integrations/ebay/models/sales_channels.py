@@ -1,5 +1,9 @@
 from django.utils.translation import gettext_lazy as _
 from core import models
+from sales_channels.integrations.ebay.constants import (
+    default_length_unit_choices,
+    default_weight_unit_choices,
+)
 from sales_channels.models.sales_channels import SalesChannel, SalesChannelView, RemoteLanguage
 import uuid
 
@@ -134,6 +138,31 @@ class EbaySalesChannelView(SalesChannelView):
         default=list,
         blank=True,
         help_text="List of available inventory locations.",
+    )
+
+    # --- Package Measurements ---
+    length_unit = models.CharField(
+        max_length=16,
+        null=True,
+        blank=True,
+        help_text="Selected unit of measure for package dimensions.",
+    )
+    length_unit_choices = models.JSONField(
+        default=default_length_unit_choices,
+        blank=True,
+        help_text="Available units of measure for package dimensions.",
+    )
+
+    weight_unit = models.CharField(
+        max_length=16,
+        null=True,
+        blank=True,
+        help_text="Selected unit of measure for package weight.",
+    )
+    weight_unit_choices = models.JSONField(
+        default=default_weight_unit_choices,
+        blank=True,
+        help_text="Available units of measure for package weight.",
     )
 
     # --- Category Tree ---
