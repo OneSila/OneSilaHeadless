@@ -10,18 +10,21 @@ from core.schema.core.types.types import (
 )
 from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
+    EbayInternalProperty,
     EbayProperty,
     EbayPropertySelectValue,
     EbaySalesChannelView,
 )
 from sales_channels.integrations.ebay.schema.types.filters import (
     EbaySalesChannelFilter,
+    EbayInternalPropertyFilter,
     EbayPropertyFilter,
     EbayPropertySelectValueFilter,
     EbaySalesChannelViewFilter,
 )
 from sales_channels.integrations.ebay.schema.types.ordering import (
     EbaySalesChannelOrder,
+    EbayInternalPropertyOrder,
     EbayPropertyOrder,
     EbayPropertySelectValueOrder,
     EbaySalesChannelViewOrder,
@@ -64,6 +67,24 @@ class EbayPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
     select_values: List[Annotated[
         'EbayPropertySelectValueType',
         lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]]
+
+
+@type(
+    EbayInternalProperty,
+    filters=EbayInternalPropertyFilter,
+    order=EbayInternalPropertyOrder,
+    pagination=True,
+    fields="__all__",
+)
+class EbayInternalPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'EbaySalesChannelType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'PropertyType',
+        lazy("properties.schema.types.types")
     ]]
 
 
