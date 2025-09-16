@@ -348,13 +348,8 @@ class GetEbayAPIMixin:
     def get_all_products(self, limit: int | None = None) -> Iterator[dict[str, Any]]:
         """Yield all inventory items for the configured sales channel."""
 
-        api = getattr(self, "api", None)
-        if api is None:
-            api = self.get_api()
-            self.api = api
-
         yield from self._paginate_api_results(
-            api.sell_inventory_get_inventory_items,
+            self.api.sell_inventory_get_inventory_items,
             limit=limit,
             record_key="record",
             records_key="inventory_items",
@@ -368,11 +363,6 @@ class GetEbayAPIMixin:
     ) -> dict[str, set[str]]:
         """Return category IDs associated with all offers for the channel inventory."""
 
-        api = getattr(self, "api", None)
-        if api is None:
-            api = self.get_api()
-            self.api = api
-
         category_ids_by_marketplace: dict[str, set[str]] = {}
 
         for product in self.get_all_products(limit=products_limit):
@@ -384,7 +374,7 @@ class GetEbayAPIMixin:
                 continue
 
             for offer in self._paginate_api_results(
-                api.sell_inventory_get_offers,
+                self.api.sell_inventory_get_offers,
                 limit=offers_limit,
                 record_key="record",
                 records_key="offers",
