@@ -164,7 +164,7 @@ class EbayProductTypeItem(RemoteObjectMixin, models.Model):
         related_name='items',
         help_text="eBay product type this aspect belongs to.",
     )
-    remote_property = models.ForeignKey(
+    ebay_property = models.ForeignKey(
         EbayProperty,
         on_delete=models.CASCADE,
         related_name='product_type_items',

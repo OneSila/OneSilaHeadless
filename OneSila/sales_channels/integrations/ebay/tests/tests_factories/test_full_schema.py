@@ -393,18 +393,18 @@ class TestEbayProductTypeRuleFactory(TestCaseEbayMixin):
 
         brand_values = {
             value.localized_value
-            for value in EbayPropertySelectValue.objects.filter(remote_property=properties["Brand"])
+            for value in EbayPropertySelectValue.objects.filter(ebay_property=properties["Brand"])
         }
         self.assertEqual(brand_values, {"Unbranded", "Apple"})
 
         connectivity_values = {
             value.localized_value
-            for value in EbayPropertySelectValue.objects.filter(remote_property=properties["Connectivity"])
+            for value in EbayPropertySelectValue.objects.filter(ebay_property=properties["Connectivity"])
         }
         self.assertEqual(connectivity_values, {"2G", "3G", "4G"})
 
         items = {
-            item.remote_property.localized_name: item.remote_type
+            item.ebay_property.localized_name: item.remote_type
             for item in EbayProductTypeItem.objects.filter(product_type=product_type)
         }
 

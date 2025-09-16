@@ -66,10 +66,10 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
             return
 
         for aspect in aspects:
-            remote_property = self._sync_property(product_type, aspect)
-            if remote_property is None:
+            ebay_property = self._sync_property(product_type, aspect)
+            if ebay_property is None:
                 continue
-            self._sync_product_type_item(product_type, remote_property, aspect)
+            self._sync_product_type_item(product_type, ebay_property, aspect)
 
     @staticmethod
     def _ensure_real_view(view: EbaySalesChannelView) -> EbaySalesChannelView:
@@ -179,7 +179,7 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         aspect_format = constraint.get("aspectFormat")
         property_type, allows_unmapped = self._determine_property_metadata(aspect, aspect_values)
 
-        remote_property, _ = EbayProperty.objects.get_or_create(
+        ebay_property, _ = EbayProperty.objects.get_or_create(
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
             marketplace=self.view,
@@ -190,40 +190,40 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         aspect_id = aspect.get("aspectId")
         if aspect_id is not None:
             aspect_id = str(aspect_id)
-            if remote_property.remote_id != aspect_id:
-                remote_property.remote_id = aspect_id
+            if ebay_property.remote_id != aspect_id:
+                ebay_property.remote_id = aspect_id
                 update_fields.append("remote_id")
 
-        if remote_property.type != property_type:
-            remote_property.type = property_type
+        if ebay_property.type != property_type:
+            ebay_property.type = property_type
             update_fields.append("type")
 
-        if remote_property.allows_unmapped_values != allows_unmapped:
-            remote_property.allows_unmapped_values = allows_unmapped
+        if ebay_property.allows_unmapped_values != allows_unmapped:
+            ebay_property.allows_unmapped_values = allows_unmapped
             update_fields.append("allows_unmapped_values")
 
         normalized_format = aspect_format or None
-        if remote_property.value_format != normalized_format:
-            remote_property.value_format = normalized_format
+        if ebay_property.value_format != normalized_format:
+            ebay_property.value_format = normalized_format
             update_fields.append("value_format")
 
-        if remote_property.raw_data != aspect:
-            remote_property.raw_data = aspect
+        if ebay_property.raw_data != aspect:
+            ebay_property.raw_data = aspect
             update_fields.append("raw_data")
 
         if update_fields:
-            remote_property.save(update_fields=update_fields)
+            ebay_property.save(update_fields=update_fields)
 
-        self._sync_property_values(remote_property, aspect_values)
+        self._sync_property_values(ebay_property, aspect_values)
 
-        return remote_property
+        return ebay_property
 
     def _sync_property_values(
         self,
-        remote_property: EbayProperty,
+        ebay_property: EbayProperty,
         aspect_values: list[Any],
     ) -> None:
-        if remote_property.type not in {Property.TYPES.SELECT, Property.TYPES.MULTISELECT}:
+        if ebay_property.type not in {Property.TYPES.SELECT, Property.TYPES.MULTISELECT}:
             return
 
         for value_data in aspect_values or []:
@@ -236,7 +236,7 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
             value_obj, _ = EbayPropertySelectValue.objects.get_or_create(
                 sales_channel=self.sales_channel,
                 multi_tenant_company=self.multi_tenant_company,
-                ebay_property=remote_property,
+                ebay_property=ebay_property,
                 marketplace=self.view,
                 localized_value=localized_value,
             )
@@ -251,7 +251,7 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
     def _sync_product_type_item(
         self,
         product_type: EbayProductType,
-        remote_property: EbayProperty,
+        ebay_property: EbayProperty,
         aspect: dict[str, Any],
     ) -> None:
         constraint = aspect.get("aspectConstraint") or {}
@@ -261,7 +261,7 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
             product_type=product_type,
-            remote_property=remote_property,
+            ebay_property=ebay_property,
         )
 
         if rule_item.remote_type != remote_type:
