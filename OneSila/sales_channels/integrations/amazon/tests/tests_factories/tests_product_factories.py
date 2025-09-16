@@ -679,6 +679,16 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         patches = mixin._build_patches(current, new)
         self.assertEqual(patches, [])
 
+    def test_build_patches_ignores_marketplace_id(self):
+        mixin = GetAmazonAPIMixin()
+        current = {"attr": [{"marketplace_id": "GB", "value": "foo"}]}
+        new = {"attr": [{"value": "foo"}]}
+        self.assertEqual(mixin._build_patches(current, new), [])
+        self.assertEqual(
+            mixin._build_patches({"attr": [{"value": "foo"}]}, {"attr": [{"marketplace_id": "GB", "value": "foo"}]}),
+            [],
+        )
+
     def test_replace_tokens_drops_empty_units(self):
         mixin = AmazonProductPropertyBaseMixin()
         data = {
@@ -826,7 +836,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
                     "cell_composition_other_than_listed": [
                         {"value": "lithium_ion", "language_tag": "en"}
                     ],
-                    "iec_code": [{"value": "18650"}],
+                    "iec_code": [{"value": 18650}],
                     "weight": [{"value": 10.0, "unit": "grams"}],
                     "marketplace_id": "GB",
                 }
@@ -840,7 +850,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             "item_package_weight": [
                 {"value": 2.5, "unit": "grams", "marketplace_id": "GB"}
             ],
-            "recommended_browse_nodes": [{'marketplace_id': 'GB', 'value': '1'}]
+            "recommended_browse_nodes": [{'marketplace_id': 'GB', 'value': 1}]
         }
 
         expected_body = {
@@ -1089,7 +1099,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         expected_images = {
             key: [{"marketplace_id": "FR", "media_location": "https://example.com/img.jpg"}]
             for key in keys
-            if key in ("main_offer_image_locator", "main_product_image_locator")
+            if key in ("main_product_image_locator")
         }
         expected_attributes = {
             "merchant_suggested_asin": [
@@ -1126,7 +1136,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
                     ],
                 }
             ],
-            'list_price': [{'currency': 'GBP', 'value_with_tax': 80.0}],
+            'list_price': [{'currency': 'GBP', "marketplace_id": "FR", 'value_with_tax': 80.0}],
             **expected_images,
             "color": [
                 {
@@ -1142,7 +1152,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
                     "cell_composition_other_than_listed": [
                         {"value": "lithium_ion", "language_tag": "fr"}
                     ],
-                    "iec_code": [{"value": "18650"}],
+                    "iec_code": [{"value": 18650}],
                     "weight": [{"value": 10.0, "unit": "grams"}],
                     "marketplace_id": "FR",
                 }
@@ -1899,6 +1909,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         body = mock_instance.put_listings_item.call_args.kwargs.get("body")
         attrs = body.get("attributes", {})
 
+
         self.assertEqual(
             attrs.get("purchasable_offer"),
             [
@@ -1913,7 +1924,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             ],
         )
 
-        self.assertEqual(attrs.get("list_price"), [{"currency": "GBP", "value_with_tax": 80.0}])
+        self.assertEqual(attrs.get("list_price"), [{"currency": "GBP", "marketplace_id": "GB", "value_with_tax": 80.0}])
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
