@@ -288,7 +288,12 @@ class GetEbayAPIMixin:
         offset = kwargs.pop("offset", 0) or 0
 
         while True:
-            response = fetcher(limit=limit, offset=offset, **kwargs)
+            request_kwargs = dict(kwargs)
+            request_kwargs["limit"] = limit
+            if offset:
+                request_kwargs["offset"] = offset
+
+            response = fetcher(**request_kwargs)
 
             is_iterator_response = isinstance(response, Iterator)
             response_items = response if is_iterator_response else (response,)
