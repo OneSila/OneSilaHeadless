@@ -55,6 +55,7 @@ class MappedImportSkipBrokenRecordsTest(TestCase):
 
         self.assertEqual(mapped_import.status, 'success')
         self.assertEqual(len(mapped_import.broken_records), 1)
+        self.assertEqual(mapped_import.broken_record_entries.count(), 1)
         self.assertIn('step', mapped_import.broken_records[0])
         self.assertIn('error', mapped_import.broken_records[0])
         self.assertIn('traceback', mapped_import.broken_records[0])
@@ -89,4 +90,5 @@ class MappedImportUpdateOnlyBrokenRecordsTest(TestCase):
 
         self.assertEqual(mapped_import.status, 'success')
         self.assertEqual(len(mapped_import.broken_records), 1)
+        self.assertEqual(mapped_import.broken_record_entries.count(), 1)
         self.assertIn('error', mapped_import.broken_records[0])
