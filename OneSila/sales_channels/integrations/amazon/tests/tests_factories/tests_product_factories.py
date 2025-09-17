@@ -750,6 +750,33 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_sync_factory_uses_create_when_force_full_update(
+        self,
+        mock_listings,
+        mock_get_images,
+        mock_get_client,
+    ):
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        self.remote_product.created_marketplaces = [self.view.remote_id]
+        self.remote_product.save(update_fields=["created_marketplaces"])
+
+        fac = AmazonProductSyncFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+            force_full_update=True,
+        )
+        fac.run()
+
+        mock_instance.put_listings_item.assert_called_once()
+        mock_instance.patch_listings_item.assert_not_called()
+
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch.object(AmazonMediaProductThroughBase, "_get_images", return_value=["https://example.com/img.jpg"])
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_create_product_factory_builds_correct_payload(self, mock_listings, mock_get_images, mock_get_client):
         """This test checks if the CreateFactory gives the expected payload including attributes, prices, and content."""
         mock_instance = mock_listings.return_value

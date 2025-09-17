@@ -145,6 +145,7 @@ def resync_amazon_product_db_task(
     remote_product_id,
     view_id,
     force_validation_only=False,
+    force_full_update=False,
 ):
     """Run the resync factory for an Amazon product."""
     from products.models import Product
@@ -160,6 +161,7 @@ def resync_amazon_product_db_task(
             remote_instance=AmazonProduct.objects.get(id=remote_product_id),
             view=AmazonSalesChannelView.objects.get(id=view_id),
             force_validation_only=force_validation_only,
+            force_full_update=force_full_update,
         )
         factory.run()
 
