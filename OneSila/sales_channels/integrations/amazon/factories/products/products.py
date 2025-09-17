@@ -87,13 +87,14 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     create_product_factory = property(get_create_product_factory)
     delete_product_factory = property(get_delete_product_factory)
 
-    def __init__(self, *args, view=None, force_validation_only: bool = False, **kwargs):
+    def __init__(self, *args, view=None, force_validation_only: bool = False, force_full_update: bool = False, **kwargs):
 
         if view is None:
             raise ValueError("AmazonProduct factories require a view argument")
 
         self.view = view
         self.force_validation_only = force_validation_only
+        self.force_full_update = force_full_update
         super().__init__(*args, **kwargs)
         self.attributes: Dict = {}
         self.image_attributes: Dict = {}
@@ -537,6 +538,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                                           parent_local_instance=self.parent_local_instance,
                                           remote_parent_product=self.remote_parent_product,
                                           force_validation_only=self.force_validation_only,
+                                          force_full_update=self.force_full_update,
                                           is_switched=True)
         fac.run()
         self.remote_instance = fac.remote_instance
@@ -557,6 +559,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             remote_parent_product=self.remote_parent_product,
             api=self.api,
             view=self.view,
+            force_full_update=self.force_full_update,
             is_switched=True
         )
         sync_factory.run()
@@ -729,6 +732,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             api=self.api,
             view=self.view,
             force_validation_only=self.force_validation_only,
+            force_full_update=self.force_full_update,
         )
         factory.run()
 
@@ -744,6 +748,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             api=self.api,
             view=self.view,
             force_validation_only=self.force_validation_only,
+            force_full_update=self.force_full_update,
         )
         factory.run()
         remote_variation = factory.remote_instance
@@ -767,7 +772,6 @@ class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFa
     fixing_identifier_class = AmazonProductBaseFactory
 
     def perform_remote_action(self):
-
         resp = self.update_product(
             self.sku,
             self.view.remote_id,
@@ -838,15 +842,23 @@ class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactor
     create_product_factory = AmazonProductCreateFactory
 
     def perform_remote_action(self):
-
-        resp = self.update_product(
-            self.sku,
-            self.view.remote_id,
-            self.remote_rule,
-            self.payload.get("attributes", {}),
-            self.current_attrs,
-            force_validation_only=self.force_validation_only,
-        )
+        if self.force_full_update:
+            resp = self.create_product(
+                sku=self.sku,
+                marketplace_id=self.view.remote_id,
+                product_type=self.remote_rule,
+                attributes=self.payload.get("attributes", {}),
+                force_validation_only=self.force_validation_only,
+            )
+        else:
+            resp = self.update_product(
+                self.sku,
+                self.view.remote_id,
+                self.remote_rule,
+                self.payload.get("attributes", {}),
+                self.current_attrs,
+                force_validation_only=self.force_validation_only,
+            )
         return resp
 
     def serialize_response(self, response):

@@ -366,6 +366,12 @@ class GetAmazonAPIMixin:
             else:
                 requirements = "LISTING"
 
+        if getattr(self, "force_full_update", False):
+            if created and created[0] != self.view.remote_id:
+                requirements = "LISTING_OFFER_ONLY"
+            else:
+                requirements = "LISTING"
+
         if requirements == "LISTING_OFFER_ONLY":
             region = self.view.api_region_code
             allowed_keys = (
@@ -531,10 +537,20 @@ class GetAmazonAPIMixin:
             current_attributes = self.get_listing_attributes(sku, marketplace_id)
 
         patches = self._build_patches(current_attributes, new_attributes)
+
+        if not patches:
+            logger.info(
+                "update_product skipping remote call for sku=%s marketplace_id=%s: no patches generated",
+                sku,
+                marketplace_id,
+            )
+            return None
+
         body = {
             "productType": product_type.product_type_code,
             "patches": patches,
         }
+
         logger.info(
             "update_product current attributes:\n%s",
             pprint.pformat(current_attributes),

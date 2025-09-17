@@ -43,6 +43,7 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
     remote_ean_code_class = MagentoEanCode
     remote_imageproductassociation_class = MagentoImageProductAssociation
     remote_price_class = MagentoPrice
+    remote_product_content_class = MagentoProductContent
 
     def __init__(self, import_process, sales_channel, language=None):
         super().__init__(import_process, sales_channel, language)
