@@ -43,6 +43,7 @@ class ImportBrokenRecordAdmin(admin.ModelAdmin):
         'import_process__status',
         'import_process__skip_broken_records',
         'import_process__update_only',
+        'import_process',
     )
     search_fields = (
         'import_process__name',
