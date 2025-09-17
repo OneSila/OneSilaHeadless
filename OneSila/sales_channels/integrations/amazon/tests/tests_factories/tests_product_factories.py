@@ -647,6 +647,37 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         body = mock_instance.patch_listings_item.call_args.kwargs.get("body")
         self.assertIsInstance(body, dict)
 
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_update_product_skips_when_no_patches(self, mock_listings):
+        class Dummy(GetAmazonAPIMixin):
+            def __init__(self, sales_channel, view):
+                self.sales_channel = sales_channel
+                self.view = view
+
+            def _get_client(self):
+                return None
+
+            def get_identifiers(self):
+                return "test", "test"
+
+            def update_assign_issues(self, *args, **kwargs):
+                pass
+
+        dummy = Dummy(self.sales_channel, self.view)
+
+        product_type = AmazonProductType.objects.get(local_instance=self.rule)
+        with patch.object(dummy, "_build_patches", return_value=[]):
+            response = dummy.update_product(
+                "AMZSKU",
+                self.view.remote_id,
+                product_type,
+                {"item_name": []},
+                current_attributes={"item_name": []},
+            )
+
+        mock_listings.return_value.patch_listings_item.assert_not_called()
+        self.assertIsNone(response)
+
     def test_build_patches_adds_value_for_delete(self):
         mixin = GetAmazonAPIMixin()
         current = {
