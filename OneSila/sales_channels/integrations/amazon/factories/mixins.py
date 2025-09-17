@@ -541,6 +541,13 @@ class GetAmazonAPIMixin:
             "productType": product_type.product_type_code,
             "patches": patches,
         }
+        if not patches:
+            logger.info(
+                "update_product skipping remote call for sku=%s marketplace_id=%s: no patches generated",
+                sku,
+                marketplace_id,
+            )
+            return None
         logger.info(
             "update_product current attributes:\n%s",
             pprint.pformat(current_attributes),
