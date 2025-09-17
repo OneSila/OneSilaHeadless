@@ -70,7 +70,6 @@ class Import(PolymorphicModel, models.Model):
         blank=True,
         help_text="JSON array storing details of records that failed during import."
     )
-
     total_records = models.PositiveIntegerField(
         default=0,
         help_text="Total number of items that this import will process.",
@@ -162,6 +161,25 @@ class Import(PolymorphicModel, models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+
+class ImportBrokenRecord(models.Model):
+    """Store broken records generated during an import process."""
+
+    import_process = models.ForeignKey(
+        'imports_exports.Import',
+        on_delete=models.CASCADE,
+        related_name='broken_record_entries'
+    )
+    record = models.JSONField(
+        blank=True,
+        help_text="Store broken record that failed during import."
+    )
+
+    class Meta:
+        verbose_name = "Import Broken Record"
+        verbose_name_plural = "Import Broken Records"
+
 
 
 class ImportableModel(PolymorphicModel, models.Model):

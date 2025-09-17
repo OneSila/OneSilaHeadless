@@ -2,6 +2,7 @@ from imports_exports.decorators import handle_import_exception
 from imports_exports.factories.products import ImportProductInstance
 from imports_exports.factories.properties import ImportProductPropertiesRuleInstance, ImportPropertySelectValueInstance, \
     ImportPropertyInstance
+from imports_exports.helpers import append_broken_record
 from imports_exports.models import Import, ImportReport
 from notifications.factories.email import SendImportReportEmailFactory
 import traceback
@@ -248,17 +249,36 @@ class ImportMixin:
     def process_completed(self):
         pass
 
+    def _add_broken_record(self, *, code=None, message=None, data=None, context=None, exc=None, record=None, extra=None):
+        if not self.import_process.skip_broken_records:
+            return
+
+        if record is None:
+            payload = {
+                "code": code,
+                "message": message,
+                "data": ensure_serializable(data) if data else {},
+                "context": context or {},
+            }
+            if extra:
+                payload.update(extra)
+            if exc is not None:
+                payload["error"] = str(exc)
+                payload["traceback"] = traceback.format_exc()
+        else:
+            payload = ensure_serializable(record)
+
+        self._broken_records.append(payload)
+        append_broken_record(self.import_process.id, payload)
+
     def set_broken_records(self):
-
-        if len(self._broken_records) > 0:
-
-            records = []
-            for br in self._broken_records:
-                cleaned = ensure_serializable(br)
-                records.append(cleaned)
-
-            self.import_process.broken_records = records
-            self.import_process.save(update_fields=['broken_records'])
+        if not self._broken_records:
+            self.import_process.broken_records = []
+        else:
+            self.import_process.broken_records = [
+                ensure_serializable(br) for br in self._broken_records
+            ]
+        self.import_process.save(update_fields=["broken_records"])
 
     def send_reports(self):
 

@@ -559,7 +559,7 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
             "error": "MagentoPropertySelectValue matching query does not exist.",
         }
 
-        self._broken_records.append(record)
+        self._add_broken_record(record=record)
 
     def register_product_processing_error(self, product: MagentoApiProduct, exc: Exception):
         record = {
@@ -570,7 +570,7 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
             "traceback": traceback.format_exc(),
         }
 
-        self._broken_records.append(record)
+        self._add_broken_record(record=record)
 
     def get_product_prices(self, product: MagentoApiProduct,
                            currency_product_map=None):
