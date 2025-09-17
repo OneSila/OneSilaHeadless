@@ -510,6 +510,20 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
                             raise
 
                         continue
+                    except MagentoPropertySelectValue.MultipleObjectsReturned as exc:
+                        params = {
+                            "sales_channel_id": getattr(self.sales_channel, "id", None),
+                            "multi_tenant_company_id": getattr(self.import_process.multi_tenant_company, "id", None),
+                            "remote_property_id": getattr(magento_property, "id", None),
+                            "remote_property_remote_id": getattr(magento_property, "remote_id", None),
+                            "remote_id": magento_value,
+                        }
+                        message = (
+                            "Multiple MagentoPropertySelectValue objects returned for "
+                            f"parameters: {params}"
+                        )
+                        logger.error(message)
+                        raise MagentoPropertySelectValue.MultipleObjectsReturned(message) from exc
 
                 else:  # MULTISELECT
                     select_values_ids = magento_value.split(',')
