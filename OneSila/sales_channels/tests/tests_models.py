@@ -1,10 +1,12 @@
 from datetime import date
 
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 
 from core.tests import TestCase
+from model_bakery import baker
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
-from sales_channels.models import SalesChannel, SalesChannelIntegrationPricelist
+from sales_channels.models import SalesChannel, SalesChannelIntegrationPricelist, RemoteProduct
 from sales_channels.receivers import sales_channels__sales_channel__post_create_receiver
 from core.signals import post_create
 from unittest.mock import patch
@@ -55,6 +57,89 @@ class SalesChannelIntegrationPricelistTestCase(TestCase):
             price_list=pl2,
             multi_tenant_company=self.multi_tenant_company,
         )
+
+
+class RemoteProductConstraintTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+
+        self.sales_channel = baker.make(
+            SalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="https://channel.example.com",
+        )
+        self.parent_product_a = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.parent_product_b = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.child_product_a = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.child_product_b = baker.make(
+            "products.Product",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        self.parent_remote_a = RemoteProduct.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            local_instance=self.parent_product_a,
+            remote_sku="PARENT-A",
+            is_variation=False,
+        )
+        self.parent_remote_b = RemoteProduct.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            local_instance=self.parent_product_b,
+            remote_sku="PARENT-B",
+            is_variation=False,
+        )
+
+    def test_variation_sku_can_repeat_for_different_parents(self):
+        RemoteProduct.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            local_instance=self.child_product_a,
+            remote_parent_product=self.parent_remote_a,
+            remote_sku="SHARED-SKU",
+            is_variation=True,
+        )
+
+        duplicate_with_other_parent = RemoteProduct.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            local_instance=self.child_product_b,
+            remote_parent_product=self.parent_remote_b,
+            remote_sku="SHARED-SKU",
+            is_variation=True,
+        )
+
+        self.assertIsNotNone(duplicate_with_other_parent.pk)
+
+    def test_variation_sku_cannot_repeat_for_same_parent(self):
+        RemoteProduct.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            local_instance=self.child_product_a,
+            remote_parent_product=self.parent_remote_a,
+            remote_sku="DUP-SKU",
+            is_variation=True,
+        )
+
+        with self.assertRaises(IntegrityError):
+            RemoteProduct.objects.create(
+                sales_channel=self.sales_channel,
+                multi_tenant_company=self.multi_tenant_company,
+                local_instance=self.child_product_b,
+                remote_parent_product=self.parent_remote_a,
+                remote_sku="DUP-SKU",
+                is_variation=True,
+            )
 
     def test_overlapping_same_currency_not_allowed(self):
         pl1 = self._create_pricelist(
