@@ -3,6 +3,7 @@ from django.db import transaction
 from django.db.models import F, Case, When, IntegerField
 from django.db.models.functions import Cast
 
+from sales_channels.integrations.amazon.models import AmazonImportBrokenRecord
 from .models import Import, ImportBrokenRecord
 
 
@@ -23,6 +24,15 @@ def increment_processed_records(process_id: int, delta: int = 1) -> None:
         ),
     )
 
+
+def append_amazon_broken_record(process_id: int, record: dict) -> None:
+    """Safely append a broken record to the import process."""
+    imp = Import.objects.get(pk=process_id)
+    AmazonImportBrokenRecord.objects.create(
+        multi_tenant_company=imp.multi_tenant_company,
+        import_process=imp,
+        record=record,
+    )
 
 def append_broken_record(process_id: int, record: dict) -> None:
     """Safely append a broken record to the import process."""

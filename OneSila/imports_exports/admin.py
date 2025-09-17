@@ -51,7 +51,6 @@ class ImportBrokenRecordAdmin(admin.ModelAdmin):
         'record__code',
         'record__step',
     )
-    autocomplete_fields = ['import_process']
     readonly_fields = ['formatted_record', 'created_at', 'updated_at']
     ordering = ('-created_at',)
 

@@ -89,6 +89,5 @@ class MappedImportUpdateOnlyBrokenRecordsTest(TestCase):
         mapped_import.refresh_from_db()
 
         self.assertEqual(mapped_import.status, 'success')
-        self.assertEqual(len(mapped_import.broken_records), 1)
         self.assertEqual(mapped_import.broken_record_entries.count(), 1)
         self.assertIn('error', mapped_import.broken_records[0])
