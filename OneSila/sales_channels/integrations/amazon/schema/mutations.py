@@ -187,6 +187,7 @@ class AmazonSalesChannelMutation:
         remote_product: AmazonProductPartialInput,
         view: AmazonSalesChannelViewPartialInput,
         force_validation_only: bool,
+        force_full_update: bool = False,
         info: Info,
     ) -> AmazonProductGraphqlType:
         """Trigger a manual sync for an Amazon product."""
@@ -218,6 +219,7 @@ class AmazonSalesChannelMutation:
             instance=remote_product,
             view=view,
             force_validation_only=force_validation_only,
+            force_full_update=force_full_update,
         )
 
         return remote_product

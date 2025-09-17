@@ -366,6 +366,12 @@ class GetAmazonAPIMixin:
             else:
                 requirements = "LISTING"
 
+        if getattr(self, "force_full_update", False):
+            if created and created[0] != self.view.remote_id:
+                requirements = "LISTING_OFFER_ONLY"
+            else:
+                requirements = "LISTING"
+
         if requirements == "LISTING_OFFER_ONLY":
             region = self.view.api_region_code
             allowed_keys = (
