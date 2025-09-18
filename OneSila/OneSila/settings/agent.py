@@ -65,3 +65,10 @@ AMAZON_CLIENT_ID = None
 AMAZON_CLIENT_SECRET = None
 AMAZON_APP_ID = None
 TEST_WEBHOOK_SECRET = "test-secret"
+
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    }
+}
