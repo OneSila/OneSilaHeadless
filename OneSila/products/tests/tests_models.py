@@ -31,6 +31,24 @@ class AlasProductTestCase(TestCase):
         )
         self.assertIsNotNone(alias_product.sku)
 
+    def test_alias_product_cannot_be_its_own_parent(self):
+        simple_product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company
+        )
+
+        alias_product = AliasProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            alias_parent_product=simple_product
+        )
+
+        alias_product.alias_parent_product = alias_product
+
+        with self.assertRaisesMessage(
+            ValueError,
+            "An alias product cannot point to another alias product.",
+        ):
+            alias_product.save()
+
 
 class ProductModelTest(TestCase):
     def setUp(self):

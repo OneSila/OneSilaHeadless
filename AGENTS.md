@@ -8,6 +8,7 @@
 - Follow the "always kwargs" pattern for Python callables. Define functions with a leading `*` so they only accept keyword arguments.
 - Keep individual source files under ~500 lines. If a file grows beyond this, split it into the conventional folder structure (e.g., `schema/`, `factories/`, `flows/`).
 - Prefer incremental, well-tested changes. Add tests for any meaningful behaviour change; very small tweaks are the only exception. Use decorator-based patching for integrations (e.g., `@patch("sales_channels.integrations.amazon.receivers.create_amazon_product_type_rule_task")`). When adding or updating tests locally, try running them with `./manage.py test -k new_test_name` so only the new or changed cases execute. If a failure is clearly caused by the SQLite-in-container setup (the project runs on PostgreSQL), document the limitation and proceed; otherwise, fix the code or the test before shipping.
+- Run Django test suites with the agent settings module: append `--settings OneSila.settings.agent` to the manage.py command. For example, `python manage.py test products.tests.tests_models.AlasProductTestCase --settings OneSila.settings.agent`.
 - When defining Strawberry GraphQL types that reference foreign keys, manually add lazy imports such as `product: Optional[Annotated['ProductType', lazy("products.schema.types.types")]]`.
 - Mind concurrency and scale; design solutions that remain efficient as data volume grows.
 
