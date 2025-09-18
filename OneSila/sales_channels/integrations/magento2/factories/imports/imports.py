@@ -274,6 +274,22 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
         property_map = self.remote_local_property_map.get(value_data.attribute.attribute_code, {})
         remote_property = property_map.get('remote', None)
 
+        if remote_property:
+            try:
+                remote_value = MagentoPropertySelectValue.objects.get(
+                    sales_channel=self.sales_channel,
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    remote_property=remote_property,
+                    remote_id=str(value_data.value),
+                )
+            except MagentoPropertySelectValue.DoesNotExist:
+                remote_value = None
+            else:
+                import_instance.set_remote_instance(remote_value)
+
+                if remote_value.local_instance:
+                    import_instance.instance = remote_value.local_instance
+
         import_instance.prepare_mirror_model_class(
             mirror_model_class=MagentoPropertySelectValue,
             sales_channel=self.sales_channel,
@@ -281,7 +297,8 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
                 "local_instance": "*",
             },
             mirror_model_defaults={
-                "remote_property": remote_property
+                "remote_property": remote_property,
+                "remote_id": str(value_data.value),
             }
         )
 
