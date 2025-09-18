@@ -38,7 +38,11 @@ class SearchQuerySetMixin:
             search_term = search_term[:100]
 
         # Apply keyword searches.
-        def construct_search(field_name):
+        def construct_search(field_name, is_literal=False):
+
+            if is_literal:
+                return "%s__iexact" % field_name
+
             if field_name.startswith('^'):
                 return "%s__istartswith" % field_name[1:]
             elif field_name.startswith('='):
@@ -75,8 +79,12 @@ class SearchQuerySetMixin:
             filter_kwargs['multi_tenant_company'] = multi_tenant_company
 
         if search_fields and search_term:
-            orm_lookups = [construct_search(str(search_field)) for search_field in search_fields]
 
+            is_literal = False
+            if search_term.startswith('"') and search_term.endswith('"') and len(search_term) > 1:
+                is_literal = True
+
+            orm_lookups = [construct_search(str(search_field), is_literal) for search_field in search_fields]
             for bit in smart_split(search_term):
                 if bit.startswith(('"', "'")) and bit[0] == bit[-1]:
                     bit = unescape_string_literal(bit)
