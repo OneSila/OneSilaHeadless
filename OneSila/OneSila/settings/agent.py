@@ -1,3 +1,7 @@
+# ⚠️ TEST SETTINGS ONLY
+# This file is safe to commit publicly.
+# Do NOT copy values into production!
+
 from .base import *
 import os
 import tempfile
@@ -71,4 +75,9 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels.layers.InMemoryChannelLayer",
     }
+}
+
+MIGRATION_MODULES = {
+    "amazon": "sales_channels.integrations.amazon.migrations_agent",
+    "woocommerce": "sales_channels.integrations.woocommerce.migrations_agent",
 }
