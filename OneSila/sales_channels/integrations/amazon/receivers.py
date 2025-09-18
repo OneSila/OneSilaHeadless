@@ -160,7 +160,14 @@ def sales_channels__amazon_import_completed(sender, instance, **kwargs):
 
 
 @receiver(manual_sync_remote_product, sender='amazon.AmazonProduct')
-def amazon__product__manual_sync(sender, instance, view, force_validation_only=False, **kwargs):
+def amazon__product__manual_sync(
+    sender,
+    instance,
+    view,
+    force_validation_only=False,
+    force_full_update=False,
+    **kwargs,
+):
     """Queue a task to resync an Amazon product."""
     product = instance.local_instance
     count = 1 + (getattr(product, 'get_configurable_variations', lambda: [])().count())
@@ -172,6 +179,7 @@ def amazon__product__manual_sync(sender, instance, view, force_validation_only=F
         product_id=product.id,
         remote_product_id=instance.id,
         force_validation_only=force_validation_only,
+        force_full_update=force_full_update,
     )
 
 

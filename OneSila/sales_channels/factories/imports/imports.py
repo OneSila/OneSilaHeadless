@@ -91,6 +91,7 @@ class SalesChannelImportMixin(ImportMixin):
         super().__init__(import_process, language)
 
         self.sales_channel = sales_channel
+        self.multi_tenant_company = self.import_process.multi_tenant_company
         self.initial_sales_channel_status = sales_channel.active
         self.api = self.get_api()
 

@@ -43,7 +43,7 @@ from core.helpers import ensure_serializable
 from dateutil.parser import parse
 from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
 import datetime
-from imports_exports.helpers import append_broken_record, increment_processed_records
+from imports_exports.helpers import append_amazon_broken_record, increment_processed_records
 from sales_channels.integrations.amazon.models.imports import (
     AmazonImportRelationship,
     AmazonImportData,
@@ -81,7 +81,7 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
 
         self.broken_records.append(record)
 
-        append_broken_record(self.import_process.id, record)
+        append_amazon_broken_record(self.import_process.id, record)
 
     def __init__(self, import_process, sales_channel, language=None):
         super().__init__(import_process, language)

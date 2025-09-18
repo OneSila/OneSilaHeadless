@@ -32,6 +32,7 @@ from magento.models import Product as MagentoApiProduct
 from magento.models import ConfigurableProduct as MagentoApiConfigurableProduct
 from sales_channels.models.products import RemoteProductConfigurator
 import logging
+import traceback
 
 from taxes.models import VatRate
 
@@ -42,6 +43,7 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
     remote_ean_code_class = MagentoEanCode
     remote_imageproductassociation_class = MagentoImageProductAssociation
     remote_price_class = MagentoPrice
+    remote_product_content_class = MagentoProductContent
 
     def __init__(self, import_process, sales_channel, language=None):
         super().__init__(import_process, sales_channel, language)
@@ -240,8 +242,26 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
 
     def get_structured_select_value_data(self, value_data: AttributeOption):
 
+        structured_value = value_data.label
+        translations_dict = getattr(value_data, 'translations', None)
+
+        if translations_dict:
+            preferred_language = getattr(self.multi_tenant_company, 'language', None)
+            if preferred_language:
+                preferred_translation = translations_dict.get(preferred_language)
+                if preferred_translation:
+                    structured_value = preferred_translation
+                else:
+                    first_translation = next(iter(translations_dict.values()), None)
+                    if first_translation:
+                        structured_value = first_translation
+            else:
+                first_translation = next(iter(translations_dict.values()), None)
+                if first_translation:
+                    structured_value = first_translation
+
         structured_data = {
-            'value': value_data.label,
+            'value': structured_value,
         }
 
         if hasattr(value_data, 'translations'):
@@ -272,6 +292,22 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
         property_map = self.remote_local_property_map.get(value_data.attribute.attribute_code, {})
         remote_property = property_map.get('remote', None)
 
+        if remote_property:
+            try:
+                remote_value = MagentoPropertySelectValue.objects.get(
+                    sales_channel=self.sales_channel,
+                    multi_tenant_company=self.import_process.multi_tenant_company,
+                    remote_property=remote_property,
+                    remote_id=str(value_data.value),
+                )
+            except MagentoPropertySelectValue.DoesNotExist:
+                remote_value = None
+            else:
+                import_instance.set_remote_instance(remote_value)
+
+                if remote_value.local_instance:
+                    import_instance.instance = remote_value.local_instance
+
         import_instance.prepare_mirror_model_class(
             mirror_model_class=MagentoPropertySelectValue,
             sales_channel=self.sales_channel,
@@ -279,7 +315,8 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
                 "local_instance": "*",
             },
             mirror_model_defaults={
-                "remote_property": remote_property
+                "remote_property": remote_property,
+                "remote_id": str(value_data.value),
             }
         )
 
@@ -464,7 +501,8 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
 
         return images, image_id_map
 
-    def get_product_attributes(self, custom_attributes: dict, translation_product_map: Optional[dict] = None):
+    def get_product_attributes(self, custom_attributes: dict, translation_product_map: Optional[dict] = None,
+                               product_sku: Optional[str] = None):
         attributes = []
         mirror_map = {}
         accepted_properties = self.remote_local_property_map.keys()
@@ -487,13 +525,40 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
                 value_is_id = True
 
                 if property.type == Property.TYPES.SELECT:
-                    magento_select_value = MagentoPropertySelectValue.objects.get(
-                        sales_channel=self.sales_channel,
-                        multi_tenant_company=self.import_process.multi_tenant_company,
-                        remote_property=magento_property,
-                        remote_id=magento_value
-                    )
-                    value = magento_select_value.local_instance.id
+                    try:
+                        magento_select_value = MagentoPropertySelectValue.objects.get(
+                            sales_channel=self.sales_channel,
+                            multi_tenant_company=self.import_process.multi_tenant_company,
+                            remote_property=magento_property,
+                            remote_id=magento_value
+                        )
+                        value = magento_select_value.local_instance.id
+                    except MagentoPropertySelectValue.DoesNotExist:
+                        self.register_missing_select_value_record(
+                            product_sku=product_sku,
+                            attribute_code=attribute_code,
+                            magento_property=magento_property,
+                            magento_value=magento_value,
+                        )
+
+                        if not self.import_process.skip_broken_records:
+                            raise
+
+                        continue
+                    except MagentoPropertySelectValue.MultipleObjectsReturned as exc:
+                        params = {
+                            "sales_channel_id": getattr(self.sales_channel, "id", None),
+                            "multi_tenant_company_id": getattr(self.import_process.multi_tenant_company, "id", None),
+                            "remote_property_id": getattr(magento_property, "id", None),
+                            "remote_property_remote_id": getattr(magento_property, "remote_id", None),
+                            "remote_id": magento_value,
+                        }
+                        message = (
+                            "Multiple MagentoPropertySelectValue objects returned for "
+                            f"parameters: {params}"
+                        )
+                        logger.error(message)
+                        raise MagentoPropertySelectValue.MultipleObjectsReturned(message) from exc
 
                 else:  # MULTISELECT
                     select_values_ids = magento_value.split(',')
@@ -532,6 +597,30 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
             }
 
         return attributes, mirror_map
+
+    def register_missing_select_value_record(self, product_sku: Optional[str], attribute_code: str,
+                                             magento_property: MagentoProperty, magento_value):
+        record = {
+            "step": "product_attributes",
+            "sku": product_sku,
+            "attribute_code": attribute_code,
+            "remote_property_id": getattr(magento_property, "remote_id", None),
+            "remote_value": str(magento_value),
+            "error": "MagentoPropertySelectValue matching query does not exist.",
+        }
+
+        self._add_broken_record(record=record)
+
+    def register_product_processing_error(self, product: MagentoApiProduct, exc: Exception):
+        record = {
+            "step": "product_import",
+            "sku": getattr(product, "sku", None),
+            "remote_id": getattr(product, "id", None) or getattr(product, "entity_id", None),
+            "error": str(exc),
+            "traceback": traceback.format_exc(),
+        }
+
+        self._add_broken_record(record=record)
 
     def get_product_prices(self, product: MagentoApiProduct,
                            currency_product_map=None):
@@ -663,7 +752,7 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
         structured_data['images'], structured_data['__image_index_to_remote_id'] = self.get_product_images(product)
 
         if product_type == Product.SIMPLE:
-            structured_data['properties'], structured_data['__mirror_product_properties_map'] = self.get_product_attributes(custom_attributes, translation_map)
+            structured_data['properties'], structured_data['__mirror_product_properties_map'] = self.get_product_attributes(custom_attributes, translation_map, product.sku)
             structured_data['prices'] = self.get_product_prices(product, currency_map)
 
         elif product_type == Product.CONFIGURABLE:
@@ -846,48 +935,53 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
                 product_batch = [product_batch]
 
             for product in product_batch:
+                try:
+                    is_variation = self.is_magento_variation(product)
+                    rule = self.get_product_rule(product)
+                    structured_data = self.get_product_data(product, rule)
 
-                is_variation = self.is_magento_variation(product)
-                rule = self.get_product_rule(product)
-                structured_data = self.get_product_data(product, rule)
+                    if not structured_data:
+                        continue
 
-                if not structured_data:
+                    product_import_instance = ImportProductInstance(
+                        data=structured_data,
+                        import_process=self.import_process,
+                        rule=rule,
+                    )
+
+                    # This is creating the remote_id and is actually
+                    # your "import_instance".
+                    product_import_instance.prepare_mirror_model_class(
+                        mirror_model_class=MagentoProduct,
+                        sales_channel=self.sales_channel,
+                        mirror_model_map={
+                            "local_instance": "*",
+                        },
+                        mirror_model_defaults={
+                            "remote_sku": product.sku,
+                        }
+                    )
+
+                    product_import_instance.process()
+
+                    self.update_remote_product(product_import_instance, product, is_variation)
+                    self.create_log_instance(product_import_instance, structured_data)
+                    self.handle_ean_code(product_import_instance)
+                    self.handle_attributes(product_import_instance)
+                    self.handle_translations(product_import_instance)
+                    self.handle_prices(product_import_instance)
+                    self.handle_images(product_import_instance)
+                    self.handle_variations(product_import_instance, rule)
+
+                    if not is_variation:
+                        self.handle_sales_channels_views(product_import_instance, product)
+
+                    self.update_percentage()
+                except Exception as exc:
+                    self.register_product_processing_error(product, exc)
+                    if not self.import_process.skip_broken_records:
+                        raise
                     continue
-
-                product_import_instance = ImportProductInstance(
-                    data=structured_data,
-                    import_process=self.import_process,
-                    rule=rule,
-                )
-
-                # This is creating the remote_id and is actually
-                # your "import_instance".
-                product_import_instance.prepare_mirror_model_class(
-                    mirror_model_class=MagentoProduct,
-                    sales_channel=self.sales_channel,
-                    mirror_model_map={
-                        "local_instance": "*",
-                    },
-                    mirror_model_defaults={
-                        "remote_sku": product.sku,
-                    }
-                )
-
-                product_import_instance.process()
-
-                self.update_remote_product(product_import_instance, product, is_variation)
-                self.create_log_instance(product_import_instance, structured_data)
-                self.handle_ean_code(product_import_instance)
-                self.handle_attributes(product_import_instance)
-                self.handle_translations(product_import_instance)
-                self.handle_prices(product_import_instance)
-                self.handle_images(product_import_instance)
-                self.handle_variations(product_import_instance, rule)
-
-                if not is_variation:
-                    self.handle_sales_channels_views(product_import_instance, product)
-
-                self.update_percentage()
 
             try:
                 product_batch = products_api.next()

@@ -66,9 +66,11 @@ class ImportImageInstance(AbstractImportInstance):
         Securely downloads an image from the given HTTPS URL.
         Returns a temporary file object if successful; otherwise, returns None.
         """
-        if not self.image_url.startswith("https://"):
-            self.skip_create = True
-            return None
+        # @TODO: Temporary remove unitl we decide
+        # if not self.image_url.startswith("https://"):
+        #     self.skip_create = True
+        #     return None
+
         try:
             response = requests.get(self.image_url, stream=True, timeout=10)
             response.raise_for_status()

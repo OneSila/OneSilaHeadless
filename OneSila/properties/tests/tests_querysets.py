@@ -128,3 +128,65 @@ class PropertySelectValueQuerySetTest(TestCase):
             vals = [v.value for v in qs]
 
         self.assertEqual(set(vals), {"Val 0", "Val 1"})
+
+
+class PropertySelectValueSearchQuerySetTest(TestCase):
+    def test_literal_exact_match_search(self):
+        property_instance, _ = Property.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            internal_name='size',
+            defaults={
+                'type': Property.TYPES.SELECT,
+                'is_public_information': True,
+            },
+        )
+        PropertyTranslation.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=property_instance,
+            language=self.multi_tenant_company.language,
+            defaults={
+                'name': 'Size',
+                'multi_tenant_company': self.multi_tenant_company,
+            },
+        )
+
+        for index in range(5000):
+            value_instance = PropertySelectValue.objects.create(
+                property=property_instance,
+                multi_tenant_company=self.multi_tenant_company,
+            )
+            PropertySelectValueTranslation.objects.create(
+                propertyselectvalue=value_instance,
+                language=self.multi_tenant_company.language,
+                value=f"{index}S value",
+                multi_tenant_company=self.multi_tenant_company,
+            )
+
+        exact_match = PropertySelectValue.objects.create(
+            property=property_instance,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            propertyselectvalue=exact_match,
+            language=self.multi_tenant_company.language,
+            value="S",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        queryset, _ = PropertySelectValue.objects.filter(
+            property=property_instance,
+            multi_tenant_company=self.multi_tenant_company,
+        ).get_search_results(
+            search_term='"S"',
+            search_fields=PropertySelectValue._meta.search_terms,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        self.assertEqual(queryset.count(), 1)
+
+        result = queryset.first()
+        self.assertIsNotNone(result)
+        self.assertEqual(
+            result.value,
+            "S",
+        )

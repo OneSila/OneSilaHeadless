@@ -1,6 +1,6 @@
+import inspect
 import traceback
 from functools import wraps
-import inspect
 
 def handle_import_exception(func):
 
@@ -33,7 +33,7 @@ def handle_import_exception(func):
                     'error': str(e),
                     'traceback': traceback.format_exc(),
                 }
-                self._broken_records.append(record)
+                self._add_broken_record(record=record)
             else:
                 raise
 
