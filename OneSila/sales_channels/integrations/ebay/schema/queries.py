@@ -22,5 +22,5 @@ class EbaySalesChannelsQuery:
     ebay_property_select_value: EbayPropertySelectValueType = node()
     ebay_property_select_values: DjangoListConnection[EbayPropertySelectValueType] = connection()
 
-    ebay_channel_view: EbaySalesChannelViewType = node()
-    ebay_channel_views: DjangoListConnection[EbaySalesChannelViewType] = connection()
+    ebay_sales_channel_view: EbaySalesChannelViewType = node()
+    ebay_sales_channel_views: DjangoListConnection[EbaySalesChannelViewType] = connection()
