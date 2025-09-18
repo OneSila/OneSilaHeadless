@@ -21,6 +21,15 @@ DATABASES = {
     }
 }
 
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "agent-default",
+    }
+}
+
 # Static/media roots in /tmp
 STATIC_ROOT = os.path.join(tempfile.gettempdir(), "static")
 MEDIA_ROOT = os.path.join(tempfile.gettempdir(), "media")
