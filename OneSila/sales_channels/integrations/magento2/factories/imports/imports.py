@@ -242,8 +242,26 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
 
     def get_structured_select_value_data(self, value_data: AttributeOption):
 
+        structured_value = value_data.label
+        translations_dict = getattr(value_data, 'translations', None)
+
+        if translations_dict:
+            preferred_language = getattr(self.multi_tenant_company, 'language', None)
+            if preferred_language:
+                preferred_translation = translations_dict.get(preferred_language)
+                if preferred_translation:
+                    structured_value = preferred_translation
+                else:
+                    first_translation = next(iter(translations_dict.values()), None)
+                    if first_translation:
+                        structured_value = first_translation
+            else:
+                first_translation = next(iter(translations_dict.values()), None)
+                if first_translation:
+                    structured_value = first_translation
+
         structured_data = {
-            'value': value_data.label,
+            'value': structured_value,
         }
 
         if hasattr(value_data, 'translations'):
