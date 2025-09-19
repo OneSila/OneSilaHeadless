@@ -173,6 +173,13 @@ class EbayProductType(RemoteObjectMixin, models.Model):
         null=True,
         help_text="Local product type rule associated with this category.",
     )
+    marketplace = models.ForeignKey(
+        'ebay.EbaySalesChannelView',
+        on_delete=models.CASCADE,
+        related_name='product_types',
+        null=True,
+        help_text="Marketplace in which this category applies.",
+    )
     name = models.CharField(
         max_length=255,
         null=True,
@@ -194,9 +201,9 @@ class EbayProductType(RemoteObjectMixin, models.Model):
         verbose_name_plural = _("eBay Product Types")
         constraints = [
             models.UniqueConstraint(
-                fields=['sales_channel', 'remote_id'],
+                fields=['marketplace', 'remote_id'],
                 condition=models.Q(remote_id__isnull=False),
-                name='unique_ebayproducttype_remote_id_per_channel',
+                name='unique_ebayproducttype_remote_id_per_marketplace',
             ),
             models.UniqueConstraint(
                 fields=['sales_channel', 'local_instance'],
