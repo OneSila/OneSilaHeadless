@@ -64,6 +64,10 @@ class EbayPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
         'PropertyType',
         lazy("properties.schema.types.types")
     ]]
+    marketplace: Annotated[
+        'SalesChannelViewType',
+        lazy("sales_channels.schema.types.types")
+    ]
     select_values: List[Annotated[
         'EbayPropertySelectValueType',
         lazy("sales_channels.integrations.ebay.schema.types.types")
