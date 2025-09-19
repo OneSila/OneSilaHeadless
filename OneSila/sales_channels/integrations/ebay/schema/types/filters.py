@@ -11,6 +11,15 @@ from sales_channels.integrations.ebay.models import (
 )
 from properties.schema.types.filters import PropertyFilter, PropertySelectValueFilter
 from sales_channels.schema.types.filters import SalesChannelFilter, SalesChannelViewFilter
+from sales_channels.integrations.ebay.managers import (
+    EbayPropertyQuerySet,
+    EbayPropertySelectValueQuerySet,
+)
+from sales_channels.schema.types.filter_mixins import (
+    DependentMappedLocallyFilterMixin,
+    GeneralMappedLocallyFilterMixin,
+    GeneralMappedRemotelyFilterMixin,
+)
 
 
 @filter(EbaySalesChannel)
@@ -20,16 +29,21 @@ class EbaySalesChannelFilter(SearchFilterMixin):
 
 
 @filter(EbayProperty)
-class EbayPropertyFilter(SearchFilterMixin):
+class EbayPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
     allow_multiple: auto
     # type: auto
 
+    mapped_locally_querysets = (
+        (EbayPropertyQuerySet, "filter_mapped_locally"),
+        (EbayPropertySelectValueQuerySet, "filter_ebay_property_mapped_locally"),
+    )
+
 
 @filter(EbayInternalProperty)
-class EbayInternalPropertyFilter(SearchFilterMixin):
+class EbayInternalPropertyFilter(SearchFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
@@ -38,7 +52,7 @@ class EbayInternalPropertyFilter(SearchFilterMixin):
 
 
 @filter(EbayPropertySelectValue)
-class EbayPropertySelectValueFilter(SearchFilterMixin):
+class EbayPropertySelectValueFilter(SearchFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     ebay_property: Optional[EbayPropertyFilter]
