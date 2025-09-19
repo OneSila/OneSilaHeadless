@@ -146,28 +146,16 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
             logger.warning("Unable to determine remote_id for eBay category. Skipping sync.")
             return None
 
-        product_type = EbayProductType.objects.filter(
+        defaults: dict[str, Any] = {}
+        if name:
+            defaults["name"] = name
+        product_type, _ = EbayProductType.objects.get_or_create(
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
             marketplace=self.view,
             remote_id=str(remote_id),
-        ).first()
-
-        if product_type is None:
-            product_type = EbayProductType.objects.filter(
-                sales_channel=self.sales_channel,
-                multi_tenant_company=self.multi_tenant_company,
-                marketplace__isnull=True,
-                remote_id=str(remote_id),
-            ).first()
-
-        if product_type is None:
-            product_type = EbayProductType.objects.create(
-                sales_channel=self.sales_channel,
-                multi_tenant_company=self.multi_tenant_company,
-                marketplace=self.view,
-                remote_id=str(remote_id),
-            )
+            defaults=defaults,
+        )
 
         update_fields: list[str] = []
         if product_type.marketplace_id != getattr(self.view, "id", None):
