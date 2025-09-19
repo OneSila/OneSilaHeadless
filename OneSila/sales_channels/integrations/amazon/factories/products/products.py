@@ -661,7 +661,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             theme = self._get_variation_theme(self.local_instance)
 
         if theme:
-            attrs["variation_theme"] = [{"name": theme}]
+            attrs["variation_theme"] = [{"name": theme, "marketplace_id": self.view.remote_id}]
 
         if self.is_variation:
             attrs["parentage_level"] = [
