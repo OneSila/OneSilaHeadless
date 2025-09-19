@@ -24,6 +24,7 @@ class ProductInput:
     name: str
     alias_copy_images: bool
     alias_copy_product_properties: bool
+    alias_copy_content: bool = True
 
 
 @partial(Product, fields="__all__")
