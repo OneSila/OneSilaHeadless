@@ -95,8 +95,9 @@ def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelI
         woocommerce_import_db_task(import_process=instance, sales_channel=sales_channel)
 
     elif isinstance(sales_channel, AmazonSalesChannel):
-        refresh_subscription_receiver(sales_channel)
-        amazon_import_db_task(import_process=instance, sales_channel=sales_channel)
+        if instance.status == AmazonSalesChannelImport.STATUS_NEW or instance.status == AmazonSalesChannelImport.STATUS_PENDING:
+            refresh_subscription_receiver(sales_channel)
+            amazon_import_db_task(import_process=instance, sales_channel=sales_channel)
 
     else:
         logger.warning(f"Sales channel {type(sales_channel)} is not supported in post_create.")
