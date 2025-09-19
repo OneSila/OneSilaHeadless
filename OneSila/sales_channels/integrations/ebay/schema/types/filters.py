@@ -36,10 +36,11 @@ class EbayPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin, G
     allows_unmapped_values: auto
     type: auto
 
-    # mapped_locally_querysets = (
-    #     (EbayPropertyQuerySet, "filter_mapped_locally"),
-    #     (EbayPropertySelectValueQuerySet, "filter_ebay_property_mapped_locally"),
-    # )
+    def get_mapped_locally_querysets(self):
+        return (
+            (EbayPropertyQuerySet, "filter_mapped_locally"),
+            (EbayPropertySelectValueQuerySet, "filter_ebay_property_mapped_locally"),
+        )
 
 
 @filter(EbayInternalProperty)
