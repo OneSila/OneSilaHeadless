@@ -359,7 +359,7 @@ class AmazonVariationThemeTest(DisableWooCommerceSignalsMixin, TestCase, AmazonP
         )
         attrs = fac.build_variation_attributes()
 
-        expected_theme = [{"name": "COLOR/SIZE", "marketplace_id": self.view.remote_id}]
+        expected_theme = [{"name": "COLOR/SIZE"}]
         expected_parentage = [{"value": "child", "marketplace_id": self.view.remote_id}]
         expected_rel = [
             {

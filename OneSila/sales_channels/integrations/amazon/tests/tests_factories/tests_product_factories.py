@@ -720,6 +720,34 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             [],
         )
 
+    def test_build_patches_skips_existing_variation_theme(self):
+        mixin = GetAmazonAPIMixin()
+        current = {"variation_theme": [{"name": "COLOR/SIZE"}]}
+        new = {"variation_theme": [{"name": "COLOR/SIZE"}]}
+
+        self.assertEqual(mixin._build_patches(current, new), [])
+
+    def test_build_patches_appends_missing_variation_theme(self):
+        mixin = GetAmazonAPIMixin()
+        current = {"variation_theme": [{"name": "COLOR/SIZE", "marketplace_id": "GB"}]}
+        new = {"variation_theme": [{"name": "SIZE"}]}
+
+        patches = mixin._build_patches(current, new)
+
+        self.assertEqual(
+            patches,
+            [
+                {
+                    "op": "replace",
+                    "path": "/attributes/variation_theme",
+                    "value": [
+                        {"name": "COLOR/SIZE", "marketplace_id": "GB"},
+                        {"name": "SIZE"},
+                    ],
+                }
+            ],
+        )
+
     def test_replace_tokens_drops_empty_units(self):
         mixin = AmazonProductPropertyBaseMixin()
         data = {
@@ -2603,7 +2631,7 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
         child_body = next(b for b in bodies if b["attributes"].get("parentage_level", [{}])[0]["value"] == "child")
 
         # Shared expectations
-        expected_theme = [{"name": "COLOR/SIZE", "marketplace_id": self.view.remote_id}]
+        expected_theme = [{"name": "COLOR/SIZE"}]
 
         self.assertEqual(parent_body["attributes"].get("variation_theme"), expected_theme)
         self.assertEqual(parent_body["attributes"].get("parentage_level"),
@@ -2649,7 +2677,7 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
 
         body = mock_instance.put_listings_item.call_args.kwargs.get("body")
         attrs = body.get("attributes", {})
-        expected_theme = [{"name": "COLOR/SIZE", "marketplace_id": self.view.remote_id}]
+        expected_theme = [{"name": "COLOR/SIZE"}]
         expected_parentage = [{"value": "child", "marketplace_id": self.view.remote_id}]
         expected_rel = [
             {
