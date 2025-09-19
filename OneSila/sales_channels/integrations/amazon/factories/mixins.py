@@ -2,7 +2,6 @@ from core.logging_helpers import timeit_and_log
 from properties.models import Property, PropertyTranslation
 from sales_channels.integrations.amazon.constants import AMAZON_PATCH_SKIP_KEYS
 from sales_channels.integrations.amazon.models.properties import AmazonProperty
-import copy
 import json
 
 from django.conf import settings
@@ -496,33 +495,6 @@ class GetAmazonAPIMixin:
             if key in skip_keys:
                 continue
             current_value = current_attributes.get(key)
-
-            if key == "variation_theme" and isinstance(new_value, list):
-                current_list = current_value if isinstance(current_value, list) else []
-                current_copy = copy.deepcopy(current_list)
-                existing_names = {
-                    item.get("name")
-                    for item in current_copy
-                    if isinstance(item, dict) and item.get("name")
-                }
-
-                merged_value = copy.deepcopy(current_copy)
-                added = False
-                for item in new_value:
-                    if not isinstance(item, dict):
-                        continue
-                    name = item.get("name")
-                    if not name or name in existing_names:
-                        continue
-                    merged_value.append(item)
-                    existing_names.add(name)
-                    added = True
-
-                if added:
-                    new_value = merged_value
-                    current_value = current_copy
-                elif existing_names:
-                    continue
 
             new_value = clean(new_value)
             path = f"/attributes/{key}"
