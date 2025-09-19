@@ -14,6 +14,12 @@ from sales_channels.models.properties import (
 from sales_channels.integrations.ebay.constants import (
     EBAY_INTERNAL_PROPERTY_DEFAULTS,
 )
+from sales_channels.integrations.ebay.managers import (
+    EbayInternalPropertyManager,
+    EbayProductTypeManager,
+    EbayPropertyManager,
+    EbayPropertySelectValueManager,
+)
 
 
 class EbayProperty(RemoteProperty):
@@ -58,6 +64,8 @@ class EbayProperty(RemoteProperty):
         blank=True,
         help_text="Format specification returned by eBay (aspectFormat).",
     )
+
+    objects = EbayPropertyManager()
 
     class Meta:
         verbose_name = _("eBay Property")
@@ -108,6 +116,8 @@ class EbayInternalProperty(RemoteObjectMixin, models.Model):
     def __str__(self):
         return f"{self.code} ({self.sales_channel})"
 
+    objects = EbayInternalPropertyManager()
+
 class EbayPropertySelectValue(RemoteObjectMixin, models.Model):
     """eBay attribute value model with localization support."""
 
@@ -149,6 +159,8 @@ class EbayPropertySelectValue(RemoteObjectMixin, models.Model):
     def __str__(self):
         return f"{self.localized_value} ({self.marketplace})"
 
+    objects = EbayPropertySelectValueManager()
+
 
 class EbayProductType(RemoteObjectMixin, models.Model):
     """eBay product type (category) representation."""
@@ -172,6 +184,8 @@ class EbayProductType(RemoteObjectMixin, models.Model):
         help_text="Category name translated into the company language.",
     )
     imported = models.BooleanField(default=True)
+
+    objects = EbayProductTypeManager()
 
     class Meta:
         verbose_name = _("eBay Product Type")

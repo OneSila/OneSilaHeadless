@@ -69,6 +69,14 @@ class EbayPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
         lazy("sales_channels.integrations.ebay.schema.types.types")
     ]]
 
+    @field()
+    def mapped_locally(self, info) -> bool:
+        return self.mapped_locally
+
+    @field()
+    def mapped_remotely(self, info) -> bool:
+        return self.mapped_remotely
+
 
 @type(
     EbayInternalProperty,
@@ -86,6 +94,14 @@ class EbayInternalPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
         'PropertyType',
         lazy("properties.schema.types.types")
     ]]
+
+    @field()
+    def mapped_locally(self, info) -> bool:
+        return self.mapped_locally
+
+    @field()
+    def mapped_remotely(self, info) -> bool:
+        return self.mapped_remotely
 
 
 @type(
@@ -109,6 +125,14 @@ class EbayPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
         'PropertySelectValueType',
         lazy("properties.schema.types.types")
     ]]
+
+    @field()
+    def mapped_locally(self, info) -> bool:
+        return self.mapped_locally
+
+    @field()
+    def mapped_remotely(self, info) -> bool:
+        return self.mapped_remotely
 
 
 @type(
