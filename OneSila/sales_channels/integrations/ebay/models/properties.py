@@ -102,6 +102,8 @@ class EbayInternalProperty(RemoteObjectMixin, models.Model):
         help_text="Defines if the value belongs to the inventory item payload root.",
     )
 
+    objects = EbayInternalPropertyManager()
+
     class Meta:
         verbose_name = _("eBay Internal Property")
         verbose_name_plural = _("eBay Internal Properties")
@@ -116,7 +118,7 @@ class EbayInternalProperty(RemoteObjectMixin, models.Model):
     def __str__(self):
         return f"{self.code} ({self.sales_channel})"
 
-    objects = EbayInternalPropertyManager()
+
 
 class EbayPropertySelectValue(RemoteObjectMixin, models.Model):
     """eBay attribute value model with localization support."""
@@ -150,6 +152,8 @@ class EbayPropertySelectValue(RemoteObjectMixin, models.Model):
         help_text="Aspect value translated into the company language.",
     )
 
+    objects = EbayPropertySelectValueManager()
+
     class Meta:
         verbose_name = _("eBay Property Value")
         verbose_name_plural = _("eBay Property Values")
@@ -158,8 +162,6 @@ class EbayPropertySelectValue(RemoteObjectMixin, models.Model):
 
     def __str__(self):
         return f"{self.localized_value} ({self.marketplace})"
-
-    objects = EbayPropertySelectValueManager()
 
 
 class EbayProductType(RemoteObjectMixin, models.Model):
