@@ -1,8 +1,9 @@
+from types import SimpleNamespace
+
 from imports_exports.models import Import
 from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonProductItemFactory
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.helpers import serialize_listing_item
-from sales_channels.integrations.amazon.models import AmazonSalesChannelImport
 from spapi.rest import ApiException
 
 
@@ -23,13 +24,17 @@ class AmazonProductImportFactory(GetAmazonAPIMixin):
 
     def _create_import_process(self):
         identifier = self.product.sku or self.product.id
-        return AmazonSalesChannelImport.objects.create(
-            sales_channel=self.sales_channel,
-            multi_tenant_company=self.sales_channel.multi_tenant_company,
-            type=AmazonSalesChannelImport.TYPE_PRODUCTS,
+
+        return SimpleNamespace(
+            multi_tenant_company=self.product.multi_tenant_company,
             name=f"Manual Amazon product refresh - {identifier}",
-            total_records=1,
             status=Import.STATUS_PROCESSING,
+            percentage=0,
+            broken_records=[],
+            save=lambda *args, **kwargs: None,
+            create_only=False,
+            update_only=False,
+            id=None,
         )
 
     def _get_listing_payload(self):
@@ -75,8 +80,8 @@ class AmazonProductImportFactory(GetAmazonAPIMixin):
                 product_data=product_data,
                 import_process=import_process,
                 sales_channel=self.sales_channel,
-                is_last=True,
-                updated_with=1,
+                is_last=False,
+                updated_with=None,
             )
             factory.run()
         except Exception:
