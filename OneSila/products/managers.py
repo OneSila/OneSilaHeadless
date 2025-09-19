@@ -255,6 +255,7 @@ class AliasProductQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
             for trans in default_translations:
                 alias_translation, created = ProductTranslation.objects.get_or_create(
                     product=alias_product,
+                    multi_tenant_company=alias_product.multi_tenant_company,
                     language=trans.language,
                     sales_channel=None,
                     defaults={
