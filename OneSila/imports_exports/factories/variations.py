@@ -270,6 +270,7 @@ class ImportAliasVariationInstance(AbstractImportInstance):
         - `parent_product` (product it points to)
         - `alias_copy_images` (bool)
         - `alias_copy_product_properties` (bool)
+        - `alias_copy_content` (bool)
     """
 
     def __init__(self, data: dict, import_process=None, parent_product=None, alias_product=None, instance=None, sales_channel=None):
@@ -282,6 +283,7 @@ class ImportAliasVariationInstance(AbstractImportInstance):
         self.set_field_if_exists('parent_product_data')
         self.set_field_if_exists('alias_copy_images', default_value=False)
         self.set_field_if_exists('alias_copy_product_properties', default_value=False)
+        self.set_field_if_exists('alias_copy_content', default_value=True)
 
         if hasattr(self, 'variation_data'):
             if isinstance(self.variation_data, dict):
@@ -321,11 +323,16 @@ class ImportAliasVariationInstance(AbstractImportInstance):
 
     def process_logic(self):
 
-        if self.created and (self.alias_copy_images or self.alias_copy_product_properties):
+        if self.created and (
+            self.alias_copy_images
+            or self.alias_copy_product_properties
+            or self.alias_copy_content
+        ):
             AliasProduct.objects.copy_from_parent(
                 self.alias_product,
                 copy_images=self.alias_copy_images,
-                copy_properties=self.alias_copy_product_properties
+                copy_properties=self.alias_copy_product_properties,
+                copy_content=self.alias_copy_content,
             )
 
         self.instance = self.alias_product

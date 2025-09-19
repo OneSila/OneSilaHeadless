@@ -10,6 +10,7 @@ from products.models import (
     AliasProduct,
     ProductTranslation,
     Product,
+    ProductTranslationBulletPoint,
 )
 from media.models import Media, MediaProductThrough
 from properties.models import Property, PropertyTranslation, ProductProperty, ProductPropertyTextTranslation
@@ -30,6 +31,70 @@ class AlasProductTestCase(TestCase):
             alias_parent_product=simple_product
         )
         self.assertIsNotNone(alias_product.sku)
+
+    def test_copy_from_parent_copies_default_translations(self):
+        parent = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company
+        )
+        translation = ProductTranslation.objects.create(
+            product=parent,
+            language=self.multi_tenant_company.language,
+            name="Parent name",
+            short_description="Parent short",
+            description="Parent description",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductTranslationBulletPoint.objects.create(
+            product_translation=translation,
+            text="First",
+            sort_order=0,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        alias = AliasProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            alias_parent_product=parent,
+        )
+
+        AliasProduct.objects.copy_from_parent(alias)
+
+        alias_translation = alias.translations.get(
+            language=self.multi_tenant_company.language,
+            sales_channel=None,
+        )
+        self.assertEqual(alias_translation.name, "Parent name")
+        self.assertEqual(alias_translation.short_description, "Parent short")
+        self.assertEqual(alias_translation.description, "Parent description")
+        self.assertEqual(alias_translation.bullet_points.count(), 1)
+        self.assertEqual(
+            alias_translation.bullet_points.first().text,
+            "First",
+        )
+
+    def test_copy_from_parent_skips_content_when_disabled(self):
+        parent = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company
+        )
+        ProductTranslation.objects.create(
+            product=parent,
+            language=self.multi_tenant_company.language,
+            name="Parent name",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        alias = AliasProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            alias_parent_product=parent,
+        )
+
+        AliasProduct.objects.copy_from_parent(alias, copy_content=False)
+
+        self.assertFalse(
+            alias.translations.filter(
+                language=self.multi_tenant_company.language,
+                sales_channel=None,
+            ).exists()
+        )
 
 
 class ProductModelTest(TestCase):
