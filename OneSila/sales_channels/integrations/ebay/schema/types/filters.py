@@ -5,11 +5,16 @@ from core.schema.core.types.types import auto
 from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
     EbayInternalProperty,
+    EbayProductType,
     EbayProperty,
     EbayPropertySelectValue,
     EbaySalesChannelView,
 )
-from properties.schema.types.filters import PropertyFilter, PropertySelectValueFilter
+from properties.schema.types.filters import (
+    ProductPropertiesRuleFilter,
+    PropertyFilter,
+    PropertySelectValueFilter,
+)
 from sales_channels.schema.types.filters import SalesChannelFilter, SalesChannelViewFilter
 from sales_channels.integrations.ebay.managers import (
     EbayPropertyQuerySet,
@@ -26,6 +31,15 @@ from sales_channels.schema.types.filter_mixins import (
 class EbaySalesChannelFilter(SearchFilterMixin):
     active: auto
     hostname: auto
+
+
+@filter(EbayProductType)
+class EbayProductTypeFilter(SearchFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: Optional[ProductPropertiesRuleFilter]
+    marketplace: Optional[SalesChannelViewFilter]
+    imported: auto
 
 
 @filter(EbayProperty)

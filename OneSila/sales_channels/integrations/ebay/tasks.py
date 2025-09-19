@@ -54,3 +54,18 @@ def ebay_translate_select_value_task(select_value_id: int):
         property_code_attr="ebay_property.remote_id",
     )
     flow.flow()
+
+
+@db_task()
+def ebay_translate_product_type_task(product_type_id: int):
+    from sales_channels.integrations.ebay.models import EbayProductType
+
+    instance = EbayProductType.objects.get(id=product_type_id)
+    flow = TranslateRemotePropertyFlow(
+        instance=instance,
+        integration_label="eBay",
+        remote_name_fields=("name", "remote_id"),
+        translation_field="translated_name",
+        remote_identifier_attr="remote_id",
+    )
+    flow.flow()
