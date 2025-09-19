@@ -33,13 +33,13 @@ class EbayPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin, G
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
-    allow_multiple: auto
-    # type: auto
+    allows_unmapped_values: auto
+    type: auto
 
-    mapped_locally_querysets = (
-        (EbayPropertyQuerySet, "filter_mapped_locally"),
-        (EbayPropertySelectValueQuerySet, "filter_ebay_property_mapped_locally"),
-    )
+    # mapped_locally_querysets = (
+    #     (EbayPropertyQuerySet, "filter_mapped_locally"),
+    #     (EbayPropertySelectValueQuerySet, "filter_ebay_property_mapped_locally"),
+    # )
 
 
 @filter(EbayInternalProperty)

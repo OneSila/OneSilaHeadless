@@ -70,10 +70,10 @@ class AmazonPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin,
     allows_unmapped_values: auto
     type: auto
 
-    mapped_locally_querysets = (
-        (AmazonPropertyQuerySet, "filter_mapped_locally"),
-        (AmazonPropertySelectValueQuerySet, "filter_amazon_property_mapped_locally"),
-    )
+    # mapped_locally_querysets = (
+    #     (AmazonPropertyQuerySet, "filter_mapped_locally"),
+    #     (AmazonPropertySelectValueQuerySet, "filter_amazon_property_mapped_locally"),
+    # )
 
 
 @filter(AmazonPropertySelectValue)
