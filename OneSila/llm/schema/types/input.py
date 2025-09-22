@@ -48,6 +48,8 @@ class AITranslationInput:
     product: Optional[ProductPartialInput] = None
     product_content_type: Optional[ContentAiGenerateType] = None
     sales_channel: Optional[SalesChannelPartialInput] = None
+    return_one_bullet_point: Optional[bool] = False
+    bullet_point_index: Optional[int] = None
 
 
 @strawberry_input
@@ -63,6 +65,7 @@ class AIBulkTranslationInput:
 @partial(Product, fields="__all__")
 class ProductAiBulletPointsInput(NodeInput):
     language_code: str
+    return_one: Optional[bool] = False
 
 
 @input(BrandCustomPrompt, fields="__all__")
