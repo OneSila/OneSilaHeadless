@@ -1,5 +1,6 @@
 from core.schema.core.mutations import create, update, delete, type, List
 from core.schema.core.extensions import default_extensions
+from core.schema.core.helpers import get_multi_tenant_company
 import strawberry_django
 from strawberry import Info
 
@@ -28,9 +29,14 @@ class WebhooksMutation:
         from webhooks.factories import SendWebhookDeliveryFactory
         from webhooks.models import WebhookDelivery
 
-        delivery = WebhookDelivery.objects.select_related("webhook_integration", "outbox").get(
-            id=instance.id.node_id
-        )
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        try:
+            delivery = WebhookDelivery.objects.select_related("webhook_integration", "outbox").get(
+                id=instance.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            )
+        except WebhookDelivery.DoesNotExist:
+            raise PermissionError("Invalid company")
         factory = SendWebhookDeliveryFactory(
             outbox_id=delivery.outbox_id, delivery_id=delivery.pk
         )
@@ -44,6 +50,13 @@ class WebhooksMutation:
     ) -> WebhookIntegrationType:
         from webhooks.models import WebhookIntegration
 
-        integration = WebhookIntegration.objects.get(id=instance.id.node_id)
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        try:
+            integration = WebhookIntegration.objects.get(
+                id=instance.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            )
+        except WebhookIntegration.DoesNotExist:
+            raise PermissionError("Invalid company")
         integration.regenerate_secret()
         return integration
