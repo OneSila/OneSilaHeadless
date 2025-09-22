@@ -9,7 +9,7 @@ class ShopifyPriceUpdateFactory(GetShopifyApiMixin, RemotePriceUpdateFactory):
     remote_model_class = ShopifyPrice
 
     def get_local_product(self):
-        return self.remote_product.product
+        return self.remote_product.local_instance
 
     def update_remote(self):
         gql = self.api.GraphQL()
