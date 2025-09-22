@@ -141,8 +141,12 @@ class ProductsMutation:
         create_as_alias: bool = False,
     ) -> ProductType:
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        instance = Product.objects.get(id=product.id.node_id)
-        if instance.multi_tenant_company != multi_tenant_company:
+        try:
+            instance = Product.objects.get(
+                id=product.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            )
+        except Product.DoesNotExist:
             raise PermissionError("Invalid company")
         duplicated = Product.objects.duplicate_product(
             instance, sku=sku, create_as_alias=create_as_alias
