@@ -54,7 +54,11 @@ class LlmMutation:
 
         product = Product.objects.get(id=instance.id.node_id, multi_tenant_company=multi_tenant_company)
 
-        flow = AIGenerateBulletPointsFlow(product=product, language=instance.language_code)
+        flow = AIGenerateBulletPointsFlow(
+            product=product,
+            language=instance.language_code,
+            return_one=instance.return_one or False,
+        )
         flow.flow()
 
         bullets = [BulletPoint(text=bp) for bp in flow.generated_points]
@@ -83,7 +87,8 @@ class LlmMutation:
                                                    to_language_code=instance.to_language_code,
                                                    product=product,
                                                    content_type=content_type,
-                                                   sales_channel=sales_channel)
+                                                   sales_channel=sales_channel,
+                                                   return_one_bullet_point=instance.return_one_bullet_point or False)
         content_generator.flow()
 
         return AiContent(content=content_generator.translated_content, points=content_generator.used_points)
