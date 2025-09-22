@@ -88,10 +88,13 @@ class LlmMutation:
                                                    product=product,
                                                    content_type=content_type,
                                                    sales_channel=sales_channel,
-                                                   return_one_bullet_point=instance.return_one_bullet_point or False)
+                                                   return_one_bullet_point=instance.return_one_bullet_point or False,
+                                                   bullet_point_index=instance.bullet_point_index)
         content_generator.flow()
 
-        return AiContent(content=content_generator.translated_content, points=content_generator.used_points)
+        return AiContent(content=content_generator.translated_content,
+                         points=content_generator.used_points,
+                         bullet_point_index=content_generator.bullet_point_index)
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def bulk_translate_ai_content(self, instance: AIBulkTranslationInput, info: Info) -> AiTaskResponse:
