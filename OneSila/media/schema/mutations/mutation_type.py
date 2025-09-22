@@ -42,10 +42,10 @@ class MediaMutation:
     delete_videos: List[VideoType] = delete(is_bulk=True)
 
     create_mediaproducthrough: MediaProductThroughType = create(MediaProductThroughInput)
-    create_mediaproducthroughs: List[MediaProductThroughType] = create(MediaProductThroughInput)
+    create_mediaproducthroughs: List[MediaProductThroughType] = create(List[MediaProductThroughInput])
     update_mediaproducthrough: MediaProductThroughType = update(MediaProductThroughPartialInput)
     delete_mediaproducthrough: MediaProductThroughType = delete()
-    delete_mediaproducthroughs: List[MediaProductThroughType] = delete()
+    delete_mediaproducthroughs: List[MediaProductThroughType] = delete(is_bulk=True)
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def upload_images_from_urls(self, urls: List[ImageUrlInput], info: Info) -> List[ImageType]:

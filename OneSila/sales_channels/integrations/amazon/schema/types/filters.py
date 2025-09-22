@@ -140,6 +140,7 @@ class AmazonProductFilter(SearchFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[ProductFilter]
+    remote_parent_product: Optional[RemoteProductFilter]
 
 
 @filter(AmazonProductProperty)
@@ -182,6 +183,7 @@ class AmazonRemoteLogFilter(SearchFilterMixin):
 @filter(AmazonProductIssue)
 class AmazonProductIssueFilter(SearchFilterMixin):
     id: auto
+    is_validation_issue: auto
     view: Optional[SalesChannelViewFilter]
     remote_product: Optional[RemoteProductFilter]
 

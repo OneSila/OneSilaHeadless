@@ -46,6 +46,7 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonVariationThemeType,
 )
 from sales_channels.schema.types.input import SalesChannelViewPartialInput
+from products.schema.types.input import ProductPartialInput
 from core.schema.core.mutations import create, type, List, update, delete
 from strawberry import Info
 import strawberry_django
@@ -180,6 +181,51 @@ class AmazonSalesChannelMutation:
         factory.run()
 
         return remote_product
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def refresh_amazon_product_from_remote(
+        self,
+        product: ProductPartialInput,
+        view: AmazonSalesChannelViewPartialInput,
+        info: Info,
+    ) -> AmazonProductGraphqlType | None:
+        """Trigger a manual import for a single Amazon product."""
+        from sales_channels.integrations.amazon.models import (
+            AmazonSalesChannelView,
+        )
+        from products.models import Product
+        from sales_channels.integrations.amazon.tasks import amazon_refresh_product_import_task
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        product = Product.objects.get(
+            id=product.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        view = AmazonSalesChannelView.objects.select_related("sales_channel").get(
+            id=view.id.node_id,
+            sales_channel__multi_tenant_company=multi_tenant_company,
+        )
+
+        if view.sales_channel.multi_tenant_company_id != product.multi_tenant_company_id:
+            raise ValidationError(
+                _("Selected marketplace view does not belong to the product sales channel."),
+            )
+
+        from sales_channels.integrations.amazon.models import AmazonProduct
+
+        existing_remote_product = AmazonProduct.objects.filter(
+            sales_channel=view.sales_channel,
+            local_instance=product,
+        ).first()
+
+        amazon_refresh_product_import_task(
+            product_id=product.id,
+            view_id=view.id,
+        )
+
+        return existing_remote_product
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def resync_amazon_product(

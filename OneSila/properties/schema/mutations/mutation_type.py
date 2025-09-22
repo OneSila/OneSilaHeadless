@@ -53,7 +53,10 @@ class PropertiesMutation:
             target_id=target_id,
         )
 
-        return PropertySelectValue.objects.get(id=target_id)
+        return PropertySelectValue.objects.get(
+            id=target_id,
+            multi_tenant_company=multi_tenant_company,
+        )
 
     create_product_property: ProductPropertyType = create(ProductPropertyInput)
     create_product_properties: List[ProductPropertyType] = create(ProductPropertyInput)
@@ -77,8 +80,12 @@ class PropertiesMutation:
             translation_data = item_data.pop("translation", None)
             value_multi_select = item_data.pop("value_multi_select", UNSET)
             value_select = item_data.pop("value_select", UNSET)
-            obj = ProductProperty.objects.get(id=obj_id)
-            if obj.multi_tenant_company != multi_tenant_company:
+            try:
+                obj = ProductProperty.objects.get(
+                    id=obj_id,
+                    multi_tenant_company=multi_tenant_company,
+                )
+            except ProductProperty.DoesNotExist:
                 raise PermissionError("Invalid company")
             for field, value in item_data.items():
                 if value is not UNSET:
@@ -163,7 +170,13 @@ class PropertiesMutation:
         info: Info,
     ) -> PropertySelectValueDuplicatesType:
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        property_instance = Property.objects.get(id=property.id.node_id)
+        try:
+            property_instance = Property.objects.get(
+                id=property.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            )
+        except Property.DoesNotExist:
+            raise PermissionError("Invalid company")
         duplicates = PropertySelectValue.objects.check_for_duplicates(
             value,
             property_instance,

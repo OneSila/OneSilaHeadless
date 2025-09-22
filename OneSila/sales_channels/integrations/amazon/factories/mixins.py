@@ -380,6 +380,12 @@ class GetAmazonAPIMixin:
                 else []
             )
             if allowed_keys:
+                always_included_keys = {
+                    "variation_theme",
+                    "child_parent_sku_relationship",
+                    "parentage_level",
+                }
+                allowed_keys = set(allowed_keys) | always_included_keys
                 attributes = {k: v for k, v in (attributes or {}).items() if k in allowed_keys}
 
         return {
@@ -414,6 +420,12 @@ class GetAmazonAPIMixin:
             "VALIDATION_PREVIEW" if settings.DEBUG or force_validation_only else None,
             pprint.pformat(body),
         )
+
+        if body.get("requirements") == "LISTING_OFFER_ONLY":
+            logger.info(
+                "create_product initial attributes for LISTING_OFFER_ONLY: %s",
+                pprint.pformat(attributes),
+            )
 
         response = listings.put_listings_item(
             **self._build_listing_kwargs(sku, marketplace_id, body, force_validation_only))
@@ -495,6 +507,7 @@ class GetAmazonAPIMixin:
             if key in skip_keys:
                 continue
             current_value = current_attributes.get(key)
+
             new_value = clean(new_value)
             path = f"/attributes/{key}"
 

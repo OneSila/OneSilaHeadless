@@ -147,7 +147,7 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
 
     class Meta:
         search_terms = ['propertyselectvaluetranslation__value']
-        ordering = ('propertyselectvaluetranslation__value',)
+        ordering = ('id',)
 
 
 class PropertySelectValueTranslation(TranslationFieldsMixin, models.Model):

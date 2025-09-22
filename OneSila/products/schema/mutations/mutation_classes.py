@@ -27,7 +27,8 @@ class AliasProductCreateMutation(TranslatableCreateMutation):
             AliasProduct.objects.copy_from_parent(
                 instance,
                 copy_images=data.get("alias_copy_images", False),
-                copy_properties=data.get("alias_copy_product_properties", False)
+                copy_properties=data.get("alias_copy_product_properties", False),
+                copy_content=data.get("alias_copy_content", True),
             )
 
         instance.refresh_from_db()

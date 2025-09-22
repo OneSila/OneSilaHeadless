@@ -31,7 +31,7 @@ class PropertyFilterTranslationTestCase(TransactionTestCaseMixin, TransactionTes
         PropertyTranslation.objects.create(
             property=self.p1,
             language="en",
-            name="Color",
+            name="",
             multi_tenant_company=self.multi_tenant_company,
         )
         self.p2 = Property.objects.create(
@@ -78,14 +78,14 @@ class PropertyFilterTranslationTestCase(TransactionTestCaseMixin, TransactionTes
             PROPERTIES_MISSING_MAIN_TRANSLATION_QUERY,
             {"missingMainTranslation": True},
         )
-        self.assertSetEqual(ids, {self.p3.id})
+        self.assertSetEqual(ids, {self.p1.id, self.p3.id})
 
     def test_property_missing_main_translation_false(self):
         ids = self._query_ids(
             PROPERTIES_MISSING_MAIN_TRANSLATION_QUERY,
             {"missingMainTranslation": False},
         )
-        self.assertSetEqual(ids, {self.p1.id, self.p2.id})
+        self.assertSetEqual(ids, {self.p2.id})
 
     def test_property_missing_translations_true(self):
         ids = self._query_ids(
@@ -131,7 +131,7 @@ class PropertySelectValueFilterTranslationTestCase(TransactionTestCaseMixin, Tra
         PropertySelectValueTranslation.objects.create(
             propertyselectvalue=self.v1,
             language="en",
-            value="Red",
+            value="",
             multi_tenant_company=self.multi_tenant_company,
         )
         self.v2 = PropertySelectValue.objects.create(
@@ -174,14 +174,14 @@ class PropertySelectValueFilterTranslationTestCase(TransactionTestCaseMixin, Tra
             PROPERTY_SELECT_VALUES_MISSING_MAIN_TRANSLATION_QUERY,
             {"missingMainTranslation": True},
         )
-        self.assertSetEqual(ids, {self.v3.id})
+        self.assertSetEqual(ids, {self.v1.id, self.v3.id})
 
     def test_property_select_value_missing_main_translation_false(self):
         ids = self._query_ids(
             PROPERTY_SELECT_VALUES_MISSING_MAIN_TRANSLATION_QUERY,
             {"missingMainTranslation": False},
         )
-        self.assertSetEqual(ids, {self.v1.id, self.v2.id})
+        self.assertSetEqual(ids, {self.v2.id})
 
     def test_property_select_value_missing_translations_true(self):
         ids = self._query_ids(

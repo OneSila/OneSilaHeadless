@@ -234,13 +234,69 @@ class VariationManager(ProductManager):
 
 class AliasProductQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
 
-    def copy_from_parent(self, alias_product, *, copy_images=False, copy_properties=False):
+    def copy_from_parent(
+        self,
+        alias_product,
+        *,
+        copy_images=False,
+        copy_properties=False,
+        copy_content=True,
+    ):
         from media.models import MediaProductThrough
         from properties.models import ProductProperty, Property, ProductPropertyTextTranslation
+        from .models import ProductTranslation, ProductTranslationBulletPoint
 
         parent = alias_product.alias_parent_product
         if not parent:
             raise ValueError("Alias product must have an alias_parent_product set.")
+
+        if copy_content:
+            default_translations = parent.translations.filter(sales_channel__isnull=True).prefetch_related("bullet_points")
+            for trans in default_translations:
+                alias_translation, created = ProductTranslation.objects.get_or_create(
+                    product=alias_product,
+                    multi_tenant_company=alias_product.multi_tenant_company,
+                    language=trans.language,
+                    sales_channel=None,
+                    defaults={
+                        "name": trans.name,
+                        "short_description": trans.short_description,
+                        "description": trans.description,
+                        "url_key": trans.url_key,
+                        "multi_tenant_company": parent.multi_tenant_company,
+                    },
+                )
+
+                if not created:
+                    alias_translation.name = trans.name
+                    alias_translation.short_description = trans.short_description
+                    alias_translation.description = trans.description
+                    alias_translation.url_key = trans.url_key
+                    alias_translation.multi_tenant_company = parent.multi_tenant_company
+                    alias_translation.save(
+                        update_fields=[
+                            "name",
+                            "short_description",
+                            "description",
+                            "url_key",
+                            "multi_tenant_company",
+                        ]
+                    )
+
+                alias_translation.bullet_points.all().delete()
+                bullet_points = list(trans.bullet_points.all())
+                if bullet_points:
+                    ProductTranslationBulletPoint.objects.bulk_create(
+                        [
+                            ProductTranslationBulletPoint(
+                                product_translation=alias_translation,
+                                text=bp.text,
+                                sort_order=bp.sort_order,
+                                multi_tenant_company=alias_translation.multi_tenant_company,
+                            )
+                            for bp in bullet_points
+                        ]
+                    )
 
         if copy_images:
             parent_images = parent.mediaproductthrough_set.all()
