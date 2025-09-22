@@ -1,3 +1,5 @@
+import json
+
 from django.core.exceptions import ValidationError
 from llm.factories.translations import StringTranslationLLM
 from llm.schema.types.input import ContentAiGenerateType
@@ -80,6 +82,17 @@ class AITranslateContentFlow:
         if isinstance(self.to_translate, str) and self.to_translate == '<p><br></p>':
             raise ValidationError(_("There is no source to translate"))
 
+    def _parse_bullet_point_string(self, bullet_points: str) -> list[str]:
+        try:
+            parsed = json.loads(bullet_points)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            parsed = None
+
+        if isinstance(parsed, list):
+            return [str(bp).strip() for bp in parsed if str(bp).strip()]
+
+        return [bp.strip() for bp in bullet_points.split("\n") if bp.strip()]
+
     def _set_factory(self):
         self.factory = StringTranslationLLM(
             to_translate=self.to_translate,
@@ -100,7 +113,7 @@ class AITranslateContentFlow:
         if self.content_type == ContentAiGenerateType.BULLET_POINTS:
             bullet_points = self.to_translate or []
             if isinstance(bullet_points, str):
-                bullet_points = [bp.strip() for bp in bullet_points.split("\n") if bp.strip()]
+                bullet_points = self._parse_bullet_point_string(bullet_points)
             if self.return_one_bullet_point:
                 if not bullet_points:
                     raise ValidationError(_("There is no source to translate"))
