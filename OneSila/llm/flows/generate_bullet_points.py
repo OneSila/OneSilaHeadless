@@ -33,8 +33,6 @@ class AIGenerateBulletPointsFlow:
         self.factory.generate_response()
         process = self.factory.ai_process
         self.generated_points = self.factory.bullet_points
-        if self.return_one and self.generated_points:
-            self.generated_points = self.generated_points[:1]
         self.used_points = process.transaction.points
 
     def flow(self):

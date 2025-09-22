@@ -379,7 +379,7 @@ class BulletPointsLLM(ContentLLMMixin):
         if self.return_one:
             return (
                 "Generate exactly one concise and unique bullet point in the given language "
-                "describing the product. Respond ONLY with a JSON array containing a single "
+                "describing the product. Respond ONLY point text and nothing else. "
                 "string. Do not repeat or rephrase any of the existing bullet points."
             )
 
