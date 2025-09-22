@@ -54,7 +54,7 @@ class PropertyFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
         if value not in (None, UNSET):
             condition = Q(
                 propertytranslation__language=F("multi_tenant_company__language")
-            )
+            ) & ~Q(propertytranslation__name="")
             if value:
                 queryset = queryset.exclude(condition)
             else:
@@ -137,7 +137,7 @@ class PropertySelectValueFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
                 propertyselectvaluetranslation__language=F(
                     "multi_tenant_company__language"
                 )
-            )
+            ) & ~Q(propertyselectvaluetranslation__value="")
             if value:
                 queryset = queryset.exclude(condition)
             else:
