@@ -878,7 +878,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
                     ],
                 }
             ],
-            "list_price": [{"currency": "GBP", "value_with_tax": 80.0}],
+            "list_price": [{"currency": "GBP", 'marketplace_id': 'GB', "value_with_tax": 80.0}],
             **expected_images,
             "color": [
                 {
@@ -908,7 +908,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             "item_package_weight": [
                 {"value": 2.5, "unit": "grams", "marketplace_id": "GB"}
             ],
-            "recommended_browse_nodes": [{'marketplace_id': 'GB', 'value': 1}]
+            "recommended_browse_nodes": [{'marketplace_id': 'GB', 'value': '1'}]
         }
 
         expected_body = {
@@ -1449,27 +1449,27 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             language=self.multi_tenant_company.language,
             name="Size",
         )
-        size_val1 = baker.make(
-            PropertySelectValue,
-            property=multi_prop,
-            multi_tenant_company=self.multi_tenant_company,
-        )
         size_val2 = baker.make(
             PropertySelectValue,
             property=multi_prop,
             multi_tenant_company=self.multi_tenant_company,
         )
-        PropertySelectValueTranslation.objects.create(
+        size_val1 = baker.make(
+            PropertySelectValue,
+            property=multi_prop,
             multi_tenant_company=self.multi_tenant_company,
-            propertyselectvalue=size_val1,
-            language=self.multi_tenant_company.language,
-            value="Small",
         )
         PropertySelectValueTranslation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             propertyselectvalue=size_val2,
             language=self.multi_tenant_company.language,
             value="Large",
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=size_val1,
+            language=self.multi_tenant_company.language,
+            value="Small",
         )
         pp_multi = ProductProperty.objects.create(
             product=self.product,
