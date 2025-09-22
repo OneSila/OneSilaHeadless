@@ -1,4 +1,5 @@
 import json
+from typing import Optional
 
 from django.core.exceptions import ValidationError
 from llm.factories.translations import StringTranslationLLM
@@ -13,9 +14,9 @@ BULLET_POINT_SEPARATOR = "__BULLET_SEPARATOR__"
 
 class AITranslateContentFlow:
     def __init__(self, to_translate, from_language_code, to_language_code, multi_tenant_company,
-                 product=None, content_type=None, sales_channel=None, return_one_bullet_point: bool = False):
+                 product=None, content_type=None, sales_channel=None, return_one_bullet_point: bool = False,
+                 bullet_point_index: Optional[int] = None):
         self.to_translate = to_translate
-        self.original_to_translate = to_translate
         self.from_language_code = from_language_code
         self.to_language_code = to_language_code
         self.multi_tenant_company = multi_tenant_company
@@ -25,24 +26,11 @@ class AITranslateContentFlow:
         self.translated_content = ''
         self.used_points = 0
         self.return_one_bullet_point = return_one_bullet_point
+        self.bullet_point_index = bullet_point_index
 
     def _get_safe_translation(self, translation, attr):
         """Helper method to safely get a translation attribute."""
         return getattr(translation, attr, '') or ''
-
-    def _resolve_bullet_point_index(self, bullet_points: list[str]) -> int:
-        if self.original_to_translate in (None, ""):
-            raise ValidationError(_("A bullet point index is required to translate a single bullet point."))
-
-        try:
-            index = int(self.original_to_translate)
-        except (TypeError, ValueError):
-            raise ValidationError(_("Invalid bullet point index for translation."))
-
-        if index < 0 or index >= len(bullet_points):
-            raise ValidationError(_("There is no bullet point for the provided index."))
-
-        return index
 
     def _set_product_translation(self):
         if self.product:
@@ -117,7 +105,15 @@ class AITranslateContentFlow:
             if self.return_one_bullet_point:
                 if not bullet_points:
                     raise ValidationError(_("There is no source to translate"))
-                index = self._resolve_bullet_point_index(bullet_points)
+                if self.bullet_point_index in (None, ""):
+                    raise ValidationError(_("A bullet point index is required to translate a single bullet point."))
+                try:
+                    index = int(self.bullet_point_index)
+                except (TypeError, ValueError):
+                    raise ValidationError(_("Invalid bullet point index for translation."))
+                if index < 0 or index >= len(bullet_points):
+                    raise ValidationError(_("There is no bullet point for the provided index."))
+                self.bullet_point_index = index
                 bullet_points = [bullet_points[index]]
             translated = []
             total_points = 0
@@ -131,12 +127,14 @@ class AITranslateContentFlow:
             if self.return_one_bullet_point:
                 self.translated_content = translated[0] if translated else ''
             else:
+                self.bullet_point_index = None
                 self.translated_content = BULLET_POINT_SEPARATOR.join(translated)
             self.used_points = total_points
         else:
             self._set_factory()
             self._validate()
             self.translate_content()
+            self.bullet_point_index = None
         return self.translated_content
 
 

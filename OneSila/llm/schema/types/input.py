@@ -49,6 +49,7 @@ class AITranslationInput:
     product_content_type: Optional[ContentAiGenerateType] = None
     sales_channel: Optional[SalesChannelPartialInput] = None
     return_one_bullet_point: Optional[bool] = False
+    bullet_point_index: Optional[int] = None
 
 
 @strawberry_input
