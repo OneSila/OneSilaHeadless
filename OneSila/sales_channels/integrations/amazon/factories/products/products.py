@@ -679,8 +679,11 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             attrs["parentage_level"] = [
                 {"value": "parent", "marketplace_id": self.view.remote_id}
             ]
+            # if the product was created by mistake as a child or is converted from a child this will make sure
+            # to delete the old child_parent_sku_relationship -> variation
+            attrs["child_parent_sku_relationship"] = None
 
-        # @TODO: come back to this
+            # @TODO: come back to this
         # if theme:
         #     parts = [p.lower() for p in theme.split("/")]
         #     for part in parts:
