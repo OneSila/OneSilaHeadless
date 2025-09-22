@@ -7,6 +7,9 @@ from sales_channels.integrations.magento2.models import MagentoPrice, MagentoCur
 class MagentoPriceUpdateFactory(GetMagentoAPIMixin, RemotePriceUpdateFactory):
     remote_model_class = MagentoPrice
 
+    def get_local_product(self):
+        return self.local_instance
+
     def update_remote(self):
         self.magento_product: Product = self.api.products.by_sku(self.remote_product.remote_sku)
 
