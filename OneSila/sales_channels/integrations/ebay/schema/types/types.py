@@ -12,6 +12,7 @@ from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
     EbayInternalProperty,
     EbayProductType,
+    EbayProductTypeItem,
     EbayProperty,
     EbayPropertySelectValue,
     EbaySalesChannelView,
@@ -20,6 +21,7 @@ from sales_channels.integrations.ebay.schema.types.filters import (
     EbaySalesChannelFilter,
     EbayInternalPropertyFilter,
     EbayProductTypeFilter,
+    EbayProductTypeItemFilter,
     EbayPropertyFilter,
     EbayPropertySelectValueFilter,
     EbaySalesChannelViewFilter,
@@ -28,6 +30,7 @@ from sales_channels.integrations.ebay.schema.types.ordering import (
     EbaySalesChannelOrder,
     EbayInternalPropertyOrder,
     EbayProductTypeOrder,
+    EbayProductTypeItemOrder,
     EbayPropertyOrder,
     EbayPropertySelectValueOrder,
     EbaySalesChannelViewOrder,
@@ -79,6 +82,28 @@ class EbayProductTypeType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def mapped_remotely(self, info) -> bool:
         return self.mapped_remotely
+
+
+@type(
+    EbayProductTypeItem,
+    filters=EbayProductTypeItemFilter,
+    order=EbayProductTypeItemOrder,
+    pagination=True,
+    fields="__all__",
+)
+class EbayProductTypeItemType(relay.Node, GetQuerysetMultiTenantMixin):
+    product_type: Annotated[
+        'EbayProductTypeType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+    ebay_property: Annotated[
+        'EbayPropertyType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'ProductPropertiesRuleItemType',
+        lazy("properties.schema.types.types")
+    ]]
 
 
 @type(
