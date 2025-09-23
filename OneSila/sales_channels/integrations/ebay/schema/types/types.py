@@ -74,6 +74,10 @@ class EbayProductTypeType(relay.Node, GetQuerysetMultiTenantMixin):
         'SalesChannelViewType',
         lazy("sales_channels.schema.types.types")
     ]
+    items: List[Annotated[
+        'EbayProductTypeItemType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]]
 
     @field()
     def mapped_locally(self, info) -> bool:
