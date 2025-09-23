@@ -6,12 +6,14 @@ from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
     EbayInternalProperty,
     EbayProductType,
+    EbayProductTypeItem,
     EbayProperty,
     EbayPropertySelectValue,
     EbaySalesChannelView,
 )
 from properties.schema.types.filters import (
     ProductPropertiesRuleFilter,
+    ProductPropertiesRuleItemFilter,
     PropertyFilter,
     PropertySelectValueFilter,
 )
@@ -40,6 +42,15 @@ class EbayProductTypeFilter(SearchFilterMixin, GeneralMappedLocallyFilterMixin, 
     local_instance: Optional[ProductPropertiesRuleFilter]
     marketplace: Optional[SalesChannelViewFilter]
     imported: auto
+
+
+@filter(EbayProductTypeItem)
+class EbayProductTypeItemFilter(SearchFilterMixin):
+    id: auto
+    product_type: Optional[EbayProductTypeFilter]
+    local_instance: Optional[ProductPropertiesRuleItemFilter]
+    ebay_property: Optional['EbayPropertyFilter']
+    remote_type: auto
 
 
 @filter(EbayProperty)

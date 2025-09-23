@@ -3,6 +3,7 @@ from sales_channels.integrations.ebay.schema.types.types import (
     EbaySalesChannelType,
     EbayInternalPropertyType,
     EbayProductTypeType,
+    EbayProductTypeItemType,
     EbayPropertyType,
     EbayPropertySelectValueType,
     EbaySalesChannelViewType,
@@ -19,6 +20,9 @@ class EbaySalesChannelsQuery:
 
     ebay_product_type: EbayProductTypeType = node()
     ebay_product_types: DjangoListConnection[EbayProductTypeType] = connection()
+
+    ebay_product_type_item: EbayProductTypeItemType = node()
+    ebay_product_type_items: DjangoListConnection[EbayProductTypeItemType] = connection()
 
     ebay_internal_property: EbayInternalPropertyType = node()
     ebay_internal_properties: DjangoListConnection[EbayInternalPropertyType] = connection()
