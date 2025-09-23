@@ -20,7 +20,7 @@ from properties.schema.types.filters import (
 from sales_channels.schema.types.filters import SalesChannelFilter, SalesChannelViewFilter
 from sales_channels.integrations.ebay.managers import (
     EbayPropertyQuerySet,
-    EbayPropertySelectValueQuerySet,
+    EbayPropertySelectValueQuerySet, EbayInternalPropertyQuerySet,
 )
 from sales_channels.schema.types.filter_mixins import (
     DependentMappedLocallyFilterMixin,
@@ -78,7 +78,7 @@ class EbayInternalPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilter
 
     def get_mapped_locally_querysets(self):
         return (
-            (EbayPropertyQuerySet, "filter_mapped_locally"),
+            (EbayInternalPropertyQuerySet, "filter_mapped_locally"),
             (EbayPropertySelectValueQuerySet, "filter_ebay_property_mapped_locally"),
         )
 
