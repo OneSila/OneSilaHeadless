@@ -9,6 +9,7 @@ from sales_channels.integrations.ebay.models import (
     EbayProductTypeItem,
     EbayProperty,
     EbayPropertySelectValue,
+    EbaySalesChannelImport,
     EbaySalesChannelView,
 )
 from properties.schema.types.filters import (
@@ -97,3 +98,11 @@ class EbaySalesChannelViewFilter(SearchFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     is_default: auto
+
+
+@filter(EbaySalesChannelImport)
+class EbaySalesChannelImportFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    status: auto
+    type: auto

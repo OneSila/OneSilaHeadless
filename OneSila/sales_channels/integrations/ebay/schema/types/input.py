@@ -5,6 +5,7 @@ from sales_channels.integrations.ebay.models import (
     EbayProductType,
     EbayProperty,
     EbayPropertySelectValue,
+    EbaySalesChannelImport,
     EbaySalesChannelView,
 )
 
@@ -57,6 +58,16 @@ class EbayPropertySelectValueInput:
 
 @partial(EbayPropertySelectValue, fields="__all__")
 class EbayPropertySelectValuePartialInput(NodeInput):
+    pass
+
+
+@input(EbaySalesChannelImport, exclude=['saleschannelimport_ptr', 'import_ptr'])
+class EbaySalesChannelImportInput:
+    pass
+
+
+@partial(EbaySalesChannelImport, fields="__all__")
+class EbaySalesChannelImportPartialInput(NodeInput):
     pass
 
 
