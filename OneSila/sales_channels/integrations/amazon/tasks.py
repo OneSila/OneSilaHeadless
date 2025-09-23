@@ -42,6 +42,19 @@ def amazon_product_import_item_task(
     fac.run()
 
 
+@db_task(priority=HIGH_PRIORITY)
+def amazon_refresh_product_import_task(product_id: int, view_id: int):
+    from products.models import Product
+    from sales_channels.integrations.amazon.factories.imports.product_import import AmazonProductImportFactory
+    from sales_channels.integrations.amazon.models import AmazonSalesChannelView
+
+    product = Product.objects.get(id=product_id)
+    view = AmazonSalesChannelView.objects.select_related("sales_channel").get(id=view_id)
+
+    factory = AmazonProductImportFactory(product=product, view=view)
+    factory.run()
+
+
 # @run_task_after_commit
 @db_task()
 def create_amazon_product_type_rule_task(product_type_code: str, sales_channel_id: int):

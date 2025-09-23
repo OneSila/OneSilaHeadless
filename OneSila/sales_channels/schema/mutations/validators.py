@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from sales_channels.exceptions import VariationAlreadyExistsOnWebsite
@@ -50,12 +51,14 @@ def validate_sku_conflicts(data, info):
             )
 
 
-def validate_amazon_first_assignment(data, info):
+def validate_amazon_assignment(data, info):
     product = data['product'].pk
     view = data['sales_channel_view'].pk
     sales_channel = view.sales_channel.get_real_instance()
 
     from sales_channels.integrations.amazon.models import (
+        AmazonExternalProductId,
+        AmazonGtinExemption,
         AmazonSalesChannel,
         AmazonSalesChannelView,
         AmazonProductBrowseNode,
@@ -63,20 +66,49 @@ def validate_amazon_first_assignment(data, info):
     )
 
     if isinstance(sales_channel, AmazonSalesChannel):
+        views = [view]
+        default_view = AmazonSalesChannelView.objects.filter(
+            sales_channel=sales_channel,
+            is_default=True,
+        ).first()
+
+        if default_view and default_view != view:
+            views.append(default_view)
+
+        has_gtin_exemption = AmazonGtinExemption.objects.filter(
+            product=product,
+            view__in=views,
+            value=True,
+        ).exists()
+
+        has_external_id = (
+            AmazonExternalProductId.objects.filter(
+                product=product,
+                view__in=views,
+            )
+            .exclude(value__isnull=True)
+            .exclude(value__exact="")
+            .exists()
+        )
+
+        has_ean_code = bool(product.ean_code)
+        is_configurable = product.is_configurable()
+
+        if not any((has_gtin_exemption, has_external_id, has_ean_code, is_configurable)):
+            raise ValidationError(
+                {
+                    '__all__': _(
+                        'Amazon listings require a GTIN exemption, external product id, EAN code, or configurable product.'
+                    )
+                }
+            )
+
         exists = SalesChannelViewAssign.objects.filter(
             product=product,
             sales_channel_view__sales_channel=sales_channel,
         ).exists()
 
         if not exists:
-            default_view = AmazonSalesChannelView.objects.filter(
-                sales_channel=sales_channel,
-                is_default=True,
-            ).first()
-            views = [view]
-            if default_view and default_view != view:
-                views.append(default_view)
-
             if not AmazonProductBrowseNode.objects.filter(
                 product=product,
                 sales_channel=sales_channel,
@@ -94,6 +126,29 @@ def validate_amazon_first_assignment(data, info):
                     {
                         '__all__': _(
                             'Amazon configurable products require a variation theme for the first assignment.'
+                        )
+                    }
+                )
+        else:
+            has_asin = (
+                AmazonExternalProductId.objects.filter(
+                    product=product,
+                    view__in=views,
+                )
+                .exclude(value__isnull=True)
+                .exclude(value__exact="")
+                .filter(
+                    Q(created_asin__isnull=False) & ~Q(created_asin__exact="")
+                    | Q(type=AmazonExternalProductId.TYPE_ASIN)
+                )
+                .exists()
+            )
+
+            if not has_asin:
+                raise ValidationError(
+                    {
+                        '__all__': _(
+                            'To create a new Amazon assignment there must be at least one completed assignment validated by Amazon with an ASIN. Wait for validation or provide an ASIN manually.'
                         )
                     }
                 )

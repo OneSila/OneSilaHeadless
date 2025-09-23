@@ -1,3 +1,5 @@
+from typing import Optional, List
+
 from .mixins import ContentLLMMixin, AskGPTMixin
 from integrations.constants import (
     MAGENTO_INTEGRATION,
@@ -366,12 +368,21 @@ class ShortDescriptionLLM(DescriptionGenLLM):
 class BulletPointsLLM(ContentLLMMixin):
     """Generate bullet points for a product."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, return_one: bool = False, existing_bullet_points: Optional[List[str]] = None, **kwargs):
+        self.return_one = return_one
+        self.existing_bullet_points = existing_bullet_points or []
         super().__init__(*args, **kwargs)
         self.bullet_points: list[str] = []
 
     @property
     def system_prompt(self):
+        if self.return_one:
+            return (
+                "Generate exactly one concise and unique bullet point in the given language "
+                "describing the product. Respond ONLY point text and nothing else. "
+                "string. Do not repeat or rephrase any of the existing bullet points."
+            )
+
         return (
             "Generate a short list (max 5 items) of concise bullet points in the "
             "given language describing the product. Respond ONLY with a JSON array "
@@ -400,6 +411,28 @@ class BulletPointsLLM(ContentLLMMixin):
             prompt += f"""
             ##Brand Personality##
             {self.brand_prompt}
+            """
+
+        if self.return_one:
+            prompt += "\n##Instructions##\nGenerate a single additional bullet point that complements the product.\n"
+            if self.existing_bullet_points:
+                existing = "\n".join(self.existing_bullet_points)
+                prompt += f"""
+                ##Existing Bullet Points##
+                {existing}
+                \nEnsure the new bullet point is unique and does not repeat or rephrase any of the existing ones.
+                """
+            else:
+                prompt += "Ensure the bullet point is unique.\n"
+
+        if self.sales_channel_type == AMAZON_INTEGRATION:
+            prompt += """
+            ##Amazon Bullet Point Guidelines##
+            These bullet points will be published on an Amazon product detail page. Follow these rules:
+            - Highlight concrete product features and benefits with customer-focused language.
+            - Keep each bullet point under 200 characters and avoid special characters or emojis.
+            - Do not include pricing, promotions, shipping information, or subjective claims.
+            - Maintain a professional, informative tone optimized for keyword visibility.
             """
         return prompt
 

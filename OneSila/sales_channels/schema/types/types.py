@@ -273,6 +273,11 @@ class RemoteLogType(relay.Node, GetQuerysetMultiTenantMixin):
 class RemoteProductType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
 
+    local_instance: Optional[Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]]
+
     @field()
     def has_errors(self, info) -> bool | None:
         return self.has_errors

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from core.schema.core.types.types import relay, type, strawberry_type, GetQuerysetMultiTenantMixin
 from .filters import BrandCustomPromptFilter
@@ -11,6 +11,7 @@ from llm.models import BrandCustomPrompt
 class AiContent:
     content: str
     points: str
+    bullet_point_index: Optional[int] = None
 
 
 @strawberry_type

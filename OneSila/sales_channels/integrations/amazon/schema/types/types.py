@@ -281,8 +281,8 @@ class AmazonProductType(relay.Node, GetQuerysetMultiTenantMixin):
         lazy("sales_channels.integrations.amazon.schema.types.types")
     ]]
     remote_parent_product: Optional[Annotated[
-        'AmazonProductType',
-        lazy("sales_channels.integrations.amazon.schema.types.types")
+        'RemoteProductType',
+        lazy("sales_channels.schema.types.types")
     ]]
 
     @field()
