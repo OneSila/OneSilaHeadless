@@ -8,6 +8,8 @@ from core.schema.core.types.types import (
     field,
     lazy,
 )
+from strawberry.relay import to_base64
+from imports_exports.schema.queries import ImportType
 from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
     EbayInternalProperty,
@@ -15,6 +17,7 @@ from sales_channels.integrations.ebay.models import (
     EbayProductTypeItem,
     EbayProperty,
     EbayPropertySelectValue,
+    EbaySalesChannelImport,
     EbaySalesChannelView,
 )
 from sales_channels.integrations.ebay.schema.types.filters import (
@@ -24,6 +27,7 @@ from sales_channels.integrations.ebay.schema.types.filters import (
     EbayProductTypeItemFilter,
     EbayPropertyFilter,
     EbayPropertySelectValueFilter,
+    EbaySalesChannelImportFilter,
     EbaySalesChannelViewFilter,
 )
 from sales_channels.integrations.ebay.schema.types.ordering import (
@@ -33,6 +37,7 @@ from sales_channels.integrations.ebay.schema.types.ordering import (
     EbayProductTypeItemOrder,
     EbayPropertyOrder,
     EbayPropertySelectValueOrder,
+    EbaySalesChannelImportOrder,
     EbaySalesChannelViewOrder,
 )
 
@@ -199,6 +204,30 @@ class EbayPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def mapped_remotely(self, info) -> bool:
         return self.mapped_remotely
+
+
+@type(
+    EbaySalesChannelImport,
+    filters=EbaySalesChannelImportFilter,
+    order=EbaySalesChannelImportOrder,
+    pagination=True,
+    fields="__all__",
+)
+class EbaySalesChannelImportType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'EbaySalesChannelType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+
+    @field()
+    def import_id(self, info) -> str:
+        return to_base64(ImportType, self.pk)
+
+    @field()
+    def proxy_id(self, info) -> str:
+        from sales_channels.schema.types.types import SalesChannelImportType
+
+        return to_base64(SalesChannelImportType, self.pk)
 
 
 @type(

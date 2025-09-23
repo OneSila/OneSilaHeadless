@@ -9,6 +9,8 @@ from sales_channels.integrations.ebay.schema.types.input import (
     EbayInternalPropertyPartialInput,
     EbayPropertyPartialInput,
     EbayPropertySelectValuePartialInput,
+    EbaySalesChannelImportInput,
+    EbaySalesChannelImportPartialInput,
     EbaySalesChannelViewPartialInput,
 )
 from sales_channels.integrations.ebay.schema.types.types import (
@@ -19,6 +21,7 @@ from sales_channels.integrations.ebay.schema.types.types import (
     EbayPropertyType,
     EbayPropertySelectValueType,
     EbaySalesChannelViewType,
+    EbaySalesChannelImportType,
     SuggestedEbayCategory,
     SuggestedEbayCategoryEntry,
 )
@@ -44,6 +47,9 @@ class EbaySalesChannelMutation:
     update_ebay_internal_property: EbayInternalPropertyType = update(EbayInternalPropertyPartialInput)
     update_ebay_property_select_value: EbayPropertySelectValueType = update(EbayPropertySelectValuePartialInput)
     update_ebay_sales_channel_view: EbaySalesChannelViewType = update(EbaySalesChannelViewPartialInput)
+
+    create_ebay_import_process: EbaySalesChannelImportType = create(EbaySalesChannelImportInput)
+    update_ebay_import_process: EbaySalesChannelImportType = update(EbaySalesChannelImportPartialInput)
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def get_ebay_redirect_url(self, instance: EbaySalesChannelPartialInput, info: Info) -> EbayRedirectUrlType:

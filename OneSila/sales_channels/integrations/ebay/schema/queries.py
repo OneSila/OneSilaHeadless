@@ -7,6 +7,7 @@ from sales_channels.integrations.ebay.schema.types.types import (
     EbayPropertyType,
     EbayPropertySelectValueType,
     EbaySalesChannelViewType,
+    EbaySalesChannelImportType,
 )
 
 
@@ -30,3 +31,6 @@ class EbaySalesChannelsQuery:
 
     ebay_sales_channel_view: EbaySalesChannelViewType = node()
     ebay_sales_channel_views: DjangoListConnection[EbaySalesChannelViewType] = connection()
+
+    ebay_import_process: EbaySalesChannelImportType = node()
+    ebay_import_processes: DjangoListConnection[EbaySalesChannelImportType] = connection()
