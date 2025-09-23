@@ -135,6 +135,7 @@ class EbaySalesChannelMutation:
         from sales_channels.integrations.ebay.models import (
             EbayProductType,
             EbaySalesChannel,
+            EbaySalesChannelView,
         )
 
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
@@ -144,20 +145,34 @@ class EbaySalesChannelMutation:
             multi_tenant_company=multi_tenant_company,
         )
 
+        marketplaces = list(
+            EbaySalesChannelView.objects.filter(sales_channel=sales_channel)
+        )
+        if not marketplaces:
+            marketplaces = [None]
+
         product_types: list[EbayProductType] = []
         for rule in ProductPropertiesRule.objects.filter(
             multi_tenant_company=multi_tenant_company,
         ).iterator():
-            product_type, _ = EbayProductType.objects.get_or_create(
-                sales_channel=sales_channel,
-                multi_tenant_company=multi_tenant_company,
-                local_instance=rule,
-                defaults={
-                    "name": rule.product_type.value,
-                    "translated_name": rule.product_type.value,
-                    "imported": False,
-                },
-            )
-            product_types.append(product_type)
+            rule_name = getattr(rule.product_type, "value", None)
+            for marketplace in marketplaces:
+                defaults = {"imported": False}
+                if rule_name:
+                    defaults["name"] = rule_name
+
+                create_kwargs = {
+                    "sales_channel": sales_channel,
+                    "multi_tenant_company": multi_tenant_company,
+                    "local_instance": rule,
+                }
+                if marketplace is not None:
+                    create_kwargs["marketplace"] = marketplace
+
+                product_type, _ = EbayProductType.objects.get_or_create(
+                    defaults=defaults,
+                    **create_kwargs,
+                )
+                product_types.append(product_type)
 
         return product_types
