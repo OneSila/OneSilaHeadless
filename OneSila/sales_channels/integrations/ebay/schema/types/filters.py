@@ -58,12 +58,18 @@ class EbayPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin, G
 
 
 @filter(EbayInternalProperty)
-class EbayInternalPropertyFilter(SearchFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
+class EbayInternalPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
     code: auto
     is_root: auto
+
+    def get_mapped_locally_querysets(self):
+        return (
+            (EbayPropertyQuerySet, "filter_mapped_locally"),
+            (EbayPropertySelectValueQuerySet, "filter_ebay_property_mapped_locally"),
+        )
 
 
 @filter(EbayPropertySelectValue)

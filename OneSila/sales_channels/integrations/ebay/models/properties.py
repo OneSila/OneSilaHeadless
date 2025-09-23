@@ -87,7 +87,7 @@ class EbayInternalProperty(RemoteObjectMixin, models.Model):
         max_length=255,
         help_text="Field code used when building eBay requests.",
     )
-    label = models.CharField(
+    name = models.CharField(
         max_length=255,
         help_text="Human readable label for the internal field.",
     )
@@ -113,7 +113,7 @@ class EbayInternalProperty(RemoteObjectMixin, models.Model):
                 name='unique_ebay_internal_property_code_per_channel',
             )
         ]
-        search_terms = ['code', 'label']
+        search_terms = ['code', 'name']
 
     def __str__(self):
         return f"{self.code} ({self.sales_channel})"
