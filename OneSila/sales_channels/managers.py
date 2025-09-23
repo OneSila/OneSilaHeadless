@@ -88,6 +88,17 @@ class RemoteProductConfiguratorManager(PolymorphicManager, MultiTenantManager):
         return self.get_queryset().create_from_remote_product(*args, **kwargs)
 
 
+class SalesChannelViewQuerySet(PolymorphicQuerySet, MultiTenantQuerySet):
+    """QuerySet for :class:`SalesChannelView` with multitenancy and polymorphic support."""
+
+
+class SalesChannelViewManager(PolymorphicManager, MultiTenantManager):
+    """Manager for :class:`SalesChannelView` providing search and multitenancy."""
+
+    def get_queryset(self):
+        return SalesChannelViewQuerySet(self.model, using=self._db)
+
+
 class SalesChannelViewAssignQuerySet(PolymorphicQuerySet, MultiTenantQuerySet):
     """QuerySet for :class:`SalesChannelViewAssign` with multitenancy and polymorphic support."""
 

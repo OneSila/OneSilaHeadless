@@ -157,6 +157,7 @@ class SalesChannelImportFilter(SearchFilterMixin):
 
 @filter(SalesChannelView)
 class SalesChannelViewFilter(SearchFilterMixin):
+    search: Optional[str]
     id: auto
     remote_id: auto
     sales_channel: Optional[SalesChannelFilter]
