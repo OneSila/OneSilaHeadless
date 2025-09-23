@@ -149,7 +149,7 @@ class EbaySalesChannelMutation:
             EbaySalesChannelView.objects.filter(sales_channel=sales_channel)
         )
         if not marketplaces:
-            marketplaces = [None]
+            return EbayProductType.objects.none()
 
         product_types: list[EbayProductType] = []
         for rule in ProductPropertiesRule.objects.filter(
@@ -165,10 +165,8 @@ class EbaySalesChannelMutation:
                     "sales_channel": sales_channel,
                     "multi_tenant_company": multi_tenant_company,
                     "local_instance": rule,
+                    "marketplace": marketplace
                 }
-                if marketplace is not None:
-                    create_kwargs["marketplace"] = marketplace
-
                 product_type, _ = EbayProductType.objects.get_or_create(
                     defaults=defaults,
                     **create_kwargs,

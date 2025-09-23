@@ -130,6 +130,7 @@ class EbaySyncFactoriesTest(TestCase):
         remote_property = self._create_remote_property()
         product_type = EbayProductType.objects.create(
             multi_tenant_company=self.multi_tenant_company,
+            marketplace=self.view,
             sales_channel=self.sales_channel,
             remote_id="123",
             local_instance=self.rule,
