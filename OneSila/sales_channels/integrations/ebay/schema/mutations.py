@@ -117,3 +117,41 @@ class EbaySalesChannelMutation:
                 for entry in factory.categories
             ],
         )
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def create_ebay_product_types_from_local_rules(
+        self,
+        instance: EbaySalesChannelPartialInput,
+        info: Info,
+    ) -> List[EbayProductTypeType]:
+        """Create eBay product types for every local product rule on the sales channel."""
+        from properties.models import ProductPropertiesRule
+        from sales_channels.integrations.ebay.models import (
+            EbayProductType,
+            EbaySalesChannel,
+        )
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        sales_channel = EbaySalesChannel.objects.get(
+            id=instance.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        product_types: list[EbayProductType] = []
+        for rule in ProductPropertiesRule.objects.filter(
+            multi_tenant_company=multi_tenant_company,
+        ).iterator():
+            product_type, _ = EbayProductType.objects.get_or_create(
+                sales_channel=sales_channel,
+                multi_tenant_company=multi_tenant_company,
+                local_instance=rule,
+                defaults={
+                    "name": rule.product_type.value,
+                    "translated_name": rule.product_type.value,
+                    "imported": False,
+                },
+            )
+            product_types.append(product_type)
+
+        return product_types
