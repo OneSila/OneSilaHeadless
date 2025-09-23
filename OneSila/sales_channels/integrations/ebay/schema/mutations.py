@@ -5,6 +5,7 @@ from sales_channels.integrations.ebay.schema.types.input import (
     EbaySalesChannelInput,
     EbaySalesChannelPartialInput,
     EbayValidateAuthInput,
+    EbayProductTypePartialInput,
     EbayInternalPropertyPartialInput,
     EbayPropertyPartialInput,
     EbayPropertySelectValuePartialInput,
@@ -13,6 +14,7 @@ from sales_channels.integrations.ebay.schema.types.input import (
 from sales_channels.integrations.ebay.schema.types.types import (
     EbaySalesChannelType,
     EbayRedirectUrlType,
+    EbayProductTypeType,
     EbayInternalPropertyType,
     EbayPropertyType,
     EbayPropertySelectValueType,
@@ -35,6 +37,8 @@ class EbaySalesChannelMutation:
     create_ebay_sales_channels: List[EbaySalesChannelType] = create(EbaySalesChannelInput)
 
     update_ebay_sales_channel: EbaySalesChannelType = update(EbaySalesChannelPartialInput)
+
+    update_ebay_product_type: EbayProductTypeType = update(EbayProductTypePartialInput)
 
     update_ebay_property: EbayPropertyType = update(EbayPropertyPartialInput)
     update_ebay_internal_property: EbayInternalPropertyType = update(EbayInternalPropertyPartialInput)

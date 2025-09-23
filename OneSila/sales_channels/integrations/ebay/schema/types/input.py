@@ -2,6 +2,7 @@ from core.schema.core.types.input import NodeInput, input, partial, strawberry_i
 from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
     EbayInternalProperty,
+    EbayProductType,
     EbayProperty,
     EbayPropertySelectValue,
     EbaySalesChannelView,
@@ -41,6 +42,11 @@ class EbayInternalPropertyInput:
 
 @partial(EbayInternalProperty, fields="__all__")
 class EbayInternalPropertyPartialInput(NodeInput):
+    pass
+
+
+@partial(EbayProductType, fields="__all__")
+class EbayProductTypePartialInput(NodeInput):
     pass
 
 
