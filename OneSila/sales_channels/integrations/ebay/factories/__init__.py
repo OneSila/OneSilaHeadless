@@ -1,3 +1,7 @@
+from .category_nodes import (
+    EbayCategoryNodeRefreshFactory,
+    EbayCategoryNodeSyncFactory,
+)
 from .sales_channels import (
     GetEbayRedirectUrlFactory,
     ValidateEbayAuthFactory,
@@ -18,6 +22,8 @@ __all__ = [
     'EbaySalesChannelViewPullFactory',
     'EbayProductTypeRuleFactory',
     'EbayCategorySuggestionFactory',
+    'EbayCategoryNodeSyncFactory',
+    'EbayCategoryNodeRefreshFactory',
     'EbaySchemaImportProcessor',
     'EbayPropertyRuleItemSyncFactory',
 ]
