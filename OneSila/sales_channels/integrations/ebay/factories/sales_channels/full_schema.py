@@ -303,24 +303,24 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
 
         # Default values
         property_type = Property.TYPES.TEXT
-        allows_unmapped = False
+        allows_unmapped = True
 
         if mode == "FREE_TEXT" and advanced_data_type == "NUMERIC_RANGE":
-            return Property.TYPES.TEXT, False
+            return Property.TYPES.TEXT, allows_unmapped
 
         if data_type == "NUMBER":
             format_lower = (aspect_format or "").lower()
             if format_lower == "double":
-                return Property.TYPES.FLOAT, False
-            return Property.TYPES.INT, False
+                return Property.TYPES.FLOAT, allows_unmapped
+            return Property.TYPES.INT, allows_unmapped
 
         if data_type == "DATE":
             if self._is_datetime_format(aspect_format):
-                return Property.TYPES.DATETIME, False
-            return Property.TYPES.DATE, False
+                return Property.TYPES.DATETIME, allows_unmapped
+            return Property.TYPES.DATE, allows_unmapped
 
         if aspect_values:
-            allows_unmapped = mode == "FREE_TEXT"
+            allows_unmapped = mode != "SELECTION_ONLY"
             if cardinality == "MULTI":
                 property_type = Property.TYPES.MULTISELECT
             else:
@@ -329,8 +329,8 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
 
         if mode == "FREE_TEXT":
             if max_length is not None and max_length > 800:
-                return Property.TYPES.DESCRIPTION, False
-            return Property.TYPES.TEXT, False
+                return Property.TYPES.DESCRIPTION, allows_unmapped
+            return Property.TYPES.TEXT, allows_unmapped
 
         return property_type, allows_unmapped
 
