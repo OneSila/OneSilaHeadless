@@ -11,7 +11,9 @@ from sales_channels.integrations.ebay.models import (
     EbayPropertySelectValue,
     EbaySalesChannelImport,
     EbaySalesChannelView,
+    EbayCurrency,
 )
+from currencies.schema.types.filters import CurrencyFilter
 from properties.schema.types.filters import (
     ProductPropertiesRuleFilter,
     ProductPropertiesRuleItemFilter,
@@ -106,3 +108,11 @@ class EbaySalesChannelImportFilter(SearchFilterMixin):
     sales_channel: Optional[SalesChannelFilter]
     status: auto
     type: auto
+
+
+@filter(EbayCurrency)
+class EbayCurrencyFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    sales_channel_view: Optional[SalesChannelViewFilter]
+    local_instance: Optional[CurrencyFilter]

@@ -9,6 +9,7 @@ from sales_channels.integrations.ebay.models import (
     EbayPropertySelectValue,
     EbaySalesChannelImport,
     EbaySalesChannelView,
+    EbayCurrency,
 )
 
 
@@ -49,4 +50,9 @@ class EbaySalesChannelViewOrder:
 
 @order(EbaySalesChannelImport)
 class EbaySalesChannelImportOrder:
+    id: auto
+
+
+@order(EbayCurrency)
+class EbayCurrencyOrder:
     id: auto

@@ -7,6 +7,7 @@ from sales_channels.integrations.ebay.models import (
     EbayPropertySelectValue,
     EbaySalesChannelImport,
     EbaySalesChannelView,
+    EbayCurrency,
 )
 
 
@@ -78,4 +79,9 @@ class EbaySalesChannelViewInput:
 
 @partial(EbaySalesChannelView, fields="__all__")
 class EbaySalesChannelViewPartialInput(NodeInput):
+    pass
+
+
+@partial(EbayCurrency, fields="__all__")
+class EbayCurrencyPartialInput(NodeInput):
     pass

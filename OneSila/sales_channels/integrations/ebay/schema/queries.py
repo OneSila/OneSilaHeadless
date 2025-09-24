@@ -8,6 +8,7 @@ from sales_channels.integrations.ebay.schema.types.types import (
     EbayPropertySelectValueType,
     EbaySalesChannelViewType,
     EbaySalesChannelImportType,
+    EbayCurrencyType,
 )
 
 
@@ -34,3 +35,6 @@ class EbaySalesChannelsQuery:
 
     ebay_import_process: EbaySalesChannelImportType = node()
     ebay_import_processes: DjangoListConnection[EbaySalesChannelImportType] = connection()
+
+    ebay_currency: EbayCurrencyType = node()
+    ebay_currencies: DjangoListConnection[EbayCurrencyType] = connection()
