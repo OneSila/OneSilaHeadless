@@ -19,6 +19,7 @@ from sales_channels.integrations.ebay.models import (
     EbayPropertySelectValue,
     EbaySalesChannelImport,
     EbaySalesChannelView,
+    EbayCurrency,
 )
 from sales_channels.integrations.ebay.schema.types.filters import (
     EbaySalesChannelFilter,
@@ -29,6 +30,7 @@ from sales_channels.integrations.ebay.schema.types.filters import (
     EbayPropertySelectValueFilter,
     EbaySalesChannelImportFilter,
     EbaySalesChannelViewFilter,
+    EbayCurrencyFilter,
 )
 from sales_channels.integrations.ebay.schema.types.ordering import (
     EbaySalesChannelOrder,
@@ -39,6 +41,7 @@ from sales_channels.integrations.ebay.schema.types.ordering import (
     EbayPropertySelectValueOrder,
     EbaySalesChannelImportOrder,
     EbaySalesChannelViewOrder,
+    EbayCurrencyOrder,
 )
 
 
@@ -246,6 +249,28 @@ class EbaySalesChannelViewType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def active(self, info) -> bool:
         return self.sales_channel.active
+
+
+@type(
+    EbayCurrency,
+    filters=EbayCurrencyFilter,
+    order=EbayCurrencyOrder,
+    pagination=True,
+    fields="__all__",
+)
+class EbayCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated[
+        'EbaySalesChannelType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+    sales_channel_view: Optional[Annotated[
+        'EbaySalesChannelViewType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]]
+    local_instance: Optional[Annotated[
+        'CurrencyType',
+        lazy("currencies.schema.types.types")
+    ]]
 
 
 @strawberry_type
