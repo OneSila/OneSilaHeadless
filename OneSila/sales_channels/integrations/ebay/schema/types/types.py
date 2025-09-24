@@ -272,6 +272,12 @@ class EbayCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):
         lazy("currencies.schema.types.types")
     ]]
 
+    @field()
+    def proxy_id(self, info) -> str:
+        from sales_channels.schema.types.types import RemoteCurrencyType
+
+        return to_base64(RemoteCurrencyType, self.pk)
+
 
 @strawberry_type
 class SuggestedEbayCategoryEntry:

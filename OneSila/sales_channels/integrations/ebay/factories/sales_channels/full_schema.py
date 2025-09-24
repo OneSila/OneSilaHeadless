@@ -57,6 +57,8 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
             return
 
         category_data = self._fetch_category_details()
+        print('------------------------------------------')
+        print(category_data)
         product_type = self._get_or_create_product_type(category_data)
         if product_type is None:
             return
@@ -65,6 +67,9 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         if not aspects:
             return
 
+        # print('--------------------------------------------------- ASPECTS')
+        # import pprint
+        # pprint.pprint(aspects)
         for aspect in aspects:
             ebay_property = self._sync_property(product_type, aspect)
             if ebay_property is None:
@@ -90,6 +95,8 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
                 category_id=self.category_id,
                 category_tree_id=self.category_tree_id,
             )
+            print('--------------------------------- RESPONSE DETAILS')
+            print(response)
         except Exception:  # pragma: no cover - defensive logging
             logger.exception(
                 "Failed to fetch eBay category subtree for category %s in tree %s",
@@ -101,7 +108,7 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         if not isinstance(response, dict):
             return None
 
-        node = response.get("categorySubtreeNode")
+        node = response.get("category_subtree_node")
         if isinstance(node, dict):
             category = node.get("category")
             if isinstance(category, dict):
@@ -137,10 +144,10 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         remote_id = self.category_id
         name = None
         if category:
-            category_id = category.get("categoryId")
+            category_id = category.get("category_id")
             if category_id is not None:
                 remote_id = str(category_id)
-            name = category.get("categoryName")
+            name = category.get("category_name")
 
         if remote_id is None:
             logger.warning("Unable to determine remote_id for eBay category. Skipping sync.")
@@ -149,6 +156,10 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         defaults: dict[str, Any] = {}
         if name:
             defaults["name"] = name
+
+        print('------------------------------------------ NAME')
+        print(name)
+
         product_type, _ = EbayProductType.objects.get_or_create(
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
@@ -175,17 +186,17 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         product_type: EbayProductType,
         aspect: dict[str, Any],
     ) -> EbayProperty | None:
-        localized_name = aspect.get("localizedAspectName")
+        localized_name = aspect.get("localized_aspect_name")
         if not localized_name:
             return None
 
-        constraint = aspect.get("aspectConstraint") or {}
-        applicable_to = constraint.get("aspectApplicableTo")
+        constraint = aspect.get("aspect_constraint") or {}
+        applicable_to = constraint.get("aspect_applicable_to")
         if isinstance(applicable_to, list) and "PRODUCT" not in applicable_to:
             return None
 
-        aspect_values = aspect.get("aspectValues") or []
-        aspect_format = constraint.get("aspectFormat")
+        aspect_values = aspect.get("aspect_values") or []
+        aspect_format = constraint.get("aspect_format")
         property_type, allows_unmapped = self._determine_property_metadata(aspect, aspect_values)
 
         ebay_property, _ = EbayProperty.objects.get_or_create(
@@ -196,7 +207,7 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         )
 
         update_fields: list[str] = []
-        aspect_id = aspect.get("aspectId")
+        aspect_id = aspect.get("aspect_id")
         if aspect_id is not None:
             aspect_id = str(aspect_id)
             if ebay_property.remote_id != aspect_id:
@@ -238,7 +249,7 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         for value_data in aspect_values or []:
             if not isinstance(value_data, dict):
                 continue
-            localized_value = value_data.get("localizedValue")
+            localized_value = value_data.get("localized_value")
             if not localized_value:
                 continue
 
@@ -250,7 +261,7 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
                 localized_value=localized_value,
             )
 
-            remote_value_id = value_data.get("valueId") or value_data.get("value")
+            remote_value_id = value_data.get("value_id") or value_data.get("value")
             if remote_value_id is not None:
                 remote_value_id = str(remote_value_id)
                 if value_obj.remote_id != remote_value_id:
@@ -263,7 +274,7 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         ebay_property: EbayProperty,
         aspect: dict[str, Any],
     ) -> None:
-        constraint = aspect.get("aspectConstraint") or {}
+        constraint = aspect.get("aspect_constraint") or {}
         remote_type = self._determine_remote_type(constraint)
 
         rule_item, _ = EbayProductTypeItem.objects.get_or_create(
@@ -282,13 +293,13 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         aspect: dict[str, Any],
         aspect_values: list[Any],
     ) -> tuple[str, bool]:
-        constraint = aspect.get("aspectConstraint") or {}
-        data_type = (constraint.get("aspectDataType") or "").upper()
-        mode = (constraint.get("aspectMode") or "").upper()
-        cardinality = (constraint.get("itemToAspectCardinality") or "").upper()
-        advanced_data_type = (constraint.get("aspectAdvancedDataType") or "").upper()
-        max_length = self._to_int(constraint.get("aspectMaxLength"))
-        aspect_format = constraint.get("aspectFormat")
+        constraint = aspect.get("aspect_constraint") or {}
+        data_type = (constraint.get("aspect_data_type") or "").upper()
+        mode = (constraint.get("aspect_mode") or "").upper()
+        cardinality = (constraint.get("item_to_aspect_cardinality") or "").upper()
+        advanced_data_type = (constraint.get("aspect_advanced_data_type") or "").upper()
+        max_length = self._to_int(constraint.get("aspect_max_length"))
+        aspect_format = constraint.get("aspect_format")
 
         # Default values
         property_type = Property.TYPES.TEXT
@@ -352,9 +363,9 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         return None
 
     def _determine_remote_type(self, constraint: dict[str, Any]) -> Optional[str]:
-        variations = self._normalize_bool(constraint.get("aspectEnabledForVariations"))
-        required = self._normalize_bool(constraint.get("aspectRequired"))
-        usage = (constraint.get("aspectUsage") or "").upper()
+        variations = self._normalize_bool(constraint.get("aspect_enabled_for_variations"))
+        required = self._normalize_bool(constraint.get("aspect_required"))
+        usage = (constraint.get("aspect_usage") or "").upper()
 
         if variations:
             if required:
