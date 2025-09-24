@@ -3,6 +3,7 @@ from core.signals import post_create, post_update
 from sales_channels.signals import refresh_website_pull_models, sales_channel_created
 from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
+    EbayProductType,
     EbayProperty,
     EbayPropertySelectValue,
 )
@@ -56,6 +57,23 @@ def sales_channels__ebay_property__sync_rule_item(sender, instance: EbayProperty
         return
 
     factory = EbayPropertyRuleItemSyncFactory(instance)
+    factory.run()
+
+
+@receiver(post_create, sender='ebay.EbayProductType')
+@receiver(post_update, sender='ebay.EbayProductType')
+def sales_channels__ebay_product_type__propagate_remote_id(sender, instance: EbayProductType, **kwargs):
+    signal = kwargs.get('signal')
+    if signal == post_update and not instance.is_dirty_field('remote_id'):
+        return
+    if not instance.remote_id or not instance.local_instance_id:
+        return
+
+    from sales_channels.integrations.ebay.factories.sales_channels import (
+        EbayProductTypeRemoteMappingFactory,
+    )
+
+    factory = EbayProductTypeRemoteMappingFactory(product_type=instance)
     factory.run()
 
 
