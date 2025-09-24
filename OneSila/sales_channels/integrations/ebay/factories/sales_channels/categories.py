@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
-from sales_channels.integrations.ebay.models.sales_channels import (
+from sales_channels.integrations.ebay.models import (
+    EbayCategory,
     EbaySalesChannel,
     EbaySalesChannelView,
 )
@@ -30,7 +31,7 @@ class EbayCategorySuggestionFactory(GetEbayAPIMixin):
             return
         if not self._resolve_category_tree_id():
             return
-        if not self._configure_api():
+        if self.query and not self._configure_api():
             return
         self._fetch_payload()
         self._normalize_payload()
@@ -66,7 +67,7 @@ class EbayCategorySuggestionFactory(GetEbayAPIMixin):
         return self.api is not None
 
     def _fetch_payload(self) -> None:
-        if self.api is None or self._resolved_category_tree_id is None:
+        if self._resolved_category_tree_id is None:
             return
 
         try:
@@ -75,10 +76,6 @@ class EbayCategorySuggestionFactory(GetEbayAPIMixin):
                     category_tree_id=self._resolved_category_tree_id,
                     q=self.query,
                 )
-            else:
-                self._raw_payload = self.api.commerce_taxonomy_get_category_tree(
-                    category_tree_id=self._resolved_category_tree_id,
-                )
         except Exception:
             self._raw_payload = {}
 
@@ -86,18 +83,28 @@ class EbayCategorySuggestionFactory(GetEbayAPIMixin):
         self._normalized_payload = self._to_dict(self._raw_payload)
 
     def _parse_categories(self) -> None:
-        data = self._normalized_payload
-        if self.query:
-            self.categories = self._parse_suggestions(data)
+        if not self.query:
+            if self._resolved_category_tree_id is None:
+                self.categories = []
+                return
+
+            queryset = EbayCategory.objects.filter(
+                marketplace_default_tree_id=self._resolved_category_tree_id,
+            ).order_by("name")
+
+            self.categories = [
+                {
+                    "category_id": category.remote_id,
+                    "category_name": category.name,
+                    "category_path": category.name,
+                    "leaf": True,
+                }
+                for category in queryset
+            ]
             return
 
-        categories: list[dict[str, Any]] = []
-        root_node = None
-        if isinstance(data, dict):
-            root_node = data.get("rootCategoryNode") or data.get("root_category_node")
-        if isinstance(root_node, dict):
-            self._traverse_tree(root_node, [], categories)
-        self.categories = categories
+        data = self._normalized_payload
+        self.categories = self._parse_suggestions(data)
 
     def _finalize_category_tree_id(self) -> None:
         tree_id = None
@@ -202,24 +209,3 @@ class EbayCategorySuggestionFactory(GetEbayAPIMixin):
                 suggestions.append(suggestion)
         return suggestions
 
-    def _traverse_tree(
-        self,
-        node: dict[str, Any],
-        path_segments: list[str],
-        accumulator: list[dict[str, Any]],
-    ) -> None:
-        category = node.get("category") or {}
-        category_id = category.get("categoryId")
-        category_name = category.get("categoryName")
-        current_path = path_segments
-        if category_name:
-            current_path = path_segments + [category_name]
-        leaf = bool(node.get("leafCategoryTreeNode"))
-        if category_id not in (None, "0", 0) and category_name:
-            entry = self._build_entry(category, current_path, leaf)
-            if entry is not None:
-                accumulator.append(entry)
-        children = node.get("childCategoryTreeNodes", []) or []
-        for child in children:
-            if isinstance(child, dict):
-                self._traverse_tree(child, current_path, accumulator)
