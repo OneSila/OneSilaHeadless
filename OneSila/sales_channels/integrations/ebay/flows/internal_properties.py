@@ -10,7 +10,7 @@ def ensure_internal_properties_flow(sales_channel):
             sales_channel=sales_channel,
             code=definition['code'],
             defaults={
-                'label': definition['name'],
+                'name': definition['name'],
                 'type': definition['type'],
                 'is_root': definition['is_root'],
             },

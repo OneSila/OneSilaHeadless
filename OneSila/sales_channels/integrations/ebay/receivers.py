@@ -17,9 +17,6 @@ from sales_channels.integrations.ebay.tasks import (
     ebay_translate_select_value_task,
 )
 
-# @receiver(post_update, sender='app_name.Model')
-# def app_name__model__action__example(sender, instance, **kwargs):
-#     do_something()
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
 @receiver(refresh_website_pull_models, sender='ebay.EbaySalesChannel')
 @receiver(sales_channel_created, sender='sales_channels.SalesChannel')

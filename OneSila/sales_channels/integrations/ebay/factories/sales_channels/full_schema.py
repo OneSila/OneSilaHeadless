@@ -40,6 +40,10 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         self.category_tree_id = category_tree_id or getattr(self.view, "default_category_tree_id", None)
         self.language = language
         self.multi_tenant_company = sales_channel.multi_tenant_company
+        self.set_category_aspects(category_aspects)
+
+
+    def set_category_aspects(self, category_aspects):
         normalized_category_aspects: dict[str, set[str]] = {}
         for aspect_name, values in (category_aspects or {}).items():
             if not aspect_name:
@@ -60,40 +64,6 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
 
         # Each factory instance needs its own API configured for the specific view headers.
         self.api = self.get_api()
-
-    def run(self) -> None:
-        """Build local product type rules for the configured category."""
-
-        if not self.category_id:
-            logger.warning("Skipping eBay product type sync because category_id is missing.")
-            return
-
-        if not self.category_tree_id:
-            logger.warning(
-                "Skipping eBay product type sync for category %s due to missing category tree id.",
-                self.category_id,
-            )
-            return
-
-        category_data = self._fetch_category_details()
-        print('------------------------------------------')
-        print(category_data)
-        product_type = self._get_or_create_product_type(category_data)
-        if product_type is None:
-            return
-
-        aspects = self._fetch_aspects()
-        if not aspects:
-            return
-
-        # print('--------------------------------------------------- ASPECTS')
-        # import pprint
-        # pprint.pprint(aspects)
-        for aspect in aspects:
-            ebay_property = self._sync_property(product_type, aspect)
-            if ebay_property is None:
-                continue
-            self._sync_product_type_item(product_type, ebay_property, aspect)
 
     @staticmethod
     def _ensure_real_view(view: EbaySalesChannelView) -> EbaySalesChannelView:
@@ -421,3 +391,33 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
             return ProductPropertiesRuleItem.OPTIONAL
 
         return ProductPropertiesRuleItem.OPTIONAL
+
+
+    def run(self) -> None:
+        """Build local product type rules for the configured category."""
+
+        if not self.category_id:
+            logger.warning("Skipping eBay product type sync because category_id is missing.")
+            return
+
+        if not self.category_tree_id:
+            logger.warning(
+                "Skipping eBay product type sync for category %s due to missing category tree id.",
+                self.category_id,
+            )
+            return
+
+        category_data = self._fetch_category_details()
+        product_type = self._get_or_create_product_type(category_data)
+        if product_type is None:
+            return
+
+        aspects = self._fetch_aspects()
+        if not aspects:
+            return
+
+        for aspect in aspects:
+            ebay_property = self._sync_property(product_type, aspect)
+            if ebay_property is None:
+                continue
+            self._sync_product_type_item(product_type, ebay_property, aspect)
