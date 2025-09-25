@@ -11,6 +11,7 @@ from core.schema.core.types.types import (
 from strawberry.relay import to_base64
 from imports_exports.schema.queries import ImportType
 from sales_channels.integrations.ebay.models import (
+    EbayCategory,
     EbaySalesChannel,
     EbayInternalProperty,
     EbayProductType,
@@ -22,6 +23,7 @@ from sales_channels.integrations.ebay.models import (
     EbayCurrency,
 )
 from sales_channels.integrations.ebay.schema.types.filters import (
+    EbayCategoryFilter,
     EbaySalesChannelFilter,
     EbayInternalPropertyFilter,
     EbayProductTypeFilter,
@@ -33,6 +35,7 @@ from sales_channels.integrations.ebay.schema.types.filters import (
     EbayCurrencyFilter,
 )
 from sales_channels.integrations.ebay.schema.types.ordering import (
+    EbayCategoryOrder,
     EbaySalesChannelOrder,
     EbayInternalPropertyOrder,
     EbayProductTypeOrder,
@@ -48,6 +51,17 @@ from sales_channels.integrations.ebay.schema.types.ordering import (
 @strawberry_type
 class EbayRedirectUrlType:
     redirect_url: str
+
+
+@type(
+    EbayCategory,
+    filters=EbayCategoryFilter,
+    order=EbayCategoryOrder,
+    pagination=True,
+    fields="__all__",
+)
+class EbayCategoryType(relay.Node):
+    pass
 
 
 @type(EbaySalesChannel, filters=EbaySalesChannelFilter, order=EbaySalesChannelOrder, pagination=True, fields="__all__")

@@ -128,22 +128,27 @@ class EbayCategoryNodeSyncFactoryTest(TestCase):
         )
 
     @patch("sales_channels.integrations.ebay.factories.sales_channels.categories.GetEbayAPIMixin.get_api")
-    def test_suggestion_factory_uses_cached_categories(self, mock_get_api: Mock) -> None:
-        EbayCategory.objects.create(
-            remote_id="100",
-            marketplace_default_tree_id="3",
-            name="Parent",
+    def test_suggestion_factory_fetches_remote_suggestions(self, mock_get_api: Mock) -> None:
+        payload = {
+            "categoryTreeId": "3",
+            "categorySuggestions": [
+                {
+                    "category": {"categoryId": "200", "categoryName": "Leaf"},
+                    "categoryTreeNodeAncestors": [
+                        {"category": {"categoryName": "Parent"}},
+                    ],
+                }
+            ],
+        }
+        api = SimpleNamespace(
+            commerce_taxonomy_get_category_suggestions=Mock(return_value=payload),
         )
-        EbayCategory.objects.create(
-            remote_id="200",
-            marketplace_default_tree_id="3",
-            name="Leaf",
-        )
+        mock_get_api.return_value = api
 
-        factory = EbayCategorySuggestionFactory(view=self.view, query="")
+        factory = EbayCategorySuggestionFactory(view=self.view, query=" Leaf ")
         factory.run()
 
-        mock_get_api.assert_not_called()
+        mock_get_api.assert_called_once_with()
         self.assertEqual(factory.category_tree_id, "3")
         self.assertEqual(
             factory.categories,
@@ -151,14 +156,8 @@ class EbayCategoryNodeSyncFactoryTest(TestCase):
                 {
                     "category_id": "200",
                     "category_name": "Leaf",
-                    "category_path": "Leaf",
+                    "category_path": "Parent > Leaf",
                     "leaf": True,
-                },
-                {
-                    "category_id": "100",
-                    "category_name": "Parent",
-                    "category_path": "Parent",
-                    "leaf": True,
-                },
+                }
             ],
         )
