@@ -1,5 +1,8 @@
 from core.managers import MultiTenantManager, MultiTenantQuerySet
+from core.managers.search import SearchManagerMixin, SearchQuerySetMixin
 from django.db.models import BooleanField, Case, Value, When
+from django.db.models import Manager as DjangoManager
+from django.db.models import QuerySet as DjangoQuerySet
 from polymorphic.managers import PolymorphicManager, PolymorphicQuerySet
 
 from sales_channels.managers import _MappingManagerMixin, _MappingQuerySetMixin
@@ -48,3 +51,12 @@ class EbayPropertySelectValueManager(_MappingManagerMixin, MultiTenantManager):
 
 class EbayProductTypeManager(_MappingManagerMixin, MultiTenantManager):
     queryset_class = EbayProductTypeQuerySet
+
+
+class EbayCategoryQuerySet(SearchQuerySetMixin, DjangoQuerySet):
+    pass
+
+
+class EbayCategoryManager(SearchManagerMixin, DjangoManager):
+    def get_queryset(self):
+        return EbayCategoryQuerySet(self.model, using=self._db)
