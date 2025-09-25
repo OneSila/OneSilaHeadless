@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
+from ast import literal_eval
+from collections.abc import Iterable, Iterator, Mapping
 from typing import Any
 
 import requests
@@ -355,15 +356,15 @@ class GetEbayAPIMixin:
             records_key="inventory_items",
         )
 
-    def get_all_category_ids(
+    def get_category_aspects_map(
         self,
         *,
         products_limit: int | None = None,
         offers_limit: int | None = None,
-    ) -> dict[str, set[str]]:
-        """Return category IDs associated with all offers for the channel inventory."""
+    ) -> dict[str, dict[str, dict[str, Any]]]:
+        """Return category and aspect information grouped by marketplace."""
 
-        category_ids_by_marketplace: dict[str, set[str]] = {}
+        category_map: dict[str, dict[str, dict[str, Any]]] = {}
 
         for product in self.get_all_products(limit=products_limit):
             if not isinstance(product, dict):
@@ -372,6 +373,8 @@ class GetEbayAPIMixin:
             sku = product.get("sku") or product.get("inventoryItemSku")
             if not sku:
                 continue
+
+            product_aspects = self._extract_product_aspects(product=product)
 
             for offer in self._paginate_api_results(
                 self.api.sell_inventory_get_offers,
@@ -392,11 +395,73 @@ class GetEbayAPIMixin:
                     continue
 
                 marketplace_key = str(marketplace_id)
-                if marketplace_key not in category_ids_by_marketplace:
-                    category_ids_by_marketplace[marketplace_key] = set()
+                marketplace_categories = category_map.setdefault(marketplace_key, {})
 
-                category_ids_by_marketplace[marketplace_key].add(str(category_id))
+                category_key = str(category_id)
+                category_details = marketplace_categories.setdefault(
+                    category_key,
+                    {"category_id": category_key, "aspects": {}},
+                )
 
-        return category_ids_by_marketplace
+                aspects_map = category_details.setdefault("aspects", {})
+
+                if not product_aspects:
+                    continue
+
+                for aspect_name, aspect_values in product_aspects.items():
+                    value_set = aspects_map.setdefault(aspect_name, set())
+                    value_set.update(aspect_values)
+
+        return category_map
+
+    def _extract_product_aspects(
+        self,
+        *,
+        product: dict[str, Any],
+    ) -> dict[str, set[str]]:
+        """Return normalized aspect data from a product payload."""
+
+        product_data = product.get("product")
+        if isinstance(product_data, dict):
+            aspects_raw = product_data.get("aspects")
+        else:
+            aspects_raw = None
+
+        if isinstance(aspects_raw, Mapping):
+            aspects_source = aspects_raw
+        elif isinstance(aspects_raw, str):
+            try:
+                parsed = literal_eval(aspects_raw)
+            except (SyntaxError, ValueError):
+                return {}
+            if not isinstance(parsed, Mapping):
+                return {}
+            aspects_source = parsed
+        else:
+            return {}
+
+        normalized: dict[str, set[str]] = {}
+        for aspect_name, values in aspects_source.items():
+            if not aspect_name:
+                continue
+
+            if isinstance(values, str):
+                source_values: Iterable[Any] = [values]
+            elif isinstance(values, Iterable) and not isinstance(values, (str, bytes, bytearray)):
+                source_values = values
+            else:
+                continue
+
+            normalized_values = {str(value) for value in source_values if value is not None}
+            if not normalized_values:
+                continue
+
+            key = str(aspect_name)
+            if key in normalized:
+                normalized[key].update(normalized_values)
+            else:
+                normalized[key] = normalized_values
+
+        return normalized
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from typing import Any, Optional
 
 from properties.models import Property, ProductPropertiesRuleItem
@@ -31,6 +32,7 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         category_id: str,
         category_tree_id: Optional[str] = None,
         language: Optional[str] = None,
+        category_aspects: Optional[dict[str, set[str]]] = None,
     ) -> None:
         self.sales_channel = sales_channel
         self.view = self._ensure_real_view(view)
@@ -38,6 +40,23 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         self.category_tree_id = category_tree_id or getattr(self.view, "default_category_tree_id", None)
         self.language = language
         self.multi_tenant_company = sales_channel.multi_tenant_company
+        normalized_category_aspects: dict[str, set[str]] = {}
+        for aspect_name, values in (category_aspects or {}).items():
+            if not aspect_name:
+                continue
+
+            if isinstance(values, set):
+                normalized_values = {str(value) for value in values if value is not None}
+            elif isinstance(values, Iterable) and not isinstance(values, (str, bytes, bytearray)):
+                normalized_values = {str(value) for value in values if value is not None}
+            else:
+                continue
+
+            if not normalized_values:
+                continue
+
+            normalized_category_aspects[str(aspect_name)] = normalized_values
+        self.category_aspects = normalized_category_aspects
 
         # Each factory instance needs its own API configured for the specific view headers.
         self.api = self.get_api()
@@ -234,23 +253,44 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         if update_fields:
             ebay_property.save(update_fields=update_fields)
 
-        self._sync_property_values(ebay_property, aspect_values)
+        allowed_values = self.category_aspects.get(localized_name)
+        self._sync_property_values(
+            ebay_property=ebay_property,
+            aspect_values=aspect_values,
+            allows_unmapped=allows_unmapped,
+            allowed_values=allowed_values,
+        )
 
         return ebay_property
 
     def _sync_property_values(
         self,
+        *,
         ebay_property: EbayProperty,
         aspect_values: list[Any],
+        allows_unmapped: bool,
+        allowed_values: Optional[set[str]],
     ) -> None:
         if ebay_property.type not in {Property.TYPES.SELECT, Property.TYPES.MULTISELECT}:
             return
+
+        allowed_lookup: set[str] | None = None
+        if allows_unmapped:
+            if not allowed_values:
+                return
+            allowed_lookup = {str(value) for value in allowed_values if value is not None}
 
         for value_data in aspect_values or []:
             if not isinstance(value_data, dict):
                 continue
             localized_value = value_data.get("localized_value")
-            if not localized_value:
+            if localized_value in {None, ""}:
+                continue
+
+            if not isinstance(localized_value, str):
+                localized_value = str(localized_value)
+
+            if allowed_lookup is not None and localized_value not in allowed_lookup:
                 continue
 
             value_obj, _ = EbayPropertySelectValue.objects.get_or_create(
