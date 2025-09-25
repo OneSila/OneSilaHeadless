@@ -13,6 +13,9 @@ def ebay_import_db_task(import_process, sales_channel):
     from sales_channels.integrations.ebay.factories.imports.schema_imports import (
         EbaySchemaImportProcessor,
     )
+    from sales_channels.integrations.ebay.factories.imports.products_imports import (
+        EbayProductsAsyncImportProcessor,
+    )
     from sales_channels.integrations.ebay.models import EbaySalesChannelImport
 
     import_type = getattr(import_process, "type", EbaySalesChannelImport.TYPE_SCHEMA)
@@ -23,6 +26,38 @@ def ebay_import_db_task(import_process, sales_channel):
             sales_channel=sales_channel,
         )
         factory.run()
+    elif import_type == EbaySalesChannelImport.TYPE_PRODUCTS:
+        factory = EbayProductsAsyncImportProcessor(
+            import_process=import_process,
+            sales_channel=sales_channel,
+        )
+        factory.run()
+
+
+@db_task()
+def ebay_product_import_item_task(
+    import_process_id: int,
+    sales_channel_id: int,
+    product_data: dict,
+    is_last: bool = False,
+    updated_with: int | None = None,
+):
+    from imports_exports.models import Import
+    from sales_channels.integrations.ebay.factories.imports.products_imports import (
+        EbayProductItemFactory,
+    )
+    from sales_channels.integrations.ebay.models import EbaySalesChannel
+
+    process = Import.objects.get(id=import_process_id)
+    channel = EbaySalesChannel.objects.get(id=sales_channel_id)
+    factory = EbayProductItemFactory(
+        product_data=product_data,
+        import_process=process,
+        sales_channel=channel,
+        is_last=is_last,
+        updated_with=updated_with,
+    )
+    factory.run()
 
 
 @db_task()
