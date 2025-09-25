@@ -4,7 +4,6 @@ from typing import Any
 
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
 from sales_channels.integrations.ebay.models import (
-    EbayCategory,
     EbaySalesChannel,
     EbaySalesChannelView,
 )
@@ -13,11 +12,11 @@ from sales_channels.integrations.ebay.models import (
 class EbayCategorySuggestionFactory(GetEbayAPIMixin):
     """Fetch and normalize eBay category suggestions or trees."""
 
-    def __init__(self, *, view: Any, query: str | None = None) -> None:
+    def __init__(self, *, view: Any, query: str) -> None:
         self.original_view = view
         self.view = self._resolve_view(view)
         self.sales_channel = self._resolve_sales_channel(self.view, view)
-        self.query = (query or "").strip()
+        self.query = query.strip()
         self.api = None
         self.category_tree_id: str = ""
         self.categories: list[dict[str, Any]] = []
@@ -31,11 +30,13 @@ class EbayCategorySuggestionFactory(GetEbayAPIMixin):
             return
         if not self._resolve_category_tree_id():
             return
-        if self.query and not self._configure_api():
+        if not self.query:
+            return
+        if not self._configure_api():
             return
         self._fetch_payload()
         self._normalize_payload()
-        self._parse_categories()
+        self.categories = self._parse_suggestions(self._normalized_payload)
         self._finalize_category_tree_id()
 
     def _reset_state(self) -> None:
@@ -67,44 +68,19 @@ class EbayCategorySuggestionFactory(GetEbayAPIMixin):
         return self.api is not None
 
     def _fetch_payload(self) -> None:
-        if self._resolved_category_tree_id is None:
+        if self._resolved_category_tree_id is None or not self.query or self.api is None:
             return
 
         try:
-            if self.query:
-                self._raw_payload = self.api.commerce_taxonomy_get_category_suggestions(
-                    category_tree_id=self._resolved_category_tree_id,
-                    q=self.query,
-                )
+            self._raw_payload = self.api.commerce_taxonomy_get_category_suggestions(
+                category_tree_id=self._resolved_category_tree_id,
+                q=self.query,
+            )
         except Exception:
             self._raw_payload = {}
 
     def _normalize_payload(self) -> None:
         self._normalized_payload = self._to_dict(self._raw_payload)
-
-    def _parse_categories(self) -> None:
-        if not self.query:
-            if self._resolved_category_tree_id is None:
-                self.categories = []
-                return
-
-            queryset = EbayCategory.objects.filter(
-                marketplace_default_tree_id=self._resolved_category_tree_id,
-            ).order_by("name")
-
-            self.categories = [
-                {
-                    "category_id": category.remote_id,
-                    "category_name": category.name,
-                    "category_path": category.name,
-                    "leaf": True,
-                }
-                for category in queryset
-            ]
-            return
-
-        data = self._normalized_payload
-        self.categories = self._parse_suggestions(data)
 
     def _finalize_category_tree_id(self) -> None:
         tree_id = None

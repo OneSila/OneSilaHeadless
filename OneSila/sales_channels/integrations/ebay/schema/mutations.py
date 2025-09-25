@@ -95,7 +95,7 @@ class EbaySalesChannelMutation:
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def suggest_ebay_category(
         self,
-        name: str | None,
+        name: str,
         marketplace: SalesChannelViewPartialInput,
         info: Info,
     ) -> SuggestedEbayCategory:
@@ -104,7 +104,9 @@ class EbaySalesChannelMutation:
 
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
 
-        query = (name or "").strip()
+        query = name.strip()
+        if not query:
+            raise ValidationError(_("Category name is required."))
 
         view = SalesChannelView.objects.select_related("sales_channel").get(
             id=marketplace.id.node_id,
