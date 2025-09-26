@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Optional
 
 from django.core.exceptions import ValidationError
@@ -10,6 +11,7 @@ from properties.models import Property, PropertySelectValue, PropertyTranslation
 
 
 BULLET_POINT_SEPARATOR = "__BULLET_SEPARATOR__"
+logger = logging.getLogger(__name__)
 
 
 class AITranslateContentFlow:
@@ -219,6 +221,21 @@ class BulkAiTranslateContentFlow:
             for to_lang in self.to_language_codes:
 
                 try:
+                    existing_translation = translation_model.objects.filter(
+                        **{
+                            get_or_create_field: obj,
+                            "language": to_lang,
+                            "multi_tenant_company": self.multi_tenant_company,
+                        }
+                    ).first()
+
+                    if (
+                        existing_translation
+                        and getattr(existing_translation, assign_field, None)
+                        and not self.override_translation
+                    ):
+                        continue
+
                     flow = AITranslateContentFlow(
                         to_translate=original_value,
                         from_language_code=self.from_language_code,
@@ -227,23 +244,34 @@ class BulkAiTranslateContentFlow:
                     )
                     flow.flow()
 
-                    translation, created = translation_model.objects.get_or_create(
-                        **{get_or_create_field: obj, "language": to_lang,
-                           "multi_tenant_company": self.multi_tenant_company}
-                    )
-
-                    # Skip if existing value and not overriding
-                    existing_value = getattr(translation, assign_field, None)
-                    if not created and existing_value and not self.override_translation:
-                        continue
+                    if existing_translation:
+                        translation = existing_translation
+                    else:
+                        translation, _ = translation_model.objects.get_or_create(
+                            **{
+                                get_or_create_field: obj,
+                                "language": to_lang,
+                                "multi_tenant_company": self.multi_tenant_company,
+                            }
+                        )
 
                     setattr(translation, assign_field, flow.translated_content)
                     translation.save()
 
                     self.total_points += flow.used_points
 
-                except Exception:
-                    pass
+                    logger.info(
+                        "Translated %s for %s to %s", assign_field, obj, to_lang
+                    )
+
+                except Exception as exc:
+                    logger.exception(
+                        "Failed to translate %s for %s to %s. Error: %s",
+                        assign_field,
+                        obj,
+                        to_lang,
+                        exc,
+                    )
 
     def translate_properties(self):
 
