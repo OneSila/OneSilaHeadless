@@ -5,6 +5,7 @@ This document explains how to add new sales-channel integrations under `sales_ch
 ## Macro steps to follow
 
 To do this integration:
+0. If necessary do oAuth.
 1. Do the PULL factories (or you end up with strange situations in the final step when creating the ProductSyncFactories)
 2. Make sure your SalesChannelViewAssign SalesChannelView and SalesChannel infrastructure exists and your test-mixins are connected to it
 3. You do the Attributes, Media, etc.

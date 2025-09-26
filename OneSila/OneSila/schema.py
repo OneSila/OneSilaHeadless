@@ -19,6 +19,8 @@ from media.schema import MediaQuery, MediaMutation, MediaSubscription
 from products.schema import ProductsQuery, ProductsMutation, ProductsSubscription
 from products_inspector.schema import ProductsInspectorSubscription, ProductsInspectorMutation
 from properties.schema import PropertiesQuery, PropertiesMutation, PropertiesSubscription
+from sales_channels.integrations.ebay.schema import EbaySalesChannelMutation, EbaySalesChannelsQuery, \
+        EbaySalesChannelsSubscription
 from sales_prices.schema import SalesPricesQuery, SalesPricesMutation, SalesPriceSubscription
 from sales_channels.schema import SalesChannelsQuery, SalesChannelsMutation, SalesChannelsSubscription
 from sales_channels.integrations.magento2.schema import MagentoSalesChannelMutation, MagentoSalesChannelsQuery, \
@@ -54,6 +56,7 @@ class Query(
         MagentoSalesChannelsQuery,
         ShopifySalesChannelsQuery,
         WoocommerceSalesChannelsQuery,
+        EbaySalesChannelsQuery,
         ProductsQuery,
         PropertiesQuery,
         SalesPricesQuery,
@@ -76,6 +79,7 @@ class Mutation(
         MultiTenantMutation,
         ShopifySalesChannelMutation,
         WoocommerceSalesChannelMutation,
+        EbaySalesChannelMutation,
         ProductsInspectorMutation,
         ProductsMutation,
         PropertiesMutation,
@@ -106,6 +110,7 @@ class Subscription(
         TaxSubscription,
         ShopifySalesChannelsSubscription,
         WoocommerceSalesChannelsSubscription,
+        EbaySalesChannelsSubscription,
 ):
     pass
 

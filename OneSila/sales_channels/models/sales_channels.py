@@ -5,7 +5,7 @@ from polymorphic.models import PolymorphicModel
 from core.helpers import get_languages
 from integrations.models import Integration
 from sales_channels.models.mixins import RemoteObjectMixin
-from sales_channels.managers import SalesChannelViewAssignManager
+from sales_channels.managers import SalesChannelViewAssignManager, SalesChannelViewManager
 
 import logging
 
@@ -132,9 +132,12 @@ class SalesChannelView(PolymorphicModel, RemoteObjectMixin, models.Model):
     name = models.CharField(max_length=216, null=True, blank=True)
     url = models.CharField(max_length=512, null=True, blank=True)
 
+    objects = SalesChannelViewManager()
+
     class Meta:
         verbose_name = 'Sales Channel View'
         verbose_name_plural = 'Sales Channel Views'
+        search_terms = ['name']
 
     def __str__(self):
         return str(self.name)

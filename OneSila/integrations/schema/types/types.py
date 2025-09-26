@@ -19,6 +19,7 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
         from sales_channels.integrations.shopify.models import ShopifySalesChannel
         from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
         from sales_channels.integrations.amazon.models import AmazonSalesChannel
+        from sales_channels.integrations.ebay.models import EbaySalesChannel
         from webhooks.models import WebhookIntegration
 
         if isinstance(self, MagentoSalesChannel):
@@ -31,6 +32,8 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
             return self.access_token is not None
         elif isinstance(self, WebhookIntegration):
             return True
+        elif isinstance(self, EbaySalesChannel):
+            return self.access_token is not None
 
         raise NotImplementedError(f"Integration type {self.__class__} not implemented")
 
@@ -46,6 +49,9 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
         from sales_channels.integrations.amazon.schema.types.types import AmazonSalesChannelType
         from webhooks.models import WebhookIntegration
         from webhooks.schema.types.types import WebhookIntegrationType
+        from sales_channels.integrations.ebay.models import EbaySalesChannel
+        from sales_channels.integrations.ebay.schema.types.types import EbaySalesChannelType
+
 
         if isinstance(self, MagentoSalesChannel):
             graphql_type = MagentoSalesChannelType
@@ -57,6 +63,8 @@ class IntegrationType(relay.Node, GetQuerysetMultiTenantMixin):
             graphql_type = AmazonSalesChannelType
         elif isinstance(self, WebhookIntegration):
             graphql_type = WebhookIntegrationType
+        elif isinstance(self, EbaySalesChannel):
+            graphql_type = EbaySalesChannelType
         else:
             raise NotImplementedError(f"Integration type {self.__class__} not implemented")
 
