@@ -4,6 +4,7 @@ from .languages import EbayRemoteLanguagePullFactory
 from .views import EbaySalesChannelViewPullFactory
 from .categories import EbayCategorySuggestionFactory
 from .full_schema import EbayProductTypeRuleFactory
+from .product_type_mapping import EbayProductTypeRemoteMappingFactory
 
 __all__ = [
     'GetEbayRedirectUrlFactory',
@@ -13,4 +14,5 @@ __all__ = [
     'EbaySalesChannelViewPullFactory',
     'EbayProductTypeRuleFactory',
     'EbayCategorySuggestionFactory',
+    'EbayProductTypeRemoteMappingFactory',
 ]
