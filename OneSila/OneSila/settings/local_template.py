@@ -119,5 +119,6 @@ EBAY_CLIENT_SECRET = None
 EBAY_DEV_ID = None
 EBAY_APPLICATION_SCOPES = ["https://api.ebay.com/oauth/api_scope"]
 EBAY_RU_NAME = 'Name'
+EBAY_ACCOUNT_DELETION_VERIFICATION_TOKEN = "replace-with-onesila-ebay-verification-token-123456"
 
 TEST_WEBHOOK_SECRET = "test-secret"
