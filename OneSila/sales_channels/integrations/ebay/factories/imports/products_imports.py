@@ -41,10 +41,44 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
         return 0
 
     def get_products_data(self) -> Iterator[dict[str, Any]]:
-        """Yield serialized product payloads from the remote API."""
+        """Yield product and offer payload pairs from the remote API."""
 
-        pass
-        return iter(())
+        for product in self.get_all_products():
+            if not isinstance(product, dict):
+                continue
+
+            sku = product.get("sku") or product.get("inventory_item_sku")
+            if not sku:
+                continue
+
+            offers_iterator = self._paginate_api_results(
+                self.api.sell_inventory_get_offers,
+                limit=None,
+                record_key="record",
+                records_key="offers",
+                sku=sku,
+            )
+
+            for offer in offers_iterator:
+                if not isinstance(offer, dict):
+                    continue
+
+                yield {"product": product, "offer": offer}
+
+    def import_products_process(self) -> None:
+        for product_payload in self.get_products_data():
+            if not isinstance(product_payload, dict):
+                continue
+
+            product = product_payload.get("product")
+            offer = product_payload.get("offer")
+            if not isinstance(product, dict):
+                continue
+            if not isinstance(offer, dict):
+                continue
+
+            self.process_product_item(product, offer)
+            self.update_percentage()
 
     def _parse_prices(self, *, product_data: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract price payloads from a remote product response."""
@@ -136,7 +170,11 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
 
         pass
 
-    def process_product_item(self, *, product_data: dict[str, Any]) -> None:
+    def process_product_item(
+        self,
+        product_data: dict[str, Any],
+        offer_data: dict[str, Any] | None = None,
+    ) -> None:
         """Process a single serialized product payload."""
 
         pass
