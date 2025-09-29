@@ -3,10 +3,53 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from currencies.models import Currency
 from imports_exports.factories.imports import AsyncProductImportMixin, ImportMixin
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
+from sales_channels.models import SalesChannelIntegrationPricelist
+from sales_prices.models import SalesPrice
+
+
+def get_parent_skus(*, product_data: Any) -> set[str]:
+    """Return the parent SKU identifiers declared on the payload."""
+
+    if not isinstance(product_data, dict):
+        return set()
+
+    parent_skus: set[str] = set()
+
+    for key in ("group_ids", "inventory_item_group_keys"):
+        values = product_data.get(key)
+        if values is None:
+            continue
+
+        if isinstance(values, str) or not isinstance(values, (list, tuple, set)):
+            iterable = [values]
+        else:
+            iterable = list(values)
+
+        for value in iterable:
+            if value is None:
+                continue
+
+            normalized = value.strip() if isinstance(value, str) else str(value)
+            if not normalized:
+                continue
+
+            parent_skus.add(normalized)
+
+    return parent_skus
+
+
+def get_is_product_variation(*, product_data: Any) -> tuple[bool, set[str]]:
+    """Return whether the payload references a variation and its parent SKUs."""
+
+    parent_skus = get_parent_skus(product_data=product_data)
+
+    return (bool(parent_skus), parent_skus)
 
 
 class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
@@ -80,11 +123,120 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
             self.process_product_item(product, offer)
             self.update_percentage()
 
-    def _parse_prices(self, *, product_data: dict[str, Any]) -> list[dict[str, Any]]:
-        """Extract price payloads from a remote product response."""
+    def _parse_prices(
+        self,
+        *,
+        product_data: dict[str, Any],
+        local_product: Any | None = None,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Convert eBay offer pricing into local price and pricelist payloads."""
 
-        pass
-        return []
+        if not isinstance(product_data, dict):
+            return [], []
+
+        offers_data = product_data.get("offers") or []
+        if isinstance(offers_data, list):
+            offers = [offer for offer in offers_data if isinstance(offer, dict)]
+        elif isinstance(offers_data, dict):
+            offers = [offers_data]
+        else:
+            offers = []
+
+        prices: list[dict[str, Any]] = []
+        sales_pricelist_items: list[dict[str, Any]] = []
+        processed_currencies: set[str] = set()
+
+        for offer_payload in offers:
+            pricing_summary = offer_payload.get("pricing_summary") or {}
+            price_data = pricing_summary.get("price") or {}
+            amount = price_data.get("value")
+            currency_code = price_data.get("currency")
+
+            if amount is None or not currency_code:
+                continue
+
+            iso_code = str(currency_code).upper()
+            if iso_code in processed_currencies:
+                continue
+
+            try:
+                price_decimal = Decimal(str(amount))
+            except (InvalidOperation, TypeError, ValueError):
+                continue
+
+            try:
+                currency = Currency.objects.get(
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
+                    iso_code=iso_code,
+                )
+            except Currency.DoesNotExist as exc:
+                raise ValueError(
+                    f"Currency with ISO code {iso_code} does not exist locally"
+                ) from exc
+
+            processed_currencies.add(iso_code)
+
+            scip = (
+                SalesChannelIntegrationPricelist.objects.filter(
+                    sales_channel=self.sales_channel,
+                    price_list__currency=currency,
+                )
+                .select_related("price_list")
+                .first()
+            )
+
+            if scip:
+                sales_pricelist_items.append(
+                    {
+                        "salespricelist": scip.price_list,
+                        "disable_auto_update": True,
+                        "price_auto": price_decimal,
+                    }
+                )
+            else:
+                sales_pricelist_items.append(
+                    {
+                        "salespricelist_data": {
+                            "name": f"eBay {self.sales_channel.hostname} {iso_code}",
+                            "currency_object": currency,
+                        },
+                        "disable_auto_update": True,
+                        "price_auto": price_decimal,
+                    }
+                )
+
+            has_sales_price = (
+                local_product
+                and SalesPrice.objects.filter(
+                    product=local_product,
+                    currency__iso_code=iso_code,
+                ).exists()
+            )
+
+            if has_sales_price:
+                continue
+
+            price_payload: dict[str, Any] = {
+                "price": price_decimal,
+                "currency": iso_code,
+            }
+
+            original_price = pricing_summary.get("original_retail_price") or {}
+            original_amount = original_price.get("value")
+            original_currency = original_price.get("currency")
+
+            if original_amount is not None and original_currency:
+                try:
+                    original_decimal = Decimal(str(original_amount))
+                except (InvalidOperation, TypeError, ValueError):
+                    original_decimal = None
+
+                if original_decimal is not None and str(original_currency).upper() == iso_code:
+                    price_payload["rrp"] = original_decimal
+
+            prices.append(price_payload)
+
+        return prices, sales_pricelist_items
 
     def _parse_translations(self, *, product_data: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract translation payloads from a remote product response."""
