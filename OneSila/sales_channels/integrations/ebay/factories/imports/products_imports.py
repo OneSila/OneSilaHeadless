@@ -247,8 +247,44 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
     def _parse_images(self, *, product_data: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract image payloads from a remote product response."""
 
-        pass
-        return []
+        if not isinstance(product_data, dict):
+            return []
+
+        product_payload = product_data.get("product") or {}
+        if not isinstance(product_payload, dict):
+            return []
+
+        image_urls = product_payload.get("image_urls")
+        if not image_urls:
+            return []
+
+        if isinstance(image_urls, str) or not isinstance(image_urls, (list, tuple, set)):
+            iterable = [image_urls]
+        else:
+            iterable = list(image_urls)
+
+        images: list[dict[str, Any]] = []
+        seen_urls: set[str] = set()
+
+        for value in iterable:
+            if value is None:
+                continue
+
+            url = str(value).strip()
+            if not url or url in seen_urls:
+                continue
+
+            sort_order = len(images)
+            images.append(
+                {
+                    "image_url": url,
+                    "sort_order": sort_order,
+                    "is_main_image": sort_order == 0,
+                }
+            )
+            seen_urls.add(url)
+
+        return images
 
     def _parse_variations(self, *, product_data: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract variation payloads from a remote product response."""
