@@ -370,7 +370,7 @@ class GetEbayAPIMixin:
             if not isinstance(product, dict):
                 continue
 
-            sku = product.get("sku") or product.get("inventoryItemSku")
+            sku = product.get("sku") or product.get("inventory_item_sku")
             if not sku:
                 continue
 
@@ -386,11 +386,11 @@ class GetEbayAPIMixin:
                 if not isinstance(offer, dict):
                     continue
 
-                marketplace_id = offer.get("marketplace_id") or offer.get("marketplaceId")
+                marketplace_id = offer.get("marketplace_id")
                 if not marketplace_id:
                     continue
 
-                category_id = offer.get("category_id") or offer.get("categoryId")
+                category_id = offer.get("category_id")
                 if not category_id:
                     continue
 
