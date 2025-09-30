@@ -14,7 +14,7 @@ from properties.models import Property
 from products.product_types import CONFIGURABLE, SIMPLE
 
 from currencies.models import Currency
-from imports_exports.factories.imports import AsyncProductImportMixin, ImportMixin
+from imports_exports.factories.imports import AsyncProductImportMixin
 from imports_exports.factories.products import ImportProductInstance
 from imports_exports.helpers import append_broken_record
 from core.helpers import ensure_serializable
@@ -27,10 +27,15 @@ from sales_channels.integrations.ebay.models import (
     EbayPropertySelectValue,
     EbaySalesChannelView,
     EbayProductType,
-    EbayRemoteLanguage
+    EbayRemoteLanguage,
+    EbayMediaThroughProduct,
+    EbayPrice,
+    EbayProductContent,
+    EbayEanCode,
 )
 from sales_channels.models import SalesChannelIntegrationPricelist
 from sales_prices.models import SalesPrice
+from sales_channels.factories.imports import SalesChannelImportMixin
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +79,7 @@ def get_is_product_variation(*, product_data: Any) -> tuple[bool, set[str]]:
     return (bool(parent_skus), parent_skus)
 
 
-class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
+class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
     """Base processor that will orchestrate eBay product imports."""
 
     import_properties = False
@@ -87,14 +92,21 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
     ERROR_PARENT_FETCH_FAILED = "PARENT_FETCH_FAILED"
     ERROR_INVALID_PRODUCT_DATA = "INVALID_PRODUCT_DATA"
 
-    def __init__(self, *, import_process, sales_channel, language=None):
-        super().__init__(import_process, language)
+    remote_ean_code_class = EbayEanCode
+    remote_product_content_class = EbayProductContent
+    remote_imageproductassociation_class = EbayMediaThroughProduct
+    remote_price_class = EbayPrice
 
-        self.sales_channel = sales_channel
+    def __init__(self, *, import_process, sales_channel, language=None):
+        super().__init__(
+            import_process=import_process,
+            sales_channel=sales_channel,
+            language=language,
+        )
+
         self.language = language
         self.multi_tenant_company = sales_channel.multi_tenant_company
         self._processed_parent_skus: set[str] = set()
-        self.api = self.get_api()
 
     def _add_broken_record(
         self,
@@ -117,19 +129,6 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
             record["traceback"] = traceback.format_exc()
 
         append_broken_record(self.import_process.id, record)
-
-    def prepare_import_process(self):
-        """Placeholder hook executed before the import starts."""
-
-        self.sales_channel.active = False
-        self.sales_channel.is_importing = True
-        self.sales_channel.save(update_fields=["active", "is_importing"])
-
-    def process_completed(self):
-        """Placeholder hook executed after the import finishes."""
-
-        self.sales_channel.is_importing = False
-        self.sales_channel.save(update_fields=["is_importing"])
 
     def get_total_instances(self) -> int:
         """Return the number of remote products that will be processed."""
@@ -949,28 +948,8 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
 
         pass
 
-    def handle_translations(self, *, import_instance: Any) -> None:
-        """Placeholder hook to persist product translations."""
-
-        pass
-
-    def handle_prices(self, *, import_instance: Any) -> None:
-        """Placeholder hook to persist product prices."""
-
-        pass
-
-    def handle_images(self, *, import_instance: Any) -> None:
-        """Placeholder hook to persist product media."""
-
-        pass
-
     def handle_variations(self, *, import_instance: Any) -> None:
         """Placeholder hook to link variation relationships."""
-
-        pass
-
-    def handle_ean_code(self, *, import_instance: Any) -> None:
-        """Placeholder hook to synchronise barcode metadata."""
 
         pass
 
