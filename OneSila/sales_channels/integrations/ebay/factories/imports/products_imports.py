@@ -34,9 +34,10 @@ from sales_channels.integrations.ebay.models import (
     EbayProductContent,
     EbayEanCode,
 )
-from sales_channels.models import SalesChannelIntegrationPricelist
+from sales_channels.models import SalesChannelIntegrationPricelist, SalesChannelViewAssign
 from sales_prices.models import SalesPrice
 from sales_channels.factories.imports import SalesChannelImportMixin
+from sales_channels.models.products import RemoteProductConfigurator
 
 logger = logging.getLogger(__name__)
 
@@ -1029,9 +1030,66 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
                     app.remote_select_values.set(remote_select_values)
 
     def handle_variations(self, *, import_instance: Any) -> None:
-        """Placeholder hook to link variation relationships."""
+        """Link configurator variations to their remote eBay mirrors."""
 
-        pass
+        remote_product = getattr(import_instance, "remote_instance", None)
+        if remote_product is None:
+            return
+
+        if not hasattr(import_instance, "variations_products_instances"):
+            return
+
+        variations_queryset = import_instance.variations_products_instances
+        variations = [variation for variation in variations_queryset if variation is not None]
+
+        if not variations:
+            return
+
+        for variation in variations:
+            remote_variation, _ = EbayProduct.objects.get_or_create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                local_instance=variation,
+            )
+
+            updated = False
+
+            if not remote_variation.is_variation:
+                remote_variation.is_variation = True
+                updated = True
+
+            if remote_variation.remote_parent_product_id != remote_product.id:
+                remote_variation.remote_parent_product = remote_product
+                updated = True
+
+            if not remote_variation.remote_sku:
+                sku = getattr(variation, "sku", None)
+                if sku:
+                    remote_variation.remote_sku = sku
+                    updated = True
+
+            if updated:
+                remote_variation.save()
+
+        rule = import_instance.rule
+        if rule is None and remote_product.local_instance is not None:
+            rule = remote_product.local_instance.get_product_rule()
+
+        if rule is None:
+            return
+
+        if hasattr(remote_product, "configurator"):
+            remote_product.configurator.update_if_needed(
+                rule=rule,
+                variations=variations_queryset,
+                send_sync_signal=False,
+            )
+        else:
+            RemoteProductConfigurator.objects.create_from_remote_product(
+                remote_product=remote_product,
+                rule=rule,
+                variations=variations_queryset,
+            )
 
     def handle_sales_channels_views(
         self,
@@ -1042,9 +1100,70 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
         offer_data: dict[str, Any] | None = None,
         child_offer_data: dict[str, Any] | None = None,
     ) -> None:
-        """Placeholder hook to link imported products to channel views."""
+        """Attach imported products to their eBay marketplace assignments."""
 
-        pass
+        remote_product = getattr(import_instance, "remote_instance", None)
+        local_product = getattr(import_instance, "instance", None)
+
+        if remote_product is None or local_product is None:
+            return
+
+        resolved_view = view
+
+        if resolved_view is None and isinstance(structured_data, Mapping):
+            marketplace_id = structured_data.get("__marketplace_id")
+            if marketplace_id:
+                resolved_view = (
+                    EbaySalesChannelView.objects.filter(
+                        sales_channel=self.sales_channel,
+                        remote_id=str(marketplace_id).strip(),
+                    )
+                    .select_related()
+                    .first()
+                )
+
+        if resolved_view is None:
+            return
+
+        assign, _ = SalesChannelViewAssign.objects.get_or_create(
+            product=local_product,
+            sales_channel_view=resolved_view,
+            multi_tenant_company=self.import_process.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            defaults={"remote_product": remote_product},
+        )
+
+        updated_fields: list[str] = []
+
+        if assign.remote_product_id != remote_product.id:
+            assign.remote_product = remote_product
+            updated_fields.append("remote_product")
+
+        offer_payloads: tuple[Mapping[str, Any] | None, ...] = (
+            offer_data if isinstance(offer_data, Mapping) else None,
+            child_offer_data if isinstance(child_offer_data, Mapping) else None,
+        )
+
+        offer_id: str | None = None
+        for payload in offer_payloads:
+            if not payload:
+                continue
+
+            candidate = payload.get("offer_id")
+            if candidate is None:
+                continue
+
+            normalized = str(candidate).strip()
+            if normalized:
+                offer_id = normalized
+                break
+
+        if offer_id and assign.remote_id != offer_id:
+            assign.remote_id = offer_id
+            updated_fields.append("remote_id")
+
+        if updated_fields:
+            assign.save(update_fields=updated_fields)
 
     def process_product_item(
         self,
