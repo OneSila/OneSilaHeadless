@@ -2,18 +2,26 @@
 
 from __future__ import annotations
 
+import logging
+import traceback
+
 from collections.abc import Iterator, Mapping
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from django.db import IntegrityError
 from django.db.models import Q
 from properties.models import Property
 from products.product_types import CONFIGURABLE, SIMPLE
 
 from currencies.models import Currency
 from imports_exports.factories.imports import AsyncProductImportMixin, ImportMixin
+from imports_exports.factories.products import ImportProductInstance
+from imports_exports.helpers import append_broken_record
+from core.helpers import ensure_serializable
 from sales_channels.integrations.ebay.constants import EBAY_INTERNAL_PROPERTY_DEFAULTS
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
 from sales_channels.integrations.ebay.models import (
+    EbayProduct,
     EbayInternalProperty,
     EbayProperty,
     EbayPropertySelectValue,
@@ -23,6 +31,8 @@ from sales_channels.integrations.ebay.models import (
 )
 from sales_channels.models import SalesChannelIntegrationPricelist
 from sales_prices.models import SalesPrice
+
+logger = logging.getLogger(__name__)
 
 
 def get_parent_skus(*, product_data: Any) -> set[str]:
@@ -72,12 +82,41 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
     import_rules = False
     import_products = True
 
+    ERROR_BROKEN_IMPORT_PROCESS = "BROKEN_IMPORT_PROCESS"
+    ERROR_MISSING_MARKETPLACE = "MISSING_MARKETPLACE"
+    ERROR_PARENT_FETCH_FAILED = "PARENT_FETCH_FAILED"
+    ERROR_INVALID_PRODUCT_DATA = "INVALID_PRODUCT_DATA"
+
     def __init__(self, *, import_process, sales_channel, language=None):
         super().__init__(import_process, language)
 
         self.sales_channel = sales_channel
         self.language = language
+        self.multi_tenant_company = sales_channel.multi_tenant_company
+        self._processed_parent_skus: set[str] = set()
         self.api = self.get_api()
+
+    def _add_broken_record(
+        self,
+        *,
+        code: str,
+        message: str,
+        data: dict[str, Any] | None = None,
+        context: dict[str, Any] | None = None,
+        exc: Exception | None = None,
+    ) -> None:
+        record: dict[str, Any] = {
+            "code": code,
+            "message": message,
+            "data": ensure_serializable(data) if data else {},
+            "context": context or {},
+        }
+
+        if exc is not None:
+            record["error"] = str(exc)
+            record["traceback"] = traceback.format_exc()
+
+        append_broken_record(self.import_process.id, record)
 
     def prepare_import_process(self):
         """Placeholder hook executed before the import starts."""
@@ -95,8 +134,7 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
     def get_total_instances(self) -> int:
         """Return the number of remote products that will be processed."""
 
-        pass
-        return 0
+        return self.get_products_count()
 
     def get_products_data(self) -> Iterator[dict[str, Any]]:
         """Yield product and offer payload pairs from the remote API."""
@@ -717,6 +755,73 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
 
         return configurator_values
 
+    def _extract_sku(self, payload: Any) -> str | None:
+        if not isinstance(payload, Mapping):
+            return None
+
+        for key in ("sku", "inventory_item_sku", "inventoryItemSku"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        product_section = payload.get("product")
+        if isinstance(product_section, Mapping):
+            sku_value = product_section.get("sku")
+            if isinstance(sku_value, str) and sku_value.strip():
+                return sku_value.strip()
+
+        for key in ("inventory_item_group_key", "inventoryItemGroupKey"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        return None
+
+    def _extract_group_inventory_items(
+        self,
+        response: Any,
+        *,
+        exclude_sku: str | None = None,
+    ) -> list[dict[str, Any]]:
+        items: list[tuple[str | None, dict[str, Any]]] = []
+
+        def _collect(candidate: Any) -> None:
+            if isinstance(candidate, Mapping):
+                sku = self._extract_sku(candidate)
+                if sku or "product" in candidate:
+                    items.append((sku, dict(candidate)))
+                for key in (
+                    "inventory_items",
+                    "inventoryItems",
+                    "members",
+                    "inventory_item_group",
+                    "inventoryItemGroup",
+                ):
+                    nested = candidate.get(key)
+                    if nested is not None:
+                        _collect(nested)
+            elif isinstance(candidate, (list, tuple, set)):
+                for entry in candidate:
+                    _collect(entry)
+
+        _collect(response)
+
+        unique_items: list[dict[str, Any]] = []
+        seen_skus: set[str] = set()
+        excluded = exclude_sku.strip() if isinstance(exclude_sku, str) else None
+
+        for sku, payload in items:
+            normalized = sku.strip() if isinstance(sku, str) else None
+            if normalized and excluded and normalized == excluded:
+                continue
+            key = normalized or str(id(payload))
+            if key in seen_skus:
+                continue
+            seen_skus.add(key)
+            unique_items.append(payload)
+
+        return unique_items
+
     def get__product_data(
         self,
         *,
@@ -838,21 +943,6 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
 
         return structured, language, view
 
-    def get_structured_product_data(self, *, product_data: dict[str, Any]) -> dict[str, Any]:
-        """Combine parsed sub-sections into the final product payload."""
-
-        pass
-        return product_data
-
-    def update_product_log_instance(
-        self,
-        *,
-        log_instance: dict[str, Any],
-        import_instance: Any,
-    ) -> None:
-        """Placeholder hook to update the import log after processing."""
-
-        pass
 
     def handle_attributes(self, *, import_instance: Any) -> None:
         """Placeholder hook to synchronise product attributes."""
@@ -899,6 +989,9 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
         *,
         import_instance: Any,
         structured_data: dict[str, Any],
+        view: EbaySalesChannelView | None = None,
+        offer_data: dict[str, Any] | None = None,
+        child_offer_data: dict[str, Any] | None = None,
     ) -> None:
         """Placeholder hook to link imported products to channel views."""
 
@@ -908,10 +1001,214 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
         self,
         product_data: dict[str, Any],
         offer_data: dict[str, Any] | None = None,
+        child_offer_data: dict[str, Any] | None = None,
     ) -> None:
         """Process a single serialized product payload."""
 
-        pass
+        if not isinstance(product_data, dict):
+            self._add_broken_record(
+                code=self.ERROR_INVALID_PRODUCT_DATA,
+                message="Invalid product payload received",
+                data={"raw": product_data},
+            )
+            return
+
+        sku = self._extract_sku(product_data)
+        if not sku:
+            self._add_broken_record(
+                code=self.ERROR_INVALID_PRODUCT_DATA,
+                message="Unable to determine SKU for inventory item",
+                data=product_data,
+            )
+            return
+
+        sku = sku.strip()
+
+        remote_product = (
+            EbayProduct.objects.filter(
+                sales_channel=self.sales_channel,
+                multi_tenant_company=self.multi_tenant_company,
+                remote_sku=sku,
+            )
+            .select_related("local_instance")
+            .first()
+        )
+        product_instance = remote_product.local_instance if remote_product and remote_product.local_instance else None
+
+        is_variation, parent_skus = get_is_product_variation(product_data=product_data)
+
+        if remote_product:
+            is_variation = remote_product.is_variation
+
+        if parent_skus and child_offer_data is None:
+            for parent_sku in parent_skus:
+                normalized_parent = parent_sku.strip() if isinstance(parent_sku, str) else str(parent_sku)
+                if not normalized_parent:
+                    continue
+                if normalized_parent == sku or normalized_parent in self._processed_parent_skus:
+                    continue
+
+                self._processed_parent_skus.add(normalized_parent)
+
+                try:
+                    group_response = self.api.sell_inventory_get_inventory_item_group(
+                        inventory_item_group_key=normalized_parent,
+                    )
+                except Exception as exc:  # pragma: no cover - defensive logging
+                    logger.warning(
+                        "Failed to fetch inventory item group %s for SKU %s", normalized_parent, sku, exc_info=exc
+                    )
+                    self._add_broken_record(
+                        code=self.ERROR_PARENT_FETCH_FAILED,
+                        message="Unable to fetch parent inventory item group",
+                        data={"sku": sku, "parent_sku": normalized_parent},
+                        exc=exc,
+                    )
+                    continue
+
+                parent_items = self._extract_group_inventory_items(
+                    group_response,
+                    exclude_sku=sku,
+                )
+
+                if not parent_items:
+                    self._add_broken_record(
+                        code=self.ERROR_PARENT_FETCH_FAILED,
+                        message="Parent inventory group returned no items",
+                        data={"sku": sku, "parent_sku": normalized_parent},
+                    )
+                    continue
+
+                for parent_item in parent_items:
+                    self.process_product_item(parent_item, child_offer_data=offer_data)
+
+        active_offer = offer_data if isinstance(offer_data, dict) else None
+        if active_offer is None and isinstance(child_offer_data, dict):
+            active_offer = child_offer_data
+
+        if active_offer is None:
+            self._add_broken_record(
+                code=self.ERROR_MISSING_MARKETPLACE,
+                message="Missing offer data to determine marketplace",
+                data={"sku": sku},
+            )
+            return
+
+        is_parent_product = child_offer_data is not None and not is_variation
+        is_configurable = bool(is_parent_product)
+
+        rule = None
+        if remote_product and remote_product.local_instance:
+            existing_rule = remote_product.local_instance.get_product_rule()
+            if existing_rule:
+                rule = existing_rule
+
+        if rule is None:
+            rule = self.get_product_rule(offer_data=active_offer)
+
+        try:
+            structured, language, view = self.get__product_data(
+                product_data=product_data,
+                offer_data=active_offer,
+                is_variation=is_variation,
+                is_configurable=is_configurable,
+                product_instance=product_instance,
+            )
+        except ValueError as exc:
+            self._add_broken_record(
+                code=self.ERROR_INVALID_PRODUCT_DATA,
+                message=str(exc) or "Invalid product data returned by eBay",
+                data={"sku": sku},
+                context={"is_variation": is_variation},
+                exc=exc,
+            )
+            return
+
+        if remote_product and remote_product.local_instance and remote_product.local_instance.type:
+            structured["type"] = remote_product.local_instance.type
+
+        try:
+            sku_for_defaults = structured["sku"]
+        except KeyError:
+            sku_for_defaults = sku
+
+        instance = ImportProductInstance(
+            structured,
+            import_process=self.import_process,
+            rule=rule,
+            sales_channel=self.sales_channel,
+            instance=product_instance,
+            update_current_rule=True,
+        )
+
+        if instance.data.get("type") != CONFIGURABLE:
+            instance.update_only = True
+
+        instance.prepare_mirror_model_class(
+            mirror_model_class=EbayProduct,
+            sales_channel=self.sales_channel,
+            mirror_model_map={"local_instance": "*"},
+            mirror_model_defaults={
+                "remote_sku": sku_for_defaults,
+                "is_variation": is_variation,
+            },
+        )
+        instance.language = language
+
+        try:
+            instance.process()
+        except IntegrityError as exc:
+            context = {
+                "sku": instance.data.get("sku", sku),
+                "marketplace_id": instance.data.get("__marketplace_id"),
+                "is_variation": is_variation,
+            }
+            self._add_broken_record(
+                code=self.ERROR_BROKEN_IMPORT_PROCESS,
+                message="Broken import process for SKU",
+                data=instance.data,
+                context=context,
+                exc=exc,
+            )
+
+            if remote_product:
+                instance.remote_instance = remote_product
+                if product_instance:
+                    instance.instance = product_instance
+            else:
+                return
+
+        if instance.remote_instance is None:
+            instance.remote_instance = remote_product
+
+        if instance.remote_instance is None:
+            self._add_broken_record(
+                code=self.ERROR_BROKEN_IMPORT_PROCESS,
+                message="Remote instance missing after processing",
+                data=instance.data,
+                context={"sku": instance.data.get("sku", sku)},
+            )
+            return
+
+        self.update_remote_product(instance, product_data, view, is_variation)
+
+        if not is_parent_product:
+            self.handle_ean_code(import_instance=instance)
+            self.handle_translations(import_instance=instance)
+            self.handle_prices(import_instance=instance)
+            self.handle_images(import_instance=instance)
+
+        if instance.data.get("type") == CONFIGURABLE:
+            self.handle_variations(import_instance=instance)
+
+        if not is_variation:
+            self.handle_sales_channels_views(
+                import_instance=instance,
+                structured_data=instance.data,
+                view=view,
+                offer_data=active_offer,
+                child_offer_data=child_offer_data,
+            )
 
 
 class EbayProductsAsyncImportProcessor(AsyncProductImportMixin, EbayProductsImportProcessor):

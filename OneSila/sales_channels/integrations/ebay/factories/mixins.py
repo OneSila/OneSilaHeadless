@@ -356,6 +356,26 @@ class GetEbayAPIMixin:
             records_key="inventory_items",
         )
 
+    def get_products_count(self) -> int:
+        """Return the total number of inventory items available remotely."""
+
+        response = self.api.sell_inventory_get_inventory_items(limit=1)
+        if isinstance(response, Iterator):
+            response_items = response
+        else:
+            response_items = (response,)
+
+        for item in response_items:
+            _, total_available, _ = self._extract_paginated_records(
+                item,
+                record_key="record",
+                records_key="inventory_items",
+            )
+            if isinstance(total_available, int) and total_available >= 0:
+                return total_available
+
+        return 0
+
     def get_category_aspects_map(
         self,
         *,
@@ -463,5 +483,4 @@ class GetEbayAPIMixin:
                 normalized[key] = normalized_values
 
         return normalized
-
 
