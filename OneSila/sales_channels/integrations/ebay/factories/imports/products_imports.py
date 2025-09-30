@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 from django.db.models import Q
 from properties.models import Property
+from products.product_types import CONFIGURABLE, SIMPLE
 
 from currencies.models import Currency
 from imports_exports.factories.imports import AsyncProductImportMixin, ImportMixin
@@ -178,102 +179,96 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
     def _parse_prices(
         self,
         *,
-        product_data: dict[str, Any],
+        offer_data: dict[str, Any],
         local_product: Any | None = None,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Convert eBay offer pricing into local price and pricelist payloads."""
 
-        if not isinstance(product_data, dict):
+        if not isinstance(offer_data, dict):
             return [], []
 
-        offers_data = product_data.get("offers") or []
-        if isinstance(offers_data, list):
-            offers = [offer for offer in offers_data if isinstance(offer, dict)]
-        elif isinstance(offers_data, dict):
-            offers = [offers_data]
+        pricing_summary = offer_data.get("pricing_summary") or {}
+        if not isinstance(pricing_summary, Mapping):
+            pricing_summary = {}
+
+        price_data = pricing_summary.get("price") or {}
+        if not isinstance(price_data, Mapping):
+            price_data = {}
+
+        amount = price_data.get("value")
+        currency_code = price_data.get("currency")
+
+        if amount is None or not currency_code:
+            return [], []
+
+        iso_code = str(currency_code).upper()
+
+        try:
+            price_decimal = Decimal(str(amount))
+        except (InvalidOperation, TypeError, ValueError):
+            return [], []
+
+        try:
+            currency = Currency.objects.get(
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                iso_code=iso_code,
+            )
+        except Currency.DoesNotExist as exc:
+            raise ValueError(
+                f"Currency with ISO code {iso_code} does not exist locally"
+            ) from exc
+
+        sales_pricelist_items: list[dict[str, Any]] = []
+
+        scip = (
+            SalesChannelIntegrationPricelist.objects.filter(
+                sales_channel=self.sales_channel,
+                price_list__currency=currency,
+            )
+            .select_related("price_list")
+            .first()
+        )
+
+        if scip:
+            sales_pricelist_items.append(
+                {
+                    "salespricelist": scip.price_list,
+                    "disable_auto_update": True,
+                    "price_auto": price_decimal,
+                }
+            )
         else:
-            offers = []
+            sales_pricelist_items.append(
+                {
+                    "salespricelist_data": {
+                        "name": f"eBay {self.sales_channel.hostname} {iso_code}",
+                        "currency_object": currency,
+                    },
+                    "disable_auto_update": True,
+                    "price_auto": price_decimal,
+                }
+            )
 
         prices: list[dict[str, Any]] = []
-        sales_pricelist_items: list[dict[str, Any]] = []
-        processed_currencies: set[str] = set()
 
-        for offer_payload in offers:
-            pricing_summary = offer_payload.get("pricing_summary") or {}
-            price_data = pricing_summary.get("price") or {}
-            amount = price_data.get("value")
-            currency_code = price_data.get("currency")
+        has_sales_price = (
+            local_product
+            and SalesPrice.objects.filter(
+                product=local_product,
+                currency__iso_code=iso_code,
+            ).exists()
+        )
 
-            if amount is None or not currency_code:
-                continue
-
-            iso_code = str(currency_code).upper()
-            if iso_code in processed_currencies:
-                continue
-
-            try:
-                price_decimal = Decimal(str(amount))
-            except (InvalidOperation, TypeError, ValueError):
-                continue
-
-            try:
-                currency = Currency.objects.get(
-                    multi_tenant_company=self.sales_channel.multi_tenant_company,
-                    iso_code=iso_code,
-                )
-            except Currency.DoesNotExist as exc:
-                raise ValueError(
-                    f"Currency with ISO code {iso_code} does not exist locally"
-                ) from exc
-
-            processed_currencies.add(iso_code)
-
-            scip = (
-                SalesChannelIntegrationPricelist.objects.filter(
-                    sales_channel=self.sales_channel,
-                    price_list__currency=currency,
-                )
-                .select_related("price_list")
-                .first()
-            )
-
-            if scip:
-                sales_pricelist_items.append(
-                    {
-                        "salespricelist": scip.price_list,
-                        "disable_auto_update": True,
-                        "price_auto": price_decimal,
-                    }
-                )
-            else:
-                sales_pricelist_items.append(
-                    {
-                        "salespricelist_data": {
-                            "name": f"eBay {self.sales_channel.hostname} {iso_code}",
-                            "currency_object": currency,
-                        },
-                        "disable_auto_update": True,
-                        "price_auto": price_decimal,
-                    }
-                )
-
-            has_sales_price = (
-                local_product
-                and SalesPrice.objects.filter(
-                    product=local_product,
-                    currency__iso_code=iso_code,
-                ).exists()
-            )
-
-            if has_sales_price:
-                continue
-
+        if not has_sales_price:
             price_payload: dict[str, Any] = {
                 "price": price_decimal,
                 "currency": iso_code,
             }
 
             original_price = pricing_summary.get("original_retail_price") or {}
+            if not isinstance(original_price, Mapping):
+                original_price = {}
+
             original_amount = original_price.get("value")
             original_currency = original_price.get("currency")
 
@@ -283,24 +278,31 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
                 except (InvalidOperation, TypeError, ValueError):
                     original_decimal = None
 
-                if original_decimal is not None and str(original_currency).upper() == iso_code:
+                if (
+                    original_decimal is not None
+                    and str(original_currency).upper() == iso_code
+                ):
                     price_payload["rrp"] = original_decimal
 
             prices.append(price_payload)
 
         return prices, sales_pricelist_items
 
-    def _parse_translations(self, *, product_data: dict[str, Any]) -> list[dict[str, Any]]:
-        """Extract translation payloads from a remote product response."""
+    def _parse_translations(
+        self,
+        *,
+        product_data: dict[str, Any],
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        """Extract translation payloads and detected language."""
 
         if not isinstance(product_data, dict):
-            return []
+            return [], None
 
         inventory_item = product_data.get("product")
         if not isinstance(inventory_item, dict):
             inventory_item = product_data
             if not isinstance(inventory_item, dict):
-                return []
+                return [], None
 
         locale = inventory_item.get("locale")
         if not isinstance(locale, str) or not locale:
@@ -372,7 +374,7 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
             description = listing_description
 
         if not name:
-            return []
+            return [], language_code
 
         translation: dict[str, Any] = {
             "name": name,
@@ -383,7 +385,7 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
         if description is not None:
             translation["description"] = description
 
-        return [translation]
+        return [translation], language_code
 
     def _parse_images(self, *, product_data: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract image payloads from a remote product response."""
@@ -715,36 +717,126 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
 
         return configurator_values
 
-    def get__product_data(self, product_data, offer_data, is_variation, is_configurable,  product_instance=None):
-        # get sku product_data.get('sku')
-        # get type is_configurable = CONFIGURABLE if not is SIMPLE
-        # get the name (the product.title)
-        # get view  offer_data marketplace_id
-        # get language view ebay language
-        # build initial structured data the actiive will be get by offer_data.listing.listing_status
+    def get__product_data(
+        self,
+        *,
+        product_data: dict[str, Any],
+        offer_data: dict[str, Any],
+        is_variation: bool,
+        is_configurable: bool,
+        product_instance: Any | None = None,
+    ) -> tuple[dict[str, Any], str | None, EbaySalesChannelView | None]:
+        """Return the structured payload, language, and view for an eBay product."""
 
-        # if type == SIMPLE:
-        #     prices, sales_pricelist_items = self._parse_prices(product_data, product_instance)
-        #     if prices:
-        #         structured["prices"] = prices
-        #     if sales_pricelist_items:
-        #         structured["sales_pricelist_items"] = sales_pricelist_items
+        if not isinstance(product_data, dict):
+            product_data = {}
 
-        # attributes, mirror_map = self._parse_attributes(
-        #     product_attrs, product_type_code, view
-        # )
-        # structured["properties"] = attributes
-        # structured["__mirror_product_properties_map"] = mirror_map
-        # structured["translations"] = self._parse_translations(name, language, product_data.get("attributes"))
+        normalized_product = dict(product_data)
 
-        # if is_configurable:
-        #     structured["configurator_select_values"] = self._parse_configurator_select_values(product_data)
+        product_section = normalized_product.get("product")
+        if not isinstance(product_section, Mapping):
+            product_section = normalized_product
+            normalized_product["product"] = product_section
 
-        # structured["__marketplace_id"] = marketplace_id
-        # return structured, language, view
+        if isinstance(offer_data, dict):
+            normalized_product.setdefault("offer", offer_data)
+            normalized_product.setdefault("offers", [offer_data])
+        else:
+            offer_data = {}
 
+        sku = normalized_product.get("sku") or normalized_product.get("inventory_item_sku")
+        if not sku and isinstance(product_section, Mapping):
+            sku = product_section.get("sku")
 
-        pass
+        if not sku:
+            raise ValueError("Missing SKU on eBay inventory item payload")
+
+        sku = str(sku).strip()
+
+        title = None
+        if isinstance(product_section, Mapping):
+            raw_title = product_section.get("title")
+            if isinstance(raw_title, str):
+                title = raw_title.strip()
+                if len(title) > 80:
+                    title = title[:80]
+
+        if not title:
+            title = sku
+
+        listing_data = offer_data.get("listing") if isinstance(offer_data, Mapping) else {}
+        if not isinstance(listing_data, Mapping):
+            listing_data = {}
+
+        listing_status = listing_data.get("listing_status")
+        is_active = bool(listing_status and str(listing_status).upper() == "ACTIVE")
+
+        marketplace_id = offer_data.get("marketplace_id") if isinstance(offer_data, Mapping) else None
+        if marketplace_id is not None:
+            marketplace_id = str(marketplace_id).strip()
+        if not marketplace_id:
+            raise ValueError("Missing marketplace_id in eBay offer payload")
+
+        view = (
+            EbaySalesChannelView.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_id=marketplace_id,
+            )
+            .select_related()
+            .first()
+        )
+
+        if view is None:
+            raise ValueError(
+                f"Marketplace {marketplace_id} is not linked to sales channel {self.sales_channel.id}"
+            )
+
+        structured: dict[str, Any] = {
+            "sku": sku,
+            "name": title,
+            "active": is_active,
+            "type": CONFIGURABLE if is_configurable else SIMPLE,
+        }
+
+        images = self._parse_images(product_data=normalized_product)
+        if images:
+            structured["images"] = images
+
+        if not is_configurable:
+            prices, sales_pricelist_items = self._parse_prices(
+                offer_data=offer_data,
+                local_product=product_instance,
+            )
+            if prices:
+                structured["prices"] = prices
+            if sales_pricelist_items:
+                structured["sales_pricelist_items"] = sales_pricelist_items
+
+        attributes, mirror_map = self._parse_attributes(
+            product_data=normalized_product,
+            view=view,
+        )
+
+        if attributes:
+            structured["properties"] = attributes
+            structured["__mirror_product_properties_map"] = mirror_map
+
+        translations, language = self._parse_translations(
+            product_data=normalized_product,
+        )
+        if translations:
+            structured["translations"] = translations
+
+        if is_configurable:
+            configurator_values = self._parse_configurator_select_values(
+                product_data=normalized_product,
+            )
+            if configurator_values:
+                structured["configurator_select_values"] = configurator_values
+
+        structured["__marketplace_id"] = marketplace_id
+
+        return structured, language, view
 
     def get_structured_product_data(self, *, product_data: dict[str, Any]) -> dict[str, Any]:
         """Combine parsed sub-sections into the final product payload."""
