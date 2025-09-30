@@ -394,11 +394,7 @@ SHOPIFY_TEST_REDIRECT_URI = os.getenv('SHOPIFY_TEST_REDIRECT_URI')
 SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
 SHOPIFY_API_SECRET = os.getenv('SHOPIFY_API_SECRET')
 
-#
-# eBay integration settings (sales_channels.integrations.ebay)
-#
 
-EBAY_ACCOUNT_DELETION_VERIFICATION_TOKEN = os.getenv('EBAY_ACCOUNT_DELETION_VERIFICATION_TOKEN', '')
 #
 # OpenAI settings. (llm)
 #

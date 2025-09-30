@@ -71,12 +71,15 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
     def prepare_import_process(self):
         """Placeholder hook executed before the import starts."""
 
-        pass
+        self.sales_channel.active = False
+        self.sales_channel.is_importing = True
+        self.sales_channel.save(update_fields=["active", "is_importing"])
 
     def process_completed(self):
         """Placeholder hook executed after the import finishes."""
 
-        pass
+        self.sales_channel.is_importing = False
+        self.sales_channel.save(update_fields=["is_importing"])
 
     def get_total_instances(self) -> int:
         """Return the number of remote products that will be processed."""
