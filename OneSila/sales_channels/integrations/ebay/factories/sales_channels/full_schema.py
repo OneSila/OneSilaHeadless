@@ -84,8 +84,7 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
                 category_id=self.category_id,
                 category_tree_id=self.category_tree_id,
             )
-            print('--------------------------------- RESPONSE DETAILS')
-            print(response)
+
         except Exception:  # pragma: no cover - defensive logging
             logger.exception(
                 "Failed to fetch eBay category subtree for category %s in tree %s",
@@ -145,9 +144,6 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         defaults: dict[str, Any] = {}
         if name:
             defaults["name"] = name
-
-        print('------------------------------------------ NAME')
-        print(name)
 
         product_type, _ = EbayProductType.objects.get_or_create(
             sales_channel=self.sales_channel,

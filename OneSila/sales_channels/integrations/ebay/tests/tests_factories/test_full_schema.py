@@ -120,10 +120,10 @@ class TestEbayProductTypeRuleFactory(TestCaseEbayMixin):
 
     def _build_category_response(self) -> dict[str, Any]:
         return {
-            "categorySubtreeNode": {
+            "category_subtree_node": {
                 "category": {
-                    "categoryId": "3197",
-                    "categoryName": "Furniture",
+                    "category_id": "3197",
+                    "category_name": "Furniture",
                 }
             }
         }
@@ -132,191 +132,191 @@ class TestEbayProductTypeRuleFactory(TestCaseEbayMixin):
         return {
             "aspects": [
                 {
-                    "localizedAspectName": "Brand",
-                    "aspectConstraint": {
-                        "aspectDataType": "STRING",
-                        "itemToAspectCardinality": "SINGLE",
-                        "aspectMode": "FREE_TEXT",
-                        "aspectRequired": True,
-                        "aspectUsage": "RECOMMENDED",
-                        "aspectEnabledForVariations": False,
-                        "aspectApplicableTo": ["PRODUCT"],
+                    "localized_aspect_name": "Brand",
+                    "aspect_constraint": {
+                        "aspect_data_type": "STRING",
+                        "item_to_aspect_cardinality": "SINGLE",
+                        "aspect_mode": "FREE_TEXT",
+                        "aspect_required": True,
+                        "aspect_usage": "RECOMMENDED",
+                        "aspect_enabled_for_variations": False,
+                        "aspect_applicable_to": ["PRODUCT"],
                     },
-                    "aspectValues": [
-                        {"localizedValue": "Unbranded"},
-                        {"localizedValue": "Apple"},
+                    "aspect_values": [
+                        {"localized_value": "Unbranded"},
+                        {"localized_value": "Apple"},
                     ],
                 },
                 {
-                    "localizedAspectName": "Color",
-                    "aspectConstraint": {
-                        "aspectDataType": "STRING",
-                        "itemToAspectCardinality": "SINGLE",
-                        "aspectMode": "FREE_TEXT",
-                        "aspectRequired": True,
-                        "aspectUsage": "RECOMMENDED",
-                        "aspectEnabledForVariations": True,
-                        "aspectApplicableTo": ["PRODUCT"],
+                    "localized_aspect_name": "Color",
+                    "aspect_constraint": {
+                        "aspect_data_type": "STRING",
+                        "item_to_aspect_cardinality": "SINGLE",
+                        "aspect_mode": "FREE_TEXT",
+                        "aspect_required": True,
+                        "aspect_usage": "RECOMMENDED",
+                        "aspect_enabled_for_variations": True,
+                        "aspect_applicable_to": ["PRODUCT"],
                     },
-                    "aspectValues": [
-                        {"localizedValue": "Black"},
-                        {"localizedValue": "Blue"},
+                    "aspect_values": [
+                        {"localized_value": "Black"},
+                        {"localized_value": "Blue"},
                     ],
                 },
                 {
-                    "localizedAspectName": "Pattern",
-                    "aspectConstraint": {
-                        "aspectDataType": "STRING",
-                        "itemToAspectCardinality": "SINGLE",
-                        "aspectMode": "FREE_TEXT",
-                        "aspectRequired": False,
-                        "aspectUsage": "OPTIONAL",
-                        "aspectEnabledForVariations": True,
-                        "aspectApplicableTo": ["PRODUCT"],
+                    "localized_aspect_name": "Pattern",
+                    "aspect_constraint": {
+                        "aspect_data_type": "STRING",
+                        "item_to_aspect_cardinality": "SINGLE",
+                        "aspect_mode": "FREE_TEXT",
+                        "aspect_required": False,
+                        "aspect_usage": "OPTIONAL",
+                        "aspect_enabled_for_variations": True,
+                        "aspect_applicable_to": ["PRODUCT"],
                     },
-                    "aspectValues": [
-                        {"localizedValue": "Striped"},
-                        {"localizedValue": "Solid"},
+                    "aspect_values": [
+                        {"localized_value": "Striped"},
+                        {"localized_value": "Solid"},
                     ],
                 },
                 {
-                    "localizedAspectName": "Connectivity",
-                    "aspectConstraint": {
-                        "aspectDataType": "STRING",
-                        "itemToAspectCardinality": "MULTI",
-                        "aspectMode": "FREE_TEXT",
-                        "aspectRequired": False,
-                        "aspectUsage": "RECOMMENDED",
-                        "aspectEnabledForVariations": False,
-                        "aspectApplicableTo": ["PRODUCT"],
+                    "localized_aspect_name": "Connectivity",
+                    "aspect_constraint": {
+                        "aspect_data_type": "STRING",
+                        "item_to_aspect_cardinality": "MULTI",
+                        "aspect_mode": "FREE_TEXT",
+                        "aspect_required": False,
+                        "aspect_usage": "RECOMMENDED",
+                        "aspect_enabled_for_variations": False,
+                        "aspect_applicable_to": ["PRODUCT"],
                     },
-                    "aspectValues": [
-                        {"localizedValue": "2G"},
-                        {"localizedValue": "3G"},
-                        {"localizedValue": "4G"},
+                    "aspect_values": [
+                        {"localized_value": "2G"},
+                        {"localized_value": "3G"},
+                        {"localized_value": "4G"},
                     ],
                 },
                 {
-                    "localizedAspectName": "EC Range",
-                    "aspectConstraint": {
-                        "aspectDataType": "STRING",
-                        "itemToAspectCardinality": "SINGLE",
-                        "aspectMode": "SELECTION_ONLY",
-                        "aspectRequired": False,
-                        "aspectUsage": "RECOMMENDED",
-                        "aspectEnabledForVariations": False,
-                        "aspectApplicableTo": ["PRODUCT"],
+                    "localized_aspect_name": "EC Range",
+                    "aspect_constraint": {
+                        "aspect_data_type": "STRING",
+                        "item_to_aspect_cardinality": "SINGLE",
+                        "aspect_mode": "SELECTION_ONLY",
+                        "aspect_required": False,
+                        "aspect_usage": "RECOMMENDED",
+                        "aspect_enabled_for_variations": False,
+                        "aspect_applicable_to": ["PRODUCT"],
                     },
-                    "aspectValues": [{"localizedValue": "A - G"}],
+                    "aspect_values": [{"localized_value": "A - G"}],
                 },
                 {
-                    "localizedAspectName": "Energy Star",
-                    "aspectConstraint": {
-                        "aspectDataType": "STRING",
-                        "itemToAspectCardinality": "SINGLE",
-                        "aspectMode": "SELECTION_ONLY",
-                        "aspectRequired": False,
-                        "aspectUsage": "RECOMMENDED",
-                        "aspectEnabledForVariations": False,
-                        "aspectApplicableTo": ["PRODUCT"],
+                    "localized_aspect_name": "Energy Star",
+                    "aspect_constraint": {
+                        "aspect_data_type": "STRING",
+                        "item_to_aspect_cardinality": "SINGLE",
+                        "aspect_mode": "SELECTION_ONLY",
+                        "aspect_required": False,
+                        "aspect_usage": "RECOMMENDED",
+                        "aspect_enabled_for_variations": False,
+                        "aspect_applicable_to": ["PRODUCT"],
                     },
-                    "aspectValues": [
-                        {"localizedValue": "A"},
-                        {"localizedValue": "B"},
-                        {"localizedValue": "C"},
+                    "aspect_values": [
+                        {"localized_value": "A"},
+                        {"localized_value": "B"},
+                        {"localized_value": "C"},
                     ],
                 },
                 {
-                    "localizedAspectName": "Detailed Description",
-                    "aspectConstraint": {
-                        "aspectDataType": "STRING",
-                        "aspectMode": "FREE_TEXT",
-                        "aspectRequired": False,
-                        "aspectUsage": "OPTIONAL",
-                        "aspectEnabledForVariations": False,
-                        "aspectApplicableTo": ["PRODUCT"],
-                        "aspectMaxLength": 1000,
+                    "localized_aspect_name": "Detailed Description",
+                    "aspect_constraint": {
+                        "aspect_data_type": "STRING",
+                        "aspect_mode": "FREE_TEXT",
+                        "aspect_required": False,
+                        "aspect_usage": "OPTIONAL",
+                        "aspect_enabled_for_variations": False,
+                        "aspect_applicable_to": ["PRODUCT"],
+                        "aspect_max_length": 1000,
                     },
-                    "aspectValues": [],
+                    "aspect_values": [],
                 },
                 {
-                    "localizedAspectName": "Material",
-                    "aspectConstraint": {
-                        "aspectDataType": "STRING",
-                        "aspectMode": "FREE_TEXT",
-                        "aspectRequired": False,
-                        "aspectUsage": "OPTIONAL",
-                        "aspectEnabledForVariations": False,
-                        "aspectApplicableTo": ["PRODUCT"],
-                        "aspectMaxLength": 200,
-                    },
-                },
-                {
-                    "localizedAspectName": "Voltage",
-                    "aspectConstraint": {
-                        "aspectDataType": "STRING",
-                        "aspectMode": "FREE_TEXT",
-                        "aspectRequired": False,
-                        "aspectUsage": "OPTIONAL",
-                        "aspectEnabledForVariations": False,
-                        "aspectApplicableTo": ["PRODUCT"],
-                        "aspectAdvancedDataType": "NUMERIC_RANGE",
+                    "localized_aspect_name": "Material",
+                    "aspect_constraint": {
+                        "aspect_data_type": "STRING",
+                        "aspect_mode": "FREE_TEXT",
+                        "aspect_required": False,
+                        "aspect_usage": "OPTIONAL",
+                        "aspect_enabled_for_variations": False,
+                        "aspect_applicable_to": ["PRODUCT"],
+                        "aspect_max_length": 200,
                     },
                 },
                 {
-                    "localizedAspectName": "Screen Size",
-                    "aspectConstraint": {
-                        "aspectDataType": "NUMBER",
-                        "aspectFormat": "double",
-                        "aspectMode": "FREE_TEXT",
-                        "aspectRequired": False,
-                        "aspectUsage": "OPTIONAL",
-                        "aspectEnabledForVariations": False,
-                        "aspectApplicableTo": ["PRODUCT"],
+                    "localized_aspect_name": "Voltage",
+                    "aspect_constraint": {
+                        "aspect_data_type": "STRING",
+                        "aspect_mode": "FREE_TEXT",
+                        "aspect_required": False,
+                        "aspect_usage": "OPTIONAL",
+                        "aspect_enabled_for_variations": False,
+                        "aspect_applicable_to": ["PRODUCT"],
+                        "aspect_advanced_data_type": "NUMERIC_RANGE",
                     },
                 },
                 {
-                    "localizedAspectName": "Memory",
-                    "aspectConstraint": {
-                        "aspectDataType": "NUMBER",
-                        "aspectFormat": "int32",
-                        "aspectMode": "FREE_TEXT",
-                        "aspectRequired": False,
-                        "aspectUsage": "OPTIONAL",
-                        "aspectEnabledForVariations": False,
-                        "aspectApplicableTo": ["PRODUCT"],
+                    "localized_aspect_name": "Screen Size",
+                    "aspect_constraint": {
+                        "aspect_data_type": "NUMBER",
+                        "aspect_format": "double",
+                        "aspect_mode": "FREE_TEXT",
+                        "aspect_required": False,
+                        "aspect_usage": "OPTIONAL",
+                        "aspect_enabled_for_variations": False,
+                        "aspect_applicable_to": ["PRODUCT"],
                     },
                 },
                 {
-                    "localizedAspectName": "Release Date",
-                    "aspectConstraint": {
-                        "aspectDataType": "DATE",
-                        "aspectFormat": "YYYYMMDD",
-                        "aspectMode": "FREE_TEXT",
-                        "aspectRequired": False,
-                        "aspectUsage": "OPTIONAL",
-                        "aspectEnabledForVariations": False,
-                        "aspectApplicableTo": ["PRODUCT"],
+                    "localized_aspect_name": "Memory",
+                    "aspect_constraint": {
+                        "aspect_data_type": "NUMBER",
+                        "aspect_format": "int32",
+                        "aspect_mode": "FREE_TEXT",
+                        "aspect_required": False,
+                        "aspect_usage": "OPTIONAL",
+                        "aspect_enabled_for_variations": False,
+                        "aspect_applicable_to": ["PRODUCT"],
                     },
                 },
                 {
-                    "localizedAspectName": "Warranty Expiration",
-                    "aspectConstraint": {
-                        "aspectDataType": "DATE",
-                        "aspectFormat": "YYYYMMDDHHMMSS",
-                        "aspectMode": "FREE_TEXT",
-                        "aspectRequired": False,
-                        "aspectUsage": "OPTIONAL",
-                        "aspectEnabledForVariations": False,
-                        "aspectApplicableTo": ["PRODUCT"],
+                    "localized_aspect_name": "Release Date",
+                    "aspect_constraint": {
+                        "aspect_data_type": "DATE",
+                        "aspect_format": "YYYYMMDD",
+                        "aspect_mode": "FREE_TEXT",
+                        "aspect_required": False,
+                        "aspect_usage": "OPTIONAL",
+                        "aspect_enabled_for_variations": False,
+                        "aspect_applicable_to": ["PRODUCT"],
                     },
                 },
                 {
-                    "localizedAspectName": "Item Only",
-                    "aspectConstraint": {
-                        "aspectDataType": "STRING",
-                        "aspectMode": "FREE_TEXT",
-                        "aspectApplicableTo": ["ITEM"],
+                    "localized_aspect_name": "Warranty Expiration",
+                    "aspect_constraint": {
+                        "aspect_data_type": "DATE",
+                        "aspect_format": "YYYYMMDDHHMMSS",
+                        "aspect_mode": "FREE_TEXT",
+                        "aspect_required": False,
+                        "aspect_usage": "OPTIONAL",
+                        "aspect_enabled_for_variations": False,
+                        "aspect_applicable_to": ["PRODUCT"],
+                    },
+                },
+                {
+                    "localized_aspect_name": "Item Only",
+                    "aspect_constraint": {
+                        "aspect_data_type": "STRING",
+                        "aspect_mode": "FREE_TEXT",
+                        "aspect_applicable_to": ["ITEM"],
                     },
                 },
             ]
@@ -329,10 +329,16 @@ class TestEbayProductTypeRuleFactory(TestCaseEbayMixin):
             EbayProductTypeRuleFactory,
         )
 
+        aspects_response = self._build_aspects_response()
         dummy_api = _DummyEbayAPI(
             category_response=self._build_category_response(),
-            aspects_response=self._build_aspects_response(),
+            aspects_response=aspects_response,
         )
+
+        category_aspects = {
+            "Brand": {"Unbranded", "Apple"},
+            "Connectivity": {"2G", "3G", "4G"},
+        }
 
         with patch.object(EbayProductTypeRuleFactory, "get_api", return_value=dummy_api):
             factory = EbayProductTypeRuleFactory(
@@ -340,6 +346,7 @@ class TestEbayProductTypeRuleFactory(TestCaseEbayMixin):
                 view=self.view,
                 category_id="3197",
                 category_tree_id="123",
+                category_aspects=category_aspects,
             )
             factory.run()
 
@@ -414,4 +421,3 @@ class TestEbayProductTypeRuleFactory(TestCaseEbayMixin):
         self.assertEqual(items["Connectivity"], ProductPropertiesRuleItem.OPTIONAL)
         self.assertEqual(items["EC Range"], ProductPropertiesRuleItem.OPTIONAL)
         self.assertEqual(items["Detailed Description"], ProductPropertiesRuleItem.OPTIONAL)
-
