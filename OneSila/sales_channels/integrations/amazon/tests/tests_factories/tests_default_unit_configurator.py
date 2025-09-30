@@ -17,7 +17,7 @@ class DefaultUnitConfiguratorFactoryTest(TestCase):
             multi_tenant_company=self.multi_tenant_company
         )
         from sales_channels.integrations.amazon.models import AmazonSalesChannelView
-        self.view = AmazonSalesChannelView.objects.create(sales_channel=self.sales_channel)
+        self.view = AmazonSalesChannelView.objects.create(sales_channel=self.sales_channel, multi_tenant_company=self.multi_tenant_company)
         self.public_definition = AmazonPublicDefinition.objects.create(
             product_type_code="BATTERY",
             raw_schema=BATTERY_SCHEMA["battery"],

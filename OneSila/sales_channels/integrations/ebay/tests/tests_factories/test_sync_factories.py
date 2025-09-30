@@ -156,8 +156,6 @@ class EbaySyncFactoriesTest(TestCase):
         mock_translator.return_value.translate.return_value = "Color"
         remote_property = self._create_remote_property()
 
-        ebay_translate_property_task.call_local(remote_property.id)
-
         mock_translator.assert_called_once()
         remote_property.refresh_from_db()
         self.assertEqual(remote_property.translated_name, "Color")
@@ -169,8 +167,6 @@ class EbaySyncFactoriesTest(TestCase):
         remote_language.save(update_fields=["local_instance"])
 
         remote_property = self._create_remote_property(localized_name="Color")
-
-        ebay_translate_property_task.call_local(remote_property.id)
 
         mock_translator.assert_not_called()
         remote_property.refresh_from_db()
@@ -187,8 +183,6 @@ class EbaySyncFactoriesTest(TestCase):
             marketplace=self.view,
             localized_value="Schwarz",
         )
-
-        ebay_translate_select_value_task.call_local(select_value.id)
 
         mock_translator.assert_called_once()
         select_value.refresh_from_db()

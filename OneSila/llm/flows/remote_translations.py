@@ -79,11 +79,15 @@ class BaseRemoteTranslationFlow:
             return remote_text
 
     def _build_translator(self, remote_text: str, remote_lang: str, target_lang: str):
-        if self.translator_class is None:
+        translator_cls = self._get_translator_class()
+        if translator_cls is None:
             raise ValueError("translator_class must be defined for the flow")
 
         kwargs = self._translator_kwargs(remote_text, remote_lang, target_lang)
-        return self.translator_class(**kwargs)
+        return translator_cls(**kwargs)
+
+    def _get_translator_class(self):
+        return self.translator_class
 
     def _translator_kwargs(self, remote_text: str, remote_lang: str, target_lang: str) -> dict[str, Any]:
         raise NotImplementedError
@@ -148,7 +152,7 @@ class BaseRemoteTranslationFlow:
 class TranslateRemoteSelectValueFlow(BaseRemoteTranslationFlow):
     """Translate remote property select values and persist the result."""
 
-    translator_class = RemoteSelectValueTranslationLLM
+    translator_class = None
 
     def __init__(
         self,
@@ -183,11 +187,14 @@ class TranslateRemoteSelectValueFlow(BaseRemoteTranslationFlow):
             "property_code": self._resolve_attribute(self.property_code_attr),
         }
 
+    def _get_translator_class(self):
+        return RemoteSelectValueTranslationLLM
+
 
 class TranslateRemotePropertyFlow(BaseRemoteTranslationFlow):
     """Translate remote property names and persist the result."""
 
-    translator_class = RemotePropertyTranslationLLM
+    translator_class = None
 
     def __init__(
         self,
@@ -218,3 +225,6 @@ class TranslateRemotePropertyFlow(BaseRemoteTranslationFlow):
             "to_language_code": target_lang,
             "remote_identifier": self._resolve_attribute(self.remote_identifier_attr),
         }
+
+    def _get_translator_class(self):
+        return RemotePropertyTranslationLLM
