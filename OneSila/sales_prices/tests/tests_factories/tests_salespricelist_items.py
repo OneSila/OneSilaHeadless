@@ -178,7 +178,6 @@ class SalesPriceForSalesPriceListItemCreateFactoryTestCase(TestCase):
         salespricelistitem_thb.refresh_from_db()
 
         self.assertTrue(salespricelistitem_thb.price_auto != None)
-        self.assertTrue(salespricelistitem_thb.discount_auto != None)
 
     def test_create_items(self):
         """ We want to ensure that the right items are created

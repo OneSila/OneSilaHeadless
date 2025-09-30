@@ -715,11 +715,36 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
 
         return configurator_values
 
-    def _parse_variations(self, *, product_data: dict[str, Any]) -> list[dict[str, Any]]:
-        """Extract variation payloads from a remote product response."""
+    def get__product_data(self, product_data, offer_data, is_variation, is_configurable,  product_instance=None):
+        # get sku product_data.get('sku')
+        # get type is_configurable = CONFIGURABLE if not is SIMPLE
+        # get the name (the product.title)
+        # get view  offer_data marketplace_id
+        # get language view ebay language
+        # build initial structured data the actiive will be get by offer_data.listing.listing_status
+
+        # if type == SIMPLE:
+        #     prices, sales_pricelist_items = self._parse_prices(product_data, product_instance)
+        #     if prices:
+        #         structured["prices"] = prices
+        #     if sales_pricelist_items:
+        #         structured["sales_pricelist_items"] = sales_pricelist_items
+
+        # attributes, mirror_map = self._parse_attributes(
+        #     product_attrs, product_type_code, view
+        # )
+        # structured["properties"] = attributes
+        # structured["__mirror_product_properties_map"] = mirror_map
+        # structured["translations"] = self._parse_translations(name, language, product_data.get("attributes"))
+
+        # if is_configurable:
+        #     structured["configurator_select_values"] = self._parse_configurator_select_values(product_data)
+
+        # structured["__marketplace_id"] = marketplace_id
+        # return structured, language, view
+
 
         pass
-        return []
 
     def get_structured_product_data(self, *, product_data: dict[str, Any]) -> dict[str, Any]:
         """Combine parsed sub-sections into the final product payload."""
