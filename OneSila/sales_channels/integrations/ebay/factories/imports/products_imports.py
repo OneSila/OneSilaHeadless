@@ -915,16 +915,6 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
 
         pass
 
-    def handle_gtin_exemption(self, *, import_instance: Any) -> None:
-        """Placeholder hook to manage GTIN exemption flags."""
-
-        pass
-
-    def handle_product_browse_node(self, *, import_instance: Any) -> None:
-        """Placeholder hook to manage browse node assignments."""
-
-        pass
-
     def handle_sales_channels_views(
         self,
         *,
