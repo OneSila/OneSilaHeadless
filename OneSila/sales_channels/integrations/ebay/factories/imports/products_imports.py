@@ -9,6 +9,7 @@ from typing import Any
 from currencies.models import Currency
 from imports_exports.factories.imports import AsyncProductImportMixin, ImportMixin
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
+from sales_channels.integrations.ebay.models import EbayProductType
 from sales_channels.models import SalesChannelIntegrationPricelist
 from sales_prices.models import SalesPrice
 
@@ -107,6 +108,44 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
                     continue
 
                 yield {"product": product, "offer": offer}
+
+    def get_product_rule(
+        self,
+        *,
+        offer_data: dict[str, Any] | None = None,
+    ) -> Any | None:
+        """Return the local product rule linked to the offer's category."""
+
+        if not isinstance(offer_data, dict):
+            return None
+
+        category_id = offer_data.get("category_id")
+        marketplace_id = offer_data.get("marketplace_id")
+
+        if category_id is None or not marketplace_id:
+            return None
+
+        category_key = str(category_id).strip()
+        marketplace_key = str(marketplace_id).strip()
+
+        if not category_key or not marketplace_key:
+            return None
+
+        product_type = (
+            EbayProductType.objects.filter(
+                sales_channel=self.sales_channel,
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                marketplace__remote_id=marketplace_key,
+                remote_id=category_key,
+            )
+            .select_related("local_instance")
+            .first()
+        )
+
+        if not product_type or product_type.local_instance is None:
+            return None
+
+        return product_type.local_instance
 
     def import_products_process(self) -> None:
         for product_payload in self.get_products_data():
