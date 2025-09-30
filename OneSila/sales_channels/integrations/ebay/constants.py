@@ -41,6 +41,12 @@ EBAY_INTERNAL_PROPERTY_DEFAULTS = [
         'is_root': True,
     },
     {
+        'code': 'packageWeightAndSize__shippingIrregular',
+        'name': _("Package Shipping Irregular"),
+        'type': Property.TYPES.BOOLEAN,
+        'is_root': True,
+    },
+    {
         'code': 'isbn',
         'name': _("International Standard Book Number"),
         'type': Property.TYPES.TEXT,
@@ -50,6 +56,12 @@ EBAY_INTERNAL_PROPERTY_DEFAULTS = [
         'code': 'brand',
         'name': _("Brand"),
         'type': Property.TYPES.SELECT,
+        'is_root': False,
+    },
+    {
+        'code': 'epid',
+        'name': _("eBay Product ID"),
+        'type': Property.TYPES.TEXT,
         'is_root': False,
     },
     {
