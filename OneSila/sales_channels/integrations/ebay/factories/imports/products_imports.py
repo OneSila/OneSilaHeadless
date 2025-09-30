@@ -9,6 +9,7 @@ from typing import Any
 from currencies.models import Currency
 from imports_exports.factories.imports import AsyncProductImportMixin, ImportMixin
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
+from sales_channels.integrations.ebay.models import EbayRemoteLanguage
 from sales_channels.models import SalesChannelIntegrationPricelist
 from sales_prices.models import SalesPrice
 
@@ -241,8 +242,97 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
     def _parse_translations(self, *, product_data: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract translation payloads from a remote product response."""
 
-        pass
-        return []
+        if not isinstance(product_data, dict):
+            return []
+
+        inventory_item = product_data.get("product")
+        if not isinstance(inventory_item, dict):
+            inventory_item = product_data
+            if not isinstance(inventory_item, dict):
+                return []
+
+        locale = inventory_item.get("locale")
+        if not isinstance(locale, str) or not locale:
+            raise ValueError("Missing locale on eBay inventory item payload")
+
+        remote_language = (
+            EbayRemoteLanguage.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_code__iexact=locale,
+            )
+            .exclude(local_instance__isnull=True)
+            .exclude(local_instance="")
+            .first()
+        )
+
+        if remote_language is None:
+            raise ValueError(
+                "Locale %r is not mapped to a local language for sales channel %s"
+                % (locale, self.sales_channel.id)
+            )
+
+        language_code = remote_language.local_instance
+
+        name = inventory_item.get("title")
+        if isinstance(name, str):
+            name = name.strip()
+            if len(name) > 80:
+                name = name[:80]
+        else:
+            name = None
+
+        subtitle = inventory_item.get("subtitle")
+        if isinstance(subtitle, str):
+            subtitle = subtitle.strip() or None
+        else:
+            subtitle = None
+
+        description = inventory_item.get("description")
+        if isinstance(description, str):
+            description = description.strip()
+        else:
+            description = None
+
+        listing_description = None
+        offers_data = product_data.get("offers")
+        if isinstance(offers_data, list):
+            offer_iterable = offers_data
+        elif isinstance(offers_data, dict):
+            offer_iterable = [offers_data]
+        else:
+            offer_iterable = []
+
+        for offer in offer_iterable:
+            if not isinstance(offer, dict):
+                continue
+            value = offer.get("listing_description")
+            if isinstance(value, str) and value.strip():
+                listing_description = value.strip()
+                break
+
+        if listing_description is None:
+            offer = product_data.get("offer")
+            if isinstance(offer, dict):
+                value = offer.get("listing_description")
+                if isinstance(value, str) and value.strip():
+                    listing_description = value.strip()
+
+        if listing_description:
+            description = listing_description
+
+        if not name:
+            return []
+
+        translation: dict[str, Any] = {
+            "name": name,
+            "language": language_code,
+            "subtitle": subtitle,
+        }
+
+        if description is not None:
+            translation["description"] = description
+
+        return [translation]
 
     def _parse_images(self, *, product_data: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract image payloads from a remote product response."""
