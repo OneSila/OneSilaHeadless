@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from django.db.models import Q
+from properties.models import Property
 
 from currencies.models import Currency
 from imports_exports.factories.imports import AsyncProductImportMixin, ImportMixin
+from sales_channels.integrations.ebay.constants import EBAY_INTERNAL_PROPERTY_DEFAULTS
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
-from sales_channels.integrations.ebay.models import EbayProductType, EbayRemoteLanguage
+from sales_channels.integrations.ebay.models import (
+    EbayInternalProperty,
+    EbayProperty,
+    EbayPropertySelectValue,
+    EbaySalesChannelView,
+    EbayProductType,
+    EbayRemoteLanguage
+)
 from sales_channels.models import SalesChannelIntegrationPricelist
 from sales_prices.models import SalesPrice
 
@@ -416,6 +426,294 @@ class EbayProductsImportProcessor(ImportMixin, GetEbayAPIMixin):
             seen_urls.add(url)
 
         return images
+
+    def _parse_attributes(
+        self,
+        *,
+        product_data: dict[str, Any],
+        view: EbaySalesChannelView | None = None,
+    ) -> tuple[list[dict[str, Any]], dict[int, dict[str, Any]]]:
+        """Extract attribute payloads and mirror data for the given product."""
+
+        attributes: list[dict[str, Any]] = []
+        mirror_map: dict[int, dict[str, Any]] = {}
+
+        if not isinstance(product_data, dict):
+            return attributes, mirror_map
+
+        product_section = product_data.get("product")
+        if not isinstance(product_section, Mapping):
+            product_section = {}
+
+        package_weight_size = product_data.get("packageWeightAndSize")
+        if not isinstance(package_weight_size, Mapping):
+            package_weight_size = {}
+
+        dimensions = package_weight_size.get("dimensions")
+        if not isinstance(dimensions, Mapping):
+            dimensions = {}
+
+        weight = package_weight_size.get("weight")
+        if not isinstance(weight, Mapping):
+            weight = {}
+
+        internal_defaults_map = {definition["code"]: definition for definition in EBAY_INTERNAL_PROPERTY_DEFAULTS}
+        internal_codes = list(internal_defaults_map.keys())
+
+        existing_internal = {
+            internal_property.code: internal_property
+            for internal_property in EbayInternalProperty.objects.filter(
+                sales_channel=self.sales_channel,
+                code__in=internal_codes,
+            )
+        }
+
+        internal_properties: dict[str, EbayInternalProperty] = {}
+        for code in internal_codes:
+            internal_property = existing_internal.get(code)
+            if internal_property is None:
+                definition = internal_defaults_map[code]
+                internal_property, _ = EbayInternalProperty.objects.get_or_create(
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    code=code,
+                    defaults={
+                        "name": definition["name"],
+                        "type": definition["type"],
+                        "is_root": definition["is_root"],
+                    },
+                )
+            internal_properties[code] = internal_property
+
+        def _normalize_single(value: Any) -> Any:
+            if isinstance(value, (list, tuple, set)):
+                for entry in value:
+                    normalized = _normalize_single(entry)
+                    if normalized not in (None, ""):
+                        return normalized
+                return None
+            if isinstance(value, str):
+                stripped = value.strip()
+                return stripped or None
+            if isinstance(value, Mapping):
+                return None
+            if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
+                return value
+            if value is None:
+                return None
+            return str(value)
+
+        internal_values: dict[str, Any] = {
+            "condition": _normalize_single(product_data.get("condition")),
+            "brand": _normalize_single(product_section.get("brand")),
+            "mpn": _normalize_single(product_section.get("mpn")),
+            "upc": _normalize_single(product_section.get("upc")),
+            "isbn": _normalize_single(product_section.get("isbn")),
+            "epid": _normalize_single(product_section.get("epid")),
+            "packageWeightAndSize__dimensions__length": _normalize_single(dimensions.get("length")),
+            "packageWeightAndSize__dimensions__width": _normalize_single(dimensions.get("width")),
+            "packageWeightAndSize__dimensions__height": _normalize_single(dimensions.get("height")),
+            "packageWeightAndSize__weight__value": _normalize_single(weight.get("value")),
+            "packageWeightAndSize__packageType": _normalize_single(package_weight_size.get("packageType")),
+            "packageWeightAndSize__shippingIrregular": _normalize_single(package_weight_size.get("shippingIrregular")),
+        }
+
+        for code, value in internal_values.items():
+            if value in (None, ""):
+                continue
+
+            internal_property = internal_properties.get(code)
+            if not internal_property or not internal_property.local_instance:
+                continue
+
+            attributes.append({
+                "property": internal_property.local_instance,
+                "value": value,
+            })
+
+        aspect_payload: dict[str, Any]
+        if "product" in product_data and isinstance(product_data["product"], Mapping):
+            aspect_payload = product_data
+        else:
+            aspect_payload = {"product": product_section}
+
+        aspects_map = self._extract_product_aspects(product=aspect_payload)
+
+        if not aspects_map:
+            return attributes, mirror_map
+
+        for aspect_name, values in aspects_map.items():
+            if not aspect_name or not values:
+                continue
+
+            normalized_values = sorted({str(value) for value in values if value not in (None, "")})
+            if not normalized_values:
+                continue
+
+            property_filters = {
+                "sales_channel": self.sales_channel,
+            }
+            if isinstance(view, EbaySalesChannelView):
+                property_filters["marketplace"] = view
+
+            remote_property = EbayProperty.objects.filter(**property_filters).filter(
+                Q(localized_name__iexact=aspect_name) | Q(translated_name__iexact=aspect_name)
+            ).first()
+
+            if not remote_property or not remote_property.local_instance:
+                continue
+
+            property_instance = remote_property.local_instance
+            marketplace = view or remote_property.marketplace
+
+            remote_value: Any | None = None
+            remote_select_value: EbayPropertySelectValue | None = None
+            remote_select_values: list[EbayPropertySelectValue] = []
+            is_mapped = False
+
+            if property_instance.type == Property.TYPES.SELECT:
+                remote_value = normalized_values[0]
+                if marketplace is None:
+                    select_value = None
+                else:
+                    select_value, _ = EbayPropertySelectValue.objects.get_or_create(
+                        multi_tenant_company=self.sales_channel.multi_tenant_company,
+                        sales_channel=self.sales_channel,
+                        marketplace=marketplace,
+                        ebay_property=remote_property,
+                        localized_value=remote_value,
+                        defaults={"translated_value": remote_value},
+                    )
+
+                if select_value is not None:
+                    remote_select_value = select_value
+                    remote_select_values = [select_value]
+                    if select_value.local_instance:
+                        is_mapped = True
+                        attributes.append(
+                            {
+                                "property": property_instance,
+                                "value": select_value.local_instance.id,
+                                "value_is_id": True,
+                            }
+                        )
+
+            elif property_instance.type == Property.TYPES.MULTISELECT:
+                remote_value = normalized_values
+                if marketplace is not None:
+                    mapped_ids: list[int] = []
+                    for value_entry in normalized_values:
+                        select_value, _ = EbayPropertySelectValue.objects.get_or_create(
+                            multi_tenant_company=self.sales_channel.multi_tenant_company,
+                            sales_channel=self.sales_channel,
+                            marketplace=marketplace,
+                            ebay_property=remote_property,
+                            localized_value=value_entry,
+                            defaults={"translated_value": value_entry},
+                        )
+                        remote_select_values.append(select_value)
+                        if select_value.local_instance:
+                            mapped_ids.append(select_value.local_instance.id)
+
+                    if mapped_ids and len(mapped_ids) == len(normalized_values):
+                        is_mapped = True
+                        attributes.append(
+                            {
+                                "property": property_instance,
+                                "value": mapped_ids,
+                                "value_is_id": True,
+                            }
+                        )
+
+            else:
+                remote_value = normalized_values[0]
+                is_mapped = True
+                attributes.append(
+                    {
+                        "property": property_instance,
+                        "value": remote_value,
+                    }
+                )
+
+            if remote_value is None and not remote_select_values:
+                continue
+
+            mirror_map[property_instance.id] = {
+                "remote_property": remote_property,
+                "remote_value": remote_value,
+                "is_mapped": is_mapped,
+                "remote_select_value": remote_select_value,
+                "remote_select_values": remote_select_values,
+            }
+
+        return attributes, mirror_map
+
+    def _parse_configurator_select_values(
+        self,
+        *,
+        product_data: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Return configurator select values declared on the remote payload."""
+
+        if not isinstance(product_data, dict):
+            return []
+
+        varies_by = product_data.get("varies_by")
+        if not isinstance(varies_by, dict):
+            return []
+
+        specifications = varies_by.get("specifications")
+        if specifications is None:
+            return []
+
+        if isinstance(specifications, dict):
+            raw_specs = [specifications]
+        elif isinstance(specifications, (list, tuple, set)):
+            raw_specs = [spec for spec in specifications if isinstance(spec, dict)]
+        else:
+            return []
+
+        configurator_values: list[dict[str, Any]] = []
+        seen_names: set[str] = set()
+
+        for spec in raw_specs:
+            name = spec.get("name")
+            if not isinstance(name, str):
+                continue
+
+            normalized_name = name.strip()
+            if not normalized_name:
+                continue
+
+            normalized_key = normalized_name.casefold()
+            if normalized_key in seen_names:
+                continue
+
+            seen_names.add(normalized_key)
+
+            remote_property = (
+                EbayProperty.objects.filter(
+                    sales_channel=self.sales_channel,
+                )
+                .filter(localized_name__iexact=normalized_name)
+                .select_related("local_instance")
+                .first()
+            )
+
+            if remote_property and remote_property.local_instance:
+                configurator_values.append({"property": remote_property.local_instance})
+                continue
+
+            configurator_values.append(
+                {
+                    "property_data": {
+                        "name": normalized_name,
+                        "type": Property.TYPES.SELECT,
+                    }
+                }
+            )
+
+        return configurator_values
 
     def _parse_variations(self, *, product_data: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract variation payloads from a remote product response."""
