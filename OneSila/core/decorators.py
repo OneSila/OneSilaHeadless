@@ -6,6 +6,25 @@ from core.logging_helpers import timeit_and_log
 import logging
 logger = logging.getLogger(__name__)
 
+def allow_soft_sanity_check_errors(func):
+    """
+    Decorator to catch SoftSanityCheck exceptions and allow the function to continue gracefully.
+    If a SoftSanityCheck is raised, it will be logged as a warning and not propagated.
+    """
+    from core.exceptions import SoftSanityCheckError
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except SoftSanityCheckError as e:
+            logger.warning(f"SoftSanityCheckError ignored in {func.__name__}: {e}")
+            # Optionally, you could return None or some default value
+            return None
+    wrapper.allow_soft_sanity_errors = True
+    return wrapper
+
+
 
 def trigger_pre_and_post_save(dirty_field, signal_pre=None, signal_post=None):
     """
