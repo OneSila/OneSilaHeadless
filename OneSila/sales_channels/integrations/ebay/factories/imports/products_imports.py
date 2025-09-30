@@ -10,7 +10,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 from django.db import IntegrityError
 from django.db.models import Q
-from properties.models import Property
+from properties.models import Property, ProductProperty
 from products.product_types import CONFIGURABLE, SIMPLE
 
 from currencies.models import Currency
@@ -906,9 +906,127 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
 
 
     def handle_attributes(self, *, import_instance: Any) -> None:
-        """Placeholder hook to synchronise product attributes."""
+        """Synchronise local product properties with their eBay mirrors."""
 
-        pass
+        if not hasattr(import_instance, "properties"):
+            return
+
+        remote_product = getattr(import_instance, "remote_instance", None)
+        if remote_product is None:
+            return
+
+        mirror_map = import_instance.data.get("__mirror_product_properties_map", {})
+        if not isinstance(mirror_map, Mapping):
+            mirror_map = {}
+
+        product_properties = getattr(import_instance, "product_property_instances", [])
+
+        for product_property in product_properties:
+            local_property = getattr(product_property, "property", None)
+            if local_property is None:
+                continue
+
+            mirror_data = mirror_map.get(local_property.id)
+            if not mirror_data:
+                continue
+
+            remote_property = mirror_data.get("remote_property")
+            remote_value = mirror_data.get("remote_value")
+            remote_select_value = mirror_data.get("remote_select_value")
+            remote_select_values = mirror_data.get("remote_select_values", [])
+
+            if remote_property is None:
+                continue
+
+            remote_product_property, _ = EbayProductProperty.objects.get_or_create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                local_instance=product_property,
+                remote_product=remote_product,
+            )
+
+            updated = False
+
+            if remote_product_property.remote_property != remote_property:
+                remote_product_property.remote_property = remote_property
+                updated = True
+
+            if remote_value is not None and not remote_product_property.remote_value:
+                remote_product_property.remote_value = str(remote_value)
+                updated = True
+
+            if (
+                hasattr(remote_product_property, "remote_select_value")
+                and remote_product_property.remote_select_value != remote_select_value
+            ):
+                remote_product_property.remote_select_value = remote_select_value
+                updated = True
+
+            if updated:
+                remote_product_property.save()
+
+            if hasattr(remote_product_property, "remote_select_values"):
+                existing_ids = set(
+                    remote_product_property.remote_select_values.all().values_list("id", flat=True)
+                )
+                new_ids = {value.id for value in remote_select_values if value is not None}
+                if existing_ids != new_ids:
+                    remote_product_property.save()
+                    remote_product_property.remote_select_values.set(remote_select_values)
+
+        for mirror_data in mirror_map.values():
+            if mirror_data.get("is_mapped"):
+                continue
+
+            remote_property = mirror_data.get("remote_property")
+            remote_value = mirror_data.get("remote_value")
+            remote_select_value = mirror_data.get("remote_select_value")
+            remote_select_values = mirror_data.get("remote_select_values", [])
+
+            if remote_property is None:
+                continue
+
+            local_instance: ProductProperty | None = None
+            if remote_product.local_instance and remote_property.local_instance:
+                local_instance = (
+                    ProductProperty.objects.filter(
+                        product=remote_product.local_instance,
+                        property=remote_property.local_instance,
+                    )
+                    .select_related("property")
+                    .first()
+                )
+
+            app, created = EbayProductProperty.objects.get_or_create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                remote_product=remote_product,
+                remote_property=remote_property,
+                local_instance=local_instance,
+            )
+
+            changed = False
+
+            if remote_value is not None and app.remote_value != str(remote_value):
+                app.remote_value = str(remote_value)
+                changed = True
+
+            if (
+                hasattr(app, "remote_select_value")
+                and app.remote_select_value != remote_select_value
+            ):
+                app.remote_select_value = remote_select_value
+                changed = True
+
+            if changed or created:
+                app.save()
+
+            if hasattr(app, "remote_select_values"):
+                existing_ids = set(app.remote_select_values.all().values_list("id", flat=True))
+                new_ids = {value.id for value in remote_select_values if value is not None}
+                if created or existing_ids != new_ids:
+                    app.save()
+                    app.remote_select_values.set(remote_select_values)
 
     def handle_variations(self, *, import_instance: Any) -> None:
         """Placeholder hook to link variation relationships."""
