@@ -5,6 +5,8 @@ SEP_REGEX = re.compile(r"[\s\-_./]+")
 ALNUM_REGEX = re.compile(r"[a-z0-9]+")
 CODE_TOKEN_REGEX = re.compile(r"^(?=.*[a-z])(?=.*\d)[a-z0-9]+$")  # any token mixing letters+digits
 
+RESERVED_PROPERTY_INTERNAL_NAMES = {"product_type"}
+
 
 def _strip_accents(s: str) -> str:
     return "".join(ch for ch in unicodedata.normalize("NFKD", s or "") if not unicodedata.combining(ch))
@@ -33,6 +35,24 @@ def _norm_code(s: str) -> str:
     """Collapse to alnum only (lowercased, accents stripped)."""
     s = _strip_accents(s or "").lower()
     return re.sub(r"[^a-z0-9]", "", s)
+
+
+def sanitize_internal_name(internal_name: str | None, multi_tenant_company=None, *, allow_reserved: bool = False) -> str | None:
+    """Return a normalised internal name, avoiding reserved identifiers unless explicitly allowed."""
+    if not internal_name:
+        return internal_name
+
+    from django.utils.text import slugify
+
+    normalised = slugify(internal_name).replace('-', '_')
+
+    if normalised in RESERVED_PROPERTY_INTERNAL_NAMES and not allow_reserved:
+        replacement_base = f"{normalised}_external"
+        if multi_tenant_company:
+            return generate_unique_internal_name(replacement_base, multi_tenant_company)
+        return replacement_base
+
+    return normalised
 
 
 def get_product_properties_dict(product) -> dict[str, list[str]]:
