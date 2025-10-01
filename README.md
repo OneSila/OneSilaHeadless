@@ -104,6 +104,23 @@ will yield:
 }
 ```
 
+### Importing images via GraphQL
+
+Images can be uploaded in bulk by calling the `uploadImagesFromUrls` mutation. Each entry accepts the image URL, type, and an optional title:
+
+```graphql
+mutation uploadImagesFromUrls {
+  uploadImagesFromUrls(
+    urls: [
+      { url: "https://example.com/product.jpg", type: "PACK", title: "Front shot" }
+    ]
+  ) {
+    id
+    title
+  }
+}
+```
+
 ## Running tests
 
 Runings tests, including coverage:

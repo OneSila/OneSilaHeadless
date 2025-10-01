@@ -55,7 +55,11 @@ class MediaMutation:
         images = []
         for image_url in urls:
             importer = ImportImageInstance(
-                {'image_url': image_url.url, 'type': image_url.type},
+                {
+                    'image_url': image_url.url,
+                    'type': image_url.type,
+                    'title': image_url.title,
+                },
                 import_process=import_process,
             )
             importer.process()

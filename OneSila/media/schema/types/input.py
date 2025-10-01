@@ -1,3 +1,5 @@
+from typing import Optional
+
 from core.schema.core.types.input import NodeInput, input, partial, strawberry_input
 from media.models import Media, Image, Video, MediaProductThrough, File
 
@@ -56,3 +58,4 @@ class MediaProductThroughPartialInput(NodeInput):
 class ImageUrlInput:
     url: str
     type: str
+    title: Optional[str] = None
