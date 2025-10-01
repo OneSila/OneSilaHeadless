@@ -16,6 +16,8 @@ class ImportImageInstance(AbstractImportInstance):
       - image_url: HTTPS URL of the image (used if image_content is not provided).
       - image_content: Binary or base64 image content (takes priority over image_url).
       - type: Image type; defaults to Image.PACK_SHOT if not provided.
+      - title: Optional image title.
+      - description: Optional image description.
       - product_data: Optional data for importing an associated product.
       - is_main_image: Optional boolean flag indicating if this is the main image (default: False).
       - sort_order: Optional integer for ordering (default: 10).
@@ -30,6 +32,8 @@ class ImportImageInstance(AbstractImportInstance):
         self.set_field_if_exists('image_url')
         self.set_field_if_exists('image_content')
         self.set_field_if_exists('type', default_value=Image.PACK_SHOT)
+        self.set_field_if_exists('title')
+        self.set_field_if_exists('description')
         self.set_field_if_exists('product_data')
 
         # relevant only if we have either product or product_data provided
@@ -94,6 +98,12 @@ class ImportImageInstance(AbstractImportInstance):
             'multi_tenant_company': self.multi_tenant_company,
             'image_type': self.type,
         }
+
+        if hasattr(self, 'title'):
+            self.kwargs['title'] = self.title
+
+        if hasattr(self, 'description'):
+            self.kwargs['description'] = self.description
 
         try:
             if hasattr(self, 'image_content'):
