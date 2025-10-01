@@ -44,9 +44,12 @@ class Media(models.Model):
     )
 
     type = models.CharField(max_length=5, choices=MEDIA_TYPE_CHOICES)
+    title = models.CharField(_('title'), max_length=255, blank=True, null=True)
+    description = models.TextField(_('description'), blank=True, null=True)
 
+    # Video Fields
     video_url = models.URLField(null=True, blank=True)
-
+    # Image Fields
     image_type = models.CharField(max_length=5, choices=IMAGE_TYPE_CHOICES, default=PACK_SHOT)
     image = models.ImageField(
         _('Image (High resolution)'),
@@ -60,7 +63,7 @@ class Media(models.Model):
     onesila_thumbnail = ImageSpecField(source='image',
         id='mediapp:image:onesilathumbnail')
     image_hash = models.CharField(_('image hash'), max_length=100, blank=True, null=True)
-
+    # File Fields
     file = models.FileField(
         _('File'),
         upload_to=tenant_upload_to('files'),
@@ -79,6 +82,7 @@ class Media(models.Model):
     images = ImageManager()
 
     class Meta:
+        search_terms = ['title', 'description']
         constraints = [
             # Ensure that if image_hash is set then it is unique per multi_tenant_company.
             models.UniqueConstraint(

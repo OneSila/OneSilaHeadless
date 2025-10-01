@@ -31,6 +31,13 @@ def prevent_media_delete_if_linked(sender, instance, **kwargs):
     if PropertySelectValue.objects.filter(image=instance).exists():
         raise ValidationError(_("Cannot delete Media because it is used in Property Select Values."))
 
+@receiver(post_save, sender=Media)
+@receiver(post_save, sender=Image)
+@receiver(post_save, sender=File)
+@receiver(post_save, sender=Video)
+def populate_media_title_signal_sender(sender, instance, **kwargs):
+    from .tasks import populate_media_title_task
+    populate_media_title_task(instance)
 
 @receiver(post_delete, sender=Image)
 @receiver(post_delete, sender=Media)
