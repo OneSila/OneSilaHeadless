@@ -34,6 +34,11 @@ from properties.schema.types.filters import (
     ProductPropertyFilter,
 )
 from products.schema.types.filters import ProductFilter
+from sales_channels.schema.types.filter_mixins import (
+    DependentMappedLocallyFilterMixin,
+    GeneralMappedLocallyFilterMixin,
+    GeneralMappedRemotelyFilterMixin,
+)
 from sales_channels.schema.types.filters import (
     SalesChannelFilter,
     SalesChannelViewFilter,
@@ -58,72 +63,35 @@ class AmazonSalesChannelViewFilter(SearchFilterMixin):
 
 
 @filter(AmazonProperty)
-class AmazonPropertyFilter(SearchFilterMixin):
+class AmazonPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
     allows_unmapped_values: auto
     type: auto
 
-    @custom_filter
-    def mapped_locally(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
-
-        if value not in (None, UNSET):
-            if isinstance(queryset, AmazonPropertyQuerySet):
-                queryset = queryset.filter_mapped_locally(value)
-            elif isinstance(queryset, AmazonPropertySelectValueQuerySet):
-                queryset = queryset.filter_amazon_property_mapped_locally(value)
-            else:
-                raise Exception(f"Unexpected queryset class: {type(queryset)}")
-
-        return queryset, Q()
-
-    @custom_filter
-    def mapped_remotely(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
-        if value not in (None, UNSET):
-            queryset = queryset.filter_mapped_remotely(value)
-        return queryset, Q()
+    def get_mapped_locally_querysets(self):
+        return (
+            (AmazonPropertyQuerySet, "filter_mapped_locally"),
+            (AmazonPropertySelectValueQuerySet, "filter_amazon_property_mapped_locally"),
+        )
 
 
 @filter(AmazonPropertySelectValue)
-class AmazonPropertySelectValueFilter(SearchFilterMixin):
+class AmazonPropertySelectValueFilter(SearchFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     amazon_property: Optional[AmazonPropertyFilter]
     local_instance: Optional[PropertySelectValueFilter]
     marketplace: Optional[SalesChannelViewFilter]
 
-    @custom_filter
-    def mapped_locally(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
-        if value not in (None, UNSET):
-            queryset = queryset.filter_mapped_locally(value)
-        return queryset, Q()
-
-    @custom_filter
-    def mapped_remotely(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
-        if value not in (None, UNSET):
-            queryset = queryset.filter_mapped_remotely(value)
-        return queryset, Q()
-
 
 @filter(AmazonProductType)
-class AmazonProductTypeFilter(SearchFilterMixin):
+class AmazonProductTypeFilter(SearchFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
     id: auto
     product_type_code: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[ProductPropertiesRuleFilter]
-
-    @custom_filter
-    def mapped_locally(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
-        if value not in (None, UNSET):
-            queryset = queryset.filter_mapped_locally(value)
-        return queryset, Q()
-
-    @custom_filter
-    def mapped_remotely(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
-        if value not in (None, UNSET):
-            queryset = queryset.filter_mapped_remotely(value)
-        return queryset, Q()
 
 
 @filter(AmazonProductTypeItem)

@@ -64,6 +64,7 @@ INSTALLED_LOCAL_APPS = [
     'sales_channels.integrations.shopify',
     'sales_channels.integrations.woocommerce',
     'sales_channels.integrations.amazon',
+    'sales_channels.integrations.ebay',
     'sales_prices',
     'properties',
     'orders',
@@ -392,6 +393,8 @@ SHOPIFY_API_VERSION = "2025-04"
 SHOPIFY_TEST_REDIRECT_URI = os.getenv('SHOPIFY_TEST_REDIRECT_URI')
 SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
 SHOPIFY_API_SECRET = os.getenv('SHOPIFY_API_SECRET')
+
+
 #
 # OpenAI settings. (llm)
 #

@@ -39,8 +39,9 @@ class Integration(PolymorphicModel, models.Model):
 
     def clean(self):
         from sales_channels.integrations.amazon.models import AmazonSalesChannel
+        from sales_channels.integrations.ebay.models import EbaySalesChannel
 
-        if not isinstance(self, AmazonSalesChannel):
+        if not isinstance(self, AmazonSalesChannel) and not isinstance(self, EbaySalesChannel):
             validator = URLValidator(schemes=['http', 'https'])
             try:
                 validator(self.hostname)

@@ -23,16 +23,17 @@ class ImportSalesPriceListItemInstanceTests(TestCase):
         sales_price.set_prices(rrp=100, price=90)
         return product
 
-    def _create_pricelist(self):
+    def _create_pricelist(self, discount_pcnt=None):
         return SalesPriceList.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             name="Retail",
             currency=self.currency,
+            discount_pcnt=discount_pcnt,
         )
 
     def test_create_with_objects(self):
         product = self._create_product_with_sales_price()
-        pricelist = self._create_pricelist()
+        pricelist = self._create_pricelist(discount_pcnt=3)
         inst = ImportSalesPriceListItemInstance(
             {}, self.import_process, sales_pricelist=pricelist, product=product
         )
