@@ -56,6 +56,9 @@ class AITranslateContentFlow:
                 if self.content_type == ContentAiGenerateType.SHORT_DESCRIPTION:
                     self.to_translate = self._get_safe_translation(translation, 'short_description')
 
+                if self.content_type == ContentAiGenerateType.SUBTITLE:
+                    self.to_translate = self._get_safe_translation(translation, 'subtitle')
+
                 if self.content_type == ContentAiGenerateType.NAME:
                     self.to_translate = self._get_safe_translation(translation, 'name')
 
@@ -165,6 +168,7 @@ class BulkAiTranslateContentFlow:
 
                 for content_type in [
                     ContentAiGenerateType.NAME,
+                    ContentAiGenerateType.SUBTITLE,
                     ContentAiGenerateType.SHORT_DESCRIPTION,
                     ContentAiGenerateType.DESCRIPTION
                 ]:

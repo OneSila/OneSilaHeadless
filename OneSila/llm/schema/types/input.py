@@ -22,6 +22,7 @@ from sales_channels.schema.types.input import SalesChannelPartialInput
 class ContentAiGenerateType(Enum):
     DESCRIPTION = "description"
     SHORT_DESCRIPTION = "short_description"
+    SUBTITLE = "subtitle"
     NAME = "name"
     BULLET_POINTS = "bullet_points"
 

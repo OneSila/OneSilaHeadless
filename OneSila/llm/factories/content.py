@@ -365,6 +365,56 @@ class ShortDescriptionLLM(DescriptionGenLLM):
         return base_prompt + channel_addition
 
 
+class SubtitleLLM(ContentLLMMixin):
+    """Generate a concise subtitle for a product."""
+
+    @property
+    def system_prompt(self):
+        return (
+            "You create concise product subtitles or taglines. Respond with a single "
+            "sentence under 80 characters in the requested language. Do not use HTML "
+            "or markdown and avoid repeating the product name verbatim."
+        )
+
+    @property
+    def prompt(self):
+        prompt = f"""
+        ##Language Code##
+        {self.language_code}
+
+        ##Product name##
+        {self.product_name}
+
+        ##Product attributes##
+        {self.property_values}
+        """
+
+        if self.short_description:
+            prompt += f"""
+            ##Product Short Description##
+            {self.short_description}
+            """
+
+        if self.brand_prompt:
+            prompt += f"""
+            ##Brand Personality##
+            {self.brand_prompt}
+            """
+
+        prompt += """
+        ##Instructions##
+        Craft a persuasive subtitle or tagline that complements the product name.
+        Keep it conversational, benefit driven, and within 80 characters.
+        Avoid quotation marks, trailing punctuation, or repeating the product name.
+        """
+
+        return prompt
+
+    def parse_response(self):
+        lines = [line.strip().strip('"\'') for line in self.text_response.splitlines() if line.strip()]
+        self.text_response = lines[0] if lines else ""
+
+
 class BulletPointsLLM(ContentLLMMixin):
     """Generate bullet points for a product."""
 
