@@ -50,6 +50,13 @@ class ImportInstanceValidateDataTest(TestCase):
         self.assertEqual(getattr(instance, 'internal_name', None), "size")
         self.assertEqual(getattr(instance, 'type', None), "TEXT")
 
+    def test_reserved_internal_name_is_sanitized(self):
+        data = {
+            "internal_name": "product_type"
+        }
+        instance = DummyImportPropertyInstance(data)
+        self.assertEqual(getattr(instance, 'internal_name', None), "product_type_external")
+
     def test_data_without_type(self):
         data = {
             "internal_name": "weight",
@@ -129,6 +136,23 @@ class ImportPropertyProcessTest(TestCase):
 
         properties_post_import_cnt = Property.objects.filter(multi_tenant_company=self.multi_tenant_company).count()
         self.assertEqual(properties_cnt + 1, properties_post_import_cnt)
+
+    def test_process_sanitizes_reserved_internal_name(self):
+
+        data = {
+            "name": "Woo Product Type",
+            "internal_name": "product_type",
+            "type": "SELECT",
+            "is_public_information": True,
+            "add_to_filters": True,
+            "has_image": False
+        }
+
+        instance = ImportPropertyInstance(data, self.import_process)
+        instance.process()
+
+        created_internal_name = instance.instance.internal_name
+        self.assertEqual(created_internal_name, "product_type_external")
 
     def test_edit_is_public_information_internal_name(self):
         data = {
@@ -686,6 +710,50 @@ class ImportProductPropertiesRuleItemInstanceProcessTest(TestCase):
         rule = instance.rule
         self.assertIsNotNone(rule.id, self.existing_rule.id)
         self.assertEqual(ProductPropertiesRuleItem.objects.filter(rule=rule).count(), 1)
+
+    def test_reserved_internal_name_in_property_data_is_sanitized(self):
+        data = {
+            "property_data": {
+                "internal_name": "product_type",
+                "name": "Woo Product Type",
+                "type": "SELECT"
+            }
+        }
+
+        instance = ImportProductPropertiesRuleItemInstance(data, self.import_process, rule=self.existing_rule)
+        instance.process()
+
+        self.assertEqual(instance.property.internal_name, "product_type_external")
+
+    def test_reserved_internal_name_property_data_reuses_property(self):
+        data = {
+            "property_data": {
+                "internal_name": "product_type",
+                "name": "Woo Product Type",
+                "type": "SELECT"
+            }
+        }
+
+        base_count = Property.objects.filter(multi_tenant_company=self.multi_tenant_company).count()
+
+        first_instance = ImportProductPropertiesRuleItemInstance(data, self.import_process, rule=self.existing_rule)
+        first_instance.process()
+
+        mid_count = Property.objects.filter(multi_tenant_company=self.multi_tenant_company).count()
+
+        second_instance = ImportProductPropertiesRuleItemInstance({
+            "property_data": {
+                "internal_name": "product_type",
+                "name": "Woo Product Type",
+                "type": "SELECT"
+            }
+        }, self.import_process, rule=self.existing_rule)
+        second_instance.process()
+
+        final_count = Property.objects.filter(multi_tenant_company=self.multi_tenant_company).count()
+
+        self.assertEqual(mid_count, final_count)
+        self.assertEqual(first_instance.property, second_instance.property)
 
     def test_process_create_using_existing_property(self):
         """

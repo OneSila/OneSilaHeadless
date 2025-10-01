@@ -6,6 +6,7 @@ from imports_exports.factories.mixins import ImportOperationMixin, AbstractImpor
 from llm.factories.property_type_detector import DetectPropertyTypeLLM
 from properties.models import Property, PropertyTranslation, PropertySelectValue, PropertySelectValueTranslation, \
     ProductPropertiesRule, ProductPropertiesRuleItem, ProductProperty, ProductPropertyTextTranslation
+from properties.helpers import sanitize_internal_name
 from dateutil.parser import parse as flexible_parse
 
 
@@ -154,7 +155,22 @@ class ImportPropertyInstance(AbstractImportInstance):
         self.set_field_if_exists('is_public_information')
         self.set_field_if_exists('add_to_filters')
         self.set_field_if_exists('has_image')
+        self.set_field_if_exists('is_product_type')
         self.set_field_if_exists('translations')
+
+        allow_reserved_internal_name = bool(getattr(self, 'is_product_type', False))
+        if self.instance and getattr(self.instance, 'is_product_type', False):
+            allow_reserved_internal_name = True
+
+        if hasattr(self, 'internal_name'):
+            normalised_internal_name = sanitize_internal_name(
+                self.internal_name,
+                self.multi_tenant_company,
+                allow_reserved=allow_reserved_internal_name,
+            )
+            if normalised_internal_name != self.internal_name:
+                self.internal_name = normalised_internal_name
+                self.data['internal_name'] = normalised_internal_name
 
         # First, validate required keys and boolean field types (ignoring 'type').
         self.validate()
@@ -509,6 +525,17 @@ class ImportProductPropertiesRuleItemInstance(AbstractImportInstance):
         self.set_field_if_exists('sort_order')
         self.set_field_if_exists('rule_data')
         self.set_field_if_exists('property_data')
+
+        if hasattr(self, 'property_data') and isinstance(self.property_data, dict):
+            allow_reserved = bool(self.property_data.get('is_product_type'))
+            sanitised_internal_name = sanitize_internal_name(
+                self.property_data.get('internal_name'),
+                self.multi_tenant_company,
+                allow_reserved=allow_reserved,
+            )
+            if sanitised_internal_name != self.property_data.get('internal_name'):
+                self.property_data['internal_name'] = sanitised_internal_name
+                self.data['property_data'] = self.property_data
 
         if self.property is None:
             # we might want to add the property directly into data because most of the times the items will be created

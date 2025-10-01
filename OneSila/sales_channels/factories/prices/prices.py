@@ -100,13 +100,13 @@ class RemotePriceUpdateFactory(ToUpdateCurrenciesMixin, ProductAssignmentMixin, 
     def preflight_check(self):
         if not self.skip_checks:
             if not self.sales_channel.sync_prices:
-                logger.warning(f"{self.__class__.__name__} Preflight check: Sales channel {self.sales_channel.name} does not sync prices")
+                logger.warning(f"{self.__class__.__name__} Preflight check: Sales channel {self.sales_channel.hostname} does not sync prices")
                 return False
             if not self.remote_product:
-                logger.warning(f"{self.__class__.__name__} Preflight check: Remote product not found for sales channel {self.sales_channel.name}")
+                logger.warning(f"{self.__class__.__name__} Preflight check: Remote product not found for sales channel {self.sales_channel.hostname}")
                 return False
             if not self.assigned_to_website():
-                logger.warning(f"{self.__class__.__name__} Preflight check: Product {self.local_instance.name} is not assigned to website {self.sales_channel.website.name}")
+                logger.warning(f"{self.__class__.__name__} Preflight check: Product {self.local_instance.name} is not assigned to website {self.sales_channel.hostname}")
                 return False
 
         try:
