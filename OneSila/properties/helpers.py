@@ -6,6 +6,7 @@ ALNUM_REGEX = re.compile(r"[a-z0-9]+")
 CODE_TOKEN_REGEX = re.compile(r"^(?=.*[a-z])(?=.*\d)[a-z0-9]+$")  # any token mixing letters+digits
 
 RESERVED_PROPERTY_INTERNAL_NAMES = {"product_type"}
+RESERVED_PROPERTY_INTERNAL_NAME_MAP = {"product_type": "product_type_external"}
 
 
 def _strip_accents(s: str) -> str:
@@ -47,10 +48,8 @@ def sanitize_internal_name(internal_name: str | None, multi_tenant_company=None,
     normalised = slugify(internal_name).replace('-', '_')
 
     if normalised in RESERVED_PROPERTY_INTERNAL_NAMES and not allow_reserved:
-        replacement_base = f"{normalised}_external"
-        if multi_tenant_company:
-            return generate_unique_internal_name(replacement_base, multi_tenant_company)
-        return replacement_base
+        replacement = RESERVED_PROPERTY_INTERNAL_NAME_MAP.get(normalised, f"{normalised}_external")
+        return replacement
 
     return normalised
 

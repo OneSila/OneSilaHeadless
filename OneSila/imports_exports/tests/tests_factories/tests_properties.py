@@ -152,8 +152,7 @@ class ImportPropertyProcessTest(TestCase):
         instance.process()
 
         created_internal_name = instance.instance.internal_name
-        self.assertNotEqual(created_internal_name, "product_type")
-        self.assertTrue(created_internal_name.startswith("product_type_external"))
+        self.assertEqual(created_internal_name, "product_type_external")
 
     def test_edit_is_public_information_internal_name(self):
         data = {
@@ -724,8 +723,37 @@ class ImportProductPropertiesRuleItemInstanceProcessTest(TestCase):
         instance = ImportProductPropertiesRuleItemInstance(data, self.import_process, rule=self.existing_rule)
         instance.process()
 
-        self.assertNotEqual(instance.property.internal_name, "product_type")
-        self.assertTrue(instance.property.internal_name.startswith("product_type_external"))
+        self.assertEqual(instance.property.internal_name, "product_type_external")
+
+    def test_reserved_internal_name_property_data_reuses_property(self):
+        data = {
+            "property_data": {
+                "internal_name": "product_type",
+                "name": "Woo Product Type",
+                "type": "SELECT"
+            }
+        }
+
+        base_count = Property.objects.filter(multi_tenant_company=self.multi_tenant_company).count()
+
+        first_instance = ImportProductPropertiesRuleItemInstance(data, self.import_process, rule=self.existing_rule)
+        first_instance.process()
+
+        mid_count = Property.objects.filter(multi_tenant_company=self.multi_tenant_company).count()
+
+        second_instance = ImportProductPropertiesRuleItemInstance({
+            "property_data": {
+                "internal_name": "product_type",
+                "name": "Woo Product Type",
+                "type": "SELECT"
+            }
+        }, self.import_process, rule=self.existing_rule)
+        second_instance.process()
+
+        final_count = Property.objects.filter(multi_tenant_company=self.multi_tenant_company).count()
+
+        self.assertEqual(mid_count, final_count)
+        self.assertEqual(first_instance.property, second_instance.property)
 
     def test_process_create_using_existing_property(self):
         """
