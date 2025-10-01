@@ -32,7 +32,7 @@ from sales_channels.integrations.ebay.models import (
     EbayMediaThroughProduct,
     EbayPrice,
     EbayProductContent,
-    EbayEanCode,
+    EbayEanCode, EbayProductProperty,
 )
 from sales_channels.models import SalesChannelIntegrationPricelist, SalesChannelViewAssign
 from sales_prices.models import SalesPrice
@@ -70,28 +70,6 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
         self.language = language
         self.multi_tenant_company = sales_channel.multi_tenant_company
         self._processed_parent_skus: set[str] = set()
-
-    def _add_broken_record(
-        self,
-        *,
-        code: str,
-        message: str,
-        data: dict[str, Any] | None = None,
-        context: dict[str, Any] | None = None,
-        exc: Exception | None = None,
-    ) -> None:
-        record: dict[str, Any] = {
-            "code": code,
-            "message": message,
-            "data": ensure_serializable(data) if data else {},
-            "context": context or {},
-        }
-
-        if exc is not None:
-            record["error"] = str(exc)
-            record["traceback"] = traceback.format_exc()
-
-        append_broken_record(self.import_process.id, record)
 
     def get_total_instances(self) -> int:
         """Return the number of remote products that will be processed."""
@@ -1031,6 +1009,7 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
 
     def handle_variations(self, *, import_instance: Any) -> None:
         """Link configurator variations to their remote eBay mirrors."""
+        # @Todo: This need refactoring and we need to do it the other way around. We first create the configurable product and we need to get all of the variant_skus of the group and to link them when they appear we can have a map like group_key (parent sku) vs variant_skus
 
         remote_product = getattr(import_instance, "remote_instance", None)
         if remote_product is None:
