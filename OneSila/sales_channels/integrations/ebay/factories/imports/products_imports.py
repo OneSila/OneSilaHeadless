@@ -70,6 +70,8 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
         self.language = language
         self.multi_tenant_company = sales_channel.multi_tenant_company
         self._processed_parent_skus: set[str] = set()
+        self._parent_child_sku_map: dict[str, set[str]] = {}
+
 
     def get_total_instances(self) -> int:
         """Return the number of remote products that will be processed."""
@@ -717,6 +719,33 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
 
         return None
 
+    def _extract_remote_id(self, payload: Any) -> str | None:
+        """Return a stable remote identifier when present on the payload."""
+
+        if not isinstance(payload, Mapping):
+            return None
+
+        candidate_keys = (
+            "inventory_item_id",
+            "inventoryItemId",
+            "inventory_item_group_key",
+            "inventoryItemGroupKey",
+        )
+
+        for key in candidate_keys:
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        product_section = payload.get("product")
+        if isinstance(product_section, Mapping):
+            for key in candidate_keys:
+                value = product_section.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+
+        return None
+
     def _extract_group_inventory_items(
         self,
         response: Any,
@@ -881,6 +910,14 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
 
         structured["__marketplace_id"] = marketplace_id
 
+        if is_configurable:
+            variant_skus = product_data["variant_skus"]
+            self._parent_child_sku_map[sku] = {
+                str(value).strip()
+                for value in variant_skus
+                if value is not None and str(value).strip()
+            }
+
         return structured, language, view
 
 
@@ -1007,68 +1044,96 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
                     app.save()
                     app.remote_select_values.set(remote_select_values)
 
-    def handle_variations(self, *, import_instance: Any) -> None:
-        """Link configurator variations to their remote eBay mirrors."""
-        # @Todo: This need refactoring and we need to do it the other way around. We first create the configurable product and we need to get all of the variant_skus of the group and to link them when they appear we can have a map like group_key (parent sku) vs variant_skus
+    def handle_variations(self, *, import_instance: Any, parent_skus) -> None:
+        """Link variation mirrors to their parent and update the configurator when ready."""
 
-        remote_product = getattr(import_instance, "remote_instance", None)
-        if remote_product is None:
+        remote_variation = getattr(import_instance, "remote_instance", None)
+        if remote_variation is None or not parent_skus:
             return
 
-        if not hasattr(import_instance, "variations_products_instances"):
-            return
+        variation_sku = None
+        if hasattr(import_instance, "instance"):
+            variation_sku = getattr(import_instance.instance, "sku", None)
+        if not variation_sku and isinstance(getattr(import_instance, "data", {}), Mapping):
+            variation_sku = import_instance.data.get("sku")
+        if not variation_sku:
+            variation_sku = getattr(remote_variation, "remote_sku", None)
 
-        variations_queryset = import_instance.variations_products_instances
-        variations = [variation for variation in variations_queryset if variation is not None]
+        normalized_variation_sku = (
+            str(variation_sku).strip() if variation_sku is not None else None
+        )
 
-        if not variations:
-            return
-
-        for variation in variations:
-            remote_variation, _ = EbayProduct.objects.get_or_create(
-                multi_tenant_company=self.import_process.multi_tenant_company,
-                sales_channel=self.sales_channel,
-                local_instance=variation,
+        for parent_sku in parent_skus:
+            normalized_parent_sku = (
+                str(parent_sku).strip() if parent_sku is not None else ""
             )
+            if not normalized_parent_sku:
+                continue
+
+            remote_parent = (
+                EbayProduct.objects.filter(
+                    sales_channel=self.sales_channel,
+                    multi_tenant_company=self.multi_tenant_company,
+                    remote_sku=normalized_parent_sku,
+                )
+                .select_related("local_instance")
+                .first()
+            )
+            if remote_parent is None:
+                continue
 
             updated = False
-
             if not remote_variation.is_variation:
                 remote_variation.is_variation = True
                 updated = True
 
-            if remote_variation.remote_parent_product_id != remote_product.id:
-                remote_variation.remote_parent_product = remote_product
+            if remote_variation.remote_parent_product_id != remote_parent.id:
+                remote_variation.remote_parent_product = remote_parent
                 updated = True
 
-            if not remote_variation.remote_sku:
-                sku = getattr(variation, "sku", None)
-                if sku:
-                    remote_variation.remote_sku = sku
-                    updated = True
+            if normalized_variation_sku and remote_variation.remote_sku != normalized_variation_sku:
+                remote_variation.remote_sku = normalized_variation_sku
+                updated = True
 
             if updated:
                 remote_variation.save()
 
-        rule = import_instance.rule
-        if rule is None and remote_product.local_instance is not None:
-            rule = remote_product.local_instance.get_product_rule()
+            child_skus = self._parent_child_sku_map.get(normalized_parent_sku)
+            if not isinstance(child_skus, set):
+                continue
 
-        if rule is None:
-            return
+            if normalized_variation_sku:
+                child_skus.discard(normalized_variation_sku)
 
-        if hasattr(remote_product, "configurator"):
-            remote_product.configurator.update_if_needed(
-                rule=rule,
-                variations=variations_queryset,
-                send_sync_signal=False,
+            is_last_child = not child_skus
+            if not is_last_child:
+                continue
+
+            self._parent_child_sku_map.pop(normalized_parent_sku, None)
+
+            parent_rule = import_instance.rule
+            if parent_rule is None and remote_parent.local_instance is not None:
+                parent_rule = remote_parent.local_instance.get_product_rule()
+
+            if parent_rule is None or remote_parent.local_instance is None:
+                continue
+
+            variations_queryset = remote_parent.local_instance.get_configurable_variations(
+                active_only=False
             )
-        else:
-            RemoteProductConfigurator.objects.create_from_remote_product(
-                remote_product=remote_product,
-                rule=rule,
-                variations=variations_queryset,
-            )
+
+            if hasattr(remote_parent, "configurator"):
+                remote_parent.configurator.update_if_needed(
+                    rule=parent_rule,
+                    variations=variations_queryset,
+                    send_sync_signal=False,
+                )
+            else:
+                RemoteProductConfigurator.objects.create_from_remote_product(
+                    remote_product=remote_parent,
+                    rule=parent_rule,
+                    variations=variations_queryset,
+                )
 
     def handle_sales_channels_views(
         self,
@@ -1144,6 +1209,51 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
         if updated_fields:
             assign.save(update_fields=updated_fields)
 
+    def update_remote_product(
+        self,
+        import_instance: Any,
+        product_data: Any,
+        view: EbaySalesChannelView | None,
+        is_variation: bool,
+    ) -> None:
+        """Persist remote product metadata derived from the latest payload."""
+
+        remote_product = getattr(import_instance, "remote_instance", None)
+        if remote_product is None:
+            return
+
+        updates: list[str] = []
+
+        sku_candidate = self._extract_sku(product_data)
+        if not sku_candidate and isinstance(getattr(import_instance, "data", None), Mapping):
+            sku_candidate = import_instance.data.get("sku")
+
+        if sku_candidate:
+            normalized_sku = str(sku_candidate).strip()
+            if normalized_sku and remote_product.remote_sku != normalized_sku:
+                remote_product.remote_sku = normalized_sku
+                updates.append("remote_sku")
+
+        remote_id = self._extract_remote_id(product_data)
+        if remote_id and remote_product.remote_id != remote_id:
+            remote_product.remote_id = remote_id
+            updates.append("remote_id")
+
+        if remote_product.syncing_current_percentage != 100:
+            remote_product.syncing_current_percentage = 100
+            updates.append("syncing_current_percentage")
+
+        if remote_product.is_variation != is_variation:
+            remote_product.is_variation = is_variation
+            updates.append("is_variation")
+
+        if not is_variation and remote_product.remote_parent_product_id is not None:
+            remote_product.remote_parent_product = None
+            updates.append("remote_parent_product")
+
+        if updates:
+            remote_product.save(update_fields=updates)
+
     def process_product_item(
         self,
         product_data: dict[str, Any],
@@ -1190,8 +1300,10 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
         if parent_skus and child_offer_data is None:
             for parent_sku in parent_skus:
                 normalized_parent = parent_sku.strip() if isinstance(parent_sku, str) else str(parent_sku)
+
                 if not normalized_parent:
                     continue
+
                 if normalized_parent == sku or normalized_parent in self._processed_parent_skus:
                     continue
 
@@ -1345,8 +1457,8 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
             self.handle_prices(import_instance=instance)
             self.handle_images(import_instance=instance)
 
-        if instance.data.get("type") == CONFIGURABLE:
-            self.handle_variations(import_instance=instance)
+        if parent_skus and is_variation:
+            self.handle_variations(import_instance=instance, parent_skus=parent_skus)
 
         if not is_variation:
             self.handle_sales_channels_views(
