@@ -1,13 +1,12 @@
 import hashlib
-import hmac
 import json
 import logging
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpResponse, JsonResponse
-from django.utils.crypto import constant_time_compare
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
@@ -21,14 +20,33 @@ def _get_verification_token() -> str:
     if not token:
         raise ImproperlyConfigured("Missing EBAY_ACCOUNT_DELETION_VERIFICATION_TOKEN setting")
     if not 32 <= len(token) <= 80:
-        raise ImproperlyConfigured("EBAY_ACCOUNT_DELETION_VERIFICATION_TOKEN must be between 32 and 80 characters")
+        raise ImproperlyConfigured(
+            "EBAY_ACCOUNT_DELETION_VERIFICATION_TOKEN must be between 32 and 80 characters"
+        )
     return token
 
 
+def _get_registered_endpoint(request) -> str:
+    """
+    The 'endpoint' used in the challenge hash must be EXACTLY the URL you registered,
+    with no query string or fragment. Prefer a settings override; otherwise strip query/fragment.
+    """
+    endpoint = getattr(settings, "EBAY_ACCOUNT_DELETION_ENDPOINT", None)
+    if endpoint:
+        return endpoint
+
+    full_url = request.build_absolute_uri()  # may include ?challenge_code=...&app_key=...
+    parts = urlsplit(full_url)
+    # Remove query + fragment to avoid mismatches; keep scheme + host + path exactly as served
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+
+
 def _compute_challenge_response(*, challenge_code: str, verification_token: str, endpoint: str) -> str:
-    message = f"{challenge_code}{endpoint}".encode("utf-8")
-    key = verification_token.encode("utf-8")
-    return hmac.new(key=key, msg=message, digestmod=hashlib.sha256).hexdigest()
+    """
+    Spec: SHA-256 of the concatenation: challengeCode + verificationToken + endpoint
+    """
+    data = (challenge_code + verification_token + endpoint).encode("utf-8")
+    return hashlib.sha256(data).hexdigest()
 
 
 def _extract_account_identifier(*, payload: Any) -> str | None:
@@ -57,45 +75,30 @@ def _extract_account_identifier(*, payload: Any) -> str | None:
     return None
 
 
-def _extract_request_token(*, request) -> str | None:
-    header_value = request.headers.get("X-EBAY-VERIFICATION-TOKEN")
-    if header_value:
-        return header_value
-
-    return (
-        request.GET.get("verification_token")
-        or request.GET.get("verificationToken")
-    )
-
-
 def _handle_challenge(*, request, verification_token: str) -> HttpResponse:
+    # eBay sends a random challenge code as 'challenge_code' (or sometimes 'challengeCode')
     challenge_code = request.GET.get("challenge_code") or request.GET.get("challengeCode")
     if not challenge_code:
         logger.warning("eBay account deletion challenge missing challenge code")
         return HttpResponse(status=400)
 
-    endpoint = request.GET.get("endpoint") or request.build_absolute_uri()
-    provided_token = _extract_request_token(request=request)
-    if provided_token and not constant_time_compare(provided_token, verification_token):
-        logger.warning("eBay account deletion challenge token mismatch")
-        return HttpResponse(status=403)
+    # IMPORTANT: Do NOT include query params in the endpoint used for hashing.
+    endpoint = _get_registered_endpoint(request)
 
-    response = _compute_challenge_response(
+    challenge_response = _compute_challenge_response(
         challenge_code=challenge_code,
         verification_token=verification_token,
         endpoint=endpoint,
     )
-    return JsonResponse({"challengeResponse": response})
+
+    return JsonResponse({"challengeResponse": challenge_response})
 
 
 def _handle_notification(*, request, verification_token: str) -> HttpResponse:
-    provided_token = _extract_request_token(request=request)
-    if not provided_token:
-        logger.warning("eBay account deletion notification missing verification token")
-        return HttpResponse(status=403)
-    if not constant_time_compare(provided_token, verification_token):
-        logger.warning("eBay account deletion notification token mismatch")
-        return HttpResponse(status=403)
+    """
+    For marketplace account deletion POST notifications, eBay can include data identifying the account.
+    We accept the payload, try to find an identifier, and mark the channel for delete.
+    """
 
     try:
         raw_body = request.body.decode("utf-8")
@@ -103,7 +106,7 @@ def _handle_notification(*, request, verification_token: str) -> HttpResponse:
         logger.warning("eBay account deletion payload is not valid UTF-8")
         return HttpResponse(status=400)
 
-    body = raw_body.strip()
+    body = (raw_body or "").strip()
     if not body:
         payload: dict[str, Any] = {}
     else:
