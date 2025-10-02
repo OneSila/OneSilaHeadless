@@ -1,4 +1,5 @@
 from sales_channels.integrations.amazon.exceptions import AmazonUnsupportedPropertyForProductType
+from sales_channels.exceptions import RemotePropertyValueNotMapped
 from sales_channels.integrations.amazon.models.properties import (
     AmazonProperty,
     AmazonProductType,
@@ -36,8 +37,14 @@ class AmazonRemoteValueMixin:
             ).first()
             if not remote_val:
                 if not remote_property.allows_unmapped_values:
-                    raise ValueError(
-                        f"Value {val.value} not mapped for {remote_property.code}"
+                    prop_name = getattr(
+                        remote_property.local_instance,
+                        "name",
+                        remote_property.code,
+                    )
+                    value_label = getattr(val, "value", str(val))
+                    raise RemotePropertyValueNotMapped(
+                        f"Value '{value_label}' for property '{prop_name}' cannot be synced because the Amazon attribute '{remote_property.code}' does not accept custom options. Map the value before retrying."
                     )
                 remote_values.append(val.value)
             else:

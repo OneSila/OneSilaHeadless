@@ -1,6 +1,7 @@
 from sales_channels.integrations.woocommerce.mixins import GetWoocommerceAPIMixin
 from sales_channels.integrations.woocommerce.models import WoocommerceRemoteLanguage
 from sales_channels.integrations.woocommerce.constants import EAN_CODE_WOOCOMMERCE_FIELD_NAME
+from sales_channels.exceptions import ConfiguratorPropertyNotFilterable
 from django.conf import settings
 from media.models import Media
 from sales_channels.integrations.woocommerce.models import WoocommerceGlobalAttribute, \
@@ -239,10 +240,16 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
         product = self.get_local_product()
         return product.get_configurator_properties(public_information_only=False)
 
-    def get_global_attribute(self, prod_prop):
+    def get_global_attribute(self, prod_prop, *, raise_if_none: bool = False):
         # We only get a global attribute if the property has add_to_filters set to True.
         prop = prod_prop.property
         if not prop.add_to_filters:
+            if raise_if_none:
+                prop_name = getattr(prop, "name", None)
+                identifier = prop_name or f"ID={getattr(prop, 'id', 'UNKNOWN')}"
+                raise ConfiguratorPropertyNotFilterable(
+                    f"Property '{identifier}' is not marked as filterable and cannot be used as a configurator attribute."
+                )
             return None
 
         try:
@@ -462,7 +469,7 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
             configurator_attributes = self.get_configurable_product_attributes()
             config_payload = []
             for prod_prop in configurator_attributes.iterator():
-                ga = self.get_global_attribute(prod_prop)
+                ga = self.get_global_attribute(prod_prop, raise_if_none=True)
                 values = self.get_configurator_property_values(prod_prop)
 
                 if not isinstance(values, list):

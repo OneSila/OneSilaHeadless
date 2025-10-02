@@ -8,6 +8,7 @@ from sales_channels.models.sales_channels import (
 )
 from django.db.models import Q
 import uuid
+from sales_channels.exceptions import RemotePropertyValueNotMapped
 
 
 class AmazonSalesChannel(SalesChannel):
@@ -107,6 +108,7 @@ class AmazonSalesChannel(SalesChannel):
     class Meta:
         verbose_name = 'Amazon Sales Channel'
         verbose_name_plural = 'Amazon Sales Channels'
+        user_exceptions = (RemotePropertyValueNotMapped,)
 
     def __str__(self):
         return f"Amazon Store: {self.hostname}"
