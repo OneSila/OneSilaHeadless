@@ -1,3 +1,5 @@
+import logging
+
 from core.receivers import receiver
 from core.signals import post_create, post_update
 from django.db.models.signals import post_delete
@@ -8,6 +10,18 @@ from sales_channels.signals import (
     update_remote_product,
     create_remote_product,
     sales_view_assign_updated,
+    create_remote_product_property,
+    update_remote_product_property,
+    delete_remote_product_property,
+    update_remote_price,
+    update_remote_product_content,
+    update_remote_product_eancode,
+    add_remote_product_variation,
+    remove_remote_product_variation,
+    create_remote_image_association,
+    update_remote_image_association,
+    delete_remote_image_association,
+    delete_remote_image,
 )
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
@@ -16,6 +30,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonProductType,
     AmazonProductBrowseNode,
     AmazonGtinExemption,
+    AmazonProduct,
 )
 from sales_channels.integrations.amazon.factories.sync.rule_sync import (
     AmazonPropertyRuleItemSyncFactory,
@@ -35,6 +50,26 @@ from sales_channels.integrations.amazon.constants import (
 from imports_exports.signals import import_success
 from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonConfigurableVariationsFactory
 from sales_channels.integrations.amazon.flows.tasks_runner import run_single_amazon_product_task_flow
+
+
+logger = logging.getLogger(__name__)
+
+
+def _log_amazon_product_signal(event_name, product, context=None):
+    remote_product_ids = list(
+        AmazonProduct.objects.filter(local_instance=product).values_list('id', flat=True)
+    )
+    sanitized_context = {}
+    if context:
+        sanitized_context = {key: value for key, value in context.items() if value is not None}
+
+    logger.info(
+        'Amazon receiver triggered: %s product_id=%s remote_product_ids=%s context=%s',
+        event_name,
+        getattr(product, 'id', None),
+        remote_product_ids,
+        sanitized_context,
+    )
 
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
@@ -265,4 +300,178 @@ def amazon__assign__update(sender, instance, sales_channel, view, **kwargs):
         number_of_remote_requests=count,
         product_id=instance.id,
         force_validation_only=settings.DEBUG,
+    )
+
+
+@receiver(update_remote_product, sender='products.Product')
+def amazon__product__update(sender, instance, **kwargs):
+    _log_amazon_product_signal(
+        'update_remote_product',
+        instance,
+        context={'payload_keys': sorted(kwargs.keys())},
+    )
+
+
+@receiver(create_remote_product_property, sender='properties.ProductProperty')
+def amazon__product_property__create(sender, instance, **kwargs):
+    product = instance.product
+    property_obj = getattr(instance, 'property', None)
+    _log_amazon_product_signal(
+        'create_remote_product_property',
+        product,
+        context={
+            'product_property_id': instance.id,
+            'property_id': getattr(property_obj, 'id', None),
+            'property_code': getattr(property_obj, 'code', None),
+        },
+    )
+
+
+@receiver(update_remote_product_property, sender='properties.ProductProperty')
+def amazon__product_property__update(sender, instance, **kwargs):
+    product = instance.product
+    property_obj = getattr(instance, 'property', None)
+    _log_amazon_product_signal(
+        'update_remote_product_property',
+        product,
+        context={
+            'product_property_id': instance.id,
+            'property_id': getattr(property_obj, 'id', None),
+            'property_code': getattr(property_obj, 'code', None),
+            'payload_keys': sorted(kwargs.keys()),
+        },
+    )
+
+
+@receiver(delete_remote_product_property, sender='properties.ProductProperty')
+def amazon__product_property__delete(sender, instance, **kwargs):
+    product = instance.product
+    property_obj = getattr(instance, 'property', None)
+    _log_amazon_product_signal(
+        'delete_remote_product_property',
+        product,
+        context={
+            'product_property_id': instance.id,
+            'property_id': getattr(property_obj, 'id', None),
+            'property_code': getattr(property_obj, 'code', None),
+        },
+    )
+
+
+@receiver(update_remote_price, sender='products.Product')
+def amazon__price__update(sender, instance, **kwargs):
+    currency = kwargs.get('currency')
+    _log_amazon_product_signal(
+        'update_remote_price',
+        instance,
+        context={
+            'currency_id': getattr(currency, 'id', None),
+            'currency_code': getattr(currency, 'code', None),
+            'currency_iso_code': getattr(currency, 'iso_code', None),
+        },
+    )
+
+
+@receiver(update_remote_product_content, sender='products.Product')
+def amazon__content__update(sender, instance, **kwargs):
+    language = kwargs.get('language')
+    _log_amazon_product_signal(
+        'update_remote_product_content',
+        instance,
+        context={
+            'language_id': getattr(language, 'id', None),
+            'language_code': getattr(language, 'code', None),
+            'language_iso_code': getattr(language, 'iso_code', None),
+        },
+    )
+
+
+@receiver(update_remote_product_eancode, sender='products.Product')
+def amazon__ean_code__update(sender, instance, **kwargs):
+    _log_amazon_product_signal('update_remote_product_eancode', instance)
+
+
+@receiver(add_remote_product_variation, sender='products.ConfigurableVariation')
+def amazon__variation__add(sender, parent_product, variation_product, **kwargs):
+    _log_amazon_product_signal(
+        'add_remote_product_variation',
+        parent_product,
+        context={
+            'parent_product_id': getattr(parent_product, 'id', None),
+            'variation_product_id': getattr(variation_product, 'id', None),
+        },
+    )
+
+
+@receiver(remove_remote_product_variation, sender='products.ConfigurableVariation')
+def amazon__variation__remove(sender, parent_product, variation_product, **kwargs):
+    _log_amazon_product_signal(
+        'remove_remote_product_variation',
+        parent_product,
+        context={
+            'parent_product_id': getattr(parent_product, 'id', None),
+            'variation_product_id': getattr(variation_product, 'id', None),
+        },
+    )
+
+
+@receiver(create_remote_image_association, sender='media.MediaProductThrough')
+def amazon__image_assoc__create(sender, instance, **kwargs):
+    product = instance.product
+    media = getattr(instance, 'media', None)
+    _log_amazon_product_signal(
+        'create_remote_image_association',
+        product,
+        context={
+            'media_product_through_id': instance.id,
+            'media_id': getattr(media, 'id', None),
+            'media_type': getattr(media, 'type', None),
+        },
+    )
+
+
+@receiver(update_remote_image_association, sender='media.MediaProductThrough')
+def amazon__image_assoc__update(sender, instance, **kwargs):
+    product = instance.product
+    media = getattr(instance, 'media', None)
+    _log_amazon_product_signal(
+        'update_remote_image_association',
+        product,
+        context={
+            'media_product_through_id': instance.id,
+            'media_id': getattr(media, 'id', None),
+            'media_type': getattr(media, 'type', None),
+            'payload_keys': sorted(kwargs.keys()),
+        },
+    )
+
+
+@receiver(delete_remote_image_association, sender='media.MediaProductThrough')
+def amazon__image_assoc__delete(sender, instance, **kwargs):
+    product = instance.product
+    media = getattr(instance, 'media', None)
+    _log_amazon_product_signal(
+        'delete_remote_image_association',
+        product,
+        context={
+            'media_product_through_id': instance.id,
+            'media_id': getattr(media, 'id', None),
+            'media_type': getattr(media, 'type', None),
+        },
+    )
+
+
+@receiver(delete_remote_image, sender='media.Media')
+def amazon__image__delete(sender, instance, **kwargs):
+    product_ids = list(instance.products.values_list('id', flat=True))
+    remote_products = AmazonProduct.objects.filter(local_instance_id__in=product_ids)
+    remote_map = {}
+    for remote_product in remote_products:
+        remote_map.setdefault(remote_product.local_instance_id, []).append(remote_product.id)
+
+    logger.info(
+        'Amazon receiver triggered: delete_remote_image image_id=%s product_ids=%s remote_product_ids=%s',
+        instance.id,
+        product_ids,
+        remote_map,
     )
