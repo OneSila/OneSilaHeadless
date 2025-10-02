@@ -142,6 +142,7 @@ class Image(Media):
 
     class Meta:
         proxy = True
+        search_terms = ['title', 'description']
 
 
 class Video(Media):
@@ -150,6 +151,7 @@ class Video(Media):
 
     class Meta:
         proxy = True
+        search_terms = ['title', 'description']
 
 
 class File(Media):
@@ -158,6 +160,7 @@ class File(Media):
 
     class Meta:
         proxy = True
+        search_terms = ['title', 'description']
 
 
 class MediaProductThrough(models.Model):
