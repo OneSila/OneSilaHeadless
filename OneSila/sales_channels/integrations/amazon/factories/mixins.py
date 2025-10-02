@@ -342,6 +342,37 @@ class GetAmazonAPIMixin:
         )
         return remote_lang.remote_code if remote_lang else None
 
+    def _build_fulfillment_availability_attribute(self):
+        if not getattr(self, "is_create", False):
+            return None
+
+        sales_channel = getattr(self, "sales_channel", None)
+        starting_stock = getattr(sales_channel, "starting_stock", None)
+        if starting_stock is None:
+            return None
+
+        local_instance = getattr(self, "local_instance", None)
+        is_configurable = False
+        if local_instance is not None:
+            is_configurable_method = getattr(local_instance, "is_configurable", None)
+            if callable(is_configurable_method):
+                is_configurable = bool(is_configurable_method())
+        if is_configurable:
+            return None
+
+        view = getattr(self, "view", None)
+        marketplace_id = getattr(view, "remote_id", None)
+        if marketplace_id is None:
+            return None
+
+        return [
+            {
+                "fulfillment_channel_code": "DEFAULT",
+                "quantity": starting_stock,
+                "marketplace_id": marketplace_id,
+            }
+        ]
+
     def _build_common_body(self, product_type, attributes):
         """Return body for Amazon create/update requests."""
 
@@ -356,6 +387,11 @@ class GetAmazonAPIMixin:
         has_asin = "merchant_suggested_asin" in (attributes or {})
         remote_product = getattr(self, "remote_product", getattr(self, "remote_instance", None))
         created = getattr(remote_product, "created_marketplaces", []) or []
+
+        fulfillment_availability = self._build_fulfillment_availability_attribute()
+        if fulfillment_availability:
+            attributes = dict(attributes or {})
+            attributes.setdefault("fulfillment_availability", fulfillment_availability)
 
         # Determine requirements
         if len(created) > 1:
@@ -388,11 +424,13 @@ class GetAmazonAPIMixin:
                 allowed_keys = set(allowed_keys) | always_included_keys
                 attributes = {k: v for k, v in (attributes or {}).items() if k in allowed_keys}
 
-        return {
+        body = {
             "productType": pt_code,
             "requirements": requirements,
             "attributes": clean(attributes),
         }
+
+        return body
 
     def _build_listing_kwargs(self, sku, marketplace_id, body, force_validation_only=False):
         kwargs = {
@@ -410,7 +448,12 @@ class GetAmazonAPIMixin:
 
     @throttle_safe(max_retries=5, base_delay=1)
     def create_product(
-        self, sku, marketplace_id, product_type, attributes, force_validation_only: bool = False
+        self,
+        sku,
+        marketplace_id,
+        product_type,
+        attributes,
+        force_validation_only: bool = False,
     ):
         body = self._build_common_body(product_type, attributes)
         listings = ListingsApi(self._get_client())

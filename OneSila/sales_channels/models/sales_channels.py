@@ -25,6 +25,11 @@ class SalesChannel(Integration, models.Model):
     first_import_complete = models.BooleanField(default=False, help_text="Set to True once the first import has been completed.")
     is_importing = models.BooleanField(default=False, help_text=_("True while an import process is running."))
     mark_for_delete = models.BooleanField(default=False, help_text="Set to True when shop is scheduled for deletion (e.g. from shopify/shop_redact).")
+    starting_stock = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Initial stock quantity to send when creating remote products.",
+    )
 
     is_external_install = models.BooleanField(
         default=False,
