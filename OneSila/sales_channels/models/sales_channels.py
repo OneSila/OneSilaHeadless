@@ -5,7 +5,7 @@ from polymorphic.models import PolymorphicModel
 from core.helpers import get_languages
 from integrations.models import Integration
 from sales_channels.models.mixins import RemoteObjectMixin
-from sales_channels.managers import SalesChannelViewAssignManager
+from sales_channels.managers import SalesChannelViewAssignManager, SalesChannelViewManager
 
 import logging
 
@@ -25,6 +25,11 @@ class SalesChannel(Integration, models.Model):
     first_import_complete = models.BooleanField(default=False, help_text="Set to True once the first import has been completed.")
     is_importing = models.BooleanField(default=False, help_text=_("True while an import process is running."))
     mark_for_delete = models.BooleanField(default=False, help_text="Set to True when shop is scheduled for deletion (e.g. from shopify/shop_redact).")
+    starting_stock = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Initial stock quantity to send when creating remote products.",
+    )
 
     is_external_install = models.BooleanField(
         default=False,
@@ -132,9 +137,12 @@ class SalesChannelView(PolymorphicModel, RemoteObjectMixin, models.Model):
     name = models.CharField(max_length=216, null=True, blank=True)
     url = models.CharField(max_length=512, null=True, blank=True)
 
+    objects = SalesChannelViewManager()
+
     class Meta:
         verbose_name = 'Sales Channel View'
         verbose_name_plural = 'Sales Channel Views'
+        search_terms = ['name']
 
     def __str__(self):
         return str(self.name)

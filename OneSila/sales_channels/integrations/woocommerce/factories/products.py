@@ -116,6 +116,23 @@ class WooCommerceProductCreateFactory(WooCommerceProductSyncFactory, Woocommerce
     remote_product_content_class = WoocommerceProductContent
     remote_product_eancode_class = WoocommerceEanCode
 
+    def _apply_starting_stock(self):
+        starting_stock = getattr(self.sales_channel, "starting_stock", None)
+        if starting_stock is None:
+            return
+
+        if not (self.is_woocommerce_simple_product or self.is_woocommerce_variant_product):
+            return
+
+        self.payload['manage_stock'] = True
+        self.payload['stock_quantity'] = starting_stock
+
+    def _apply_backorders(self):
+        if not (self.is_woocommerce_simple_product or self.is_woocommerce_variant_product):
+            return
+
+        self.payload['backorders'] = 'yes' if self.local_instance.allow_backorder else 'no'
+
     def __init__(self, *args, is_variation_add: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
         self.is_variation_add = is_variation_add
@@ -160,6 +177,12 @@ class WooCommerceProductCreateFactory(WooCommerceProductSyncFactory, Woocommerce
 
     def get_saleschannel_remote_object(self, remote_sku):
         return self.api.get_product_by_sku(remote_sku)
+
+    def customize_payload(self):
+        payload = super().customize_payload()
+        self._apply_starting_stock()
+        self._apply_backorders()
+        return payload
 
 
 class WooCommerceProductUpdateFactory(WooCommerceProductSyncFactory, WoocommerceProductTypeMixin, RemoteProductUpdateFactory):

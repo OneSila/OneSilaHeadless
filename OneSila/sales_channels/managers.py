@@ -1,5 +1,44 @@
 from core.managers import MultiTenantManager, MultiTenantQuerySet
+from django.db.models import BooleanField, Case, Value, When
 from polymorphic.managers import PolymorphicManager, PolymorphicQuerySet
+
+
+class _MappingQuerySetMixin:
+    mapped_field: str
+
+    def annotate_mapping(self):
+        return self.annotate(
+            mapped_locally=Case(
+                When(local_instance__isnull=False, then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            ),
+            mapped_remotely=Case(
+                When(**{f"{self.mapped_field}__isnull": False}, then=Value(True)),
+                When(**{f"{self.mapped_field}__exact": ""}, then=Value(False)),
+                default=Value(False),
+                output_field=BooleanField(),
+            ),
+        )
+
+    def filter_mapped_locally(self, value: bool = True):
+        return self.annotate_mapping().filter(mapped_locally=value)
+
+    def filter_mapped_remotely(self, value: bool = True):
+        return self.annotate_mapping().filter(mapped_remotely=value)
+
+
+class _MappingManagerMixin:
+    queryset_class = None
+
+    def get_queryset(self):
+        return self.queryset_class(self.model, using=self._db).annotate_mapping()
+
+    def filter_mapped_locally(self, value: bool = True):
+        return self.get_queryset().filter_mapped_locally(value)
+
+    def filter_mapped_remotely(self, value: bool = True):
+        return self.get_queryset().filter_mapped_remotely(value)
 
 class RemoteProductConfiguratorQuerySet(PolymorphicQuerySet, MultiTenantQuerySet):
     """
@@ -47,6 +86,17 @@ class RemoteProductConfiguratorManager(PolymorphicManager, MultiTenantManager):
     # Optionally, expose QuerySet methods directly on the Manager
     def create_from_remote_product(self, *args, **kwargs):
         return self.get_queryset().create_from_remote_product(*args, **kwargs)
+
+
+class SalesChannelViewQuerySet(PolymorphicQuerySet, MultiTenantQuerySet):
+    """QuerySet for :class:`SalesChannelView` with multitenancy and polymorphic support."""
+
+
+class SalesChannelViewManager(PolymorphicManager, MultiTenantManager):
+    """Manager for :class:`SalesChannelView` providing search and multitenancy."""
+
+    def get_queryset(self):
+        return SalesChannelViewQuerySet(self.model, using=self._db)
 
 
 class SalesChannelViewAssignQuerySet(PolymorphicQuerySet, MultiTenantQuerySet):

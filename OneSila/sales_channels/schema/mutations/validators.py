@@ -93,8 +93,9 @@ def validate_amazon_assignment(data, info):
 
         has_ean_code = bool(product.ean_code)
         is_configurable = product.is_configurable()
+        has_required_identifier = any((has_gtin_exemption, has_external_id, has_ean_code))
 
-        if not any((has_gtin_exemption, has_external_id, has_ean_code, is_configurable)):
+        if not is_configurable and not has_required_identifier:
             raise ValidationError(
                 {
                     '__all__': _(
@@ -102,6 +103,43 @@ def validate_amazon_assignment(data, info):
                     )
                 }
             )
+
+        if is_configurable:
+            variations = product.get_configurable_variations(active_only=True)
+            missing_variation_skus = []
+
+            for variation in variations:
+                variation_has_gtin_exemption = AmazonGtinExemption.objects.filter(
+                    product=variation,
+                    view__in=views,
+                    value=True,
+                ).exists()
+
+                variation_has_external_id = (
+                    AmazonExternalProductId.objects.filter(
+                        product=variation,
+                        view__in=views,
+                    )
+                    .exclude(value__isnull=True)
+                    .exclude(value__exact="")
+                    .exists()
+                )
+
+                variation_has_ean_code = bool(variation.ean_code)
+
+                if not any((variation_has_gtin_exemption, variation_has_external_id, variation_has_ean_code)):
+                    missing_variation_skus.append(variation.sku or str(variation.pk))
+
+            if missing_variation_skus:
+                skus = ", ".join(missing_variation_skus)
+                raise ValidationError(
+                    {
+                        '__all__': _(
+                            'Amazon configurable products require each variation to have a GTIN exemption, external product id, or EAN code. Missing for SKU(s): %(skus)s.'
+                        )
+                        % {'skus': skus}
+                    }
+                )
 
         exists = SalesChannelViewAssign.objects.filter(
             product=product,

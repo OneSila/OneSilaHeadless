@@ -1,4 +1,4 @@
-from llm.factories.content import DescriptionGenLLM, ShortDescriptionLLM
+from llm.factories.content import DescriptionGenLLM, ShortDescriptionLLM, SubtitleLLM
 from llm.schema.types.input import ContentAiGenerateType
 
 
@@ -7,6 +7,7 @@ class AIGenerateContentFlow:
         factory_map = {
             ContentAiGenerateType.DESCRIPTION: DescriptionGenLLM,
             ContentAiGenerateType.SHORT_DESCRIPTION: ShortDescriptionLLM,
+            ContentAiGenerateType.SUBTITLE: SubtitleLLM,
         }
         factory_class = factory_map.get(content_type, DescriptionGenLLM)
 

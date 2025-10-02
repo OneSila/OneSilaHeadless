@@ -67,10 +67,12 @@ class SalesPriceItemAutoPriceUpdateMixin:
             conversion_factor=conversion_factor,
             round_prices_up_to=self.currency.round_prices_up_to,
             is_discount=True)
-        salespricelistitem.discount_auto = discount_auto
-        salespricelistitem.save()
 
-        logger.debug(f"New prices saved: {price_auto=} and {discount_auto=}")
+        if discount_auto < price_auto:
+            salespricelistitem.discount_auto = discount_auto
+
+        salespricelistitem.save()
+        logger.debug(f"New prices saved: {price_auto=} and {salespricelistitem.discount_auto=}")
 
 
 class SalesPriceListForSalesPriceListItemUpdatePricesFactory(SalesPriceItemAutoPriceUpdateMixin):

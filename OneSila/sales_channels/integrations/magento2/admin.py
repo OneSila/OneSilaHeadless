@@ -24,7 +24,7 @@ class MagentoSalesChannelAdmin(PolymorphicChildModelAdmin):
             'fields': ('hostname', 'active', 'verify_ssl', 'authentication_method', 'host_api_username', 'host_api_key', 'first_import_complete', 'is_importing', 'multi_tenant_company')
         }),
         ('Magento Settings', {
-            'fields': ('attribute_set_skeleton_id', 'use_configurable_name', 'sync_contents', 'sync_ean_codes', 'sync_prices', 'import_orders', 'requests_per_minute', 'max_retries')
+            'fields': ('attribute_set_skeleton_id', 'use_configurable_name', 'sync_contents', 'sync_ean_codes', 'sync_prices', 'import_orders', 'starting_stock', 'requests_per_minute', 'max_retries')
         }),
     )
 

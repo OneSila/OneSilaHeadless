@@ -462,6 +462,16 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
             self._assign_image_remote_ids()
             self._publish_product()
 
+    def _apply_starting_stock(self):
+        if not getattr(self, "is_create", False):
+            return
+
+        starting_stock = getattr(self.sales_channel, "starting_stock", None)
+        if starting_stock is None:
+            return
+
+        self.variant_payload['inventoryQuantity'] = starting_stock
+
     def _publish_product(self):
         publication_ids = ShopifySalesChannelView.objects.filter(sales_channel=self.sales_channel).values_list('publication_id', flat=True).distinct()
 
@@ -570,6 +580,7 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
 
     def customize_payload(self):
         super().customize_payload()
+        self._apply_starting_stock()
         super().assign_images()
 
         if self.local_instance.type == Product.CONFIGURABLE:
