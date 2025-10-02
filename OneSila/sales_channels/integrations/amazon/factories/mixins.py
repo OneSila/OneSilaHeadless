@@ -424,13 +424,11 @@ class GetAmazonAPIMixin:
                 allowed_keys = set(allowed_keys) | always_included_keys
                 attributes = {k: v for k, v in (attributes or {}).items() if k in allowed_keys}
 
-        body = {
+        return {
             "productType": pt_code,
             "requirements": requirements,
             "attributes": clean(attributes),
         }
-
-        return body
 
     def _build_listing_kwargs(self, sku, marketplace_id, body, force_validation_only=False):
         kwargs = {

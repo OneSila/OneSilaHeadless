@@ -27,11 +27,13 @@ def ebay_import_db_task(import_process, sales_channel):
         )
         factory.run()
     elif import_type == EbaySalesChannelImport.TYPE_PRODUCTS:
-        factory = EbayProductsAsyncImportProcessor(
-            import_process=import_process,
-            sales_channel=sales_channel,
-        )
-        factory.run()
+        # factory = EbayProductsAsyncImportProcessor(
+        #     import_process=import_process,
+        #     sales_channel=sales_channel,
+        # )
+        # factory.run()
+        # @TODO: Temporary disabled this until propert testing
+        pass
 
 
 @db_task()
