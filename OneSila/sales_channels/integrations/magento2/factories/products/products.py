@@ -124,13 +124,17 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
         )
 
     def set_stock(self):
-        return  # @TODO: Come back after we decide with inventory
+        if not getattr(self, "is_create", False):
+            return
 
         if self.remote_type == self.REMOTE_TYPE_CONFIGURABLE:
-            self.stock = None
-        else:
-            self.stock = self.local_instance.inventory.salable()
+            return
 
+        starting_stock = getattr(self.sales_channel, "starting_stock", None)
+        if starting_stock is None:
+            return
+
+        self.stock = starting_stock
         self.add_field_in_payload('stock', self.stock)
 
     def set_price(self):

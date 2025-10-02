@@ -21,7 +21,7 @@ class WoocommerceSalesChannelAdmin(PolymorphicChildModelAdmin):
         }),
         ('Synchronization Settings', {
             'fields': ('use_configurable_name', 'sync_contents', 'sync_ean_codes',
-                      'sync_prices', 'import_orders', 'first_import_complete',
+                      'sync_prices', 'import_orders', 'starting_stock', 'first_import_complete',
                       'is_importing', 'requests_per_minute', 'max_retries')
         }),
     )
