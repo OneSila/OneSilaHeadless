@@ -312,7 +312,8 @@ class WoocommerceApiWrapper:
 
     def create_product(self, name, type, sku, status, catalog_visibility, regular_price,
             sale_price=None, description='', short_description='', categories=[],
-            images=[], attributes=[], global_unique_id=None):
+            images=[], attributes=[], global_unique_id=None, manage_stock=None,
+            stock_quantity=None, backorders=None):
         """
         Create a product in WooCommerce.
         """
@@ -330,6 +331,9 @@ class WoocommerceApiWrapper:
             'images': images,
             'attributes': attributes,
             'global_unique_id': global_unique_id,
+            'manage_stock': manage_stock,
+            'stock_quantity': stock_quantity,
+            'backorders': backorders,
         }
 
         payload = clearout_none_values(payload)
@@ -406,7 +410,7 @@ class WoocommerceApiWrapper:
     def update_product(self, product_id, **payload):
         fields_to_update = ['name', 'type', 'sku', 'status', 'catalog_visibility', 'regular_price',
             'sale_price', 'description', 'short_description', 'categories', 'images', 'attributes',
-            'global_unique_id']
+            'global_unique_id', 'backorders']
 
         # Check if any attribute has an empty options list
         attributes = payload.get('attributes', [])
