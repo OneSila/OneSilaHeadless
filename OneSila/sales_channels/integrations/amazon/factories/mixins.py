@@ -376,6 +376,9 @@ class GetAmazonAPIMixin:
         local_instance = getattr(self, "local_instance", None)
         is_configurable = False
         if local_instance is not None:
+            if not getattr(local_instance, "active", True):
+                return None
+
             is_configurable_method = getattr(local_instance, "is_configurable", None)
             if callable(is_configurable_method):
                 is_configurable = bool(is_configurable_method())
