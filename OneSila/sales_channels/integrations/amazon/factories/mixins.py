@@ -365,8 +365,6 @@ class GetAmazonAPIMixin:
         return remote_lang.remote_code if remote_lang else None
 
     def _build_fulfillment_availability_attribute(self):
-        if not getattr(self, "is_create", False):
-            return None
 
         sales_channel = getattr(self, "sales_channel", None)
         starting_stock = getattr(sales_channel, "starting_stock", None)
@@ -382,6 +380,7 @@ class GetAmazonAPIMixin:
             is_configurable_method = getattr(local_instance, "is_configurable", None)
             if callable(is_configurable_method):
                 is_configurable = bool(is_configurable_method())
+
         if is_configurable:
             return None
 
@@ -448,6 +447,7 @@ class GetAmazonAPIMixin:
                 }
                 allowed_keys = set(allowed_keys) | always_included_keys
                 attributes = {k: v for k, v in (attributes or {}).items() if k in allowed_keys}
+
 
         return {
             "productType": pt_code,

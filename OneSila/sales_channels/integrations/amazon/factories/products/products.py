@@ -845,6 +845,7 @@ class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactor
     create_product_factory = AmazonProductCreateFactory
 
     def perform_remote_action(self):
+        print('------------------------------------- ????????????')
         if self.force_full_update:
             resp = self.create_product(
                 sku=self.sku,
