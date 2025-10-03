@@ -6,7 +6,7 @@ app_name = "ebay"
 
 urlpatterns = [
     path(
-        "account-deletion/",
+        "account-deletion",
         views.ebay_marketplace_account_deletion,
         name="marketplace_account_deletion",
     ),

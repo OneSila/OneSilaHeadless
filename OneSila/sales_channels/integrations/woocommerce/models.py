@@ -7,7 +7,10 @@ from sales_channels.models.properties import RemoteProperty, \
     RemotePropertySelectValue, RemoteProductProperty
 from sales_channels.models.products import RemoteImageProductAssociation
 from django.utils.translation import gettext_lazy as _
-from sales_channels.exceptions import VariationAlreadyExistsOnWebsite
+from sales_channels.exceptions import (
+    ConfiguratorPropertyNotFilterable,
+    VariationAlreadyExistsOnWebsite,
+)
 
 
 class WoocommerceSalesChannel(SalesChannel):
@@ -40,7 +43,10 @@ class WoocommerceSalesChannel(SalesChannel):
                 )
 
     class Meta:
-        user_exceptions = (VariationAlreadyExistsOnWebsite,)
+        user_exceptions = (
+            VariationAlreadyExistsOnWebsite,
+            ConfiguratorPropertyNotFilterable,
+        )
 
 
 class WoocommerceSalesChannelView(SalesChannelView):

@@ -28,3 +28,13 @@ class VariationAlreadyExistsOnWebsite(Exception):
     """Raised when attempting to create a variation that already exists as a
     standalone product on the remote sales channel."""
     pass
+
+
+class ConfiguratorPropertyNotFilterable(Exception):
+    """Raised when a property without filter support is used in configurator workflows."""
+    pass
+
+
+class RemotePropertyValueNotMapped(Exception):
+    """Raised when a property value lacks a remote mapping and custom values are not allowed."""
+    pass
