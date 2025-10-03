@@ -1,6 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 from core import models
 from core.exceptions import ValidationError
+from sales_channels.integrations.amazon.exceptions import AmazonResponseException
 from sales_channels.models.sales_channels import (
     SalesChannel,
     SalesChannelView,
@@ -108,7 +109,7 @@ class AmazonSalesChannel(SalesChannel):
     class Meta:
         verbose_name = 'Amazon Sales Channel'
         verbose_name_plural = 'Amazon Sales Channels'
-        user_exceptions = (RemotePropertyValueNotMapped,)
+        user_exceptions = (RemotePropertyValueNotMapped, AmazonResponseException,)
 
     def __str__(self):
         return f"Amazon Store: {self.hostname}"
