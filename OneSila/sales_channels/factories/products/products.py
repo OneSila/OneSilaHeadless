@@ -641,10 +641,14 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.finalize_content_translations()
 
     def get_medias(self):
-        return MediaProductThrough.objects.filter(
-            product=self.local_instance,
-            media__type=Media.IMAGE
-        ).order_by('-is_main_image', 'sort_order')
+        return (
+            MediaProductThrough.objects.get_product_images(
+                product=self.local_instance,
+                sales_channel=self.sales_channel,
+            )
+            .filter(media__type=Media.IMAGE)
+            .order_by('-is_main_image', 'sort_order')
+        )
 
     def assign_images(self):
         """

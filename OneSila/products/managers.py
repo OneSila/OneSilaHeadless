@@ -116,9 +116,10 @@ class ProductQuerySet(MultiTenantQuerySet):
                     product=new_product,
                     sort_order=img.sort_order,
                     is_main_image=img.is_main_image,
+                    sales_channel=img.sales_channel,
                     multi_tenant_company=multi_tenant_company,
                 )
-                for img in MediaProductThrough.objects.filter(product=product)
+                for img in product.mediaproductthrough_set.all()
             ])
 
             # Properties
@@ -306,6 +307,7 @@ class AliasProductQuerySet(QuerySetProxyModelMixin, ProductQuerySet):
                     product=alias_product,
                     sort_order=img.sort_order,
                     is_main_image=img.is_main_image,
+                    sales_channel=img.sales_channel,
                     multi_tenant_company=parent.multi_tenant_company
                 ) for img in parent_images
             ])

@@ -11,7 +11,13 @@ from core.validators import no_dots_in_filename, validate_image_extension, \
     validate_file_extensions
 from core.upload_paths import tenant_upload_to
 from .image_specs import ImageWebSpec
-from .managers import ImageManager, VideoManager, FileManager, MediaManager
+from .managers import (
+    ImageManager,
+    VideoManager,
+    FileManager,
+    MediaManager,
+    MediaProductThroughManager,
+)
 
 
 import os
@@ -169,6 +175,15 @@ class MediaProductThrough(models.Model):
     media = models.ForeignKey(Media, on_delete=models.CASCADE)
     sort_order = models.IntegerField(default=10)
     is_main_image = models.BooleanField(default=False)
+    sales_channel = models.ForeignKey(
+        'sales_channels.SalesChannel',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='media_product_assignments',
+    )
+
+    objects = MediaProductThroughManager()
 
     def __str__(self):
         return '{} > {}'.format(self.product, self.media)
@@ -179,17 +194,33 @@ class MediaProductThrough(models.Model):
 
     class Meta:
         ordering = ('sort_order',)
-        unique_together = ('product', 'media')
+        constraints = [
+            models.UniqueConstraint(
+                fields=('product', 'media'),
+                condition=models.Q(sales_channel__isnull=True),
+                name='media_product_unique_default_sales_channel',
+            ),
+            models.UniqueConstraint(
+                fields=('product', 'media', 'sales_channel'),
+                condition=models.Q(sales_channel__isnull=False),
+                name='media_product_unique_per_sales_channel',
+            ),
+        ]
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
 
         # Ensure the first image is automatically set as the main image if none exist
         if self.media.type == Media.IMAGE:
+            channel_images = MediaProductThrough.objects.get_product_images(
+                product=self.product,
+                sales_channel=self.sales_channel,
+            )
+
             # Check if there's no image marked as the main image for this product
-            if not MediaProductThrough.objects.filter(product=self.product, media__type=Media.IMAGE, is_main_image=True).exists():
+            if not channel_images.filter(media__type=Media.IMAGE, is_main_image=True).exists():
                 # Set the first image by sort order as the main image if none are set
-                first_image = MediaProductThrough.objects.filter(product=self.product, media__type=Media.IMAGE).order_by('sort_order').first()
+                first_image = channel_images.filter(media__type=Media.IMAGE).order_by('sort_order').first()
                 if first_image and first_image.pk == self.pk:
                     self.is_main_image = True
                     self.save()
@@ -200,10 +231,9 @@ class MediaProductThrough(models.Model):
             # If this image is marked as the main image, ensure no other image for this product is marked as main
             if self.is_main_image:
                 # Get all other instances marked as main image for the same product
-                other_main_images = MediaProductThrough.objects.filter(
-                    product=self.product,
+                other_main_images = channel_images.filter(
                     media__type=Media.IMAGE,
-                    is_main_image=True
+                    is_main_image=True,
                 ).exclude(pk=self.pk)
 
                 # Iterate through each instance and set is_main_image to False, saving individually to trigger post_save

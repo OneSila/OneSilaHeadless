@@ -120,10 +120,10 @@ class ImportImageInstanceProcessTest(TestCase):
         instance.process()
 
         product = Product.objects.get(sku="IMG002")
-        through_exists = MediaProductThrough.objects.filter(
+        through_exists = MediaProductThrough.objects.get_product_images(
             product=product,
-            media=instance.instance
-        ).exists()
+            sales_channel=None,
+        ).filter(media=instance.instance).exists()
 
         self.assertTrue(through_exists)
 
@@ -136,10 +136,10 @@ class ImportImageInstanceProcessTest(TestCase):
         instance.multi_tenant_company = self.import_process.multi_tenant_company
         instance.process()
 
-        through_exists = MediaProductThrough.objects.filter(
+        through_exists = MediaProductThrough.objects.get_product_images(
             product=self.product,
-            media=instance.instance
-        ).exists()
+            sales_channel=None,
+        ).filter(media=instance.instance).exists()
 
         self.assertTrue(through_exists)
 

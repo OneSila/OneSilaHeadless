@@ -10,6 +10,29 @@ class MediaQuerySet(MultiTenantQuerySet):
     pass
 
 
+class MediaProductThroughQuerySet(MultiTenantQuerySet):
+    def get_product_images(self, *, product, sales_channel=None):
+        base_queryset = self.filter(product=product)
+
+        if sales_channel is None:
+            return base_queryset.filter(sales_channel__isnull=True)
+
+        sales_channel_queryset = base_queryset.filter(sales_channel=sales_channel)
+
+        if sales_channel_queryset.exists():
+            return sales_channel_queryset
+
+        return base_queryset.filter(sales_channel__isnull=True)
+
+
+class MediaProductThroughManager(MultiTenantManager):
+    def get_queryset(self):
+        return MediaProductThroughQuerySet(self.model, using=self._db)
+
+    def get_product_images(self, *, product, sales_channel=None):
+        return self.get_queryset().get_product_images(product=product, sales_channel=sales_channel)
+
+
 class MediaManager(MultiTenantManager):
     def get_queryset(self):
         return MediaQuerySet(self.model, using=self._db)
