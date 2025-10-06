@@ -1,6 +1,6 @@
 from core.helpers import ensure_serializable
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
-from sales_channels.integrations.amazon.models import AmazonProductIssue
+from sales_channels.integrations.amazon.models import AmazonProduct, AmazonProductIssue
 from products_inspector.signals import inspector_block_refresh
 from products_inspector.constants import AMAZON_VALIDATION_ISSUES_ERROR, AMAZON_REMOTE_ISSUES_ERROR
 
@@ -85,6 +85,14 @@ class FetchRemoteIssuesFactory(GetAmazonAPIMixin):
                 error_code=AMAZON_REMOTE_ISSUES_ERROR,
                 run_async=False,
             )
+
+        child_products = (
+            AmazonProduct.objects.filter(remote_parent_product=self.remote_product)
+            .select_related("local_instance", "sales_channel")
+        )
+
+        for child_product in child_products.iterator():
+            FetchRemoteIssuesFactory(remote_product=child_product, view=self.view).run()
 
 
 class FetchRemoteValidationIssueFactory:

@@ -463,6 +463,8 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
             self._publish_product()
 
     def _apply_starting_stock(self):
+
+        # this is temporary not applied because it is breaking the inventory (sku / backorder) integration
         if not getattr(self, "is_create", False):
             return
 
@@ -580,7 +582,6 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
 
     def customize_payload(self):
         super().customize_payload()
-        self._apply_starting_stock()
         super().assign_images()
 
         if self.local_instance.type == Product.CONFIGURABLE:

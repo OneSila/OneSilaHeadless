@@ -123,20 +123,6 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
             ).values_list('sales_channel_view__remote_id', flat=True))
         )
 
-    def set_stock(self):
-        if not getattr(self, "is_create", False):
-            return
-
-        if self.remote_type == self.REMOTE_TYPE_CONFIGURABLE:
-            return
-
-        starting_stock = getattr(self.sales_channel, "starting_stock", None)
-        if starting_stock is None:
-            return
-
-        self.stock = starting_stock
-        self.add_field_in_payload('stock', self.stock)
-
     def set_price(self):
         """Sets the price(s) for the product or variation in the payload, supporting multiple currencies."""
 
@@ -313,6 +299,23 @@ class MagentoProductCreateFactory(RemoteProductCreateFactory, MagentoProductSync
 
     def get_saleschannel_remote_object(self, sku):
         return self.api.products.by_sku(sku)
+
+    def set_stock(self):
+        if not getattr(self, "is_create", False):
+            return
+
+        if self.remote_type == self.REMOTE_TYPE_CONFIGURABLE:
+            return
+
+        starting_stock = getattr(self.sales_channel, "starting_stock", None)
+        if starting_stock is None:
+            return
+
+        self.payload['stock'] = starting_stock
+
+    def build_payload(self):
+        super().build_payload()
+        self.set_stock()
 
     def customize_payload(self):
         super().customize_payload()

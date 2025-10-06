@@ -8,7 +8,9 @@ from django.conf import settings
 from django.utils import timezone
 from sp_api.base import SellingApiException
 from spapi import SellersApi, SPAPIConfig, SPAPIClient, DefinitionsApi, ListingsApi
+from spapi.rest import ApiException
 from sales_channels.integrations.amazon.decorators import throttle_safe
+from sales_channels.integrations.amazon.exceptions import AmazonResponseException
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 from sales_channels.models.logs import RemoteLog
 from deepdiff import DeepDiff
@@ -16,6 +18,26 @@ from deepdiff import DeepDiff
 import pprint
 import logging
 logger = logging.getLogger(__name__)
+
+
+def _extract_api_error_message(*, exc):
+    body = getattr(exc, "body", None) or getattr(exc, "response_body", None)
+    if isinstance(body, bytes):
+        body = body.decode("utf-8", errors="ignore")
+
+    if body:
+        try:
+            payload = json.loads(body)
+        except (TypeError, ValueError):
+            return str(exc)
+
+        errors = payload.get("errors") if isinstance(payload, dict) else None
+        if isinstance(errors, list) and errors:
+            messages = [item.get("message") for item in errors if isinstance(item, dict) and item.get("message")]
+            if messages:
+                return "; ".join(messages)
+
+    return str(exc)
 
 
 class PullAmazonMixin:
@@ -343,8 +365,6 @@ class GetAmazonAPIMixin:
         return remote_lang.remote_code if remote_lang else None
 
     def _build_fulfillment_availability_attribute(self):
-        if not getattr(self, "is_create", False):
-            return None
 
         sales_channel = getattr(self, "sales_channel", None)
         starting_stock = getattr(sales_channel, "starting_stock", None)
@@ -354,9 +374,13 @@ class GetAmazonAPIMixin:
         local_instance = getattr(self, "local_instance", None)
         is_configurable = False
         if local_instance is not None:
+            if not getattr(local_instance, "active", True):
+                return None
+
             is_configurable_method = getattr(local_instance, "is_configurable", None)
             if callable(is_configurable_method):
                 is_configurable = bool(is_configurable_method())
+
         if is_configurable:
             return None
 
@@ -424,6 +448,7 @@ class GetAmazonAPIMixin:
                 allowed_keys = set(allowed_keys) | always_included_keys
                 attributes = {k: v for k, v in (attributes or {}).items() if k in allowed_keys}
 
+
         return {
             "productType": pt_code,
             "requirements": requirements,
@@ -468,8 +493,13 @@ class GetAmazonAPIMixin:
                 pprint.pformat(attributes),
             )
 
-        response = listings.put_listings_item(
-            **self._build_listing_kwargs(sku, marketplace_id, body, force_validation_only))
+        try:
+            response = listings.put_listings_item(
+                **self._build_listing_kwargs(sku, marketplace_id, body, force_validation_only))
+        except ApiException as exc:
+            if 400 <= getattr(exc, "status", None) < 500:
+                raise AmazonResponseException(_extract_api_error_message(exc=exc)) from exc
+            raise
 
         if getattr(self, "remote_product", None):
             self.remote_product.last_sync_at = timezone.now()
@@ -620,7 +650,13 @@ class GetAmazonAPIMixin:
         )
 
         listings = ListingsApi(self._get_client())
-        response = listings.patch_listings_item(**self._build_listing_kwargs(sku, marketplace_id, body, force_validation_only))
+        try:
+            response = listings.patch_listings_item(
+                **self._build_listing_kwargs(sku, marketplace_id, body, force_validation_only))
+        except ApiException as exc:
+            if 400 <= getattr(exc, "status", None) < 500:
+                raise AmazonResponseException(_extract_api_error_message(exc=exc)) from exc
+            raise
 
         if getattr(self, "remote_product", None):
             self.remote_product.last_sync_at = timezone.now()
