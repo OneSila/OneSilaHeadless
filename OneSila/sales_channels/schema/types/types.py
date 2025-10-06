@@ -118,6 +118,10 @@ class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
     def ebay_imports(self) -> List[Annotated['EbaySalesChannelImportType', lazy("sales_channels.integrations.ebay.schema.types.types")]]:
         return EbaySalesChannelImport.objects.filter(sales_channel=self)
 
+    @field()
+    def type(self, info) -> str:
+        return INTEGRATIONS_TYPES_MAP.get(self.__class__, MAGENTO_INTEGRATION)
+
 
 @type(ImportCurrency, filters=ImportCurrencyFilter, order=ImportCurrencyOrder, pagination=True, fields='__all__')
 class ImportCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):

@@ -5,6 +5,7 @@ from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDe
 
 from media.models import Media, Image, Video, MediaProductThrough, File
 from products.schema.types.filters import ProductFilter
+from sales_channels.schema.types.filters import SalesChannelFilter
 
 
 @filter(Media)
@@ -34,3 +35,4 @@ class MediaProductThroughFilter(ExcluideDemoDataFilterMixin):
     id: auto
     media: Optional[MediaFilter]
     product: Optional[ProductFilter]
+    sales_channel: Optional[SalesChannelFilter]
