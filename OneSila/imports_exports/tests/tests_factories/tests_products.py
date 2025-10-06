@@ -420,7 +420,12 @@ class ImportProductInstanceProcessTest(TestCase):
         instance = ImportProductInstance(data, self.import_process)
         instance.process()
 
-        self.assertTrue(MediaProductThrough.objects.filter(product=instance.instance).exists())
+        self.assertTrue(
+            MediaProductThrough.objects.get_product_images(
+                product=instance.instance,
+                sales_channel=None,
+            ).exists()
+        )
 
     def test_create_product_with_prices(self):
         data = {
@@ -776,7 +781,12 @@ class ImportProductInstanceProcessTest(TestCase):
         instance.process()
 
         self.assertTrue(ProductTranslation.objects.filter(product=instance.instance).exists())
-        self.assertTrue(MediaProductThrough.objects.filter(product=instance.instance).exists())
+        self.assertTrue(
+            MediaProductThrough.objects.get_product_images(
+                product=instance.instance,
+                sales_channel=None,
+            ).exists()
+        )
         self.assertTrue(SalesPrice.objects.filter(product=instance.instance).count() >= 2)
         self.assertTrue(ConfigurableVariation.objects.filter(parent=instance.instance).exists())
         self.assertTrue(ProductPropertiesRuleItem.objects.filter(rule=instance.rule).count() >= 2)
@@ -893,7 +903,10 @@ class ImportProductInstanceCreateOnlyTest(TestCase):
         instance1.process()
         product = instance1.instance
         self.assertEqual(product.name, "Original Product")
-        initial_images = MediaProductThrough.objects.filter(product=product).count()
+        initial_images = MediaProductThrough.objects.get_product_images(
+            product=product,
+            sales_channel=None,
+        ).count()
 
         second_data = {
             "name": "Updated Product",
@@ -908,7 +921,10 @@ class ImportProductInstanceCreateOnlyTest(TestCase):
         product.refresh_from_db()
         self.assertEqual(product.name, "Original Product")
         self.assertEqual(
-            MediaProductThrough.objects.filter(product=product).count(),
+            MediaProductThrough.objects.get_product_images(
+                product=product,
+                sales_channel=None,
+            ).count(),
             initial_images,
         )
 
@@ -926,7 +942,10 @@ class ImportProductInstanceCreateOnlyTest(TestCase):
         instance1.process()
         product = instance1.instance
         self.assertEqual(product.name, "Original Product")
-        initial_images = MediaProductThrough.objects.filter(product=product).count()
+        initial_images = MediaProductThrough.objects.get_product_images(
+            product=product,
+            sales_channel=None,
+        ).count()
 
         second_data = {
             "name": "Updated Product",
@@ -946,7 +965,10 @@ class ImportProductInstanceCreateOnlyTest(TestCase):
         product.refresh_from_db()
         self.assertEqual(product.name, "Updated Product")
         self.assertEqual(
-            MediaProductThrough.objects.filter(product=product).count(),
+            MediaProductThrough.objects.get_product_images(
+                product=product,
+                sales_channel=None,
+            ).count(),
             initial_images + 1,
         )
 

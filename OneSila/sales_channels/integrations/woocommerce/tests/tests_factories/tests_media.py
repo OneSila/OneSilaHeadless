@@ -22,7 +22,10 @@ class WooCommerceMediaProductThroughFactoryTestCase(CreateTestProductMixin, Crea
             name="Test Product",
             assign_to_sales_channel=True)
         image = self.create_and_attach_image(self.product, fname='yellow.png')
-        local_image_count = MediaProductThrough.objects.filter(product=self.product).count()
+        local_image_count = MediaProductThrough.objects.get_product_images(
+            product=self.product,
+            sales_channel=self.sales_channel,
+        ).count()
         logger.debug(f"Product has {local_image_count} images pre-woocommerce product create")
 
         remote_instance = WoocommerceProduct.objects.get(local_instance=self.product)
@@ -34,5 +37,8 @@ class WooCommerceMediaProductThroughFactoryTestCase(CreateTestProductMixin, Crea
 
         remote_product = self.api.get_product(remote_instance.remote_id)
         remote_image_count = len(remote_product['images'])
-        local_image_count = MediaProductThrough.objects.filter(product=self.product).count()
+        local_image_count = MediaProductThrough.objects.get_product_images(
+            product=self.product,
+            sales_channel=self.sales_channel,
+        ).count()
         self.assertEqual(remote_image_count, local_image_count)

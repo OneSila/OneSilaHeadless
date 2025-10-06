@@ -329,10 +329,14 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         return remote_property.id
 
     def get_medias(self):
-        return MediaProductThrough.objects.filter(
-            product=self.local_instance,
-            media__type__in=[Media.IMAGE, Media.VIDEO]
-        ).order_by('-is_main_image', 'sort_order')
+        return (
+            MediaProductThrough.objects.get_product_images(
+                product=self.local_instance,
+                sales_channel=self.sales_channel,
+            )
+            .filter(media__type__in=[Media.IMAGE, Media.VIDEO])
+            .order_by('-is_main_image', 'sort_order')
+        )
 
     def create_image_assignment(self, media_through):
         """

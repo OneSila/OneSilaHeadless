@@ -39,9 +39,11 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin):
     def _get_images(self):
         product = self.remote_product.local_instance
         throughs = (
-            MediaProductThrough.objects.filter(
-                product=product, media__type=Media.IMAGE
+            MediaProductThrough.objects.get_product_images(
+                product=product,
+                sales_channel=self.sales_channel,
             )
+            .filter(media__type=Media.IMAGE)
             .order_by("sort_order")
         )
 

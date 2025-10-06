@@ -167,7 +167,11 @@ class HasImagesInspectorBlockFactory(InspectorBlockFactory):
         super().__init__(block, success_signal=inspector_has_images_success, failure_signal=inspector_has_images_failed, save_inspector=save_inspector)
 
     def _check(self):
-        images_count = MediaProductThrough.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product).count()
+        images_count = (
+            MediaProductThrough.objects.filter_multi_tenant(self.multi_tenant_company)
+            .get_product_images(product=self.product, sales_channel=None)
+            .count()
+        )
 
         if self.product.is_configurable():
             if images_count == 0:

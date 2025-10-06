@@ -393,12 +393,16 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
 
         images_instances_ids = []
         images_instances_associations_ids = []
+        product_has_images = self.instance.mediaproductthrough_set.exists()
+
         for image in self.images:
 
             image_import_instance = ImportImageInstance(
                 image,
                 import_process=self.import_process,
-                product=self.instance
+                product=self.instance,
+                sales_channel=self.sales_channel,
+                create_default_assignment=not product_has_images if self.sales_channel is not None else False
             )
             image_import_instance.process()
 
