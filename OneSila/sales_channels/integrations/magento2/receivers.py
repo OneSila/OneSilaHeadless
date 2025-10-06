@@ -267,6 +267,7 @@ def sales_channels__magento__media_product_through__create(sender, instance, **k
         task_func=create_magento_image_association_db_task,
         multi_tenant_company=instance.multi_tenant_company,
         product=instance.product,
+        sales_channels_filter_kwargs={'id': instance.sales_channel_id} if instance.sales_channel_id else None,
         **task_kwargs)
 
 
@@ -279,6 +280,7 @@ def sales_channels__magento__media_product_through__update(sender, instance, **k
         task_func=update_magento_image_association_db_task,
         multi_tenant_company=instance.multi_tenant_company,
         product=instance.product,
+        sales_channels_filter_kwargs={'id': instance.sales_channel_id} if instance.sales_channel_id else None,
         **task_kwargs)
 
 
@@ -292,7 +294,8 @@ def sales_channels__magento__media_product_through__delete(sender, instance, **k
         multi_tenant_company=instance.multi_tenant_company,
         remote_class=MagentoImageProductAssociation,
         local_instance_id=instance.id,
-        product=instance.product
+        product=instance.product,
+        sales_channels_filter_kwargs={'id': instance.sales_channel_id} if instance.sales_channel_id else None
     )
 
 
