@@ -10,6 +10,7 @@ from properties.models import (
     ProductProperty,
     ProductPropertiesRule, ProductPropertiesRuleItem,
 )
+from sales_channels.exceptions import RemotePropertyValueNotMapped
 from sales_channels.integrations.amazon.factories import AmazonProductSyncFactory
 from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
 from sales_channels.models.products import RemoteProductConfigurator
@@ -271,7 +272,7 @@ class AmazonProductPropertyFactoryTest(DisableWooCommerceSignalsMixin, TestCase,
             get_value_only=True,
         )
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(RemotePropertyValueNotMapped):
             fac.create_body()
 
 
