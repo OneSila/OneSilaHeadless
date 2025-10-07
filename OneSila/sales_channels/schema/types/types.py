@@ -8,7 +8,6 @@ from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from currencies.schema.types.types import CurrencyType
 from imports_exports.schema.queries import ImportType
 from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION
-from products.schema.types.types import ProductType
 from integrations.schema.types.types import IntegrationType
 
 from sales_channels.models import (
@@ -297,7 +296,7 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
     sales_channel_view: SalesChannelViewType
     remote_product: Optional[RemoteProductType]
-    product: ProductType
+    product: Annotated['ProductType', lazy("products.schema.types.types")]
 
     @field()
     def integration_type(self, info) -> str:
