@@ -1,5 +1,6 @@
 from media.models import MediaProductThrough, Media
 from sales_channels.factories.mixins import RemoteInstanceCreateFactory, ProductAssignmentMixin, RemoteInstanceUpdateFactory, RemoteInstanceDeleteFactory
+from integrations.signals import remote_instance_post_create
 
 
 import logging
@@ -46,6 +47,20 @@ class RemoteMediaProductThroughCreateFactory(ProductAssignmentMixin, RemoteInsta
             raise ValueError("Factory has skip checks enabled without providing the remote product.")
 
         self.skip_checks = skip_checks
+        self._existing_remote_assignment = None
+        self._current_remote_assignment = None
+
+        remote_model_class = getattr(self, 'remote_model_class', None)
+
+        if remote_model_class and self.remote_product and self.local_instance:
+            self._current_remote_assignment = remote_model_class.objects.filter(
+                local_instance=self.local_instance,
+                sales_channel=self.sales_channel,
+                remote_product=self.remote_product,
+            ).first()
+
+            if not self._current_remote_assignment and self.local_instance.sales_channel_id:
+                self._existing_remote_assignment = self._get_existing_default_remote_assignment()
 
     def preflight_check(self):
         """
@@ -86,6 +101,68 @@ class RemoteMediaProductThroughCreateFactory(ProductAssignmentMixin, RemoteInsta
             self.remote_instance_data['remote_image'] = self.remote_image
 
         return self.remote_instance_data
+
+    def _get_existing_default_remote_assignment(self):
+        default_assignment = MediaProductThrough.objects.filter(
+            product=self.local_instance.product,
+            media=self.local_instance.media,
+            sales_channel__isnull=True,
+        ).first()
+
+        if not default_assignment:
+            return None
+
+        remote_model_class = getattr(self, 'remote_model_class', None)
+
+        if remote_model_class is None:
+            return None
+
+        return remote_model_class.objects.filter(
+            local_instance=default_assignment,
+            sales_channel=self.sales_channel,
+            remote_product=self.remote_product,
+        ).select_related('remote_image').first()
+
+    def _reuse_existing_remote_assignment(self):
+        if not self._existing_remote_assignment:
+            return
+
+        existing_remote_assignment = self._existing_remote_assignment
+
+        if hasattr(existing_remote_assignment, 'remote_image'):
+            self.remote_image = existing_remote_assignment.remote_image
+
+        self.build_remote_instance_data()
+        self.customize_remote_instance_data()
+        self.initialize_remote_instance()
+
+        update_fields = set(self.remote_instance_data.keys())
+
+        for attr in ('remote_id', 'remote_image', 'successfully_created', 'outdated', 'outdated_since'):
+            if hasattr(existing_remote_assignment, attr):
+                setattr(self.remote_instance, attr, getattr(existing_remote_assignment, attr))
+                update_fields.add(attr)
+
+        self.remote_instance.save(update_fields=list(update_fields))
+
+        remote_instance_post_create.send(sender=self.remote_instance.__class__, instance=self.remote_instance)
+
+    def run(self):
+        if self._current_remote_assignment:
+            if not self.preflight_check():
+                return
+
+            self.remote_instance = self._current_remote_assignment
+            return
+
+        if self._existing_remote_assignment:
+            if not self.preflight_check():
+                return
+
+            self._reuse_existing_remote_assignment()
+            return
+
+        super().run()
 
 
 class RemoteMediaProductThroughUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
