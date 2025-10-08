@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterable, List, Tuple
 
 from django.db.models import Q
 
+from currencies.models import Currency
 from media.models import Media, MediaProductThrough
 from products.models import ProductTranslation
 from properties.models import ProductProperty, Property
@@ -20,6 +21,7 @@ from sales_channels.integrations.ebay.models.properties import (
     EbayProperty,
     EbayPropertySelectValue,
 )
+from sales_channels.integrations.ebay.models.taxes import EbayCurrency
 
 
 class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
@@ -593,6 +595,258 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         if language_code:
             return language_code.replace("_", "-")
         return "en-US"
+
+    def _ensure_assign(self) -> SalesChannelViewAssign | None:
+        product = getattr(self.remote_product, "local_instance", None)
+        if product is None or self.view is None:
+            return None
+
+        assign = SalesChannelViewAssign.objects.filter(
+            product=product,
+            sales_channel_view=self.view,
+        ).first()
+
+        if assign is None:
+            assign = SalesChannelViewAssign.objects.create(
+                product=product,
+                sales_channel_view=self.view,
+                sales_channel=self.sales_channel,
+                remote_product=getattr(self, "remote_product", None),
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+            )
+            return assign
+
+        updates: list[str] = []
+        if assign.sales_channel_id != self.sales_channel.id:
+            assign.sales_channel = self.sales_channel
+            updates.append("sales_channel")
+
+        remote_product = getattr(self, "remote_product", None)
+        if remote_product is not None and assign.remote_product_id != getattr(remote_product, "id", None):
+            assign.remote_product = remote_product
+            updates.append("remote_product")
+
+        if updates:
+            assign.save(update_fields=updates)
+
+        return assign
+
+    def _get_primary_currency(self) -> Currency | None:
+        remote_currency = (
+            EbayCurrency.objects.filter(sales_channel=self.sales_channel)
+            .select_related("local_instance")
+            .first()
+        )
+        if remote_currency and remote_currency.local_instance:
+            return remote_currency.local_instance
+
+        return Currency.objects.filter(
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            is_default_currency=True,
+        ).first()
+
+    def _build_listing_policies(self) -> Dict[str, Any]:
+        policies: Dict[str, Any] = {}
+        fulfillment_id = getattr(self.view, "fulfillment_policy_id", None)
+        payment_id = getattr(self.view, "payment_policy_id", None)
+        return_id = getattr(self.view, "return_policy_id", None)
+
+        if fulfillment_id:
+            policies["fulfillment_policy_id"] = fulfillment_id
+        if payment_id:
+            policies["payment_policy_id"] = payment_id
+        if return_id:
+            policies["return_policy_id"] = return_id
+
+        return policies
+
+    def _build_pricing_summary(self) -> Dict[str, Any]:
+        product = getattr(self.remote_product, "local_instance", None)
+        currency = self._get_primary_currency()
+
+        if product is None or currency is None:
+            return {}
+
+        base_price, discount_price = product.get_price_for_sales_channel(
+            self.sales_channel,
+            currency=currency,
+        )
+
+        effective_price = discount_price if discount_price is not None else base_price
+        if effective_price is None:
+            return {}
+
+        summary: Dict[str, Any] = {
+            "price": {
+                "currency": currency.iso_code,
+                "value": float(effective_price),
+            }
+        }
+
+        if (
+            discount_price is not None
+            and base_price is not None
+            and float(discount_price) != float(base_price)
+        ):
+            summary["original_retail_price"] = {
+                "currency": currency.iso_code,
+                "value": float(base_price),
+            }
+
+        return summary
+
+    def _build_tax_section(self) -> Dict[str, Any]:
+        product = getattr(self.remote_product, "local_instance", None)
+        vat_rate = getattr(product, "vat_rate", None)
+        tax: Dict[str, Any] = {"apply_tax": False}
+
+        if vat_rate is None:
+            return tax
+
+        rate = getattr(vat_rate, "rate", None)
+        if rate is None:
+            tax["vat_percentage"] = None
+            return tax
+
+        tax["apply_tax"] = True
+        tax["vat_percentage"] = float(rate)
+        return tax
+
+    def _get_merchant_location_key(self) -> str | None:
+        return getattr(self.view, "merchant_location_key", None)
+
+    def _get_listing_duration(self) -> str:
+        duration = getattr(self.view, "listing_duration", None)
+        return duration or "GTC"
+
+    def build_offer_payload(self) -> Dict[str, Any]:
+        product = getattr(self.remote_product, "local_instance", None)
+        if product is None:
+            raise ValueError("Remote product missing local instance for offer payload build")
+
+        payload: Dict[str, Any] = {
+            "sku": self._get_sku(product=product),
+            "marketplace_id": getattr(self.view, "remote_id", None),
+            "format": "FIXED_PRICE",
+            "listing_duration": self._get_listing_duration(),
+        }
+
+        listing_description = self.get_listing_description()
+        if listing_description:
+            payload["listing_description"] = listing_description
+
+        listing_policies = self._build_listing_policies()
+        if listing_policies:
+            payload["listing_policies"] = listing_policies
+
+        pricing_summary = self._build_pricing_summary()
+        if pricing_summary:
+            payload["pricing_summary"] = pricing_summary
+
+        tax_section = self._build_tax_section()
+        if tax_section:
+            payload["tax"] = tax_section
+
+        merchant_key = self._get_merchant_location_key()
+        if merchant_key:
+            payload["merchant_location_key"] = merchant_key
+
+        return payload
+
+    def _extract_offer_id(self, response: Any) -> str | None:
+        if isinstance(response, dict):
+            for key in ("offer_id", "offerId", "id"):
+                candidate = response.get(key)
+                if candidate:
+                    return str(candidate)
+        return None
+
+    def send_offer(self) -> Any:
+        payload = self.build_offer_payload()
+
+        if self.get_value_only:
+            return payload
+
+        api = getattr(self, "api", None) or self.get_api()
+        self.api = api
+
+        response = api.sell_inventory_create_offer(
+            body=payload,
+            content_language=self._get_content_language(),
+            content_type="application/json",
+        )
+
+        offer_id = self._extract_offer_id(response)
+        if offer_id:
+            assign = self._ensure_assign()
+            if assign and assign.remote_id != offer_id:
+                assign.remote_id = offer_id
+                assign.save(update_fields=["remote_id"])
+
+        return response
+
+    def publish_offer(self) -> Any:
+        offer_id = self._get_offer_remote_id()
+        if not offer_id:
+            return {"offer_id": None} if self.get_value_only else None
+
+        if self.get_value_only:
+            return {"offer_id": offer_id}
+
+        api = getattr(self, "api", None) or self.get_api()
+        self.api = api
+        return api.sell_inventory_publish_offer(offer_id=offer_id)
+
+    def withdraw_offer(self) -> Any:
+        offer_id = self._get_offer_remote_id()
+        if not offer_id:
+            return {"offer_id": None} if self.get_value_only else None
+
+        if self.get_value_only:
+            return {"offer_id": offer_id}
+
+        api = getattr(self, "api", None) or self.get_api()
+        self.api = api
+        return api.sell_inventory_withdraw_offer(offer_id=offer_id)
+
+    def delete_inventory(self) -> Any:
+        product = getattr(self.remote_product, "local_instance", None)
+        if product is None:
+            return None
+
+        sku = self._get_sku(product=product)
+        if self.get_value_only:
+            return {"sku": sku}
+
+        api = getattr(self, "api", None) or self.get_api()
+        self.api = api
+        response = api.sell_inventory_delete_inventory_item(sku=sku)
+
+        remote_product = getattr(self, "remote_product", None)
+        if remote_product and getattr(remote_product, "remote_id", None):
+            remote_product.remote_id = None
+            remote_product.save(update_fields=["remote_id"])
+
+        return response
+
+    def delete_offer(self) -> Any:
+        offer_id = self._get_offer_remote_id()
+        if not offer_id:
+            return {"offer_id": None} if self.get_value_only else None
+
+        if self.get_value_only:
+            return {"offer_id": offer_id}
+
+        api = getattr(self, "api", None) or self.get_api()
+        self.api = api
+        response = api.sell_inventory_delete_offer(offer_id=offer_id)
+
+        assign = self._ensure_assign()
+        if assign and assign.remote_id:
+            assign.remote_id = None
+            assign.save(update_fields=["remote_id"])
+
+        return response
 
 
 class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
