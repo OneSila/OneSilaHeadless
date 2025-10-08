@@ -24,8 +24,6 @@ from .filters import (
 from taxes.schema.types.types import VatRateType
 from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
     ProductTranslation, ConfigurableVariation, BundleVariation, AliasProduct
-from properties.schema.types.types import ProductPropertyType
-from properties.models import ProductProperty
 from products.models import (
     Product,
     BundleProduct,

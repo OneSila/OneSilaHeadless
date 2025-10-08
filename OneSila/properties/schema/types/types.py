@@ -7,7 +7,6 @@ from core.schema.core.mixins import (
 )
 
 from typing import List, Optional
-from media.schema.types.types import ImageType
 from properties.models import Property, PropertyTranslation, \
     PropertySelectValue, ProductProperty, ProductPropertyTextTranslation, PropertySelectValueTranslation, ProductPropertiesRule, ProductPropertiesRuleItem
 from .filters import PropertyFilter, PropertyTranslationFilter, \
@@ -35,7 +34,7 @@ class PropertyTranslationType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(PropertySelectValue, filters=PropertySelectValueFilter, order=PropertySelectValueOrder, pagination=True, fields="__all__")
 class PropertySelectValueType(relay.Node, GetPropertySelectValueQuerysetMultiTenantMixin):
     property: PropertyType
-    image: Optional[ImageType]
+    image: Optional[Annotated['ImageType', lazy("media.schema.types.types")]]
     productpropertiesrule_set: List[Annotated['ProductPropertiesRuleType', lazy("properties.schema.types.types")]]
     propertyselectvaluetranslation_set: List[Annotated['PropertySelectValueTranslationType', lazy("properties.schema.types.types")]]
 
