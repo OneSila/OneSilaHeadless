@@ -23,6 +23,7 @@ from .products import (
     EbayProductPropertyUpdateFactory,
     EbayProductPropertyDeleteFactory,
 )
+from .prices import EbayPriceUpdateFactory
 
 __all__ = [
     'GetEbayRedirectUrlFactory',
@@ -44,4 +45,5 @@ __all__ = [
     'EbayProductPropertyCreateFactory',
     'EbayProductPropertyUpdateFactory',
     'EbayProductPropertyDeleteFactory',
+    'EbayPriceUpdateFactory',
 ]

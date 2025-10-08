@@ -54,3 +54,4 @@ class EbayProductContentUpdateFactory(
             content_language=self._get_content_language(),
             content_type="application/json",
         )
+
