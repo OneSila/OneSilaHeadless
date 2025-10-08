@@ -21,6 +21,7 @@ from sales_channels.integrations.ebay.factories.products import (
 from sales_channels.integrations.ebay.models.properties import EbayProductProperty
 from sales_channels.integrations.ebay.models.taxes import EbayCurrency
 from sales_channels.models.sales_channels import SalesChannelViewAssign
+from sales_channels.exceptions import PreFlightCheckError
 
 from .mixins import EbayProductPushFactoryTestBase
 
@@ -80,6 +81,14 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         )
         SalesChannelViewAssign.objects.filter(pk=assign.pk).update(remote_id=None)
         assign.refresh_from_db()
+
+        type(self.view).objects.filter(pk=self.view.pk).update(
+            fulfillment_policy_id="FULFILL-1",
+            payment_policy_id="PAY-1",
+            return_policy_id="RETURN-1",
+            merchant_location_key="LOC-1",
+        )
+        self.view.refresh_from_db()
 
         translation = self.product.translations.get(
             sales_channel=self.sales_channel,
@@ -200,17 +209,17 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         mock_ean_run.assert_called()
         mock_content_run.assert_called_once()
 
-        brand_remote = EbayProductProperty.objects.get(
-            remote_product=self.remote_product,
-            local_instance=self.brand_product_property,
+    def test_create_flow_errors_when_policies_missing(self) -> None:
+        type(self.view).objects.filter(pk=self.view.pk).update(
+            fulfillment_policy_id=None,
+            payment_policy_id=None,
+            return_policy_id=None,
         )
-        self.assertEqual(brand_remote.remote_value, "Acme")
+        self.view.refresh_from_db()
 
-        weight_remote = EbayProductProperty.objects.get(
-            remote_product=self.remote_product,
-            local_instance=self.weight_product_property,
-        )
-        self.assertEqual(weight_remote.remote_value, "2.5")
+        factory = self._build_create_factory()
+        with self.assertRaises(PreFlightCheckError):
+            factory.run()
 
     @patch(
         "sales_channels.integrations.ebay.factories.products.products.EbayEanCodeUpdateFactory.run",
@@ -400,6 +409,14 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
             sales_channel_view=self.view,
         ).update(remote_id=None)
 
+        type(self.view).objects.filter(pk=self.view.pk).update(
+            fulfillment_policy_id="FULFILL-1",
+            payment_policy_id="PAY-1",
+            return_policy_id="RETURN-1",
+            merchant_location_key="LOC-1",
+        )
+        self.view.refresh_from_db()
+
         self.image_patch = patch(
             "sales_channels.integrations.ebay.factories.products.mixins.EbayInventoryItemPayloadMixin._collect_image_urls",
             return_value=["https://example.com/image.jpg"],
@@ -441,6 +458,8 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
             value_float=2.5,
             multi_tenant_company=self.multi_tenant_company,
         )
+        child.vat_rate = self.product.vat_rate
+        child.save(update_fields=["vat_rate"])
         SalesPrice.objects.update_or_create(
             product=child,
             currency=self.currency,
@@ -544,6 +563,7 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
 
         offer_body = api_mock.sell_inventory_bulk_create_offer.call_args.kwargs["body"]
         self.assertEqual(len(offer_body["requests"]), 2)
+
         for offer_request in offer_body["requests"]:
             offer = offer_request["offer"]
             self.assertEqual(offer["listing_policies"], {

@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, datetime
 import json
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from django.db.models import Q
 
@@ -15,6 +15,7 @@ from properties.models import ProductProperty, Property
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
+from sales_channels.factories.mixins import PreFlightCheckError
 from sales_channels.integrations.ebay.models.products import EbayMediaThroughProduct
 from sales_channels.integrations.ebay.models.properties import (
     EbayInternalProperty,
@@ -38,6 +39,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         if not hasattr(self, "get_value_only"):
             self.get_value_only = get_value_only
         self._latest_listing_description: str | None = None
+        self._listing_policies_cache: Dict[str, Any] | None = None
         super().__init__(*args, **kwargs)
 
     # ------------------------------------------------------------------
@@ -698,19 +700,39 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         ).first()
 
     def _build_listing_policies(self) -> Dict[str, Any]:
+        if self._listing_policies_cache is not None:
+            return dict(self._listing_policies_cache)
+
         policies: Dict[str, Any] = {}
         fulfillment_id = getattr(self.view, "fulfillment_policy_id", None)
         payment_id = getattr(self.view, "payment_policy_id", None)
         return_id = getattr(self.view, "return_policy_id", None)
 
+        missing: list[str] = []
         if fulfillment_id:
             policies["fulfillment_policy_id"] = fulfillment_id
+        else:
+            missing.append("fulfillment policy")
+
         if payment_id:
             policies["payment_policy_id"] = payment_id
+        else:
+            missing.append("payment policy")
+
         if return_id:
             policies["return_policy_id"] = return_id
+        else:
+            missing.append("return policy")
 
-        return policies
+        if missing:
+            raise PreFlightCheckError(
+                "Missing eBay listing policies ({}). Please configure the marketplace policies before pushing products.".format(
+                    ", ".join(missing)
+                )
+            )
+
+        self._listing_policies_cache = policies
+        return dict(policies)
 
     def _build_pricing_summary(self) -> Dict[str, Any]:
         product = getattr(self.remote_product, "local_instance", None)
@@ -944,11 +966,10 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
 
     def send_inventory_payload(self) -> Any:
         is_parent = self.is_configurable_parent()
-        payload = (
-            self._build_inventory_group_payload()
-            if is_parent
-            else self.build_inventory_payload()
-        )
+        if is_parent:
+            payload = self._build_inventory_group_payload()
+        else:
+            payload = self.build_inventory_payload()
 
         if self.get_value_only:
             return payload
@@ -964,7 +985,14 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
                 inventory_item_group_key=self.get_parent_remote_sku(),
             )
 
+        sku = payload.get("sku")
+        if not sku:
+            product = getattr(self.remote_product, "local_instance", None)
+            if product is not None:
+                sku = self._get_sku(product=product)
+
         return api.sell_inventory_create_or_replace_inventory_item(
+            sku=sku,
             body=payload,
             content_language=self._get_content_language(),
             content_type="application/json",

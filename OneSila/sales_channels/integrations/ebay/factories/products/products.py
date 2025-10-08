@@ -164,6 +164,7 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
         return remote_children
 
     def _run_configurable_sequence(self) -> Dict[str, Any]:
+        self._build_listing_policies()
         child_remotes = self._collect_child_remote_products()
 
         children_payloads = {
@@ -410,6 +411,7 @@ class EbayProductCreateFactory(EbayProductBaseFactory):
         if not self.preflight_check():
             return None
 
+        self._build_listing_policies()
         self._resolve_remote_product()
         self.set_api()
         if self._is_configurable_product():
@@ -442,6 +444,7 @@ class EbayProductUpdateFactory(EbayProductBaseFactory):
         if not self.preflight_check():
             return None
 
+        self._build_listing_policies()
         self._resolve_remote_product()
         self.set_api()
         if self._is_configurable_product():
@@ -549,6 +552,7 @@ class EbayProductVariationAddFactory(EbayProductBaseFactory):
         if not self.preflight_check():
             return None
 
+        self._build_listing_policies()
         parent_remote = self._resolve_parent_remote_product()
         self._resolve_remote_product()
         self.set_api()
