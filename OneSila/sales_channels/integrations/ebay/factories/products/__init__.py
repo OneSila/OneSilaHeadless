@@ -9,6 +9,7 @@ from .products import (
     EbayProductBaseFactory,
     EbayProductCreateFactory,
     EbayProductDeleteFactory,
+    EbayProductVariationAddFactory,
     EbayProductSyncFactory,
     EbayProductUpdateFactory,
 )
@@ -31,5 +32,6 @@ __all__ = [
     "EbayProductCreateFactory",
     "EbayProductUpdateFactory",
     "EbayProductDeleteFactory",
+    "EbayProductVariationAddFactory",
     "EbayProductSyncFactory",
 ]

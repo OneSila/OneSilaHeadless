@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from contextlib import contextmanager
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, datetime
 import json
 from typing import Any, Dict, Iterable, List, Tuple
@@ -596,8 +597,9 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             return language_code.replace("_", "-")
         return "en-US"
 
-    def _ensure_assign(self) -> SalesChannelViewAssign | None:
-        product = getattr(self.remote_product, "local_instance", None)
+    def _ensure_assign(self, *, remote_product: Any | None = None) -> SalesChannelViewAssign | None:
+        candidate = remote_product or getattr(self, "remote_product", None)
+        product = getattr(candidate, "local_instance", None)
         if product is None or self.view is None:
             return None
 
@@ -611,7 +613,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
                 product=product,
                 sales_channel_view=self.view,
                 sales_channel=self.sales_channel,
-                remote_product=getattr(self, "remote_product", None),
+                remote_product=candidate,
                 multi_tenant_company=self.sales_channel.multi_tenant_company,
             )
             return assign
@@ -621,15 +623,65 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             assign.sales_channel = self.sales_channel
             updates.append("sales_channel")
 
-        remote_product = getattr(self, "remote_product", None)
-        if remote_product is not None and assign.remote_product_id != getattr(remote_product, "id", None):
-            assign.remote_product = remote_product
+        if candidate is not None and assign.remote_product_id != getattr(candidate, "id", None):
+            assign.remote_product = candidate
             updates.append("remote_product")
 
         if updates:
-            assign.save(update_fields=updates)
+            self._update_assign_fields(assign=assign, fields=tuple(updates))
 
         return assign
+
+    def _ensure_assign_for_remote(self, *, remote_product: Any) -> SalesChannelViewAssign | None:
+        return self._ensure_assign(remote_product=remote_product)
+
+    def _update_remote_product_fields(
+        self,
+        *,
+        remote_product: Any | None,
+        fields: Sequence[str],
+    ) -> None:
+        if remote_product is None or not fields:
+            return
+
+        pk = getattr(remote_product, "pk", None)
+        if pk is None:
+            return
+
+        update_kwargs = {field: getattr(remote_product, field) for field in fields}
+        type(remote_product).objects.filter(pk=pk).update(**update_kwargs)
+        for field, value in update_kwargs.items():
+            setattr(remote_product, field, value)
+
+    def _update_assign_fields(
+        self,
+        *,
+        assign: SalesChannelViewAssign | None,
+        fields: Sequence[str],
+    ) -> None:
+        if assign is None or not fields:
+            return
+
+        pk = getattr(assign, "pk", None)
+        if pk is None:
+            return
+
+        update_kwargs = {field: getattr(assign, field) for field in fields}
+        SalesChannelViewAssign.objects.filter(pk=pk).update(**update_kwargs)
+        for field, value in update_kwargs.items():
+            setattr(assign, field, value)
+
+    @contextmanager
+    def _use_remote_product(self, remote_product: Any) -> Iterable[None]:
+        original_remote_product = getattr(self, "remote_product", None)
+        original_remote_instance = getattr(self, "remote_instance", None)
+        try:
+            self.remote_product = remote_product
+            self.remote_instance = remote_product
+            yield
+        finally:
+            self.remote_product = original_remote_product
+            self.remote_instance = original_remote_instance
 
     def _get_primary_currency(self) -> Currency | None:
         remote_currency = (
@@ -719,37 +771,60 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         duration = getattr(self.view, "listing_duration", None)
         return duration or "GTC"
 
-    def build_offer_payload(self) -> Dict[str, Any]:
-        product = getattr(self.remote_product, "local_instance", None)
-        if product is None:
-            raise ValueError("Remote product missing local instance for offer payload build")
-
-        payload: Dict[str, Any] = {
+    def _build_offer_base_payload(self, *, product) -> Dict[str, Any]:
+        return {
             "sku": self._get_sku(product=product),
             "marketplace_id": getattr(self.view, "remote_id", None),
             "format": "FIXED_PRICE",
             "listing_duration": self._get_listing_duration(),
         }
 
+    def _build_offer_metadata(self) -> Dict[str, Any]:
+        metadata: Dict[str, Any] = {}
         listing_description = self.get_listing_description()
         if listing_description:
-            payload["listing_description"] = listing_description
-
-        listing_policies = self._build_listing_policies()
-        if listing_policies:
-            payload["listing_policies"] = listing_policies
-
-        pricing_summary = self._build_pricing_summary()
-        if pricing_summary:
-            payload["pricing_summary"] = pricing_summary
-
-        tax_section = self._build_tax_section()
-        if tax_section:
-            payload["tax"] = tax_section
+            metadata["listing_description"] = listing_description
 
         merchant_key = self._get_merchant_location_key()
         if merchant_key:
-            payload["merchant_location_key"] = merchant_key
+            metadata["merchant_location_key"] = merchant_key
+
+        return metadata
+
+    def _apply_offer_section(self, *, payload: Dict[str, Any], key: str, value: Any) -> None:
+        if isinstance(value, Mapping):
+            if value:
+                payload[key] = value
+            return
+        if value not in (None, ""):
+            payload[key] = value
+
+    def build_offer_payload(self) -> Dict[str, Any]:
+        product = getattr(self.remote_product, "local_instance", None)
+        if product is None:
+            raise ValueError("Remote product missing local instance for offer payload build")
+
+        payload = self._build_offer_base_payload(product=product)
+
+        metadata = self._build_offer_metadata()
+        for key, value in metadata.items():
+            self._apply_offer_section(payload=payload, key=key, value=value)
+
+        self._apply_offer_section(
+            payload=payload,
+            key="listing_policies",
+            value=self._build_listing_policies(),
+        )
+        self._apply_offer_section(
+            payload=payload,
+            key="pricing_summary",
+            value=self._build_pricing_summary(),
+        )
+        self._apply_offer_section(
+            payload=payload,
+            key="tax",
+            value=self._build_tax_section(),
+        )
 
         return payload
 
@@ -781,7 +856,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             assign = self._ensure_assign()
             if assign and assign.remote_id != offer_id:
                 assign.remote_id = offer_id
-                assign.save(update_fields=["remote_id"])
+                self._update_assign_fields(assign=assign, fields=("remote_id",))
 
         return response
 
@@ -825,7 +900,10 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         remote_product = getattr(self, "remote_product", None)
         if remote_product and getattr(remote_product, "remote_id", None):
             remote_product.remote_id = None
-            remote_product.save(update_fields=["remote_id"])
+            self._update_remote_product_fields(
+                remote_product=remote_product,
+                fields=("remote_id",),
+            )
 
         return response
 
@@ -844,13 +922,15 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         assign = self._ensure_assign()
         if assign and assign.remote_id:
             assign.remote_id = None
-            assign.save(update_fields=["remote_id"])
+            self._update_assign_fields(assign=assign, fields=("remote_id",))
 
         return response
 
 
 class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
     """Mixin adding API submission helpers for inventory payloads."""
+
+    _BULK_MAX_BATCH = 25
 
     def __init__(self, *args: Any, view=None, get_value_only: bool = False, **kwargs: Any) -> None:
         if view is None:
@@ -889,6 +969,153 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
             content_language=self._get_content_language(),
             content_type="application/json",
         )
+
+    def _chunk_requests(self, requests: Sequence[Any]) -> List[List[Any]]:
+        if not requests:
+            return []
+        return [
+            list(requests[index : index + self._BULK_MAX_BATCH])
+            for index in range(0, len(requests), self._BULK_MAX_BATCH)
+        ]
+
+    def build_bulk_inventory_requests(self, *, remote_products: Sequence[Any]) -> List[Dict[str, Any]]:
+        requests: List[Dict[str, Any]] = []
+        for remote_product in list(remote_products):
+            with self._use_remote_product(remote_product):
+                requests.append(self.build_inventory_payload())
+        return requests
+
+    def send_bulk_inventory_payloads(self, *, remote_products: Sequence[Any]) -> List[Any]:
+        remote_products = list(remote_products)
+        requests = self.build_bulk_inventory_requests(remote_products=remote_products)
+        batches = self._chunk_requests(requests)
+
+        if self.get_value_only:
+            return [{"requests": batch} for batch in batches]
+
+        if not batches:
+            return []
+
+        api = getattr(self, "api", None) or self.get_api()
+        self.api = api
+
+        responses: List[Any] = []
+        for batch in batches:
+            responses.append(
+                api.sell_inventory_bulk_create_or_replace_inventory_item(
+                    body={"requests": batch},
+                    content_language=self._get_content_language(),
+                    content_type="application/json",
+                )
+            )
+
+        return responses
+
+    def build_bulk_offer_requests(self, *, remote_products: Sequence[Any]) -> List[Dict[str, Any]]:
+        requests: List[Dict[str, Any]] = []
+        for remote_product in list(remote_products):
+            with self._use_remote_product(remote_product):
+                requests.append({"offer": self.build_offer_payload()})
+        return requests
+
+    def _store_bulk_offer_ids(self, *, response: Any, remote_products: Sequence[Any]) -> None:
+        if not isinstance(response, Mapping):
+            return
+
+        entries = response.get("responses")
+        if not isinstance(entries, Sequence):
+            return
+
+        for remote_product, entry in zip(remote_products, entries):
+            offer_id = self._extract_offer_id(entry)
+            if not offer_id:
+                continue
+            assign = self._ensure_assign_for_remote(remote_product=remote_product)
+            if assign and assign.remote_id != offer_id:
+                assign.remote_id = offer_id
+                self._update_assign_fields(assign=assign, fields=("remote_id",))
+
+    def send_bulk_offer_payloads(self, *, remote_products: Sequence[Any]) -> List[Any]:
+        remote_products = list(remote_products)
+        requests = self.build_bulk_offer_requests(remote_products=remote_products)
+        batches = self._chunk_requests(requests)
+
+        if self.get_value_only:
+            return [{"requests": batch} for batch in batches]
+
+        if not batches:
+            return []
+
+        api = getattr(self, "api", None) or self.get_api()
+        self.api = api
+
+        responses: List[Any] = []
+        start = 0
+        for batch in batches:
+            end = start + len(batch)
+            remote_slice = remote_products[start:end]
+            response = api.sell_inventory_bulk_create_offer(
+                body={"requests": batch},
+                content_language=self._get_content_language(),
+                content_type="application/json",
+            )
+            responses.append(response)
+            self._store_bulk_offer_ids(response=response, remote_products=remote_slice)
+            start = end
+
+        return responses
+
+    def _build_group_action_payload(self) -> Dict[str, Any]:
+        return {"inventory_item_group_key": self.get_parent_remote_sku()}
+
+    def publish_group(self) -> Any:
+        payload = self._build_group_action_payload()
+        if self.get_value_only:
+            return payload
+
+        api = getattr(self, "api", None) or self.get_api()
+        self.api = api
+        return api.sell_inventory_publish_offer_by_inventory_item_group(
+            body=payload,
+            content_type="application/json",
+        )
+
+    def withdraw_group(self) -> Any:
+        payload = self._build_group_action_payload()
+        if self.get_value_only:
+            return payload
+
+        api = getattr(self, "api", None) or self.get_api()
+        self.api = api
+        return api.sell_inventory_withdraw_offer_by_inventory_item_group(
+            body=payload,
+            content_type="application/json",
+        )
+
+    def delete_inventory_group(self) -> Any:
+        key = self.get_parent_remote_sku()
+        if self.get_value_only:
+            return {"inventory_item_group_key": key}
+
+        api = getattr(self, "api", None) or self.get_api()
+        self.api = api
+        return api.sell_inventory_delete_inventory_item_group(
+            inventory_item_group_key=key,
+        )
+
+    def delete_offers_for_remote_products(self, *, remote_products: Sequence[Any]) -> List[Any]:
+        results: List[Any] = []
+        for remote_product in list(remote_products):
+            with self._use_remote_product(remote_product):
+                results.append(self.delete_offer())
+        return results
+
+    def delete_inventory_for_remote_products(self, *, remote_products: Sequence[Any]) -> List[Any]:
+        results: List[Any] = []
+        for remote_product in list(remote_products):
+            with self._use_remote_product(remote_product):
+                results.append(self.delete_inventory())
+        return results
 
 
 class EbayProductPropertyValueMixin(EbayInventoryItemPushMixin):

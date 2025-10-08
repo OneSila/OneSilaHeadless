@@ -6,12 +6,15 @@ from unittest.mock import MagicMock, patch
 from model_bakery import baker
 
 from currencies.models import Currency
+from products.models import ConfigurableVariation, Product, ProductTranslation
+from properties.models import ProductProperty
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
 
 from sales_channels.integrations.ebay.factories.products import (
     EbayProductCreateFactory,
     EbayProductDeleteFactory,
+    EbayProductVariationAddFactory,
     EbayProductSyncFactory,
     EbayProductUpdateFactory,
 )
@@ -348,3 +351,341 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
 
         mock_update_run.assert_called_once()
         mock_create_run.assert_not_called()
+
+
+class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
+    """End-to-end coverage for configurable eBay product exports."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.sales_channel.starting_stock = 10
+        self.sales_channel.save(update_fields=["starting_stock"])
+
+        self.currency, _ = Currency.objects.update_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            defaults={
+                "iso_code": "GBP",
+                "name": "Pound",
+                "symbol": "£",
+                "exchange_rate": 1,
+                "is_default_currency": True,
+            },
+        )
+        EbayCurrency.objects.update_or_create(
+            sales_channel=self.sales_channel,
+            defaults={
+                "local_instance": self.currency,
+                "remote_code": self.currency.iso_code,
+                "multi_tenant_company": self.multi_tenant_company,
+            },
+        )
+        SalesPrice.objects.update_or_create(
+            product=self.product,
+            currency=self.currency,
+            multi_tenant_company=self.multi_tenant_company,
+            defaults={"rrp": Decimal("120"), "price": Decimal("95")},
+        )
+
+        vat_rate = baker.make(
+            VatRate,
+            rate=Decimal("20"),
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.product.vat_rate = vat_rate
+        self.product.type = Product.CONFIGURABLE
+        self.product.save(update_fields=["vat_rate", "type"])
+
+        SalesChannelViewAssign.objects.filter(
+            product=self.product,
+            sales_channel_view=self.view,
+        ).update(remote_id=None)
+
+        self.image_patch = patch(
+            "sales_channels.integrations.ebay.factories.products.mixins.EbayInventoryItemPayloadMixin._collect_image_urls",
+            return_value=["https://example.com/image.jpg"],
+        )
+        self.image_patch.start()
+        self.addCleanup(self.image_patch.stop)
+
+        self.children = [
+            self._create_child_product(sku="TEST-SKU-1", name="Child One"),
+            self._create_child_product(sku="TEST-SKU-2", name="Child Two"),
+        ]
+
+    def _create_child_product(self, *, sku: str, name: str):
+        child = baker.make(
+            "products.Product",
+            sku=sku,
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductTranslation.objects.create(
+            product=child,
+            sales_channel=self.sales_channel,
+            language="en-us",
+            name=name,
+            subtitle="Child subtitle",
+            description="Child description",
+            short_description="Child short description",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=child,
+            property=self.brand_property,
+            value_select=self.brand_value,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=child,
+            property=self.weight_property,
+            value_float=2.5,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        SalesPrice.objects.update_or_create(
+            product=child,
+            currency=self.currency,
+            multi_tenant_company=self.multi_tenant_company,
+            defaults={"rrp": Decimal("120"), "price": Decimal("95")},
+        )
+        ConfigurableVariation.objects.create(
+            parent=self.product,
+            variation=child,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        return child
+
+    def _prime_remote_state(self) -> None:
+        api_mock = MagicMock()
+        api_mock.sell_inventory_bulk_create_or_replace_inventory_item.return_value = {"responses": []}
+        api_mock.sell_inventory_bulk_create_offer.return_value = {
+            "responses": [
+                {"offerId": f"OFFER-{child.sku}"}
+                for child in self.children
+            ]
+        }
+        api_mock.sell_inventory_create_or_replace_inventory_item_group.return_value = {
+            "inventory_item_group_key": self.product.sku
+        }
+        api_mock.sell_inventory_publish_offer_by_inventory_item_group.return_value = {
+            "status": "PUBLISHED"
+        }
+
+        with patch.object(EbayProductCreateFactory, "get_api", return_value=api_mock), patch(
+            "sales_channels.integrations.ebay.factories.products.products.EbayPriceUpdateFactory.run"
+        ), patch(
+            "sales_channels.integrations.ebay.factories.products.products.EbayEanCodeUpdateFactory.run",
+            return_value="EAN",
+        ), patch(
+            "sales_channels.integrations.ebay.factories.products.products.EbayProductContentUpdateFactory.run"
+        ), patch(
+            "sales_channels.integrations.ebay.factories.products.mixins.EbayInventoryItemPayloadMixin._build_varies_by_configuration",
+            return_value=None,
+        ):
+            factory = EbayProductCreateFactory(
+                sales_channel=self.sales_channel,
+                local_instance=self.product,
+                view=self.view,
+            )
+            factory.run()
+
+    @patch(
+        "sales_channels.integrations.ebay.factories.products.mixins.EbayInventoryItemPayloadMixin._build_varies_by_configuration",
+        return_value={
+            "aspects_image_varies_by": ["Size"],
+            "specifications": [{"name": "Size", "values": ["Child One", "Child Two"]}],
+        },
+    )
+    @patch(
+        "sales_channels.integrations.ebay.factories.products.products.EbayProductContentUpdateFactory.run"
+    )
+    @patch(
+        "sales_channels.integrations.ebay.factories.products.products.EbayEanCodeUpdateFactory.run",
+        return_value="EAN",
+    )
+    @patch(
+        "sales_channels.integrations.ebay.factories.products.products.EbayPriceUpdateFactory.run"
+    )
+    def test_configurable_create_flow_batches_children_and_group(
+        self,
+        mock_price_run: MagicMock,
+        mock_ean_run: MagicMock,
+        mock_content_run: MagicMock,
+        mock_varies: MagicMock,
+    ) -> None:
+        api_mock = MagicMock()
+        api_mock.sell_inventory_bulk_create_or_replace_inventory_item.return_value = {"responses": []}
+        api_mock.sell_inventory_bulk_create_offer.return_value = {
+            "responses": [
+                {"offerId": "OFFER-TEST-SKU-1"},
+                {"offerId": "OFFER-TEST-SKU-2"},
+            ]
+        }
+        api_mock.sell_inventory_create_or_replace_inventory_item_group.return_value = {
+            "inventory_item_group_key": self.product.sku
+        }
+        api_mock.sell_inventory_publish_offer_by_inventory_item_group.return_value = {
+            "status": "PUBLISHED"
+        }
+
+        with patch.object(EbayProductCreateFactory, "get_api", return_value=api_mock):
+            factory = EbayProductCreateFactory(
+                sales_channel=self.sales_channel,
+                local_instance=self.product,
+                view=self.view,
+            )
+            result = factory.run()
+
+        inventory_body = api_mock.sell_inventory_bulk_create_or_replace_inventory_item.call_args.kwargs["body"]
+        self.assertEqual(len(inventory_body["requests"]), 2)
+        self.assertCountEqual(
+            [entry["sku"] for entry in inventory_body["requests"]],
+            [child.sku for child in self.children],
+        )
+
+        offer_body = api_mock.sell_inventory_bulk_create_offer.call_args.kwargs["body"]
+        self.assertEqual(len(offer_body["requests"]), 2)
+        for offer_request in offer_body["requests"]:
+            offer = offer_request["offer"]
+            self.assertEqual(offer["listing_policies"], {
+                "fulfillment_policy_id": "FULFILL-1",
+                "payment_policy_id": "PAY-1",
+                "return_policy_id": "RETURN-1",
+            })
+            self.assertIn("pricing_summary", offer)
+            self.assertEqual(offer["tax"], {"apply_tax": True, "vat_percentage": 20.0})
+
+        group_body = api_mock.sell_inventory_create_or_replace_inventory_item_group.call_args.kwargs["body"]
+        self.assertCountEqual(group_body["variant_skus"], [child.sku for child in self.children])
+        self.assertEqual(group_body["varies_by"], mock_varies.return_value)
+
+        publish_body = api_mock.sell_inventory_publish_offer_by_inventory_item_group.call_args.kwargs["body"]
+        self.assertEqual(publish_body, {"inventory_item_group_key": self.product.sku})
+
+        for idx, child in enumerate(self.children, start=1):
+            assign = SalesChannelViewAssign.objects.get(product=child, sales_channel_view=self.view)
+            self.assertEqual(assign.remote_id, f"OFFER-{child.sku}")
+
+        self.assertIn("children", result)
+        self.assertEqual(result["publish"], {"status": "PUBLISHED"})
+        mock_price_run.assert_called_once()
+        mock_ean_run.assert_called()
+        mock_content_run.assert_called_once()
+
+    @patch(
+        "sales_channels.integrations.ebay.factories.products.products.EbayEanCodeUpdateFactory.run",
+        return_value="EAN",
+    )
+    @patch(
+        "sales_channels.integrations.ebay.factories.products.products.EbayPriceUpdateFactory.run"
+    )
+    def test_configurable_create_value_only_payload(self, mock_price_run: MagicMock, mock_ean_run: MagicMock) -> None:
+        factory = EbayProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            view=self.view,
+            get_value_only=True,
+        )
+        result = factory.run()
+
+        inventory_batches = result["children"]["inventory"]
+        self.assertEqual(len(inventory_batches), 1)
+        self.assertEqual(len(inventory_batches[0]["requests"]), 2)
+        offer_batches = result["children"]["offers"]
+        self.assertEqual(len(offer_batches), 1)
+        self.assertEqual(len(offer_batches[0]["requests"]), 2)
+        self.assertEqual(result["publish"], {"inventory_item_group_key": self.product.sku})
+        mock_price_run.assert_called_once()
+        mock_ean_run.assert_called()
+
+    @patch(
+        "sales_channels.integrations.ebay.factories.products.products.EbayProductContentUpdateFactory.run"
+    )
+    @patch(
+        "sales_channels.integrations.ebay.factories.products.products.EbayEanCodeUpdateFactory.run",
+        return_value="EAN",
+    )
+    @patch(
+        "sales_channels.integrations.ebay.factories.products.products.EbayPriceUpdateFactory.run"
+    )
+    def test_variation_add_refreshes_group(
+        self,
+        mock_price_run: MagicMock,
+        mock_ean_run: MagicMock,
+        mock_content_run: MagicMock,
+    ) -> None:
+        new_child = self._create_child_product(sku="TEST-SKU-3", name="Child Three")
+        self.children.append(new_child)
+
+        api_mock = MagicMock()
+        api_mock.sell_inventory_create_or_replace_inventory_item.return_value = {"sku": new_child.sku}
+        api_mock.sell_inventory_create_offer.return_value = {"offer_id": "OFFER-NEW"}
+        api_mock.sell_inventory_publish_offer.return_value = {"status": "PUBLISHED"}
+        api_mock.sell_inventory_create_or_replace_inventory_item_group.return_value = {
+            "variant_skus": [child.sku for child in self.children]
+        }
+        api_mock.sell_inventory_publish_offer_by_inventory_item_group.return_value = {
+            "status": "GROUP-PUBLISHED"
+        }
+
+        with patch.object(EbayProductVariationAddFactory, "get_api", return_value=api_mock):
+            factory = EbayProductVariationAddFactory(
+                sales_channel=self.sales_channel,
+                local_instance=new_child,
+                parent_local_instance=self.product,
+                remote_parent_product=self.remote_product,
+                view=self.view,
+            )
+            result = factory.run()
+
+        api_mock.sell_inventory_create_or_replace_inventory_item.assert_called_once()
+        api_mock.sell_inventory_create_offer.assert_called_once()
+        api_mock.sell_inventory_publish_offer.assert_called_once()
+        api_mock.sell_inventory_create_or_replace_inventory_item_group.assert_called_once()
+        api_mock.sell_inventory_publish_offer_by_inventory_item_group.assert_called_once()
+
+        assign = SalesChannelViewAssign.objects.get(product=new_child, sales_channel_view=self.view)
+        self.assertEqual(assign.remote_id, "OFFER-NEW")
+        self.assertEqual(result["group_publish"], {"status": "GROUP-PUBLISHED"})
+        mock_price_run.assert_called_once()
+        mock_ean_run.assert_called()
+        mock_content_run.assert_called_once()
+
+    def test_configurable_delete_clears_offers_and_group(self) -> None:
+        self._prime_remote_state()
+
+        api_mock = MagicMock()
+        api_mock.sell_inventory_withdraw_offer_by_inventory_item_group.return_value = {
+            "status": "WITHDRAWN"
+        }
+        api_mock.sell_inventory_delete_offer.return_value = {}
+        api_mock.sell_inventory_delete_inventory_item_group.return_value = {
+            "status": "REMOVED"
+        }
+        api_mock.sell_inventory_delete_inventory_item.return_value = {}
+
+        with patch.object(EbayProductDeleteFactory, "get_api", return_value=api_mock):
+            factory = EbayProductDeleteFactory(
+                sales_channel=self.sales_channel,
+                local_instance=self.product,
+                view=self.view,
+            )
+            result = factory.run()
+
+        api_mock.sell_inventory_withdraw_offer_by_inventory_item_group.assert_called_once()
+        self.assertEqual(
+            api_mock.sell_inventory_delete_offer.call_count,
+            len(self.children),
+        )
+        self.assertEqual(
+            api_mock.sell_inventory_delete_inventory_item.call_count,
+            len(self.children),
+        )
+        api_mock.sell_inventory_delete_inventory_item_group.assert_called_once()
+
+        for child in self.children:
+            assign = SalesChannelViewAssign.objects.get(product=child, sales_channel_view=self.view)
+            self.assertIsNone(assign.remote_id)
+
+        self.remote_product.refresh_from_db()
+        self.assertIsNone(self.remote_product.remote_id)
+        self.assertEqual(result["withdraw"], {"status": "WITHDRAWN"})
