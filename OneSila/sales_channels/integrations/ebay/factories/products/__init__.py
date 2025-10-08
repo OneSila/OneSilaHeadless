@@ -5,6 +5,13 @@ from .images import (
 )
 from .content import EbayProductContentUpdateFactory
 from .eancodes import EbayEanCodeUpdateFactory
+from .products import (
+    EbayProductBaseFactory,
+    EbayProductCreateFactory,
+    EbayProductDeleteFactory,
+    EbayProductSyncFactory,
+    EbayProductUpdateFactory,
+)
 from .properties import (
     EbayProductPropertyCreateFactory,
     EbayProductPropertyUpdateFactory,
@@ -20,4 +27,9 @@ __all__ = [
     "EbayProductPropertyCreateFactory",
     "EbayProductPropertyUpdateFactory",
     "EbayProductPropertyDeleteFactory",
+    "EbayProductBaseFactory",
+    "EbayProductCreateFactory",
+    "EbayProductUpdateFactory",
+    "EbayProductDeleteFactory",
+    "EbayProductSyncFactory",
 ]

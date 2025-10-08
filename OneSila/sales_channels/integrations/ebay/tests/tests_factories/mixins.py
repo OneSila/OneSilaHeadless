@@ -136,7 +136,7 @@ class EbayProductPushFactoryTestBase(TestCaseEbayMixin):
             type=Property.TYPES.FLOAT,
             multi_tenant_company=self.multi_tenant_company,
         )
-        ProductProperty.objects.create(
+        self.weight_product_property = ProductProperty.objects.create(
             product=self.product,
             property=self.weight_property,
             value_float=2.5,

@@ -22,6 +22,11 @@ from .products import (
     EbayProductPropertyCreateFactory,
     EbayProductPropertyUpdateFactory,
     EbayProductPropertyDeleteFactory,
+    EbayProductBaseFactory,
+    EbayProductCreateFactory,
+    EbayProductUpdateFactory,
+    EbayProductDeleteFactory,
+    EbayProductSyncFactory,
 )
 from .prices import EbayPriceUpdateFactory
 
@@ -45,5 +50,10 @@ __all__ = [
     'EbayProductPropertyCreateFactory',
     'EbayProductPropertyUpdateFactory',
     'EbayProductPropertyDeleteFactory',
+    'EbayProductBaseFactory',
+    'EbayProductCreateFactory',
+    'EbayProductUpdateFactory',
+    'EbayProductDeleteFactory',
+    'EbayProductSyncFactory',
     'EbayPriceUpdateFactory',
 ]
