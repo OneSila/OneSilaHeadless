@@ -114,7 +114,9 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
                 sales_channel=self.sales_channel,
             ).first()
 
-            sku = self._get_sku(product=child)
+            sku = child.sku
+            if remote_child is not None:
+                sku = remote_child.remote_sku or remote_child.remote_id or sku
 
             if remote_child is None:
                 try:
