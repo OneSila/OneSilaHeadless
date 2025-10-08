@@ -26,6 +26,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
     """Utilities for building full eBay inventory item payloads."""
 
     remote_model_class = EbayMediaThroughProduct
+    remote_eancode_update_factory = None
 
     def __init__(self, *args: Any, get_value_only: bool = False, **kwargs: Any) -> None:
         if not hasattr(self, "view") or self.view is None:
@@ -66,6 +67,10 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
 
         if image_urls:
             product_section["image_urls"] = image_urls
+
+        ean_value = self._get_ean_value()
+        if ean_value:
+            product_section["ean"] = ean_value
 
         if title:
             product_section["title"] = title[:80]
@@ -204,6 +209,39 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             if media and media.image_web_url:
                 urls.append(media.image_web_url)
         return urls
+
+    def _get_ean_value(self) -> str | None:
+        if getattr(self, "_ean_factory_marker", False):
+            value = getattr(self, "_ean_value", None)
+            return value or None
+
+        factory_class = getattr(self, "remote_eancode_update_factory", None)
+        if factory_class is None or not getattr(self, "remote_product", None):
+            return None
+
+        remote_instance = factory_class.remote_model_class.objects.filter(
+            remote_product=self.remote_product,
+            sales_channel=self.sales_channel,
+        ).first()
+
+        factory_kwargs: Dict[str, Any] = {
+            "sales_channel": self.sales_channel,
+            "local_instance": self.remote_product.local_instance,
+            "remote_product": self.remote_product,
+            "view": self.view,
+            "get_value_only": True,
+        }
+
+        if remote_instance is not None:
+            factory_kwargs["remote_instance"] = remote_instance
+
+        factory = factory_class(**factory_kwargs)
+        if factory.get_value_only and getattr(factory, "api", None) is None:
+            sentinel = getattr(self, "api", None)
+            factory.api = sentinel if sentinel is not None else object()
+
+        value = factory.run()
+        return value or None
 
     def _get_sku(self, *, product) -> str:
         if getattr(self.remote_product, "remote_sku", None):

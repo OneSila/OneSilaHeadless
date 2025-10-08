@@ -4,6 +4,7 @@ from .images import (
     EbayMediaProductThroughDeleteFactory,
 )
 from .content import EbayProductContentUpdateFactory
+from .eancodes import EbayEanCodeUpdateFactory
 from .properties import (
     EbayProductPropertyCreateFactory,
     EbayProductPropertyUpdateFactory,
@@ -15,6 +16,7 @@ __all__ = [
     "EbayMediaProductThroughUpdateFactory",
     "EbayMediaProductThroughDeleteFactory",
     "EbayProductContentUpdateFactory",
+    "EbayEanCodeUpdateFactory",
     "EbayProductPropertyCreateFactory",
     "EbayProductPropertyUpdateFactory",
     "EbayProductPropertyDeleteFactory",
