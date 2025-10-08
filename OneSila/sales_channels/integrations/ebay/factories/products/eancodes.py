@@ -97,8 +97,14 @@ class EbayEanCodeUpdateFactory(EbayInventoryItemPushMixin, RemoteEanCodeUpdateFa
             self.remote_instance.ean_code = new_value
 
     def run(self):
-        result = super().run()
-        return self._ean_value if self.get_value_only else result
+        if self.get_value_only:
+            if not self.preflight_check():
+                return None
+
+            self.preflight_process()
+            return self._ean_value
+
+        return super().run()
 
 
 EbayInventoryItemPayloadMixin.remote_eancode_update_factory = EbayEanCodeUpdateFactory
