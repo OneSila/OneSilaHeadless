@@ -81,7 +81,7 @@ class EbayEanCodeUpdateFactoryTest(EbayProductPushFactoryTestBase):
         self, _mock_get_api: MagicMock
     ):
         remote_instance = baker.make(
-            "sales_channels.integrations.ebay.EbayEanCode",
+            EbayEanCode,
             remote_product=self.remote_product,
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
@@ -89,13 +89,12 @@ class EbayEanCodeUpdateFactoryTest(EbayProductPushFactoryTestBase):
         )
         self._make_ean(code="9501234567890")
 
-        factory = self._build_factory(get_value_only=True)
-        factory.log_action = MagicMock()
-        factory.log_error = MagicMock()
         factory = self._build_factory(
             get_value_only=True,
             remote_instance=remote_instance,
         )
+        factory.log_action = MagicMock()
+        factory.log_error = MagicMock()
         value = factory.run()
 
         self.assertEqual(value, "9501234567890")

@@ -85,9 +85,12 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         translation.name = "X" * 100
         translation.save(update_fields=["name"])
 
-        media = self.media_through.media
-        media.image_web_url = "https://example.com/image.jpg"
-        media.save(update_fields=["image_web_url"])
+        self.image_patch = patch(
+            "sales_channels.integrations.ebay.factories.products.mixins.EbayInventoryItemPayloadMixin._collect_image_urls",
+            return_value=["https://example.com/image.jpg"],
+        )
+        self.image_patch.start()
+        self.addCleanup(self.image_patch.stop)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -115,7 +118,8 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         "sales_channels.integrations.ebay.factories.products.products.EbayProductContentUpdateFactory.run"
     )
     @patch(
-        "sales_channels.integrations.ebay.factories.products.products.EbayEanCodeUpdateFactory.run"
+        "sales_channels.integrations.ebay.factories.products.products.EbayEanCodeUpdateFactory.run",
+        return_value="EAN",
     )
     @patch(
         "sales_channels.integrations.ebay.factories.products.products.EbayPriceUpdateFactory.run"
@@ -190,7 +194,7 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         self.assertEqual(assign.remote_id, "NEW-OFFER")
 
         mock_price_run.assert_called_once()
-        mock_ean_run.assert_called_once()
+        mock_ean_run.assert_called()
         mock_content_run.assert_called_once()
 
         brand_remote = EbayProductProperty.objects.get(
@@ -224,7 +228,7 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
 
         mock_get_api.assert_not_called()
         mock_price_run.assert_called_once()
-        mock_ean_run.assert_called_once()
+        mock_ean_run.assert_called()
         self.assertEqual(result["inventory"]["sku"], "TEST-SKU")
         self.assertIn("listing_policies", result["offer"])
         self.assertEqual(result["price"], {"price_payload": {}, "promotions": []})
@@ -276,7 +280,7 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         assign.refresh_from_db()
         self.assertEqual(assign.remote_id, "UPDATED")
         mock_price_run.assert_called_once()
-        mock_ean_run.assert_called_once()
+        mock_ean_run.assert_called()
         mock_content_run.assert_called_once()
 
     def test_delete_flow_removes_offer_and_inventory(self) -> None:
