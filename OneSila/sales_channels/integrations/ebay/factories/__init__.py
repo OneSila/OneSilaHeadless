@@ -13,6 +13,15 @@ from .sales_channels import (
 )
 from .imports import EbaySchemaImportProcessor
 from .sync import EbayPropertyRuleItemSyncFactory
+from .products import (
+    EbayMediaProductThroughCreateFactory,
+    EbayMediaProductThroughUpdateFactory,
+    EbayMediaProductThroughDeleteFactory,
+    EbayProductContentUpdateFactory,
+    EbayProductPropertyCreateFactory,
+    EbayProductPropertyUpdateFactory,
+    EbayProductPropertyDeleteFactory,
+)
 
 __all__ = [
     'GetEbayRedirectUrlFactory',
@@ -26,4 +35,11 @@ __all__ = [
     'EbayCategoryNodeRefreshFactory',
     'EbaySchemaImportProcessor',
     'EbayPropertyRuleItemSyncFactory',
+    'EbayMediaProductThroughCreateFactory',
+    'EbayMediaProductThroughUpdateFactory',
+    'EbayMediaProductThroughDeleteFactory',
+    'EbayProductContentUpdateFactory',
+    'EbayProductPropertyCreateFactory',
+    'EbayProductPropertyUpdateFactory',
+    'EbayProductPropertyDeleteFactory',
 ]
