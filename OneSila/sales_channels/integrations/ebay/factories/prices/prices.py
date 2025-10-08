@@ -61,6 +61,12 @@ class EbayPriceUpdateFactory(GetEbayAPIMixin, RemotePriceUpdateFactory):
 
         return bool(self.to_update_currencies)
 
+    def set_api(self) -> None:
+        """Skip API creation when only computing payload values."""
+        if self.get_value_only:
+            return
+        super().set_api()
+
     # ------------------------------------------------------------------
     # Remote helpers
     # ------------------------------------------------------------------

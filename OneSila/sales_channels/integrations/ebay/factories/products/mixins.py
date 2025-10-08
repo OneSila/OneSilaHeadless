@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import date, datetime
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterable, List, Tuple
 
 from django.db.models import Q
 
@@ -100,6 +100,127 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
 
         self._latest_listing_description = listing_description or description
         return payload
+
+    # ------------------------------------------------------------------
+    # Configurable helpers
+    # ------------------------------------------------------------------
+    def is_configurable_parent(self) -> bool:
+        product = getattr(self.remote_product, "local_instance", None)
+        if product is None:
+            return False
+        is_configurable = getattr(product, "is_configurable", None)
+        if callable(is_configurable):
+            return bool(is_configurable())
+        return False
+
+    def get_parent_remote_sku(self) -> str:
+        product = getattr(self.remote_product, "local_instance", None)
+        if product is None:
+            return self.remote_product.remote_sku
+        return product.sku
+
+    def get_child_remote_skus(self) -> List[str]:
+        product = getattr(self.remote_product, "local_instance", None)
+        if product is None or not self.is_configurable_parent():
+            return []
+
+        child_qs = getattr(product, "children", None)
+        if callable(child_qs):  # configurable product proxy
+            child_products = list(child_qs())
+        else:
+            try:
+                from products.models import ConfigurableVariation
+
+                child_products = list(
+                    ConfigurableVariation.objects.filter(parent=product)
+                    .select_related("variation")
+                    .values_list("variation__sku", flat=True)
+                )
+            except Exception:  # pragma: no cover - fallback if relation missing
+                child_products = []
+
+        if not child_products:
+            return []
+
+        return [sku for sku in child_products if sku]
+
+    def _build_inventory_group_payload(self) -> Dict[str, Any]:
+        base_payload = self.build_inventory_payload()
+        product_section = base_payload.get("product", {})
+        product = getattr(self.remote_product, "local_instance", None)
+
+        variant_skus = self.get_child_remote_skus()
+        varies_by = self._build_varies_by_configuration(product=product)
+
+        group_payload: Dict[str, Any] = {
+            "description": product_section.get("description"),
+            "image_urls": product_section.get("image_urls", []),
+            "inventory_item_group_key": self.get_parent_remote_sku(),
+            "subtitle": product_section.get("subtitle"),
+            "title": product_section.get("title"),
+            "variant_skus": variant_skus,
+            "aspects": product_section.get("aspects"),
+        }
+
+        if varies_by:
+            group_payload["varies_by"] = varies_by
+
+        base_payload.pop("sku", None)
+        if "product" in base_payload:
+            del base_payload["product"]
+        base_payload.update(group_payload)
+        return base_payload
+
+    def _build_varies_by_configuration(self, *, product) -> Dict[str, Any] | None:
+        if product is None:
+            return None
+
+        variation_data = self._collect_variation_dimensions(product=product)
+        if not variation_data:
+            return None
+
+        aspects = sorted({name for name, _ in variation_data})
+        specs: List[Dict[str, Any]] = []
+        for name in aspects:
+            values = sorted({value for aspect, value in variation_data if aspect == name})
+            if values:
+                specs.append({"name": name, "values": values})
+
+        if not specs:
+            return None
+
+        return {
+            "aspects_image_varies_by": aspects,
+            "specifications": specs,
+        }
+
+    def _collect_variation_dimensions(self, *, product) -> List[Tuple[str, str]]:
+        try:
+            from products.models import ConfigurableVariation
+        except ImportError:  # pragma: no cover
+            return []
+
+        mappings = ConfigurableVariation.objects.filter(parent=product).select_related("variation")
+        if not mappings:
+            return []
+
+        variation_properties = (
+            product.get_configurator_properties()
+            if hasattr(product, "get_configurator_properties")
+            else []
+        )
+
+        collected: List[Tuple[str, str]] = []
+        for mapping in mappings:
+            variation = getattr(mapping, "variation", None)
+            if variation is None:
+                continue
+            for prop in variation_properties:
+                prop_value = variation.get_property_value(prop)
+                if prop_value in (None, ""):
+                    continue
+                collected.append((prop.name, str(prop_value)))
+        return collected
 
     def get_listing_description(self) -> str | None:
         """Expose the last computed listing description for offer updates."""
@@ -488,12 +609,27 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
         super().__init__(*args, **kwargs)
 
     def send_inventory_payload(self) -> Any:
-        payload = self.build_inventory_payload()
+        is_parent = self.is_configurable_parent()
+        payload = (
+            self._build_inventory_group_payload()
+            if is_parent
+            else self.build_inventory_payload()
+        )
+
         if self.get_value_only:
             return payload
 
         api = getattr(self, "api", None) or self.get_api()
         self.api = api
+
+        if is_parent:
+            return api.sell_inventory_create_or_replace_inventory_item_group(
+                body=payload,
+                content_language=self._get_content_language(),
+                content_type="application/json",
+                inventory_item_group_key=self.get_parent_remote_sku(),
+            )
+
         return api.sell_inventory_create_or_replace_inventory_item(
             body=payload,
             content_language=self._get_content_language(),

@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from model_bakery import baker
 
+from currencies.models import Currency
 from sales_prices.models import SalesPrice
 from sales_channels.integrations.ebay.models.products import EbayPrice
 
@@ -20,15 +21,7 @@ class EbayPriceUpdateFactoryTest(EbayProductPushFactoryTestBase):
         self.sales_channel.starting_stock = 5
         self.sales_channel.save(update_fields=["starting_stock"])
 
-        self.currency = baker.make(
-            "currencies.Currency",
-            iso_code="GBP",
-            name="Pound",
-            symbol="£",
-            exchange_rate=1,
-            is_default_currency=True,
-            multi_tenant_company=self.multi_tenant_company,
-        )
+        self.currency = Currency.objects.get(iso_code="GBP")
         baker.make(
             "sales_channels.RemoteCurrency",
             sales_channel=self.sales_channel,
