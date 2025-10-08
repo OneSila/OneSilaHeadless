@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+
+from django.db import IntegrityError
 
 from sales_channels.factories.products.products import RemoteProductSyncFactory
 from properties.models import ProductProperty
+from products.models import ConfigurableVariation
 
 from sales_channels.integrations.ebay.factories.products.content import (
     EbayProductContentUpdateFactory,
@@ -86,23 +89,128 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
         if getattr(self, "api", None) is None:
             self.api = self.get_api()
 
+    def _is_configurable_product(self) -> bool:
+        product = self.local_instance
+        return bool(product and hasattr(product, "is_configurable") and product.is_configurable())
+
+    def _collect_child_remote_products(self) -> List[EbayProduct]:
+        if not self._is_configurable_product():
+            return []
+
+        parent_remote = getattr(self, "remote_product", None)
+        if parent_remote is None:
+            return []
+
+        child_mappings = ConfigurableVariation.objects.filter(parent=self.local_instance).select_related("variation")
+        remote_children: List[EbayProduct] = []
+
+        for mapping in child_mappings:
+            child = getattr(mapping, "variation", None)
+            if child is None:
+                continue
+
+            remote_child = EbayProduct.objects.filter(
+                local_instance=child,
+                sales_channel=self.sales_channel,
+            ).first()
+
+            sku = self._get_sku(product=child)
+
+            if remote_child is None:
+                try:
+                    remote_child = EbayProduct.objects.create(
+                        multi_tenant_company=self.sales_channel.multi_tenant_company,
+                        sales_channel=self.sales_channel,
+                        local_instance=child,
+                        remote_parent_product=parent_remote,
+                        remote_sku=sku,
+                        remote_id=sku,
+                        is_variation=True,
+                    )
+                except IntegrityError:
+                    remote_child = EbayProduct.objects.filter(
+                        sales_channel=self.sales_channel,
+                        remote_sku=sku,
+                        remote_parent_product=parent_remote,
+                    ).first()
+                    if remote_child is None:
+                        raise
+            else:
+                updates: list[str] = []
+                if remote_child.remote_parent_product_id != parent_remote.id:
+                    remote_child.remote_parent_product = parent_remote
+                    updates.append("remote_parent_product")
+                if remote_child.remote_sku != sku:
+                    remote_child.remote_sku = sku
+                    updates.append("remote_sku")
+                if remote_child.remote_id != sku:
+                    remote_child.remote_id = sku
+                    if "remote_id" not in updates:
+                        updates.append("remote_id")
+                if not remote_child.is_variation:
+                    remote_child.is_variation = True
+                    updates.append("is_variation")
+                if updates:
+                    self._update_remote_product_fields(
+                        remote_product=remote_child,
+                        fields=tuple(updates),
+                    )
+
+            self._ensure_assign(remote_product=remote_child)
+            remote_children.append(remote_child)
+
+        return remote_children
+
+    def _run_configurable_sequence(self) -> Dict[str, Any]:
+        child_remotes = self._collect_child_remote_products()
+
+        children_payloads = {
+            "inventory": self.send_bulk_inventory_payloads(remote_products=child_remotes),
+            "offers": self.send_bulk_offer_payloads(remote_products=child_remotes),
+        }
+
+        group_result = self.send_inventory_payload()
+        publish_result = self.publish_group()
+        extras = self._post_inventory_push()
+
+        result: Dict[str, Any] = {
+            "children": children_payloads,
+            "group": group_result,
+            "publish": publish_result,
+        }
+        if extras:
+            result.update(extras)
+        return result
+
     def _resolve_remote_product(self) -> EbayProduct:
         remote_product = getattr(self, "remote_instance", None)
+        expected_parent = getattr(self, "remote_parent_product", None)
+
         if remote_product is None:
-            remote_product = EbayProduct.objects.filter(
-                local_instance=self.local_instance,
-                sales_channel=self.sales_channel,
-                remote_parent_product__isnull=True,
-            ).first()
+            filter_kwargs = {
+                "local_instance": self.local_instance,
+                "sales_channel": self.sales_channel,
+            }
+            if expected_parent is not None:
+                filter_kwargs["remote_parent_product"] = expected_parent
+            else:
+                filter_kwargs["remote_parent_product__isnull"] = True
+            remote_product = EbayProduct.objects.filter(**filter_kwargs).first()
+
+        if expected_parent is None and remote_product is not None:
+            expected_parent = remote_product.remote_parent_product
 
         created = False
         if remote_product is None:
+            sku = self._get_sku(product=self.local_instance)
             remote_product = EbayProduct.objects.create(
                 multi_tenant_company=self.sales_channel.multi_tenant_company,
                 sales_channel=self.sales_channel,
                 local_instance=self.local_instance,
-                remote_sku=self.local_instance.sku,
-                is_variation=False,
+                remote_parent_product=expected_parent,
+                remote_sku=sku,
+                remote_id=sku,
+                is_variation=expected_parent is not None,
             )
             created = True
 
@@ -113,25 +221,37 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
             remote_product.remote_sku = sku
             updates.append("remote_sku")
 
-        if created or not remote_product.remote_id:
+        if remote_product.remote_id != sku:
             remote_product.remote_id = sku
             if "remote_id" not in updates:
                 updates.append("remote_id")
 
+        if expected_parent is None and remote_product.remote_parent_product_id is not None:
+            remote_product.remote_parent_product = None
+            updates.append("remote_parent_product")
+        elif (
+            expected_parent is not None
+            and remote_product.remote_parent_product_id != expected_parent.id
+        ):
+            remote_product.remote_parent_product = expected_parent
+            updates.append("remote_parent_product")
+
+        is_variation = expected_parent is not None
+        if remote_product.is_variation != is_variation:
+            remote_product.is_variation = is_variation
+            updates.append("is_variation")
+
         if updates:
-            remote_product.save(update_fields=updates)
+            self._update_remote_product_fields(
+                remote_product=remote_product,
+                fields=tuple(updates),
+            )
 
         self.remote_product = remote_product
         self.remote_instance = remote_product
-        self._ensure_assign()
+        self.remote_parent_product = expected_parent
+        self._ensure_assign(remote_product=remote_product)
         return remote_product
-
-    def _ensure_assign(self) -> Optional[SalesChannelViewAssign]:
-        assign = super()._ensure_assign()
-        if assign and assign.remote_product_id != getattr(self.remote_product, "id", None):
-            assign.remote_product = self.remote_product
-            assign.save(update_fields=["remote_product"])
-        return assign
 
     def _post_inventory_push(self) -> None:
         return {
@@ -290,6 +410,9 @@ class EbayProductCreateFactory(EbayProductBaseFactory):
 
         self._resolve_remote_product()
         self.set_api()
+        if self._is_configurable_product():
+            return self._run_configurable_sequence()
+
         inventory_result = self.send_inventory_payload()
 
         if self.get_value_only:
@@ -319,6 +442,9 @@ class EbayProductUpdateFactory(EbayProductBaseFactory):
 
         self._resolve_remote_product()
         self.set_api()
+        if self._is_configurable_product():
+            return self._run_configurable_sequence()
+
         inventory_result = self.send_inventory_payload()
 
         if self.get_value_only:
@@ -349,6 +475,31 @@ class EbayProductDeleteFactory(EbayProductBaseFactory):
         self._resolve_remote_product()
         self.set_api()
 
+        if self._is_configurable_product():
+            child_remotes = self._collect_child_remote_products()
+            withdraw_result = self.withdraw_group()
+            offer_responses = self.delete_offers_for_remote_products(remote_products=child_remotes)
+            group_delete = self.delete_inventory_group()
+            inventory_responses = self.delete_inventory_for_remote_products(remote_products=child_remotes)
+
+            if not self.get_value_only:
+                remote_product = getattr(self, "remote_product", None)
+                if remote_product and getattr(remote_product, "remote_id", None):
+                    remote_product.remote_id = None
+                    self._update_remote_product_fields(
+                        remote_product=remote_product,
+                        fields=("remote_id",),
+                    )
+
+            return {
+                "withdraw": withdraw_result,
+                "children": {
+                    "offers": offer_responses,
+                    "inventory": inventory_responses,
+                },
+                "group": group_delete,
+            }
+
         offer_response = self.delete_offer()
         inventory_response = self.delete_inventory()
 
@@ -356,6 +507,81 @@ class EbayProductDeleteFactory(EbayProductBaseFactory):
             "offer": offer_response,
             "inventory": inventory_response,
         }
+
+
+class EbayProductVariationAddFactory(EbayProductBaseFactory):
+    """Add a new variation to an existing configurable parent."""
+
+    def _resolve_parent_remote_product(self) -> EbayProduct:
+        parent_remote = getattr(self, "remote_parent_product", None)
+        if parent_remote is not None:
+            self._ensure_assign(remote_product=parent_remote)
+            return parent_remote
+
+        parent_local = getattr(self, "parent_local_instance", None)
+        if parent_local is None:
+            raise ValueError("Parent product instance required for variation add")
+
+        parent_remote = EbayProduct.objects.filter(
+            local_instance=parent_local,
+            sales_channel=self.sales_channel,
+            remote_parent_product__isnull=True,
+        ).first()
+
+        if parent_remote is None:
+            sku = self._get_sku(product=parent_local)
+            parent_remote = EbayProduct.objects.create(
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                local_instance=parent_local,
+                remote_sku=sku,
+                remote_id=sku,
+                is_variation=False,
+            )
+
+        self.remote_parent_product = parent_remote
+        self._ensure_assign(remote_product=parent_remote)
+        return parent_remote
+
+    def run(self) -> Optional[Dict[str, Any]]:
+        if not self.preflight_check():
+            return None
+
+        parent_remote = self._resolve_parent_remote_product()
+        self._resolve_remote_product()
+        self.set_api()
+
+        inventory_result = self.send_inventory_payload()
+
+        if self.get_value_only:
+            extras = self._post_inventory_push()
+            with self._use_remote_product(parent_remote):
+                group_payload = self.send_inventory_payload()
+                group_publish = self.publish_group()
+
+            value_only: Dict[str, Any] = {
+                "inventory": inventory_result,
+                "offer": self.build_offer_payload(),
+                "group": group_payload,
+                "group_publish": group_publish,
+            }
+            value_only.update(extras)
+            return value_only
+
+        offer_data = self._run_offer_sequence()
+        extras = self._post_inventory_push()
+
+        with self._use_remote_product(parent_remote):
+            group_result = self.send_inventory_payload()
+            group_publish = self.publish_group()
+
+        result: Dict[str, Any] = {"inventory": inventory_result, "group": group_result, "group_publish": group_publish}
+        result.update(offer_data)
+        result.update(extras)
+        return result
+
+
+EbayProductBaseFactory.add_variation_factory = EbayProductVariationAddFactory
 
 
 class EbayProductSyncFactory(EbayProductBaseFactory):
