@@ -108,6 +108,13 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
 
     remote_model_class = EbayMediaThroughProduct
     remote_eancode_update_factory = None
+    _IDENTIFIER_FIELD_SHAPES: Dict[str, bool] = {
+        "ean": True,
+        "isbn": True,
+        "upc": True,
+        "epid": False,
+        "mpn": False,
+    }
 
     def __init__(self, *args: Any, get_value_only: bool = False, **kwargs: Any) -> None:
         if not hasattr(self, "view") or self.view is None:
@@ -152,8 +159,9 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             product_section["image_urls"] = image_urls
 
         ean_value = self._get_ean_value()
-        if ean_value:
-            product_section["ean"] = ean_value
+        normalized_ean = self._apply_identifier_shape(code="ean", value=ean_value)
+        if normalized_ean:
+            product_section["ean"] = normalized_ean
 
         if title:
             product_section["title"] = title[:80]
@@ -169,7 +177,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         payload: Dict[str, Any] = {
             "sku": self._get_sku(product=product),
             "availability": {
-                "ship_to_location_availability": {
+                "shipToLocationAvailability": {
                     "quantity": self._get_quantity(),
                 }
             },
@@ -424,6 +432,44 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
                 urls.append(media.image_web_url)
         return urls
 
+    def _collect_identifier_entries(self, *, value: Any) -> List[str]:
+        if value in (None, ""):
+            return []
+
+        if isinstance(value, str):
+            candidates: Iterable[Any] = [value]
+        elif isinstance(value, Iterable) and not isinstance(value, (str, bytes, bytearray)):
+            candidates = value
+        else:
+            candidates = [value]
+
+        normalized: List[str] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            if candidate in (None, ""):
+                continue
+            candidate_str = str(candidate).strip()
+            if not candidate_str or candidate_str in seen:
+                continue
+            seen.add(candidate_str)
+            normalized.append(candidate_str)
+
+        return normalized
+
+    def _apply_identifier_shape(self, *, code: str, value: Any) -> Any:
+        expects_list = self._IDENTIFIER_FIELD_SHAPES.get(code)
+        if expects_list is None:
+            return value
+
+        entries = self._collect_identifier_entries(value=value)
+        if expects_list:
+            return entries
+
+        if not entries:
+            return None
+
+        return entries[0]
+
     def _get_ean_value(self) -> str | None:
         if getattr(self, "_ean_factory_marker", False):
             value = getattr(self, "_ean_value", None)
@@ -572,6 +618,8 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             target = root_section if internal_property.is_root else product_section
             self._assign_nested_value(container=target, path=internal_property.code, value=value)
 
+        self._apply_package_unit_defaults(root_section=root_section)
+
     def _render_property_value(
         self,
         *,
@@ -718,11 +766,11 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         value: Any,
     ) -> Any:
         if internal_property.type != Property.TYPES.SELECT:
-            return value
+            return self._apply_identifier_shape(code=internal_property.code, value=value)
 
         options = self._get_internal_property_options(internal_property=internal_property)
         if not options or value in (None, "", []):
-            return value
+            return self._apply_identifier_shape(code=internal_property.code, value=value)
 
         property_type = product_property.property.type
 
@@ -734,7 +782,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
                     None,
                 )
                 if matched_option:
-                    return matched_option.value
+                    return self._apply_identifier_shape(code=internal_property.code, value=matched_option.value)
 
         if property_type == Property.TYPES.MULTISELECT:
             local_values = list(product_property.value_multi_select.all())
@@ -755,14 +803,15 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
                                 raw_value=local_value.value,
                             )
                         )
-                return normalized_values
+                return self._apply_identifier_shape(code=internal_property.code, value=normalized_values)
 
         if isinstance(value, str):
-            return self._match_internal_property_option(
+            matched = self._match_internal_property_option(
                 internal_property=internal_property,
                 options=options,
                 raw_value=value,
             )
+            return self._apply_identifier_shape(code=internal_property.code, value=matched)
 
         if isinstance(value, Iterable) and not isinstance(value, (str, bytes, bytearray)):
             normalized_values: List[str] = []
@@ -774,13 +823,74 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
                 )
                 if matched:
                     normalized_values.append(matched)
-            return normalized_values
+            return self._apply_identifier_shape(code=internal_property.code, value=normalized_values)
 
-        return self._match_internal_property_option(
+        matched = self._match_internal_property_option(
             internal_property=internal_property,
             options=options,
             raw_value=str(value),
         )
+        return self._apply_identifier_shape(code=internal_property.code, value=matched)
+
+    def _extract_listing_details(self, payload: Any) -> tuple[Optional[str], Optional[str]]:
+        if not isinstance(payload, Mapping):
+            return None, None
+
+        listing = payload.get("listing") if isinstance(payload, Mapping) else None
+        if isinstance(listing, Mapping):
+            listing_id = listing.get("listing_id") or listing.get("listingId")
+            listing_status = listing.get("listing_status") or listing.get("listingStatus")
+        else:
+            listing_id = payload.get("listing_id") or payload.get("listingId")
+            listing_status = payload.get("listing_status") or payload.get("listingStatus")
+
+        listing_id_str = str(listing_id).strip() if listing_id else None
+        listing_status_str = str(listing_status).strip() if listing_status else None
+        return listing_id_str or None, listing_status_str or None
+
+    def _update_assign_from_offer_payload(
+        self,
+        *,
+        assign: SalesChannelViewAssign | None,
+        payload: Any,
+    ) -> None:
+        if assign is None or not payload:
+            return
+
+        listing_id, listing_status = self._extract_listing_details(payload)
+
+        fields: list[str] = []
+        if listing_id and assign.listing_id != listing_id:
+            assign.listing_id = listing_id
+            fields.append("listing_id")
+
+        if fields:
+            assign.save(update_fields=fields)
+
+    def _apply_package_unit_defaults(self, *, root_section: Dict[str, Any]) -> None:
+        package_section = root_section.get("packageWeightAndSize")
+        if not isinstance(package_section, dict):
+            return
+
+        dimensions = package_section.get("dimensions")
+        if isinstance(dimensions, dict) and not dimensions.get("unit"):
+            dimensions["unit"] = self._get_dimensions_unit()
+
+        weight_section = package_section.get("weight")
+        if isinstance(weight_section, dict) and not weight_section.get("unit"):
+            weight_section["unit"] = self._get_weight_unit()
+
+    def _get_dimensions_unit(self) -> str:
+        unit = getattr(self.view, "length_unit", None)
+        if not unit:
+            unit = getattr(self.sales_channel, "length_unit", None)
+        return (unit or "CENTIMETER").upper()
+
+    def _get_weight_unit(self) -> str:
+        unit = getattr(self.view, "weight_unit", None)
+        if not unit:
+            unit = getattr(self.sales_channel, "weight_unit", None)
+        return (unit or "KILOGRAM").upper()
 
     def _get_offer_remote_id(self) -> str | None:
         product = getattr(self.remote_product, "local_instance", None)
@@ -890,18 +1000,34 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             self.remote_instance = original_remote_instance
 
     def _get_primary_currency(self) -> Currency | None:
+        view = getattr(self, "view", None)
+        if view is None:
+            return None
+
         remote_currency = (
-            EbayCurrency.objects.filter(sales_channel=self.sales_channel)
+            EbayCurrency.objects.filter(
+                sales_channel=self.sales_channel,
+                sales_channel_view=view,
+            )
             .select_related("local_instance")
             .first()
         )
-        if remote_currency and remote_currency.local_instance:
-            return remote_currency.local_instance
 
-        return Currency.objects.filter(
-            multi_tenant_company=self.sales_channel.multi_tenant_company,
-            is_default_currency=True,
-        ).first()
+        view_label = getattr(view, "name", None) or getattr(view, "remote_id", None) or "the selected eBay marketplace"
+
+        if remote_currency is None:
+            raise PreFlightCheckError(
+                f"No currency configured for {view_label}. Please map the marketplace currency before pushing products."
+            )
+
+        local_currency = getattr(remote_currency, "local_instance", None)
+        if local_currency is None:
+            code = getattr(remote_currency, "remote_code", None) or "the marketplace currency"
+            raise PreFlightCheckError(
+                f"{code} is not linked to a local currency for {view_label}. Please complete the currency mapping and retry."
+            )
+
+        return local_currency
 
     def _build_listing_policies(self) -> Dict[str, Any]:
         if self._listing_policies_cache is not None:
@@ -914,17 +1040,17 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
 
         missing: list[str] = []
         if fulfillment_id:
-            policies["fulfillment_policy_id"] = fulfillment_id
+            policies["fulfillmentPolicyId"] = fulfillment_id
         else:
             missing.append("fulfillment policy")
 
         if payment_id:
-            policies["payment_policy_id"] = payment_id
+            policies["paymentPolicyId"] = payment_id
         else:
             missing.append("payment policy")
 
         if return_id:
-            policies["return_policy_id"] = return_id
+            policies["returnPolicyId"] = return_id
         else:
             missing.append("return policy")
 
@@ -952,7 +1078,16 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
 
         effective_price = discount_price if discount_price is not None else base_price
         if effective_price is None:
-            return {}
+            currency_code = getattr(currency, "iso_code", None) or getattr(currency, "code", None) or "the marketplace currency"
+            sku = getattr(product, "sku", None) or getattr(product, "id", "product")
+            view_label = (
+                getattr(self.view, "name", None)
+                or getattr(self.view, "remote_id", None)
+                or "the selected eBay marketplace"
+            )
+            raise EbayResponseException(
+                f"No {currency_code} price found for SKU {sku} on {view_label}. Please configure a {currency_code} price and retry."
+            )
 
         summary: Dict[str, Any] = {
             "price": {
@@ -966,7 +1101,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             and base_price is not None
             and float(discount_price) != float(base_price)
         ):
-            summary["original_retail_price"] = {
+            summary["originalRetailPrice"] = {
                 "currency": currency.iso_code,
                 "value": float(base_price),
             }
@@ -976,18 +1111,18 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
     def _build_tax_section(self) -> Dict[str, Any]:
         product = getattr(self.remote_product, "local_instance", None)
         vat_rate = getattr(product, "vat_rate", None)
-        tax: Dict[str, Any] = {"apply_tax": False}
+        tax: Dict[str, Any] = {"applyTax": False}
 
         if vat_rate is None:
             return tax
 
         rate = getattr(vat_rate, "rate", None)
         if rate is None:
-            tax["vat_percentage"] = None
+            tax["vatPercentage"] = None
             return tax
 
-        tax["apply_tax"] = True
-        tax["vat_percentage"] = float(rate)
+        tax["applyTax"] = True
+        tax["vatPercentage"] = float(rate)
         return tax
 
     def _get_merchant_location_key(self) -> str | None:
@@ -1000,20 +1135,20 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
     def _build_offer_base_payload(self, *, product) -> Dict[str, Any]:
         return {
             "sku": self._get_sku(product=product),
-            "marketplace_id": getattr(self.view, "remote_id", None),
+            "marketplaceId": getattr(self.view, "remote_id", None),
             "format": "FIXED_PRICE",
-            "listing_duration": self._get_listing_duration(),
+            "listingDuration": self._get_listing_duration(),
         }
 
     def _build_offer_metadata(self) -> Dict[str, Any]:
         metadata: Dict[str, Any] = {}
         listing_description = self.get_listing_description()
         if listing_description:
-            metadata["listing_description"] = listing_description
+            metadata["listingDescription"] = listing_description
 
         merchant_key = self._get_merchant_location_key()
         if merchant_key:
-            metadata["merchant_location_key"] = merchant_key
+            metadata["merchantLocationKey"] = merchant_key
 
         return metadata
 
@@ -1038,12 +1173,12 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
 
         self._apply_offer_section(
             payload=payload,
-            key="listing_policies",
+            key="listingPolicies",
             value=self._build_listing_policies(),
         )
         self._apply_offer_section(
             payload=payload,
-            key="pricing_summary",
+            key="pricingSummary",
             value=self._build_pricing_summary(),
         )
         self._apply_offer_section(
@@ -1060,6 +1195,55 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
                 candidate = response.get(key)
                 if candidate:
                     return str(candidate)
+        return None
+
+    def _extract_offer_id_from_error(self, *, exc: Exception) -> str | None:
+        payload: Any = None
+
+        for attr in ("body", "response_body", "detail", "response_data"):
+            payload = getattr(exc, attr, None)
+            if payload:
+                break
+
+        if isinstance(payload, bytes):
+            try:
+                payload = payload.decode("utf-8", errors="ignore")
+            except Exception:
+                payload = None
+
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except (TypeError, ValueError):
+                payload = None
+
+        if not isinstance(payload, dict):
+            as_dict = getattr(exc, "as_dict", None)
+            if callable(as_dict):
+                try:
+                    payload = as_dict() or None
+                except Exception:
+                    payload = None
+
+        if not isinstance(payload, dict):
+            return None
+
+        errors = payload.get("errors")
+        if isinstance(errors, list):
+            for error in errors:
+                if not isinstance(error, dict):
+                    continue
+                parameters = error.get("parameters")
+                if isinstance(parameters, list):
+                    for param in parameters:
+                        if not isinstance(param, dict):
+                            continue
+                        name = param.get("name")
+                        if name and name.lower() == "offerid":
+                            value = param.get("value")
+                            if value:
+                                return str(value)
+
         return None
 
     def send_offer(self) -> Any:
@@ -1080,15 +1264,29 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
                 content_type="application/json",
             )
         except (EbayApiError, ApiException) as exc:
+            existing_offer_id = self._extract_offer_id_from_error(exc=exc)
+            if existing_offer_id:
+                assign = self._ensure_assign()
+                if assign and assign.remote_id != existing_offer_id:
+                    assign.remote_id = existing_offer_id
+                    self._update_assign_fields(assign=assign, fields=("remote_id",))
+                if assign:
+                    self._update_assign_from_offer_payload(
+                        assign=assign,
+                        payload={"offerId": existing_offer_id},
+                    )
+                return {"offerId": existing_offer_id, "status": "EXISTS"}
+
             message = _extract_ebay_api_error_message(exc=exc)
             raise EbayResponseException(message) from exc
 
+        assign = self._ensure_assign()
         offer_id = self._extract_offer_id(response)
-        if offer_id:
-            assign = self._ensure_assign()
-            if assign and assign.remote_id != offer_id:
+        if assign:
+            if offer_id and assign.remote_id != offer_id:
                 assign.remote_id = offer_id
                 self._update_assign_fields(assign=assign, fields=("remote_id",))
+            self._update_assign_from_offer_payload(assign=assign, payload=response)
 
         return response
 
@@ -1103,10 +1301,16 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         api = getattr(self, "api", None) or self.get_api()
         self.api = api
         try:
-            return api.sell_inventory_publish_offer(offer_id=offer_id)
+            response = api.sell_inventory_publish_offer(offer_id=offer_id)
         except (EbayApiError, ApiException) as exc:
             message = _extract_ebay_api_error_message(exc=exc)
             raise EbayResponseException(message) from exc
+
+        assign = self._ensure_assign()
+        if assign:
+            self._update_assign_from_offer_payload(assign=assign, payload=response)
+
+        return response
 
     def withdraw_offer(self) -> Any:
         offer_id = self._get_offer_remote_id()
@@ -1119,10 +1323,24 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         api = getattr(self, "api", None) or self.get_api()
         self.api = api
         try:
-            return api.sell_inventory_withdraw_offer(offer_id=offer_id)
+            response = api.sell_inventory_withdraw_offer(offer_id=offer_id)
         except (EbayApiError, ApiException) as exc:
             message = _extract_ebay_api_error_message(exc=exc)
             raise EbayResponseException(message) from exc
+
+        assign = self._ensure_assign()
+        if assign:
+            fields: list[str] = []
+            if assign.successfully_created:
+                assign.successfully_created = False
+                fields.append("successfully_created")
+            if assign.listing_id:
+                assign.listing_id = None
+                fields.append("listing_id")
+            if fields:
+                assign.save(update_fields=fields)
+
+        return response
 
     def delete_inventory(self) -> Any:
         product = getattr(self.remote_product, "local_instance", None)
@@ -1170,7 +1388,13 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         assign = self._ensure_assign()
         if assign and assign.remote_id:
             assign.remote_id = None
-            self._update_assign_fields(assign=assign, fields=("remote_id",))
+            fields = ["remote_id"]
+            if assign.listing_id:
+                assign.listing_id = None
+                fields.append("listing_id")
+            assign.successfully_created = False
+            fields.append("successfully_created")
+            self._update_assign_fields(assign=assign, fields=tuple(fields))
 
         return response
 
@@ -1293,13 +1517,16 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
             return
 
         for remote_product, entry in zip(remote_products, entries):
-            offer_id = self._extract_offer_id(entry)
-            if not offer_id:
-                continue
             assign = self._ensure_assign_for_remote(remote_product=remote_product)
-            if assign and assign.remote_id != offer_id:
+            if assign is None:
+                continue
+
+            offer_id = self._extract_offer_id(entry)
+            if offer_id and assign.remote_id != offer_id:
                 assign.remote_id = offer_id
                 self._update_assign_fields(assign=assign, fields=("remote_id",))
+
+            self._update_assign_from_offer_payload(assign=assign, payload=entry if isinstance(entry, Mapping) else {})
 
     def send_bulk_offer_payloads(self, *, remote_products: Sequence[Any]) -> List[Any]:
         remote_products = list(remote_products)
@@ -1348,13 +1575,19 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
         self.api = api
         self._log_api_payload(action="publish_inventory_item_group", payload=payload)
         try:
-            return api.sell_inventory_publish_offer_by_inventory_item_group(
+            response = api.sell_inventory_publish_offer_by_inventory_item_group(
                 body=payload,
                 content_type="application/json",
             )
         except (EbayApiError, ApiException) as exc:
             message = _extract_ebay_api_error_message(exc=exc)
             raise EbayResponseException(message) from exc
+
+        assign = self._ensure_assign()
+        if assign:
+            self._update_assign_from_offer_payload(assign=assign, payload=response)
+
+        return response
 
     def withdraw_group(self) -> Any:
         payload = self._build_group_action_payload()
@@ -1365,13 +1598,27 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
         self.api = api
         self._log_api_payload(action="withdraw_inventory_item_group", payload=payload)
         try:
-            return api.sell_inventory_withdraw_offer_by_inventory_item_group(
+            response = api.sell_inventory_withdraw_offer_by_inventory_item_group(
                 body=payload,
                 content_type="application/json",
             )
         except (EbayApiError, ApiException) as exc:
             message = _extract_ebay_api_error_message(exc=exc)
             raise EbayResponseException(message) from exc
+
+        assign = self._ensure_assign()
+        if assign:
+            fields: list[str] = []
+            if assign.successfully_created:
+                assign.successfully_created = False
+                fields.append("successfully_created")
+            if assign.listing_id:
+                assign.listing_id = None
+                fields.append("listing_id")
+            if fields:
+                assign.save(update_fields=fields)
+
+        return response
 
     def delete_inventory_group(self) -> Any:
         key = self.get_parent_remote_sku()

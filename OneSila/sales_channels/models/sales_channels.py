@@ -157,6 +157,12 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.SET_NULL, null=True,
                                        blank=True, help_text="The remote product associated with this assign.")
     needs_resync = models.BooleanField(default=False, help_text="Indicates if a resync is needed.")
+    listing_id = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="Listing identifier returned by the remote marketplace.",
+    )
 
     objects = SalesChannelViewAssignManager()
 
@@ -182,6 +188,9 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
             AmazonExternalProductId,
             AmazonSalesChannel,
             AmazonSalesChannelView,
+        )
+        from sales_channels.integrations.ebay.models import (
+            EbaySalesChannel,
         )
 
         sales_channel = self.sales_channel.get_real_instance()
@@ -216,6 +225,19 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
                     except AmazonExternalProductId.DoesNotExist:
                         pass
             return None
+        elif isinstance(sales_channel, EbaySalesChannel):
+            listing_id = (self.listing_id or "").strip()
+            base_url = (self.sales_channel_view.url or "").rstrip('/') if self.sales_channel_view else ""
+
+            if sales_channel.environment == EbaySalesChannel.SANDBOX:
+                base_url = "https://sandbox.ebay.com"
+            elif not base_url:
+                base_url = "https://www.ebay.com"
+
+            if listing_id:
+                return f"{base_url.rstrip('/')}/itm/{listing_id}"
+
+            return base_url or None
 
         return f"{self.sales_channel_view.url}{self.product.url_key}.html"
 

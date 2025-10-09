@@ -120,35 +120,209 @@ EBAY_CONDITION_OPTIONS = [
 
 
 EBAY_PACKAGE_TYPE_OPTIONS = [
-    {"value": "LETTER", "label": _("Letter")},
-    {"value": "BULKY_GOODS", "label": _("Bulky Goods")},
-    {"value": "CARAVAN", "label": _("Caravan")},
-    {"value": "CARS", "label": _("Cars")},
-    {"value": "EUROPALLET", "label": _("Euro Pallet")},
-    {"value": "EXPANDABLE_TOUGH_BAGS", "label": _("Expandable Tough Bag")},
-    {"value": "EXTRA_LARGE_PACK", "label": _("Extra Large Pack")},
-    {"value": "FURNITURE", "label": _("Furniture")},
-    {"value": "INDUSTRY_VEHICLES", "label": _("Industry Vehicle")},
-    {"value": "LARGE_CANADA_POSTBOX", "label": _("Large Canada Post Box")},
-    {"value": "LARGE_CANADA_POST_BUBBLE_MAILER", "label": _("Large Canada Post Bubble Mailer")},
-    {"value": "LARGE_ENVELOPE", "label": _("Large Envelope")},
-    {"value": "MAILING_BOX", "label": _("Mailing Box")},
-    {"value": "MEDIUM_CANADA_POST_BOX", "label": _("Medium Canada Post Box")},
-    {"value": "MEDIUM_CANADA_POST_BUBBLE_MAILER", "label": _("Medium Canada Post Bubble Mailer")},
-    {"value": "MOTORBIKES", "label": _("Motorbike")},
-    {"value": "ONE_WAY_PALLET", "label": _("One-way Pallet")},
-    {"value": "PACKAGE_THICK_ENVELOPE", "label": _("Thick Envelope")},
-    {"value": "PADDED_BAGS", "label": _("Padded Bag")},
-    {"value": "PARCEL_OR_PADDED_ENVELOPE", "label": _("Parcel or Padded Envelope")},
-    {"value": "ROLL", "label": _("Roll")},
-    {"value": "SMALL_CANADA_POST_BOX", "label": _("Small Canada Post Box")},
-    {"value": "SMALL_CANADA_POST_BUBBLE_MAILER", "label": _("Small Canada Post Bubble Mailer")},
-    {"value": "TOUGH_BAGS", "label": _("Tough Bag")},
-    {"value": "UPS_LETTER", "label": _("UPS Letter")},
-    {"value": "USPS_FLAT_RATE_ENVELOPE", "label": _("USPS Flat-rate Envelope")},
-    {"value": "USPS_LARGE_PACK", "label": _("USPS Large Pack")},
-    {"value": "VERY_LARGE_PACK", "label": _("Very Large Pack")},
-    {"value": "WINE_PAK", "label": _("Wine Pak")},
+    {
+        "value": "LETTER",
+        "label": _("Letter"),
+        "description": _(
+            "Package type used is a letter."
+        ),
+    },
+    {
+        "value": "BULKY_GOODS",
+        "label": _("Bulky Goods"),
+        "description": _(
+            "Item is considered a bulky good."
+        ),
+    },
+    {
+        "value": "CARAVAN",
+        "label": _("Caravan"),
+        "description": _(
+            "Package type used is a caravan."
+        ),
+    },
+    {
+        "value": "CARS",
+        "label": _("Cars"),
+        "description": _(
+            "Inventory item is a car."
+        ),
+    },
+    {
+        "value": "EUROPALLET",
+        "label": _("Euro Pallet"),
+        "description": _(
+            "Package type used is a Euro pallet."
+        ),
+    },
+    {
+        "value": "EXPANDABLE_TOUGH_BAGS",
+        "label": _("Expandable Tough Bag"),
+        "description": _(
+            "Package type used is an expandable tough bag."
+        ),
+    },
+    {
+        "value": "EXTRA_LARGE_PACK",
+        "label": _("Extra Large Pack"),
+        "description": _(
+            "Package type used is an extra large pack."
+        ),
+    },
+    {
+        "value": "FURNITURE",
+        "label": _("Furniture"),
+        "description": _(
+            "Inventory item is furniture."
+        ),
+    },
+    {
+        "value": "INDUSTRY_VEHICLES",
+        "label": _("Industry Vehicle"),
+        "description": _(
+            "Inventory item is an industry vehicle."
+        ),
+    },
+    {
+        "value": "LARGE_CANADA_POSTBOX",
+        "label": _("Large Canada Post Box"),
+        "description": _(
+            "Package type used is a Canada Post large box."
+        ),
+    },
+    {
+        "value": "LARGE_CANADA_POST_BUBBLE_MAILER",
+        "label": _("Large Canada Post Bubble Mailer"),
+        "description": _(
+            "Package type used is a Canada Post large bubble mailer."
+        ),
+    },
+    {
+        "value": "LARGE_ENVELOPE",
+        "label": _("Large Envelope"),
+        "description": _(
+            "Package type used is a large envelope."
+        ),
+    },
+    {
+        "value": "MAILING_BOX",
+        "label": _("Mailing Box"),
+        "description": _(
+            "Package type used is a standard mailing box."
+        ),
+    },
+    {
+        "value": "MEDIUM_CANADA_POST_BOX",
+        "label": _("Medium Canada Post Box"),
+        "description": _(
+            "Package type used is a medium Canada Post box."
+        ),
+    },
+    {
+        "value": "MEDIUM_CANADA_POST_BUBBLE_MAILER",
+        "label": _("Medium Canada Post Bubble Mailer"),
+        "description": _(
+            "Package type used is a medium Canada Post bubble mailer."
+        ),
+    },
+    {
+        "value": "MOTORBIKES",
+        "label": _("Motorbike"),
+        "description": _(
+            "Inventory item is a motorcycle."
+        ),
+    },
+    {
+        "value": "ONE_WAY_PALLET",
+        "label": _("One-way Pallet"),
+        "description": _(
+            "Package type used is a one-way pallet."
+        ),
+    },
+    {
+        "value": "PACKAGE_THICK_ENVELOPE",
+        "label": _("Thick Envelope"),
+        "description": _(
+            "Package type used is a thick envelope."
+        ),
+    },
+    {
+        "value": "PADDED_BAGS",
+        "label": _("Padded Bag"),
+        "description": _(
+            "Package type used is a padded bag."
+        ),
+    },
+    {
+        "value": "PARCEL_OR_PADDED_ENVELOPE",
+        "label": _("Parcel or Padded Envelope"),
+        "description": _(
+            "Package type used is a parcel or padded envelope."
+        ),
+    },
+    {
+        "value": "ROLL",
+        "label": _("Roll"),
+        "description": _(
+            "Package type used is a roll."
+        ),
+    },
+    {
+        "value": "SMALL_CANADA_POST_BOX",
+        "label": _("Small Canada Post Box"),
+        "description": _(
+            "Package type used is a small Canada Post box."
+        ),
+    },
+    {
+        "value": "SMALL_CANADA_POST_BUBBLE_MAILER",
+        "label": _("Small Canada Post Bubble Mailer"),
+        "description": _(
+            "Package type used is a small Canada Post bubble mailer."
+        ),
+    },
+    {
+        "value": "TOUGH_BAGS",
+        "label": _("Tough Bag"),
+        "description": _(
+            "Package type used is a tough bag."
+        ),
+    },
+    {
+        "value": "UPS_LETTER",
+        "label": _("UPS Letter"),
+        "description": _(
+            "Package type used is a UPS letter."
+        ),
+    },
+    {
+        "value": "USPS_FLAT_RATE_ENVELOPE",
+        "label": _("USPS Flat-rate Envelope"),
+        "description": _(
+            "Package type used is a USPS flat-rate envelope."
+        ),
+    },
+    {
+        "value": "USPS_LARGE_PACK",
+        "label": _("USPS Large Pack"),
+        "description": _(
+            "Package type used is a USPS large pack."
+        ),
+    },
+    {
+        "value": "VERY_LARGE_PACK",
+        "label": _("Very Large Pack"),
+        "description": _(
+            "Package type used is a USPS very large pack."
+        ),
+    },
+    {
+        "value": "WINE_PAK",
+        "label": _("Wine Pak"),
+        "description": _(
+            "Package type used is a wine pak."
+        ),
+    },
 ]
 
 

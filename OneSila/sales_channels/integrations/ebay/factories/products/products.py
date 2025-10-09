@@ -411,30 +411,50 @@ class EbayProductCreateFactory(EbayProductBaseFactory):
         if not self.preflight_check():
             return None
 
-        self._build_listing_policies()
-        self._resolve_remote_product()
         self.set_api()
-        if self._is_configurable_product():
-            return self._run_configurable_sequence()
+        self.set_type()
+        log_identifier, fixing_identifier = self.get_identifiers()
 
-        inventory_result = self.send_inventory_payload()
+        try:
+            self._build_listing_policies()
+            self._resolve_remote_product()
+            self.set_remote_product_for_logging()
+            self.sanity_check()
+            self.precalculate_progress_step_increment(3)
+            self.update_progress()
 
-        if self.get_value_only:
-            extras = self._post_inventory_push()
-            value_only: Dict[str, Any] = {
-                "inventory": inventory_result,
-                "offer": self.build_offer_payload(),
-            }
-            value_only.update(extras)
-            return value_only
+            if self._is_configurable_product():
+                result = self._run_configurable_sequence()
+            else:
+                inventory_result = self.send_inventory_payload()
 
-        offer_data = self._run_offer_sequence()
-        extras = self._post_inventory_push()
+                if self.get_value_only:
+                    extras = self._post_inventory_push()
+                    value_only: Dict[str, Any] = {
+                        "inventory": inventory_result,
+                        "offer": self.build_offer_payload(),
+                    }
+                    value_only.update(extras)
+                    return value_only
 
-        result: Dict[str, Any] = {"inventory": inventory_result}
-        result.update(offer_data)
-        result.update(extras)
-        return result
+                offer_data = self._run_offer_sequence()
+                extras = self._post_inventory_push()
+
+                result = {"inventory": inventory_result}
+                result.update(offer_data)
+                result.update(extras)
+
+            self.update_progress()
+            self.final_process()
+            self.log_action(self.action_log, result or {}, self.payload, log_identifier)
+            return result
+
+        except Exception as exc:
+            self.log_error(exc, self.action_log, log_identifier, self.payload, fixing_identifier)
+            raise
+
+        finally:
+            self.finalize_progress()
 
 
 class EbayProductUpdateFactory(EbayProductBaseFactory):
@@ -444,30 +464,50 @@ class EbayProductUpdateFactory(EbayProductBaseFactory):
         if not self.preflight_check():
             return None
 
-        self._build_listing_policies()
-        self._resolve_remote_product()
         self.set_api()
-        if self._is_configurable_product():
-            return self._run_configurable_sequence()
+        self.set_type()
+        log_identifier, fixing_identifier = self.get_identifiers()
 
-        inventory_result = self.send_inventory_payload()
+        try:
+            self._build_listing_policies()
+            self._resolve_remote_product()
+            self.set_remote_product_for_logging()
+            self.sanity_check()
+            self.precalculate_progress_step_increment(3)
+            self.update_progress()
 
-        if self.get_value_only:
-            extras = self._post_inventory_push()
-            value_only: Dict[str, Any] = {
-                "inventory": inventory_result,
-                "offer": self.build_offer_payload(),
-            }
-            value_only.update(extras)
-            return value_only
+            if self._is_configurable_product():
+                result = self._run_configurable_sequence()
+            else:
+                inventory_result = self.send_inventory_payload()
 
-        offer_data = self._run_offer_sequence()
-        extras = self._post_inventory_push()
+                if self.get_value_only:
+                    extras = self._post_inventory_push()
+                    value_only: Dict[str, Any] = {
+                        "inventory": inventory_result,
+                        "offer": self.build_offer_payload(),
+                    }
+                    value_only.update(extras)
+                    return value_only
 
-        result: Dict[str, Any] = {"inventory": inventory_result}
-        result.update(offer_data)
-        result.update(extras)
-        return result
+                offer_data = self._run_offer_sequence()
+                extras = self._post_inventory_push()
+
+                result = {"inventory": inventory_result}
+                result.update(offer_data)
+                result.update(extras)
+
+            self.update_progress()
+            self.final_process()
+            self.log_action(self.action_log, result or {}, self.payload, log_identifier)
+            return result
+
+        except Exception as exc:
+            self.log_error(exc, self.action_log, log_identifier, self.payload, fixing_identifier)
+            raise
+
+        finally:
+            self.finalize_progress()
 
 
 class EbayProductDeleteFactory(EbayProductBaseFactory):
@@ -477,41 +517,56 @@ class EbayProductDeleteFactory(EbayProductBaseFactory):
         if not self.preflight_check():
             return None
 
-        self._resolve_remote_product()
         self.set_api()
+        self.set_type()
+        log_identifier, fixing_identifier = self.get_identifiers()
 
-        if self._is_configurable_product():
-            child_remotes = self._collect_child_remote_products()
-            withdraw_result = self.withdraw_group()
-            offer_responses = self.delete_offers_for_remote_products(remote_products=child_remotes)
-            group_delete = self.delete_inventory_group()
-            inventory_responses = self.delete_inventory_for_remote_products(remote_products=child_remotes)
+        try:
+            self._resolve_remote_product()
+            self.set_remote_product_for_logging()
+            self.precalculate_progress_step_increment(2)
+            self.update_progress()
 
-            if not self.get_value_only:
-                remote_product = getattr(self, "remote_product", None)
-                if remote_product and getattr(remote_product, "remote_id", None):
-                    remote_product.remote_id = None
-                    self._update_remote_product_fields(
-                        remote_product=remote_product,
-                        fields=("remote_id",),
-                    )
+            if self._is_configurable_product():
+                child_remotes = self._collect_child_remote_products()
+                withdraw_result = self.withdraw_group()
+                offer_responses = self.delete_offers_for_remote_products(remote_products=child_remotes)
+                group_delete = self.delete_inventory_group()
+                inventory_responses = self.delete_inventory_for_remote_products(remote_products=child_remotes)
 
-            return {
-                "withdraw": withdraw_result,
-                "children": {
-                    "offers": offer_responses,
-                    "inventory": inventory_responses,
-                },
-                "group": group_delete,
-            }
+                result = {
+                    "withdraw": withdraw_result,
+                    "children": {
+                        "offers": offer_responses,
+                        "inventory": inventory_responses,
+                    },
+                    "group": group_delete,
+                }
 
-        offer_response = self.delete_offer()
-        inventory_response = self.delete_inventory()
+                if not self.get_value_only:
+                    remote_product = getattr(self, "remote_product", None)
+                    if remote_product and getattr(remote_product, "remote_id", None):
+                        remote_product.remote_id = None
+                        self._update_remote_product_fields(
+                            remote_product=remote_product,
+                            fields=("remote_id",),
+                        )
+            else:
+                offer_response = self.delete_offer()
+                inventory_response = self.delete_inventory()
+                result = {"offer": offer_response, "inventory": inventory_response}
 
-        return {
-            "offer": offer_response,
-            "inventory": inventory_response,
-        }
+            self.update_progress()
+            self.final_process()
+            self.log_action(self.action_log, result or {}, self.payload, log_identifier)
+            return result
+
+        except Exception as exc:
+            self.log_error(exc, self.action_log, log_identifier, self.payload, fixing_identifier)
+            raise
+
+        finally:
+            self.finalize_progress()
 
 
 class EbayProductVariationAddFactory(EbayProductBaseFactory):

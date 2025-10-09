@@ -71,7 +71,7 @@ class EbayEanCodeUpdateFactoryTest(EbayProductPushFactoryTestBase):
 
         api.sell_inventory_create_or_replace_inventory_item.assert_called_once()
         payload = api.sell_inventory_create_or_replace_inventory_item.call_args.kwargs["body"]
-        self.assertEqual(payload["product"]["ean"], "4006381333931")
+        self.assertEqual(payload["product"]["ean"], ["4006381333931"])
 
     @patch(
         "sales_channels.integrations.ebay.factories.mixins.GetEbayAPIMixin.get_api",
