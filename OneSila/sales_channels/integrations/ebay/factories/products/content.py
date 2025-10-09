@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from typing import Any
 
+from ebay_rest.api.sell_inventory.rest import ApiException
+from ebay_rest.error import Error as EbayApiError
+
 from sales_channels.factories.products.content import RemoteProductContentUpdateFactory
 
+from sales_channels.integrations.ebay.exceptions import EbayResponseException
 from sales_channels.integrations.ebay.models.products import EbayProductContent
 
-from .mixins import EbayInventoryItemPushMixin
+from .mixins import EbayInventoryItemPushMixin, _extract_ebay_api_error_message
 
 
 class EbayProductContentUpdateFactory(
@@ -48,10 +52,15 @@ class EbayProductContentUpdateFactory(
 
         api = getattr(self, "api", None) or self.get_api()
         self.api = api
-        api.sell_inventory_update_offer(
-            offer_id=offer_id,
-            body={"listing_description": description},
-            content_language=self._get_content_language(),
-            content_type="application/json",
-        )
-
+        payload = {"listing_description": description}
+        self._log_api_payload(action="update_offer", payload=payload)
+        try:
+            api.sell_inventory_update_offer(
+                offer_id=offer_id,
+                body=payload,
+                content_language=self._get_content_language(),
+                content_type="application/json",
+            )
+        except (EbayApiError, ApiException) as exc:
+            message = _extract_ebay_api_error_message(exc=exc)
+            raise EbayResponseException(message) from exc

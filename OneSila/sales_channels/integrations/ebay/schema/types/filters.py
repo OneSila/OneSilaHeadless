@@ -6,6 +6,7 @@ from sales_channels.integrations.ebay.models import (
     EbayCategory,
     EbaySalesChannel,
     EbayInternalProperty,
+    EbayInternalPropertyOption,
     EbayProductType,
     EbayProductTypeItem,
     EbayProperty,
@@ -93,6 +94,16 @@ class EbayInternalPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilter
             (EbayInternalPropertyQuerySet, "filter_mapped_locally"),
             (EbayPropertySelectValueQuerySet, "filter_ebay_property_mapped_locally"),
         )
+
+
+@filter(EbayInternalPropertyOption)
+class EbayInternalPropertyOptionFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    internal_property: Optional[EbayInternalPropertyFilter]
+    value: auto
+    is_active: auto
+    local_instance: Optional[PropertySelectValueFilter]
 
 
 @filter(EbayPropertySelectValue)

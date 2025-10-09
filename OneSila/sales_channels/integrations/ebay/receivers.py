@@ -1,8 +1,15 @@
 from core.receivers import receiver
 from core.signals import post_create, post_update
-from sales_channels.signals import refresh_website_pull_models, sales_channel_created
+from sales_channels.signals import (
+    refresh_website_pull_models,
+    sales_channel_created,
+    manual_sync_remote_product,
+    create_remote_product,
+    sales_view_assign_updated,
+)
 from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
+    EbayProduct,
     EbayProductType,
     EbayProperty,
     EbayPropertySelectValue,
@@ -16,7 +23,10 @@ from sales_channels.integrations.ebay.factories.sync import (
 from sales_channels.integrations.ebay.tasks import (
     ebay_translate_property_task,
     ebay_translate_select_value_task,
+    create_ebay_product_db_task,
+    resync_ebay_product_db_task,
 )
+from sales_channels.integrations.ebay.flows.tasks_runner import run_single_ebay_product_task_flow
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
 @receiver(refresh_website_pull_models, sender='ebay.EbaySalesChannel')
@@ -91,6 +101,8 @@ def _get_remote_language_code(view):
 
     remote_language = view.remote_languages.first()
     return remote_language.local_instance if remote_language else None
+
+
 @receiver(post_create, sender='ebay.EbayProperty')
 @receiver(post_update, sender='ebay.EbayProperty')
 def sales_channels__ebay_property__translate(sender, instance: EbayProperty, **kwargs):
@@ -130,3 +142,74 @@ def sales_channels__ebay_property_select_value__translate(sender, instance: Ebay
         return
 
     ebay_translate_select_value_task(instance.id)
+
+
+@receiver(manual_sync_remote_product, sender='ebay.EbayProduct')
+def ebay__product__manual_sync(
+    sender,
+    instance: EbayProduct,
+    view=None,
+    force_validation_only: bool = False,
+    force_full_update: bool = False,
+    **kwargs,
+):
+    product = instance.local_instance
+    if product is None:
+        return
+
+    if view is None:
+        return
+
+    resolved_view = view.get_real_instance()
+    sales_channel = resolved_view.sales_channel.get_real_instance()
+
+    if not isinstance(sales_channel, EbaySalesChannel) or not sales_channel.active:
+        return
+
+    count = 1 + getattr(product, 'get_configurable_variations', lambda: [])().count()
+
+    run_single_ebay_product_task_flow(
+        task_func=resync_ebay_product_db_task,
+        view=resolved_view,
+        number_of_remote_requests=count,
+        product_id=product.id,
+        remote_product_id=instance.id,
+    )
+
+
+@receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
+def ebay__product__create_from_assign(sender, instance, view, **kwargs):
+    sales_channel = instance.sales_channel.get_real_instance()
+
+    if not isinstance(sales_channel, EbaySalesChannel) or not sales_channel.active:
+        return
+
+    resolved_view = view.get_real_instance()
+    product = instance.product
+    count = 1 + getattr(product, 'get_configurable_variations', lambda: [])().count()
+
+    run_single_ebay_product_task_flow(
+        task_func=create_ebay_product_db_task,
+        view=resolved_view,
+        number_of_remote_requests=count,
+        product_id=product.id,
+    )
+
+
+@receiver(sales_view_assign_updated, sender='products.Product')
+def ebay__assign__update(sender, instance, sales_channel, view, **kwargs):
+    sales_channel = sales_channel.get_real_instance()
+    is_delete = kwargs.get('is_delete', False)
+
+    if not isinstance(sales_channel, EbaySalesChannel) or not sales_channel.active or is_delete:
+        return
+
+    resolved_view = view.get_real_instance()
+    count = 1 + getattr(instance, 'get_configurable_variations', lambda: [])().count()
+
+    run_single_ebay_product_task_flow(
+        task_func=create_ebay_product_db_task,
+        view=resolved_view,
+        number_of_remote_requests=count,
+        product_id=instance.id,
+    )
