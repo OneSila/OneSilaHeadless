@@ -179,24 +179,26 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         self.assertIsNotNone(offer_call)
         offer_payload = offer_call.kwargs["body"]
         self.assertEqual(offer_payload["sku"], "TEST-SKU")
-        self.assertEqual(offer_payload["marketplace_id"], "EBAY_GB")
-        self.assertEqual(offer_payload["listing_policies"], {
-            "fulfillment_policy_id": "FULFILL-1",
-            "payment_policy_id": "PAY-1",
-            "return_policy_id": "RETURN-1",
+        self.assertEqual(offer_payload["marketplaceId"], "EBAY_GB")
+        self.assertEqual(offer_payload["categoryId"], self.ebay_product_type.remote_id)
+        self.assertEqual(offer_payload["listingPolicies"], {
+            "fulfillmentPolicyId": "FULFILL-1",
+            "paymentPolicyId": "PAY-1",
+            "returnPolicyId": "RETURN-1",
         })
-        self.assertEqual(offer_payload["listing_duration"], "GTC")
-        self.assertEqual(offer_payload["merchant_location_key"], "LOC-1")
+        self.assertEqual(offer_payload["listingDuration"], "GTC")
+        self.assertEqual(offer_payload["merchantLocationKey"], "LOC-1")
         self.assertEqual(
-            offer_payload["pricing_summary"],
+            offer_payload["pricingSummary"],
             {
                 "price": {"currency": "GBP", "value": 95.0},
-                "original_retail_price": {"currency": "GBP", "value": 120.0},
+                "originalRetailPrice": {"currency": "GBP", "value": 120.0},
+                "originallySoldForRetailPriceOn": "OFF_EBAY",
             },
         )
         self.assertEqual(
             offer_payload["tax"],
-            {"apply_tax": True, "vat_percentage": 20.0},
+            {"applyTax": True, "vatPercentage": 20.0},
         )
 
         api_mock.sell_inventory_publish_offer.assert_called_once_with(
@@ -286,12 +288,27 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         self.assertEqual(product_payload.get("epid"), "EPID-456")
 
     @patch(
+        "sales_channels.integrations.ebay.factories.products.products.EbayProductContentUpdateFactory.run",
+        return_value={}
+    )
+    @patch(
+        "sales_channels.integrations.ebay.factories.products.products.EbayEanCodeUpdateFactory.run",
+        return_value="EAN"
+    )
+    @patch(
+        "sales_channels.integrations.ebay.factories.products.products.EbayPriceUpdateFactory.run",
+        return_value={"price_payload": {}, "promotions": []},
+    )
+    @patch(
         "sales_channels.integrations.ebay.factories.products.mixins.EbayInventoryItemPayloadMixin._collect_image_urls",
         return_value=[],
     )
     def test_create_offer_sets_remote_id_on_existing_offer_error(
         self,
         _mock_collect_images,
+        _mock_price_run,
+        _mock_ean_run,
+        _mock_content_run,
     ) -> None:
         api_mock = MagicMock()
         api_mock.sell_inventory_create_or_replace_inventory_item.return_value = {"sku": "TEST-SKU"}
@@ -317,6 +334,8 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
             factory = self._build_create_factory()
             factory.run()
 
+        offer_payload = api_mock.sell_inventory_create_offer.call_args.kwargs["body"]
+        self.assertEqual(offer_payload.get("categoryId"), self.ebay_product_type.remote_id)
         assign = SalesChannelViewAssign.objects.get(
             product=self.product,
             sales_channel_view=self.view,
@@ -345,10 +364,19 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         mock_price_run.assert_called_once()
         mock_ean_run.assert_called()
         self.assertEqual(result["inventory"]["sku"], "TEST-SKU")
-        self.assertIn("listing_policies", result["offer"])
+        self.assertIn("listingPolicies", result["offer"])
+        self.assertEqual(result["offer"].get("categoryId"), self.ebay_product_type.remote_id)
+        self.assertEqual(
+            result["offer"]["pricingSummary"],
+            {
+                "price": {"currency": "GBP", "value": 95.0},
+                "originalRetailPrice": {"currency": "GBP", "value": 120.0},
+                "originallySoldForRetailPriceOn": "OFF_EBAY",
+            },
+        )
         self.assertEqual(result["price"], {"price_payload": {}, "promotions": []})
         self.assertEqual(result["ean"], "EAN-VALUE")
-        self.assertIn("listing_description", result["content"])
+        self.assertIn("listingDescription", result["content"])
         property_map = result["properties"]
         self.assertEqual(property_map[str(self.brand_property.id)], "Acme")
         self.assertEqual(property_map[str(self.weight_property.id)], "2.5")
@@ -540,6 +568,7 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
             type=Product.SIMPLE,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._assign_product_type(child)
         ProductTranslation.objects.create(
             product=child,
             sales_channel=self.sales_channel,
@@ -670,13 +699,21 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
 
         for offer_request in offer_body["requests"]:
             offer = offer_request["offer"]
-            self.assertEqual(offer["listing_policies"], {
-                "fulfillment_policy_id": "FULFILL-1",
-                "payment_policy_id": "PAY-1",
-                "return_policy_id": "RETURN-1",
+            self.assertEqual(offer.get("categoryId"), self.ebay_product_type.remote_id)
+            self.assertEqual(offer["listingPolicies"], {
+                "fulfillmentPolicyId": "FULFILL-1",
+                "paymentPolicyId": "PAY-1",
+                "returnPolicyId": "RETURN-1",
             })
-            self.assertIn("pricing_summary", offer)
-            self.assertEqual(offer["tax"], {"apply_tax": True, "vat_percentage": 20.0})
+            self.assertEqual(
+                offer["pricingSummary"],
+                {
+                    "price": {"currency": "GBP", "value": 95.0},
+                    "originalRetailPrice": {"currency": "GBP", "value": 120.0},
+                    "originallySoldForRetailPriceOn": "OFF_EBAY",
+                },
+            )
+            self.assertEqual(offer["tax"], {"applyTax": True, "vatPercentage": 20.0})
 
         group_body = api_mock.sell_inventory_create_or_replace_inventory_item_group.call_args.kwargs["body"]
         self.assertCountEqual(group_body["variant_skus"], [child.sku for child in self.children])

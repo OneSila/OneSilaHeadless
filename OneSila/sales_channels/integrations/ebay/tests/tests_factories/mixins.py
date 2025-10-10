@@ -7,8 +7,14 @@ from model_bakery import baker
 from core.tests import TransactionTestCase
 from media.models import Media, MediaProductThrough
 from products.models import ProductTranslation
-from properties.models import ProductProperty, Property, PropertySelectValue
+from properties.models import (
+    ProductProperty,
+    Property,
+    PropertySelectValue,
+    ProductPropertiesRule,
+)
 from sales_channels.integrations.ebay.models import EbayProduct, EbaySalesChannel
+from sales_channels.integrations.ebay.models.properties import EbayProductType
 from sales_channels.integrations.ebay.models.properties import (
     EbayInternalProperty,
     EbayProperty,
@@ -45,6 +51,45 @@ class EbayProductPushFactoryTestBase(TestCaseEbayMixin):
 
     def setUp(self):
         super().setUp()
+
+        signal_names = [
+            "create_remote_product",
+            "delete_remote_product",
+            "update_remote_product",
+            "sync_remote_product",
+            "manual_sync_remote_product",
+            "create_remote_product_property",
+            "update_remote_product_property",
+            "delete_remote_product_property",
+            "update_remote_price",
+            "update_remote_product_content",
+            "update_remote_product_eancode",
+            "add_remote_product_variation",
+            "remove_remote_product_variation",
+            "create_remote_image_association",
+            "update_remote_image_association",
+            "delete_remote_image_association",
+            "delete_remote_image",
+            "sales_view_assign_updated",
+        ]
+
+        from sales_channels import signals as sc_signals
+
+        self._signal_patchers = [
+            patch.object(getattr(sc_signals, name), "send", return_value=[])
+            for name in signal_names
+        ]
+        for patcher in self._signal_patchers:
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        api_patcher = patch(
+            "sales_channels.integrations.ebay.factories.products.mixins.GetEbayAPIMixin.get_api",
+            return_value=MagicMock(),
+        )
+        self._api_patcher = api_patcher
+        self._api_patcher.start()
+        self.addCleanup(self._api_patcher.stop)
 
         translate_property_patcher = patch(
             "sales_channels.integrations.ebay.tasks.ebay_translate_property_task"
@@ -152,6 +197,47 @@ class EbayProductPushFactoryTestBase(TestCaseEbayMixin):
             is_root=True,
         )
 
+        self.product_type_property = Property.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            is_product_type=True,
+        ).first()
+        if self.product_type_property is None:
+            self.product_type_property = baker.make(
+                Property,
+                type=Property.TYPES.SELECT,
+                is_product_type=True,
+                multi_tenant_company=self.multi_tenant_company,
+            )
+
+        self.product_type_value = PropertySelectValue.objects.filter(
+            property=self.product_type_property,
+        ).first()
+        if self.product_type_value is None:
+            self.product_type_value = baker.make(
+                PropertySelectValue,
+                property=self.product_type_property,
+                multi_tenant_company=self.multi_tenant_company,
+            )
+
+        self.product_rule, _ = ProductPropertiesRule.objects.update_or_create(
+            product_type=self.product_type_value,
+            multi_tenant_company=self.multi_tenant_company,
+            defaults={"require_ean_code": False},
+        )
+        self._assign_product_type(self.product)
+
+        self.ebay_product_type, _ = EbayProductType.objects.update_or_create(
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            local_instance=self.product_rule,
+            multi_tenant_company=self.multi_tenant_company,
+            defaults={
+                "remote_id": "123456",
+                "name": "Home & Garden",
+            },
+        )
+        self.category_id = self.ebay_product_type.remote_id
+
         self.remote_product = EbayProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
@@ -176,6 +262,16 @@ class EbayProductPushFactoryTestBase(TestCaseEbayMixin):
             media=media,
             sort_order=0,
             multi_tenant_company=self.multi_tenant_company,
+        )
+
+    def _assign_product_type(self, product) -> None:
+        ProductProperty.objects.update_or_create(
+            product=product,
+            property=self.product_type_property,
+            defaults={
+                "multi_tenant_company": self.multi_tenant_company,
+                "value_select": self.product_type_value,
+            },
         )
 
     def _build_image_factory(self, *, get_value_only: bool):

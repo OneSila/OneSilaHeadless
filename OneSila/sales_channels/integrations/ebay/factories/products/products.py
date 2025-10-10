@@ -66,6 +66,7 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
     ) -> None:
         self.view = view
         self.get_value_only = get_value_only
+        self._enable_price_update = True
         super().__init__(
             sales_channel=sales_channel,
             local_instance=local_instance,
@@ -343,7 +344,7 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
             return None
 
         if self.get_value_only:
-            return {"listing_description": self.get_listing_description()}
+            return {"listingDescription": self.get_listing_description()}
 
         remote_model = factory_class.remote_model_class
         remote_instance, _ = remote_model.objects.get_or_create(
@@ -375,6 +376,23 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
             api=self.api,
             get_value_only=self.get_value_only,
         )
+
+        primary_currency = self._get_primary_currency()
+        if primary_currency is not None:
+            factory.limit_to_currency_iso = primary_currency.iso_code
+
+        factory.set_to_update_currencies()
+        has_discount = any(
+            (details.get("discount_price") not in (None, ""))
+            for details in factory.price_data.values()
+        )
+
+        allow_price_update = getattr(self, "_enable_price_update", True) and not self.get_value_only
+        factory.skip_price_update = not allow_price_update
+
+        if not allow_price_update:
+            factory.get_value_only = not has_discount
+
         result = factory.run()
         return getattr(factory, "value", None) or result
 
@@ -406,6 +424,10 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
 
 class EbayProductCreateFactory(EbayProductBaseFactory):
     """Create the remote inventory item and marketplace offer for a product."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._enable_price_update = False
 
     def run(self) -> Optional[Dict[str, Any]]:
         if not self.preflight_check():

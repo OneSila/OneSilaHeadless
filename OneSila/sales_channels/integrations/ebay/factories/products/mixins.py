@@ -24,6 +24,7 @@ from sales_channels.integrations.ebay.models.properties import (
     EbayProductProperty,
     EbayProperty,
     EbayPropertySelectValue,
+    EbayProductType,
 )
 from ebay_rest.api.sell_inventory.rest import ApiException
 from ebay_rest.error import Error as EbayApiError
@@ -1064,6 +1065,32 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         self._listing_policies_cache = policies
         return dict(policies)
 
+    def _get_category_id(self) -> str | None:
+        category_id: str | None = None
+        product = getattr(self.remote_product, "local_instance", None)
+        view = getattr(self, "view", None)
+
+        if product is not None and view is not None and hasattr(product, "get_product_rule"):
+            try:
+                rule = product.get_product_rule()
+            except Exception:  # pragma: no cover - defensive guard
+                rule = None
+
+            if rule is not None:
+                product_type = (
+                    EbayProductType.objects.filter(
+                        sales_channel=self.sales_channel,
+                        marketplace=view,
+                        local_instance=rule,
+                    )
+                    .exclude(remote_id__in=(None, ""))
+                    .first()
+                )
+                if product_type and product_type.remote_id:
+                    category_id = str(product_type.remote_id)
+
+        return category_id if category_id not in (None, "") else None
+
     def _build_pricing_summary(self) -> Dict[str, Any]:
         product = getattr(self.remote_product, "local_instance", None)
         currency = self._get_primary_currency()
@@ -1105,6 +1132,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
                 "currency": currency.iso_code,
                 "value": float(base_price),
             }
+            summary["originallySoldForRetailPriceOn"] = "OFF_EBAY"
 
         return summary
 
@@ -1171,6 +1199,11 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         for key, value in metadata.items():
             self._apply_offer_section(payload=payload, key=key, value=value)
 
+        self._apply_offer_section(
+            payload=payload,
+            key="categoryId",
+            value=self._get_category_id(),
+        )
         self._apply_offer_section(
             payload=payload,
             key="listingPolicies",

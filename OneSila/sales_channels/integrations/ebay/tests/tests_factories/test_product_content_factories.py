@@ -32,7 +32,7 @@ class EbayProductContentUpdateFactoryTest(EbayProductPushFactoryTestBase):
         api.sell_inventory_create_or_replace_inventory_item.assert_called_once()
         api.sell_inventory_update_offer.assert_called_once_with(
             offer_id="OFFER-123",
-            body={"listing_description": "Listing description"},
+            body={"listingDescription": "Listing description"},
             content_language="en-us".replace("_", "-"),
             content_type="application/json",
         )

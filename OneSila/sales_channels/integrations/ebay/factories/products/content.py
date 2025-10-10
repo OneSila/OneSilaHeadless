@@ -52,7 +52,7 @@ class EbayProductContentUpdateFactory(
 
         api = getattr(self, "api", None) or self.get_api()
         self.api = api
-        payload = {"listing_description": description}
+        payload = {"listingDescription": description}
         self._log_api_payload(action="update_offer", payload=payload)
         try:
             api.sell_inventory_update_offer(

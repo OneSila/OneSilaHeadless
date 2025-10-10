@@ -35,6 +35,8 @@ class EbayPriceUpdateFactory(GetEbayAPIMixin, RemotePriceUpdateFactory):
         self.get_value_only = get_value_only
         self.value: Optional[Dict[str, Any]] = None
         self.previous_price_data: Dict[str, Dict[str, Any]] = {}
+        self.limit_to_currency_iso: Optional[str] = None
+        self.skip_price_update: bool = False
 
         super().__init__(
             sales_channel=sales_channel,
@@ -136,6 +138,16 @@ class EbayPriceUpdateFactory(GetEbayAPIMixin, RemotePriceUpdateFactory):
             return language_code.replace("_", "-")
         return "en-US"
 
+    def _get_inventory_sku(self) -> Optional[str]:
+        remote_product = getattr(self, "remote_product", None)
+        if not remote_product:
+            return None
+        sku = getattr(remote_product, "remote_sku", None) or getattr(remote_product, "remote_id", None)
+        if sku:
+            return str(sku)
+        local_instance = getattr(remote_product, "local_instance", None)
+        return getattr(local_instance, "sku", None)
+
     def _build_price_request(
         self,
         *,
@@ -161,22 +173,43 @@ class EbayPriceUpdateFactory(GetEbayAPIMixin, RemotePriceUpdateFactory):
         offer_id: str,
         currency_code: str,
         discount_price: float,
+        base_price: float,
+        inventory_sku: str,
     ) -> Dict[str, Any]:
         start_time = timezone.now().replace(microsecond=0)
         end_time = start_time + timedelta(days=30)
+        amount_off = max(float(base_price) - float(discount_price), 0.0)
+
         return {
-            "marketplace_id": getattr(self.view, "remote_id", None),
-            "offers": [
+            "description": f"Automated markdown for offer {offer_id}",
+            "marketplaceId": getattr(self.view, "remote_id", None),
+            "promotionStatus": "SCHEDULED",
+            "startDate": start_time.isoformat(),
+            "endDate": end_time.isoformat(),
+            "selectedInventoryDiscounts": [
                 {
-                    "offer_id": offer_id,
-                    "markdown_price": {
-                        "currency": currency_code,
-                        "value": discount_price,
+                    "discountBenefit": {
+                        "amountOffItem": {
+                            "currency": currency_code,
+                            "value": round(amount_off, 2),
+                        },
+                        "amountOffOrder": {
+                            "currency": currency_code,
+                            "value": round(amount_off, 2),
+                        },
+                    },
+                    "inventoryCriterion": {
+                        "inventoryCriterionType": "INVENTORY_BY_VALUE",
+                        "inventoryItems": [
+                            {
+                                "inventoryReferenceId": inventory_sku,
+                                "inventoryReferenceType": "SKU",
+                            },
+                        ],
+                        "listingIds": [offer_id],
                     },
                 }
             ],
-            "start_date": start_time.isoformat(),
-            "end_date": end_time.isoformat(),
         }
 
     def _extract_promotion_id(self, response: Any) -> Optional[str]:
@@ -197,70 +230,9 @@ class EbayPriceUpdateFactory(GetEbayAPIMixin, RemotePriceUpdateFactory):
         price_info: Dict[str, Any],
         dry_run: bool,
     ) -> Optional[Dict[str, Any]]:
-        discount_price = price_info.get("discount_price")
-        previous = self.previous_price_data.get(currency_code, {})
-        previous_promotion_id = previous.get("promotion_id")
-
-        if offer_id is None:
-            price_info.pop("promotion_id", None)
-            return None
-
-        if discount_price is None:
-            price_info.pop("promotion_id", None)
-            if previous_promotion_id:
-                if not dry_run:
-                    api.sell_marketing_delete_item_price_markdown_promotion(
-                        promotion_id=previous_promotion_id,
-                    )
-                return {
-                    "action": "delete",
-                    "promotion_id": previous_promotion_id,
-                }
-            return None
-
-        payload = self._build_markdown_payload(
-            offer_id=offer_id,
-            currency_code=currency_code,
-            discount_price=discount_price,
-        )
-
-        if dry_run:
-            if previous_promotion_id:
-                price_info["promotion_id"] = previous_promotion_id
-            return {
-                "action": "update" if previous_promotion_id else "create",
-                "promotion_id": previous_promotion_id,
-                "payload": payload,
-            }
-
-        if previous_promotion_id:
-            response = api.sell_marketing_update_item_price_markdown_promotion(
-                promotion_id=previous_promotion_id,
-                body=payload,
-                content_type="application/json",
-            )
-            promotion_id = self._extract_promotion_id(response) or previous_promotion_id
-            price_info["promotion_id"] = promotion_id
-            return {
-                "action": "update",
-                "promotion_id": promotion_id,
-                "payload": payload,
-            }
-
-        response = api.sell_marketing_create_item_price_markdown_promotion(
-            body=payload,
-            content_type="application/json",
-        )
-        promotion_id = self._extract_promotion_id(response)
-        if promotion_id:
-            price_info["promotion_id"] = promotion_id
-        else:
-            price_info.pop("promotion_id", None)
-        return {
-            "action": "create",
-            "promotion_id": promotion_id,
-            "payload": payload,
-        }
+        # Temporarily disable eBay markdown promotions until full configuration
+        # (name, media, percentage vs amount) is supported across integrations.
+        return None
 
     # ------------------------------------------------------------------
     # Update hook
@@ -307,21 +279,22 @@ class EbayPriceUpdateFactory(GetEbayAPIMixin, RemotePriceUpdateFactory):
             }
             return self.value
 
-        if offer_id is None or not requests:
+        api = getattr(self, "api", None)
+        if api is None:
+            api = self.get_api()
+            self.api = api
+
+        if offer_id is None or not requests or self.skip_price_update:
             self.value = {
                 "price_payload": payload,
                 "promotions": promotions,
             }
-            return []
-
-        api = getattr(self, "api", None) or self.get_api()
-        self.api = api
-
-        response = api.sell_inventory_bulk_update_price_quantity(
-            body=payload,
-            content_language=self._get_content_language(),
-            content_type="application/json",
-        )
+            response = []
+        else:
+            response = api.sell_inventory_bulk_update_price_quantity(
+                body=payload,
+                content_type="application/json",
+            )
 
         for currency_code in self.to_update_currencies:
             price_info = self.price_data.get(currency_code, {})

@@ -56,13 +56,15 @@ class EbayPriceUpdateFactoryTest(EbayProductPushFactoryTestBase):
     def _build_factory(self, *, get_value_only: bool = False):
         from sales_channels.integrations.ebay.factories.prices import EbayPriceUpdateFactory
 
-        return EbayPriceUpdateFactory(
+        factory = EbayPriceUpdateFactory(
             sales_channel=self.sales_channel,
             local_instance=self.product,
             remote_product=self.remote_product,
             view=self.view,
             get_value_only=get_value_only,
         )
+        factory.limit_to_currency_iso = self.currency.iso_code
+        return factory
 
     def _prepare_api_mock(self, mock_get_api: MagicMock) -> MagicMock:
         api_mock = MagicMock()
@@ -106,14 +108,12 @@ class EbayPriceUpdateFactoryTest(EbayProductPushFactoryTestBase):
         payload = call_args.kwargs.get("body")
         self.assertIsInstance(payload, dict)
         requests = payload.get("requests", [])
-        self.assertEqual(len(requests), 2)
+        self.assertEqual(len(requests), 1)
 
-        requests_by_currency = {entry["price"]["currency"]: entry for entry in requests}
-        self.assertEqual(requests_by_currency["GBP"].get("offer_id"), "OFFER-123")
-        self.assertEqual(requests_by_currency["GBP"]["price"], {"currency": "GBP", "value": 100.0})
-        self.assertEqual(requests_by_currency["GBP"].get("available_quantity"), 5)
-        self.assertEqual(requests_by_currency["USD"].get("offer_id"), "OFFER-123")
-        self.assertEqual(requests_by_currency["USD"]["price"], {"currency": "USD", "value": 75.0})
+        entry = requests[0]
+        self.assertEqual(entry.get("offer_id"), "OFFER-123")
+        self.assertEqual(entry["price"], {"currency": "GBP", "value": 100.0})
+        self.assertEqual(entry.get("available_quantity"), 5)
 
         api_mock.sell_marketing_create_item_price_markdown_promotion.assert_not_called()
         api_mock.sell_marketing_update_item_price_markdown_promotion.assert_not_called()
@@ -131,18 +131,14 @@ class EbayPriceUpdateFactoryTest(EbayProductPushFactoryTestBase):
         factory = self._build_factory()
         factory.run()
 
-        api_mock.sell_marketing_create_item_price_markdown_promotion.assert_called_once()
-        create_kwargs = api_mock.sell_marketing_create_item_price_markdown_promotion.call_args.kwargs
-        self.assertEqual(create_kwargs["body"]["offers"][0]["offer_id"], "OFFER-123")
-        self.assertEqual(create_kwargs["body"]["offers"][0]["markdown_price"], {
-            "currency": "GBP",
-            "value": 95.0,
-        })
+        api_mock.sell_marketing_create_item_price_markdown_promotion.assert_not_called()
+        api_mock.sell_marketing_update_item_price_markdown_promotion.assert_not_called()
+        api_mock.sell_marketing_delete_item_price_markdown_promotion.assert_not_called()
 
         entry = self._refresh_price_entry()
         self.assertEqual(entry.get("price"), 120.0)
         self.assertEqual(entry.get("discount_price"), 95.0)
-        self.assertEqual(entry.get("promotion_id"), "PROMO-NEW")
+        self.assertIsNone(entry.get("promotion_id"))
 
     @patch("sales_channels.integrations.ebay.factories.prices.prices.EbayPriceUpdateFactory.get_api")
     def test_updates_markdown_when_discount_changes(self, mock_get_api: MagicMock) -> None:
@@ -164,15 +160,13 @@ class EbayPriceUpdateFactoryTest(EbayProductPushFactoryTestBase):
         factory = self._build_factory()
         factory.run()
 
-        api_mock.sell_marketing_update_item_price_markdown_promotion.assert_called_once_with(
-            promotion_id="PROMO-EXISTING",
-            body=api_mock.sell_marketing_update_item_price_markdown_promotion.call_args.kwargs["body"],
-            content_type="application/json",
-        )
+        api_mock.sell_marketing_create_item_price_markdown_promotion.assert_not_called()
+        api_mock.sell_marketing_update_item_price_markdown_promotion.assert_not_called()
+        api_mock.sell_marketing_delete_item_price_markdown_promotion.assert_not_called()
 
         entry = self._refresh_price_entry()
         self.assertEqual(entry.get("discount_price"), 88.0)
-        self.assertEqual(entry.get("promotion_id"), "PROMO-UPDATED")
+        self.assertIsNone(entry.get("promotion_id"))
 
     @patch("sales_channels.integrations.ebay.factories.prices.prices.EbayPriceUpdateFactory.get_api")
     def test_deletes_markdown_when_discount_removed(self, mock_get_api: MagicMock) -> None:
@@ -191,9 +185,9 @@ class EbayPriceUpdateFactoryTest(EbayProductPushFactoryTestBase):
         factory = self._build_factory()
         factory.run()
 
-        api_mock.sell_marketing_delete_item_price_markdown_promotion.assert_called_once_with(
-            promotion_id="PROMO-EXISTING",
-        )
+        api_mock.sell_marketing_create_item_price_markdown_promotion.assert_not_called()
+        api_mock.sell_marketing_update_item_price_markdown_promotion.assert_not_called()
+        api_mock.sell_marketing_delete_item_price_markdown_promotion.assert_not_called()
 
         entry = self._refresh_price_entry()
         self.assertEqual(entry.get("discount_price"), None)

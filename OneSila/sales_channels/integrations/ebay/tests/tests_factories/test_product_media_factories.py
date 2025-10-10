@@ -34,7 +34,7 @@ class EbayMediaProductThroughCreateFactoryTest(EbayProductPushFactoryTestBase):
         factory = self._build_image_factory(get_value_only=True)
         payload = factory.build_inventory_payload()
 
-        availability = payload["availability"]["ship_to_location_availability"]
+        availability = payload["availability"]["shipToLocationAvailability"]
         self.assertEqual(availability["quantity"], 12)
 
     @patch(

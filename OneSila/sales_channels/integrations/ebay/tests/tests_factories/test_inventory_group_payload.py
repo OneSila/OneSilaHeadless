@@ -27,6 +27,7 @@ class EbayInventoryGroupPayloadTest(EbayProductPushFactoryTestBase):
             type=SIMPLE,
             sku="CHILD-1",
         )
+        self._assign_product_type(self.child_one)
 
         self.child_two = baker.make(
             "products.Product",
@@ -34,6 +35,7 @@ class EbayInventoryGroupPayloadTest(EbayProductPushFactoryTestBase):
             type=SIMPLE,
             sku="CHILD-2",
         )
+        self._assign_product_type(self.child_two)
 
         baker.make(
             "products.ConfigurableVariation",
