@@ -62,11 +62,12 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
         api=None,
         remote_instance=None,
         get_value_only: bool = False,
+        enable_price_update: bool = True,
         **kwargs: Any,
     ) -> None:
         self.view = view
         self.get_value_only = get_value_only
-        self._enable_price_update = True
+        self._enable_price_update = enable_price_update
         super().__init__(
             sales_channel=sales_channel,
             local_instance=local_instance,
@@ -425,9 +426,8 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
 class EbayProductCreateFactory(EbayProductBaseFactory):
     """Create the remote inventory item and marketplace offer for a product."""
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._enable_price_update = False
+    def __init__(self, *, enable_price_update: bool = False, **kwargs) -> None:
+        super().__init__(enable_price_update=enable_price_update, **kwargs)
 
     def run(self) -> Optional[Dict[str, Any]]:
         if not self.preflight_check():
@@ -670,6 +670,9 @@ EbayProductBaseFactory.add_variation_factory = EbayProductVariationAddFactory
 class EbayProductSyncFactory(EbayProductBaseFactory):
     """Dispatch to create or update depending on offer state."""
 
+    def __init__(self, *, enable_price_update: bool = False, **kwargs) -> None:
+        super().__init__(enable_price_update=enable_price_update, **kwargs)
+
     def run(self) -> Optional[Dict[str, Any]]:
         if not self.preflight_check():
             return None
@@ -686,5 +689,6 @@ class EbayProductSyncFactory(EbayProductBaseFactory):
             view=self.view,
             api=self.api,
             get_value_only=self.get_value_only,
+            enable_price_update=self._enable_price_update,
         )
         return factory.run()

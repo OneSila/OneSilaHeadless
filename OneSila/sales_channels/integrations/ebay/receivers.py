@@ -196,20 +196,20 @@ def ebay__product__create_from_assign(sender, instance, view, **kwargs):
     )
 
 
-@receiver(sales_view_assign_updated, sender='products.Product')
-def ebay__assign__update(sender, instance, sales_channel, view, **kwargs):
-    sales_channel = sales_channel.get_real_instance()
-    is_delete = kwargs.get('is_delete', False)
-
-    if not isinstance(sales_channel, EbaySalesChannel) or not sales_channel.active or is_delete:
-        return
-
-    resolved_view = view.get_real_instance()
-    count = 1 + getattr(instance, 'get_configurable_variations', lambda: [])().count()
-
-    run_single_ebay_product_task_flow(
-        task_func=create_ebay_product_db_task,
-        view=resolved_view,
-        number_of_remote_requests=count,
-        product_id=instance.id,
-    )
+# @receiver(sales_view_assign_updated, sender='products.Product')
+# def ebay__assign__update(sender, instance, sales_channel, view, **kwargs):
+#     sales_channel = sales_channel.get_real_instance()
+#     is_delete = kwargs.get('is_delete', False)
+#
+#     if not isinstance(sales_channel, EbaySalesChannel) or not sales_channel.active or is_delete:
+#         return
+#
+#     resolved_view = view.get_real_instance()
+#     count = 1 + getattr(instance, 'get_configurable_variations', lambda: [])().count()
+#
+#     run_single_ebay_product_task_flow(
+#         task_func=create_ebay_product_db_task,
+#         view=resolved_view,
+#         number_of_remote_requests=count,
+#         product_id=instance.id,
+#     )

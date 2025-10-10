@@ -25,6 +25,8 @@ from sales_channels.integrations.ebay.managers import (
 class EbayProperty(RemoteProperty):
     """eBay attribute model holding marketplace specific metadata."""
 
+    allow_multiple = True
+
     marketplace = models.ForeignKey(
         'ebay.EbaySalesChannelView',
         on_delete=models.CASCADE,

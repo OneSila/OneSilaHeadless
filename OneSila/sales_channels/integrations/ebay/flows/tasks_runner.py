@@ -22,6 +22,8 @@ def run_single_ebay_product_task_flow(
         **kwargs,
     }
 
+    print(task_kwargs)
+
     transaction.on_commit(
         lambda lb_task_kwargs=task_kwargs, integration_id=sales_channel.id: add_task_to_queue(
             integration_id=integration_id,

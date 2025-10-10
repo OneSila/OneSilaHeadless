@@ -1288,36 +1288,51 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         api = getattr(self, "api", None) or self.get_api()
         self.api = api
 
-        self._log_api_payload(action="create_offer", payload=payload)
-
-        try:
-            response = api.sell_inventory_create_offer(
-                body=payload,
-                content_language=self._get_content_language(),
-                content_type="application/json",
-            )
-        except (EbayApiError, ApiException) as exc:
-            existing_offer_id = self._extract_offer_id_from_error(exc=exc)
-            if existing_offer_id:
-                assign = self._ensure_assign()
-                if assign and assign.remote_id != existing_offer_id:
-                    assign.remote_id = existing_offer_id
-                    self._update_assign_fields(assign=assign, fields=("remote_id",))
-                if assign:
-                    self._update_assign_from_offer_payload(
-                        assign=assign,
-                        payload={"offerId": existing_offer_id},
-                    )
-                return {"offerId": existing_offer_id, "status": "EXISTS"}
-
-            message = _extract_ebay_api_error_message(exc=exc)
-            raise EbayResponseException(message) from exc
-
         assign = self._ensure_assign()
-        offer_id = self._extract_offer_id(response)
+        offer_id = getattr(assign, "remote_id", None)
+
+        def _update_offer(target_offer_id: str) -> Any:
+            self._log_api_payload(action="update_offer", payload=payload)
+            try:
+                return api.sell_inventory_update_offer(
+                    offer_id=target_offer_id,
+                    body=payload,
+                    content_language=self._get_content_language(),
+                    content_type="application/json",
+                )
+            except (EbayApiError, ApiException) as exc:
+                message = _extract_ebay_api_error_message(exc=exc)
+                raise EbayResponseException(message) from exc
+
+        if offer_id:
+            response = _update_offer(offer_id)
+        else:
+            self._log_api_payload(action="create_offer", payload=payload)
+            try:
+                response = api.sell_inventory_create_offer(
+                    body=payload,
+                    content_language=self._get_content_language(),
+                    content_type="application/json",
+                )
+            except (EbayApiError, ApiException) as exc:
+                existing_offer_id = self._extract_offer_id_from_error(exc=exc)
+                if existing_offer_id:
+                    if assign and assign.remote_id != existing_offer_id:
+                        assign.remote_id = existing_offer_id
+                        self._update_assign_fields(assign=assign, fields=("remote_id",))
+                    response = _update_offer(existing_offer_id)
+                    offer_id = existing_offer_id
+                else:
+                    message = _extract_ebay_api_error_message(exc=exc)
+                    raise EbayResponseException(message) from exc
+
+        assign = assign or self._ensure_assign()
+        response_offer_id = self._extract_offer_id(response)
+        final_offer_id = response_offer_id or offer_id
+
         if assign:
-            if offer_id and assign.remote_id != offer_id:
-                assign.remote_id = offer_id
+            if final_offer_id and assign.remote_id != final_offer_id:
+                assign.remote_id = final_offer_id
                 self._update_assign_fields(assign=assign, fields=("remote_id",))
             self._update_assign_from_offer_payload(assign=assign, payload=response)
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 import json
 from unittest.mock import MagicMock, patch
+from typing import Dict
 
 from model_bakery import baker
 
@@ -328,6 +329,7 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
             }
         )
         api_mock.sell_inventory_create_offer.side_effect = error
+        api_mock.sell_inventory_update_offer.return_value = {"offerId": "9553634010"}
         api_mock.sell_inventory_publish_offer.return_value = {"status": "PUBLISHED"}
 
         with patch.object(EbayProductCreateFactory, "get_api", return_value=api_mock):
@@ -336,6 +338,10 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
 
         offer_payload = api_mock.sell_inventory_create_offer.call_args.kwargs["body"]
         self.assertEqual(offer_payload.get("categoryId"), self.ebay_product_type.remote_id)
+        api_mock.sell_inventory_update_offer.assert_called_once()
+        update_call = api_mock.sell_inventory_update_offer.call_args
+        self.assertEqual(update_call.kwargs.get("offer_id"), "9553634010")
+        self.assertEqual(update_call.kwargs.get("body"), offer_payload)
         assign = SalesChannelViewAssign.objects.get(
             product=self.product,
             sales_channel_view=self.view,
@@ -410,14 +416,17 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
 
         api_mock = MagicMock()
         api_mock.sell_inventory_create_or_replace_inventory_item.return_value = {"sku": "TEST-SKU"}
-        api_mock.sell_inventory_create_offer.return_value = {"offerId": "UPDATED"}
+        api_mock.sell_inventory_update_offer.return_value = {"offerId": "UPDATED"}
         api_mock.sell_inventory_publish_offer.return_value = {"status": "UPDATED"}
 
         with patch.object(EbayProductUpdateFactory, "get_api", return_value=api_mock):
             factory = self._build_update_factory()
             factory.run()
 
-        api_mock.sell_inventory_create_offer.assert_called_once()
+        api_mock.sell_inventory_create_offer.assert_not_called()
+        api_mock.sell_inventory_update_offer.assert_called_once()
+        update_call = api_mock.sell_inventory_update_offer.call_args
+        self.assertEqual(update_call.kwargs.get("offer_id"), "EXISTING")
         api_mock.sell_inventory_publish_offer.assert_called_once_with(offer_id="UPDATED")
 
         assign.refresh_from_db()
@@ -491,6 +500,33 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
 
         mock_update_run.assert_called_once()
         mock_create_run.assert_not_called()
+
+    def test_sync_disables_price_update_during_resync(self) -> None:
+        assign = SalesChannelViewAssign.objects.get(
+            product=self.product,
+            sales_channel_view=self.view,
+        )
+        SalesChannelViewAssign.objects.filter(pk=assign.pk).update(remote_id="HAS-OFFER")
+        assign.refresh_from_db()
+
+        captured: Dict[str, bool] = {}
+        original_init = EbayProductUpdateFactory.__init__
+
+        def capture_init(self, *, enable_price_update: bool = True, **kwargs) -> None:
+            captured["enable_price_update"] = enable_price_update
+            original_init(self, enable_price_update=enable_price_update, **kwargs)
+
+        with patch.object(EbayProductUpdateFactory, "run", MagicMock(return_value=None)):
+            with patch.object(EbayProductUpdateFactory, "__init__", capture_init):
+                factory = EbayProductSyncFactory(
+                    sales_channel=self.sales_channel,
+                    local_instance=self.product,
+                    view=self.view,
+                )
+                factory.run()
+
+        self.assertIn("enable_price_update", captured)
+        self.assertFalse(captured["enable_price_update"])
 
 
 class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
