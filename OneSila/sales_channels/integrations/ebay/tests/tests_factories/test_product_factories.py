@@ -24,7 +24,7 @@ from sales_channels.integrations.ebay.factories.products import (
 )
 from sales_channels.integrations.ebay.models.properties import EbayProductProperty, EbayInternalProperty
 from sales_channels.integrations.ebay.models.taxes import EbayCurrency
-from sales_channels.models.sales_channels import SalesChannelViewAssign
+from sales_channels.integrations.ebay.models.products import EbayProductOffer, EbayProduct
 from sales_channels.exceptions import PreFlightCheckError
 
 from .mixins import EbayProductPushFactoryTestBase
@@ -80,12 +80,12 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         )
         self.view.refresh_from_db()
 
-        assign = SalesChannelViewAssign.objects.get(
-            product=self.product,
+        offer = EbayProductOffer.objects.get(
+            remote_product=self.remote_product,
             sales_channel_view=self.view,
         )
-        SalesChannelViewAssign.objects.filter(pk=assign.pk).update(remote_id=None)
-        assign.refresh_from_db()
+        EbayProductOffer.objects.filter(pk=offer.pk).update(remote_id=None)
+        offer.refresh_from_db()
 
         type(self.view).objects.filter(pk=self.view.pk).update(
             fulfillment_policy_id="FULFILL-1",
@@ -206,11 +206,11 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
             offer_id="NEW-OFFER",
         )
 
-        assign = SalesChannelViewAssign.objects.get(
-            product=self.product,
+        offer = EbayProductOffer.objects.get(
+            remote_product=self.remote_product,
             sales_channel_view=self.view,
         )
-        self.assertEqual(assign.remote_id, "NEW-OFFER")
+        self.assertEqual(offer.remote_id, "NEW-OFFER")
 
         mock_price_run.assert_called_once()
         mock_ean_run.assert_called()
@@ -342,11 +342,11 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         update_call = api_mock.sell_inventory_update_offer.call_args
         self.assertEqual(update_call.kwargs.get("offer_id"), "9553634010")
         self.assertEqual(update_call.kwargs.get("body"), offer_payload)
-        assign = SalesChannelViewAssign.objects.get(
-            product=self.product,
+        offer = EbayProductOffer.objects.get(
+            remote_product=self.remote_product,
             sales_channel_view=self.view,
         )
-        self.assertEqual(assign.remote_id, "9553634010")
+        self.assertEqual(offer.remote_id, "9553634010")
         api_mock.sell_inventory_publish_offer.assert_called_once_with(offer_id="9553634010")
 
     @patch(
@@ -357,7 +357,7 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         "sales_channels.integrations.ebay.factories.products.products.EbayPriceUpdateFactory.run",
         return_value={"price_payload": {}, "promotions": []},
     )
-    def test_get_value_only_returns_payloads(
+    def test_ean_code_factory_get_value_only_returns_payloads(
         self,
         mock_price_run: MagicMock,
         mock_ean_run: MagicMock,
@@ -386,11 +386,11 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         property_map = result["properties"]
         self.assertEqual(property_map[str(self.brand_property.id)], "Acme")
         self.assertEqual(property_map[str(self.weight_property.id)], "2.5")
-        assign = SalesChannelViewAssign.objects.get(
-            product=self.product,
+        offer = EbayProductOffer.objects.get(
+            remote_product=self.remote_product,
             sales_channel_view=self.view,
         )
-        self.assertIsNone(assign.remote_id)
+        self.assertIsNone(offer.remote_id)
 
     @patch(
         "sales_channels.integrations.ebay.factories.products.products.EbayProductContentUpdateFactory.run"
@@ -407,12 +407,12 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         mock_ean_run: MagicMock,
         mock_content_run: MagicMock,
     ) -> None:
-        assign = SalesChannelViewAssign.objects.get(
-            product=self.product,
+        offer = EbayProductOffer.objects.get(
+            remote_product=self.remote_product,
             sales_channel_view=self.view,
         )
-        SalesChannelViewAssign.objects.filter(pk=assign.pk).update(remote_id="EXISTING")
-        assign.refresh_from_db()
+        EbayProductOffer.objects.filter(pk=offer.pk).update(remote_id="EXISTING")
+        offer.refresh_from_db()
 
         api_mock = MagicMock()
         api_mock.sell_inventory_create_or_replace_inventory_item.return_value = {"sku": "TEST-SKU"}
@@ -429,19 +429,19 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         self.assertEqual(update_call.kwargs.get("offer_id"), "EXISTING")
         api_mock.sell_inventory_publish_offer.assert_called_once_with(offer_id="UPDATED")
 
-        assign.refresh_from_db()
-        self.assertEqual(assign.remote_id, "UPDATED")
+        offer.refresh_from_db()
+        self.assertEqual(offer.remote_id, "UPDATED")
         mock_price_run.assert_called_once()
         mock_ean_run.assert_called()
         mock_content_run.assert_called_once()
 
     def test_delete_flow_removes_offer_and_inventory(self) -> None:
-        assign = SalesChannelViewAssign.objects.get(
-            product=self.product,
+        offer = EbayProductOffer.objects.get(
+            remote_product=self.remote_product,
             sales_channel_view=self.view,
         )
-        SalesChannelViewAssign.objects.filter(pk=assign.pk).update(remote_id="TO-DELETE")
-        assign.refresh_from_db()
+        EbayProductOffer.objects.filter(pk=offer.pk).update(remote_id="TO-DELETE")
+        offer.refresh_from_db()
 
         api_mock = MagicMock()
         api_mock.sell_inventory_delete_offer.return_value = {}
@@ -458,18 +458,18 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         api_mock.sell_inventory_delete_offer.assert_called_once_with(offer_id="TO-DELETE")
         api_mock.sell_inventory_delete_inventory_item.assert_called_once_with(sku="TEST-SKU")
 
-        assign.refresh_from_db()
-        self.assertIsNone(assign.remote_id)
+        offer.refresh_from_db()
+        self.assertIsNone(offer.remote_id)
 
     @patch("sales_channels.integrations.ebay.factories.products.products.EbayProductUpdateFactory.run")
     @patch("sales_channels.integrations.ebay.factories.products.products.EbayProductCreateFactory.run")
     def test_sync_dispatches_to_create(self, mock_create_run: MagicMock, mock_update_run: MagicMock) -> None:
-        assign = SalesChannelViewAssign.objects.get(
-            product=self.product,
+        offer = EbayProductOffer.objects.get(
+            remote_product=self.remote_product,
             sales_channel_view=self.view,
         )
-        SalesChannelViewAssign.objects.filter(pk=assign.pk).update(remote_id=None)
-        assign.refresh_from_db()
+        EbayProductOffer.objects.filter(pk=offer.pk).update(remote_id=None)
+        offer.refresh_from_db()
 
         factory = EbayProductSyncFactory(
             sales_channel=self.sales_channel,
@@ -484,12 +484,12 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
     @patch("sales_channels.integrations.ebay.factories.products.products.EbayProductUpdateFactory.run")
     @patch("sales_channels.integrations.ebay.factories.products.products.EbayProductCreateFactory.run")
     def test_sync_dispatches_to_update(self, mock_create_run: MagicMock, mock_update_run: MagicMock) -> None:
-        assign = SalesChannelViewAssign.objects.get(
-            product=self.product,
+        offer = EbayProductOffer.objects.get(
+            remote_product=self.remote_product,
             sales_channel_view=self.view,
         )
-        SalesChannelViewAssign.objects.filter(pk=assign.pk).update(remote_id="HAS-OFFER")
-        assign.refresh_from_db()
+        EbayProductOffer.objects.filter(pk=offer.pk).update(remote_id="HAS-OFFER")
+        offer.refresh_from_db()
 
         factory = EbayProductSyncFactory(
             sales_channel=self.sales_channel,
@@ -502,12 +502,12 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         mock_create_run.assert_not_called()
 
     def test_sync_disables_price_update_during_resync(self) -> None:
-        assign = SalesChannelViewAssign.objects.get(
-            product=self.product,
+        offer = EbayProductOffer.objects.get(
+            remote_product=self.remote_product,
             sales_channel_view=self.view,
         )
-        SalesChannelViewAssign.objects.filter(pk=assign.pk).update(remote_id="HAS-OFFER")
-        assign.refresh_from_db()
+        EbayProductOffer.objects.filter(pk=offer.pk).update(remote_id="HAS-OFFER")
+        offer.refresh_from_db()
 
         captured: Dict[str, bool] = {}
         original_init = EbayProductUpdateFactory.__init__
@@ -572,8 +572,8 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
         self.product.type = Product.CONFIGURABLE
         self.product.save(update_fields=["vat_rate", "type"])
 
-        SalesChannelViewAssign.objects.filter(
-            product=self.product,
+        EbayProductOffer.objects.filter(
+            remote_product=self.remote_product,
             sales_channel_view=self.view,
         ).update(remote_id=None)
 
@@ -679,7 +679,7 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
     @patch(
         "sales_channels.integrations.ebay.factories.products.mixins.EbayInventoryItemPayloadMixin._build_varies_by_configuration",
         return_value={
-            "aspects_image_varies_by": ["Size"],
+            "aspectsImageVariesBy": ["Size"],
             "specifications": [{"name": "Size", "values": ["Child One", "Child Two"]}],
         },
     )
@@ -752,15 +752,22 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
             self.assertEqual(offer["tax"], {"applyTax": True, "vatPercentage": 20.0})
 
         group_body = api_mock.sell_inventory_create_or_replace_inventory_item_group.call_args.kwargs["body"]
-        self.assertCountEqual(group_body["variant_skus"], [child.sku for child in self.children])
-        self.assertEqual(group_body["varies_by"], mock_varies.return_value)
+        self.assertCountEqual(group_body["variantSKUs"], [child.sku for child in self.children])
+        self.assertEqual(group_body["variesBy"], mock_varies.return_value)
 
         publish_body = api_mock.sell_inventory_publish_offer_by_inventory_item_group.call_args.kwargs["body"]
         self.assertEqual(publish_body, {"inventory_item_group_key": self.product.sku})
 
         for idx, child in enumerate(self.children, start=1):
-            assign = SalesChannelViewAssign.objects.get(product=child, sales_channel_view=self.view)
-            self.assertEqual(assign.remote_id, f"OFFER-{child.sku}")
+            remote_child = EbayProduct.objects.get(
+                local_instance=child,
+                sales_channel=self.sales_channel,
+            )
+            offer = EbayProductOffer.objects.get(
+                remote_product=remote_child,
+                sales_channel_view=self.view,
+            )
+            self.assertEqual(offer.remote_id, f"OFFER-{child.sku}")
 
         self.assertIn("children", result)
         self.assertEqual(result["publish"], {"status": "PUBLISHED"})
@@ -818,7 +825,7 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
         api_mock.sell_inventory_create_offer.return_value = {"offer_id": "OFFER-NEW"}
         api_mock.sell_inventory_publish_offer.return_value = {"status": "PUBLISHED"}
         api_mock.sell_inventory_create_or_replace_inventory_item_group.return_value = {
-            "variant_skus": [child.sku for child in self.children]
+            "variantSKUs": [child.sku for child in self.children]
         }
         api_mock.sell_inventory_publish_offer_by_inventory_item_group.return_value = {
             "status": "GROUP-PUBLISHED"
@@ -840,8 +847,15 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
         api_mock.sell_inventory_create_or_replace_inventory_item_group.assert_called_once()
         api_mock.sell_inventory_publish_offer_by_inventory_item_group.assert_called_once()
 
-        assign = SalesChannelViewAssign.objects.get(product=new_child, sales_channel_view=self.view)
-        self.assertEqual(assign.remote_id, "OFFER-NEW")
+        remote_new_child = EbayProduct.objects.get(
+            local_instance=new_child,
+            sales_channel=self.sales_channel,
+        )
+        offer = EbayProductOffer.objects.get(
+            remote_product=remote_new_child,
+            sales_channel_view=self.view,
+        )
+        self.assertEqual(offer.remote_id, "OFFER-NEW")
         self.assertEqual(result["group_publish"], {"status": "GROUP-PUBLISHED"})
         mock_price_run.assert_called_once()
         mock_ean_run.assert_called()
@@ -880,8 +894,15 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
         api_mock.sell_inventory_delete_inventory_item_group.assert_called_once()
 
         for child in self.children:
-            assign = SalesChannelViewAssign.objects.get(product=child, sales_channel_view=self.view)
-            self.assertIsNone(assign.remote_id)
+            remote_child = EbayProduct.objects.get(
+                local_instance=child,
+                sales_channel=self.sales_channel,
+            )
+            offer = EbayProductOffer.objects.get(
+                remote_product=remote_child,
+                sales_channel_view=self.view,
+            )
+            self.assertIsNone(offer.remote_id)
 
         self.remote_product.refresh_from_db()
         self.assertIsNone(self.remote_product.remote_id)

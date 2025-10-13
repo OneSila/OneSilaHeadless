@@ -14,11 +14,14 @@ from currencies.models import Currency
 from media.models import Media, MediaProductThrough
 from products.models import ProductTranslation
 from properties.models import ProductProperty, Property
-from sales_channels.models.sales_channels import SalesChannelViewAssign
-
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
 from sales_channels.factories.mixins import PreFlightCheckError
-from sales_channels.integrations.ebay.models.products import EbayMediaThroughProduct
+from sales_channels.models.sales_channels import SalesChannelViewAssign
+
+from sales_channels.integrations.ebay.models.products import (
+    EbayMediaThroughProduct,
+    EbayProductOffer,
+)
 from sales_channels.integrations.ebay.models.properties import (
     EbayInternalProperty,
     EbayProductProperty,
@@ -171,7 +174,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         if description:
             product_section["description"] = description
         if language_code:
-            product_section["locale"] = language_code.replace("_", "-")
+            product_section["locale"] = self._get_content_language()
         if aspects:
             product_section["aspects"] = aspects
 
@@ -246,32 +249,79 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
 
         return [sku for sku in child_products if sku]
 
+    def _get_configurable_child_products(self, *, product) -> List[Any]:
+        if product is None or not self.is_configurable_parent():
+            return []
+
+        try:
+            from products.models import ConfigurableVariation
+        except ImportError:  # pragma: no cover
+            return []
+
+        child_products: List[Any] = []
+        for mapping in ConfigurableVariation.objects.filter(parent=product).select_related("variation"):
+            variation = getattr(mapping, "variation", None)
+            if variation is not None:
+                child_products.append(variation)
+
+        return child_products
+
     def _build_inventory_group_payload(self) -> Dict[str, Any]:
         base_payload = self.build_inventory_payload()
         product_section = base_payload.get("product", {})
         product = getattr(self.remote_product, "local_instance", None)
 
         variant_skus = self.get_child_remote_skus()
+        child_products = self._get_configurable_child_products(product=product)
+        variation_aspects = (
+            self._collect_variation_aspect_values(
+                product=product,
+                child_products=child_products,
+            )
+            if product
+            else {}
+        )
         varies_by = self._build_varies_by_configuration(product=product)
+        common_child_aspects = self._collect_common_child_aspects(
+            child_products=child_products,
+            language_code=self._get_language_code(),
+        )
 
         group_payload: Dict[str, Any] = {
             "description": product_section.get("description"),
-            "image_urls": product_section.get("image_urls", []),
-            "inventory_item_group_key": self.get_parent_remote_sku(),
+            "imageUrls": product_section.get("image_urls", []),
+            "inventoryItemGroupKey": self.get_parent_remote_sku(),
             "subtitle": product_section.get("subtitle"),
             "title": product_section.get("title"),
-            "variant_skus": variant_skus,
-            "aspects": product_section.get("aspects"),
+            "variantSKUs": variant_skus,
         }
 
-        if varies_by:
-            group_payload["varies_by"] = varies_by
+        combined_aspects: Dict[str, List[str]] = {}
 
-        base_payload.pop("sku", None)
-        if "product" in base_payload:
-            del base_payload["product"]
-        base_payload.update(group_payload)
-        return base_payload
+        parent_aspects = product_section.get("aspects")
+        if isinstance(parent_aspects, Mapping):
+            for name, value in parent_aspects.items():
+                if isinstance(value, list):
+                    cleaned = [str(entry) for entry in value if entry not in (None, "")]
+                    if cleaned:
+                        combined_aspects[name] = cleaned
+                elif value not in (None, ""):
+                    combined_aspects[name] = [str(value)]
+
+        for name, values in common_child_aspects.items():
+            combined_aspects[name] = values
+
+        for name, values in variation_aspects.items():
+            if len(values) == 1 and name not in combined_aspects:
+                combined_aspects[name] = [next(iter(sorted(values)))]
+
+        if combined_aspects:
+            group_payload["aspects"] = combined_aspects
+
+        if varies_by:
+            group_payload["variesBy"] = varies_by
+
+        return group_payload
 
     def _build_varies_by_configuration(self, *, product) -> Dict[str, Any] | None:
         if product is None:
@@ -292,37 +342,171 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             return None
 
         return {
-            "aspects_image_varies_by": aspects,
+            "aspectsImageVariesBy": aspects,
             "specifications": specs,
         }
 
-    def _collect_variation_dimensions(self, *, product) -> List[Tuple[str, str]]:
-        try:
-            from products.models import ConfigurableVariation
-        except ImportError:  # pragma: no cover
-            return []
+    def _format_variation_value(
+        self,
+        *,
+        property_obj: Property,
+        product_property: ProductProperty,
+        language_code: str | None,
+    ) -> str | None:
+        if property_obj.type == Property.TYPES.SELECT:
+            select_value = getattr(product_property, "value_select", None)
+            if select_value is None:
+                return None
+            if language_code:
+                translated = select_value.value_by_language_code(language=language_code)
+                if translated not in (None, ""):
+                    return str(translated)
+            return str(select_value.value or "") or None
 
-        mappings = ConfigurableVariation.objects.filter(parent=product).select_related("variation")
-        if not mappings:
-            return []
+        if property_obj.type == Property.TYPES.MULTISELECT:
+            values: list[str] = []
+            for select_value in product_property.value_multi_select.all():
+                if language_code:
+                    translated = select_value.value_by_language_code(language=language_code)
+                    if translated not in (None, ""):
+                        values.append(str(translated))
+                        continue
+                raw_value = select_value.value
+                if raw_value not in (None, ""):
+                    values.append(str(raw_value))
+            if not values:
+                return None
+            return ", ".join(sorted(values))
 
-        variation_properties = (
+        raw_value = product_property.get_value()
+        if isinstance(raw_value, str):
+            raw_value = raw_value.strip()
+        return str(raw_value) if raw_value not in (None, "") else None
+
+    def _collect_variation_aspect_values(
+        self,
+        *,
+        product,
+        child_products: Sequence[Any] | None = None,
+    ) -> Dict[str, set[str]]:
+        if child_products is None:
+            child_products = self._get_configurable_child_products(product=product)
+
+        if not child_products:
+            return {}
+
+        variation_properties = list(
             product.get_configurator_properties()
             if hasattr(product, "get_configurator_properties")
             else []
         )
 
-        collected: List[Tuple[str, str]] = []
-        for mapping in mappings:
-            variation = getattr(mapping, "variation", None)
-            if variation is None:
-                continue
-            for prop in variation_properties:
-                prop_value = variation.get_property_value(prop)
-                if prop_value in (None, ""):
+        if not variation_properties:
+            return {}
+
+        language_code = self._get_language_code()
+        collected_values: dict[str, set[str]] = {}
+        remote_property_map = self._get_remote_property_map()
+
+        for variation in child_products:
+            for rule_item in variation_properties:
+                property_obj = getattr(rule_item, "property", None) or rule_item
+                product_property = ProductProperty.objects.filter(
+                    product=variation,
+                    property=property_obj,
+                ).select_related("property", "value_select").first()
+
+                if product_property is None:
                     continue
-                collected.append((prop.name, str(prop_value)))
+
+                remote_property = remote_property_map.get(property_obj.id)
+                if remote_property is None:
+                    continue
+
+                formatted_value = self._format_variation_value(
+                    property_obj=property_obj,
+                    product_property=product_property,
+                    language_code=language_code,
+                )
+                if formatted_value in (None, ""):
+                    continue
+
+                aspect_name = (
+                    remote_property.localized_name
+                    or remote_property.translated_name
+                    or remote_property.remote_id
+                )
+                if not aspect_name:
+                    continue
+
+                collected_values.setdefault(aspect_name, set()).add(formatted_value)
+
+        return collected_values
+
+    def _collect_variation_dimensions(self, *, product) -> List[Tuple[str, str]]:
+        child_products = self._get_configurable_child_products(product=product)
+        collected_values = self._collect_variation_aspect_values(
+            product=product,
+            child_products=child_products,
+        )
+
+        if not collected_values:
+            return []
+
+        collected: list[tuple[str, str]] = []
+        for aspect_name, values in collected_values.items():
+            if len(values) <= 1:
+                continue
+            for value in sorted(values):
+                collected.append((aspect_name, value))
+
         return collected
+
+    def _collect_common_child_aspects(
+        self,
+        *,
+        child_products: Sequence[Any],
+        language_code: str | None,
+    ) -> Dict[str, List[str]]:
+        if not child_products:
+            return {}
+
+        common_values: Dict[str, Tuple[str, ...]] | None = None
+
+        for variation in child_products:
+            child_aspect_map = self._compute_product_aspects(
+                product=variation,
+                language_code=language_code,
+            )
+
+            child_aspects: Dict[str, Tuple[str, ...]] = {
+                name: tuple(sorted(value_list))
+                for name, value_list in child_aspect_map.items()
+                if value_list
+            }
+
+            if common_values is None:
+                common_values = child_aspects
+            else:
+                common_values = {
+                    name: values
+                    for name, values in common_values.items()
+                    if name in child_aspects and child_aspects[name] == values
+                }
+
+            if not common_values:
+                break
+
+        if not common_values:
+            return {}
+
+        result: Dict[str, List[str]] = {}
+        for name, values in common_values.items():
+            cleaned = [value for value in values if value not in (None, "")]
+            if cleaned:
+                result[name] = cleaned
+
+        return result
 
     def get_listing_description(self) -> str | None:
         """Expose the last computed listing description for offer updates."""
@@ -336,14 +520,12 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
     # Internal helpers
     # ------------------------------------------------------------------
     def _get_language_code(self) -> str | None:
-        language = None
         remote_languages = getattr(self.view, "remote_languages", None)
         if remote_languages is not None:
             remote_language = remote_languages.first()
             if remote_language and remote_language.local_instance:
-                language = remote_language.local_instance
-        if language:
-            return language
+                return remote_language.local_instance
+
         return getattr(self.sales_channel.multi_tenant_company, "language", None)
 
     def _get_translation(self, *, language_code: str | None) -> ProductTranslation | None:
@@ -527,53 +709,8 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
 
     def _build_aspects(self, *, language_code: str | None) -> Dict[str, List[str]]:
         product = self.remote_product.local_instance
-        product_properties = {
-            prop.property_id: prop
-            for prop in ProductProperty.objects.filter(product=product)
-        }
-
-        if not product_properties:
-            return {}
-
-        queryset = (
-            EbayProperty.objects.filter(sales_channel=self.sales_channel)
-            .filter(Q(marketplace=self.view) | Q(marketplace__isnull=True))
-            .select_related("local_instance")
-        )
-
-        aspects: Dict[str, List[str]] = {}
-        for remote_property in queryset:
-            local_property = remote_property.local_instance
-            if not local_property:
-                continue
-            product_property = product_properties.get(local_property.id)
-            if not product_property:
-                continue
-
-            values = self._render_property_value(
-                product_property=product_property,
-                remote_property=remote_property,
-                language_code=language_code,
-            )
-            if not values:
-                continue
-
-            name = (
-                remote_property.localized_name
-                or remote_property.translated_name
-                or remote_property.remote_id
-            )
-            if not name:
-                continue
-
-            if isinstance(values, str):
-                values_list = [values]
-            else:
-                values_list = [str(value) for value in values if value not in (None, "")]
-            if not values_list:
-                continue
-            aspects[name] = values_list
-        return aspects
+        product = self.remote_product.local_instance
+        return self._compute_product_aspects(product=product, language_code=language_code)
 
     def _apply_internal_properties(
         self,
@@ -849,24 +986,28 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         listing_status_str = str(listing_status).strip() if listing_status else None
         return listing_id_str or None, listing_status_str or None
 
-    def _update_assign_from_offer_payload(
+    def _update_offer_from_payload(
         self,
         *,
-        assign: SalesChannelViewAssign | None,
+        offer: EbayProductOffer | None,
         payload: Any,
     ) -> None:
-        if assign is None or not payload:
+        if offer is None or not payload:
             return
 
         listing_id, listing_status = self._extract_listing_details(payload)
 
         fields: list[str] = []
-        if listing_id and assign.listing_id != listing_id:
-            assign.listing_id = listing_id
+        if listing_id and offer.listing_id != listing_id:
+            offer.listing_id = listing_id
             fields.append("listing_id")
 
+        if listing_status and offer.listing_status != listing_status:
+            offer.listing_status = listing_status
+            fields.append("listing_status")
+
         if fields:
-            assign.save(update_fields=fields)
+            offer.save(update_fields=fields)
 
     def _apply_package_unit_defaults(self, *, root_section: Dict[str, Any]) -> None:
         package_section = root_section.get("packageWeightAndSize")
@@ -893,64 +1034,196 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             unit = getattr(self.sales_channel, "weight_unit", None)
         return (unit or "KILOGRAM").upper()
 
-    def _get_offer_remote_id(self) -> str | None:
-        product = getattr(self.remote_product, "local_instance", None)
-        if product is None or self.view is None:
+    def _get_offer_record(
+        self,
+        *,
+        remote_product: Any | None = None,
+    ) -> EbayProductOffer | None:
+        candidate = remote_product or getattr(self, "remote_product", None)
+        if candidate is None or self.view is None:
             return None
-        assign = (
-            SalesChannelViewAssign.objects.filter(
-                product=product,
+
+        return (
+            EbayProductOffer.objects.filter(
+                remote_product=candidate,
                 sales_channel_view=self.view,
             )
-            .exclude(remote_id__isnull=True)
-            .exclude(remote_id="")
+            .select_related("remote_product", "sales_channel_view")
             .first()
         )
-        return assign.remote_id if assign else None
 
-    def _get_content_language(self) -> str:
-        language_code = self._get_language_code()
-        if language_code:
-            return language_code.replace("_", "-")
-        return "en-US"
-
-    def _ensure_assign(self, *, remote_product: Any | None = None) -> SalesChannelViewAssign | None:
+    def _ensure_offer_record(
+        self,
+        *,
+        remote_product: Any | None = None,
+    ) -> EbayProductOffer | None:
         candidate = remote_product or getattr(self, "remote_product", None)
-        product = getattr(candidate, "local_instance", None)
-        if product is None or self.view is None:
+        if candidate is None or self.view is None:
             return None
 
-        assign = SalesChannelViewAssign.objects.filter(
+        offer = self._get_offer_record(remote_product=candidate)
+        if offer is not None:
+            fields: list[str] = []
+            if offer.sales_channel_id != self.sales_channel.id:
+                offer.sales_channel = self.sales_channel
+                fields.append("sales_channel")
+            mt_company_id = getattr(offer, "multi_tenant_company_id", None)
+            expected_company = getattr(self.sales_channel, "multi_tenant_company_id", None)
+            if expected_company and mt_company_id != expected_company:
+                offer.multi_tenant_company = self.sales_channel.multi_tenant_company
+                fields.append("multi_tenant_company")
+            if fields:
+                offer.save(update_fields=fields)
+            self._attach_remote_product_assigns(remote_product=candidate)
+            return offer
+
+        defaults = {
+            "sales_channel": self.sales_channel,
+            "multi_tenant_company": getattr(self.sales_channel, "multi_tenant_company", None),
+        }
+        offer, _ = EbayProductOffer.objects.get_or_create(
+            multi_tenant_company=candidate.multi_tenant_company,
+            remote_product=candidate,
+            sales_channel_view=self.view,
+            defaults=defaults,
+        )
+
+        # Ensure relational defaults persisted if created without save()
+        fields: list[str] = []
+        if offer.sales_channel_id != self.sales_channel.id:
+            offer.sales_channel = self.sales_channel
+            fields.append("sales_channel")
+        expected_company = getattr(self.sales_channel, "multi_tenant_company_id", None)
+        if expected_company and getattr(offer, "multi_tenant_company_id", None) != expected_company:
+            offer.multi_tenant_company = self.sales_channel.multi_tenant_company
+            fields.append("multi_tenant_company")
+        if fields:
+            offer.save(update_fields=fields)
+
+        self._attach_remote_product_assigns(remote_product=candidate)
+        return offer
+
+    def _attach_remote_product_assigns(self, *, remote_product: Any) -> None:
+        product = getattr(remote_product, "local_instance", None)
+        if product is None or self.view is None:
+            return
+
+        assigns = SalesChannelViewAssign.objects.filter(
             product=product,
             sales_channel_view=self.view,
-        ).first()
+        )
 
-        if assign is None:
-            assign = SalesChannelViewAssign.objects.create(
-                product=product,
-                sales_channel_view=self.view,
-                sales_channel=self.sales_channel,
-                remote_product=candidate,
-                multi_tenant_company=self.sales_channel.multi_tenant_company,
+        remote_product_id = getattr(remote_product, "id", None)
+
+        for assign in assigns:
+            fields: list[str] = []
+
+            if assign.remote_product_id != remote_product_id:
+                assign.remote_product = remote_product
+                fields.append("remote_product")
+
+            if assign.sales_channel_id != self.sales_channel.id:
+                assign.sales_channel = self.sales_channel
+                fields.append("sales_channel")
+
+            if fields:
+                assign.save(update_fields=fields)
+
+    def _get_offer_remote_id(self) -> str | None:
+        offer = self._get_offer_record()
+        if offer and offer.remote_id:
+            return str(offer.remote_id)
+
+        remote_product = getattr(self, "remote_product", None)
+        if (
+            offer is None
+            and remote_product is not None
+            and getattr(remote_product, "is_variation", False)
+            and getattr(remote_product, "remote_parent_product", None)
+        ):
+            parent_offer = self._get_offer_record(remote_product=remote_product.remote_parent_product)
+            if parent_offer and parent_offer.remote_id:
+                return str(parent_offer.remote_id)
+
+        return None
+
+    def _get_content_language(self) -> str:
+        remote_languages = getattr(self.view, "remote_languages", None)
+        if remote_languages is not None:
+            remote_language = remote_languages.first()
+            if remote_language and remote_language.remote_code:
+                return remote_language.remote_code.replace("_", "-").lower()
+
+        language_code = self._get_language_code()
+        if language_code:
+            return language_code.replace("_", "-").lower()
+        return "en-us"
+
+    def _compute_product_aspects(
+        self,
+        *,
+        product,
+        language_code: str | None,
+    ) -> Dict[str, List[str]]:
+        if product is None:
+            return {}
+
+        product_properties = {
+            prop.property_id: prop
+            for prop in ProductProperty.objects.filter(product=product)
+        }
+
+        if not product_properties:
+            return {}
+
+        aspects: Dict[str, List[str]] = {}
+        property_map = self._get_remote_property_map()
+
+        for property_id, product_property in product_properties.items():
+            remote_property = property_map.get(property_id)
+            if remote_property is None:
+                continue
+
+            values = self._render_property_value(
+                product_property=product_property,
+                remote_property=remote_property,
+                language_code=language_code,
             )
-            return assign
+            if not values:
+                continue
 
-        updates: list[str] = []
-        if assign.sales_channel_id != self.sales_channel.id:
-            assign.sales_channel = self.sales_channel
-            updates.append("sales_channel")
+            aspect_name = (
+                remote_property.localized_name
+                or remote_property.translated_name
+                or remote_property.remote_id
+            )
 
-        if candidate is not None and assign.remote_product_id != getattr(candidate, "id", None):
-            assign.remote_product = candidate
-            updates.append("remote_product")
+            if not aspect_name:
+                continue
 
-        if updates:
-            self._update_assign_fields(assign=assign, fields=tuple(updates))
+            if isinstance(values, str):
+                values_list = [values]
+            else:
+                values_list = [str(value) for value in values if value not in (None, "")]
 
-        return assign
+            if not values_list:
+                continue
 
-    def _ensure_assign_for_remote(self, *, remote_product: Any) -> SalesChannelViewAssign | None:
-        return self._ensure_assign(remote_product=remote_product)
+            aspects[aspect_name] = values_list
+
+        return aspects
+
+    def _get_remote_property_map(self) -> Dict[int, EbayProperty]:
+        return {
+            remote_property.local_instance_id: remote_property
+            for remote_property in EbayProperty.objects.filter(sales_channel=self.sales_channel)
+            .filter(Q(marketplace=self.view) | Q(marketplace__isnull=True))
+            .select_related("local_instance")
+            if getattr(remote_property, "local_instance_id", None) is not None
+        }
+
+    def _ensure_offer_for_remote(self, *, remote_product: Any) -> EbayProductOffer | None:
+        return self._ensure_offer_record(remote_product=remote_product)
 
     def _update_remote_product_fields(
         self,
@@ -970,23 +1243,16 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         for field, value in update_kwargs.items():
             setattr(remote_product, field, value)
 
-    def _update_assign_fields(
+    def _update_offer_fields(
         self,
         *,
-        assign: SalesChannelViewAssign | None,
+        offer: EbayProductOffer | None,
         fields: Sequence[str],
     ) -> None:
-        if assign is None or not fields:
+        if offer is None or not fields:
             return
 
-        pk = getattr(assign, "pk", None)
-        if pk is None:
-            return
-
-        update_kwargs = {field: getattr(assign, field) for field in fields}
-        SalesChannelViewAssign.objects.filter(pk=pk).update(**update_kwargs)
-        for field, value in update_kwargs.items():
-            setattr(assign, field, value)
+        offer.save(update_fields=list(fields))
 
     @contextmanager
     def _use_remote_product(self, remote_product: Any) -> Iterable[None]:
@@ -1288,8 +1554,8 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         api = getattr(self, "api", None) or self.get_api()
         self.api = api
 
-        assign = self._ensure_assign()
-        offer_id = getattr(assign, "remote_id", None)
+        offer_record = self._ensure_offer_record()
+        offer_id = getattr(offer_record, "remote_id", None)
 
         def _update_offer(target_offer_id: str) -> Any:
             self._log_api_payload(action="update_offer", payload=payload)
@@ -1317,24 +1583,24 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             except (EbayApiError, ApiException) as exc:
                 existing_offer_id = self._extract_offer_id_from_error(exc=exc)
                 if existing_offer_id:
-                    if assign and assign.remote_id != existing_offer_id:
-                        assign.remote_id = existing_offer_id
-                        self._update_assign_fields(assign=assign, fields=("remote_id",))
+                    if offer_record and offer_record.remote_id != existing_offer_id:
+                        offer_record.remote_id = existing_offer_id
+                        self._update_offer_fields(offer=offer_record, fields=("remote_id",))
                     response = _update_offer(existing_offer_id)
                     offer_id = existing_offer_id
                 else:
                     message = _extract_ebay_api_error_message(exc=exc)
                     raise EbayResponseException(message) from exc
 
-        assign = assign or self._ensure_assign()
+        offer_record = offer_record or self._ensure_offer_record()
         response_offer_id = self._extract_offer_id(response)
         final_offer_id = response_offer_id or offer_id
 
-        if assign:
-            if final_offer_id and assign.remote_id != final_offer_id:
-                assign.remote_id = final_offer_id
-                self._update_assign_fields(assign=assign, fields=("remote_id",))
-            self._update_assign_from_offer_payload(assign=assign, payload=response)
+        if offer_record:
+            if final_offer_id and offer_record.remote_id != final_offer_id:
+                offer_record.remote_id = final_offer_id
+                self._update_offer_fields(offer=offer_record, fields=("remote_id",))
+            self._update_offer_from_payload(offer=offer_record, payload=response)
 
         return response
 
@@ -1354,9 +1620,9 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             message = _extract_ebay_api_error_message(exc=exc)
             raise EbayResponseException(message) from exc
 
-        assign = self._ensure_assign()
-        if assign:
-            self._update_assign_from_offer_payload(assign=assign, payload=response)
+        offer_record = self._ensure_offer_record()
+        if offer_record:
+            self._update_offer_from_payload(offer=offer_record, payload=response)
 
         return response
 
@@ -1376,17 +1642,20 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             message = _extract_ebay_api_error_message(exc=exc)
             raise EbayResponseException(message) from exc
 
-        assign = self._ensure_assign()
-        if assign:
+        offer_record = self._ensure_offer_record()
+        if offer_record:
             fields: list[str] = []
-            if assign.successfully_created:
-                assign.successfully_created = False
+            if offer_record.successfully_created:
+                offer_record.successfully_created = False
                 fields.append("successfully_created")
-            if assign.listing_id:
-                assign.listing_id = None
+            if offer_record.listing_id:
+                offer_record.listing_id = None
                 fields.append("listing_id")
+            if offer_record.listing_status:
+                offer_record.listing_status = None
+                fields.append("listing_status")
             if fields:
-                assign.save(update_fields=fields)
+                self._update_offer_fields(offer=offer_record, fields=fields)
 
         return response
 
@@ -1433,16 +1702,20 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             message = _extract_ebay_api_error_message(exc=exc)
             raise EbayResponseException(message) from exc
 
-        assign = self._ensure_assign()
-        if assign and assign.remote_id:
-            assign.remote_id = None
+        offer_record = self._ensure_offer_record()
+        if offer_record and offer_record.remote_id:
+            offer_record.remote_id = None
             fields = ["remote_id"]
-            if assign.listing_id:
-                assign.listing_id = None
+            if offer_record.listing_id:
+                offer_record.listing_id = None
                 fields.append("listing_id")
-            assign.successfully_created = False
-            fields.append("successfully_created")
-            self._update_assign_fields(assign=assign, fields=tuple(fields))
+            if offer_record.listing_status:
+                offer_record.listing_status = None
+                fields.append("listing_status")
+            if offer_record.successfully_created:
+                offer_record.successfully_created = False
+                fields.append("successfully_created")
+            self._update_offer_fields(offer=offer_record, fields=fields)
 
         return response
 
@@ -1534,18 +1807,31 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
         self.api = api
 
         responses: List[Any] = []
+        start = 0
         for batch in batches:
-            self._log_api_payload(action="bulk_create_or_replace_inventory_item", payload={"requests": batch})
+            end = start + len(batch)
+            remote_slice = remote_products[start:end]
+            payload = {"requests": batch}
+            self._log_api_payload(
+                action="bulk_create_or_replace_inventory_item",
+                payload=payload,
+            )
             try:
                 response = api.sell_inventory_bulk_create_or_replace_inventory_item(
-                    body={"requests": batch},
+                    body=payload,
                     content_language=self._get_content_language(),
                     content_type="application/json",
                 )
             except (EbayApiError, ApiException) as exc:
                 message = _extract_ebay_api_error_message(exc=exc)
                 raise EbayResponseException(message) from exc
+
             responses.append(response)
+
+            for remote_product in remote_slice:
+                self._attach_remote_product_assigns(remote_product=remote_product)
+
+            start = end
 
         return responses
 
@@ -1556,7 +1842,12 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
                 requests.append({"offer": self.build_offer_payload()})
         return requests
 
-    def _store_bulk_offer_ids(self, *, response: Any, remote_products: Sequence[Any]) -> None:
+    def _store_bulk_offer_ids(
+        self,
+        *,
+        response: Any,
+        remote_products: Sequence[Any],
+    ) -> None:
         if not isinstance(response, Mapping):
             return
 
@@ -1565,16 +1856,19 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
             return
 
         for remote_product, entry in zip(remote_products, entries):
-            assign = self._ensure_assign_for_remote(remote_product=remote_product)
-            if assign is None:
+            offer = self._ensure_offer_record(remote_product=remote_product)
+            if offer is None:
                 continue
 
             offer_id = self._extract_offer_id(entry)
-            if offer_id and assign.remote_id != offer_id:
-                assign.remote_id = offer_id
-                self._update_assign_fields(assign=assign, fields=("remote_id",))
+            if offer_id and offer.remote_id != offer_id:
+                offer.remote_id = offer_id
+                self._update_offer_fields(offer=offer, fields=("remote_id",))
 
-            self._update_assign_from_offer_payload(assign=assign, payload=entry if isinstance(entry, Mapping) else {})
+            self._update_offer_from_payload(
+                offer=offer,
+                payload=entry if isinstance(entry, Mapping) else {},
+            )
 
     def send_bulk_offer_payloads(self, *, remote_products: Sequence[Any]) -> List[Any]:
         remote_products = list(remote_products)
@@ -1595,18 +1889,21 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
         for batch in batches:
             end = start + len(batch)
             remote_slice = remote_products[start:end]
-            self._log_api_payload(action="bulk_create_offer", payload={"requests": batch})
+            payload = {"requests": batch}
+            self._log_api_payload(action="bulk_create_offer", payload=payload)
             try:
                 response = api.sell_inventory_bulk_create_offer(
-                    body={"requests": batch},
+                    body=payload,
                     content_language=self._get_content_language(),
                     content_type="application/json",
                 )
             except (EbayApiError, ApiException) as exc:
                 message = _extract_ebay_api_error_message(exc=exc)
                 raise EbayResponseException(message) from exc
+
             responses.append(response)
             self._store_bulk_offer_ids(response=response, remote_products=remote_slice)
+
             start = end
 
         return responses
@@ -1631,9 +1928,9 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
             message = _extract_ebay_api_error_message(exc=exc)
             raise EbayResponseException(message) from exc
 
-        assign = self._ensure_assign()
-        if assign:
-            self._update_assign_from_offer_payload(assign=assign, payload=response)
+        offer_record = self._ensure_offer_record()
+        if offer_record:
+            self._update_offer_from_payload(offer=offer_record, payload=response)
 
         return response
 
@@ -1654,17 +1951,20 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
             message = _extract_ebay_api_error_message(exc=exc)
             raise EbayResponseException(message) from exc
 
-        assign = self._ensure_assign()
-        if assign:
+        offer_record = self._ensure_offer_record()
+        if offer_record:
             fields: list[str] = []
-            if assign.successfully_created:
-                assign.successfully_created = False
+            if offer_record.successfully_created:
+                offer_record.successfully_created = False
                 fields.append("successfully_created")
-            if assign.listing_id:
-                assign.listing_id = None
+            if offer_record.listing_id:
+                offer_record.listing_id = None
                 fields.append("listing_id")
+            if offer_record.listing_status:
+                offer_record.listing_status = None
+                fields.append("listing_status")
             if fields:
-                assign.save(update_fields=fields)
+                self._update_offer_fields(offer=offer_record, fields=fields)
 
         return response
 

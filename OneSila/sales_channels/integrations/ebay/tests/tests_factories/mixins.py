@@ -13,7 +13,11 @@ from properties.models import (
     PropertySelectValue,
     ProductPropertiesRule,
 )
-from sales_channels.integrations.ebay.models import EbayProduct, EbaySalesChannel
+from sales_channels.integrations.ebay.models import (
+    EbayProduct,
+    EbayProductOffer,
+    EbaySalesChannel,
+)
 from sales_channels.integrations.ebay.models.properties import EbayProductType
 from sales_channels.integrations.ebay.models.properties import (
     EbayInternalProperty,
@@ -24,7 +28,7 @@ from sales_channels.integrations.ebay.models.sales_channels import (
     EbayRemoteLanguage,
     EbaySalesChannelView,
 )
-from sales_channels.models.sales_channels import SalesChannelViewAssign
+from sales_channels.models import SalesChannelViewAssign
 
 
 def _defer_patch(patcher):
@@ -244,11 +248,10 @@ class EbayProductPushFactoryTestBase(TestCaseEbayMixin):
             local_instance=self.product,
             remote_sku="REMOTE-SKU",
         )
-        SalesChannelViewAssign.objects.create(
+        self.offer = EbayProductOffer.objects.create(
             multi_tenant_company=self.multi_tenant_company,
-            product=self.product,
-            sales_channel_view=self.view,
             sales_channel=self.sales_channel,
+            sales_channel_view=self.view,
             remote_product=self.remote_product,
             remote_id="OFFER-123",
         )
@@ -262,6 +265,14 @@ class EbayProductPushFactoryTestBase(TestCaseEbayMixin):
             media=media,
             sort_order=0,
             multi_tenant_company=self.multi_tenant_company,
+        )
+
+        SalesChannelViewAssign.objects.create(
+            sales_channel=self.sales_channel,
+            product=self.product,
+            remote_product=self.remote_product,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel_view=self.view
         )
 
     def _assign_product_type(self, product) -> None:

@@ -6,11 +6,10 @@ from model_bakery import baker
 
 from eancodes.models import EanCode
 from sales_channels.integrations.ebay.factories.products.eancodes import EbayEanCodeUpdateFactory
-from sales_channels.integrations.ebay.models.products import EbayEanCode
+from sales_channels.integrations.ebay.models.products import EbayEanCode, EbayProductOffer
 from sales_channels.integrations.ebay.tests.tests_factories.mixins import (
     EbayProductPushFactoryTestBase,
 )
-from sales_channels.models.sales_channels import SalesChannelViewAssign
 
 
 class EbayEanCodeUpdateFactoryTest(EbayProductPushFactoryTestBase):
@@ -33,7 +32,7 @@ class EbayEanCodeUpdateFactoryTest(EbayProductPushFactoryTestBase):
         )
 
     def test_preflight_requires_view_assignment(self):
-        SalesChannelViewAssign.objects.filter(product=self.product).delete()
+        EbayProductOffer.objects.filter(remote_product=self.remote_product).delete()
 
         factory = self._build_factory(get_value_only=False)
         result = factory.run()

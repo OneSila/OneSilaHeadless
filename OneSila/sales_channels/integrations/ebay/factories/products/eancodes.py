@@ -3,13 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from sales_channels.factories.products.eancodes import RemoteEanCodeUpdateFactory
-from sales_channels.models.sales_channels import SalesChannelViewAssign
-
 from sales_channels.integrations.ebay.factories.products.mixins import (
     EbayInventoryItemPushMixin,
     EbayInventoryItemPayloadMixin,
 )
-from sales_channels.integrations.ebay.models.products import EbayEanCode
+from sales_channels.integrations.ebay.models.products import EbayEanCode, EbayProductOffer
 
 
 class EbayEanCodeUpdateFactory(EbayInventoryItemPushMixin, RemoteEanCodeUpdateFactory):
@@ -49,21 +47,24 @@ class EbayEanCodeUpdateFactory(EbayInventoryItemPushMixin, RemoteEanCodeUpdateFa
         if not self.remote_product or not getattr(self, "view", None):
             return False
 
-        product = self.remote_product.local_instance
-        assign_exists = SalesChannelViewAssign.objects.filter(
-            product=product,
+        offer_exists = EbayProductOffer.objects.filter(
+            remote_product=self.remote_product,
             sales_channel=self.sales_channel,
             sales_channel_view=self.view,
         ).exists()
 
-        if not assign_exists and self.remote_product.is_variation and self.remote_product.remote_parent_product:
-            assign_exists = SalesChannelViewAssign.objects.filter(
-                product=self.remote_product.remote_parent_product.local_instance,
+        if (
+            not offer_exists
+            and self.remote_product.is_variation
+            and self.remote_product.remote_parent_product
+        ):
+            offer_exists = EbayProductOffer.objects.filter(
+                remote_product=self.remote_product.remote_parent_product,
                 sales_channel=self.sales_channel,
                 sales_channel_view=self.view,
             ).exists()
 
-        if not assign_exists:
+        if not offer_exists:
             return False
 
         self.remote_instance, _ = self.remote_model_class.objects.get_or_create(

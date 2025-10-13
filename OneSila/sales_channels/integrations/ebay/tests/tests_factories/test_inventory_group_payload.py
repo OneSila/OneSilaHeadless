@@ -8,6 +8,7 @@ from products.product_types import CONFIGURABLE, SIMPLE
 from sales_channels.integrations.ebay.factories.products.images import (
     EbayMediaProductThroughCreateFactory,
 )
+from sales_channels.integrations.ebay.models.products import EbayProductOffer
 from sales_channels.integrations.ebay.tests.tests_factories.mixins import (
     EbayProductPushFactoryTestBase,
 )
@@ -50,24 +51,24 @@ class EbayInventoryGroupPayloadTest(EbayProductPushFactoryTestBase):
             variation=self.child_two,
         )
 
-        assign = self._assign_remote(self.product, self.remote_product)
-        assign.remote_id = "OFFER-PARENT"
-        assign.save(update_fields=["remote_id"])
+        offer = self._assign_remote(self.product, self.remote_product)
+        offer.remote_id = "OFFER-PARENT"
+        offer.save(update_fields=["remote_id"])
 
     def _assign_remote(self, product, remote_product):
-        from sales_channels.models.sales_channels import SalesChannelViewAssign
-
-        assign, _ = SalesChannelViewAssign.objects.get_or_create(
-            product=product,
+        offer, _ = EbayProductOffer.objects.get_or_create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
+            remote_product=remote_product,
             sales_channel_view=self.view,
-            defaults={"remote_product": remote_product},
         )
-        if assign.remote_product_id != remote_product.id:
-            assign.remote_product = remote_product
-            assign.save(update_fields=["remote_product"])
-        return assign
+        if offer.sales_channel_id != self.sales_channel.id:
+            offer.sales_channel = self.sales_channel
+            offer.save(update_fields=["sales_channel"])
+        if getattr(offer, "multi_tenant_company_id", None) != self.multi_tenant_company.id:
+            offer.multi_tenant_company = self.multi_tenant_company
+            offer.save(update_fields=["multi_tenant_company"])
+        return offer
 
     def _patch_variation_dimensions(self, values):
         return patch(
@@ -109,9 +110,9 @@ class EbayInventoryGroupPayloadTest(EbayProductPushFactoryTestBase):
         self.assertEqual(call_kwargs["inventory_item_group_key"], self.product.sku)
         self.assertEqual(call_kwargs["content_language"], "en-us".replace("_", "-"))
         body = call_kwargs["body"]
-        self.assertEqual(set(body.get("variant_skus", [])), {"CHILD-1", "CHILD-2"})
-        varies_by = body.get("varies_by")
-        self.assertEqual(sorted(varies_by.get("aspects_image_varies_by", [])), ["Color", "Size"])
+        self.assertEqual(set(body.get("variantSKUs", [])), {"CHILD-1", "CHILD-2"})
+        varies_by = body.get("variesBy")
+        self.assertEqual(sorted(varies_by.get("aspectsImageVariesBy", [])), ["Color", "Size"])
         spec_map = {entry["name"]: entry["values"] for entry in varies_by.get("specifications", [])}
         self.assertEqual(sorted(spec_map["Color"]), ["Blue", "Red"])
         self.assertEqual(spec_map["Size"], ["Large"])

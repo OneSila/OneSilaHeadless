@@ -7,8 +7,7 @@ from datetime import timedelta
 
 from sales_channels.factories.prices.prices import RemotePriceUpdateFactory
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
-from sales_channels.integrations.ebay.models.products import EbayPrice
-from sales_channels.models.sales_channels import SalesChannelViewAssign
+from sales_channels.integrations.ebay.models.products import EbayPrice, EbayProductOffer
 
 
 class EbayPriceUpdateFactory(GetEbayAPIMixin, RemotePriceUpdateFactory):
@@ -77,9 +76,9 @@ class EbayPriceUpdateFactory(GetEbayAPIMixin, RemotePriceUpdateFactory):
         if product is None or self.view is None:
             return None
 
-        assign = (
-            SalesChannelViewAssign.objects.filter(
-                product=product,
+        offer = (
+            EbayProductOffer.objects.filter(
+                remote_product=self.remote_product,
                 sales_channel_view=self.view,
             )
             .exclude(remote_id__isnull=True)
@@ -87,22 +86,21 @@ class EbayPriceUpdateFactory(GetEbayAPIMixin, RemotePriceUpdateFactory):
             .first()
         )
 
-        if assign:
-            return assign.remote_id
+        if offer:
+            return offer.remote_id
 
         if self.remote_product.is_variation and self.remote_product.remote_parent_product:
-            parent_product = self.remote_product.remote_parent_product.local_instance
-            assign = (
-                SalesChannelViewAssign.objects.filter(
-                    product=parent_product,
+            parent_offer = (
+                EbayProductOffer.objects.filter(
+                    remote_product=self.remote_product.remote_parent_product,
                     sales_channel_view=self.view,
                 )
                 .exclude(remote_id__isnull=True)
                 .exclude(remote_id="")
                 .first()
             )
-            if assign:
-                return assign.remote_id
+            if parent_offer:
+                return parent_offer.remote_id
 
         return None
 

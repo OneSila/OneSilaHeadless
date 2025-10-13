@@ -33,7 +33,6 @@ from sales_channels.integrations.ebay.models.properties import (
     EbayProductProperty,
     EbayProperty,
 )
-from sales_channels.models.sales_channels import SalesChannelViewAssign
 
 
 class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactory):
@@ -160,7 +159,7 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
                         fields=tuple(updates),
                     )
 
-            self._ensure_assign(remote_product=remote_child)
+            self._ensure_offer_for_remote(remote_product=remote_child)
             remote_children.append(remote_child)
 
         return remote_children
@@ -255,7 +254,7 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
         self.remote_product = remote_product
         self.remote_instance = remote_product
         self.remote_parent_product = expected_parent
-        self._ensure_assign(remote_product=remote_product)
+        self._ensure_offer_record(remote_product=remote_product)
         return remote_product
 
     def _post_inventory_push(self) -> None:
@@ -597,7 +596,7 @@ class EbayProductVariationAddFactory(EbayProductBaseFactory):
     def _resolve_parent_remote_product(self) -> EbayProduct:
         parent_remote = getattr(self, "remote_parent_product", None)
         if parent_remote is not None:
-            self._ensure_assign(remote_product=parent_remote)
+            self._ensure_offer_for_remote(remote_product=parent_remote)
             return parent_remote
 
         parent_local = getattr(self, "parent_local_instance", None)
@@ -622,7 +621,7 @@ class EbayProductVariationAddFactory(EbayProductBaseFactory):
             )
 
         self.remote_parent_product = parent_remote
-        self._ensure_assign(remote_product=parent_remote)
+        self._ensure_offer_for_remote(remote_product=parent_remote)
         return parent_remote
 
     def run(self) -> Optional[Dict[str, Any]]:
@@ -678,8 +677,8 @@ class EbayProductSyncFactory(EbayProductBaseFactory):
             return None
 
         remote_product = self._resolve_remote_product()
-        assign = self._ensure_assign()
-        has_offer = bool(assign and assign.remote_id)
+        offer_record = self._get_offer_record()
+        has_offer = bool(offer_record and offer_record.remote_id)
 
         factory_cls = EbayProductUpdateFactory if has_offer else EbayProductCreateFactory
         factory = factory_cls(

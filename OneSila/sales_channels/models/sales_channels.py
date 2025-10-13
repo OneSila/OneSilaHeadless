@@ -157,12 +157,6 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.SET_NULL, null=True,
                                        blank=True, help_text="The remote product associated with this assign.")
     needs_resync = models.BooleanField(default=False, help_text="Indicates if a resync is needed.")
-    listing_id = models.CharField(
-        max_length=64,
-        null=True,
-        blank=True,
-        help_text="Listing identifier returned by the remote marketplace.",
-    )
 
     objects = SalesChannelViewAssignManager()
 
@@ -226,7 +220,24 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
                         pass
             return None
         elif isinstance(sales_channel, EbaySalesChannel):
-            listing_id = (self.listing_id or "").strip()
+            listing_id = None
+
+            if self.remote_product and self.remote_product.id:
+                from sales_channels.integrations.ebay.models.products import EbayProductOffer
+
+                offer = (
+                    EbayProductOffer.objects.filter(
+                        remote_product_id= self.remote_product.id,
+                        sales_channel_view=self.sales_channel_view,
+                    )
+                    .only("remote_id", "listing_id")
+                    .first()
+                )
+
+                if offer:
+                    listing_id = (offer.listing_id or "").strip()
+                    listing_status = (offer.listing_status or "").strip()
+
             base_url = (self.sales_channel_view.url or "").rstrip('/') if self.sales_channel_view else ""
 
             if sales_channel.environment == EbaySalesChannel.SANDBOX:
