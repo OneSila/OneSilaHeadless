@@ -94,8 +94,11 @@ class EbayCategoryNodeSyncFactoryTest(TestCase):
         fac = EbayCategoryNodeSyncFactory(view=self.view)
         fac.run()
 
-        node = EbayCategory.objects.get(remote_id="200", marketplace_default_tree_id="3")
-        self.assertEqual(node.name, "Root > Parent > Leaf")
+        leaf = EbayCategory.objects.get(remote_id="200", marketplace_default_tree_id="3")
+        self.assertEqual(leaf.name, "Parent > Leaf")
+
+        parent = EbayCategory.objects.get(remote_id="100", marketplace_default_tree_id="3")
+        self.assertEqual(parent.name, "Parent")
 
     @patch("sales_channels.integrations.ebay.factories.category_nodes.sync.GetEbayAPIMixin.get_api")
     def test_removes_stale_nodes(self, mock_get_api: Mock) -> None:

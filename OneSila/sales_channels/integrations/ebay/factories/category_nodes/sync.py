@@ -106,10 +106,14 @@ class EbayCategoryNodeSyncFactory(GetEbayAPIMixin):
 
         path_parts = tuple(part for part in (*ancestors, node_name) if part)
 
-        if node_id and path_parts:
+        trimmed_parts = path_parts[1:] if len(path_parts) > 1 else path_parts
+        if not trimmed_parts and path_parts:
+            trimmed_parts = (path_parts[-1],)
+
+        if node_id and trimmed_parts:
             yield _CategoryEntry(
                 remote_id=node_id,
-                name=" > ".join(path_parts),
+                name=" > ".join(trimmed_parts),
             )
 
         children = node.get("childCategoryTreeNodes") or node.get("child_category_tree_nodes") or []
