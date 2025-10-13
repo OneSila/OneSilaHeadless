@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, PropertyMock
 
 from django.templatetags.i18n import language
 from django.test import override_settings
@@ -72,6 +72,7 @@ from sales_channels.integrations.amazon.factories.products.images import (
 )
 from sales_channels.models.products import RemoteProductConfigurator
 from products.models import ConfigurableVariation
+from integrations.models import IntegrationLog
 
 
 class AmazonProductTestMixin:
@@ -2800,3 +2801,44 @@ class AmazonProductFallbackValuesTest(DisableWooCommerceSignalsMixin, TestCase, 
             attrs.get("recommended_browse_nodes"),
             [{"value": "BN1", "marketplace_id": self.view.remote_id}],
         )
+
+
+class AmazonProductOwnerFlagTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonProductTestMixin):
+    def setUp(self):
+        super().setUp()
+        self.errors_patch = patch(
+            "sales_channels.models.products.RemoteProduct.errors",
+            new_callable=PropertyMock,
+            return_value=IntegrationLog.objects.none(),
+        )
+        self.errors_patch.start()
+        self.addCleanup(self.errors_patch.stop)
+        self.setup_product()
+
+    @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
+    @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
+    def test_create_product_factory_marks_owner_for_new_marketplace(self, mock_listings, mock_client):
+        mock_instance = mock_listings.return_value
+        mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+
+        AmazonExternalProductId.objects.filter(product=self.product).delete()
+        EanCode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            ean_code="1234567890123",
+        )
+
+        self.remote_product.product_owner = False
+        self.remote_product.created_marketplaces = ["DE"]
+        self.remote_product.save(update_fields=["product_owner", "created_marketplaces"])
+
+        fac = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        fac.run()
+
+        self.remote_product.refresh_from_db()
+        self.assertTrue(self.remote_product.product_owner)
