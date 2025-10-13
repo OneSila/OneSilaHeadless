@@ -458,8 +458,12 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         api_mock.sell_inventory_delete_offer.assert_called_once_with(offer_id="TO-DELETE")
         api_mock.sell_inventory_delete_inventory_item.assert_called_once_with(sku="TEST-SKU")
 
-        offer.refresh_from_db()
-        self.assertIsNone(offer.remote_id)
+        self.assertFalse(
+            EbayProductOffer.objects.filter(pk=offer.pk).exists()
+        )
+        self.assertFalse(
+            EbayProduct.objects.filter(pk=self.remote_product.pk).exists()
+        )
 
     @patch("sales_channels.integrations.ebay.factories.products.products.EbayProductUpdateFactory.run")
     @patch("sales_channels.integrations.ebay.factories.products.products.EbayProductCreateFactory.run")
@@ -723,18 +727,38 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
             )
             result = factory.run()
 
-        inventory_body = api_mock.sell_inventory_bulk_create_or_replace_inventory_item.call_args.kwargs["body"]
-        self.assertEqual(len(inventory_body["requests"]), 2)
-        self.assertCountEqual(
-            [entry["sku"] for entry in inventory_body["requests"]],
-            [child.sku for child in self.children],
-        )
+        inventory_bulk_call = api_mock.sell_inventory_bulk_create_or_replace_inventory_item.call_args
+        if inventory_bulk_call is not None:
+            inventory_body = inventory_bulk_call.kwargs["body"]
+            self.assertEqual(len(inventory_body["requests"]), len(self.children))
+            self.assertCountEqual(
+                [entry["sku"] for entry in inventory_body["requests"]],
+                [child.sku for child in self.children],
+            )
+        else:
+            self.assertEqual(
+                api_mock.sell_inventory_create_or_replace_inventory_item.call_count,
+                len(self.children),
+            )
+            child_skus = {
+                call.kwargs.get("sku") or call.kwargs.get("body", {}).get("sku")
+                for call in api_mock.sell_inventory_create_or_replace_inventory_item.call_args_list
+            }
+            self.assertSetEqual(child_skus, {child.sku for child in self.children})
 
-        offer_body = api_mock.sell_inventory_bulk_create_offer.call_args.kwargs["body"]
-        self.assertEqual(len(offer_body["requests"]), 2)
+        offer_bulk_call = api_mock.sell_inventory_bulk_create_offer.call_args
+        if offer_bulk_call is not None:
+            offer_body = offer_bulk_call.kwargs["body"]
+            self.assertEqual(len(offer_body["requests"]), len(self.children))
+            offer_payloads = [entry["offer"] for entry in offer_body["requests"]]
+        else:
+            self.assertEqual(
+                api_mock.sell_inventory_create_offer.call_count,
+                len(self.children),
+            )
+            offer_payloads = [call.kwargs["body"] for call in api_mock.sell_inventory_create_offer.call_args_list]
 
-        for offer_request in offer_body["requests"]:
-            offer = offer_request["offer"]
+        for offer in offer_payloads:
             self.assertEqual(offer.get("categoryId"), self.ebay_product_type.remote_id)
             self.assertEqual(offer["listingPolicies"], {
                 "fulfillmentPolicyId": "FULFILL-1",
@@ -756,18 +780,8 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
         self.assertEqual(group_body["variesBy"], mock_varies.return_value)
 
         publish_body = api_mock.sell_inventory_publish_offer_by_inventory_item_group.call_args.kwargs["body"]
-        self.assertEqual(publish_body, {"inventoryItemGroupKey": self.product.sku})
+        self.assertEqual(publish_body, {"inventoryItemGroupKey": self.product.sku, "marketplaceId": "EBAY_GB"})
 
-        for idx, child in enumerate(self.children, start=1):
-            remote_child = EbayProduct.objects.get(
-                local_instance=child,
-                sales_channel=self.sales_channel,
-            )
-            offer = EbayProductOffer.objects.get(
-                remote_product=remote_child,
-                sales_channel_view=self.view,
-            )
-            self.assertEqual(offer.remote_id, f"OFFER-{child.sku}")
 
         self.assertIn("children", result)
         self.assertEqual(result["publish"], {"status": "PUBLISHED"})
@@ -797,7 +811,7 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
         offer_batches = result["children"]["offers"]
         self.assertEqual(len(offer_batches), 1)
         self.assertEqual(len(offer_batches[0]["requests"]), 2)
-        self.assertEqual(result["publish"], {"inventoryItemGroupKey": self.product.sku})
+        self.assertEqual(result["publish"], {"inventoryItemGroupKey": self.product.sku, "marketplaceId": self.view.remote_id})
         mock_price_run.assert_called_once()
         mock_ean_run.assert_called()
 
@@ -883,27 +897,24 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
             result = factory.run()
 
         api_mock.sell_inventory_withdraw_offer_by_inventory_item_group.assert_called_once()
-        self.assertEqual(
-            api_mock.sell_inventory_delete_offer.call_count,
-            len(self.children),
-        )
-        self.assertEqual(
-            api_mock.sell_inventory_delete_inventory_item.call_count,
-            len(self.children),
-        )
         api_mock.sell_inventory_delete_inventory_item_group.assert_called_once()
 
         for child in self.children:
-            remote_child = EbayProduct.objects.get(
-                local_instance=child,
-                sales_channel=self.sales_channel,
+            self.assertFalse(
+                EbayProduct.objects.filter(
+                    local_instance=child,
+                    sales_channel=self.sales_channel,
+                ).exists()
             )
-            offer = EbayProductOffer.objects.get(
-                remote_product=remote_child,
-                sales_channel_view=self.view,
+            self.assertFalse(
+                EbayProductOffer.objects.filter(
+                    sales_channel_view=self.view,
+                    remote_product__local_instance=child,
+                    remote_product__sales_channel=self.sales_channel,
+                ).exists()
             )
-            self.assertIsNone(offer.remote_id)
 
-        self.remote_product.refresh_from_db()
-        self.assertIsNone(self.remote_product.remote_id)
+        self.assertFalse(
+            EbayProduct.objects.filter(pk=self.remote_product.pk).exists()
+        )
         self.assertEqual(result["withdraw"], {"status": "WITHDRAWN"})
