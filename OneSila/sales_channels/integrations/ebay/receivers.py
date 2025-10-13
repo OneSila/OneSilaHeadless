@@ -1,3 +1,5 @@
+from collections import Counter
+
 from core.receivers import receiver
 from core.signals import post_create, post_update
 from sales_channels.signals import (
@@ -5,6 +7,7 @@ from sales_channels.signals import (
     sales_channel_created,
     manual_sync_remote_product,
     create_remote_product,
+    delete_remote_product,
     sales_view_assign_updated,
 )
 from sales_channels.integrations.ebay.models import (
@@ -25,8 +28,47 @@ from sales_channels.integrations.ebay.tasks import (
     ebay_translate_select_value_task,
     create_ebay_product_db_task,
     resync_ebay_product_db_task,
+    update_ebay_assign_offers_db_task,
+    delete_ebay_assign_offers_db_task,
+    delete_ebay_product_db_task,
 )
 from sales_channels.integrations.ebay.flows.tasks_runner import run_single_ebay_product_task_flow
+from sales_channels.models import SalesChannelViewAssign
+
+
+_PENDING_PRODUCT_DELETE_COUNTS: Counter[int] = Counter()
+
+
+def _get_remote_request_count(product) -> int:
+    getter = getattr(product, 'get_configurable_variations', None)
+    if callable(getter):
+        try:
+            return 1 + getter().count()
+        except Exception:  # pragma: no cover - defensive
+            return 1
+    return 1
+
+
+def _queue_delete_product_task(*, product, sales_channel, view) -> bool:
+    if product is None or view is None:
+        return False
+
+    remote_exists = EbayProduct.objects.filter(
+        sales_channel=sales_channel,
+        local_instance=product,
+    ).exists()
+
+    if not remote_exists:
+        return False
+
+    remote_requests = _get_remote_request_count(product)
+    run_single_ebay_product_task_flow(
+        task_func=delete_ebay_product_db_task,
+        view=view,
+        number_of_remote_requests=remote_requests,
+        product_id=product.id,
+    )
+    return True
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
 @receiver(refresh_website_pull_models, sender='ebay.EbaySalesChannel')
@@ -196,20 +238,90 @@ def ebay__product__create_from_assign(sender, instance, view, **kwargs):
     )
 
 
-# @receiver(sales_view_assign_updated, sender='products.Product')
-# def ebay__assign__update(sender, instance, sales_channel, view, **kwargs):
-#     sales_channel = sales_channel.get_real_instance()
-#     is_delete = kwargs.get('is_delete', False)
-#
-#     if not isinstance(sales_channel, EbaySalesChannel) or not sales_channel.active or is_delete:
-#         return
-#
-#     resolved_view = view.get_real_instance()
-#     count = 1 + getattr(instance, 'get_configurable_variations', lambda: [])().count()
-#
-#     run_single_ebay_product_task_flow(
-#         task_func=create_ebay_product_db_task,
-#         view=resolved_view,
-#         number_of_remote_requests=count,
-#         product_id=instance.id,
-#     )
+@receiver(sales_view_assign_updated, sender='products.Product')
+def ebay__assign__update(sender, instance, sales_channel, view, **kwargs):
+    if view is None:
+        return
+
+    resolved_channel = sales_channel.get_real_instance()
+    if not isinstance(resolved_channel, EbaySalesChannel) or not resolved_channel.active:
+        return
+
+    resolved_view = view.get_real_instance()
+    if resolved_view is None:
+        return
+
+    count = 1 + getattr(instance, 'get_configurable_variations', lambda: [])().count()
+    is_delete = kwargs.get('is_delete', False)
+    task_func = delete_ebay_assign_offers_db_task if is_delete else update_ebay_assign_offers_db_task
+
+    run_single_ebay_product_task_flow(
+        task_func=task_func,
+        view=resolved_view,
+        number_of_remote_requests=count,
+        product_id=instance.id,
+    )
+
+
+@receiver(delete_remote_product, sender='sales_channels.SalesChannelViewAssign')
+def ebay__assign__delete(sender, instance, is_variation=False, **kwargs):
+    product = getattr(instance, 'product', None)
+    product_id = getattr(product, 'id', None)
+    if product is None or product_id is None:
+        return
+
+    pending = _PENDING_PRODUCT_DELETE_COUNTS.get(product_id, 0)
+    if pending:
+        remaining = pending - 1
+        if remaining > 0:
+            _PENDING_PRODUCT_DELETE_COUNTS[product_id] = remaining
+        else:
+            _PENDING_PRODUCT_DELETE_COUNTS.pop(product_id, None)
+        return
+
+    sales_channel = instance.sales_channel.get_real_instance()
+    if not isinstance(sales_channel, EbaySalesChannel) or not sales_channel.active:
+        return
+
+    resolved_view = instance.sales_channel_view.get_real_instance()
+    if resolved_view is None:
+        return
+
+    _queue_delete_product_task(
+        product=product,
+        sales_channel=sales_channel,
+        view=resolved_view,
+    )
+
+
+@receiver(delete_remote_product, sender='products.Product')
+def ebay__product__delete(sender, instance, **kwargs):
+    product = instance
+    product_id = getattr(product, 'id', None)
+    if product_id is None:
+        return
+
+    assignments = (
+        SalesChannelViewAssign.objects.filter(product=product)
+        .select_related('sales_channel', 'sales_channel_view')
+    )
+
+    scheduled = 0
+    for assign in assignments:
+        sales_channel = assign.sales_channel.get_real_instance()
+        if not isinstance(sales_channel, EbaySalesChannel) or not sales_channel.active:
+            continue
+
+        resolved_view = assign.sales_channel_view.get_real_instance()
+        if resolved_view is None:
+            continue
+
+        if _queue_delete_product_task(
+            product=product,
+            sales_channel=sales_channel,
+            view=resolved_view,
+        ):
+            scheduled += 1
+
+    if scheduled:
+        _PENDING_PRODUCT_DELETE_COUNTS[product_id] += scheduled

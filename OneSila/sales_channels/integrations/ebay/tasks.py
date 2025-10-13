@@ -169,3 +169,97 @@ def resync_ebay_product_db_task(
         factory.run()
 
     task.execute(actual_task)
+
+
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
+@db_task()
+def update_ebay_assign_offers_db_task(
+    task_queue_item_id,
+    *,
+    sales_channel_id: int,
+    product_id: int,
+    view_id: int,
+):
+    """Ensure offers exist for the given product/view assignment."""
+    from products.models import Product
+    from sales_channels.integrations.ebay.factories.products.assigns import (
+        EbaySalesChannelViewAssignUpdateFactory,
+    )
+    from sales_channels.integrations.ebay.models import (
+        EbaySalesChannel,
+        EbaySalesChannelView,
+    )
+
+    task = BaseRemoteTask(task_queue_item_id)
+
+    def actual_task() -> None:
+        factory = EbaySalesChannelViewAssignUpdateFactory(
+            sales_channel=EbaySalesChannel.objects.get(id=sales_channel_id),
+            local_instance=Product.objects.get(id=product_id),
+            view=EbaySalesChannelView.objects.get(id=view_id),
+        )
+        factory.run()
+
+    task.execute(actual_task)
+
+
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
+@db_task()
+def delete_ebay_assign_offers_db_task(
+    task_queue_item_id,
+    *,
+    sales_channel_id: int,
+    product_id: int,
+    view_id: int,
+):
+    """Withdraw and delete offers for a removed product/view assignment."""
+    from products.models import Product
+    from sales_channels.integrations.ebay.factories.products.assigns import (
+        EbaySalesChannelViewAssignDeleteFactory,
+    )
+    from sales_channels.integrations.ebay.models import (
+        EbaySalesChannel,
+        EbaySalesChannelView,
+    )
+
+    task = BaseRemoteTask(task_queue_item_id)
+
+    def actual_task() -> None:
+        factory = EbaySalesChannelViewAssignDeleteFactory(
+            sales_channel=EbaySalesChannel.objects.get(id=sales_channel_id),
+            local_instance=Product.objects.get(id=product_id),
+            view=EbaySalesChannelView.objects.get(id=view_id),
+        )
+        factory.run()
+
+    task.execute(actual_task)
+
+
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
+@db_task()
+def delete_ebay_product_db_task(
+    task_queue_item_id,
+    *,
+    sales_channel_id: int,
+    product_id: int,
+    view_id: int,
+):
+    """Remove the remote product, offers, and inventory for a view."""
+    from products.models import Product
+    from sales_channels.integrations.ebay.factories.products import EbayProductDeleteFactory
+    from sales_channels.integrations.ebay.models import (
+        EbaySalesChannel,
+        EbaySalesChannelView,
+    )
+
+    task = BaseRemoteTask(task_queue_item_id)
+
+    def actual_task() -> None:
+        factory = EbayProductDeleteFactory(
+            sales_channel=EbaySalesChannel.objects.get(id=sales_channel_id),
+            local_instance=Product.objects.get(id=product_id),
+            view=EbaySalesChannelView.objects.get(id=view_id),
+        )
+        factory.run()
+
+    task.execute(actual_task)

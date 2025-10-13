@@ -19,6 +19,11 @@ from .properties import (
     EbayProductPropertyDeleteFactory,
 )
 
+from .assigns import (
+    EbaySalesChannelViewAssignUpdateFactory,
+    EbaySalesChannelViewAssignDeleteFactory,
+)
+
 __all__ = [
     "EbayMediaProductThroughCreateFactory",
     "EbayMediaProductThroughUpdateFactory",
@@ -34,4 +39,6 @@ __all__ = [
     "EbayProductDeleteFactory",
     "EbayProductVariationAddFactory",
     "EbayProductSyncFactory",
+    "EbaySalesChannelViewAssignUpdateFactory",
+    "EbaySalesChannelViewAssignDeleteFactory",
 ]

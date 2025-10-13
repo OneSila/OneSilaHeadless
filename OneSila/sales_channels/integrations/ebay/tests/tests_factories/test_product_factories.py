@@ -756,7 +756,7 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
         self.assertEqual(group_body["variesBy"], mock_varies.return_value)
 
         publish_body = api_mock.sell_inventory_publish_offer_by_inventory_item_group.call_args.kwargs["body"]
-        self.assertEqual(publish_body, {"inventory_item_group_key": self.product.sku})
+        self.assertEqual(publish_body, {"inventoryItemGroupKey": self.product.sku})
 
         for idx, child in enumerate(self.children, start=1):
             remote_child = EbayProduct.objects.get(
@@ -797,7 +797,7 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
         offer_batches = result["children"]["offers"]
         self.assertEqual(len(offer_batches), 1)
         self.assertEqual(len(offer_batches[0]["requests"]), 2)
-        self.assertEqual(result["publish"], {"inventory_item_group_key": self.product.sku})
+        self.assertEqual(result["publish"], {"inventoryItemGroupKey": self.product.sku})
         mock_price_run.assert_called_once()
         mock_ean_run.assert_called()
 

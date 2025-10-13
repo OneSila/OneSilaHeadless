@@ -1794,44 +1794,21 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
 
     def send_bulk_inventory_payloads(self, *, remote_products: Sequence[Any]) -> List[Any]:
         remote_products = list(remote_products)
-        requests = self.build_bulk_inventory_requests(remote_products=remote_products)
-        batches = self._chunk_requests(requests)
-
         if self.get_value_only:
+            requests = self.build_bulk_inventory_requests(remote_products=remote_products)
+            batches = self._chunk_requests(requests)
             return [{"requests": batch} for batch in batches]
 
-        if not batches:
+        if not remote_products:
             return []
 
         api = getattr(self, "api", None) or self.get_api()
         self.api = api
 
         responses: List[Any] = []
-        start = 0
-        for batch in batches:
-            end = start + len(batch)
-            remote_slice = remote_products[start:end]
-            payload = {"requests": batch}
-            self._log_api_payload(
-                action="bulk_create_or_replace_inventory_item",
-                payload=payload,
-            )
-            try:
-                response = api.sell_inventory_bulk_create_or_replace_inventory_item(
-                    body=payload,
-                    content_language=self._get_content_language(),
-                    content_type="application/json",
-                )
-            except (EbayApiError, ApiException) as exc:
-                message = _extract_ebay_api_error_message(exc=exc)
-                raise EbayResponseException(message) from exc
-
-            responses.append(response)
-
-            for remote_product in remote_slice:
-                self._attach_remote_product_assigns(remote_product=remote_product)
-
-            start = end
+        for remote_product in remote_products:
+            with self._use_remote_product(remote_product):
+                responses.append(self.send_inventory_payload())
 
         return responses
 
@@ -1871,45 +1848,32 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
             )
 
     def send_bulk_offer_payloads(self, *, remote_products: Sequence[Any]) -> List[Any]:
-        remote_products = list(remote_products)
-        requests = self.build_bulk_offer_requests(remote_products=remote_products)
-        batches = self._chunk_requests(requests)
 
+        # @TODO: Use the non bulk api until we figure it out why the bulk one always have errors
+        remote_products = list(remote_products)
         if self.get_value_only:
+            requests = self.build_bulk_offer_requests(remote_products=remote_products)
+            batches = self._chunk_requests(requests)
             return [{"requests": batch} for batch in batches]
 
-        if not batches:
+        if not remote_products:
             return []
 
         api = getattr(self, "api", None) or self.get_api()
         self.api = api
 
         responses: List[Any] = []
-        start = 0
-        for batch in batches:
-            end = start + len(batch)
-            remote_slice = remote_products[start:end]
-            payload = {"requests": batch}
-            self._log_api_payload(action="bulk_create_offer", payload=payload)
-            try:
-                response = api.sell_inventory_bulk_create_offer(
-                    body=payload,
-                    content_language=self._get_content_language(),
-                    content_type="application/json",
-                )
-            except (EbayApiError, ApiException) as exc:
-                message = _extract_ebay_api_error_message(exc=exc)
-                raise EbayResponseException(message) from exc
-
-            responses.append(response)
-            self._store_bulk_offer_ids(response=response, remote_products=remote_slice)
-
-            start = end
+        for remote_product in remote_products:
+            with self._use_remote_product(remote_product):
+                responses.append(self.send_offer())
 
         return responses
 
     def _build_group_action_payload(self) -> Dict[str, Any]:
-        return {"inventory_item_group_key": self.get_parent_remote_sku()}
+        return {
+            "inventoryItemGroupKey": self.get_parent_remote_sku(),
+            "marketplaceId": getattr(self.view, "remote_id", None),
+        }
 
     def publish_group(self) -> Any:
         payload = self._build_group_action_payload()

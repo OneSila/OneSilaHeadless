@@ -534,6 +534,15 @@ class EbayProductUpdateFactory(EbayProductBaseFactory):
 class EbayProductDeleteFactory(EbayProductBaseFactory):
     """Remove the offer and inventory item for a product."""
 
+    def _delete_remote_records(self, *, remote_product: EbayProduct, child_remotes: list[EbayProduct]) -> None:
+        to_delete = list(child_remotes)
+        to_delete.append(remote_product)
+
+        for target in to_delete:
+            if target.pk is None:
+                continue
+            type(target).objects.filter(pk=target.pk).delete()
+
     def run(self) -> Optional[Dict[str, Any]]:
         if not self.preflight_check():
             return None
@@ -548,6 +557,7 @@ class EbayProductDeleteFactory(EbayProductBaseFactory):
             self.precalculate_progress_step_increment(2)
             self.update_progress()
 
+            child_remotes: list[EbayProduct] = []
             if self._is_configurable_product():
                 child_remotes = self._collect_child_remote_products()
                 withdraw_result = self.withdraw_group()
@@ -577,9 +587,20 @@ class EbayProductDeleteFactory(EbayProductBaseFactory):
                 inventory_response = self.delete_inventory()
                 result = {"offer": offer_response, "inventory": inventory_response}
 
+            remote_product = getattr(self, "remote_product", None)
+
             self.update_progress()
             self.final_process()
             self.log_action(self.action_log, result or {}, self.payload, log_identifier)
+
+            if remote_product is not None:
+                self._delete_remote_records(
+                    remote_product=remote_product,
+                    child_remotes=child_remotes,
+                )
+                self.remote_instance = None
+                self.remote_product = None
+
             return result
 
         except Exception as exc:
