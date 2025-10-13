@@ -5,7 +5,7 @@ from core.schema.core.subscriptions import refresh_subscription_receiver
 from core.signals import post_create, post_update, mutation_update, post_save
 from eancodes.signals import ean_code_released_for_product
 from inventory.models import Inventory
-from media.models import Media
+from media.models import Media, MediaProductThrough
 from properties.signals import (
     product_properties_rule_configurator_updated,
     property_created,
@@ -562,8 +562,10 @@ def sales_channels__media_product_through__post_create_receiver(sender, instance
     Handles the creation of MediaProductThrough instances.
     Sends a create_remote_image_association signal if the media type is IMAGE.
     """
-    if instance.media.type == Media.IMAGE:
-        create_remote_image_association.send(sender=instance.__class__, instance=instance)
+    if instance.media.type != Media.IMAGE:
+        return
+
+    create_remote_image_association.send(sender=instance.__class__, instance=instance)
 
 
 @receiver(post_update, sender='media.MediaProductThrough')

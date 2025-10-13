@@ -240,6 +240,18 @@ class TestEbayProductTypeRuleFactory(TestCaseEbayMixin):
                     "aspect_values": [],
                 },
                 {
+                    "localized_aspect_name": "Care Instructions",
+                    "aspect_constraint": {
+                        "aspect_data_type": "STRING",
+                        "aspect_mode": "FREE_TEXT",
+                        "aspect_required": False,
+                        "aspect_usage": "OPTIONAL",
+                        "aspect_enabled_for_variations": True,
+                        "aspect_applicable_to": ["PRODUCT"],
+                    },
+                    "aspect_values": [],
+                },
+                {
                     "localized_aspect_name": "Material",
                     "aspect_constraint": {
                         "aspect_data_type": "STRING",
@@ -373,6 +385,7 @@ class TestEbayProductTypeRuleFactory(TestCaseEbayMixin):
             "EC Range",
             "Energy Star",
             "Detailed Description",
+            "Care Instructions",
             "Material",
             "Voltage",
             "Screen Size",
@@ -389,6 +402,7 @@ class TestEbayProductTypeRuleFactory(TestCaseEbayMixin):
         self.assertEqual(properties["EC Range"].type, Property.TYPES.SELECT)
         self.assertFalse(properties["EC Range"].allows_unmapped_values)
         self.assertEqual(properties["Detailed Description"].type, Property.TYPES.DESCRIPTION)
+        self.assertEqual(properties["Care Instructions"].type, Property.TYPES.TEXT)
         self.assertEqual(properties["Material"].type, Property.TYPES.TEXT)
         self.assertEqual(properties["Voltage"].type, Property.TYPES.TEXT)
         self.assertEqual(properties["Screen Size"].type, Property.TYPES.FLOAT)
@@ -421,3 +435,4 @@ class TestEbayProductTypeRuleFactory(TestCaseEbayMixin):
         self.assertEqual(items["Connectivity"], ProductPropertiesRuleItem.OPTIONAL)
         self.assertEqual(items["EC Range"], ProductPropertiesRuleItem.OPTIONAL)
         self.assertEqual(items["Detailed Description"], ProductPropertiesRuleItem.OPTIONAL)
+        self.assertEqual(items["Care Instructions"], ProductPropertiesRuleItem.OPTIONAL)

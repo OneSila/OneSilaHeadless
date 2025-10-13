@@ -52,10 +52,17 @@ class ToUpdateCurrenciesMixin:
 
         logger.debug(f"{self.__class__.__name__} all remote currencies: {all_remote_currencies}")
 
+        self.to_update_currencies = []
+        self.price_data = {}
+
         for remote_currency in all_remote_currencies:
             local_currency = remote_currency.local_instance
 
             if not local_currency:
+                continue
+
+            limit_iso = getattr(self, "limit_to_currency_iso", None)
+            if limit_iso and local_currency.iso_code != limit_iso:
                 continue
 
             local_product = self.get_local_product()

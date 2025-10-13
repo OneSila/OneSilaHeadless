@@ -798,7 +798,8 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
 
     def set_remote_product_for_logging(self):
         super().set_remote_product_for_logging()
-        first_assign = not (self.remote_instance.created_marketplaces or [])
+        created_marketplaces = self.remote_instance.created_marketplaces or []
+        first_assign = self.view.remote_id not in created_marketplaces
         external_id = getattr(self, "external_product_id", None)
         has_asin = bool(
             external_id
@@ -845,7 +846,6 @@ class AmazonProductSyncFactory(AmazonProductBaseFactory, RemoteProductSyncFactor
     create_product_factory = AmazonProductCreateFactory
 
     def perform_remote_action(self):
-        print('------------------------------------- ????????????')
         if self.force_full_update:
             resp = self.create_product(
                 sku=self.sku,

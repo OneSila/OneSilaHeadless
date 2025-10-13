@@ -281,7 +281,10 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         aspect: dict[str, Any],
     ) -> None:
         constraint = aspect.get("aspect_constraint") or {}
-        remote_type = self._determine_remote_type(constraint)
+        remote_type = self._determine_remote_type(
+            constraint=constraint,
+            property_type=getattr(ebay_property, "type", None),
+        )
 
         rule_item, _ = EbayProductTypeItem.objects.get_or_create(
             sales_channel=self.sales_channel,
@@ -368,12 +371,19 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
                 return lowered == "true"
         return None
 
-    def _determine_remote_type(self, constraint: dict[str, Any]) -> Optional[str]:
+    def _determine_remote_type(
+        self,
+        *,
+        constraint: dict[str, Any],
+        property_type: Optional[str],
+    ) -> Optional[str]:
         variations = self._normalize_bool(constraint.get("aspect_enabled_for_variations"))
         required = self._normalize_bool(constraint.get("aspect_required"))
         usage = (constraint.get("aspect_usage") or "").upper()
 
-        if variations:
+        supports_configurator = property_type == Property.TYPES.SELECT
+
+        if variations and supports_configurator:
             if required:
                 return ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR
             return ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR

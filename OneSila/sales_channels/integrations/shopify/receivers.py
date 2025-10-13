@@ -306,6 +306,7 @@ def shopify__image_assoc__create(sender, instance, **kwargs):
         multi_tenant_company=instance.multi_tenant_company,
         product=instance.product,
         sales_channel_class=ShopifySalesChannel,
+        sales_channels_filter_kwargs={'id': instance.sales_channel_id} if instance.sales_channel_id else None,
         media_product_through_id=instance.id,
     )
 
@@ -317,6 +318,7 @@ def shopify__image_assoc__update(sender, instance, **kwargs):
         multi_tenant_company=instance.multi_tenant_company,
         product=instance.product,
         sales_channel_class=ShopifySalesChannel,
+        sales_channels_filter_kwargs={'id': instance.sales_channel_id} if instance.sales_channel_id else None,
         media_product_through_id=instance.id,
     )
 
@@ -330,6 +332,7 @@ def shopify__image_assoc__delete(sender, instance, **kwargs):
         local_instance_id=instance.id,
         product=instance.product,
         sales_channel_class=ShopifySalesChannel,
+        sales_channels_filter_kwargs={'id': instance.sales_channel_id} if instance.sales_channel_id else None,
     )
 
 

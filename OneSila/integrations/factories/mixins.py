@@ -69,7 +69,15 @@ class IntegrationInstanceOperationMixin:
         """
         Logs actions for remote instance operations.
         """
-        self.remote_instance.add_log(
+        remote_instance = getattr(self, "remote_instance", None)
+        if not remote_instance:
+            logger.warning(
+                "Skipping action log for %s because remote_instance is missing",
+                identifier,
+            )
+            return
+
+        remote_instance.add_log(
             action=action,
             response=response_data,
             payload=payload,
@@ -86,8 +94,17 @@ class IntegrationInstanceOperationMixin:
         error_message = str(exception)
         payload = clean_json_data(payload)
 
+        remote_instance = getattr(self, "remote_instance", None)
+        if remote_instance is None:
+            logger.warning(
+                "Skipping error log for %s because remote_instance is missing: %s",
+                identifier,
+                error_message,
+            )
+            return
+
         if hasattr(self.integration._meta, 'user_exceptions') and isinstance(exception, self.integration._meta.user_exceptions):
-            self.remote_instance.add_user_error(
+            remote_instance.add_user_error(
                 action=action,
                 response=error_message,
                 payload=payload,
@@ -97,7 +114,7 @@ class IntegrationInstanceOperationMixin:
                 fixing_identifier=fixing_identifier
             )
         else:
-            self.remote_instance.add_admin_error(
+            remote_instance.add_admin_error(
                 action=action,
                 response=error_message,
                 payload=payload,

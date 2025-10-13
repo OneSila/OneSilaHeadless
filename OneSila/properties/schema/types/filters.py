@@ -5,13 +5,12 @@ from core.schema.core.types.filters import (
     filter,
     SearchFilterMixin,
     ExcluideDemoDataFilterMixin,
+    lazy,
 )
-from media.schema.types.filters import ImageFilter
 from strawberry_django import filter_field as custom_filter
 from properties.models import Property, ProductProperty, \
     ProductProperty, PropertySelectValue, PropertyTranslation, ProductPropertyTextTranslation, PropertySelectValueTranslation, ProductPropertiesRule, \
     ProductPropertiesRuleItem
-from products.schema.types.filters import ProductFilter
 from django.db.models import Q, F, Count, Exists, OuterRef
 from core.managers import QuerySet
 from strawberry import UNSET
@@ -96,7 +95,7 @@ class PropertyFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
 class PropertySelectValueFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     property: Optional[PropertyFilter]
-    image: Optional[ImageFilter]
+    image: Optional[lazy['ImageFilter', "media.schema.types.filters"]]
 
     @custom_filter
     def used_in_products(
@@ -185,7 +184,7 @@ class PropertySelectValueTranslationFilter:
 @filter(ProductProperty)
 class ProductPropertyFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
-    product: Optional[ProductFilter]
+    product: Optional[lazy['ProductFilter', "products.schema.types.filters"]]
     property: Optional[PropertyFilter]
     value_boolean: auto
     value_int: auto

@@ -1189,6 +1189,7 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
         )
 
         offer_id: str | None = None
+        listing_id: str | None = None
         for payload in offer_payloads:
             if not payload:
                 continue
@@ -1205,6 +1206,26 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
         if offer_id and assign.remote_id != offer_id:
             assign.remote_id = offer_id
             updated_fields.append("remote_id")
+
+        def _extract_listing_id(payload: Mapping[str, Any]) -> str | None:
+            listing = payload.get("listing") if isinstance(payload, Mapping) else None
+            if isinstance(listing, Mapping):
+                lid = listing.get("listing_id") or listing.get("listingId")
+            else:
+                lid = payload.get("listing_id") or payload.get("listingId")
+
+            return str(lid).strip() if lid else None
+
+        for payload in offer_payloads:
+            if not isinstance(payload, Mapping):
+                continue
+            lid = _extract_listing_id(payload)
+            if lid and not listing_id:
+                listing_id = lid
+
+        if listing_id and assign.listing_id != listing_id:
+            assign.listing_id = listing_id
+            updated_fields.append("listing_id")
 
         if updated_fields:
             assign.save(update_fields=updated_fields)

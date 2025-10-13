@@ -25,9 +25,13 @@ class ImportImageInstance(AbstractImportInstance):
     Either image_url or image_content must be provided.
     """
 
-    def __init__(self, data: dict, import_process=None, product=None, instance=None):
+    def __init__(self, data: dict, import_process=None, product=None, instance=None, sales_channel=None, create_default_assignment=False):
         super().__init__(data, import_process, instance)
         self.product = product
+        self.sales_channel = sales_channel
+        if self.sales_channel is None and hasattr(self.import_process, 'sales_channel'):
+            self.sales_channel = getattr(self.import_process, 'sales_channel')
+        self.create_default_assignment = create_default_assignment
 
         self.set_field_if_exists('image_url')
         self.set_field_if_exists('image_content')
@@ -44,6 +48,9 @@ class ImportImageInstance(AbstractImportInstance):
 
         self.kwargs = {}
         self.skip_create = False
+
+        self.media_assign = None
+        self.default_media_assign = None
 
         self._set_product_import_instance()
 
@@ -121,6 +128,22 @@ class ImportImageInstance(AbstractImportInstance):
         except Exception:
             self.skip_create = True
 
+    def _update_media_assign_fields(self, media_assign):
+        to_save = False
+
+        for field in self.updatable_fields:
+            if hasattr(self, field):
+                new_value = getattr(self, field)
+            else:
+                new_value = getattr(media_assign, field)
+
+            if getattr(media_assign, field) != new_value:
+                setattr(media_assign, field, new_value)
+                to_save = True
+
+        if to_save:
+            media_assign.save()
+
     def process_logic(self):
 
         self.instance = None
@@ -137,21 +160,30 @@ class ImportImageInstance(AbstractImportInstance):
             self.product = self.product_import_instance.instance
 
         if self.product:
-            self.media_assign, created = MediaProductThrough.objects.get_or_create(
-                multi_tenant_company=self.multi_tenant_company,
-                product=self.product,
-                media=self.instance,
+            defaults = {
+                'sort_order': getattr(self, 'sort_order', 10),
+                'is_main_image': getattr(self, 'is_main_image', False),
+            }
+
+            assignment_kwargs = {
+                'multi_tenant_company': self.multi_tenant_company,
+                'product': self.product,
+                'media': self.instance,
+                'sales_channel': self.sales_channel,
+            }
+
+            self.media_assign, _ = MediaProductThrough.objects.get_or_create(
+                defaults=defaults,
+                **assignment_kwargs,
             )
+            self._update_media_assign_fields(self.media_assign)
 
-            if not created:
+            if self.sales_channel is not None and self.create_default_assignment:
+                default_assignment_kwargs = assignment_kwargs.copy()
+                default_assignment_kwargs['sales_channel'] = None
 
-                to_save = False
-                for field in self.updatable_fields:
-                    current_value = getattr(self.media_assign, field)
-                    new_value = getattr(self.media_assign, field)
-                    if current_value != new_value:
-                        setattr(self.media_assign, field, new_value)
-                        to_save = True
-
-                if to_save:
-                    self.media_assign.save()
+                self.default_media_assign, _ = MediaProductThrough.objects.get_or_create(
+                    defaults=defaults,
+                    **default_assignment_kwargs,
+                )
+                self._update_media_assign_fields(self.default_media_assign)

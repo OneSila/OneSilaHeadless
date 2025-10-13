@@ -1,11 +1,15 @@
 from .categories import EbayCategory
 from .orders import EbayOrder, EbayOrderItem
 from .products import (
-    EbayProduct, EbayPrice, EbayProductContent,
-    EbayMediaThroughProduct, EbayEanCode
+    EbayProduct,
+    EbayPrice,
+    EbayProductContent,
+    EbayMediaThroughProduct,
+    EbayEanCode,
+    EbayProductOffer,
 )
 from .properties import (
-    EbayProperty, EbayInternalProperty, EbayProductProperty, EbayPropertySelectValue,
+    EbayProperty, EbayInternalProperty, EbayInternalPropertyOption, EbayProductProperty, EbayPropertySelectValue,
     EbayProductType, EbayProductTypeItem,
 )
 from .sales_channels import (

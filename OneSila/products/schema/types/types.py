@@ -24,8 +24,6 @@ from .filters import (
 from taxes.schema.types.types import VatRateType
 from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
     ProductTranslation, ConfigurableVariation, BundleVariation, AliasProduct
-from properties.schema.types.types import ProductPropertyType
-from properties.models import ProductProperty
 from products.models import (
     Product,
     BundleProduct,
@@ -89,7 +87,7 @@ class ProductType(relay.Node, GetProductQuerysetMultiTenantMixin):
 
     @field(description="Gets the URL of the first MediaProductThrough Image with the lowest sort order")
     def thumbnail_url(self, info) -> str | None:
-        media_relation = self.mediaproductthrough_set.filter(media__type=Media.IMAGE, is_main_image=True)
+        media_relation = self.mediaproductthrough_set.filter(media__type=Media.IMAGE, is_main_image=True, sales_channel=None)
 
         first_media = media_relation.first()
         if first_media and first_media.media.image:

@@ -8,7 +8,6 @@ from core.schema.core.mixins import GetQuerysetMultiTenantMixin
 from currencies.schema.types.types import CurrencyType
 from imports_exports.schema.queries import ImportType
 from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION
-from products.schema.types.types import ProductType
 from integrations.schema.types.types import IntegrationType
 
 from sales_channels.models import (
@@ -117,6 +116,10 @@ class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def ebay_imports(self) -> List[Annotated['EbaySalesChannelImportType', lazy("sales_channels.integrations.ebay.schema.types.types")]]:
         return EbaySalesChannelImport.objects.filter(sales_channel=self)
+
+    @field()
+    def type(self, info) -> str:
+        return INTEGRATIONS_TYPES_MAP.get(self.__class__, MAGENTO_INTEGRATION)
 
 
 @type(ImportCurrency, filters=ImportCurrencyFilter, order=ImportCurrencyOrder, pagination=True, fields='__all__')
@@ -293,7 +296,7 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
     sales_channel_view: SalesChannelViewType
     remote_product: Optional[RemoteProductType]
-    product: ProductType
+    product: Annotated['ProductType', lazy("products.schema.types.types")]
 
     @field()
     def integration_type(self, info) -> str:

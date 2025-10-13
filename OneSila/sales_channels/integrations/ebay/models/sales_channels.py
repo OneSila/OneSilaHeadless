@@ -1,6 +1,8 @@
 from django.utils.translation import gettext_lazy as _
 from core import models
+from sales_channels.exceptions import PreFlightCheckError
 from sales_channels.integrations.ebay.constants import  WEIGHT_UNIT_CHOICES, LENGTH_UNIT_CHOICES
+from sales_channels.integrations.ebay.exceptions import EbayResponseException
 from sales_channels.models.sales_channels import SalesChannel, SalesChannelView, RemoteLanguage
 import uuid
 
@@ -67,6 +69,7 @@ class EbaySalesChannel(SalesChannel):
     class Meta:
         verbose_name = "eBay Sales Channel"
         verbose_name_plural = "eBay Sales Channels"
+        user_exceptions = (EbayResponseException,PreFlightCheckError,)
 
     def __str__(self):
         return f"eBay Store: {self.hostname}"

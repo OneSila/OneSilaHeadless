@@ -58,7 +58,7 @@ The item document must include the following sections:
   "image_urls": ["https://..."],
   "variant_skus": ["sku_1", "sku_2", ...],
   "varies_by": {
-    "aspects_image_varies_by": ["Color"],
+    "aspectsImageVariesBy": ["Color"],
     "specifications": [
       {"name": "Color", "values": ["Green", "Blue", "Red"]}
     ]

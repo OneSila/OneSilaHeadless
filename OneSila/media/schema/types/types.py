@@ -59,6 +59,7 @@ class FileType(relay.Node, GetQuerysetMultiTenantMixin):
 class MediaProductThroughType(relay.Node, GetQuerysetMultiTenantMixin):
     media: MediaType
     product: Optional[Annotated['ProductType', lazy("products.schema.types.types")]]
+    sales_channel: Optional[Annotated['SalesChannelType', lazy("sales_channels.schema.types.types")]]
 
     @field()
     def product_id(self, info) -> str:

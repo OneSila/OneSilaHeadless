@@ -4,6 +4,7 @@ from sales_channels.integrations.ebay.models import (
     EbayCategory,
     EbaySalesChannel,
     EbayInternalProperty,
+    EbayInternalPropertyOption,
     EbayProductType,
     EbayProductTypeItem,
     EbayProperty,
@@ -41,6 +42,11 @@ class EbayPropertyOrder:
 
 @order(EbayInternalProperty)
 class EbayInternalPropertyOrder:
+    id: auto
+
+
+@order(EbayInternalPropertyOption)
+class EbayInternalPropertyOptionOrder:
     id: auto
 
 

@@ -25,6 +25,8 @@ from sales_channels.integrations.ebay.managers import (
 class EbayProperty(RemoteProperty):
     """eBay attribute model holding marketplace specific metadata."""
 
+    allow_multiple = True
+
     marketplace = models.ForeignKey(
         'ebay.EbaySalesChannelView',
         on_delete=models.CASCADE,
@@ -117,6 +119,69 @@ class EbayInternalProperty(RemoteObjectMixin, models.Model):
 
     def __str__(self):
         return f"{self.code} ({self.sales_channel})"
+
+
+
+class EbayInternalPropertyOption(models.Model):
+    """Allowed option for an eBay internal property."""
+
+    internal_property = models.ForeignKey(
+        EbayInternalProperty,
+        on_delete=models.CASCADE,
+        related_name='options',
+        help_text="Internal property this option belongs to.",
+    )
+    sales_channel = models.ForeignKey(
+        'ebay.EbaySalesChannel',
+        on_delete=models.CASCADE,
+        related_name='internal_property_options',
+        help_text="Sales channel that owns this option.",
+    )
+    local_instance = models.ForeignKey(
+        'properties.PropertySelectValue',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Optional link to a local property select value mapped to this option.",
+    )
+    value = models.CharField(
+        max_length=64,
+        help_text="Remote enumeration value expected by eBay.",
+    )
+    label = models.CharField(
+        max_length=255,
+        help_text="Human readable label presented to users.",
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Optional description explaining when to use this value.",
+    )
+    sort_order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order for this option.",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Deactivate to hide the option from selection lists without deleting it.",
+    )
+
+    class Meta:
+        verbose_name = _("eBay Internal Property Option")
+        verbose_name_plural = _("eBay Internal Property Options")
+        ordering = ('sort_order', 'label')
+        unique_together = ('internal_property', 'value')
+        search_terms = ['label', 'value', 'local_instance__propertyselectvaluetranslation__value']
+
+    def __str__(self):
+        return f"{self.value} @ {self.internal_property.code}"
+
+    def save(self, *args, **kwargs):
+        if self.internal_property_id:
+            if not self.sales_channel_id:
+                self.sales_channel_id = self.internal_property.sales_channel_id
+            if not self.multi_tenant_company_id:
+                self.multi_tenant_company_id = self.internal_property.multi_tenant_company_id
+        super().save(*args, **kwargs)
 
 
 

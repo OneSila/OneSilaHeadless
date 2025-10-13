@@ -14,6 +14,7 @@ from sales_channels.integrations.ebay.models import (
     EbayCategory,
     EbaySalesChannel,
     EbayInternalProperty,
+    EbayInternalPropertyOption,
     EbayProductType,
     EbayProductTypeItem,
     EbayProperty,
@@ -26,6 +27,7 @@ from sales_channels.integrations.ebay.schema.types.filters import (
     EbayCategoryFilter,
     EbaySalesChannelFilter,
     EbayInternalPropertyFilter,
+    EbayInternalPropertyOptionFilter,
     EbayProductTypeFilter,
     EbayProductTypeItemFilter,
     EbayPropertyFilter,
@@ -38,6 +40,7 @@ from sales_channels.integrations.ebay.schema.types.ordering import (
     EbayCategoryOrder,
     EbaySalesChannelOrder,
     EbayInternalPropertyOrder,
+    EbayInternalPropertyOptionOrder,
     EbayProductTypeOrder,
     EbayProductTypeItemOrder,
     EbayPropertyOrder,
@@ -46,6 +49,12 @@ from sales_channels.integrations.ebay.schema.types.ordering import (
     EbaySalesChannelViewOrder,
     EbayCurrencyOrder,
 )
+
+
+def _resolve_internal_property_options(root: EbayInternalProperty, info):
+    return list(
+        root.options.filter(is_active=True).order_by('sort_order', 'label')
+    )
 
 
 @strawberry_type
@@ -182,6 +191,10 @@ class EbayInternalPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
         'PropertyType',
         lazy("properties.schema.types.types")
     ]]
+    options: List[Annotated[
+        'EbayInternalPropertyOptionType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]] = field(resolver=_resolve_internal_property_options)
 
     @field()
     def mapped_locally(self, info) -> bool:
@@ -191,6 +204,27 @@ class EbayInternalPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
     def mapped_remotely(self, info) -> bool:
         return self.mapped_remotely
 
+
+@type(
+    EbayInternalPropertyOption,
+    filters=EbayInternalPropertyOptionFilter,
+    order=EbayInternalPropertyOptionOrder,
+    pagination=True,
+    fields="__all__",
+)
+class EbayInternalPropertyOptionType(relay.Node, GetQuerysetMultiTenantMixin):
+    internal_property: Annotated[
+        'EbayInternalPropertyType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+    sales_channel: Annotated[
+        'EbaySalesChannelType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'PropertySelectValueType',
+        lazy("properties.schema.types.types")
+    ]]
 
 @type(
     EbayPropertySelectValue,

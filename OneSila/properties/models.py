@@ -132,6 +132,19 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
             return self.translated_value
         return self._get_translated_value(field_name='value', related_name='propertyselectvaluetranslation_set', language=language, fallback='No Value Set')
 
+    def value_by_language_code(self, *, language=None):
+        """Return the translated value for the given language code when available."""
+        if language:
+            translated = self._get_translated_value(
+                field_name='value',
+                related_name='propertyselectvaluetranslation_set',
+                language=language,
+                fallback=None,
+            )
+            if translated not in (None, ''):
+                return translated
+        return self.value
+
     def __str__(self):
         return f"{self.value} <{self.property}>"
 
@@ -196,7 +209,7 @@ class ProductProperty(TranslatedModelMixin, models.Model):
         return method(language)
 
     def get_serialised_value(self, language=None):
-        value = self.get_value()
+        value = self.get_value(language)
 
         if self.property.type == Property.TYPES.MULTISELECT:
             value = list({value.value for value in self.value_multi_select.all()})

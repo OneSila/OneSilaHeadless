@@ -183,6 +183,9 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
             AmazonSalesChannel,
             AmazonSalesChannelView,
         )
+        from sales_channels.integrations.ebay.models import (
+            EbaySalesChannel,
+        )
 
         sales_channel = self.sales_channel.get_real_instance()
 
@@ -216,6 +219,36 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
                     except AmazonExternalProductId.DoesNotExist:
                         pass
             return None
+        elif isinstance(sales_channel, EbaySalesChannel):
+            listing_id = None
+
+            if self.remote_product and self.remote_product.id:
+                from sales_channels.integrations.ebay.models.products import EbayProductOffer
+
+                offer = (
+                    EbayProductOffer.objects.filter(
+                        remote_product_id= self.remote_product.id,
+                        sales_channel_view=self.sales_channel_view,
+                    )
+                    .only("remote_id", "listing_id")
+                    .first()
+                )
+
+                if offer:
+                    listing_id = (offer.listing_id or "").strip()
+                    listing_status = (offer.listing_status or "").strip()
+
+            base_url = (self.sales_channel_view.url or "").rstrip('/') if self.sales_channel_view else ""
+
+            if sales_channel.environment == EbaySalesChannel.SANDBOX:
+                base_url = "https://sandbox.ebay.com"
+            elif not base_url:
+                base_url = "https://www.ebay.com"
+
+            if listing_id:
+                return f"{base_url.rstrip('/')}/itm/{listing_id}"
+
+            return base_url or None
 
         return f"{self.sales_channel_view.url}{self.product.url_key}.html"
 

@@ -233,9 +233,15 @@ class ContentLLMMixin(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
             self.images = []
             return
 
-        self.images = [i.media.image_web_url for i in MediaProductThrough.objects.filter(
-            media__type=Media.IMAGE,
-            product=self.product)]
+        images_queryset = MediaProductThrough.objects.get_product_images(
+            product=self.product,
+            sales_channel=None,
+        )
+
+        self.images = [
+            item.media.image_web_url
+            for item in images_queryset.filter(media__type=Media.IMAGE)
+        ]
 
     def _set_documents(self):
 
@@ -243,9 +249,15 @@ class ContentLLMMixin(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
             self.documents = []
             return
 
-        self.documents = [i.media.file_url() for i in MediaProductThrough.objects.filter(
-            media__type=Media.FILE,
-            product=self.product)]
+        documents_queryset = MediaProductThrough.objects.get_product_images(
+            product=self.product,
+            sales_channel=None,
+        )
+
+        self.documents = [
+            item.media.file_url()
+            for item in documents_queryset.filter(media__type=Media.FILE)
+        ]
 
     def _set_is_configurable(self):
         self.is_configurable = self.product.is_configurable()

@@ -93,6 +93,7 @@ class EbayCategoryNodeSyncFactory(GetEbayAPIMixin):
     def _walk_nodes(
         self,
         node: dict[str, object],
+        ancestors: tuple[str, ...] = (),
     ) -> Iterator[_CategoryEntry]:
         category = node.get("category") or {}
         if not isinstance(category, dict):
@@ -103,16 +104,18 @@ class EbayCategoryNodeSyncFactory(GetEbayAPIMixin):
         node_id = str(raw_id).strip() if raw_id is not None else ""
         node_name = str(raw_name).strip() if raw_name is not None else ""
 
-        if node_id and node_name:
+        path_parts = tuple(part for part in (*ancestors, node_name) if part)
+
+        if node_id and path_parts:
             yield _CategoryEntry(
                 remote_id=node_id,
-                name=node_name,
+                name=" > ".join(path_parts),
             )
 
         children = node.get("childCategoryTreeNodes") or node.get("child_category_tree_nodes") or []
         for child in children if isinstance(children, Iterable) else []:
             if isinstance(child, dict):
-                yield from self._walk_nodes(child)
+                yield from self._walk_nodes(child, path_parts)
 
     def _persist_nodes(self, nodes: list[_CategoryEntry]) -> None:
         marketplace_id = self.category_tree_id
