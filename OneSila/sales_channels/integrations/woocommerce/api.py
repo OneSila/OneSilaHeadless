@@ -337,7 +337,7 @@ class WoocommerceApiWrapper:
         }
 
         payload = clearout_none_values(payload)
-        logger.debug(f"Create Product Payload: {payload}")
+        logger.info(f"Create Product Payload: {payload}")
 
         try:
             return self.post('products', data=payload)
