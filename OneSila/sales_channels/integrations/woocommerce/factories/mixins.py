@@ -267,11 +267,20 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
 
         return ga
 
+    def _stringify_attribute_option(self, value):
+        if isinstance(value, list):
+            return [self._stringify_attribute_option(item) for item in value]
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        return str(value)
+
     def get_serialised_woocommerce_value(self, prod_prop):
         value = prod_prop.get_serialised_value(language=self.sales_channel_assign_language)
         if prod_prop.property.type == Property.TYPES.BOOLEAN:
             value = self.get_boolean_value(value)
-        return value
+        return self._stringify_attribute_option(value)
 
     def get_common_properties(self):
         product = self.get_local_product()
