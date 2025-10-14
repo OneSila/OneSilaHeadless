@@ -483,6 +483,9 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
         self.payload = {}  # Will hold the payload data
         self.api = api
 
+        if not hasattr(self, '_remote_instance_additional_filters'):
+            self._remote_instance_additional_filters = {}
+
         setattr(self, self.integration_key, self.integration.get_real_instance())
 
         if not self.remote_model_class:
@@ -529,6 +532,8 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
                         'local_instance': self.local_instance,
                         self.integration_key: self.integration
                     }
+                    if self._remote_instance_additional_filters:
+                        lookup_payload.update(self._remote_instance_additional_filters)
                     self.remote_instance = self.remote_model_class.objects.get(**lookup_payload)
 
             logger.debug(f"Fetched remote instance: {self.remote_instance}")

@@ -257,6 +257,11 @@ class MagentoProductPropertyUpdateFactory(GetMagentoAPIMixin, RemoteValueMixin, 
     remote_property_factory = MagentoPropertyCreateFactory
     remote_property_select_value_factory = MagentoPropertySelectValueCreateFactory
 
+    def __init__(self, sales_channel, local_instance, remote_product, api=None, get_value_only=False, remote_instance=None, skip_checks=False, language=None):
+        self._remote_instance_additional_filters = {'remote_product': remote_product} if remote_product is not None else {}
+        super().__init__(sales_channel, local_instance, remote_product, api=api, get_value_only=get_value_only,
+                         remote_instance=remote_instance, skip_checks=skip_checks, language=language)
+
     def update_remote(self):
         self.magento_product: Product = self.api.products.by_sku(self.remote_product.remote_sku)
         if isinstance(self.remote_value, dict):

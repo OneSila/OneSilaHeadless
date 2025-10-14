@@ -1,4 +1,5 @@
 from integrations.models import IntegrationLog
+from types import SimpleNamespace
 from media.models import MediaProductThrough, Media
 from products.models import Product
 from properties.models import ProductProperty
@@ -155,19 +156,21 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         such as adding to payload, creating or updating remote instances, etc.
         """
         existing_remote_property_ids = []
+        skip_remote_mirror = self.should_skip_remote_product_property_mirror()
 
         for product_property in self.product_properties:
             # Attempt to process the product property
-            remote_property_id = self.process_single_property(product_property)
+            remote_property_id = self.process_single_property(product_property, skip_remote_mirror=skip_remote_mirror)
 
             # in the marketplaces some might be skipped if not mapped
-            if remote_property_id:
+            if not skip_remote_mirror and remote_property_id:
                 existing_remote_property_ids.append(remote_property_id)
 
-        # Delete any remote properties that no longer exist locally
-        self.delete_non_existing_remote_product_property(existing_remote_property_ids)
+        # Delete any remote properties that no longer exist locally when mirrors are persisted
+        if not skip_remote_mirror:
+            self.delete_non_existing_remote_product_property(existing_remote_property_ids)
 
-    def process_single_property(self, product_property):
+    def process_single_property(self, product_property, *, skip_remote_mirror=False):
         """
         Processes a single product property. Attempts to update if it exists, otherwise creates it.
         Also checks if the property needs to be updated and adds it to remote_product_properties.
@@ -175,6 +178,14 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         :param product_property: The product property to process.
         :return: The remote product property ID.
         """
+        if skip_remote_mirror:
+            remote_payload = self.collect_property_payload_without_mirror(product_property)
+
+            if remote_payload:
+                self.remote_product_properties.append(remote_payload)
+
+            return None
+
         # Try to fetch an existing remote product property
         try:
             remote_property = self.remote_product_property_class.objects.get(
@@ -223,6 +234,42 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         # If the remote property does not need updating, return its ID
         return remote_property.id
+
+    def should_skip_remote_product_property_mirror(self):
+        """Allow subclasses to skip persisting remote product property mirrors."""
+        return False
+
+    def collect_property_payload_without_mirror(self, product_property):
+        """
+        Build a lightweight structure containing the remote property definition and value without
+        creating or updating remote mirror models.
+        """
+        if not self.remote_product_property_create_factory:
+            return None
+
+        factory = self.remote_product_property_create_factory(
+            local_instance=product_property,
+            sales_channel=self.sales_channel,
+            remote_product=self.remote_instance,
+            api=self.api,
+            get_value_only=True,
+            skip_checks=True,
+        )
+
+        factory.set_api()
+        if not factory.preflight_check():
+            return None
+
+        factory.preflight_process()
+        remote_property = getattr(factory, 'remote_property', None)
+        if remote_property is None:
+            return None
+
+        remote_value = factory.get_remote_value()
+        if remote_value is None:
+            return None
+
+        return SimpleNamespace(remote_property=remote_property, remote_value=str(remote_value))
 
     def delete_non_existing_remote_product_property(self, existing_remote_property_ids):
         """
