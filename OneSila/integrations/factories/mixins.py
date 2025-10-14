@@ -518,20 +518,25 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
         Retrieve the remote instance based on the local instance and sales channel.
         Does not handle creation or deletion logic.
         """
+        lookup_payload = None
         try:
             if self.remote_instance is None:
                 if self.remote_instance_id is not None:
-                    self.remote_instance = self.remote_model_class.objects.get(id=self.remote_instance_id)
+                    lookup_payload = {'id': self.remote_instance_id}
+                    self.remote_instance = self.remote_model_class.objects.get(**lookup_payload)
                 else:
-                    get_payload = {
+                    lookup_payload = {
                         'local_instance': self.local_instance,
                         self.integration_key: self.integration
                     }
-                    self.remote_instance = self.remote_model_class.objects.get(**get_payload)
+                    self.remote_instance = self.remote_model_class.objects.get(**lookup_payload)
 
             logger.debug(f"Fetched remote instance: {self.remote_instance}")
         except self.remote_model_class.DoesNotExist:
             self.remote_instance = None
+        except self.remote_model_class.MultipleObjectsReturned as exc:
+            formatted_kwargs = ', '.join(f"{key}={value!r}" for key, value in (lookup_payload or {}).items()) or 'No lookup kwargs captured'
+            raise self.remote_model_class.MultipleObjectsReturned(f"{exc} | lookup kwargs: {formatted_kwargs}") from exc
 
     def handle_remote_instance_creation(self):
         """
