@@ -33,6 +33,7 @@ from sales_channels.models import (
     RemoteVat,
     SalesChannel,
     SalesChannelIntegrationPricelist,
+    SalesChannelContentTemplate,
     SalesChannelView,
     SalesChannelViewAssign,
     RemoteOrder,
@@ -63,6 +64,7 @@ from .filters import (
     SalesChannelIntegrationPricelistFilter,
     SalesChannelViewFilter,
     SalesChannelViewAssignFilter,
+    SalesChannelContentTemplateFilter,
     RemoteLanguageFilter,
 )
 from .ordering import (
@@ -91,6 +93,7 @@ from .ordering import (
     SalesChannelIntegrationPricelistOrder,
     SalesChannelViewOrder,
     SalesChannelViewAssignOrder,
+    SalesChannelContentTemplateOrder,
     RemoteLanguageOrder,
 )
 from ...integrations.amazon.models import AmazonSalesChannelImport, AmazonSalesChannel
@@ -103,6 +106,14 @@ class FormattedIssueType:
     message: str | None
     severity: str | None
     validation_issue: bool
+
+
+@strawberry_type
+class SalesChannelContentTemplateCheckType:
+    is_valid: bool
+    rendered_content: Optional[str]
+    available_variables: List[str]
+    errors: List[FormattedIssueType]
 
 
 @type(SalesChannel, filters=SalesChannelFilter, order=SalesChannelOrder, pagination=True, fields='__all__')
@@ -313,3 +324,8 @@ class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):
             return self.remote_product.syncing_current_percentage
 
         return 0
+
+
+@type(SalesChannelContentTemplate, filters=SalesChannelContentTemplateFilter, order=SalesChannelContentTemplateOrder, pagination=True, fields='__all__')
+class SalesChannelContentTemplateType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: SalesChannelType

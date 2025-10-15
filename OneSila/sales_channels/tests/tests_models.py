@@ -1,20 +1,23 @@
 from datetime import date
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
-
 from core.tests import TestCase
 from model_bakery import baker
 
-from products.models import Product
+from products.models import Product, ProductTranslation
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
 from sales_channels.models import SalesChannel, SalesChannelIntegrationPricelist, RemoteProduct
 from sales_channels.receivers import sales_channels__sales_channel__post_create_receiver
 from core.signals import post_create
 from unittest.mock import patch
-from sales_prices.models import SalesPriceList
+from sales_prices.models import SalesPriceList, SalesPrice
 from currencies.models import Currency
 from currencies.currencies import currencies
+from media.models import Media, MediaProductThrough
+from properties.models import Property, PropertyTranslation, PropertySelectValue, PropertySelectValueTranslation, ProductProperty
+from sales_channels.content_templates import build_content_template_context, render_sales_channel_content_template
 
 
 class SalesChannelIntegrationPricelistTestCase(TestCase):
@@ -232,3 +235,159 @@ class RemoteProductConstraintTestCase(TestCase):
                 remote_sku="DUP-SKU",
                 is_variation=True,
             )
+
+
+class SalesChannelContentTemplateTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            hostname="https://example.com",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        self.product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+        )
+
+        ProductTranslation.objects.create(
+            product=self.product,
+            language=self.multi_tenant_company.language,
+            name="Sample Product",
+            short_description="Short copy",
+            description="Long description",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        self.currency = Currency.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            is_default_currency=True,
+        ).first()
+
+        if self.currency is None:
+            self.currency = Currency.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                iso_code="EUR",
+                name="Euro",
+                symbol="€",
+                is_default_currency=True,
+            )
+
+        SalesPrice.objects.create(
+            product=self.product,
+            currency=self.currency,
+            rrp=Decimal("15.00"),
+            price=Decimal("12.50"),
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        self.brand_property = Property.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            internal_name="brand",
+        ).first()
+
+        if self.brand_property is None:
+            self.brand_property = Property.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                type=Property.TYPES.SELECT,
+                is_public_information=True,
+                internal_name="brand",
+            )
+
+        PropertyTranslation.objects.get_or_create(
+            property=self.brand_property,
+            language=self.multi_tenant_company.language,
+            multi_tenant_company=self.multi_tenant_company,
+            defaults={
+                "name": "Brand",
+                "multi_tenant_company": self.multi_tenant_company,
+            },
+        )
+
+        self.brand_value = PropertySelectValue.objects.create(
+            property=self.brand_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        PropertySelectValueTranslation.objects.create(
+            propertyselectvalue=self.brand_value,
+            language=self.multi_tenant_company.language,
+            value="OneSila",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ProductProperty.objects.create(
+            product=self.product,
+            property=self.brand_property,
+            value_select=self.brand_value,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        self.media = Media.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Media.IMAGE,
+            title="Main Image",
+        )
+
+        MediaProductThrough.objects.create(
+            product=self.product,
+            media=self.media,
+            sales_channel=self.sales_channel,
+            is_main_image=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+    def test_build_content_template_context(self):
+        context = build_content_template_context(
+            product=self.product,
+            sales_channel=self.sales_channel,
+            description="Rendered description",
+            language=self.multi_tenant_company.language,
+            title="Sample Product",
+        )
+
+        self.assertEqual(context["content"], "Rendered description")
+        self.assertEqual(context["title"], "Sample Product")
+        self.assertEqual(context["brand"], "OneSila")
+        self.assertEqual(context["currency"], self.currency.iso_code)
+        self.assertEqual(context["price"], Decimal("15.00"))
+        self.assertIn("product_properties", context)
+        self.assertTrue(
+            any(prop["internal_name"] == "brand" for prop in context["product_properties"])
+        )
+
+    def test_build_content_template_context_with_price_overrides(self):
+        context = build_content_template_context(
+            product=self.product,
+            sales_channel=self.sales_channel,
+            description="Rendered description",
+            language=self.multi_tenant_company.language,
+            title="Sample Product",
+            price=Decimal("99.99"),
+            discount_price=Decimal("79.99"),
+            currency="USD",
+        )
+
+        self.assertEqual(context["price"], Decimal("99.99"))
+        self.assertEqual(context["discount_price"], Decimal("79.99"))
+        self.assertEqual(context["currency"], "USD")
+
+    def test_render_sales_channel_content_template(self):
+        context = build_content_template_context(
+            product=self.product,
+            sales_channel=self.sales_channel,
+            description="Rendered description",
+            language=self.multi_tenant_company.language,
+            title="Sample Product",
+        )
+
+        template = "<div>{{ title }} - {{ brand }}</div>"
+        rendered = render_sales_channel_content_template(
+            template_string=template,
+            context=context,
+        )
+
+        self.assertIn("Sample Product", rendered)
+        self.assertIn("OneSila", rendered)

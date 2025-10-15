@@ -30,6 +30,7 @@ from sales_channels.models import (
     SalesChannelIntegrationPricelist,
     SalesChannelView,
     SalesChannelViewAssign,
+    SalesChannelContentTemplate,
 )
 from sales_channels.models.sales_channels import RemoteLanguage
 
@@ -175,3 +176,10 @@ class SalesChannelViewAssignFilter(SearchFilterMixin):
     sales_channel: Optional[SalesChannelFilter]
     sales_channel_view: Optional[SalesChannelViewFilter]
     product: Optional[ProductFilter]
+
+
+@filter(SalesChannelContentTemplate)
+class SalesChannelContentTemplateFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    language: auto

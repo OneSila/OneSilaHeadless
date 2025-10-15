@@ -7,6 +7,7 @@ from .types.types import (
     SalesChannelIntegrationPricelistType,
     SalesChannelViewType,
     SalesChannelViewAssignType,
+    SalesChannelContentTemplateType,
     RemoteLanguageType,
     RemoteCurrencyType,
     SalesChannelImportType,
@@ -44,5 +45,8 @@ class SalesChannelsQuery:
 
     sales_channel_view_assign: SalesChannelViewAssignType = node()
     sales_channel_view_assigns: DjangoListConnection[SalesChannelViewAssignType] = connection()
+
+    sales_channel_content_template: SalesChannelContentTemplateType = node()
+    sales_channel_content_templates: DjangoListConnection[SalesChannelContentTemplateType] = connection()
 
     integration: IntegrationType = node()

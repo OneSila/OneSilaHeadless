@@ -2,6 +2,7 @@ from integrations.models import IntegrationLog
 from media.models import MediaProductThrough, Media
 from products.models import Product
 from properties.models import ProductProperty
+from django.template import TemplateSyntaxError
 from sales_channels.exceptions import (
     SwitchedToSyncException,
     SwitchedToCreateException,
@@ -11,6 +12,11 @@ from sales_channels.factories.mixins import IntegrationInstanceOperationMixin, R
     EanCodeValueMixin, SyncProgressMixin
 import logging
 
+from sales_channels.content_templates import (
+    build_content_template_context,
+    get_sales_channel_content_template,
+    render_sales_channel_content_template,
+)
 from sales_channels.models import RemoteLog, SalesChannel, RemoteImageProductAssociation, RemoteCurrency
 from sales_channels.models.products import RemoteProductConfigurator, RemoteProduct
 from sales_channels.models.sales_channels import RemoteLanguage, SalesChannelViewAssign
@@ -70,6 +76,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.local_type = self.local_instance.type
         self.is_create = False
         self.is_switched = is_switched
+        self._content_template_media_assignments = None
+        self._content_template_cache = {}
 
     def set_local_assigns(self):
         to_assign = SalesChannelViewAssign.objects.filter(product=self.local_instance, sales_channel=self.sales_channel, remote_product__isnull=True)
@@ -96,6 +104,58 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         remote_key = self.field_mapping.get(field_name, None)
         if remote_key:
             self.payload[remote_key] = value
+
+    def _get_sales_channel_content_template(self, *, language):
+        if not language:
+            return None
+        if language not in self._content_template_cache:
+            self._content_template_cache[language] = get_sales_channel_content_template(
+                sales_channel=self.sales_channel,
+                language=language,
+            )
+        return self._content_template_cache[language]
+
+    def _render_content_template(
+        self,
+        *,
+        description,
+        language,
+        title,
+        price=None,
+        discount_price=None,
+        currency=None,
+    ):
+        template = self._get_sales_channel_content_template(language=language)
+        if not template or not template.template.strip():
+            return description
+
+        try:
+            context = build_content_template_context(
+                product=self.local_instance,
+                sales_channel=self.sales_channel,
+                description=description,
+                language=language,
+                title=title or "",
+                media_assignments=self._content_template_media_assignments,
+                product_properties=list(getattr(self, 'product_properties', []) or []),
+                price=price,
+                discount_price=discount_price,
+                currency=currency,
+            )
+            rendered = render_sales_channel_content_template(
+                template_string=template.template,
+                context=context,
+            )
+        except TemplateSyntaxError as exc:
+            logger.warning(
+                "Failed to render content template for %s (%s): %s",
+                self.local_instance,
+                language or 'default',
+                exc,
+            )
+            return description
+
+        return rendered or description
 
     def initialize_remote_product(self):
         """
@@ -374,11 +434,27 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
     def set_description(self):
         """Sets the description for the product or variation in the payload."""
+        language_code = self.sales_channel.multi_tenant_company.language
         self.description = self.local_instance._get_translated_value(
-            field_name='description', related_name='translations', sales_channel=self.sales_channel)
+            field_name='description',
+            language=language_code,
+            related_name='translations',
+            sales_channel=self.sales_channel,
+        )
 
         if self.is_variation:
             self.set_variation_description()
+
+        self.description = self._render_content_template(
+            description=self.description,
+            language=language_code,
+            title=self.local_instance._get_translated_value(
+                field_name='name',
+                language=language_code,
+                related_name='translations',
+                sales_channel=self.sales_channel,
+            ),
+        )
 
         self.add_field_in_payload('description', self.description)
 
@@ -623,6 +699,20 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
                 sales_channel=self.sales_channel
             )
 
+            description = self._render_content_template(
+                description=description,
+                language=remote_language.local_instance,
+                title=self.local_instance._get_translated_value(
+                    field_name='name',
+                    language=remote_language.local_instance,
+                    related_name='translations',
+                    sales_channel=self.sales_channel,
+                ),
+                price=getattr(self, 'price', None),
+                discount_price=getattr(self, 'discount', None),
+                currency=getattr(self, 'default_currency_code', None),
+            )
+
             url_key = self.local_instance._get_translated_value(
                 field_name='url_key',
                 language=remote_language.local_instance,
@@ -654,7 +744,11 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """
         Assigns images to the remote product.
         """
-        media_throughs = self.get_medias()
+        media_throughs = self._content_template_media_assignments
+        if media_throughs is None:
+            media_throughs = list(self.get_medias())
+        else:
+            media_throughs = list(media_throughs)
 
         # For each MediaProductThrough instance, process the image assignment
         existing_remote_images_ids = []
@@ -919,8 +1013,9 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.precalculate_progress_step_increment(4)
             self.set_local_assigns()
             self.set_rule()  # we put this here since if is not present we will stop the process
-            self.build_payload()
             self.set_product_properties()
+            self._content_template_media_assignments = list(self.get_medias())
+            self.build_payload()
             self.process_product_properties()
 
             if self.local_type == Product.CONFIGURABLE:
