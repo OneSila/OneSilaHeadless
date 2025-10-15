@@ -261,18 +261,13 @@ class SalesChannelContentTemplate(models.Model):
         on_delete=models.CASCADE,
         related_name='content_templates',
     )
-    name = models.CharField(
-        max_length=216,
-        help_text="Admin-facing name for the template.",
-    )
+
     language = models.CharField(
         max_length=7,
         choices=get_languages(),
         help_text="Language code this template targets.",
     )
     template = models.TextField(help_text="Django template used to render product descriptions.")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = 'Sales Channel Content Template'
@@ -285,7 +280,7 @@ class SalesChannelContentTemplate(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.language}) @ {self.sales_channel}"
+        return f"{self.sales_channel} ({self.language})"
 
 
 class RemoteLanguage(PolymorphicModel, RemoteObjectMixin, models.Model):

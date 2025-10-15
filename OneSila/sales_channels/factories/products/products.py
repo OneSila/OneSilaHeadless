@@ -434,27 +434,14 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
     def set_description(self):
         """Sets the description for the product or variation in the payload."""
-        language_code = self.sales_channel.multi_tenant_company.language
         self.description = self.local_instance._get_translated_value(
             field_name='description',
-            language=language_code,
             related_name='translations',
             sales_channel=self.sales_channel,
         )
 
         if self.is_variation:
             self.set_variation_description()
-
-        self.description = self._render_content_template(
-            description=self.description,
-            language=language_code,
-            title=self.local_instance._get_translated_value(
-                field_name='name',
-                language=language_code,
-                related_name='translations',
-                sales_channel=self.sales_channel,
-            ),
-        )
 
         self.add_field_in_payload('description', self.description)
 
@@ -731,7 +718,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.finalize_content_translations()
 
     def get_medias(self):
-        return (
+        medias = (
             MediaProductThrough.objects.get_product_images(
                 product=self.local_instance,
                 sales_channel=self.sales_channel,
@@ -740,15 +727,15 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             .order_by('-is_main_image', 'sort_order')
         )
 
+        self._content_template_media_assignments = medias
+
+        return medias
+
     def assign_images(self):
         """
         Assigns images to the remote product.
         """
-        media_throughs = self._content_template_media_assignments
-        if media_throughs is None:
-            media_throughs = list(self.get_medias())
-        else:
-            media_throughs = list(media_throughs)
+        media_throughs = self.get_medias()
 
         # For each MediaProductThrough instance, process the image assignment
         existing_remote_images_ids = []
@@ -1014,7 +1001,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.set_local_assigns()
             self.set_rule()  # we put this here since if is not present we will stop the process
             self.set_product_properties()
-            self._content_template_media_assignments = list(self.get_medias())
             self.build_payload()
             self.process_product_properties()
 
