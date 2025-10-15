@@ -116,11 +116,11 @@ class WoocommerceRemoteValueConversionMixin:
 
     def get_int_value(self, value):
         """Handles int value types."""
-        return value
+        return str(value)
 
     def get_float_value(self, value):
         """Handles float value types."""
-        return value
+        return str(value)
 
     def get_boolean_value(self, value: bool) -> str:
         """Converts boolean values to translated strings for WooCommerce."""
