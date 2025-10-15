@@ -275,7 +275,7 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         # @TODO: Come back to this
         pass
 
-    def process_single_property(self, product_property):
+    def process_single_property(self, product_property, *, skip_remote_mirror=False):
         def add_to_metafields(fac):
             self.metafields.append({
                 "namespace": fac.namespace,
