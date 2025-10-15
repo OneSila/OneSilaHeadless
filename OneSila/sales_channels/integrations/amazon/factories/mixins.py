@@ -2,6 +2,7 @@ from core.logging_helpers import timeit_and_log
 from properties.models import Property, PropertyTranslation
 from sales_channels.integrations.amazon.constants import AMAZON_PATCH_SKIP_KEYS
 from sales_channels.integrations.amazon.models.properties import AmazonProperty
+from sales_channels.integrations.amazon.models.products import AmazonExternalProductId
 import json
 
 from django.conf import settings
@@ -370,6 +371,24 @@ class GetAmazonAPIMixin:
         starting_stock = getattr(sales_channel, "starting_stock", None)
         if starting_stock is None:
             return None
+
+        external_product_id = getattr(self, "external_product_id", None)
+        if external_product_id is None and hasattr(self, "_get_external_product_id"):
+            external_product_id = self._get_external_product_id()
+
+        if external_product_id is not None:
+            has_assigned_asin = False
+            asin_value = getattr(external_product_id, "value", None)
+            created_asin = getattr(external_product_id, "created_asin", None)
+
+            if getattr(external_product_id, "type", None) == AmazonExternalProductId.TYPE_ASIN and asin_value:
+                has_assigned_asin = True
+
+            if created_asin:
+                has_assigned_asin = True
+
+            if has_assigned_asin:
+                return None
 
         local_instance = getattr(self, "local_instance", None)
         is_configurable = False
