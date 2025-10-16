@@ -450,8 +450,11 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
     remote_price_class = ShopifyPrice
     remote_product_content_class = ShopifyProductContent
     remote_product_eancode_class = ShopifyEanCode
-    variations_payload = []
-    sku_variations_map = {}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.variations_payload = []
+        self.sku_variations_map = {}
 
     def assign_images(self):
         # this will try to create the images AFTER the product but we already created them inside the product call
@@ -843,6 +846,8 @@ class ShopifyProductCreateFactory(ShopifyProductSyncFactory, RemoteProductCreate
             self._assign_metafield_remote_ids(variant, remote_variation)
 
     def create_or_update_children(self):
+        self.variations_payload = []
+        self.sku_variations_map = {}
         super().create_or_update_children()
         self.create_variations()
 
