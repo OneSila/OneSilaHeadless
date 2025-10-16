@@ -3,12 +3,15 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.test import RequestFactory
+from django.utils.html import format_html
 from core.tests import TestCase
 from model_bakery import baker
 
 from products.models import Product, ProductTranslation
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
-from sales_channels.models import SalesChannel, SalesChannelIntegrationPricelist, RemoteProduct
+from sales_channels.models import SalesChannel, SalesChannelIntegrationPricelist, RemoteProduct, SalesChannelContentTemplate
+from sales_channels.views import sales_channel_content_template_preview
 from sales_channels.receivers import sales_channels__sales_channel__post_create_receiver
 from core.signals import post_create
 from unittest.mock import patch
@@ -339,6 +342,8 @@ class SalesChannelContentTemplateTestCase(TestCase):
             multi_tenant_company=self.multi_tenant_company,
         )
 
+        self.request_factory = RequestFactory()
+
     def test_build_content_template_context(self):
         context = build_content_template_context(
             product=self.product,
@@ -391,3 +396,44 @@ class SalesChannelContentTemplateTestCase(TestCase):
 
         self.assertIn("Sample Product", rendered)
         self.assertIn("OneSila", rendered)
+
+    def test_render_sales_channel_content_template_as_iframe(self):
+        iframe_src = "https://example.com/template/1/product/2/"
+        rendered = render_sales_channel_content_template(
+            template_string="<div>ignored</div>",
+            context={
+                "iframe": format_html(
+                    '<iframe id="desc_ifr" title="Seller\'s description of item" '
+                    "sandbox=\"allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin\" "
+                    "height=\"2950px\" width=\"100%\" marginheight=\"0\" marginwidth=\"0\" frameborder=\"0\" "
+                    'src="{}" loading="lazy"></iframe>',
+                    iframe_src,
+                )
+            },
+        )
+
+        self.assertIn("<iframe", rendered)
+        self.assertIn(iframe_src, rendered)
+
+    def test_template_preview_view_returns_rendered_content(self):
+        template = SalesChannelContentTemplate(
+            sales_channel=self.sales_channel,
+            language=self.multi_tenant_company.language,
+            template="<div>{{ title }}</div>",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        template.id = 999
+
+        request = self.request_factory.get("/")
+        with patch(
+            "sales_channels.views.get_object_or_404",
+            side_effect=[template, self.product],
+        ):
+            response = sales_channel_content_template_preview(
+                request,
+                template_id=template.id,
+                product_id=self.product.id,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Sample Product", response.content.decode())

@@ -268,6 +268,10 @@ class SalesChannelContentTemplate(models.Model):
         help_text="Language code this template targets.",
     )
     template = models.TextField(help_text="Django template used to render product descriptions.")
+    add_as_iframe = models.BooleanField(
+        default=False,
+        help_text="Render the template output inside an iframe when syncing content.",
+    )
 
     class Meta:
         verbose_name = 'Sales Channel Content Template'
