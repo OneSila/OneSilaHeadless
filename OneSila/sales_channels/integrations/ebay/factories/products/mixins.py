@@ -21,6 +21,7 @@ from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.content_templates import (
     build_content_template_context,
     get_sales_channel_content_template,
+    get_sales_channel_content_template_iframe,
     render_sales_channel_content_template,
 )
 
@@ -659,6 +660,12 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
                 language=language_value,
                 title=title_value,
             )
+            iframe_markup = get_sales_channel_content_template_iframe(
+                template=template,
+                product=self.remote_product.local_instance,
+            )
+            if iframe_markup:
+                context["iframe"] = iframe_markup
             rendered = render_sales_channel_content_template(
                 template_string=template_string,
                 context=context,

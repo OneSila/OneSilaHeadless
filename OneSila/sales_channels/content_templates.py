@@ -5,13 +5,17 @@ from decimal import Decimal
 from typing import Iterable, Optional
 
 from django.template import engines
+from django.urls import reverse
 from django.utils.functional import cached_property
+from django.utils.html import format_html
 
 from currencies.models import Currency
 from media.models import Media, MediaProductThrough
 from products.models import Product
 from properties.models import ProductProperty, PropertySelectValue
 from sales_channels.models.sales_channels import SalesChannel, SalesChannelContentTemplate
+
+from get_absolute_url.helpers import generate_absolute_url
 
 
 @dataclass(frozen=True)
@@ -251,11 +255,54 @@ def get_sales_channel_content_template(
     ).first()
 
 
+def _render_iframe_markup(*, iframe_src: str) -> str:
+    return format_html(
+        '<iframe id="desc_ifr" title="Seller\'s description of item" '
+        "sandbox=\"allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin\" "
+        "height=\"2950px\" width=\"100%\" marginheight=\"0\" marginwidth=\"0\" frameborder=\"0\" "
+        'src="{}" loading="lazy"></iframe>',
+        iframe_src,
+    )
+
+
+def get_sales_channel_content_template_iframe(
+    *,
+    template: SalesChannelContentTemplate,
+    product: Product,
+) -> str | None:
+    if not template.add_as_iframe:
+        return None
+
+    template_id = getattr(template, "id", None)
+    product_id = getattr(product, "id", None)
+    if not template_id or not product_id:
+        return None
+
+    iframe_path = reverse(
+        "sales_channel_template_product",
+        kwargs={
+            "template_id": template_id,
+            "product_id": product_id,
+        },
+    )
+    iframe_src = f"{generate_absolute_url(trailing_slash=False)}{iframe_path}"
+
+    return _render_iframe_markup(iframe_src=iframe_src)
+
+
 def render_sales_channel_content_template(
     *,
     template_string: str,
     context: dict[str, object],
 ) -> str:
+    iframe_markup = context.get("iframe")
+    if iframe_markup:
+        return iframe_markup
+
+    iframe_src = context.get("iframe_src")
+    if iframe_src:
+        return _render_iframe_markup(iframe_src=str(iframe_src))
+
     template = engines["django"].from_string(template_string)
     return template.render(context)
 
@@ -263,6 +310,7 @@ def render_sales_channel_content_template(
 __all__ = [
     "build_content_template_context",
     "get_sales_channel_content_template",
+    "get_sales_channel_content_template_iframe",
     "render_sales_channel_content_template",
     "SalesChannelContentTemplate",
 ]
