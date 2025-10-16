@@ -46,13 +46,6 @@ def sales_channel_content_template_preview(request, template_id: int, product_id
         title=title,
     )
 
-    iframe_markup = get_sales_channel_content_template_iframe(
-        template=template,
-        product=product,
-    )
-    if iframe_markup:
-        context["iframe"] = iframe_markup
-
     rendered = render_sales_channel_content_template(
         template_string=template.template,
         context=context,
