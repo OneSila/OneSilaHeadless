@@ -202,7 +202,7 @@ class ContentTemplateDataBuilder:
                 brand = brand_value
 
         return {
-            "content": self.description,
+            "content": format_html("{}", self.description),
             "title": self.title,
             "sku": self.product.sku,
             "price": price,
