@@ -48,7 +48,7 @@ class ProductQuerySet(MultiTenantQuerySet):
         product_ids = ProductProperty.objects.filter(value_select=product_type).values_list('product_id', flat=True)
         return self.filter_multi_tenant(multi_tenant_company=product_type.multi_tenant_company).filter(id__in=product_ids)
 
-    def duplicate_product(self, product, *, sku=None, create_as_alias=False):
+    def duplicate_product(self, product, *, sku=None, create_as_alias=False, create_relationships=True):
         from django.db import transaction
         from django.core.exceptions import ValidationError
         from .models import (
@@ -166,37 +166,38 @@ class ProductQuerySet(MultiTenantQuerySet):
                     multi_tenant_company=multi_tenant_company,
                 )
 
-            # Configurable variations
-            for cv in ConfigurableVariation.objects.filter(parent=product):
-                ConfigurableVariation.objects.create(
-                    parent=new_product,
-                    variation=cv.variation,
-                    multi_tenant_company=multi_tenant_company,
-                )
+            if create_relationships:
+                # Configurable variations
+                for cv in ConfigurableVariation.objects.filter(parent=product):
+                    ConfigurableVariation.objects.create(
+                        parent=new_product,
+                        variation=cv.variation,
+                        multi_tenant_company=multi_tenant_company,
+                    )
 
-            for cv in ConfigurableVariation.objects.filter(variation=product):
-                ConfigurableVariation.objects.create(
-                    parent=cv.parent,
-                    variation=new_product,
-                    multi_tenant_company=multi_tenant_company,
-                )
+                for cv in ConfigurableVariation.objects.filter(variation=product):
+                    ConfigurableVariation.objects.create(
+                        parent=cv.parent,
+                        variation=new_product,
+                        multi_tenant_company=multi_tenant_company,
+                    )
 
-            # Bundle variations
-            for bv in BundleVariation.objects.filter(parent=product):
-                BundleVariation.objects.create(
-                    parent=new_product,
-                    variation=bv.variation,
-                    quantity=bv.quantity,
-                    multi_tenant_company=multi_tenant_company,
-                )
+                # Bundle variations
+                for bv in BundleVariation.objects.filter(parent=product):
+                    BundleVariation.objects.create(
+                        parent=new_product,
+                        variation=bv.variation,
+                        quantity=bv.quantity,
+                        multi_tenant_company=multi_tenant_company,
+                    )
 
-            for bv in BundleVariation.objects.filter(variation=product):
-                BundleVariation.objects.create(
-                    parent=bv.parent,
-                    variation=new_product,
-                    quantity=bv.quantity,
-                    multi_tenant_company=multi_tenant_company,
-                )
+                for bv in BundleVariation.objects.filter(variation=product):
+                    BundleVariation.objects.create(
+                        parent=bv.parent,
+                        variation=new_product,
+                        quantity=bv.quantity,
+                        multi_tenant_company=multi_tenant_company,
+                    )
 
             return new_product
 

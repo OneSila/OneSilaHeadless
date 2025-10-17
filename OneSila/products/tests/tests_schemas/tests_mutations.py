@@ -6,8 +6,18 @@ from products.models import SimpleProduct, ProductTranslation, Product
 
 
 DUPLICATE_PRODUCT_MUTATION = """
-    mutation($product: ProductPartialInput!, $sku: String, $createAsAlias: Boolean) {
-      duplicateProduct(product: $product, sku: $sku, createAsAlias: $createAsAlias) {
+    mutation(
+      $product: ProductPartialInput!,
+      $sku: String,
+      $createAsAlias: Boolean,
+      $createRelationships: Boolean
+    ) {
+      duplicateProduct(
+        product: $product,
+        sku: $sku,
+        createAsAlias: $createAsAlias,
+        createRelationships: $createRelationships
+      ) {
         id
         sku
       }
@@ -29,7 +39,12 @@ class DuplicateProductMutationTestCase(TransactionTestCaseMixin, TransactionTest
     def test_duplicate_product_mutation(self):
         resp = self.strawberry_test_client(
             query=DUPLICATE_PRODUCT_MUTATION,
-            variables={"product": {"id": self.to_global_id(self.product)}, "sku": None, "createAsAlias": False},
+            variables={
+                "product": {"id": self.to_global_id(self.product)},
+                "sku": None,
+                "createAsAlias": False,
+                "createRelationships": True,
+            },
         )
 
         self.assertIsNone(resp.errors)
@@ -39,7 +54,12 @@ class DuplicateProductMutationTestCase(TransactionTestCaseMixin, TransactionTest
     def test_duplicate_product_mutation_existing_sku(self):
         resp = self.strawberry_test_client(
             query=DUPLICATE_PRODUCT_MUTATION,
-            variables={"product": {"id": self.to_global_id(self.product)}, "sku": self.product.sku, "createAsAlias": False},
+            variables={
+                "product": {"id": self.to_global_id(self.product)},
+                "sku": self.product.sku,
+                "createAsAlias": False,
+                "createRelationships": True,
+            },
             asserts_errors=False,
         )
 
@@ -48,7 +68,12 @@ class DuplicateProductMutationTestCase(TransactionTestCaseMixin, TransactionTest
     def test_duplicate_product_mutation_create_as_alias(self):
         resp = self.strawberry_test_client(
             query=DUPLICATE_PRODUCT_MUTATION,
-            variables={"product": {"id": self.to_global_id(self.product)}, "sku": None, "createAsAlias": True},
+            variables={
+                "product": {"id": self.to_global_id(self.product)},
+                "sku": None,
+                "createAsAlias": True,
+                "createRelationships": True,
+            },
         )
         self.assertIsNone(resp.errors)
         data = resp.data["duplicateProduct"]
