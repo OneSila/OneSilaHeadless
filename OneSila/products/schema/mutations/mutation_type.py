@@ -139,6 +139,7 @@ class ProductsMutation:
         product: ProductPartialInput,
         sku: str | None = None,
         create_as_alias: bool = False,
+        create_relationships: bool = True,
     ) -> ProductType:
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
         try:
@@ -149,6 +150,9 @@ class ProductsMutation:
         except Product.DoesNotExist:
             raise PermissionError("Invalid company")
         duplicated = Product.objects.duplicate_product(
-            instance, sku=sku, create_as_alias=create_as_alias
+            instance,
+            sku=sku,
+            create_as_alias=create_as_alias,
+            create_relationships=create_relationships,
         )
         return duplicated
