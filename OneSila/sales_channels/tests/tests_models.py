@@ -397,6 +397,24 @@ class SalesChannelContentTemplateTestCase(TestCase):
         self.assertIn("Sample Product", rendered)
         self.assertIn("OneSila", rendered)
 
+    def test_render_sales_channel_content_template_escapes_content(self):
+        context = build_content_template_context(
+            product=self.product,
+            sales_channel=self.sales_channel,
+            description="<b>Rendered</b> & description",
+            language=self.multi_tenant_company.language,
+            title="Sample Product",
+        )
+
+        template = "<div>{{ content }}</div>"
+        rendered = render_sales_channel_content_template(
+            template_string=template,
+            context=context,
+        )
+
+        self.assertIn("&lt;b&gt;Rendered&lt;/b&gt; &amp; description", rendered)
+        self.assertNotIn("<b>Rendered</b>", rendered)
+
     def test_render_sales_channel_content_template_as_iframe(self):
         iframe_src = "https://example.com/template/1/product/2/"
         rendered = render_sales_channel_content_template(
