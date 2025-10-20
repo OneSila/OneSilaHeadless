@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.db.models import Max
 from django.utils import timezone
 from spapi import DefinitionsApi, ListingsApi
@@ -27,6 +29,7 @@ class ExportDefinitionFactory:
         self.results = []  # final flat list of export definitions
         self.current_path = [self.public_definition.code]  # tracks keys like battery > weight > value
         self.allow_not_mapped_keys = {"standardized_values", "other_than_listed"}
+        self.schema_stack: list[dict] = []
 
     def run(self):
         schema = self.public_definition.raw_schema
@@ -37,40 +40,44 @@ class ExportDefinitionFactory:
         if not isinstance(node, dict):
             return
 
-        # Dive into "items" first
-        if "items" in node:
-            self._walk(node["items"])
-            return
+        self.schema_stack.append(node)
+        try:
+            # Dive into "items" first
+            if "items" in node:
+                self._walk(node["items"])
+                return
 
-        properties = node.get("properties", {})
-        for key, value in properties.items():
-            self.current_path.append(key)
+            properties = node.get("properties", {})
+            for key, value in properties.items():
+                self.current_path.append(key)
 
-            # Skip helper/meta keys
-            if key in {"language_tag", "marketplace_id", "unit"}:
+                # Skip helper/meta keys
+                if key in {"language_tag", "marketplace_id", "unit"}:
+                    self.current_path.pop()
+                    continue
+
+                # Skip only other_than_listed for walk
+                if key.endswith("other_than_listed"):
+                    self.current_path.pop()
+                    continue
+
+                # If terminal value
+                is_leaf = not isinstance(value, dict) or (
+                    "type" in value and "items" not in value and "properties" not in value)
+
+                if is_leaf:
+                    attr_code = self._compose_attr_code()
+                    parent_key = self.current_path[-2] if len(self.current_path) >= 2 else ""
+                    allow_not_mapped = any(k in parent_key for k in self.allow_not_mapped_keys)
+                    self._add_export(attr_code, value, allow_not_mapped)
+                    self.current_path.pop()
+                    continue
+
+                # Recurse deeper
+                self._walk(value)
                 self.current_path.pop()
-                continue
-
-            # Skip only other_than_listed for walk
-            if key.endswith("other_than_listed"):
-                self.current_path.pop()
-                continue
-
-            # If terminal value
-            is_leaf = not isinstance(value, dict) or (
-                "type" in value and "items" not in value and "properties" not in value)
-
-            if is_leaf:
-                attr_code = self._compose_attr_code()
-                parent_key = self.current_path[-2] if len(self.current_path) >= 2 else ""
-                allow_not_mapped = any(k in parent_key for k in self.allow_not_mapped_keys)
-                self._add_export(attr_code, value, allow_not_mapped)
-                self.current_path.pop()
-                continue
-
-            # Recurse deeper
-            self._walk(value)
-            self.current_path.pop()
+        finally:
+            self.schema_stack.pop()
 
     def _compose_attr_code(self):
         # Filter out unwanted helper/meta keys from current_path
@@ -81,7 +88,12 @@ class ExportDefinitionFactory:
         ]
         return "__".join(keys)
 
-    def map_amazon_type_to_property_type(self, value_schema: dict) -> str:
+    def map_amazon_type_to_property_type(
+        self,
+        *,
+        value_schema: dict,
+        max_occurrences: Optional[int] = None,
+    ) -> str:
         """
         Converts Amazon schema type definition into internal Property.TYPES
         """
@@ -91,9 +103,15 @@ class ExportDefinitionFactory:
         one_of = value_schema.get("oneOf", [])
         enums = value_schema.get("enum")
 
+        occurrence_limit = self._resolve_occurrence_limit(
+            value_schema=value_schema,
+            fallback=max_occurrences,
+        )
+        resolved_limit = occurrence_limit if occurrence_limit is not None else 1
+
         if value_type == "array" and isinstance(value_schema.get("items"), dict):
             item_schema = value_schema["items"]
-            max_items = value_schema.get("maxItems", 1)
+            max_items = resolved_limit
 
             if "enum" in item_schema or self._any_of_has_enum(item_schema.get("anyOf", [])):
                 return Property.TYPES.MULTISELECT if max_items > 1 else Property.TYPES.SELECT
@@ -122,7 +140,7 @@ class ExportDefinitionFactory:
         # Handle enum/select/multiselect
         if enums or self._any_of_has_enum(any_of):
             # MultiSelect if parent array has maxItems > 1
-            if value_schema.get("maxItems", 1) > 1:
+            if resolved_limit > 1:
                 return Property.TYPES.MULTISELECT
             return Property.TYPES.SELECT
 
@@ -222,10 +240,32 @@ class ExportDefinitionFactory:
 
         return [{"value": val, "name": name} for val, name in zip(enums, enum_names)]
 
+    @staticmethod
+    def _resolve_occurrence_limit(*, value_schema: dict, fallback: Optional[int]) -> Optional[int]:
+        if isinstance(value_schema, dict):
+            for key in ("maxItems", "maxUniqueItems"):
+                value = value_schema.get(key)
+                if isinstance(value, int):
+                    return value
+        return fallback
+
+    def _resolve_max_occurrences_for_current_path(self) -> Optional[int]:
+        for schema in reversed(self.schema_stack):
+            if not isinstance(schema, dict):
+                continue
+            if schema.get("type") != "array":
+                continue
+            limit = self._resolve_occurrence_limit(value_schema=schema, fallback=None)
+            if limit is not None:
+                return limit
+        return None
+
     def _add_export(self, attr_code, value_schema, force_allow_not_mapped=False):
 
         # Always preserve the title from the original value_schema
         original_title = value_schema.get("title") or attr_code.replace("__", " ").title()
+
+        max_occurrences = self._resolve_max_occurrences_for_current_path()
 
         # Check if there's a sibling standardized_values
         parent_schema = self._get_parent_schema()
@@ -238,7 +278,10 @@ class ExportDefinitionFactory:
         export = {
             "code": attr_code,
             "name": original_title,
-            "type": self.map_amazon_type_to_property_type(value_schema),
+            "type": self.map_amazon_type_to_property_type(
+                value_schema=value_schema,
+                max_occurrences=max_occurrences,
+            ),
             "values": self.extract_enum_values(value_schema),
         }
 

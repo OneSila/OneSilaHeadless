@@ -3,6 +3,7 @@ from .sales_channels import (
     SalesChannel,
     SalesChannelView,
     SalesChannelIntegrationPricelist,
+    SalesChannelContentTemplate,
     SalesChannelViewAssign,
     RemoteLanguage
 )
@@ -48,6 +49,7 @@ from .sales_channels import (
     SalesChannel,
     SalesChannelView,
     SalesChannelIntegrationPricelist,
+    SalesChannelContentTemplate,
     SalesChannelViewAssign,
 )
 from .taxes import RemoteVat, RemoteCurrency

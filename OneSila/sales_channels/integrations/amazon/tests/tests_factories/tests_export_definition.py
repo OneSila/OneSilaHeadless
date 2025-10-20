@@ -80,7 +80,7 @@ class ExportDefinitionFactoryTest(TestCase):
 
         battery_type = next((x for x in results if x["code"] == "num_batteries__type"), None)
         self.assertIsNotNone(battery_type)
-        self.assertEqual(battery_type["type"], "SELECT")
+        self.assertEqual(battery_type["type"], "MULTISELECT")
         self.assertEqual(len(battery_type["values"]), 9)
         self.assertIn({"name": "AA", "value": "aa"}, battery_type["values"])
 
@@ -134,7 +134,7 @@ class ExportDefinitionFactoryTest(TestCase):
 
         plug = next((x for x in results if x["code"] == "power_plug_type"), None)
         self.assertIsNotNone(plug)
-        self.assertEqual(plug["type"], "SELECT")
+        self.assertEqual(plug["type"], "MULTISELECT")
         self.assertEqual(len(plug["values"]), 27)
         self.assertIn({"name": "Type G", "value": "type_g_3pin_uk"}, plug["values"])
 
@@ -153,7 +153,7 @@ class ExportDefinitionFactoryTest(TestCase):
 
         controller = next((x for x in results if x["code"] == "controller_type"), None)
         self.assertIsNotNone(controller)
-        self.assertEqual(controller["type"], "SELECT")
+        self.assertEqual(controller["type"], "MULTISELECT")
         self.assertTrue(controller.get("allow_not_mapped_values"))
         self.assertGreaterEqual(len(controller["values"]), 10)
         self.assertIn({"value": "Amazon Alexa", "name": "Amazon Alexa"}, controller["values"])

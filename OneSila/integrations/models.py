@@ -244,7 +244,7 @@ class IntegrationLog(PolymorphicModel, models.Model):
     fixing_identifier = models.CharField(max_length=255, null=True, blank=True, help_text=_(
         "Identifier used by a later log to indicate this error has been fixed."))
     keep = models.BooleanField(default=False, help_text="Whether to keep this log permanently.")
-    related_object_str = models.CharField(max_length=556, null=True, blank=True, help_text="String representation of the related object.")
+    related_object_str = models.CharField(max_length=1056, null=True, blank=True, help_text="String representation of the related object.")
 
     class Meta:
         verbose_name = 'Integration Log'

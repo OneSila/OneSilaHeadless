@@ -9,6 +9,7 @@ import pprint
 from typing import Any, Dict, List, Tuple, Optional
 
 from django.db.models import Q
+from django.template import TemplateSyntaxError
 
 from currencies.models import Currency
 from media.models import Media, MediaProductThrough
@@ -17,6 +18,12 @@ from properties.models import ProductProperty, Property
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
 from sales_channels.factories.mixins import PreFlightCheckError
 from sales_channels.models.sales_channels import SalesChannelViewAssign
+from sales_channels.content_templates import (
+    build_content_template_context,
+    get_sales_channel_content_template,
+    get_sales_channel_content_template_iframe,
+    render_sales_channel_content_template,
+)
 
 from sales_channels.integrations.ebay.models.products import (
     EbayMediaThroughProduct,
@@ -129,6 +136,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         self._latest_listing_description: str | None = None
         self._listing_policies_cache: Dict[str, Any] | None = None
         self._internal_property_options_cache: Dict[int, List[Any]] = {}
+        self._content_template_cache: Dict[str, Any] = {}
         super().__init__(*args, **kwargs)
 
     # ------------------------------------------------------------------
@@ -596,7 +604,82 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         if not description:
             description = getattr(product, "description", None)
 
+        template_language = language_code or (translation.language if translation else None)
+        template_source = description or listing_description or getattr(product, "description", None)
+        rendered_description, template_used = self._render_content_template(
+            description=template_source,
+            language=template_language,
+            title=title or getattr(product, "name", None),
+        )
+
+        if template_used:
+            resolved_description = rendered_description or template_source
+            description = resolved_description
+            listing_description = resolved_description
+
         return title, subtitle, description, listing_description
+
+    def _get_content_template(self, *, language: str | None):
+        if not language:
+            return None
+
+        if language in self._content_template_cache:
+            return self._content_template_cache[language]
+
+        template = get_sales_channel_content_template(
+            sales_channel=self.sales_channel,
+            language=language,
+        )
+        self._content_template_cache[language] = template
+        return template
+
+    def _render_content_template(
+        self,
+        *,
+        description: str | None,
+        language: str | None,
+        title: str | None,
+    ) -> Tuple[str | None, bool]:
+        template = self._get_content_template(language=language)
+        if template is None:
+            return description, False
+
+        template_string = getattr(template, "template", "") or ""
+        if not template_string.strip():
+            return description, False
+
+        language_value = language or ""
+        title_value = title or getattr(self.remote_product.local_instance, "name", "") or ""
+        fallback_description = description
+
+        try:
+            context = build_content_template_context(
+                product=self.remote_product.local_instance,
+                sales_channel=self.sales_channel,
+                description=fallback_description,
+                language=language_value,
+                title=title_value,
+            )
+            iframe_markup = get_sales_channel_content_template_iframe(
+                template=template,
+                product=self.remote_product.local_instance,
+            )
+            if iframe_markup:
+                context["iframe"] = iframe_markup
+            rendered = render_sales_channel_content_template(
+                template_string=template_string,
+                context=context,
+            )
+        except TemplateSyntaxError as exc:
+            logger.warning(
+                "Failed to render content template for %s (%s): %s",
+                self.remote_product.local_instance,
+                language_value or "default",
+                exc,
+            )
+            return description, False
+
+        return (rendered or fallback_description), True
 
     def _collect_image_urls(self, *, product) -> List[str]:
         throughs = (

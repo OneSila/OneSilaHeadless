@@ -7,6 +7,7 @@ from products.models import (
     SimpleProduct,
     BundleProduct,
     BundleVariation,
+    ConfigurableVariation,
     AliasProduct,
     ProductTranslation,
     Product,
@@ -210,6 +211,26 @@ class DuplicateProductTestCase(TestCase):
             multi_tenant_company=self.multi_tenant_company,
         )
 
+    def _create_relationships(self):
+        configurable_parent = ConfigurableProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company
+        )
+        ConfigurableVariation.objects.create(
+            parent=configurable_parent,
+            variation=self.product,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        bundle_parent = BundleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
+        BundleVariation.objects.create(
+            parent=bundle_parent,
+            variation=self.product,
+            quantity=1,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        return configurable_parent, bundle_parent
+
     def test_duplicate_product_manager(self):
         duplicate = SimpleProduct.objects.duplicate_product(self.product)
         self.assertNotEqual(duplicate.id, self.product.id)
@@ -217,6 +238,24 @@ class DuplicateProductTestCase(TestCase):
         self.assertEqual(duplicate.mediaproductthrough_set.count(), self.product.mediaproductthrough_set.count())
         self.assertEqual(duplicate.productproperty_set.count(), self.product.productproperty_set.count())
         self.assertEqual(duplicate.salesprice_set.count(), self.product.salesprice_set.count())
+
+    def test_duplicate_product_copies_relationships_by_default(self):
+        configurable_parent, bundle_parent = self._create_relationships()
+
+        duplicate = SimpleProduct.objects.duplicate_product(self.product)
+
+        self.assertTrue(
+            ConfigurableVariation.objects.filter(
+                parent=configurable_parent,
+                variation=duplicate,
+            ).exists()
+        )
+        self.assertTrue(
+            BundleVariation.objects.filter(
+                parent=bundle_parent,
+                variation=duplicate,
+            ).exists()
+        )
 
     def test_duplicate_product_existing_sku_error(self):
         with self.assertRaises(Exception):
@@ -228,6 +267,27 @@ class DuplicateProductTestCase(TestCase):
         )
         self.assertEqual(duplicate.type, Product.ALIAS)
         self.assertEqual(duplicate.alias_parent_product, self.product)
+
+    def test_duplicate_product_skips_relationships_when_disabled(self):
+        configurable_parent, bundle_parent = self._create_relationships()
+
+        duplicate = SimpleProduct.objects.duplicate_product(
+            self.product,
+            create_relationships=False,
+        )
+
+        self.assertFalse(
+            ConfigurableVariation.objects.filter(
+                parent=configurable_parent,
+                variation=duplicate,
+            ).exists()
+        )
+        self.assertFalse(
+            BundleVariation.objects.filter(
+                parent=bundle_parent,
+                variation=duplicate,
+            ).exists()
+        )
 
 
 class ProductTranslationModelTest(TestCase):

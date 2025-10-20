@@ -253,6 +253,40 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
         return f"{self.sales_channel_view.url}{self.product.url_key}.html"
 
 
+class SalesChannelContentTemplate(models.Model):
+    """Custom HTML template per sales channel and language."""
+
+    sales_channel = models.ForeignKey(
+        'SalesChannel',
+        on_delete=models.CASCADE,
+        related_name='content_templates',
+    )
+
+    language = models.CharField(
+        max_length=7,
+        choices=get_languages(),
+        help_text="Language code this template targets.",
+    )
+    template = models.TextField(help_text="Django template used to render product descriptions.")
+    add_as_iframe = models.BooleanField(
+        default=False,
+        help_text="Render the template output inside an iframe when syncing content.",
+    )
+
+    class Meta:
+        verbose_name = 'Sales Channel Content Template'
+        verbose_name_plural = 'Sales Channel Content Templates'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['sales_channel', 'language'],
+                name='unique_sales_channel_language_template',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.sales_channel} ({self.language})"
+
+
 class RemoteLanguage(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the remote mirror of a Language.

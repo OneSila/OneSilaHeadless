@@ -21,6 +21,7 @@ from strawberry.django.views import AsyncGraphQLView
 from .schema import schema
 from django.conf.urls.static import static
 from webhooks.views import test_receiver
+from sales_channels.views import sales_channel_content_template_preview
 
 urlpatterns = [
     path('', include('core.urls')),
@@ -37,6 +38,11 @@ urlpatterns = [
     path('sales-prices/', include('sales_prices.urls')),
     path('taxes/', include('taxes.urls')),
     path('units/', include('units.urls')),
+    path(
+        'template/<int:template_id>/product/<int:product_id>/',
+        sales_channel_content_template_preview,
+        name='sales_channel_template_product',
+    ),
     path('sales_channels/', include('sales_channels.urls')),
     path('direct/integrations/shopify/', include('sales_channels.integrations.shopify.urls')),
     path('direct/integrations/amazon/', include('sales_channels.integrations.amazon.urls')),
