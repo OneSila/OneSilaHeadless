@@ -111,6 +111,18 @@ def ebay_translate_product_type_task(product_type_id: int):
     flow.flow()
 
 
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=2)
+@db_task()
+def ebay_product_type_rule_sync_task(*, product_type_id: int) -> None:
+    """Synchronise local rule metadata for the mapped eBay category."""
+    from sales_channels.integrations.ebay.flows.product_type_rules import (
+        EbayProductTypeRuleSyncFlow,
+    )
+
+    flow = EbayProductTypeRuleSyncFlow(product_type_id=product_type_id)
+    flow.work()
+
+
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def create_ebay_product_db_task(

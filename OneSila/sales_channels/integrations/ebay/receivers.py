@@ -26,6 +26,7 @@ from sales_channels.integrations.ebay.factories.sync import (
 from sales_channels.integrations.ebay.tasks import (
     ebay_translate_property_task,
     ebay_translate_select_value_task,
+    ebay_product_type_rule_sync_task,
     create_ebay_product_db_task,
     resync_ebay_product_db_task,
     update_ebay_assign_offers_db_task,
@@ -124,6 +125,22 @@ def sales_channels__ebay_product_type__propagate_remote_id(sender, instance: Eba
 
     factory = EbayProductTypeRemoteMappingFactory(product_type=instance)
     factory.run()
+
+
+@receiver(post_update, sender='ebay.EbayProductType')
+def sales_channels__ebay_product_type__sync_rule(sender, instance: EbayProductType, **kwargs):
+    signal = kwargs.get('signal')
+    if signal == post_update and not (
+        instance.is_dirty_field('remote_id')
+        or instance.is_dirty_field('local_instance', check_relationship=True)
+    ):
+        return
+
+    remote_id = (instance.remote_id or '').strip()
+    if not remote_id or not instance.local_instance_id or not instance.marketplace_id:
+        return
+
+    ebay_product_type_rule_sync_task(product_type_id=instance.id)
 
 
 @receiver(post_update, sender='ebay.EbayProperty')

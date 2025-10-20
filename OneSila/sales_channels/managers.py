@@ -102,9 +102,27 @@ class SalesChannelViewManager(PolymorphicManager, MultiTenantManager):
 class SalesChannelViewAssignQuerySet(PolymorphicQuerySet, MultiTenantQuerySet):
     """QuerySet for :class:`SalesChannelViewAssign` with multitenancy and polymorphic support."""
 
+    def filter_by_status(self, *, status: str):
+        from sales_channels.models.products import RemoteProduct
+
+        normalized_status = (status or "").upper()
+        valid_statuses = {
+            RemoteProduct.STATUS_COMPLETED,
+            RemoteProduct.STATUS_FAILED,
+            RemoteProduct.STATUS_PROCESSING,
+        }
+
+        if normalized_status not in valid_statuses:
+            return self.none()
+
+        return self.filter(remote_product__status=normalized_status)
+
 
 class SalesChannelViewAssignManager(PolymorphicManager, MultiTenantManager):
     """Manager for :class:`SalesChannelViewAssign` providing search and multitenancy."""
 
     def get_queryset(self):
         return SalesChannelViewAssignQuerySet(self.model, using=self._db)
+
+    def filter_by_status(self, *, status: str):
+        return self.get_queryset().filter_by_status(status=status)

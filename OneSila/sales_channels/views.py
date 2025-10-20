@@ -1,5 +1,6 @@
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
+from django.utils.safestring import mark_safe
 from django.views.decorators.clickjacking import xframe_options_exempt
 
 from products.models import Product
@@ -36,7 +37,7 @@ def sales_channel_content_template_preview(request, template_id: int, product_id
     )
 
     if not template.template.strip():
-        return HttpResponse(description or "")
+        return HttpResponse(mark_safe(description or ""))
 
     context = build_content_template_context(
         product=product,
@@ -51,4 +52,4 @@ def sales_channel_content_template_preview(request, template_id: int, product_id
         context=context,
     )
 
-    return HttpResponse(rendered or description or "")
+    return HttpResponse(rendered or mark_safe(description or ""))

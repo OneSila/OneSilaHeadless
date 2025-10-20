@@ -8,6 +8,7 @@ from django.template import engines
 from django.urls import reverse
 from django.utils.functional import cached_property
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 
 from currencies.models import Currency
 from media.models import Media, MediaProductThrough
@@ -202,7 +203,7 @@ class ContentTemplateDataBuilder:
                 brand = brand_value
 
         return {
-            "content": format_html("{}", self.description),
+            "content": mark_safe(self.description or ""),
             "title": self.title,
             "sku": self.product.sku,
             "price": price,

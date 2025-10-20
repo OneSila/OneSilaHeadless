@@ -49,6 +49,13 @@ class TestCaseEbayMixin(TransactionTestCase):
             refresh_token_expiration=refresh_expiration,
         )
 
+        product_type_rule_task_patcher = patch(
+            "sales_channels.integrations.ebay.tasks.ebay_product_type_rule_sync_task",
+        )
+        self.ebay_product_type_rule_sync_task = product_type_rule_task_patcher.start()
+        self.ebay_product_type_rule_sync_task.delay = MagicMock()
+        self.addCleanup(product_type_rule_task_patcher.stop)
+
 
 class EbayProductPushFactoryTestBase(TestCaseEbayMixin):
     """Shared setup for eBay product push factory tests."""

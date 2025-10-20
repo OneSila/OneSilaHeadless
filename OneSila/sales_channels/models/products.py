@@ -1,4 +1,5 @@
 from django.db.models import UniqueConstraint, Q
+from django.db.utils import NotSupportedError
 from model_bakery.recipe import related
 
 from core import models
@@ -14,6 +15,16 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
     Polymorphic model representing the remote mirror of a Product.
     """
 
+    STATUS_COMPLETED = "COMPLETED"
+    STATUS_FAILED = "FAILED"
+    STATUS_PROCESSING = "PROCESSING"
+
+    STATUS_CHOICES = (
+        (STATUS_COMPLETED, _("Completed")),
+        (STATUS_FAILED, _("Failed")),
+        (STATUS_PROCESSING, _("Processing")),
+    )
+
     local_instance = models.ForeignKey('products.Product', on_delete=models.SET_NULL, null=True, db_index=True,
                                        help_text="The local Product instance associated with this remote product.")
     remote_sku = models.CharField(max_length=255, help_text="The SKU of the product in the remote system.", null=True, blank=True)
@@ -23,6 +34,13 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         default=0,
         validators=[MinValueValidator(0), MaxValueValidator(100)],
         help_text="Current sync progress percentage (0-100)."
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_PROCESSING,
+        db_index=True,
+        help_text="Current sync status derived from progress and sync errors.",
     )
 
     class Meta:
@@ -90,6 +108,49 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         remote_sku = self.remote_sku if self.remote_sku else "N/A"
         sales_channel = self.sales_channel.hostname if hasattr(self, 'sales_channel') and self.sales_channel else "N/A"
         return f"Remote product {local_name} (SKU: {remote_sku}) on {sales_channel}"
+
+    def save(self, *args, **kwargs):
+        previous_status = self.status
+        computed_status = self._determine_status()
+        status_changed = previous_status != computed_status
+        self.status = computed_status
+
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            mutable_fields = list(dict.fromkeys(update_fields))
+            if status_changed and "status" not in mutable_fields:
+                mutable_fields.append("status")
+            kwargs["update_fields"] = mutable_fields
+
+        super().save(*args, **kwargs)
+
+    def refresh_status(self, *, commit: bool = True) -> str:
+        computed_status = self._determine_status()
+        if computed_status != self.status:
+            self.status = computed_status
+            if commit and self.pk:
+                self.save(update_fields=["status"])
+        return self.status
+
+    def _determine_status(self) -> str:
+        if self._has_unresolved_errors():
+            return self.STATUS_FAILED
+        if self.syncing_current_percentage != 100:
+            return self.STATUS_PROCESSING
+        return self.STATUS_COMPLETED
+
+    def _has_unresolved_errors(self) -> bool:
+        from integrations.models import IntegrationLog
+
+        try:
+            return self.errors.exists()
+        except NotSupportedError:
+            if not self.pk:
+                return False
+            return IntegrationLog.objects.filter(
+                remote_product=self,
+                status=IntegrationLog.STATUS_FAILED,
+            ).exists()
 
 
 class RemoteInventory(PolymorphicModel, RemoteObjectMixin, models.Model):

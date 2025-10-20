@@ -397,7 +397,7 @@ class SalesChannelContentTemplateTestCase(TestCase):
         self.assertIn("Sample Product", rendered)
         self.assertIn("OneSila", rendered)
 
-    def test_render_sales_channel_content_template_escapes_content(self):
+    def test_render_sales_channel_content_template_preserves_html(self):
         context = build_content_template_context(
             product=self.product,
             sales_channel=self.sales_channel,
@@ -412,8 +412,8 @@ class SalesChannelContentTemplateTestCase(TestCase):
             context=context,
         )
 
-        self.assertIn("&lt;b&gt;Rendered&lt;/b&gt; &amp; description", rendered)
-        self.assertNotIn("<b>Rendered</b>", rendered)
+        self.assertIn("<b>Rendered</b> & description", rendered)
+        self.assertNotIn("&lt;b&gt;Rendered&lt;/b&gt;", rendered)
 
     def test_render_sales_channel_content_template_as_iframe(self):
         iframe_src = "https://example.com/template/1/product/2/"
@@ -455,3 +455,32 @@ class SalesChannelContentTemplateTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("Sample Product", response.content.decode())
+
+    def test_template_preview_view_renders_html_description(self):
+        ProductTranslation.objects.filter(
+            product=self.product,
+            language=self.multi_tenant_company.language,
+        ).update(description="<p><strong>Rendered</strong> description</p>")
+
+        template = SalesChannelContentTemplate(
+            sales_channel=self.sales_channel,
+            language=self.multi_tenant_company.language,
+            template="<div>{{ content }}</div>",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        template.id = 1001
+
+        request = self.request_factory.get("/")
+        with patch(
+            "sales_channels.views.get_object_or_404",
+            side_effect=[template, self.product],
+        ):
+            response = sales_channel_content_template_preview(
+                request,
+                template_id=template.id,
+                product_id=self.product.id,
+            )
+
+        html = response.content.decode()
+        self.assertIn("<p><strong>Rendered</strong> description</p>", html)
+        self.assertNotIn("&lt;p&gt;", html)

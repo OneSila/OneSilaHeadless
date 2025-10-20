@@ -165,6 +165,28 @@ class CheckSalesChannelContentTemplateMutationTestCase(TransactionTestCaseMixin,
         self.assertIn("brand", data["availableVariables"])
         self.assertEqual(data["errors"], [])
 
+    def test_check_template_mutation_without_template_preserves_html(self):
+        ProductTranslation.objects.filter(
+            product=self.product,
+            language=self.multi_tenant_company.language,
+        ).update(description="<p><strong>Rendered</strong> description</p>")
+
+        response = self.strawberry_test_client(
+            query=CHECK_TEMPLATE_MUTATION,
+            variables={
+                "salesChannel": {"id": self.to_global_id(self.sales_channel)},
+                "template": "",
+                "language": self.multi_tenant_company.language,
+                "product": {"id": self.to_global_id(self.product)},
+            },
+        )
+
+        self.assertIsNone(response.errors)
+        data = response.data["checkSalesChannelContentTemplate"]
+        self.assertTrue(data["isValid"])
+        self.assertIn("<p><strong>Rendered</strong> description</p>", data["renderedContent"])
+        self.assertNotIn("&lt;p&gt;", data["renderedContent"])
+
     def test_check_template_mutation_returns_errors(self):
         response = self.strawberry_test_client(
             query=CHECK_TEMPLATE_MUTATION,
