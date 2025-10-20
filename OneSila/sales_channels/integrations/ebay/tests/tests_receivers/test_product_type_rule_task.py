@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from model_bakery import baker
 
 from properties.models import Property, PropertySelectValue, ProductPropertiesRule
@@ -34,24 +36,28 @@ class TestEbayProductTypeRuleTask(TestCaseEbayMixin):
             multi_tenant_company=self.multi_tenant_company,
         )
 
-    def test_task_triggered_when_local_instance_is_set(self):
+    @patch(
+        "sales_channels.integrations.ebay.receivers.ebay_product_type_rule_sync_task",
+    )
+    def test_task_triggered_when_local_instance_is_set(self, ebay_product_type_rule_sync_task):
         product_type = EbayProductType.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             marketplace=self.view,
             remote_id="123",
         )
-
-        self.ebay_product_type_rule_sync_task.reset_mock()
 
         product_type.local_instance = self.product_rule
         product_type.save()
 
-        self.ebay_product_type_rule_sync_task.assert_called_once_with(
+        ebay_product_type_rule_sync_task.assert_called_once_with(
             product_type_id=product_type.id,
         )
 
-    def test_task_triggered_when_remote_id_is_set(self):
+    @patch(
+        "sales_channels.integrations.ebay.receivers.ebay_product_type_rule_sync_task",
+    )
+    def test_task_triggered_when_remote_id_is_set(self, ebay_product_type_rule_sync_task):
         product_type = EbayProductType.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
@@ -59,16 +65,17 @@ class TestEbayProductTypeRuleTask(TestCaseEbayMixin):
             local_instance=self.product_rule,
         )
 
-        self.ebay_product_type_rule_sync_task.reset_mock()
-
         product_type.remote_id = "987"
         product_type.save()
 
-        self.ebay_product_type_rule_sync_task.assert_called_once_with(
+        ebay_product_type_rule_sync_task.assert_called_once_with(
             product_type_id=product_type.id,
         )
 
-    def test_task_not_triggered_when_remote_id_is_blank(self):
+    @patch(
+        "sales_channels.integrations.ebay.receivers.ebay_product_type_rule_sync_task",
+    )
+    def test_task_not_triggered_when_remote_id_is_blank(self, ebay_product_type_rule_sync_task):
         product_type = EbayProductType.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
@@ -77,9 +84,7 @@ class TestEbayProductTypeRuleTask(TestCaseEbayMixin):
             remote_id="123",
         )
 
-        self.ebay_product_type_rule_sync_task.reset_mock()
-
         product_type.remote_id = "   "
         product_type.save()
 
-        self.ebay_product_type_rule_sync_task.assert_not_called()
+        ebay_product_type_rule_sync_task.assert_not_called()

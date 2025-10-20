@@ -45,6 +45,7 @@ class EbayProductContentUpdateFactoryTest(EbayProductPushFactoryTestBase):
     def test_updates_listing_description_with_content_template(self, _mock_collect_images):
         SalesChannelContentTemplate.objects.create(
             sales_channel=self.sales_channel,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
             language="en-us",
             template="{{ content }} -- {{ title }}",
         )

@@ -35,18 +35,17 @@ class EbayProductTypeRuleSyncFlowTestCase(TestCaseEbayMixin):
             remote_code="en_US",
         )
 
-        product_type_property = baker.make(
-            Property,
-            type=Property.TYPES.SELECT,
+        product_type_property = Property.objects.get(
             is_product_type=True,
             multi_tenant_company=self.multi_tenant_company,
         )
+
         product_type_value = baker.make(
             PropertySelectValue,
             property=product_type_property,
             multi_tenant_company=self.multi_tenant_company,
         )
-        self.product_rule = ProductPropertiesRule.objects.create(
+        self.product_rule, _ = ProductPropertiesRule.objects.get_or_create(
             product_type=product_type_value,
             multi_tenant_company=self.multi_tenant_company,
         )

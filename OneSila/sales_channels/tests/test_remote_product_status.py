@@ -70,6 +70,7 @@ class SalesChannelViewAssignStatusFilterTestCase(TestCase):
         # Completed remote product
         self.product_completed = baker.make(
             "products.Product",
+            type="SIMPLE",
             multi_tenant_company=self.multi_tenant_company,
         )
         self.remote_product_completed = RemoteProduct.objects.create(
@@ -84,6 +85,7 @@ class SalesChannelViewAssignStatusFilterTestCase(TestCase):
         # Processing remote product (progress < 100)
         self.product_processing = baker.make(
             "products.Product",
+            type='SIMPLE',
             multi_tenant_company=self.multi_tenant_company,
         )
         self.remote_product_processing = RemoteProduct.objects.create(
@@ -151,31 +153,28 @@ class SalesChannelViewAssignStatusFilterTestCase(TestCase):
     def test_filter_by_status_completed(self):
         queryset = SalesChannelViewAssign.objects.filter_by_status(
             status=RemoteProduct.STATUS_COMPLETED,
-        )
-        self.assertQuerysetEqual(
-            queryset.order_by("id"),
+        ).order_by("id")
+        self.assertListEqual(
+            list(queryset),
             [self.assign_completed],
-            transform=lambda obj: obj,
         )
 
     def test_filter_by_status_processing(self):
         queryset = SalesChannelViewAssign.objects.filter_by_status(
             status=RemoteProduct.STATUS_PROCESSING,
         ).order_by("id")
-        self.assertQuerysetEqual(
-            queryset,
+        self.assertListEqual(
+            list(queryset),
             [self.assign_processing],
-            transform=lambda obj: obj,
         )
 
     def test_filter_by_status_failed(self):
         queryset = SalesChannelViewAssign.objects.filter_by_status(
             status=RemoteProduct.STATUS_FAILED,
-        )
-        self.assertQuerysetEqual(
-            queryset.order_by("id"),
+        ).order_by("id")
+        self.assertListEqual(
+            list(queryset),
             [self.assign_failed],
-            transform=lambda obj: obj,
         )
 
     def test_filter_by_status_unknown_returns_empty(self):
