@@ -46,7 +46,7 @@ class SalesChannel(Integration, models.Model):
         if 'active' in dirty_fields and self.active and 'is_importing' not in dirty_fields:
             if self.is_importing:
                 raise Exception(
-                    _("Cannot set integration to active during an import. It will automatically be set to the previous status after the import is done.")
+                    _("Please wait until the import has fully completed.  Then mark the integration as active.")
                 )
 
         self.connect()

@@ -384,8 +384,6 @@ class EbayProductTypeRuleFactory(GetEbayAPIMixin):
         supports_configurator = property_type == Property.TYPES.SELECT
 
         if variations and supports_configurator:
-            if required:
-                return ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR
             return ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
 
         if required:
