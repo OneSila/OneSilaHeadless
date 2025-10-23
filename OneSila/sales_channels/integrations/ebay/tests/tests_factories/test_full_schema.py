@@ -430,7 +430,7 @@ class TestEbayProductTypeRuleFactory(TestCaseEbayMixin):
         }
 
         self.assertEqual(items["Brand"], ProductPropertiesRuleItem.REQUIRED)
-        self.assertEqual(items["Color"], ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR)
+        self.assertEqual(items["Color"], ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR)
         self.assertEqual(items["Pattern"], ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR)
         self.assertEqual(items["Connectivity"], ProductPropertiesRuleItem.OPTIONAL)
         self.assertEqual(items["EC Range"], ProductPropertiesRuleItem.OPTIONAL)
