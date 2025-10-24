@@ -1,8 +1,11 @@
 """Expose Shein GraphQL schema entry points."""
 
-from . import mutations, queries
+from .mutations import SheinSalesChannelMutation
+from .queries import SheinSalesChannelsQuery
+from .subscriptions import SheinSalesChannelsSubscription
 
 __all__ = [
-    "mutations",
-    "queries",
+    "SheinSalesChannelMutation",
+    "SheinSalesChannelsQuery",
+    "SheinSalesChannelsSubscription",
 ]

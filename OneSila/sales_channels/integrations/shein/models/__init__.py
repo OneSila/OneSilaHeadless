@@ -1,5 +1,17 @@
 """Model package for the Shein integration."""
 
-# Re-export modules here when real implementations arrive.
+from .sales_channels import (
+    SheinRemoteCurrency,
+    SheinRemoteLanguage,
+    SheinRemoteMarketplace,
+    SheinSalesChannel,
+    SheinSalesChannelView,
+)
 
-__all__: list[str] = []
+__all__ = [
+    "SheinRemoteCurrency",
+    "SheinRemoteLanguage",
+    "SheinRemoteMarketplace",
+    "SheinSalesChannel",
+    "SheinSalesChannelView",
+]

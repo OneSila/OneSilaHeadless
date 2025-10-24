@@ -1,13 +1,13 @@
-"""Placeholder for Shein GraphQL queries."""
+"""GraphQL query mixins for the Shein integration."""
 
-import strawberry
+from core.schema.core.queries import DjangoListConnection, connection, node, type
+
+from sales_channels.integrations.shein.schema.types.types import SheinSalesChannelType
 
 
-@strawberry.type
-class SheinQuery:
-    """Extend the root query with Shein fields."""
+@type(name="Query")
+class SheinSalesChannelsQuery:
+    """Expose Shein sales channels via Relay connections."""
 
-    @strawberry.field
-    def shein_placeholder(self, info) -> str:  # pragma: no cover - placeholder
-        """Remove once real queries are implemented."""
-        raise NotImplementedError
+    shein_channel: SheinSalesChannelType = node()
+    shein_channels: DjangoListConnection[SheinSalesChannelType] = connection()

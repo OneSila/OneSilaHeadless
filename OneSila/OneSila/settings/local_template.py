@@ -114,6 +114,10 @@ AMAZON_CLIENT_ID = None
 AMAZON_CLIENT_SECRET = None
 AMAZON_APP_ID = None
 
+SHEIN_APP_ID = None
+SHEIN_REDIRECT_URI = "https://your-domain/integrations/shein/oauth/callback"
+SHEIN_APP_SECRET = None
+
 EBAY_CLIENT_ID = None
 EBAY_CLIENT_SECRET = None
 EBAY_DEV_ID = None
