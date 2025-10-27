@@ -18,7 +18,7 @@ class EbayMediaProductThroughCreateFactoryTest(EbayProductPushFactoryTestBase):
 
         self.assertEqual(payload["sku"], "REMOTE-SKU")
         self.assertEqual(
-            payload["product"]["image_urls"],
+            payload["product"]["imageUrls"],
             ["https://cdn.example.com/image.jpg"],
         )
         self.assertEqual(payload["product"]["aspects"]["Brand"], ["Acme"])

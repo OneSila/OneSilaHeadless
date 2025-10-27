@@ -55,8 +55,8 @@ The item document must include the following sections:
   "title": "Parent title",
   "description": "Parent description",
   "aspects": { "brand": ["Nike"], "gender": ["men"] },
-  "image_urls": ["https://..."],
-  "variant_skus": ["sku_1", "sku_2", ...],
+  "imageUrls": ["https://..."],
+  "variantSKUs": ["sku_1", "sku_2", ...],
   "varies_by": {
     "aspectsImageVariesBy": ["Color"],
     "specifications": [

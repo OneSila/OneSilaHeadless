@@ -164,7 +164,7 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         self.assertEqual(inventory_payload["sku"], "TEST-SKU")
         self.assertEqual(len(inventory_payload["product"]["title"]), 80)
         self.assertEqual(
-            inventory_payload["product"]["image_urls"],
+            inventory_payload["product"]["imageUrls"],
             ["https://example.com/image.jpg"],
         )
         self.assertEqual(

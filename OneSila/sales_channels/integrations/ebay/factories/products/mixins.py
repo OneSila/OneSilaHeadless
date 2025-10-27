@@ -168,7 +168,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         image_urls = self._collect_image_urls(product=product)
 
         if image_urls:
-            product_section["image_urls"] = image_urls
+            product_section["imageUrls"] = image_urls
 
         ean_value = self._get_ean_value()
         normalized_ean = self._apply_identifier_shape(code="ean", value=ean_value)
@@ -297,7 +297,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
 
         group_payload: Dict[str, Any] = {
             "description": product_section.get("description"),
-            "imageUrls": product_section.get("image_urls", []),
+            "imageUrls": product_section.get("imageUrls", []),
             "inventoryItemGroupKey": self.get_parent_remote_sku(),
             "subtitle": product_section.get("subtitle"),
             "title": product_section.get("title"),
