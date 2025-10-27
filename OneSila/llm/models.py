@@ -280,7 +280,14 @@ class ChatGptProductFeedConfig(models.Model):
         blank=True,
         related_name="+",
     )
-    gender_system_property = models.ForeignKey(
+    size_system_property = models.ForeignKey(
+        "properties.Property",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    gender_property = models.ForeignKey(
         "properties.Property",
         on_delete=models.PROTECT,
         null=True,
