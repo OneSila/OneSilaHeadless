@@ -15,7 +15,7 @@ from properties.schema.types.input import (
     PropertyPartialInput,
     PropertySelectValuePartialInput,
 )
-from llm.models import BrandCustomPrompt
+from llm.models import BrandCustomPrompt, ChatGptProductFeedConfig
 from sales_channels.schema.types.input import SalesChannelPartialInput
 
 
@@ -76,4 +76,14 @@ class BrandCustomPromptInput:
 
 @partial(BrandCustomPrompt, fields="__all__")
 class BrandCustomPromptPartialInput(NodeInput):
+    pass
+
+
+@input(ChatGptProductFeedConfig, fields="__all__")
+class ChatGptProductFeedConfigInput:
+    pass
+
+
+@partial(ChatGptProductFeedConfig, fields="__all__")
+class ChatGptProductFeedConfigPartialInput(NodeInput):
     pass

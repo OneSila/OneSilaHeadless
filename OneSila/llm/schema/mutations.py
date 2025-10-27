@@ -12,8 +12,13 @@ from .types.input import (
     ProductAiBulletPointsInput,
 )
 from core.schema.core.mutations import type, create, update, delete, List
-from .types.types import BrandCustomPromptType
-from .types.input import BrandCustomPromptInput, BrandCustomPromptPartialInput
+from .types.types import BrandCustomPromptType, ChatGptProductFeedConfigType
+from .types.input import (
+    BrandCustomPromptInput,
+    BrandCustomPromptPartialInput,
+    ChatGptProductFeedConfigInput,
+    ChatGptProductFeedConfigPartialInput,
+)
 from core.schema.core.helpers import get_multi_tenant_company
 from products.models import Product
 from sales_channels.models import SalesChannel
@@ -26,6 +31,8 @@ class LlmMutation:
     update_brand_custom_prompt: BrandCustomPromptType = update(BrandCustomPromptPartialInput)
     delete_brand_custom_prompt: BrandCustomPromptType = delete()
     delete_brand_custom_prompts: List[BrandCustomPromptType] = delete(is_bulk=True)
+    create_chat_gpt_product_feed_config: ChatGptProductFeedConfigType = create(ChatGptProductFeedConfigInput)
+    update_chat_gpt_product_feed_config: ChatGptProductFeedConfigType = update(ChatGptProductFeedConfigPartialInput)
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def generate_product_ai_content(self, instance: ProductAiContentInput, info: Info) -> AiContent:
