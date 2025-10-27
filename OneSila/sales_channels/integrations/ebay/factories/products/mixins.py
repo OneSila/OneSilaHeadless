@@ -212,7 +212,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             serialized = json.dumps(payload, default=str, sort_keys=True, indent=2)
         except TypeError:
             serialized = pprint.pformat(payload)
-        logger.info("eBay API %s payload:\n%s", action, serialized)
+        logger.debug("eBay API %s payload:\n%s", action, serialized)
 
     # ------------------------------------------------------------------
     # Configurable helpers
