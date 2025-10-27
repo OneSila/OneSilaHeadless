@@ -153,6 +153,67 @@ class SalesChannelIntegrationPricelistTestCase(TestCase):
 
 
 
+class SalesChannelGptValidationTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.base_kwargs = {
+            "multi_tenant_company": self.multi_tenant_company,
+            "hostname": "https://channel.example.com",
+        }
+
+    def _build_channel(self, **kwargs):
+        return AmazonSalesChannel(**{**self.base_kwargs, **kwargs})
+
+    def test_gpt_enable_requires_core_fields(self):
+        channel = self._build_channel(gpt_enable=True)
+
+        with self.assertRaises(ValidationError) as ctx:
+            channel.full_clean()
+
+        errors = ctx.exception.error_dict
+        self.assertIn("gpt_seller_name", errors)
+        self.assertIn("gpt_return_policy", errors)
+        self.assertIn("gpt_return_window", errors)
+
+    def test_gpt_checkout_requires_enable(self):
+        channel = self._build_channel(gpt_enable_checkout=True)
+
+        with self.assertRaises(ValidationError) as ctx:
+            channel.full_clean()
+
+        self.assertIn("gpt_enable_checkout", ctx.exception.error_dict)
+
+    def test_gpt_checkout_requires_policy_links(self):
+        channel = self._build_channel(
+            gpt_enable=True,
+            gpt_enable_checkout=True,
+            gpt_seller_name="Acme",
+            gpt_return_policy="https://channel.example.com/returns",
+            gpt_return_window=30,
+        )
+
+        with self.assertRaises(ValidationError) as ctx:
+            channel.full_clean()
+
+        errors = ctx.exception.error_dict
+        self.assertIn("gpt_seller_privacy_policy", errors)
+        self.assertIn("gpt_seller_tos", errors)
+
+    def test_valid_configuration_passes_validation(self):
+        channel = self._build_channel(
+            gpt_enable=True,
+            gpt_enable_checkout=True,
+            gpt_seller_name="Acme",
+            gpt_return_policy="https://channel.example.com/returns",
+            gpt_return_window=30,
+            gpt_seller_privacy_policy="https://channel.example.com/privacy",
+            gpt_seller_tos="https://channel.example.com/tos",
+            gpt_seller_url="https://channel.example.com/about",
+        )
+
+        channel.full_clean()
+
+
 class RemoteProductConstraintTestCase(TestCase):
     def setUp(self):
         super().setUp()

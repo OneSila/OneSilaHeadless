@@ -1,7 +1,7 @@
 from typing import Annotated, List, Optional
 
 from core.schema.core.types.types import relay, type, strawberry_type, GetQuerysetMultiTenantMixin
-from strawberry.lazy import lazy
+from strawberry import lazy
 
 from .filters import BrandCustomPromptFilter
 from .ordering import BrandCustomPromptOrder
@@ -52,6 +52,7 @@ class ChatGptProductFeedConfigType(relay.Node, GetQuerysetMultiTenantMixin):
     condition_property: Optional[Annotated['PropertyType', lazy("properties.schema.types.types")]]
     brand_property: Optional[Annotated['PropertyType', lazy("properties.schema.types.types")]]
     material_property: Optional[Annotated['PropertyType', lazy("properties.schema.types.types")]]
+    mpn_property: Optional[Annotated['PropertyType', lazy("properties.schema.types.types")]]
     length_property: Optional[Annotated['PropertyType', lazy("properties.schema.types.types")]]
     width_property: Optional[Annotated['PropertyType', lazy("properties.schema.types.types")]]
     height_property: Optional[Annotated['PropertyType', lazy("properties.schema.types.types")]]

@@ -125,12 +125,23 @@ class ChatGptProductFeedConfig(models.Model):
         blank=True,
         related_name="+",
     )
+    mpn_property = models.ForeignKey(
+        "properties.Property",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
     length_property = models.ForeignKey(
         "properties.Property",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="+",
+    )
+    length_unit = models.CharField(
+        max_length=32,
+        blank=True,
     )
     width_property = models.ForeignKey(
         "properties.Property",
@@ -152,6 +163,10 @@ class ChatGptProductFeedConfig(models.Model):
         null=True,
         blank=True,
         related_name="+",
+    )
+    weight_unit = models.CharField(
+        max_length=32,
+        blank=True,
     )
     age_group_property = models.ForeignKey(
         "properties.Property",

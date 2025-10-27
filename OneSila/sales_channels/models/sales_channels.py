@@ -31,6 +31,40 @@ class SalesChannel(Integration, models.Model):
         help_text="Initial stock quantity to send when creating remote products.",
     )
 
+    gpt_enable = models.BooleanField(default=False, help_text=_("Enable GPT-generated product feed configuration."))
+    gpt_enable_checkout = models.BooleanField(default=False, help_text=_("Allow GPT-generated content to power checkout experiences."))
+    gpt_seller_name = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text=_("Display name presented in GPT-powered experiences."),
+    )
+    gpt_seller_url = models.URLField(
+        null=True,
+        blank=True,
+        help_text=_("Uses the hostname by default; override here to present a different seller URL."),
+    )
+    gpt_seller_privacy_policy = models.URLField(
+        null=True,
+        blank=True,
+        help_text=_("Link to your privacy policy when GPT checkout is enabled."),
+    )
+    gpt_seller_tos = models.URLField(
+        null=True,
+        blank=True,
+        help_text=_("Link to your terms of service when GPT checkout is enabled."),
+    )
+    gpt_return_policy = models.URLField(
+        null=True,
+        blank=True,
+        help_text=_("Public return policy URL required when GPT is enabled."),
+    )
+    gpt_return_window = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text=_("Return window (for example, in days) required when GPT is enabled."),
+    )
+
     is_external_install = models.BooleanField(
         default=False,
         help_text="True if the installation was initiated from the Shopify App Store or other stores."
@@ -39,6 +73,37 @@ class SalesChannel(Integration, models.Model):
     class Meta:
         verbose_name = 'Sales Channel'
         verbose_name_plural = 'Sales Channels'
+
+    def clean(self):
+        super().clean()
+
+        errors = {}
+
+        if self.gpt_enable:
+            required_on_enable = {
+                "gpt_seller_name": _("Seller name is required when GPT is enabled."),
+                "gpt_return_policy": _("Return policy URL is required when GPT is enabled."),
+                "gpt_return_window": _("Return window is required when GPT is enabled."),
+            }
+            for field, message in required_on_enable.items():
+                value = getattr(self, field)
+                if value in (None, ""):
+                    errors[field] = ValidationError(message)
+
+        if self.gpt_enable_checkout:
+            if not self.gpt_enable:
+                errors["gpt_enable_checkout"] = ValidationError(_("Enable GPT before enabling GPT checkout."))
+            checkout_required = {
+                "gpt_seller_privacy_policy": _("Privacy policy URL is required when GPT checkout is enabled."),
+                "gpt_seller_tos": _("Terms of service URL is required when GPT checkout is enabled."),
+            }
+            for field, message in checkout_required.items():
+                value = getattr(self, field)
+                if value in (None, ""):
+                    errors[field] = ValidationError(message)
+
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
 
