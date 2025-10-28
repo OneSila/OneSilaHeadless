@@ -47,6 +47,7 @@ class DummyProduct:
     sale_price: Optional[Decimal]
     product_rule: Optional[str]
     configurable: bool = False
+    url_key: str = ""
 
     def is_configurable(self) -> bool:
         return self.configurable
@@ -119,6 +120,14 @@ class StubSalesChannelViewAssign:
         self.multi_tenant_company = multi_tenant_company
         base_url = getattr(sales_channel_view, "base_url", f"https://{sales_channel.hostname}")
         self.remote_url = f"{base_url.rstrip('/')}/{product.sku}"
+
+
+@dataclass
+class DummyRemoteProduct:
+    sales_channel: DummySalesChannel
+    multi_tenant_company: DummyCompany
+    local_instance: DummyProduct
+    cached_assignments: List[SimpleNamespace]
 
 
 class ProductFeedPayloadFactoryTests(SimpleTestCase):
@@ -194,6 +203,27 @@ class ProductFeedPayloadFactoryTests(SimpleTestCase):
             multi_tenant_company=self.company,
         )
 
+    def _build_remote_product(
+        self,
+        *,
+        sales_channel: DummySalesChannel,
+        product: DummyProduct,
+        remote_url: str,
+        sales_channel_view: Optional[SimpleNamespace] = None,
+    ) -> DummyRemoteProduct:
+        assign = self._build_assign(
+            sales_channel=sales_channel,
+            product=product,
+            remote_url=remote_url,
+            sales_channel_view=sales_channel_view,
+        )
+        return DummyRemoteProduct(
+            sales_channel=sales_channel,
+            multi_tenant_company=self.company,
+            local_instance=product,
+            cached_assignments=[assign],
+        )
+
     def _property_cache(self, entries: Iterable[Tuple[Tuple[int, int], DummyProductProperty]]) -> Dict[Tuple[int, int], DummyProductProperty]:
         return {key: value for key, value in entries}
 
@@ -209,8 +239,9 @@ class ProductFeedPayloadFactoryTests(SimpleTestCase):
             price=Decimal("100"),
             sale_price=Decimal("80"),
             product_rule="Shoes",
+            url_key="SKU123",
         )
-        assign = self._build_assign(
+        remote_product = self._build_remote_product(
             sales_channel=sales_channel,
             product=product,
             remote_url="https://shop.example.com/SKU123",
@@ -279,7 +310,7 @@ class ProductFeedPayloadFactoryTests(SimpleTestCase):
         with patch.object(ProductFeedPayloadFactory, "_load_config", return_value=self.config), patch.object(
             ProductFeedPayloadFactory, "_load_configurator_items", return_value=[]
         ):
-            factory = ProductFeedPayloadFactory(sales_channel_view_assign=assign)
+            factory = ProductFeedPayloadFactory(remote_product=remote_product)
 
         with patch.object(ProductFeedPayloadFactory, "_resolve_products", return_value=[product]), patch.object(
             ProductFeedPayloadFactory, "_prepare_property_cache", return_value=property_cache
@@ -360,8 +391,9 @@ class ProductFeedPayloadFactoryTests(SimpleTestCase):
             price=Decimal("120"),
             sale_price=None,
             product_rule=None,
+            url_key="SKU999",
         )
-        assign = self._build_assign(
+        remote_product = self._build_remote_product(
             sales_channel=sales_channel,
             product=product,
             remote_url="https://shop.example.com/SKU999",
@@ -383,7 +415,7 @@ class ProductFeedPayloadFactoryTests(SimpleTestCase):
         with patch.object(ProductFeedPayloadFactory, "_load_config", return_value=self.config), patch.object(
             ProductFeedPayloadFactory, "_load_configurator_items", return_value=[]
         ):
-            factory = ProductFeedPayloadFactory(sales_channel_view_assign=assign)
+            factory = ProductFeedPayloadFactory(remote_product=remote_product)
 
         preorder_date = timezone.now().date().isoformat()
         with patch.object(ProductFeedPayloadFactory, "_resolve_products", return_value=[product]), patch.object(
@@ -417,6 +449,7 @@ class ProductFeedPayloadFactoryTests(SimpleTestCase):
             sale_price=None,
             product_rule="Shoes",
             configurable=True,
+            url_key="parent",
         )
         variation_one = DummyProduct(
             id=11,
@@ -428,6 +461,7 @@ class ProductFeedPayloadFactoryTests(SimpleTestCase):
             price=Decimal("120"),
             sale_price=Decimal("90"),
             product_rule="Shoes",
+            url_key="var-red",
         )
         variation_two = DummyProduct(
             id=12,
@@ -439,10 +473,11 @@ class ProductFeedPayloadFactoryTests(SimpleTestCase):
             price=Decimal("150"),
             sale_price=None,
             product_rule="Shoes",
+            url_key="var-blue",
         )
 
         sales_channel_view = SimpleNamespace(base_url="https://shop.example.com")
-        assign = self._build_assign(
+        remote_product = self._build_remote_product(
             sales_channel=sales_channel,
             product=parent_product,
             remote_url="https://shop.example.com/PARENT",
@@ -542,7 +577,7 @@ class ProductFeedPayloadFactoryTests(SimpleTestCase):
             with patch.object(ProductFeedPayloadFactory, "_load_config", return_value=self.config), patch.object(
                 ProductFeedPayloadFactory, "_load_configurator_items", return_value=configurator_items
             ):
-                factory = ProductFeedPayloadFactory(sales_channel_view_assign=assign)
+                factory = ProductFeedPayloadFactory(remote_product=remote_product)
 
             with patch.object(ProductFeedPayloadFactory, "_resolve_products", return_value=[variation_one, variation_two]), patch.object(
                 ProductFeedPayloadFactory, "_prepare_property_cache", return_value=property_cache
@@ -617,12 +652,13 @@ class ProductFeedPayloadFactoryTests(SimpleTestCase):
             price=Decimal("10"),
             sale_price=None,
             product_rule=None,
+            url_key="disabled",
         )
-        assign = self._build_assign(
+        remote_product = self._build_remote_product(
             sales_channel=sales_channel,
             product=product,
             remote_url="https://shop.example.com/DISABLED",
         )
 
         with self.assertRaises(ProductFeedConfigurationError):
-            ProductFeedPayloadFactory(sales_channel_view_assign=assign)
+            ProductFeedPayloadFactory(remote_product=remote_product)

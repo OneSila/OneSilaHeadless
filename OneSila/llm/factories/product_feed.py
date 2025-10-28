@@ -16,7 +16,7 @@ from llm.models import ChatGptProductFeedConfig
 from media.models import Media, MediaProductThrough
 from products.models import Product, ProductTranslation
 from properties.models import ProductProperty
-from sales_channels.models import SalesChannelViewAssign
+from sales_channels.models import RemoteProduct, SalesChannelViewAssign
 
 
 @dataclass(frozen=True)
@@ -28,13 +28,14 @@ class _CustomVariant:
 class ProductFeedPayloadFactory:
     """Build payloads for the GPT product feed."""
 
-    def __init__(self, *, sales_channel_view_assign: SalesChannelViewAssign):
-        self.sales_channel_view_assign = sales_channel_view_assign
-        self.sales_channel = sales_channel_view_assign.sales_channel
+    def __init__(self, *, remote_product: RemoteProduct):
+        self.remote_product = remote_product
+        self.sales_channel = remote_product.sales_channel
         if not getattr(self.sales_channel, "gpt_enable", False):
             raise ProductFeedConfigurationError("GPT feed is disabled for this sales channel.")
 
-        self.parent_product = sales_channel_view_assign.product
+        self.primary_assignment = self._resolve_primary_assignment()
+        self.parent_product = self._resolve_parent_product()
         self.language_code = self._resolve_language_code()
         self.config = self._load_config()
         self.configurator_items = self._load_configurator_items()
@@ -63,6 +64,31 @@ class ProductFeedPayloadFactory:
             )
 
         return payloads
+
+    def _resolve_primary_assignment(self) -> Optional[SalesChannelViewAssign]:
+        assignments = getattr(self.remote_product, "cached_assignments", None)
+        if assignments:
+            return assignments[0]
+        try:
+            return (
+                self.remote_product.saleschannelviewassign_set.select_related(
+                    "sales_channel_view",
+                    "sales_channel",
+                    "product",
+                )
+                .order_by("id")
+                .first()
+            )
+        except AttributeError:
+            return None
+
+    def _resolve_parent_product(self):
+        if self.primary_assignment and getattr(self.primary_assignment, "product", None):
+            return self.primary_assignment.product
+        local_instance = getattr(self.remote_product, "local_instance", None)
+        if local_instance is None:
+            raise ProductFeedValidationError("Remote product is not linked to a local product.")
+        return local_instance
 
     def _resolve_language_code(self) -> str:
         company = getattr(self.sales_channel, "multi_tenant_company", None)
@@ -459,16 +485,27 @@ class ProductFeedPayloadFactory:
         assignments = media_map.get(product.id) or media_map.get(self.parent_product.id, {})
         thumbnail, additional_images, video_link = self._extract_media_urls(assignments=assignments)
 
-        link = (
-            self.sales_channel_view_assign.remote_url
-            if product.id == self.sales_channel_view_assign.product_id
-            else SalesChannelViewAssign(
-                product=product,
-                sales_channel_view=self.sales_channel_view_assign.sales_channel_view,
-                sales_channel=self.sales_channel,
-                multi_tenant_company=self.sales_channel_view_assign.multi_tenant_company,
-            ).remote_url
-        )
+        link = None
+        assignment = self.primary_assignment
+        if assignment is not None:
+            link = getattr(assignment, "remote_url", None)
+            assignment_product_id = getattr(
+                assignment,
+                "product_id",
+                getattr(getattr(assignment, "product", None), "id", None),
+            )
+            if assignment_product_id != product.id:
+                sales_channel_view = getattr(assignment, "sales_channel_view", None)
+                if sales_channel_view is not None:
+                    try:
+                        link = SalesChannelViewAssign(
+                            product=product,
+                            sales_channel_view=sales_channel_view,
+                            sales_channel=self.sales_channel,
+                            multi_tenant_company=self.sales_channel.multi_tenant_company,
+                        ).remote_url
+                    except Exception:
+                        link = getattr(assignment, "remote_url", None)
 
         condition = self._compute_condition(product=product, property_cache=property_cache)
         age_group = self._compute_age_group(product=product, property_cache=property_cache)

@@ -9,13 +9,17 @@ from django.db import transaction
 from django.utils import timezone
 
 from llm.factories import ProductFeedPayloadFactory
-from sales_channels.models import RemoteProduct, SalesChannel, SalesChannelViewAssign
+from sales_channels.models import (
+    RemoteProduct,
+    SalesChannel,
+    SalesChannelGptFeed,
+)
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class _AssignmentPayload:
+class _RemoteProductPayload:
     identifiers: Set[str]
     payloads: Dict[str, Dict[str, object]]
 
@@ -23,30 +27,46 @@ class _AssignmentPayload:
 class SalesChannelGptProductFeedFactory:
     """Synchronise GPT product feeds for sales channels."""
 
-    def __init__(self, *, sync_all: bool = False):
+    def __init__(
+        self,
+        *,
+        sync_all: bool = False,
+        sales_channel_id: int | None = None,
+        deleted_sku: str | None = None,
+    ) -> None:
         self.sync_all = sync_all
+        self.sales_channel_id = sales_channel_id
+        self.deleted_sku = deleted_sku
 
-    def work(self) -> None:
-        remote_products = self._collect_remote_products()
+    def run(self) -> None:
+        if self.deleted_sku:
+            self._run_deletion_flow()
+            return
+
+        self._run_sync_flow()
+
+    def _run_sync_flow(self) -> None:
+        remote_queryset = self._collect_remote_products()
+        remote_products = list(remote_queryset)
         if not remote_products:
             return
 
-        assignments_map = self._load_assignments(remote_products=remote_products)
         grouped = self._group_by_sales_channel(remote_products=remote_products)
 
         processed_remote_ids: Set[int] = set()
 
         for sales_channel, channel_products in grouped:
             processed_remote_ids.update(product.id for product in channel_products)
-            channel_assignments = self._collect_channel_assignments(
-                channel_products=channel_products,
-                assignments_map=assignments_map,
-            )
-            existing_entries = self._load_existing_feed(sales_channel=sales_channel)
+            payloads = [
+                self._build_payload_for_remote_product(remote_product=remote_product)
+                for remote_product in channel_products
+            ]
+
+            feed = self._get_feed_for_channel(sales_channel=sales_channel)
+            existing_entries = self._load_existing_feed(feed=feed)
             updated_entries = self._merge_entries(
-                sales_channel=sales_channel,
                 existing_entries=existing_entries,
-                assignments=channel_assignments,
+                payloads=payloads,
             )
 
             if updated_entries is None:
@@ -54,7 +74,7 @@ class SalesChannelGptProductFeedFactory:
 
             with transaction.atomic():
                 self._persist_feed(
-                    sales_channel=sales_channel,
+                    feed=feed,
                     entries=updated_entries,
                 )
                 self._send_feed(
@@ -69,35 +89,16 @@ class SalesChannelGptProductFeedFactory:
         queryset = RemoteProduct.objects.filter(
             sales_channel__gpt_enable=True,
         )
+        if self.sales_channel_id is not None:
+            queryset = queryset.filter(sales_channel_id=self.sales_channel_id)
         if not self.sync_all:
             queryset = queryset.filter(required_feed_sync=True)
-        return list(
-            queryset.select_related("sales_channel", "local_instance").order_by("sales_channel_id", "id")
-        )
 
-    def _load_assignments(
-        self,
-        *,
-        remote_products: Sequence[RemoteProduct],
-    ) -> Dict[int, List[SalesChannelViewAssign]]:
-        remote_product_ids = {product.id for product in remote_products}
-        if not remote_product_ids:
-            return {}
-        assignments = (
-            SalesChannelViewAssign.objects.filter(remote_product_id__in=remote_product_ids)
-            .select_related(
-                "product",
-                "sales_channel",
-                "sales_channel_view",
-                "sales_channel_view__sales_channel",
-                "remote_product",
-            )
-            .order_by("remote_product_id", "id")
+        return (
+            queryset
+            .select_related("sales_channel", "local_instance")
+            .order_by("sales_channel_id", "id")
         )
-        mapping: Dict[int, List[SalesChannelViewAssign]] = defaultdict(list)
-        for assignment in assignments:
-            mapping[assignment.remote_product_id].append(assignment)
-        return mapping
 
     def _group_by_sales_channel(
         self,
@@ -111,61 +112,30 @@ class SalesChannelGptProductFeedFactory:
             channels[product.sales_channel_id] = product.sales_channel
         return [(channels[channel_id], grouped[channel_id]) for channel_id in grouped]
 
-    def _collect_channel_assignments(
+    def _build_payload_for_remote_product(
         self,
         *,
-        channel_products: Sequence[RemoteProduct],
-        assignments_map: Dict[int, List[SalesChannelViewAssign]],
-    ) -> Dict[int, _AssignmentPayload]:
-        channel_assignments: Dict[int, _AssignmentPayload] = {}
-        for remote_product in channel_products:
-            assignments = assignments_map.get(remote_product.id, [])
-            payloads: Dict[str, Dict[str, object]] = {}
-            identifiers: Set[str] = set()
-
-            if not assignments:
-                sku = getattr(getattr(remote_product, "local_instance", None), "sku", None)
-                if sku:
-                    identifiers.add(str(sku))
-                channel_assignments[remote_product.id] = _AssignmentPayload(
-                    identifiers=identifiers,
-                    payloads=payloads,
-                )
-                continue
-
-            for assignment in assignments:
-                payload_data = self._build_payload_for_assignment(assignment=assignment)
-                payloads.update(payload_data.payloads)
-                identifiers.update(payload_data.identifiers)
-
-            channel_assignments[remote_product.id] = _AssignmentPayload(
-                identifiers=identifiers,
-                payloads=payloads,
-            )
-        return channel_assignments
-
-    def _build_payload_for_assignment(
-        self,
-        *,
-        assignment: SalesChannelViewAssign,
-    ) -> _AssignmentPayload:
+        remote_product: RemoteProduct,
+    ) -> _RemoteProductPayload:
         identifiers: Set[str] = set()
-        product = assignment.product
-        sku = getattr(product, "sku", None)
+        payloads: Dict[str, Dict[str, object]] = {}
+
+        local_product = getattr(remote_product, "local_instance", None)
+        sku = getattr(local_product, "sku", None)
         if sku:
             identifiers.add(str(sku))
+
         try:
-            if product.is_configurable():
-                for variation in product.get_configurable_variations(active_only=False):
+            if local_product and local_product.is_configurable():
+                for variation in local_product.get_configurable_variations(active_only=False):
                     variation_sku = getattr(variation, "sku", None)
                     if variation_sku:
                         identifiers.add(str(variation_sku))
         except AttributeError:
             pass
 
-        payloads: Dict[str, Dict[str, object]] = {}
         try:
-            factory = ProductFeedPayloadFactory(sales_channel_view_assign=assignment)
+            factory = ProductFeedPayloadFactory(remote_product=remote_product)
             for payload in factory.build():
                 identifier = payload.get("id")
                 if not identifier:
@@ -175,20 +145,21 @@ class SalesChannelGptProductFeedFactory:
                 payloads[identifier_str] = payload
         except Exception:  # pragma: no cover - safety net for factory failures
             logger.exception(
-                "Failed to build GPT feed payload for assignment %s", assignment.pk
+                "Failed to build GPT feed payload for remote product %s",
+                getattr(remote_product, "pk", None),
             )
-        return _AssignmentPayload(identifiers=identifiers, payloads=payloads)
+
+        return _RemoteProductPayload(identifiers=identifiers, payloads=payloads)
+
+    def _get_feed_for_channel(self, *, sales_channel: SalesChannel) -> SalesChannelGptFeed:
+        return sales_channel.ensure_gpt_feed()
 
     def _load_existing_feed(
         self,
         *,
-        sales_channel,
+        feed: SalesChannelGptFeed,
     ) -> Dict[str, Dict[str, object]]:
-        existing = getattr(sales_channel, "gpt_feed_json", None) or []
-        if isinstance(existing, dict):
-            items = existing.get("items", [])
-        else:
-            items = existing
+        items = feed.items or []
         entries: Dict[str, Dict[str, object]] = {}
         for item in items:
             identifier = item.get("id")
@@ -200,21 +171,20 @@ class SalesChannelGptProductFeedFactory:
     def _merge_entries(
         self,
         *,
-        sales_channel,
         existing_entries: Dict[str, Dict[str, object]],
-        assignments: Dict[int, _AssignmentPayload],
+        payloads: Sequence[_RemoteProductPayload],
     ) -> Dict[str, Dict[str, object]] | None:
-        if not assignments and not self.sync_all:
+        if not payloads and not self.sync_all:
             return None
 
         merged = {} if self.sync_all else dict(existing_entries)
 
-        for payload in assignments.values():
+        for payload in payloads:
             for identifier, item in payload.payloads.items():
                 merged[identifier] = item
 
         if not self.sync_all:
-            for payload in assignments.values():
+            for payload in payloads:
                 for identifier in payload.identifiers:
                     if identifier not in payload.payloads:
                         merged.pop(identifier, None)
@@ -227,21 +197,22 @@ class SalesChannelGptProductFeedFactory:
     def _persist_feed(
         self,
         *,
-        sales_channel,
+        feed: SalesChannelGptFeed,
         entries: Dict[str, Dict[str, object]],
     ) -> None:
         ordered = [entries[key] for key in sorted(entries.keys())]
-        sales_channel.gpt_feed_json = ordered
+        feed.items = ordered
         timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
-        filename = f"gpt-feed-{sales_channel.pk}-{timestamp}.json"
+        filename = f"gpt-feed-{feed.sales_channel_id}-{timestamp}.json"
         content = json.dumps(ordered, ensure_ascii=False, indent=2, default=str)
-        sales_channel.gpt_feed_file.save(filename, ContentFile(content), save=False)
-        sales_channel.save(update_fields=["gpt_feed_json", "gpt_feed_file"])
+        feed.file.save(filename, ContentFile(content), save=False)
+        feed.last_synced_at = timezone.now()
+        feed.save(update_fields=["items", "file", "last_synced_at"])
 
     def _send_feed(
         self,
         *,
-        sales_channel,
+        sales_channel: SalesChannel,
         entries: Dict[str, Dict[str, object]],
     ) -> None:
         logger.debug(
@@ -259,3 +230,30 @@ class SalesChannelGptProductFeedFactory:
         if not ids:
             return
         RemoteProduct.objects.filter(id__in=ids).update(required_feed_sync=False)
+
+    def _run_deletion_flow(self) -> None:
+        if not self.deleted_sku:
+            return
+        if self.sales_channel_id is None:
+            logger.debug("Skipping GPT feed deletion without sales channel context.")
+            return
+
+        try:
+            sales_channel = SalesChannel.objects.get(
+                pk=self.sales_channel_id,
+                gpt_enable=True,
+            )
+        except SalesChannel.DoesNotExist:
+            return
+
+        feed = self._get_feed_for_channel(sales_channel=sales_channel)
+        existing_entries = self._load_existing_feed(feed=feed)
+        identifier = str(self.deleted_sku)
+        if identifier not in existing_entries:
+            return
+
+        existing_entries.pop(identifier, None)
+
+        with transaction.atomic():
+            self._persist_feed(feed=feed, entries=existing_entries)
+            self._send_feed(sales_channel=sales_channel, entries=existing_entries)

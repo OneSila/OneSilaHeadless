@@ -64,18 +64,6 @@ class SalesChannel(Integration, models.Model):
         blank=True,
         help_text=_("Return window (for example, in days) required when GPT is enabled."),
     )
-    gpt_feed_json = models.JSONField(
-        default=list,
-        blank=True,
-        help_text=_("Cached GPT product feed entries for this sales channel."),
-    )
-    gpt_feed_file = models.FileField(
-        upload_to="gpt_feeds/",
-        null=True,
-        blank=True,
-        help_text=_("Downloadable JSON file containing the GPT product feed."),
-    )
-
     is_external_install = models.BooleanField(
         default=False,
         help_text="True if the installation was initiated from the Shopify App Store or other stores."
@@ -139,6 +127,24 @@ class SalesChannel(Integration, models.Model):
 
     def __str__(self):
         return f"{self.hostname } @ {self.multi_tenant_company}"
+
+    def ensure_gpt_feed(self):
+        from .gpt import SalesChannelGptFeed
+
+        feed, _ = SalesChannelGptFeed.objects.get_or_create(
+            sales_channel=self,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        return feed
+
+    @property
+    def gpt_feed(self):
+        from .gpt import SalesChannelGptFeed
+
+        try:
+            return self.gpt_feed_record
+        except SalesChannelGptFeed.DoesNotExist:
+            return None
 
 
 class SalesChannelIntegrationPricelist(models.Model):

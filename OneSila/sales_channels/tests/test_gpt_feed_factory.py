@@ -4,23 +4,22 @@ from unittest.mock import Mock, patch
 from django.db import connection
 from model_bakery import baker
 
-from core.tests import TestCase
+from core.tests import TransactionTestCase
 from products.product_types import SIMPLE
 from sales_channels.factories.gpt.product_feed import SalesChannelGptProductFeedFactory
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
-from sales_channels.models import RemoteProduct, SalesChannel
+from sales_channels.models import RemoteProduct, SalesChannel, SalesChannelGptFeed
 
 
-class SalesChannelGptProductFeedFactoryTests(TestCase):
+class SalesChannelGptProductFeedFactoryTests(TransactionTestCase):
     @classmethod
     def setUpClass(cls):
+        cls._ensure_column(model=RemoteProduct, field_name="required_feed_sync")
+        cls._ensure_table(model=SalesChannelGptFeed)
         super().setUpClass()
-        cls._ensure_column(SalesChannel, "gpt_feed_json", "TEXT DEFAULT '[]'")
-        cls._ensure_column(SalesChannel, "gpt_feed_file", "TEXT")
-        cls._ensure_column(RemoteProduct, "required_feed_sync", "INTEGER DEFAULT 0 NOT NULL")
 
     @staticmethod
-    def _ensure_column(model, field_name: str, sql_definition: str) -> None:
+    def _ensure_column(*, model, field_name: str) -> None:
         field = model._meta.get_field(field_name)
         table = model._meta.db_table
         with connection.cursor() as cursor:
@@ -29,10 +28,23 @@ class SalesChannelGptProductFeedFactoryTests(TestCase):
             }
         if field.column in column_names:
             return
+
+        _, _, args, kwargs = field.deconstruct()
+        new_field = field.__class__(*args, **kwargs)
+        new_field.set_attributes_from_name(field.name)
+        with connection.schema_editor() as editor:
+            editor.add_field(model, new_field)
+
+    @staticmethod
+    def _ensure_table(*, model) -> None:
+        table = model._meta.db_table
         with connection.cursor() as cursor:
-            cursor.execute(
-                f"ALTER TABLE {table} ADD COLUMN {field.column} {sql_definition}"
-            )
+            existing_tables = connection.introspection.table_names(cursor)
+        if table in existing_tables:
+            return
+
+        with connection.schema_editor() as editor:
+            editor.create_model(model)
 
     def setUp(self):
         super().setUp()
@@ -96,60 +108,82 @@ class SalesChannelGptProductFeedFactoryTests(TestCase):
         factory_mock.build.return_value = [payload]
 
         with patch(
-            "sales_channels.factories.cpt.product_feed.ProductFeedPayloadFactory",
+            "sales_channels.factories.gpt.product_feed.ProductFeedPayloadFactory",
             return_value=factory_mock,
         ) as factory_cls:
-            SalesChannelGptProductFeedFactory(sync_all=False).work()
+            SalesChannelGptProductFeedFactory(sync_all=False).run()
 
         factory_cls.assert_called_once()
         remote_product.refresh_from_db()
         self.assertFalse(remote_product.required_feed_sync)
 
-        self.channel.refresh_from_db()
-        self.assertEqual(self.channel.gpt_feed_json, [payload])
-        self.assertIsNotNone(self.channel.gpt_feed_file)
-        self.channel.gpt_feed_file.open("r")
+        feed = SalesChannelGptFeed.objects.get(sales_channel=self.channel)
+        self.assertEqual(feed.items, [payload])
+        self.assertIsNotNone(feed.file)
+        feed.file.open("r")
         try:
-            data = json.load(self.channel.gpt_feed_file)
+            data = json.load(feed.file)
         finally:
-            self.channel.gpt_feed_file.close()
+            feed.file.close()
         self.assertEqual(data, [payload])
+        self.assertIsNotNone(feed.last_synced_at)
 
     def test_incremental_removes_stale_entries(self):
         remote_product = self._build_remote_product(sku="SKU-2")
-        self.channel.gpt_feed_json = [{"id": "SKU-2", "title": "Old"}]
-        self.channel.save(update_fields=["gpt_feed_json"])
+        feed = self.channel.ensure_gpt_feed()
+        feed.items = [{"id": "SKU-2", "title": "Old"}]
+        feed.save(update_fields=["items"])
         factory_mock = Mock()
         factory_mock.build.return_value = []
 
         with patch(
-            "sales_channels.factories.cpt.product_feed.ProductFeedPayloadFactory",
+            "sales_channels.factories.gpt.product_feed.ProductFeedPayloadFactory",
             return_value=factory_mock,
         ):
-            SalesChannelGptProductFeedFactory(sync_all=False).work()
+            SalesChannelGptProductFeedFactory(sync_all=False).run()
 
         remote_product.refresh_from_db()
         self.assertFalse(remote_product.required_feed_sync)
-        self.channel.refresh_from_db()
-        self.assertEqual(self.channel.gpt_feed_json, [])
+        feed.refresh_from_db()
+        self.assertEqual(feed.items, [])
 
     def test_sync_all_refreshes_even_without_flags(self):
         remote_product = self._build_remote_product(sku="SKU-3")
         RemoteProduct.objects.filter(pk=remote_product.pk).update(required_feed_sync=False)
         remote_product.refresh_from_db()
-        self.channel.gpt_feed_json = [{"id": "OTHER", "title": "Other"}]
-        self.channel.save(update_fields=["gpt_feed_json"])
+        feed = self.channel.ensure_gpt_feed()
+        feed.items = [{"id": "OTHER", "title": "Other"}]
+        feed.save(update_fields=["items"])
         payload = {"id": "SKU-3", "title": "Fresh"}
         factory_mock = Mock()
         factory_mock.build.return_value = [payload]
 
         with patch(
-            "sales_channels.factories.cpt.product_feed.ProductFeedPayloadFactory",
+            "sales_channels.factories.gpt.product_feed.ProductFeedPayloadFactory",
             return_value=factory_mock,
         ):
-            SalesChannelGptProductFeedFactory(sync_all=True).work()
+            SalesChannelGptProductFeedFactory(sync_all=True).run()
 
         remote_product.refresh_from_db()
         self.assertFalse(remote_product.required_feed_sync)
-        self.channel.refresh_from_db()
-        self.assertEqual(self.channel.gpt_feed_json, [payload])
+        feed.refresh_from_db()
+        self.assertEqual(feed.items, [payload])
+
+    def test_deleted_sku_removes_entry(self):
+        self._build_remote_product(sku="SKU-DEL")
+        feed = self.channel.ensure_gpt_feed()
+        feed.items = [
+            {"id": "SKU-DEL", "title": "Remove"},
+            {"id": "KEEP", "title": "Keep"},
+        ]
+        feed.save(update_fields=["items"])
+
+        SalesChannelGptProductFeedFactory(
+            sync_all=False,
+            sales_channel_id=self.channel.id,
+            deleted_sku="SKU-DEL",
+        ).run()
+
+        feed.refresh_from_db()
+        self.assertEqual(feed.items, [{"id": "KEEP", "title": "Keep"}])
+        self.assertIsNotNone(feed.last_synced_at)
