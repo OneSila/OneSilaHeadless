@@ -6,7 +6,7 @@ from model_bakery import baker
 
 from core.tests import TestCase
 from products.product_types import SIMPLE
-from sales_channels.factories.cpt.product_feed import SalesChannelGptProductFeedFactory
+from sales_channels.factories.gpt.product_feed import SalesChannelGptProductFeedFactory
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
 from sales_channels.models import RemoteProduct, SalesChannel
 

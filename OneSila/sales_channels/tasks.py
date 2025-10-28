@@ -76,13 +76,13 @@ def update_configurators_for_product_property_db_task(parent_product_id, propert
 
 @db_periodic_task(crontab(minute='*/20'))
 def sales_channels__tasks__sync_gpt_feed__cronjob():
-    from .factories.cpt.product_feed import SalesChannelGptProductFeedFactory
+    from .factories.gpt.product_feed import SalesChannelGptProductFeedFactory
 
     SalesChannelGptProductFeedFactory(sync_all=False).work()
 
 
 @db_periodic_task(crontab(hour='0', minute='0'))
 def sales_channels__tasks__sync_gpt_feed_full__cronjob():
-    from .factories.cpt.product_feed import SalesChannelGptProductFeedFactory
+    from .factories.gpt.product_feed import SalesChannelGptProductFeedFactory
 
     SalesChannelGptProductFeedFactory(sync_all=True).work()
