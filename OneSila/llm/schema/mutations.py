@@ -31,7 +31,6 @@ class LlmMutation:
     update_brand_custom_prompt: BrandCustomPromptType = update(BrandCustomPromptPartialInput)
     delete_brand_custom_prompt: BrandCustomPromptType = delete()
     delete_brand_custom_prompts: List[BrandCustomPromptType] = delete(is_bulk=True)
-    create_chat_gpt_product_feed_config: ChatGptProductFeedConfigType = create(ChatGptProductFeedConfigInput)
     update_chat_gpt_product_feed_config: ChatGptProductFeedConfigType = update(ChatGptProductFeedConfigPartialInput)
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
