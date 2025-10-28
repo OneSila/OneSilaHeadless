@@ -42,6 +42,10 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         db_index=True,
         help_text="Current sync status derived from progress and sync errors.",
     )
+    required_feed_sync = models.BooleanField(
+        default=False,
+        help_text="Indicates if the GPT product feed needs to be refreshed for this remote product.",
+    )
 
     class Meta:
         unique_together = (('sales_channel', 'local_instance', 'remote_parent_product'),)
@@ -110,6 +114,9 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         return f"Remote product {local_name} (SKU: {remote_sku}) on {sales_channel}"
 
     def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        if is_new and getattr(self.sales_channel, "gpt_enable", False):
+            self.required_feed_sync = True
         previous_status = self.status
         computed_status = self._determine_status()
         status_changed = previous_status != computed_status
@@ -120,6 +127,8 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
             mutable_fields = list(dict.fromkeys(update_fields))
             if status_changed and "status" not in mutable_fields:
                 mutable_fields.append("status")
+            if is_new and getattr(self.sales_channel, "gpt_enable", False) and "required_feed_sync" not in mutable_fields:
+                mutable_fields.append("required_feed_sync")
             kwargs["update_fields"] = mutable_fields
 
         super().save(*args, **kwargs)

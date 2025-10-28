@@ -1,4 +1,5 @@
-from huey.contrib.djhuey import db_task
+from huey import crontab
+from huey.contrib.djhuey import db_periodic_task, db_task
 from products.product_types import CONFIGURABLE
 
 # @TODO: Create flows for these tasks
@@ -71,3 +72,17 @@ def update_configurators_for_product_property_db_task(parent_product_id, propert
     for remote_product in remote_products.iterator():
         if remote_product.configurator:
             remote_product.configurator.update_if_needed(rule=product_rule, send_sync_signal=True)
+
+
+@db_periodic_task(crontab(minute='*/20'))
+def sales_channels__tasks__sync_gpt_feed__cronjob():
+    from .factories.cpt.product_feed import SalesChannelGptProductFeedFactory
+
+    SalesChannelGptProductFeedFactory(sync_all=False).work()
+
+
+@db_periodic_task(crontab(hour='0', minute='0'))
+def sales_channels__tasks__sync_gpt_feed_full__cronjob():
+    from .factories.cpt.product_feed import SalesChannelGptProductFeedFactory
+
+    SalesChannelGptProductFeedFactory(sync_all=True).work()
