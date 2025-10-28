@@ -36,6 +36,7 @@ from sales_channels.models import (
     SalesChannelContentTemplate,
     SalesChannelView,
     SalesChannelViewAssign,
+    SalesChannelGptFeed,
     RemoteOrder,
 )
 from .filters import (
@@ -116,9 +117,15 @@ class SalesChannelContentTemplateCheckType:
     errors: List[FormattedIssueType]
 
 
+@type(SalesChannelGptFeed, fields='__all__')
+class SalesChannelGptFeedType(relay.Node, GetQuerysetMultiTenantMixin):
+    sales_channel: Annotated['SalesChannelType', lazy("sales_channels.schema.types.types")]
+
+
 @type(SalesChannel, filters=SalesChannelFilter, order=SalesChannelOrder, pagination=True, fields='__all__')
 class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
     saleschannelimport_set: List[Annotated['SalesChannelImportType', lazy("sales_channels.schema.types.types")]]
+    gpt_feed: Optional[Annotated['SalesChannelGptFeedType', lazy("sales_channels.schema.types.types")]]
 
     @field()
     def amazon_imports(self) -> List[Annotated['AmazonSalesChannelImportType', lazy("sales_channels.integrations.amazon.schema.types.types")]]:
@@ -131,7 +138,6 @@ class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def type(self, info) -> str:
         return INTEGRATIONS_TYPES_MAP.get(self.__class__, MAGENTO_INTEGRATION)
-
 
 @type(ImportCurrency, filters=ImportCurrencyFilter, order=ImportCurrencyOrder, pagination=True, fields='__all__')
 class ImportCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):

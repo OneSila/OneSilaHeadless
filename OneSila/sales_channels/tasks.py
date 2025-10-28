@@ -76,13 +76,33 @@ def update_configurators_for_product_property_db_task(parent_product_id, propert
 
 @db_periodic_task(crontab(minute='*/20'))
 def sales_channels__tasks__sync_gpt_feed__cronjob():
-    from .factories.gpt.product_feed import SalesChannelGptProductFeedFactory
+    from .flows.gpt_feed import sync_gpt_feed
 
-    SalesChannelGptProductFeedFactory(sync_all=False).work()
+    sync_gpt_feed(sync_all=False)
 
 
 @db_periodic_task(crontab(hour='0', minute='0'))
 def sales_channels__tasks__sync_gpt_feed_full__cronjob():
-    from .factories.gpt.product_feed import SalesChannelGptProductFeedFactory
+    from .flows.gpt_feed import sync_gpt_feed
 
-    SalesChannelGptProductFeedFactory(sync_all=True).work()
+    sync_gpt_feed(sync_all=True)
+
+
+@db_task()
+def sales_channels__tasks__sync_gpt_feed_for_channel(*, sales_channel_id: int, sync_all: bool) -> None:
+    from .flows.gpt_feed import sync_gpt_feed
+
+    sync_gpt_feed(
+        sales_channel_id=sales_channel_id,
+        sync_all=sync_all,
+    )
+
+
+@db_task()
+def sales_channels__tasks__remove_from_gpt_feed(*, sales_channel_id: int, sku: str) -> None:
+    from .flows.gpt_feed import remove_from_gpt_feed
+
+    remove_from_gpt_feed(
+        sales_channel_id=sales_channel_id,
+        sku=sku,
+    )

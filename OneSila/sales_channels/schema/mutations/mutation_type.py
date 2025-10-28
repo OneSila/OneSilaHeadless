@@ -7,10 +7,15 @@ import strawberry_django
 from core.schema.core.extensions import default_extensions
 from core.schema.core.helpers import get_multi_tenant_company
 from core.schema.core.mutations import create, update, delete, type, List, field
-from .fields import resync_sales_channel_assign, refresh_website_models_mutation
+from .fields import (
+    resync_sales_channel_assign,
+    refresh_website_models_mutation,
+    resync_sales_channel_gpt_feed_mutation,
+)
 from ..types.types import SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, \
     SalesChannelViewAssignType, SalesChannelContentTemplateType, SalesChannelImportType, RemoteLanguageType, \
-    RemoteCurrencyType, ImportPropertyType, SalesChannelContentTemplateCheckType, FormattedIssueType
+    RemoteCurrencyType, ImportPropertyType, SalesChannelContentTemplateCheckType, FormattedIssueType, \
+    SalesChannelGptFeedType
 from ..types.input import SalesChannelImportInput, SalesChannelImportPartialInput, SalesChannelInput, \
     SalesChannelPartialInput, \
     SalesChannelIntegrationPricelistInput, SalesChannelIntegrationPricelistPartialInput, SalesChannelViewInput, \
@@ -41,6 +46,7 @@ class SalesChannelsMutation:
     delete_sales_channel: SalesChannelType = delete()
     delete_sales_channels: List[SalesChannelType] = delete()
     refresh_sales_channel_websites: SalesChannelType = refresh_website_models_mutation()
+    resync_sales_channel_gpt_feed: SalesChannelGptFeedType = resync_sales_channel_gpt_feed_mutation()
 
     create_sales_channel_integration_pricelist: SalesChannelIntegrationPricelistType = create(SalesChannelIntegrationPricelistInput)
     create_sales_channel_integration_pricelists: List[SalesChannelIntegrationPricelistType] = create(List[SalesChannelIntegrationPricelistInput])

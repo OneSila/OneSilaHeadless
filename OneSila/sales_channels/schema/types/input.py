@@ -22,6 +22,7 @@ from sales_channels.models import (
     SalesChannelView,
     SalesChannelViewAssign,
     SalesChannelContentTemplate,
+    SalesChannelGptFeed,
     ImportProperty,
 )
 from sales_channels.models.sales_channels import RemoteLanguage
@@ -244,5 +245,10 @@ class SalesChannelContentTemplateInput:
 
 @partial(SalesChannelContentTemplate, fields="__all__")
 class SalesChannelContentTemplatePartialInput(NodeInput):
+    pass
+
+
+@partial(SalesChannelGptFeed, fields="__all__")
+class SalesChannelGptFeedPartialInput(NodeInput):
     pass
 

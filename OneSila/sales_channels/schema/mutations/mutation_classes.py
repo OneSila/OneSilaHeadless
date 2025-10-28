@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from core.schema.core.mixins import GetCurrentUserMixin
 from core.schema.core.mutations import Info, Any
 from core.schema.core.mutations import UpdateMutation
-from sales_channels.models import SalesChannelViewAssign, SalesChannel
+from sales_channels.models import SalesChannelViewAssign, SalesChannel, SalesChannelGptFeed
 from sales_channels.signals import manual_sync_remote_product, refresh_website_pull_models
 from django.utils.translation import gettext_lazy as _
 
@@ -29,4 +29,15 @@ class RefreshSalesChannelWebsiteModelsMutation(UpdateMutation, GetCurrentUserMix
 
         refresh_website_pull_models.send(sender=instance.__class__, instance=instance)
 
+        return instance
+
+
+class ResyncSalesChannelGptFeedMutation(UpdateMutation, GetCurrentUserMixin):
+    def update(self, info: Info, instance: SalesChannelGptFeed, data: dict[str, Any]):
+        from sales_channels.flows.gpt_feed import sync_gpt_feed
+
+        sync_gpt_feed(
+            sales_channel_id=instance.sales_channel_id,
+            sync_all=True,
+        )
         return instance
