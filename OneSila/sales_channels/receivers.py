@@ -1,4 +1,5 @@
 from django.db.models.signals import post_delete, pre_delete, pre_save
+from typing import Iterable
 
 from core.decorators import trigger_signal_for_dirty_fields
 from core.schema.core.subscriptions import refresh_subscription_receiver
@@ -16,7 +17,7 @@ from sales_prices.signals import price_changed
 from .integrations.amazon.models import AmazonSalesChannel, AmazonSalesChannelImport
 from .integrations.ebay.models import EbaySalesChannel, EbaySalesChannelImport
 from .integrations.magento2.models import MagentoProduct
-from .models import SalesChannelImport
+from .models import RemoteProduct, SalesChannelImport
 # from .models import ImportProcess
 from .models.sales_channels import SalesChannelViewAssign
 from .signals import (
@@ -39,6 +40,57 @@ from properties.models import Property, PropertyTranslation, PropertySelectValue
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+def _mark_remote_products_for_products(*, product_ids: Iterable[int]) -> None:
+    ids = {product_id for product_id in product_ids if product_id}
+    if not ids:
+        return
+    RemoteProduct.objects.filter(
+        local_instance_id__in=ids,
+        sales_channel__gpt_enable=True,
+    ).update(required_feed_sync=True)
+
+
+# ------------------------------------------------------------- GPT FEED SYNC FLAGS
+
+
+@receiver(create_remote_product_property, sender='properties.ProductProperty')
+@receiver(update_remote_product_property, sender='properties.ProductProperty')
+@receiver(delete_remote_product_property, sender='properties.ProductProperty')
+def sales_channels__gpt_feed_flag__product_property(sender, instance, **kwargs):
+    _mark_remote_products_for_products(product_ids=[getattr(instance, "product_id", None)])
+
+
+@receiver(update_remote_price, sender='products.Product')
+@receiver(update_remote_product_content, sender='products.Product')
+@receiver(update_remote_product, sender='products.Product')
+@receiver(update_remote_product_eancode, sender='products.Product')
+@receiver(sales_view_assign_updated, sender='products.Product')
+def sales_channels__gpt_feed_flag__product(sender, instance, **kwargs):
+    _mark_remote_products_for_products(product_ids=[getattr(instance, "id", None)])
+
+
+@receiver(add_remote_product_variation, sender='products.ConfigurableVariation')
+@receiver(remove_remote_product_variation, sender='products.ConfigurableVariation')
+def sales_channels__gpt_feed_flag__variation(sender, instance, **kwargs):
+    _mark_remote_products_for_products(
+        product_ids=[getattr(instance, "parent_id", None), getattr(instance, "variation_id", None)]
+    )
+
+
+@receiver(create_remote_image_association, sender='media.MediaProductThrough')
+@receiver(delete_remote_image_association, sender='media.MediaProductThrough')
+def sales_channels__gpt_feed_flag__image_association(sender, instance, **kwargs):
+    _mark_remote_products_for_products(product_ids=[getattr(instance, "product_id", None)])
+
+
+@receiver(delete_remote_image, sender='media.Media')
+def sales_channels__gpt_feed_flag__image_delete(sender, instance, **kwargs):
+    product_ids = list(
+        MediaProductThrough.objects.filter(media=instance).values_list("product_id", flat=True)
+    )
+    _mark_remote_products_for_products(product_ids=product_ids)
 
 
 @receiver(post_update, sender=SalesChannelImport)
