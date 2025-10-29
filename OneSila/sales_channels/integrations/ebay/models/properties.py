@@ -238,6 +238,7 @@ class EbayProductType(RemoteObjectMixin, models.Model):
         ProductPropertiesRule,
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
         help_text="Local product type rule associated with this category.",
     )
     marketplace = models.ForeignKey(

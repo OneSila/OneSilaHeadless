@@ -437,6 +437,11 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         mock_content_run.assert_called_once()
 
     def test_get_category_id_prefers_product_category_mapping(self) -> None:
+        self.ensure_ebay_leaf_category(
+            remote_id="987654",
+            view=self.view,
+            name="Test",
+        )
         EbayProductCategory.objects.create(
             product=self.product,
             sales_channel=self.sales_channel,

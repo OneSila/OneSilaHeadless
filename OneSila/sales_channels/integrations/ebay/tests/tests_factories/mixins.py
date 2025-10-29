@@ -18,6 +18,7 @@ from sales_channels.integrations.ebay.models import (
     EbayProductOffer,
     EbaySalesChannel,
 )
+from sales_channels.integrations.ebay.models.categories import EbayCategory
 from sales_channels.integrations.ebay.models.properties import EbayProductType
 from sales_channels.integrations.ebay.models.properties import (
     EbayInternalProperty,
@@ -48,6 +49,31 @@ class TestCaseEbayMixin(TransactionTestCase):
             refresh_token='test-refresh-token',
             refresh_token_expiration=refresh_expiration,
         )
+
+    def ensure_ebay_leaf_category(
+        self,
+        *,
+        remote_id: str,
+        view=None,
+        name: str | None = None,
+    ) -> EbayCategory:
+        """Ensure a leaf eBay category exists for the provided remote id."""
+
+        view = view or getattr(self, "view", None)
+        tree_id = getattr(view, "default_category_tree_id", None) or "TEST-TREE"
+        category_name = name or str(remote_id)
+
+        category, _ = EbayCategory.objects.update_or_create(
+            marketplace_default_tree_id=tree_id,
+            remote_id=str(remote_id),
+            defaults={
+                "name": category_name,
+                "full_name": category_name,
+                "has_children": False,
+                "is_root": False,
+            },
+        )
+        return category
 
 
 class EbayProductPushFactoryTestBase(TestCaseEbayMixin):
@@ -122,6 +148,11 @@ class EbayProductPushFactoryTestBase(TestCaseEbayMixin):
             is_default=True,
             length_unit="CENTIMETER",
             weight_unit="KILOGRAM",
+        )
+        self.ensure_ebay_leaf_category(
+            remote_id="123456",
+            view=self.view,
+            name="Home & Garden",
         )
         EbayRemoteLanguage.objects.create(
             multi_tenant_company=self.multi_tenant_company,

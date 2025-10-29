@@ -21,6 +21,11 @@ class TestEbayProductTypeRuleTask(TestCaseEbayMixin):
             remote_id="EBAY_GB",
             default_category_tree_id="0",
         )
+        self.ensure_ebay_leaf_category(
+            remote_id="123",
+            view=self.view,
+            name="Home & Garden",
+        )
 
         product_type_property = Property.objects.get(
             is_product_type=True,
@@ -65,6 +70,11 @@ class TestEbayProductTypeRuleTask(TestCaseEbayMixin):
             local_instance=self.product_rule,
         )
 
+        self.ensure_ebay_leaf_category(
+            remote_id="987",
+            view=self.view,
+            name="Home & Garden Alt",
+        )
         product_type.remote_id = "987"
         product_type.save()
 

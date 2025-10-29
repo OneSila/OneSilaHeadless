@@ -16,6 +16,7 @@ class RemoteProductStatusTestCase(TestCase):
         )
         self.product = baker.make(
             "products.Product",
+            type='SIMPLE',
             multi_tenant_company=self.multi_tenant_company,
         )
 
