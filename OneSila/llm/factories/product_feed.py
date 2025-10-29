@@ -681,4 +681,8 @@ class ProductFeedPayloadFactory:
             ),
         }
 
-        return {key: value for key, value in payload.items() if value is not None}
+        return {
+            key: value
+            for key, value in payload.items()
+            if value is not None and (not isinstance(value, str) or value.strip())
+        }
