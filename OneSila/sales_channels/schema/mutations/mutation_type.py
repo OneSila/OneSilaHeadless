@@ -7,15 +7,20 @@ import strawberry_django
 from core.schema.core.extensions import default_extensions
 from core.schema.core.helpers import get_multi_tenant_company
 from core.schema.core.mutations import create, update, delete, type, List, field
-from .fields import resync_sales_channel_assign, refresh_website_models_mutation
+from .fields import (
+    resync_sales_channel_assign,
+    refresh_website_models_mutation,
+)
 from ..types.types import SalesChannelType, SalesChannelIntegrationPricelistType, SalesChannelViewType, \
     SalesChannelViewAssignType, SalesChannelContentTemplateType, SalesChannelImportType, RemoteLanguageType, \
-    RemoteCurrencyType, ImportPropertyType, SalesChannelContentTemplateCheckType, FormattedIssueType
+    RemoteCurrencyType, ImportPropertyType, SalesChannelContentTemplateCheckType, FormattedIssueType, \
+    SalesChannelGptFeedType
 from ..types.input import SalesChannelImportInput, SalesChannelImportPartialInput, SalesChannelInput, \
     SalesChannelPartialInput, \
     SalesChannelIntegrationPricelistInput, SalesChannelIntegrationPricelistPartialInput, SalesChannelViewInput, \
     SalesChannelViewPartialInput, SalesChannelViewAssignInput, SalesChannelViewAssignPartialInput, \
     SalesChannelContentTemplateInput, SalesChannelContentTemplatePartialInput, \
+    SalesChannelGptFeedPartialInput, \
     RemoteLanguagePartialInput, RemoteCurrencyPartialInput, ImportPropertyInput
 from .validators import validate_sku_conflicts, validate_amazon_assignment
 from core.helpers import get_languages
@@ -24,7 +29,7 @@ from sales_channels.content_templates import (
     build_content_template_context,
     render_sales_channel_content_template,
 )
-from sales_channels.models import SalesChannel
+from sales_channels.models import SalesChannel, SalesChannelGptFeed
 
 
 @type(name='Mutation')
@@ -78,6 +83,32 @@ class SalesChannelsMutation:
     update_sales_channel_view_assign: SalesChannelViewAssignType = update(SalesChannelViewAssignPartialInput)
     delete_sales_channel_view_assign: SalesChannelViewAssignType = delete()
     delete_sales_channel_view_assigns: List[SalesChannelViewAssignType] = delete()
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def resync_sales_channel_gpt_feed(
+        self,
+        info: Info,
+        *,
+        instance: SalesChannelGptFeedPartialInput,
+    ) -> SalesChannelGptFeedType:
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        try:
+            feed = SalesChannelGptFeed.objects.get(
+                id=instance.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            )
+        except SalesChannelGptFeed.DoesNotExist as exc:
+            raise PermissionError("Invalid company") from exc
+
+        from sales_channels.tasks import sales_channels__tasks__sync_gpt_feed_for_channel
+
+        sales_channels__tasks__sync_gpt_feed_for_channel(
+            sales_channel_id=feed.sales_channel_id,
+            sync_all=True,
+        )
+
+        return feed
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def check_sales_channel_content_template(

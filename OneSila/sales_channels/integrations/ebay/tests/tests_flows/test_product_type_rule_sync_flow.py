@@ -27,6 +27,11 @@ class EbayProductTypeRuleSyncFlowTestCase(TestCaseEbayMixin):
             remote_id="EBAY_GB",
             default_category_tree_id="0",
         )
+        self.ensure_ebay_leaf_category(
+            remote_id="123",
+            view=self.view,
+            name="Home & Garden",
+        )
         self.remote_language = EbayRemoteLanguage.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,

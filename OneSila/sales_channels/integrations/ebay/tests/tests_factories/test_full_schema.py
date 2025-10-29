@@ -117,6 +117,11 @@ class TestEbayProductTypeRuleFactory(TestCaseEbayMixin):
             default_category_tree_id="123",
             is_default=True,
         )
+        self.ensure_ebay_leaf_category(
+            remote_id="3197",
+            view=self.view,
+            name="Furniture",
+        )
 
     def _build_category_response(self) -> dict[str, Any]:
         return {

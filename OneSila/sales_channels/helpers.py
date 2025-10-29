@@ -1,5 +1,17 @@
 from sales_channels.integrations.magento2.models import MagentoSalesChannel
+from typing import Iterable
+
 from sales_channels.models import RemoteProduct
+
+
+def mark_remote_products_for_feed_updates(*, product_ids: Iterable[int]) -> None:
+    ids = {product_id for product_id in product_ids if product_id}
+    if not ids:
+        return
+    RemoteProduct.objects.filter(
+        local_instance_id__in=ids,
+        sales_channel__gpt_enable=True,
+    ).update(required_feed_sync=True)
 
 
 def run_generic_sales_channel_factory(sales_channel_id, factory_class, local_instance_id=None, local_instance_class=None, factory_kwargs=None, sales_channel_class=MagentoSalesChannel):

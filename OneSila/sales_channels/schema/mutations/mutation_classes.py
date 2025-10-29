@@ -30,3 +30,4 @@ class RefreshSalesChannelWebsiteModelsMutation(UpdateMutation, GetCurrentUserMix
         refresh_website_pull_models.send(sender=instance.__class__, instance=instance)
 
         return instance
+

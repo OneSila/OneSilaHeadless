@@ -63,6 +63,22 @@ class TestEbayProductTypeRemoteMappingFactory(TestCaseEbayMixin):
             is_default=False,
         )
 
+        self.ensure_ebay_leaf_category(
+            remote_id="72548",
+            view=self.view_gb,
+            name="Collectibles",
+        )
+        self.ensure_ebay_leaf_category(
+            remote_id="72548",
+            view=self.view_us,
+            name="Collectibles US",
+        )
+        self.ensure_ebay_leaf_category(
+            remote_id="99999",
+            view=self.view_us,
+            name="Existing Mapping",
+        )
+
         self.product_type_gb = EbayProductType.objects.create(
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,

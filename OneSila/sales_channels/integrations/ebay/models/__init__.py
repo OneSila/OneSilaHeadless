@@ -1,4 +1,4 @@
-from .categories import EbayCategory
+from .categories import EbayCategory, EbayProductCategory
 from .orders import EbayOrder, EbayOrderItem
 from .products import (
     EbayProduct,
