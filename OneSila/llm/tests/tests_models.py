@@ -10,7 +10,7 @@ class ChatGptProductFeedConfigModelTestCase(TestCase):
     def setUp(self):
         super().setUp()
         self.condition_property = self._create_property(internal_name="condition")
-        self.brand_property = self._create_property(internal_name="brand")
+        self.brand_property = Property.objects.get(multi_tenant_company=self.multi_tenant_company, internal_name="brand")
         self.material_property = self._create_property(internal_name="material")
         self.color_property = self._create_property(internal_name="color")
         self.size_property = self._create_property(internal_name="size")

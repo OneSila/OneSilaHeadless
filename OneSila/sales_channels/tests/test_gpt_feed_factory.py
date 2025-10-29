@@ -12,39 +12,6 @@ from sales_channels.models import RemoteProduct, SalesChannel, SalesChannelGptFe
 
 
 class SalesChannelGptProductFeedFactoryTests(TransactionTestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls._ensure_column(model=RemoteProduct, field_name="required_feed_sync")
-        cls._ensure_table(model=SalesChannelGptFeed)
-        super().setUpClass()
-
-    @staticmethod
-    def _ensure_column(*, model, field_name: str) -> None:
-        field = model._meta.get_field(field_name)
-        table = model._meta.db_table
-        with connection.cursor() as cursor:
-            column_names = {
-                column.name for column in connection.introspection.get_table_description(cursor, table)
-            }
-        if field.column in column_names:
-            return
-
-        _, _, args, kwargs = field.deconstruct()
-        new_field = field.__class__(*args, **kwargs)
-        new_field.set_attributes_from_name(field.name)
-        with connection.schema_editor() as editor:
-            editor.add_field(model, new_field)
-
-    @staticmethod
-    def _ensure_table(*, model) -> None:
-        table = model._meta.db_table
-        with connection.cursor() as cursor:
-            existing_tables = connection.introspection.table_names(cursor)
-        if table in existing_tables:
-            return
-
-        with connection.schema_editor() as editor:
-            editor.create_model(model)
 
     def setUp(self):
         super().setUp()
