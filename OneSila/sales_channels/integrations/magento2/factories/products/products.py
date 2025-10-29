@@ -92,6 +92,9 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
 
         return custom_attributes
 
+    def should_skip_remote_product_property_mirror(self):
+        return self.remote_type == self.REMOTE_TYPE_CONFIGURABLE
+
     def set_visibility(self):
         if self.is_variation:
             self.set_variation_visibility()
@@ -267,6 +270,9 @@ class MagentoProductSyncFactory(GetMagentoAPIMixin, RemoteProductSyncFactory):
             self.magento_product.save(scope=scope)
 
     def final_process(self):
+        if self.remote_type == self.REMOTE_TYPE_CONFIGURABLE:
+            return
+
         translated_product_properties = ProductProperty.objects.filter(
             product=self.local_instance, property__is_public_information=True, property__type__in=Property.TYPES.TRANSLATED)
 

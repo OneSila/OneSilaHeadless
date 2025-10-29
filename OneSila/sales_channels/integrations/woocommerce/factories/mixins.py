@@ -3,7 +3,7 @@ from sales_channels.integrations.woocommerce.models import WoocommerceRemoteLang
 from sales_channels.integrations.woocommerce.constants import EAN_CODE_WOOCOMMERCE_FIELD_NAME
 from sales_channels.exceptions import ConfiguratorPropertyNotFilterable
 from django.conf import settings
-from media.models import Media
+from media.models import Media, MediaProductThrough
 from sales_channels.integrations.woocommerce.models import WoocommerceGlobalAttribute, \
     WoocommerceCurrency
 from sales_channels.integrations.woocommerce.constants import API_ATTRIBUTE_PREFIX
@@ -116,11 +116,11 @@ class WoocommerceRemoteValueConversionMixin:
 
     def get_int_value(self, value):
         """Handles int value types."""
-        return value
+        return str(value)
 
     def get_float_value(self, value):
         """Handles float value types."""
-        return value
+        return str(value)
 
     def get_boolean_value(self, value: bool) -> str:
         """Converts boolean values to translated strings for WooCommerce."""
@@ -267,11 +267,20 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
 
         return ga
 
+    def _stringify_attribute_option(self, value):
+        if isinstance(value, list):
+            return [self._stringify_attribute_option(item) for item in value]
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        return str(value)
+
     def get_serialised_woocommerce_value(self, prod_prop):
         value = prod_prop.get_serialised_value(language=self.sales_channel_assign_language)
         if prod_prop.property.type == Property.TYPES.BOOLEAN:
             value = self.get_boolean_value(value)
-        return value
+        return self._stringify_attribute_option(value)
 
     def get_common_properties(self):
         product = self.get_local_product()
@@ -646,7 +655,15 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
         #     ]
         # }
         product = self.get_local_product()
-        image_throughs = product.mediaproductthrough_set.filter(media__type=Media.IMAGE)
+        sales_channel = getattr(self, "sales_channel", None)
+        image_throughs = (
+            MediaProductThrough.objects.get_product_images(
+                product=product,
+                sales_channel=sales_channel,
+            )
+            .filter(media__type=Media.IMAGE)
+            .select_related("media")
+        )
         payload = [{"src": self.get_image_url(i.media)} for i in image_throughs]
         self.payload['images'] = payload
         return self.payload
