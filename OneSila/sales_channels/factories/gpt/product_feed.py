@@ -78,10 +78,6 @@ class SalesChannelGptProductFeedFactory:
                     feed=feed,
                     entries=updated_entries,
                 )
-                self._send_feed(
-                    sales_channel=sales_channel,
-                    entries=updated_entries,
-                )
 
         if processed_remote_ids:
             self._clear_required_flags(remote_product_ids=processed_remote_ids)
@@ -217,18 +213,6 @@ class SalesChannelGptProductFeedFactory:
         feed.last_synced_at = timezone.now()
         feed.save(update_fields=["items", "file", "last_synced_at"])
 
-    def _send_feed(
-        self,
-        *,
-        sales_channel: SalesChannel,
-        entries: Dict[str, Dict[str, object]],
-    ) -> None:
-        logger.debug(
-            "Mock send GPT feed for sales_channel_id=%s entries=%s",
-            sales_channel.id,
-            list(entries.keys()),
-        )
-
     def _clear_required_flags(
         self,
         *,
@@ -264,4 +248,3 @@ class SalesChannelGptProductFeedFactory:
 
         with transaction.atomic():
             self._persist_feed(feed=feed, entries=existing_entries)
-            self._send_feed(sales_channel=sales_channel, entries=existing_entries)
