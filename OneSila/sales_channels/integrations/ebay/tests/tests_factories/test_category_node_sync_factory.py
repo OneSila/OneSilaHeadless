@@ -14,36 +14,6 @@ from sales_channels.integrations.ebay.models import (
 
 
 class EbayCategoryNodeSyncFactoryTest(TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        table_name = EbayCategory._meta.db_table
-        create_statement = (
-            "CREATE TABLE IF NOT EXISTS "
-            f"{table_name} "
-            "(id INTEGER PRIMARY KEY AUTOINCREMENT, "
-            "created_at DATETIME NOT NULL, "
-            "updated_at DATETIME NOT NULL, "
-            "marketplace_default_tree_id VARCHAR(50) NOT NULL, "
-            "remote_id VARCHAR(50) NOT NULL, "
-            "name VARCHAR(512) NOT NULL)"
-        )
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(create_statement)
-        except ProgrammingError:
-            pass
-        super().setUpClass()
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-        table_name = EbayCategory._meta.db_table
-        drop_statement = f"DROP TABLE IF EXISTS {table_name}"
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(drop_statement)
-        except ProgrammingError:
-            pass
-        super().tearDownClass()
 
     def setUp(self) -> None:
         super().setUp()
@@ -95,7 +65,25 @@ class EbayCategoryNodeSyncFactoryTest(TestCase):
         fac.run()
 
         node = EbayCategory.objects.get(remote_id="200", marketplace_default_tree_id="3")
-        self.assertEqual(node.name, "Root > Parent > Leaf")
+        parent = EbayCategory.objects.get(remote_id="100", marketplace_default_tree_id="3")
+        root = EbayCategory.objects.get(remote_id="0", marketplace_default_tree_id="3")
+
+        self.assertEqual(node.full_name, "Root > Parent > Leaf")
+        self.assertEqual(node.name, "Leaf")
+        self.assertFalse(node.has_children)
+        self.assertFalse(node.is_root)
+        self.assertEqual(node.parent_node_id, parent.id)
+
+        self.assertEqual(parent.full_name, "Root > Parent")
+        self.assertEqual(parent.name, "Parent")
+        self.assertTrue(parent.has_children)
+        self.assertFalse(parent.is_root)
+        self.assertEqual(parent.parent_node_id, root.id)
+
+        self.assertEqual(root.name, "Root")
+        self.assertTrue(root.has_children)
+        self.assertTrue(root.is_root)
+        self.assertIsNone(root.parent_node)
 
     @patch("sales_channels.integrations.ebay.factories.category_nodes.sync.GetEbayAPIMixin.get_api")
     def test_removes_stale_nodes(self, mock_get_api: Mock) -> None:
@@ -103,6 +91,7 @@ class EbayCategoryNodeSyncFactoryTest(TestCase):
             remote_id="999",
             marketplace_default_tree_id="3",
             name="Old",
+            full_name="Old",
         )
         self.addCleanup(lambda: existing.delete())
 

@@ -4,6 +4,7 @@ from core.schema.core.types.filters import filter, SearchFilterMixin
 from core.schema.core.types.types import auto
 from sales_channels.integrations.ebay.models import (
     EbayCategory,
+    EbayProductCategory,
     EbaySalesChannel,
     EbayInternalProperty,
     EbayInternalPropertyOption,
@@ -22,6 +23,7 @@ from properties.schema.types.filters import (
     PropertyFilter,
     PropertySelectValueFilter,
 )
+from products.schema.types.filters import ProductFilter
 from sales_channels.schema.types.filters import SalesChannelFilter, SalesChannelViewFilter
 from sales_channels.integrations.ebay.managers import (
     EbayPropertyQuerySet,
@@ -46,6 +48,19 @@ class EbayCategoryFilter(SearchFilterMixin):
     marketplace_default_tree_id: auto
     remote_id: auto
     name: auto
+    full_name: auto
+    has_children: auto
+    is_root: auto
+    parent_node: Optional['EbayCategoryFilter']
+
+
+@filter(EbayProductCategory)
+class EbayProductCategoryFilter(SearchFilterMixin):
+    id: auto
+    product: Optional[ProductFilter]
+    sales_channel: Optional[SalesChannelFilter]
+    view: Optional[SalesChannelViewFilter]
+    remote_id: auto
 
 
 @filter(EbayProductType)

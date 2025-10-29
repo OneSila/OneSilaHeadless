@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from core import models
@@ -11,6 +12,7 @@ from sales_channels.models.properties import (
     RemoteProductProperty,
     RemoteProperty,
 )
+from .categories import EbayCategory
 from sales_channels.integrations.ebay.constants import (
     EBAY_INTERNAL_PROPERTY_DEFAULTS,
 )
@@ -279,6 +281,34 @@ class EbayProductType(RemoteObjectMixin, models.Model):
 
     def __str__(self):
         return self.name or self.safe_str
+
+    def clean(self):
+        super().clean()
+
+        remote_id = (self.remote_id or "").strip()
+        if not remote_id:
+            return
+
+        marketplace = getattr(self, "marketplace", None)
+        tree_id = getattr(marketplace, "default_category_tree_id", None)
+
+        categories = EbayCategory.objects.filter(remote_id=remote_id)
+        if tree_id:
+            categories = categories.filter(marketplace_default_tree_id=tree_id)
+
+        try:
+            category = categories.get()
+        except EbayCategory.DoesNotExist as exc:
+            raise ValidationError({"remote_id": "eBay category does not exist for the given remote ID."}) from exc
+        except EbayCategory.MultipleObjectsReturned as exc:
+            raise ValidationError({"remote_id": "Multiple eBay categories found for the given remote ID."}) from exc
+
+        if category.has_children:
+            raise ValidationError({"remote_id": "Only leaf eBay categories can be assigned."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class EbayProductTypeItem(RemoteObjectMixin, models.Model):

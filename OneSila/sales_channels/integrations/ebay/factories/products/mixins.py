@@ -25,6 +25,7 @@ from sales_channels.content_templates import (
     render_sales_channel_content_template,
 )
 
+from sales_channels.integrations.ebay.models import EbayProductCategory
 from sales_channels.integrations.ebay.models.products import (
     EbayMediaThroughProduct,
     EbayProductOffer,
@@ -1415,30 +1416,55 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         return dict(policies)
 
     def _get_category_id(self) -> str | None:
-        category_id: str | None = None
         product = getattr(self.remote_product, "local_instance", None)
         view = getattr(self, "view", None)
 
-        if product is not None and view is not None and hasattr(product, "get_product_rule"):
-            try:
-                rule = product.get_product_rule()
-            except Exception:  # pragma: no cover - defensive guard
-                rule = None
+        if product is None or view is None:
+            return None
 
-            if rule is not None:
-                product_type = (
-                    EbayProductType.objects.filter(
-                        sales_channel=self.sales_channel,
-                        marketplace=view,
-                        local_instance=rule,
-                    )
-                    .exclude(remote_id__in=(None, ""))
-                    .first()
-                )
-                if product_type and product_type.remote_id:
-                    category_id = str(product_type.remote_id)
+        direct_remote_id = (
+            EbayProductCategory.objects.filter(
+                product=product,
+                sales_channel=self.sales_channel,
+                view=view,
+            )
+            .exclude(remote_id__in=(None, ""))
+            .values_list("remote_id", flat=True)
+            .first()
+        )
+        if direct_remote_id:
+            candidate = str(direct_remote_id).strip()
+            if candidate:
+                return candidate
 
-        return category_id if category_id not in (None, "") else None
+        if not hasattr(product, "get_product_rule"):
+            return None
+
+        try:
+            rule = product.get_product_rule()
+        except Exception:  # pragma: no cover - defensive guard
+            return None
+
+        if rule is None:
+            return None
+
+        product_type_remote_id = (
+            EbayProductType.objects.filter(
+                sales_channel=self.sales_channel,
+                marketplace=view,
+                local_instance=rule,
+            )
+            .exclude(remote_id__in=(None, ""))
+            .values_list("remote_id", flat=True)
+            .first()
+        )
+
+        if product_type_remote_id:
+            candidate = str(product_type_remote_id).strip()
+            if candidate:
+                return candidate
+
+        return None
 
     def _build_pricing_summary(self) -> Dict[str, Any]:
         product = getattr(self.remote_product, "local_instance", None)

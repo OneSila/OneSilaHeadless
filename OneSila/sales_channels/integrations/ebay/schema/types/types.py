@@ -12,6 +12,7 @@ from strawberry.relay import to_base64
 from imports_exports.schema.queries import ImportType
 from sales_channels.integrations.ebay.models import (
     EbayCategory,
+    EbayProductCategory,
     EbaySalesChannel,
     EbayInternalProperty,
     EbayInternalPropertyOption,
@@ -25,6 +26,7 @@ from sales_channels.integrations.ebay.models import (
 )
 from sales_channels.integrations.ebay.schema.types.filters import (
     EbayCategoryFilter,
+    EbayProductCategoryFilter,
     EbaySalesChannelFilter,
     EbayInternalPropertyFilter,
     EbayInternalPropertyOptionFilter,
@@ -38,6 +40,7 @@ from sales_channels.integrations.ebay.schema.types.filters import (
 )
 from sales_channels.integrations.ebay.schema.types.ordering import (
     EbayCategoryOrder,
+    EbayProductCategoryOrder,
     EbaySalesChannelOrder,
     EbayInternalPropertyOrder,
     EbayInternalPropertyOptionOrder,
@@ -70,7 +73,32 @@ class EbayRedirectUrlType:
     fields="__all__",
 )
 class EbayCategoryType(relay.Node):
-    pass
+    parent_node: Optional[Annotated[
+        'EbayCategoryType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]]
+
+
+@type(
+    EbayProductCategory,
+    filters=EbayProductCategoryFilter,
+    order=EbayProductCategoryOrder,
+    pagination=True,
+    fields="__all__",
+)
+class EbayProductCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
+    product: Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]
+    sales_channel: Annotated[
+        'EbaySalesChannelType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
+    view: Annotated[
+        'EbaySalesChannelViewType',
+        lazy("sales_channels.integrations.ebay.schema.types.types")
+    ]
 
 
 @type(EbaySalesChannel, filters=EbaySalesChannelFilter, order=EbaySalesChannelOrder, pagination=True, fields="__all__")
