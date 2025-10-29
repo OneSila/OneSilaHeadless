@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -122,12 +122,29 @@ class StubSalesChannelViewAssign:
         self.remote_url = f"{base_url.rstrip('/')}/{product.sku}"
 
 
+class _DummySalesChannelViewAssignManager:
+    def __init__(self, assignments: List[SimpleNamespace]) -> None:
+        self._assignments = assignments
+
+    def order_by(self, *args: str) -> "_DummySalesChannelViewAssignManager":
+        return self
+
+    def first(self) -> Optional[SimpleNamespace]:
+        if not self._assignments:
+            return None
+        return self._assignments[0]
+
+
 @dataclass
 class DummyRemoteProduct:
     sales_channel: DummySalesChannel
     multi_tenant_company: DummyCompany
     local_instance: DummyProduct
     cached_assignments: List[SimpleNamespace]
+    saleschannelviewassign_set: _DummySalesChannelViewAssignManager = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.saleschannelviewassign_set = _DummySalesChannelViewAssignManager(self.cached_assignments)
 
 
 class ProductFeedPayloadFactoryTests(SimpleTestCase):

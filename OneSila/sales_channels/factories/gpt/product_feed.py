@@ -7,6 +7,7 @@ from typing import Dict, Iterable, List, Sequence, Set, Tuple
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
+from django.utils.text import slugify
 
 from llm.factories import ProductFeedPayloadFactory
 from sales_channels.models import (
@@ -88,6 +89,8 @@ class SalesChannelGptProductFeedFactory:
     def _collect_remote_products(self) -> List[RemoteProduct]:
         queryset = RemoteProduct.objects.filter(
             sales_channel__gpt_enable=True,
+            is_variation=False,
+            local_instance__active=True
         )
         if self.sales_channel_id is not None:
             queryset = queryset.filter(sales_channel_id=self.sales_channel_id)
@@ -202,9 +205,14 @@ class SalesChannelGptProductFeedFactory:
     ) -> None:
         ordered = [entries[key] for key in sorted(entries.keys())]
         feed.items = ordered
-        timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
-        filename = f"gpt-feed-{feed.sales_channel_id}-{timestamp}.json"
+        company_id = getattr(feed.sales_channel, "multi_tenant_company_id", None) or 0
+        unique_code = f"{company_id:08x}{feed.sales_channel_id:08x}{feed.id:08x}"
+        seller_name = getattr(feed.sales_channel, "gpt_seller_name", None) or getattr(feed.sales_channel, "name", None) or str(feed.sales_channel.id)
+        seller_slug = slugify(seller_name) or f"channel-{feed.sales_channel_id}"
+        filename = f"gpt-feed-{feed.sales_channel_id}.{seller_slug}-{unique_code}.json"
         content = json.dumps(ordered, ensure_ascii=False, indent=2, default=str)
+        if feed.file:
+            feed.file.delete(save=False)
         feed.file.save(filename, ContentFile(content), save=False)
         feed.last_synced_at = timezone.now()
         feed.save(update_fields=["items", "file", "last_synced_at"])

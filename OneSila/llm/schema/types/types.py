@@ -79,3 +79,6 @@ class ChatGptProductFeedConfigType(relay.Node, GetQuerysetMultiTenantMixin):
     pickup_method_in_store_value: Optional[Annotated['PropertySelectValueType', lazy("properties.schema.types.types")]]
     pickup_method_reserve_value: Optional[Annotated['PropertySelectValueType', lazy("properties.schema.types.types")]]
     pickup_method_not_supported_value: Optional[Annotated['PropertySelectValueType', lazy("properties.schema.types.types")]]
+    gender_male_value: Optional[Annotated['PropertySelectValueType', lazy("properties.schema.types.types")]]
+    gender_female_value: Optional[Annotated['PropertySelectValueType', lazy("properties.schema.types.types")]]
+    gender_unisex_value: Optional[Annotated['PropertySelectValueType', lazy("properties.schema.types.types")]]

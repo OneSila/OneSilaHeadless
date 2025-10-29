@@ -1,4 +1,7 @@
+from typing import Optional
+
 from core import models
+from get_absolute_url.helpers import generate_absolute_url
 
 
 class SalesChannelGptFeed(models.Model):
@@ -30,3 +33,12 @@ class SalesChannelGptFeed(models.Model):
 
     def __str__(self) -> str:
         return f"GPT feed for {self.sales_channel}"
+
+    @property
+    def file_url(self) -> Optional[str]:
+        if not self.file:
+            return None
+        try:
+            return f"{generate_absolute_url(trailing_slash=False)}{self.file.url}"
+        except ValueError:
+            return None

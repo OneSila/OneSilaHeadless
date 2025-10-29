@@ -65,26 +65,22 @@ class ProductFeedPayloadFactory:
 
         return payloads
 
-    def _resolve_primary_assignment(self) -> Optional[SalesChannelViewAssign]:
-        assignments = getattr(self.remote_product, "cached_assignments", None)
-        if assignments:
-            return assignments[0]
+    def _resolve_primary_assignment(self) -> SalesChannelViewAssign:
         try:
-            return (
-                self.remote_product.saleschannelviewassign_set.select_related(
-                    "sales_channel_view",
-                    "sales_channel",
-                    "product",
-                )
-                .order_by("id")
-                .first()
+            assignment = self.remote_product.saleschannelviewassign_set.order_by("id").first()
+        except AttributeError as exc:
+            raise ProductFeedValidationError(
+                "Remote product is missing sales channel assignments, remote URL cannot be resolved."
+            ) from exc
+
+        if assignment is None:
+            raise ProductFeedValidationError(
+                "Remote product is missing sales channel assignments, remote URL cannot be resolved."
             )
-        except AttributeError:
-            return None
+
+        return assignment
 
     def _resolve_parent_product(self):
-        if self.primary_assignment and getattr(self.primary_assignment, "product", None):
-            return self.primary_assignment.product
         local_instance = getattr(self.remote_product, "local_instance", None)
         if local_instance is None:
             raise ProductFeedValidationError("Remote product is not linked to a local product.")
@@ -210,26 +206,24 @@ class ProductFeedPayloadFactory:
             translations_map[translation.product_id].append(translation)
         return translations_map
 
-    def _prepare_media(self, *, products: Sequence[Product]) -> Dict[int, Dict[str, List[MediaProductThrough]]]:
-        product_ids = {product.id for product in products}
-        if self.parent_product.id not in product_ids:
-            product_ids.add(self.parent_product.id)
+    def _prepare_media(self, *, products: Sequence[Product]) -> Dict[int, List[MediaProductThrough]]:
+        relevant_products = {product.id: product for product in products}
+        relevant_products.setdefault(self.parent_product.id, self.parent_product)
 
-        assignments = (
-            MediaProductThrough.objects.filter(
-                product_id__in=product_ids,
-                media__type__in=[Media.IMAGE, Media.VIDEO],
-                sales_channel__in=[None, self.sales_channel],
+        media_map: Dict[int, List[MediaProductThrough]] = {}
+        for product in relevant_products.values():
+            throughs = (
+                MediaProductThrough.objects.get_product_images(
+                    product=product,
+                    sales_channel=self.sales_channel,
+                )
+                .filter(media__type__in=[Media.IMAGE, Media.VIDEO])
+                .select_related("media", "sales_channel")
+                .order_by("sort_order", "id")
             )
-            .select_related("media", "sales_channel")
-            .order_by("product_id", "sales_channel__isnull", "sort_order", "id")
-        )
+            media_map[product.id] = list(throughs)
 
-        grouped: Dict[int, Dict[str, List[MediaProductThrough]]] = defaultdict(lambda: {"channel": [], "default": []})
-        for assignment in assignments:
-            key = "channel" if assignment.sales_channel_id == self.sales_channel.id else "default"
-            grouped[assignment.product_id][key].append(assignment)
-        return grouped
+        return media_map
 
     def _select_translation(self, *, translations: Iterable[ProductTranslation]) -> Optional[ProductTranslation]:
         translations = list(translations)
@@ -442,14 +436,39 @@ class ProductFeedPayloadFactory:
             variants.append(_CustomVariant())
         return variants
 
+    def _compute_gender(
+        self,
+        *,
+        product: Product,
+        property_cache: Dict[tuple[int, int], ProductProperty],
+    ) -> Optional[str]:
+        gender_property_id = self.config.gender_property_id
+        if not gender_property_id:
+            return None
+
+        product_property = property_cache.get((product.id, gender_property_id))
+        if not product_property:
+            return None
+
+        select_id = getattr(product_property, "value_select_id", None)
+        mapping = {
+            getattr(self.config.gender_male_value, "id", None): "male",
+            getattr(self.config.gender_female_value, "id", None): "female",
+            getattr(self.config.gender_unisex_value, "id", None): "unisex",
+        }
+
+        return mapping.get(select_id)
+
     def _extract_media_urls(
         self,
         *,
-        assignments: Dict[str, List[MediaProductThrough]],
+        assignments: Sequence[MediaProductThrough],
     ) -> tuple[Optional[str], List[str], Optional[str]]:
-        selected = assignments.get("channel") or assignments.get("default") or []
-        images = [item for item in selected if item.media.type == Media.IMAGE]
-        videos = [item for item in selected if item.media.type == Media.VIDEO]
+        if not assignments:
+            return None, [], None
+
+        images = [item for item in assignments if item.media.type == Media.IMAGE]
+        videos = [item for item in assignments if item.media.type == Media.VIDEO]
 
         thumbnail = None
         additional: List[str] = []
@@ -477,35 +496,19 @@ class ProductFeedPayloadFactory:
         translation: Optional[ProductTranslation],
         parent_translation: Optional[ProductTranslation],
         property_cache: Dict[tuple[int, int], ProductProperty],
-        media_map: Dict[int, Dict[str, List[MediaProductThrough]]],
+        media_map: Dict[int, List[MediaProductThrough]],
     ) -> Dict[str, object]:
         title = translation.name if translation else product.name
         description = translation.description if translation else None
 
-        assignments = media_map.get(product.id) or media_map.get(self.parent_product.id, {})
+        assignments = media_map.get(product.id) or media_map.get(self.parent_product.id, [])
         thumbnail, additional_images, video_link = self._extract_media_urls(assignments=assignments)
 
-        link = None
-        assignment = self.primary_assignment
-        if assignment is not None:
-            link = getattr(assignment, "remote_url", None)
-            assignment_product_id = getattr(
-                assignment,
-                "product_id",
-                getattr(getattr(assignment, "product", None), "id", None),
+        link = getattr(self.primary_assignment, "remote_url", None)
+        if link is None:
+            raise ProductFeedValidationError(
+                "Primary assignment is missing a remote URL, GPT feed cannot be generated."
             )
-            if assignment_product_id != product.id:
-                sales_channel_view = getattr(assignment, "sales_channel_view", None)
-                if sales_channel_view is not None:
-                    try:
-                        link = SalesChannelViewAssign(
-                            product=product,
-                            sales_channel_view=sales_channel_view,
-                            sales_channel=self.sales_channel,
-                            multi_tenant_company=self.sales_channel.multi_tenant_company,
-                        ).remote_url
-                    except Exception:
-                        link = getattr(assignment, "remote_url", None)
 
         condition = self._compute_condition(product=product, property_cache=property_cache)
         age_group = self._compute_age_group(product=product, property_cache=property_cache)
@@ -541,6 +544,7 @@ class ProductFeedPayloadFactory:
                 property_cache=property_cache,
             )
         )
+        gender = self._compute_gender(product=product, property_cache=property_cache)
 
         payload = {
             "enable_search": bool(self.sales_channel.gpt_enable),
@@ -624,13 +628,14 @@ class ProductFeedPayloadFactory:
                     property_cache=property_cache,
                 )
             ),
-            "gender": self._stringify(
-                value=self._get_property_value(
-                    product=product,
-                    property_id=self.config.gender_property_id,
-                    property_cache=property_cache,
-                )
-            ),
+            "gender": gender
+                or self._stringify(
+                    value=self._get_property_value(
+                        product=product,
+                        property_id=self.config.gender_property_id,
+                        property_cache=property_cache,
+                    )
+                ),
             "offer_id": "-".join(
                 filter(
                     None,
@@ -676,4 +681,4 @@ class ProductFeedPayloadFactory:
             ),
         }
 
-        return payload
+        return {key: value for key, value in payload.items() if value is not None}

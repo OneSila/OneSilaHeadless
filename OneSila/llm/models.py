@@ -102,6 +102,11 @@ class ChatGptProductFeedConfig(models.Model):
             "pickup_method_reserve_value",
             "pickup_method_not_supported_value",
         ),
+        "gender_property": (
+            "gender_male_value",
+            "gender_female_value",
+            "gender_unisex_value",
+        ),
     }
 
     condition_property = models.ForeignKey(
@@ -289,6 +294,27 @@ class ChatGptProductFeedConfig(models.Model):
     )
     gender_property = models.ForeignKey(
         "properties.Property",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    gender_male_value = models.ForeignKey(
+        "properties.PropertySelectValue",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    gender_female_value = models.ForeignKey(
+        "properties.PropertySelectValue",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    gender_unisex_value = models.ForeignKey(
+        "properties.PropertySelectValue",
         on_delete=models.PROTECT,
         null=True,
         blank=True,

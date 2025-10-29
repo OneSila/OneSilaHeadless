@@ -2,7 +2,7 @@ from django.contrib import admin
 from polymorphic.admin import PolymorphicChildModelAdmin
 from pygments.lexers import JsonLexer
 from core.admin import ModelAdmin
-from .models import SalesChannel, RemoteLog, SalesChannelImport, SalesChannelViewAssign
+from .models import SalesChannel, RemoteLog, SalesChannelImport, SalesChannelViewAssign, SalesChannelGptFeed
 from .models.products import RemoteProductConfigurator
 from django.utils.safestring import mark_safe
 import json
@@ -97,3 +97,9 @@ class SalesChannelViewAssignAdmin(SalesChannelRemoteAdmin):
         'last_update_by_multi_tenant_user',
         'multi_tenant_company',
     ]
+
+
+@admin.register(SalesChannelGptFeed)
+class SalesChannelGptFeedAdmin(ModelAdmin):
+    raw_id_fields = ['sales_channel']
+    list_display = ('sales_channel', 'last_synced_at')

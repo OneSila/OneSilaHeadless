@@ -121,6 +121,10 @@ class SalesChannelContentTemplateCheckType:
 class SalesChannelGptFeedType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: Annotated['SalesChannelType', lazy("sales_channels.schema.types.types")]
 
+    @field()
+    def file_url(self) -> Optional[str]:
+        return SalesChannelGptFeed.file_url.fget(self)
+
 
 @type(SalesChannel, filters=SalesChannelFilter, order=SalesChannelOrder, pagination=True, fields='__all__')
 class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):

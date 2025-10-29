@@ -4,7 +4,7 @@ from typing import Iterable
 from sales_channels.models import RemoteProduct
 
 
-def mark_remote_products_for_products(*, product_ids: Iterable[int]) -> None:
+def mark_remote_products_for_feed_updates(*, product_ids: Iterable[int]) -> None:
     ids = {product_id for product_id in product_ids if product_id}
     if not ids:
         return
