@@ -342,3 +342,26 @@ def ebay__product__delete(sender, instance, **kwargs):
 
     if scheduled:
         _PENDING_PRODUCT_DELETE_COUNTS[product_id] += scheduled
+
+
+@receiver(post_create, sender='ebay.EbayProductCategory')
+@receiver(post_update, sender='ebay.EbayProductCategory')
+def ebay__product_category__propagate_to_variations(sender, instance, **kwargs):
+    """
+    When an eBay category is assigned to a configurable (parent) product,
+    automatically propagate it to all its variations.
+    """
+    from .models.categories import EbayProductCategory
+
+    if not instance.product.is_configurable():
+        return
+
+    variations = instance.product.get_configurable_variations(active_only=False)
+    for variation in variations:
+        EbayProductCategory.objects.get_or_create(
+            multi_tenant_company=instance.multi_tenant_company,
+            product=variation,
+            sales_channel=instance.sales_channel,
+            view=instance.view,
+            defaults={'remote_id': instance.remote_id},
+        )
