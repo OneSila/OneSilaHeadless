@@ -331,7 +331,7 @@ class PropertySelectValueManager(MultiTenantManager):
 
 
 class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
-    def create_rule(self, multi_tenant_company, product_type, require_ean_code, items):
+    def create_rule(self, multi_tenant_company, product_type, require_ean_code, items, sales_channel=None):
         from .models import ProductPropertiesRuleItem
         from .signals import product_properties_rule_created
         from strawberry_django.mutations.types import ParsedObject
@@ -339,6 +339,11 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
         # we make sure it have both backend and frontend compatability
         if isinstance(product_type, ParsedObject):
             product_type = product_type.pk
+
+        if isinstance(sales_channel, ParsedObject):
+            sales_channel = sales_channel.pk
+        elif hasattr(sales_channel, "pk"):
+            sales_channel = sales_channel.pk
 
         # we want to make sure we keep the sort order right but we start creating the REQUIRED_IN_CONFIGURATOR
         # to avoid errors
@@ -354,6 +359,7 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
             rule, _ = self.get_or_create(
                 product_type=product_type,
                 multi_tenant_company=multi_tenant_company,
+                sales_channel=sales_channel,
             )
 
             if rule.require_ean_code != require_ean_code:
@@ -460,8 +466,14 @@ class ProductPropertiesRuleManager(MultiTenantManager):
     def get_queryset(self):
         return ProductPropertiesRuleQuerySet(self.model, using=self._db)
 
-    def create_rule(self, multi_tenant_company, product_type, require_ean_code, items):
-        return self.get_queryset().create_rule(multi_tenant_company, product_type, require_ean_code, items)
+    def create_rule(self, multi_tenant_company, product_type, require_ean_code, items, sales_channel=None):
+        return self.get_queryset().create_rule(
+            multi_tenant_company,
+            product_type,
+            require_ean_code,
+            items,
+            sales_channel=sales_channel,
+        )
 
     def update_rule_items(self, rule, items):
         return self.get_queryset().update_rule_items(rule, items)
