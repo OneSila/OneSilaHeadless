@@ -801,7 +801,9 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                 product_type = None
                 allowed = []
                 try:
-                    rule = import_instance.instance.get_product_rule()
+                    rule = import_instance.instance.get_product_rule(
+                        sales_channel=view.sales_channel,
+                    )
                     remote_rule = AmazonProductType.objects.get(
                         local_instance=rule,
                         sales_channel=view.sales_channel,
@@ -930,7 +932,9 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         # importing the product from additional marketplaces with a different
         # product type.
         if remote_product and remote_product.local_instance:
-            existing_rule = remote_product.local_instance.get_product_rule()
+            existing_rule = remote_product.local_instance.get_product_rule(
+                sales_channel=self.sales_channel,
+            )
             if existing_rule:
                 rule = existing_rule
 

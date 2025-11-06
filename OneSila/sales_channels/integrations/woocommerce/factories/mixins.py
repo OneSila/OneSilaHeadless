@@ -183,13 +183,16 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
 
     def set_configurator_properties(self):
         product = self.get_local_product()
-        product_rule = product.get_product_rule()
+        product_rule = product.get_product_rule(sales_channel=self.sales_channel)
 
         # Get all variations
         variations = product.get_configurable_variations(active_only=True)
 
         # Get unique property values across variations
-        self.configurator_properties = product.get_configurator_properties(product_rule=product_rule)
+        self.configurator_properties = product.get_configurator_properties(
+            product_rule=product_rule,
+            sales_channel=self.sales_channel,
+        )
         self.configurator_property_ids = self.configurator_properties.values_list('id', flat=True)
 
     def get_configurator_property_values(self, prod_prop):
@@ -234,11 +237,14 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
 
     def set_product_rule(self):
         product = self.get_local_product()
-        self.product_rule = product.get_product_rule()
+        self.product_rule = product.get_product_rule(sales_channel=self.sales_channel)
 
     def get_configurable_product_attributes(self):
         product = self.get_local_product()
-        return product.get_configurator_properties(public_information_only=False)
+        return product.get_configurator_properties(
+            public_information_only=False,
+            sales_channel=self.sales_channel,
+        )
 
     def get_global_attribute(self, prod_prop, *, raise_if_none: bool = False):
         # We only get a global attribute if the property has add_to_filters set to True.
@@ -285,7 +291,9 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
     def get_common_properties(self):
         product = self.get_local_product()
         variations = product.get_configurable_variations(active_only=True)
-        configurator_properties = product.get_configurator_properties()
+        configurator_properties = product.get_configurator_properties(
+            sales_channel=self.sales_channel,
+        )
 
         common_product_properties = ProductProperty.objects.\
             filter(
@@ -403,7 +411,9 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
             # It would seem that woocommerce doesnt have a problem with
             # Assigning too many attributes to a product. Even variations.
             # So let's just go ahead and do that.
-            configurator_prod_props = product.productproperty_set.filter_for_configurator()
+            configurator_prod_props = product.productproperty_set.filter_for_configurator(
+                sales_channel=self.sales_channel,
+            )
             variant_payload = []
             for prod_prop in configurator_prod_props.iterator():
                 ga = self.get_global_attribute(prod_prop)

@@ -146,7 +146,6 @@ class EbaySalesChannelMutation:
         info: Info,
     ) -> List[EbayProductTypeType]:
         """Create eBay product types for every local product rule on the sales channel."""
-        from properties.models import ProductPropertiesRule
         from sales_channels.integrations.ebay.models import (
             EbayProductType,
             EbaySalesChannel,
@@ -166,10 +165,10 @@ class EbaySalesChannelMutation:
         if not marketplaces:
             return EbayProductType.objects.none()
 
+        from sales_channels.helpers import get_all_product_rules_for_sales_channel
+
         product_types: list[EbayProductType] = []
-        for rule in ProductPropertiesRule.objects.filter(
-            multi_tenant_company=multi_tenant_company,
-        ).iterator():
+        for rule in get_all_product_rules_for_sales_channel(sales_channel=sales_channel):
             rule_name = getattr(rule.product_type, "value", None)
             for marketplace in marketplaces:
                 defaults = {"imported": False}

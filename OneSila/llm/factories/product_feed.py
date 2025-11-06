@@ -137,7 +137,10 @@ class ProductFeedPayloadFactory:
 
         return list(
             self.parent_product
-            .get_configurator_properties(public_information_only=False)
+            .get_configurator_properties(
+                public_information_only=False,
+                sales_channel=self.sales_channel,
+            )
             .select_related("property")
             .order_by("sort_order", "id")
         )
@@ -546,6 +549,8 @@ class ProductFeedPayloadFactory:
         )
         gender = self._compute_gender(product=product, property_cache=property_cache)
 
+        product_rule = product.get_product_rule(sales_channel=self.sales_channel)
+
         payload = {
             "enable_search": bool(self.sales_channel.gpt_enable),
             "enable_checkout": bool(self.sales_channel.gpt_enable_checkout),
@@ -562,7 +567,7 @@ class ProductFeedPayloadFactory:
             "description": description,
             "link": link,
             "condition": condition,
-            "product_category": getattr(product.get_product_rule(), "value", None),
+            "product_category": getattr(product_rule, "value", None),
             "brand": self._stringify(
                 value=self._get_property_value(
                     product=product,

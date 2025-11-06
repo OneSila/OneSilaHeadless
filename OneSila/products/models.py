@@ -166,13 +166,12 @@ class Product(TranslatedModelMixin, models.Model):
         else:
             return self
 
-    def get_product_rule(self):
+    def get_product_rule(self, *, sales_channel=None):
         from properties.models import ProductPropertiesRule
         from django.core.exceptions import ObjectDoesNotExist
 
         try:
             product_type_value = self.productproperty_set.get(property__is_product_type=True)
-            sales_channel = getattr(self, 'sales_channel', None)
 
             filters = {
                 'product_type_id': product_type_value.value_select.id,
@@ -180,26 +179,30 @@ class Product(TranslatedModelMixin, models.Model):
             }
 
             if sales_channel is not None:
-                rule = ProductPropertiesRule.objects.filter(
-                    **filters,
-                    sales_channel=sales_channel,
-                ).first()
-                if rule:
-                    return rule
+                try:
+                    return ProductPropertiesRule.objects.get(
+                        **filters,
+                        sales_channel=sales_channel,
+                    )
+                except ProductPropertiesRule.DoesNotExist:
+                    pass
 
-            return ProductPropertiesRule.objects.filter(
-                **filters,
-                sales_channel__isnull=True,
-            ).first()
+            try:
+                return ProductPropertiesRule.objects.get(
+                    **filters,
+                    sales_channel__isnull=True,
+                )
+            except ProductPropertiesRule.DoesNotExist:
+                return None
         except (ObjectDoesNotExist, AttributeError):
             return None
 
-    def get_configurator_properties(self, product_rule=None, public_information_only=True):
+    def get_configurator_properties(self, *, product_rule=None, public_information_only=True, sales_channel=None):
         from properties.models import ProductPropertiesRuleItem
 
         queryset = ProductPropertiesRuleItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-            rule=product_rule or self.get_product_rule(),
+            rule=product_rule or self.get_product_rule(sales_channel=sales_channel),
             type__in=[
                 ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
                 ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
@@ -210,12 +213,12 @@ class Product(TranslatedModelMixin, models.Model):
 
         return queryset.select_related('property')
 
-    def get_optional_in_configurator_properties(self, product_rule=None, public_information_only=True):
+    def get_optional_in_configurator_properties(self, *, product_rule=None, public_information_only=True, sales_channel=None):
         from properties.models import ProductPropertiesRuleItem
 
         queryset = ProductPropertiesRuleItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-            rule=product_rule or self.get_product_rule(),
+            rule=product_rule or self.get_product_rule(sales_channel=sales_channel),
             type=ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
         )
         if public_information_only:
@@ -223,12 +226,12 @@ class Product(TranslatedModelMixin, models.Model):
 
         return queryset.select_related('property')
 
-    def get_required_properties(self, product_rule=None, public_information_only=True):
+    def get_required_properties(self, *, product_rule=None, public_information_only=True, sales_channel=None):
         from properties.models import ProductPropertiesRuleItem
 
         queryset = ProductPropertiesRuleItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-            rule=product_rule or self.get_product_rule(),
+            rule=product_rule or self.get_product_rule(sales_channel=sales_channel),
             type__in=[
                 ProductPropertiesRuleItem.REQUIRED,
                 ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
@@ -240,12 +243,12 @@ class Product(TranslatedModelMixin, models.Model):
 
         return queryset.select_related('property')
 
-    def get_optional_properties(self, product_rule=None, public_information_only=True):
+    def get_optional_properties(self, *, product_rule=None, public_information_only=True, sales_channel=None):
         from properties.models import ProductPropertiesRuleItem
 
         queryset = ProductPropertiesRuleItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-            rule=product_rule or self.get_product_rule(),
+            rule=product_rule or self.get_product_rule(sales_channel=sales_channel),
             type=ProductPropertiesRuleItem.OPTIONAL
         )
         if public_information_only:
@@ -253,23 +256,25 @@ class Product(TranslatedModelMixin, models.Model):
 
         return queryset.select_related('property')
 
-    def get_required_and_optional_properties(self, product_rule=None, public_information_only=True):
+    def get_required_and_optional_properties(self, *, product_rule=None, public_information_only=True, sales_channel=None):
         from properties.models import ProductPropertiesRuleItem
 
         queryset = ProductPropertiesRuleItem.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
-            rule=product_rule or self.get_product_rule(),
+            rule=product_rule or self.get_product_rule(sales_channel=sales_channel),
         )
         if public_information_only:
             queryset = queryset.filter(property__is_public_information=True)
 
         return queryset.select_related('property')
 
-    def get_unique_configurable_variations(self):
+    def get_unique_configurable_variations(self, *, sales_channel=None):
         from properties.models import ProductProperty
         from django.db.models import Prefetch
 
-        duplicate_decide_property_ids = self.get_configurator_properties().values_list('property_id', flat=True)
+        duplicate_decide_property_ids = self.get_configurator_properties(
+            sales_channel=sales_channel,
+        ).values_list('property_id', flat=True)
         attributes_len = len(duplicate_decide_property_ids)
         if len(duplicate_decide_property_ids) == 0:
             return Product.objects.none()
@@ -387,7 +392,7 @@ class Product(TranslatedModelMixin, models.Model):
 
         return variations
 
-    def get_properties_for_configurable_product(self, product_rule=None):
+    def get_properties_for_configurable_product(self, *, product_rule=None, sales_channel=None):
         """Return properties shared across all active variations."""
         from properties.models import ProductProperty, ProductPropertiesRuleItem, Property
         from django.db.models import Count, Min, Value, CharField
@@ -400,7 +405,7 @@ class Product(TranslatedModelMixin, models.Model):
         if not variations.exists():
             return ProductProperty.objects.none()
 
-        rule = product_rule or self.get_product_rule()
+        rule = product_rule or self.get_product_rule(sales_channel=sales_channel)
         if not rule:
             return ProductProperty.objects.none()
 

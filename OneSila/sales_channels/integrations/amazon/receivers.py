@@ -47,6 +47,7 @@ from sales_channels.integrations.amazon.tasks import (
 from sales_channels.integrations.amazon.constants import (
     AMAZON_SELECT_VALUE_TRANSLATION_IGNORE_CODES,
 )
+from sales_channels.helpers import rebind_amazon_product_type_to_rule
 from imports_exports.signals import import_success
 from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonConfigurableVariationsFactory
 from sales_channels.integrations.amazon.flows.tasks_runner import run_single_amazon_product_task_flow
@@ -182,6 +183,25 @@ def sales_channels__amazon_product_type__imported_rule(sender, instance, **kwarg
             product_type_code=instance.product_type_code,
             sales_channel_id=instance.sales_channel_id,
         )
+
+
+@receiver(post_create, sender="amazon.AmazonProductType")
+@receiver(post_update, sender="amazon.AmazonProductType")
+def sales_channels__amazon_product_type__ensure_specific_rule(sender, instance, **kwargs):
+    signal = kwargs.get("signal")
+    if signal == post_update and not instance.is_dirty_field(
+        "local_instance",
+        check_relationship=True,
+    ):
+        return
+
+    if not instance.local_instance:
+        return
+
+    rebind_amazon_product_type_to_rule(
+        product_type=instance,
+        rule=instance.local_instance,
+    )
 
 
 @receiver(import_success, sender='amazon.AmazonSalesChannelImport')

@@ -243,7 +243,7 @@ def validate_ebay_assignment(data, info):
         )
 
     # ✅ 3. Get the product rule once and check mappings
-    product_rule = product.get_product_rule()
+    product_rule = product.get_product_rule(sales_channel=sales_channel)
 
     has_type_mapping = False
     if product_rule:

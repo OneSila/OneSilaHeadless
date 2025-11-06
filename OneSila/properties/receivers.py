@@ -38,7 +38,8 @@ def properties__property_select_value_translation__rename_rule(sender, instance,
         try:
             rule = ProductPropertiesRule.objects.get(
                 product_type=instance.propertyselectvalue,
-                multi_tenant_company=property_instance.multi_tenant_company
+                multi_tenant_company=property_instance.multi_tenant_company,
+                sales_channel__isnull=True
             )
             product_properties_rule_rename.send(sender=rule.__class__, instance=rule)
         except ProductPropertiesRule.DoesNotExist:

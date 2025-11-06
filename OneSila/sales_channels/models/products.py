@@ -299,12 +299,15 @@ class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Mode
         from django.db.models import Count
 
         if rule is None:
-            rule = local_product.get_product_rule()
+            rule = local_product.get_product_rule(sales_channel=sales_channel)
 
         if rule is None:
             raise ValueError(f"No product properties rule found for {local_product.name}")
 
-        configurator_properties = local_product.get_configurator_properties(product_rule=rule)
+        configurator_properties = local_product.get_configurator_properties(
+            product_rule=rule,
+            sales_channel=sales_channel,
+        )
 
         required_ids = configurator_properties.filter(
             type=ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR

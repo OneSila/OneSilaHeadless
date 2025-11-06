@@ -315,7 +315,7 @@ class ProductPropertiesRule(models.Model):
             models.UniqueConstraint(
                 fields=("product_type", "multi_tenant_company", "sales_channel"),
                 name="unique_product_properties_rule_per_sales_channel",
-                nulls_not_distinct=True,
+                nulls_distinct=False,
             )
         ]
         search_terms = ['product_type__propertyselectvaluetranslation__value']

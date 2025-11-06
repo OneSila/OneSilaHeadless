@@ -35,6 +35,7 @@ from sales_channels.integrations.ebay.tasks import (
 )
 from sales_channels.integrations.ebay.flows.tasks_runner import run_single_ebay_product_task_flow
 from sales_channels.models import SalesChannelViewAssign
+from sales_channels.helpers import rebind_ebay_product_type_to_rule
 
 
 _PENDING_PRODUCT_DELETE_COUNTS: Counter[int] = Counter()
@@ -125,6 +126,25 @@ def sales_channels__ebay_product_type__propagate_remote_id(sender, instance: Eba
 
     factory = EbayProductTypeRemoteMappingFactory(product_type=instance)
     factory.run()
+
+
+@receiver(post_create, sender='ebay.EbayProductType')
+@receiver(post_update, sender='ebay.EbayProductType')
+def sales_channels__ebay_product_type__ensure_specific_rule(sender, instance: EbayProductType, **kwargs):
+    signal = kwargs.get('signal')
+    if signal == post_update and not instance.is_dirty_field(
+        'local_instance',
+        check_relationship=True,
+    ):
+        return
+
+    if not instance.local_instance:
+        return
+
+    rebind_ebay_product_type_to_rule(
+        product_type=instance,
+        rule=instance.local_instance,
+    )
 
 
 @receiver(post_update, sender='ebay.EbayProductType')
@@ -351,7 +371,7 @@ def ebay__product_category__propagate_to_variations(sender, instance, **kwargs):
     When an eBay category is assigned to a configurable (parent) product,
     automatically propagate it to all its variations.
     """
-    from .models.categories import EbayProductCategory
+    from sales_channels.integrations.ebay.models.categories import EbayProductCategory
 
     if not instance.product.is_configurable():
         return

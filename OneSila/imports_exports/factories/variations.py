@@ -79,7 +79,7 @@ class ImportConfigurableVariationInstance(AbstractImportInstance):
 
         self.instance = fac.instance
 
-        rule = self.config_product.get_product_rule()
+        rule = self.config_product.get_product_rule(sales_channel=self.sales_channel)
         if rule:
             # if we created that we might want to add the
             rule_product_property, _ = ProductProperty.objects.get_or_create(

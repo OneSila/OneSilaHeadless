@@ -483,29 +483,44 @@ class ProductPropertiesRuleManager(MultiTenantManager):
 
 
 class ProductPropertyQuerySet(MultiTenantQuerySet):
-    def filter_for_configurator(self):
+    def filter_for_configurator(self, *, sales_channel=None):
         from .models import ProductPropertiesRuleItem, Property, ProductPropertiesRule, \
             PropertySelectValue
 
+        # Narrow down to the product-type properties for the current queryset.
         product_type_prod_props = self.filter(property__is_product_type=True)
         product_type_selects = PropertySelectValue.objects.filter(
             property__in=product_type_prod_props.values('property')
         )
-        rules = ProductPropertiesRule.objects.filter(
+
+        rules_qs = ProductPropertiesRule.objects.filter(
             multi_tenant_company__in=self.values('multi_tenant_company'),
-            product_type__in=product_type_selects)
+            product_type__in=product_type_selects,
+        )
+
+        if sales_channel is not None:
+            channel_rules_qs = rules_qs.filter(sales_channel=sales_channel)
+            if channel_rules_qs.exists():
+                rules_qs = channel_rules_qs
+            else:
+                rules_qs = rules_qs.filter(sales_channel__isnull=True)
+        else:
+            rules_qs = rules_qs.filter(sales_channel__isnull=True)
+
         rule_items = ProductPropertiesRuleItem.objects.filter(
-            rule__in=rules,
+            rule__in=rules_qs,
             type__in=[
                 ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
                 ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
             ],
             multi_tenant_company__in=self.all().values('multi_tenant_company')
         )
+
         properties = Property.objects.filter(
             multi_tenant_company__in=self.all().values('multi_tenant_company'),
             id__in=rule_items.values_list('property_id', flat=True)
         )
+
         return self.filter(property__in=properties)
 
 
@@ -513,5 +528,5 @@ class ProductPropertyManager(MultiTenantManager):
     def get_queryset(self):
         return ProductPropertyQuerySet(self.model, using=self._db)
 
-    def filter_for_configurator(self):
-        return self.get_queryset().filter_for_configurator()
+    def filter_for_configurator(self, *, sales_channel=None):
+        return self.get_queryset().filter_for_configurator(sales_channel=sales_channel)

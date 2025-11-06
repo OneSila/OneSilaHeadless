@@ -405,7 +405,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             return {}
 
         variation_properties = list(
-            product.get_configurator_properties()
+            product.get_configurator_properties(sales_channel=self.sales_channel)
             if hasattr(product, "get_configurator_properties")
             else []
         )
@@ -1441,7 +1441,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             return None
 
         try:
-            rule = product.get_product_rule()
+            rule = product.get_product_rule(sales_channel=self.sales_channel)
         except Exception:  # pragma: no cover - defensive guard
             return None
 

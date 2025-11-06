@@ -108,6 +108,7 @@ class ProductsMutation:
         rule_obj = ProductPropertiesRule.objects.get(
             product_type_id=rule_product_type.id.node_id,
             multi_tenant_company=multi_tenant_company,
+            sales_channel__isnull=True
         )
 
         config_product_obj = Product.objects.get(

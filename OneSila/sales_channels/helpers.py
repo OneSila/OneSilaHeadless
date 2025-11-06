@@ -1,7 +1,257 @@
+from django.db import models
+
 from sales_channels.integrations.magento2.models import MagentoSalesChannel
-from typing import Iterable
+from typing import Iterable, Optional
 
 from sales_channels.models import RemoteProduct
+
+
+def get_all_product_rules_for_sales_channel(*, sales_channel):
+    """Return channel-specific rules plus defaults without duplicates."""
+    from properties.models import ProductPropertiesRule
+
+    if sales_channel is None:
+        raise ValueError("sales_channel must be provided")
+
+    multi_tenant_company = sales_channel.multi_tenant_company
+
+    channel_rules = list(
+        ProductPropertiesRule.objects.filter(
+            multi_tenant_company=multi_tenant_company,
+            sales_channel=sales_channel,
+        )
+    )
+
+    product_type_ids = {rule.product_type_id for rule in channel_rules}
+
+    fallback_rules = list(
+        ProductPropertiesRule.objects.filter(
+            multi_tenant_company=multi_tenant_company,
+            sales_channel__isnull=True,
+        ).exclude(product_type_id__in=product_type_ids)
+    )
+
+    return channel_rules + fallback_rules
+
+
+def get_preferred_product_rule_for_sales_channel(*, rule, sales_channel):
+    """Return channel-specific rule when available for the same product type."""
+    from properties.models import ProductPropertiesRule
+
+    if rule is None or sales_channel is None:
+        return rule
+
+    if getattr(rule, "sales_channel_id", None) == sales_channel.id:
+        return rule
+
+    specialized_rule = ProductPropertiesRule.objects.filter(
+        multi_tenant_company=rule.multi_tenant_company,
+        product_type=rule.product_type,
+        sales_channel=sales_channel,
+    ).first()
+
+    return specialized_rule or rule
+
+
+def _rebuild_amazon_product_type_items(*, product_type, rule):
+    from sales_channels.integrations.amazon.models import AmazonProductTypeItem
+
+    existing_items = list(
+        AmazonProductTypeItem.objects.filter(amazon_rule=product_type)
+        .select_related(
+            "local_instance",
+            "remote_property",
+            "remote_property__local_instance",
+        )
+    )
+
+    AmazonProductTypeItem.objects.filter(amazon_rule=product_type).delete()
+
+    rule_items_by_property = {
+        item.property_id: item for item in rule.items.select_related("property")
+    }
+
+    for item in existing_items:
+        property_id: Optional[int] = None
+
+        if item.local_instance_id:
+            property_id = item.local_instance.property_id
+        elif getattr(item.remote_property, "local_instance_id", None):
+            property_id = item.remote_property.local_instance_id
+
+        if property_id is None:
+            AmazonProductTypeItem.objects.create(
+                multi_tenant_company=product_type.multi_tenant_company,
+                sales_channel=product_type.sales_channel,
+                amazon_rule=product_type,
+                remote_property=item.remote_property,
+                local_instance=None,
+                remote_type=item.remote_type,
+            )
+            continue
+
+        rule_item = rule_items_by_property.get(property_id)
+        if not rule_item:
+            continue
+
+        AmazonProductTypeItem.objects.create(
+            multi_tenant_company=product_type.multi_tenant_company,
+            sales_channel=product_type.sales_channel,
+            amazon_rule=product_type,
+            remote_property=item.remote_property,
+            local_instance=rule_item,
+            remote_type=item.remote_type or rule_item.type,
+        )
+
+
+def rebind_amazon_product_type_to_rule(*, product_type, rule):
+    if rule is None:
+        return
+
+    preferred_rule = get_preferred_product_rule_for_sales_channel(
+        rule=rule,
+        sales_channel=product_type.sales_channel,
+    )
+
+    if preferred_rule is None:
+        return
+
+    if product_type.local_instance_id != preferred_rule.id:
+        type(product_type).objects.filter(pk=product_type.pk).update(
+            local_instance=preferred_rule,
+        )
+        product_type.local_instance = preferred_rule
+
+    _rebuild_amazon_product_type_items(product_type=product_type, rule=preferred_rule)
+
+
+def rebind_amazon_product_types_for_rule(rule):
+    if getattr(rule, "sales_channel_id", None) is None:
+        return
+
+    from properties.models import ProductPropertiesRule
+    from sales_channels.integrations.amazon.models import AmazonProductType
+
+    default_rule = ProductPropertiesRule.objects.filter(
+        multi_tenant_company=rule.multi_tenant_company,
+        product_type=rule.product_type,
+        sales_channel__isnull=True,
+    ).first()
+
+    product_types = AmazonProductType.objects.filter(
+        multi_tenant_company=rule.multi_tenant_company,
+        sales_channel=rule.sales_channel,
+    )
+
+    if default_rule:
+        product_types = product_types.filter(
+            models.Q(local_instance=rule) | models.Q(local_instance=default_rule)
+        )
+    else:
+        product_types = product_types.filter(local_instance=rule)
+
+    for product_type in product_types.iterator():
+        rebind_amazon_product_type_to_rule(product_type=product_type, rule=rule)
+
+
+def _rebuild_ebay_product_type_items(*, product_type, rule):
+    from sales_channels.integrations.ebay.models import EbayProductTypeItem
+
+    existing_items = list(
+        product_type.items.select_related(
+            "local_instance",
+            "ebay_property",
+            "ebay_property__local_instance",
+        )
+    )
+
+    product_type.items.all().delete()
+
+    rule_items_by_property = {
+        item.property_id: item for item in rule.items.select_related("property")
+    }
+
+    for item in existing_items:
+        property_id: Optional[int] = None
+
+        if item.local_instance_id:
+            property_id = item.local_instance.property_id
+        elif getattr(item.ebay_property, "local_instance_id", None):
+            property_id = item.ebay_property.local_instance_id
+
+        if property_id is None:
+            EbayProductTypeItem.objects.create(
+                multi_tenant_company=product_type.multi_tenant_company,
+                sales_channel=product_type.sales_channel,
+                product_type=product_type,
+                ebay_property=item.ebay_property,
+                local_instance=None,
+                remote_type=item.remote_type,
+            )
+            continue
+
+        rule_item = rule_items_by_property.get(property_id)
+        if not rule_item:
+            continue
+
+        EbayProductTypeItem.objects.create(
+            multi_tenant_company=product_type.multi_tenant_company,
+            sales_channel=product_type.sales_channel,
+            product_type=product_type,
+            ebay_property=item.ebay_property,
+            local_instance=rule_item,
+            remote_type=item.remote_type or rule_item.type,
+        )
+
+
+def rebind_ebay_product_type_to_rule(*, product_type, rule):
+    if rule is None:
+        return
+
+    preferred_rule = get_preferred_product_rule_for_sales_channel(
+        rule=rule,
+        sales_channel=product_type.sales_channel,
+    )
+
+    if preferred_rule is None:
+        return
+
+    if product_type.local_instance_id != preferred_rule.id:
+        type(product_type).objects.filter(pk=product_type.pk).update(
+            local_instance=preferred_rule,
+        )
+        product_type.local_instance = preferred_rule
+
+    _rebuild_ebay_product_type_items(product_type=product_type, rule=preferred_rule)
+
+
+def rebind_ebay_product_types_for_rule(rule):
+    if getattr(rule, "sales_channel_id", None) is None:
+        return
+
+    from properties.models import ProductPropertiesRule
+    from sales_channels.integrations.ebay.models import EbayProductType
+
+    default_rule = ProductPropertiesRule.objects.filter(
+        multi_tenant_company=rule.multi_tenant_company,
+        product_type=rule.product_type,
+        sales_channel__isnull=True,
+    ).first()
+
+    product_types = EbayProductType.objects.filter(
+        multi_tenant_company=rule.multi_tenant_company,
+        sales_channel=rule.sales_channel,
+    )
+
+    if default_rule:
+        product_types = product_types.filter(
+            models.Q(local_instance=rule) | models.Q(local_instance=default_rule)
+        )
+    else:
+        product_types = product_types.filter(local_instance=rule)
+
+    for product_type in product_types.iterator():
+        rebind_ebay_product_type_to_rule(product_type=product_type, rule=rule)
 
 
 def mark_remote_products_for_feed_updates(*, product_ids: Iterable[int]) -> None:

@@ -77,6 +77,7 @@ class ProductPropertyTextTranslationType(relay.Node, GetQuerysetMultiTenantMixin
 @type(ProductPropertiesRule, filters=ProductPropertiesRuleFilter, order=ProductPropertiesRuleOrder, pagination=True, fields="__all__")
 class ProductPropertiesRuleType(relay.Node, GetQuerysetMultiTenantMixin):
     product_type: PropertySelectValueType
+    sales_channel: Optional[Annotated['SalesChannelType', lazy("sales_channels.schema.types.types")]]
     items: List[Annotated['ProductPropertiesRuleItemType', lazy("properties.schema.types.types")]]
 
     @field()
