@@ -5,7 +5,7 @@ from core.schema.core.mutations import CreateMutation, UpdateMutation
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from core.schema.core.mutations import Info, Any
 from properties.models import ProductPropertiesRule, ProductProperty, ProductPropertyTextTranslation, Property
-from strawberry_django.mutations.types import UNSET
+from strawberry_django.mutations.types import UNSET, ParsedObject
 from django.utils.translation import gettext_lazy as _
 
 
@@ -17,11 +17,21 @@ class CompleteCreateProductPropertiesRule(CreateMutation):
             items = data.get("items")
             product_type = data.get("product_type")
             require_ean_code = data.pop("require_ean_code", False)
+            sales_channel = data.get("sales_channel", UNSET)
 
             if items == UNSET:
                 items = []
 
-            rule = ProductPropertiesRule.objects.create_rule(multi_tenant_company, product_type, require_ean_code, items)
+            if sales_channel == UNSET:
+                sales_channel = None
+
+            rule = ProductPropertiesRule.objects.create_rule(
+                multi_tenant_company,
+                product_type,
+                require_ean_code,
+                items,
+                sales_channel=sales_channel,
+            )
             return rule
 
 
@@ -31,11 +41,26 @@ class CompleteUpdateProductPropertiesRule(UpdateMutation, GetCurrentUserMixin):
         with DjangoOptimizerExtension.disabled():
             items = data.pop("items", [])
             require_ean_code = data.pop("require_ean_code", None)
+            sales_channel = data.pop("sales_channel", UNSET)
+            should_save = False
 
             if require_ean_code is not None:
                 if require_ean_code != instance.require_ean_code:
                     instance.require_ean_code = require_ean_code
-                    instance.save()
+                    should_save = True
+
+            if sales_channel is not UNSET:
+                if isinstance(sales_channel, ParsedObject):
+                    sales_channel = sales_channel.pk
+                elif hasattr(sales_channel, "pk"):
+                    sales_channel = sales_channel.pk
+
+                if sales_channel != instance.sales_channel_id:
+                    instance.sales_channel_id = sales_channel
+                    should_save = True
+
+            if should_save:
+                instance.save()
 
             if items == UNSET:
                 items = []

@@ -172,7 +172,25 @@ class Product(TranslatedModelMixin, models.Model):
 
         try:
             product_type_value = self.productproperty_set.get(property__is_product_type=True)
-            return ProductPropertiesRule.objects.get(product_type_id=product_type_value.value_select.id, multi_tenant_company=self.multi_tenant_company)
+            sales_channel = getattr(self, 'sales_channel', None)
+
+            filters = {
+                'product_type_id': product_type_value.value_select.id,
+                'multi_tenant_company': self.multi_tenant_company,
+            }
+
+            if sales_channel is not None:
+                rule = ProductPropertiesRule.objects.filter(
+                    **filters,
+                    sales_channel=sales_channel,
+                ).first()
+                if rule:
+                    return rule
+
+            return ProductPropertiesRule.objects.filter(
+                **filters,
+                sales_channel__isnull=True,
+            ).first()
         except (ObjectDoesNotExist, AttributeError):
             return None
 
