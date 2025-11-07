@@ -13,6 +13,7 @@ class EbayCategory(models.SharedModel):
     full_name = models.CharField(max_length=512)
     has_children = models.BooleanField(default=False)
     is_root = models.BooleanField(default=False, db_index=True)
+    configurator_properties = models.JSONField(default=list, blank=True)
     parent_node = models.ForeignKey(
         "self",
         on_delete=models.CASCADE,

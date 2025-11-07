@@ -154,6 +154,13 @@ class EbayCategoryNodeSyncFactory(GetEbayAPIMixin):
             seen_ids.add(entry.remote_id)
             parent_links[entry.remote_id] = entry.parent_remote_id
 
+            if entry.has_children:
+                configurator_properties: list[str] = []
+            else:
+                configurator_properties = self._fetch_configurator_properties(
+                    category_id=entry.remote_id,
+                )
+
             if entry.remote_id in existing:
                 obj = existing[entry.remote_id]
                 updated = False
@@ -169,6 +176,9 @@ class EbayCategoryNodeSyncFactory(GetEbayAPIMixin):
                 if obj.is_root != entry.is_root:
                     obj.is_root = entry.is_root
                     updated = True
+                if obj.configurator_properties != configurator_properties:
+                    obj.configurator_properties = configurator_properties
+                    updated = True
                 if updated:
                     to_update.append(obj)
                 continue
@@ -181,6 +191,7 @@ class EbayCategoryNodeSyncFactory(GetEbayAPIMixin):
                     full_name=entry.full_name,
                     has_children=entry.has_children,
                     is_root=entry.is_root,
+                    configurator_properties=configurator_properties,
                 )
             )
 
@@ -190,7 +201,7 @@ class EbayCategoryNodeSyncFactory(GetEbayAPIMixin):
         if to_update:
             EbayCategory.objects.bulk_update(
                 to_update,
-                ["name", "full_name", "has_children", "is_root"],
+                ["name", "full_name", "has_children", "is_root", "configurator_properties"],
             )
 
         refreshed_objects = {
@@ -222,3 +233,66 @@ class EbayCategoryNodeSyncFactory(GetEbayAPIMixin):
                 marketplace_default_tree_id=marketplace_id,
                 remote_id__in=stale_ids,
             ).delete()
+
+    def _fetch_configurator_properties(self, *, category_id: str) -> list[str]:
+        if not category_id or self.api is None:
+            return []
+
+        try:
+            response = self.api.commerce_taxonomy_get_item_aspects_for_category(
+                category_id=category_id,
+                category_tree_id=self.category_tree_id,
+            )
+        except Exception:
+            return []
+
+        payload = self._to_dict(response)
+        aspects = payload.get("aspects")
+        if not isinstance(aspects, list):
+            return []
+
+        names: list[str] = []
+        for aspect in aspects:
+            if not isinstance(aspect, dict):
+                continue
+            constraint = aspect.get("aspect_constraint") or aspect.get("aspectConstraint")
+            if not isinstance(constraint, dict):
+                constraint = {}
+
+            enabled_raw = constraint.get("aspect_enabled_for_variations")
+            if enabled_raw is None:
+                enabled_raw = constraint.get("aspectEnabledForVariations")
+            if not self._truthy(enabled_raw):
+                continue
+
+            localized_name = aspect.get("localized_aspect_name") or aspect.get("localizedAspectName")
+            if localized_name is None:
+                continue
+
+            name = str(localized_name).strip()
+            if not name:
+                continue
+
+            names.append(name)
+
+        if not names:
+            return []
+
+        deduplicated: list[str] = []
+        seen: set[str] = set()
+        for name in names:
+            if name in seen:
+                continue
+            seen.add(name)
+            deduplicated.append(name)
+
+        return deduplicated
+
+    def _truthy(self, value: object) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "y"}
+        if isinstance(value, (int, float)):
+            return bool(value)
+        return False
