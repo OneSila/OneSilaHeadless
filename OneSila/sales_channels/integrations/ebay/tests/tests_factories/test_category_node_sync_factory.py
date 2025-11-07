@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 from core.tests import TestCase
 from django.db import connection
-from django.db.utils import ProgrammingError
+from django.db.utils import OperationalError, ProgrammingError
 from sales_channels.integrations.ebay.factories.category_nodes import EbayCategoryNodeSyncFactory
 from sales_channels.integrations.ebay.factories.sales_channels import EbayCategorySuggestionFactory
 from sales_channels.integrations.ebay.models import (
@@ -28,6 +28,13 @@ class EbayCategoryNodeSyncFactoryTest(TestCase):
             remote_id="GB",
             default_category_tree_id="3",
         )
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "ALTER TABLE ebay_ebaycategory ADD COLUMN configurator_properties TEXT DEFAULT '[]'",
+                )
+        except (ProgrammingError, OperationalError):
+            connection.rollback()
 
     def _build_payload(self) -> dict[str, object]:
         return {
@@ -54,10 +61,25 @@ class EbayCategoryNodeSyncFactoryTest(TestCase):
             },
         }
 
+    def _build_aspects_payload(self) -> dict[str, object]:
+        return {
+            "aspects": [
+                {
+                    "localized_aspect_name": "Color",
+                    "aspect_constraint": {"aspect_enabled_for_variations": True},
+                },
+                {
+                    "localized_aspect_name": "Brand",
+                    "aspect_constraint": {"aspect_enabled_for_variations": False},
+                },
+            ]
+        }
+
     @patch("sales_channels.integrations.ebay.factories.category_nodes.sync.GetEbayAPIMixin.get_api")
     def test_creates_leaf_nodes(self, mock_get_api: Mock) -> None:
         api = SimpleNamespace(
             commerce_taxonomy_get_category_tree=Mock(return_value=self._build_payload()),
+            commerce_taxonomy_get_item_aspects_for_category=Mock(return_value=self._build_aspects_payload()),
         )
         mock_get_api.return_value = api
 
@@ -73,6 +95,7 @@ class EbayCategoryNodeSyncFactoryTest(TestCase):
         self.assertFalse(node.has_children)
         self.assertFalse(node.is_root)
         self.assertEqual(node.parent_node_id, parent.id)
+        self.assertEqual(node.configurator_properties, ["Color"])
 
         self.assertEqual(parent.full_name, "Root > Parent")
         self.assertEqual(parent.name, "Parent")
@@ -97,6 +120,7 @@ class EbayCategoryNodeSyncFactoryTest(TestCase):
 
         api = SimpleNamespace(
             commerce_taxonomy_get_category_tree=Mock(return_value=self._build_payload()),
+            commerce_taxonomy_get_item_aspects_for_category=Mock(return_value=self._build_aspects_payload()),
         )
         mock_get_api.return_value = api
 
