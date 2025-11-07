@@ -5,6 +5,7 @@ from properties.signals import product_properties_rule_created, product_properti
 from sales_channels.flows.default import run_generic_sales_channel_task_flow, run_delete_generic_sales_channel_task_flow, \
     run_product_specific_sales_channel_task_flow, run_delete_product_specific_generic_sales_channel_task_flow
 from sales_channels.integrations.magento2.models import MagentoProperty, MagentoSalesChannel
+from sales_channels.helpers import rebind_magento_attribute_sets_for_rule
 from sales_channels.signals import create_remote_property, update_remote_property, delete_remote_property, \
     create_remote_property_select_value, \
     update_remote_property_select_value, delete_remote_property_select_value, refresh_website_pull_models, \
@@ -99,6 +100,9 @@ def sales_channels__magento__handle_pull_magento_sales_chjannel_views(sender, in
 
 @receiver(product_properties_rule_created, sender='properties.ProductPropertiesRule')
 def sales_channels__magento__attribute_set__create(sender, instance, **kwargs):
+    if instance.sales_channel_id:
+        return
+
     from .tasks import create_magento_attribute_set_task
 
     task_kwargs = {'rule_id': instance.id}

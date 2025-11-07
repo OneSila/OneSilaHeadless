@@ -128,11 +128,9 @@ def sales_channels__ebay_product_type__propagate_remote_id(sender, instance: Eba
     factory.run()
 
 
-@receiver(post_create, sender='ebay.EbayProductType')
 @receiver(post_update, sender='ebay.EbayProductType')
 def sales_channels__ebay_product_type__ensure_specific_rule(sender, instance: EbayProductType, **kwargs):
-    signal = kwargs.get('signal')
-    if signal == post_update and not instance.is_dirty_field(
+    if not instance.is_dirty_field(
         'local_instance',
         check_relationship=True,
     ):

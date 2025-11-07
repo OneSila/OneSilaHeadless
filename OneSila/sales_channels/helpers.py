@@ -122,7 +122,7 @@ def rebind_amazon_product_type_to_rule(*, product_type, rule):
         )
         product_type.local_instance = preferred_rule
 
-    _rebuild_amazon_product_type_items(product_type=product_type, rule=preferred_rule)
+        _rebuild_amazon_product_type_items(product_type=product_type, rule=preferred_rule)
 
 
 def rebind_amazon_product_types_for_rule(rule):
@@ -222,7 +222,7 @@ def rebind_ebay_product_type_to_rule(*, product_type, rule):
         )
         product_type.local_instance = preferred_rule
 
-    _rebuild_ebay_product_type_items(product_type=product_type, rule=preferred_rule)
+        _rebuild_ebay_product_type_items(product_type=product_type, rule=preferred_rule)
 
 
 def rebind_ebay_product_types_for_rule(rule):
@@ -252,6 +252,116 @@ def rebind_ebay_product_types_for_rule(rule):
 
     for product_type in product_types.iterator():
         rebind_ebay_product_type_to_rule(product_type=product_type, rule=rule)
+
+
+def _rebuild_magento_attribute_set_items(*, attribute_set, rule):
+    from sales_channels.integrations.magento2.models.properties import (
+        MagentoAttributeSetAttribute,
+    )
+
+    existing_items = list(
+        MagentoAttributeSetAttribute.objects.filter(magento_rule=attribute_set)
+        .select_related(
+            "local_instance",
+            "local_instance__property",
+            "remote_property",
+            "remote_property__local_instance",
+        )
+    )
+
+    MagentoAttributeSetAttribute.objects.filter(magento_rule=attribute_set).delete()
+
+    rule_items_by_property = {
+        item.property_id: item for item in rule.items.select_related("property")
+    }
+
+    for item in existing_items:
+        property_id: Optional[int] = None
+
+        if item.local_instance_id:
+            property_id = item.local_instance.property_id
+        elif getattr(item.remote_property, "local_instance_id", None):
+            property_id = item.remote_property.local_instance_id
+
+        if property_id is None:
+            MagentoAttributeSetAttribute.objects.create(
+                multi_tenant_company=attribute_set.multi_tenant_company,
+                sales_channel=attribute_set.sales_channel,
+                magento_rule=attribute_set,
+                remote_property=item.remote_property,
+                local_instance=None,
+            )
+            continue
+
+        rule_item = rule_items_by_property.get(property_id)
+        if not rule_item:
+            continue
+
+        MagentoAttributeSetAttribute.objects.create(
+            multi_tenant_company=attribute_set.multi_tenant_company,
+            sales_channel=attribute_set.sales_channel,
+            magento_rule=attribute_set,
+            remote_property=item.remote_property,
+            local_instance=rule_item,
+        )
+
+
+def rebind_magento_attribute_set_to_rule(*, attribute_set, rule):
+    if rule is None:
+        return
+
+    preferred_rule = get_preferred_product_rule_for_sales_channel(
+        rule=rule,
+        sales_channel=attribute_set.sales_channel,
+    )
+
+    if preferred_rule is None:
+        return
+
+    if attribute_set.local_instance_id != preferred_rule.id:
+        type(attribute_set).objects.filter(pk=attribute_set.pk).update(
+            local_instance=preferred_rule,
+        )
+        attribute_set.local_instance = preferred_rule
+
+        _rebuild_magento_attribute_set_items(
+            attribute_set=attribute_set,
+            rule=preferred_rule,
+        )
+
+
+def rebind_magento_attribute_sets_for_rule(*, rule):
+    if getattr(rule, "sales_channel_id", None) is None:
+        return
+
+    from properties.models import ProductPropertiesRule
+    from sales_channels.integrations.magento2.models.properties import (
+        MagentoAttributeSet,
+    )
+
+    default_rule = ProductPropertiesRule.objects.filter(
+        multi_tenant_company=rule.multi_tenant_company,
+        product_type=rule.product_type,
+        sales_channel__isnull=True,
+    ).first()
+
+    attribute_sets = MagentoAttributeSet.objects.filter(
+        multi_tenant_company=rule.multi_tenant_company,
+        sales_channel=rule.sales_channel,
+    )
+
+    if default_rule:
+        attribute_sets = attribute_sets.filter(
+            models.Q(local_instance=rule) | models.Q(local_instance=default_rule)
+        )
+    else:
+        attribute_sets = attribute_sets.filter(local_instance=rule)
+
+    for attribute_set in attribute_sets.iterator():
+        rebind_magento_attribute_set_to_rule(
+            attribute_set=attribute_set,
+            rule=rule,
+        )
 
 
 def mark_remote_products_for_feed_updates(*, product_ids: Iterable[int]) -> None:

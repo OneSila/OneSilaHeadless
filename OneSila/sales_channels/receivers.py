@@ -25,7 +25,7 @@ from .models.sales_channels import SalesChannelViewAssign
 from .helpers import (
     mark_remote_products_for_feed_updates,
     rebind_amazon_product_types_for_rule,
-    rebind_ebay_product_types_for_rule,
+    rebind_ebay_product_types_for_rule, rebind_magento_attribute_sets_for_rule,
 )
 from .flows.gpt_feed import mark_product_property_for_gpt_feed_update
 from .signals import (
@@ -90,10 +90,13 @@ def sales_channels__gpt_feed_flag__image_delete(sender, instance, **kwargs):
 
 
 @receiver(product_properties_rule_created, sender='properties.ProductPropertiesRule')
-@receiver(product_properties_rule_updated, sender='properties.ProductPropertiesRule')
 def sales_channels__sync_remote_product_types(sender, instance, **kwargs):
+    if not instance.sales_channel_id:
+        return
+
     rebind_amazon_product_types_for_rule(instance)
     rebind_ebay_product_types_for_rule(instance)
+    rebind_magento_attribute_sets_for_rule(rule=instance)
 
 
 @receiver(delete_remote_product, sender='sales_channels.SalesChannelViewAssign')

@@ -185,11 +185,9 @@ def sales_channels__amazon_product_type__imported_rule(sender, instance, **kwarg
         )
 
 
-@receiver(post_create, sender="amazon.AmazonProductType")
 @receiver(post_update, sender="amazon.AmazonProductType")
 def sales_channels__amazon_product_type__ensure_specific_rule(sender, instance, **kwargs):
-    signal = kwargs.get("signal")
-    if signal == post_update and not instance.is_dirty_field(
+    if not instance.is_dirty_field(
         "local_instance",
         check_relationship=True,
     ):
