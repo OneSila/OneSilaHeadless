@@ -5,8 +5,9 @@ from .sales_channels import (
     SalesChannelIntegrationPricelist,
     SalesChannelContentTemplate,
     SalesChannelViewAssign,
-    RemoteLanguage
+    RemoteLanguage,
 )
+from .gpt import SalesChannelGptFeed
 
 # Import related models
 from .imports import (

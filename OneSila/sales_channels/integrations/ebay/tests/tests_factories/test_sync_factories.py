@@ -18,6 +18,7 @@ from sales_channels.integrations.ebay.factories.sync import (
     EbayPropertyRuleItemSyncFactory,
 )
 from sales_channels.integrations.ebay.models import (
+    EbayCategory,
     EbayProductType,
     EbayProductTypeItem,
     EbayProperty,
@@ -115,6 +116,21 @@ class EbaySyncFactoriesTest(TestCase):
             property=self.local_property,
             language=self.multi_tenant_company.language,
             name="Color",
+        )
+
+        self._ensure_leaf_category(remote_id="123")
+
+    def _ensure_leaf_category(self, *, remote_id: str) -> None:
+        tree_id = self.view.default_category_tree_id or "TEST-TREE"
+        EbayCategory.objects.update_or_create(
+            marketplace_default_tree_id=tree_id,
+            remote_id=str(remote_id),
+            defaults={
+                "name": f"Category {remote_id}",
+                "full_name": f"Category {remote_id}",
+                "has_children": False,
+                "is_root": False,
+            },
         )
 
     def _create_remote_property(self, *, localized_name: str = "Farbe") -> EbayProperty:

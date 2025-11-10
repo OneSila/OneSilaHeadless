@@ -5,6 +5,8 @@ class DisableWooCommerceSignalsMixin:
     """Mixin to disable WooCommerce receivers during Amazon tests."""
 
     WOOCOMMERCE_SIGNALS = [
+        "sales_channel_created",
+        "refresh_website_pull_models",
         "create_remote_product",
         "delete_remote_product",
         "update_remote_product",

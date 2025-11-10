@@ -22,6 +22,7 @@ from sales_channels.integrations.ebay.factories.products import (
     EbayProductSyncFactory,
     EbayProductUpdateFactory,
 )
+from sales_channels.integrations.ebay.models import EbayProductCategory
 from sales_channels.integrations.ebay.models.properties import EbayProductProperty, EbayInternalProperty
 from sales_channels.integrations.ebay.models.taxes import EbayCurrency
 from sales_channels.integrations.ebay.models.products import EbayProductOffer, EbayProduct
@@ -164,7 +165,7 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         self.assertEqual(inventory_payload["sku"], "TEST-SKU")
         self.assertEqual(len(inventory_payload["product"]["title"]), 80)
         self.assertEqual(
-            inventory_payload["product"]["image_urls"],
+            inventory_payload["product"]["imageUrls"],
             ["https://example.com/image.jpg"],
         )
         self.assertEqual(
@@ -434,6 +435,31 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         mock_price_run.assert_called_once()
         mock_ean_run.assert_called()
         mock_content_run.assert_called_once()
+
+    def test_get_category_id_prefers_product_category_mapping(self) -> None:
+        self.ensure_ebay_leaf_category(
+            remote_id="987654",
+            view=self.view,
+            name="Test",
+        )
+        EbayProductCategory.objects.create(
+            product=self.product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            remote_id=" 987654 ",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        factory = self._build_create_factory()
+        factory.remote_product = self.remote_product
+
+        self.assertEqual(factory._get_category_id(), "987654")
+
+    def test_get_category_id_falls_back_to_product_type(self) -> None:
+        factory = self._build_create_factory()
+        factory.remote_product = self.remote_product
+
+        self.assertEqual(factory._get_category_id(), str(self.ebay_product_type.remote_id))
 
     def test_delete_flow_removes_offer_and_inventory(self) -> None:
         offer = EbayProductOffer.objects.get(

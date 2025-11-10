@@ -3,7 +3,7 @@ from sales_channels.integrations.woocommerce.models import WoocommerceRemoteLang
 from sales_channels.integrations.woocommerce.constants import EAN_CODE_WOOCOMMERCE_FIELD_NAME
 from sales_channels.exceptions import ConfiguratorPropertyNotFilterable
 from django.conf import settings
-from media.models import Media
+from media.models import Media, MediaProductThrough
 from sales_channels.integrations.woocommerce.models import WoocommerceGlobalAttribute, \
     WoocommerceCurrency
 from sales_channels.integrations.woocommerce.constants import API_ATTRIBUTE_PREFIX
@@ -116,11 +116,11 @@ class WoocommerceRemoteValueConversionMixin:
 
     def get_int_value(self, value):
         """Handles int value types."""
-        return value
+        return str(value)
 
     def get_float_value(self, value):
         """Handles float value types."""
-        return value
+        return str(value)
 
     def get_boolean_value(self, value: bool) -> str:
         """Converts boolean values to translated strings for WooCommerce."""
@@ -183,13 +183,16 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
 
     def set_configurator_properties(self):
         product = self.get_local_product()
-        product_rule = product.get_product_rule()
+        product_rule = product.get_product_rule(sales_channel=self.sales_channel)
 
         # Get all variations
         variations = product.get_configurable_variations(active_only=True)
 
         # Get unique property values across variations
-        self.configurator_properties = product.get_configurator_properties(product_rule=product_rule)
+        self.configurator_properties = product.get_configurator_properties(
+            product_rule=product_rule,
+            sales_channel=self.sales_channel,
+        )
         self.configurator_property_ids = self.configurator_properties.values_list('id', flat=True)
 
     def get_configurator_property_values(self, prod_prop):
@@ -234,11 +237,14 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
 
     def set_product_rule(self):
         product = self.get_local_product()
-        self.product_rule = product.get_product_rule()
+        self.product_rule = product.get_product_rule(sales_channel=self.sales_channel)
 
     def get_configurable_product_attributes(self):
         product = self.get_local_product()
-        return product.get_configurator_properties(public_information_only=False)
+        return product.get_configurator_properties(
+            public_information_only=False,
+            sales_channel=self.sales_channel,
+        )
 
     def get_global_attribute(self, prod_prop, *, raise_if_none: bool = False):
         # We only get a global attribute if the property has add_to_filters set to True.
@@ -267,16 +273,27 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
 
         return ga
 
+    def _stringify_attribute_option(self, value):
+        if isinstance(value, list):
+            return [self._stringify_attribute_option(item) for item in value]
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        return str(value)
+
     def get_serialised_woocommerce_value(self, prod_prop):
         value = prod_prop.get_serialised_value(language=self.sales_channel_assign_language)
         if prod_prop.property.type == Property.TYPES.BOOLEAN:
             value = self.get_boolean_value(value)
-        return value
+        return self._stringify_attribute_option(value)
 
     def get_common_properties(self):
         product = self.get_local_product()
         variations = product.get_configurable_variations(active_only=True)
-        configurator_properties = product.get_configurator_properties()
+        configurator_properties = product.get_configurator_properties(
+            sales_channel=self.sales_channel,
+        )
 
         common_product_properties = ProductProperty.objects.\
             filter(
@@ -394,7 +411,9 @@ class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, Woo
             # It would seem that woocommerce doesnt have a problem with
             # Assigning too many attributes to a product. Even variations.
             # So let's just go ahead and do that.
-            configurator_prod_props = product.productproperty_set.filter_for_configurator()
+            configurator_prod_props = product.productproperty_set.filter_for_configurator(
+                sales_channel=self.sales_channel,
+            )
             variant_payload = []
             for prod_prop in configurator_prod_props.iterator():
                 ga = self.get_global_attribute(prod_prop)
@@ -646,7 +665,15 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
         #     ]
         # }
         product = self.get_local_product()
-        image_throughs = product.mediaproductthrough_set.filter(media__type=Media.IMAGE)
+        sales_channel = getattr(self, "sales_channel", None)
+        image_throughs = (
+            MediaProductThrough.objects.get_product_images(
+                product=product,
+                sales_channel=sales_channel,
+            )
+            .filter(media__type=Media.IMAGE)
+            .select_related("media")
+        )
         payload = [{"src": self.get_image_url(i.media)} for i in image_throughs]
         self.payload['images'] = payload
         return self.payload

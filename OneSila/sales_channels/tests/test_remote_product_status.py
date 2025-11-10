@@ -16,6 +16,7 @@ class RemoteProductStatusTestCase(TestCase):
         )
         self.product = baker.make(
             "products.Product",
+            type='SIMPLE',
             multi_tenant_company=self.multi_tenant_company,
         )
 
@@ -100,6 +101,7 @@ class SalesChannelViewAssignStatusFilterTestCase(TestCase):
         # Failed remote product (has errors)
         self.product_failed = baker.make(
             "products.Product",
+            type="SIMPLE",
             multi_tenant_company=self.multi_tenant_company,
         )
         self.remote_product_failed = RemoteProduct.objects.create(
@@ -142,6 +144,7 @@ class SalesChannelViewAssignStatusFilterTestCase(TestCase):
         self.assign_without_remote = SalesChannelViewAssign.objects.create(
             product=baker.make(
                 "products.Product",
+                type="SIMPLE",
                 multi_tenant_company=self.multi_tenant_company,
             ),
             sales_channel_view=self.view,

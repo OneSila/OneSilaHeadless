@@ -1,6 +1,7 @@
 from core.schema.core.queries import node, connection, DjangoListConnection, type
 from sales_channels.integrations.ebay.schema.types.types import (
     EbayCategoryType,
+    EbayProductCategoryType,
     EbaySalesChannelType,
     EbayInternalPropertyType,
     EbayInternalPropertyOptionType,
@@ -17,6 +18,8 @@ from sales_channels.integrations.ebay.schema.types.types import (
 @type(name="Query")
 class EbaySalesChannelsQuery:
     ebay_categories: DjangoListConnection[EbayCategoryType] = connection()
+    ebay_product_category: EbayProductCategoryType = node()
+    ebay_product_categories: DjangoListConnection[EbayProductCategoryType] = connection()
 
     ebay_channel: EbaySalesChannelType = node()
     ebay_channels: DjangoListConnection[EbaySalesChannelType] = connection()

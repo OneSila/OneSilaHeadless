@@ -289,13 +289,41 @@ class MissingRequiredPropertiesInspectorBlockFactory(InspectorBlockFactory):
                          save_inspector=save_inspector)
 
     def _check(self):
-        from properties.models import ProductProperty
+        from properties.models import ProductProperty, ProductPropertiesRule, ProductPropertiesRuleItem
 
-        rule_item_properties_ids = self.product.get_required_properties(public_information_only=False).values_list('property_id', flat=True)
+        product_type_value = ProductProperty.objects.filter_multi_tenant(self.multi_tenant_company).filter(
+            product=self.product,
+            property__is_product_type=True,
+        ).select_related('value_select').first()
+
+        if not product_type_value or not product_type_value.value_select_id:
+            raise InspectorBlockFailed("Product is missing a required product type property.")
+
+        rules = ProductPropertiesRule.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            product_type_id=product_type_value.value_select_id,
+        )
+
+        rule_property_ids = set(
+            ProductPropertiesRuleItem.objects.filter(
+                rule__in=rules,
+                type__in=[
+                    ProductPropertiesRuleItem.REQUIRED,
+                    ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
+                    ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR,
+                ],
+            ).values_list('property_id', flat=True)
+        )
+
+        if not rule_property_ids:
+            return
+
         product_properties = ProductProperty.objects.filter_multi_tenant(self.multi_tenant_company). \
-            filter(product=self.product, property_id__in=rule_item_properties_ids)
+            filter(product=self.product, property_id__in=rule_property_ids)
 
-        if product_properties.count() != rule_item_properties_ids.count():
+        existing_property_ids = set(product_properties.values_list('property_id', flat=True))
+
+        if rule_property_ids - existing_property_ids:
             raise InspectorBlockFailed(f"Product is missing required propertes")
 
 
@@ -306,13 +334,40 @@ class MissingOptionalPropertiesInspectorBlockFactory(InspectorBlockFactory):
                          save_inspector=save_inspector)
 
     def _check(self):
-        from properties.models import ProductProperty
+        from properties.models import ProductProperty, ProductPropertiesRule, ProductPropertiesRuleItem
 
-        rule_item_properties_ids = self.product.get_optional_properties(public_information_only=False).values_list('property_id', flat=True)
+        product_type_value = ProductProperty.objects.filter_multi_tenant(self.multi_tenant_company).filter(
+            product=self.product,
+            property__is_product_type=True,
+        ).select_related('value_select').first()
+
+        if not product_type_value or not product_type_value.value_select_id:
+            return
+
+        rules = ProductPropertiesRule.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            product_type_id=product_type_value.value_select_id,
+        )
+
+        rule_property_ids = set(
+            ProductPropertiesRuleItem.objects.filter(
+                rule__in=rules,
+                type__in=[
+                    ProductPropertiesRuleItem.OPTIONAL,
+                    ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR,
+                ],
+            ).values_list('property_id', flat=True)
+        )
+
+        if not rule_property_ids:
+            return
+
         product_properties = ProductProperty.objects.filter_multi_tenant(self.multi_tenant_company). \
-            filter(product=self.product, property_id__in=rule_item_properties_ids)
+            filter(product=self.product, property_id__in=rule_property_ids)
 
-        if product_properties.count() != rule_item_properties_ids.count():
+        existing_property_ids = set(product_properties.values_list('property_id', flat=True))
+
+        if rule_property_ids - existing_property_ids:
             raise InspectorBlockFailed(f"Product is missing optional propertes")
 
 
