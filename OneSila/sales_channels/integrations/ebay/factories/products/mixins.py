@@ -615,7 +615,6 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
 
         if template_used:
             resolved_description = rendered_description or template_source
-            description = resolved_description
             listing_description = resolved_description
 
         return title, subtitle, description, listing_description
