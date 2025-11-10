@@ -28,13 +28,6 @@ class EbayCategoryNodeSyncFactoryTest(TestCase):
             remote_id="GB",
             default_category_tree_id="3",
         )
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "ALTER TABLE ebay_ebaycategory ADD COLUMN configurator_properties TEXT DEFAULT '[]'",
-                )
-        except (ProgrammingError, OperationalError):
-            connection.rollback()
 
     def _build_payload(self) -> dict[str, object]:
         return {
