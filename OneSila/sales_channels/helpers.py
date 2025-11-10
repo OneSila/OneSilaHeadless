@@ -56,22 +56,31 @@ def get_preferred_product_rule_for_sales_channel(*, rule, sales_channel):
 def _rebuild_amazon_product_type_items(*, product_type, rule):
     from sales_channels.integrations.amazon.models import AmazonProductTypeItem
 
-    existing_items = list(
+    items_qs = (
         AmazonProductTypeItem.objects.filter(amazon_rule=product_type)
         .select_related(
             "local_instance",
             "remote_property",
             "remote_property__local_instance",
         )
+        .distinct()
     )
 
-    AmazonProductTypeItem.objects.filter(amazon_rule=product_type).delete()
+    existing_items = list(items_qs)
+    if not existing_items:
+        return
 
     rule_items_by_property = {
         item.property_id: item for item in rule.items.select_related("property")
     }
 
-    for item in existing_items:
+    bound_items = [item for item in existing_items if item.local_instance_id]
+    unbound_items = [item for item in existing_items if not item.local_instance_id]
+    ordered_items = bound_items + unbound_items
+
+    assigned_rule_item_ids = set()
+
+    for item in ordered_items:
         property_id: Optional[int] = None
 
         if item.local_instance_id:
@@ -79,29 +88,35 @@ def _rebuild_amazon_product_type_items(*, product_type, rule):
         elif getattr(item.remote_property, "local_instance_id", None):
             property_id = item.remote_property.local_instance_id
 
-        if property_id is None:
-            AmazonProductTypeItem.objects.create(
-                multi_tenant_company=product_type.multi_tenant_company,
-                sales_channel=product_type.sales_channel,
-                amazon_rule=product_type,
-                remote_property=item.remote_property,
-                local_instance=None,
-                remote_type=item.remote_type,
-            )
-            continue
-
         rule_item = rule_items_by_property.get(property_id)
-        if not rule_item:
-            continue
-
-        AmazonProductTypeItem.objects.create(
-            multi_tenant_company=product_type.multi_tenant_company,
-            sales_channel=product_type.sales_channel,
-            amazon_rule=product_type,
-            remote_property=item.remote_property,
-            local_instance=rule_item,
-            remote_type=item.remote_type or rule_item.type,
+        keep_existing_assignment = bool(
+            rule_item and item.local_instance_id == rule_item.id
         )
+
+        if rule_item:
+            if rule_item.id in assigned_rule_item_ids and not keep_existing_assignment:
+                rule_item = None
+            else:
+                assigned_rule_item_ids.add(rule_item.id)
+
+        desired_remote_type = item.remote_type
+        if rule_item:
+            desired_remote_type = item.remote_type or rule_item.type
+
+        new_local_instance_id = rule_item.id if rule_item else None
+
+        updates = {}
+        if item.local_instance_id != new_local_instance_id:
+            updates["local_instance"] = rule_item
+        if item.remote_type != desired_remote_type:
+            updates["remote_type"] = desired_remote_type
+        if item.sales_channel_id != product_type.sales_channel_id:
+            updates["sales_channel"] = product_type.sales_channel
+        if item.multi_tenant_company_id != product_type.multi_tenant_company_id:
+            updates["multi_tenant_company"] = product_type.multi_tenant_company
+
+        if updates:
+            AmazonProductTypeItem.objects.filter(pk=item.pk).update(**updates)
 
 
 def rebind_amazon_product_type_to_rule(*, product_type, rule):
@@ -157,21 +172,27 @@ def rebind_amazon_product_types_for_rule(rule):
 def _rebuild_ebay_product_type_items(*, product_type, rule):
     from sales_channels.integrations.ebay.models import EbayProductTypeItem
 
-    existing_items = list(
-        product_type.items.select_related(
-            "local_instance",
-            "ebay_property",
-            "ebay_property__local_instance",
-        )
+    items_qs = product_type.items.select_related(
+        "local_instance",
+        "ebay_property",
+        "ebay_property__local_instance",
     )
 
-    product_type.items.all().delete()
+    existing_items = list(items_qs)
+    if not existing_items:
+        return
 
     rule_items_by_property = {
         item.property_id: item for item in rule.items.select_related("property")
     }
 
-    for item in existing_items:
+    bound_items = [item for item in existing_items if item.local_instance_id]
+    unbound_items = [item for item in existing_items if not item.local_instance_id]
+    ordered_items = bound_items + unbound_items
+
+    assigned_rule_item_ids = set()
+
+    for item in ordered_items:
         property_id: Optional[int] = None
 
         if item.local_instance_id:
@@ -179,29 +200,37 @@ def _rebuild_ebay_product_type_items(*, product_type, rule):
         elif getattr(item.ebay_property, "local_instance_id", None):
             property_id = item.ebay_property.local_instance_id
 
-        if property_id is None:
-            EbayProductTypeItem.objects.create(
-                multi_tenant_company=product_type.multi_tenant_company,
-                sales_channel=product_type.sales_channel,
-                product_type=product_type,
-                ebay_property=item.ebay_property,
-                local_instance=None,
-                remote_type=item.remote_type,
-            )
-            continue
-
         rule_item = rule_items_by_property.get(property_id)
-        if not rule_item:
-            continue
-
-        EbayProductTypeItem.objects.create(
-            multi_tenant_company=product_type.multi_tenant_company,
-            sales_channel=product_type.sales_channel,
-            product_type=product_type,
-            ebay_property=item.ebay_property,
-            local_instance=rule_item,
-            remote_type=item.remote_type or rule_item.type,
+        keep_existing_assignment = bool(
+            rule_item and item.local_instance_id == rule_item.id
         )
+
+        if rule_item:
+            if rule_item.id in assigned_rule_item_ids and not keep_existing_assignment:
+                rule_item = None
+            else:
+                assigned_rule_item_ids.add(rule_item.id)
+
+        desired_remote_type = item.remote_type
+        if rule_item:
+            desired_remote_type = item.remote_type or rule_item.type
+
+        new_local_instance_id = rule_item.id if rule_item else None
+
+        updates = {}
+        if item.local_instance_id != new_local_instance_id:
+            updates["local_instance"] = rule_item
+        if item.remote_type != desired_remote_type:
+            updates["remote_type"] = desired_remote_type
+        if item.sales_channel_id != product_type.sales_channel_id:
+            updates["sales_channel"] = product_type.sales_channel
+        if item.multi_tenant_company_id != product_type.multi_tenant_company_id:
+            updates["multi_tenant_company"] = product_type.multi_tenant_company
+        if item.product_type_id != product_type.id:
+            updates["product_type"] = product_type
+
+        if updates:
+            EbayProductTypeItem.objects.filter(pk=item.pk).update(**updates)
 
 
 def rebind_ebay_product_type_to_rule(*, product_type, rule):
@@ -259,7 +288,7 @@ def _rebuild_magento_attribute_set_items(*, attribute_set, rule):
         MagentoAttributeSetAttribute,
     )
 
-    existing_items = list(
+    items_qs = (
         MagentoAttributeSetAttribute.objects.filter(magento_rule=attribute_set)
         .select_related(
             "local_instance",
@@ -269,13 +298,21 @@ def _rebuild_magento_attribute_set_items(*, attribute_set, rule):
         )
     )
 
-    MagentoAttributeSetAttribute.objects.filter(magento_rule=attribute_set).delete()
+    existing_items = list(items_qs)
+    if not existing_items:
+        return
 
     rule_items_by_property = {
         item.property_id: item for item in rule.items.select_related("property")
     }
 
-    for item in existing_items:
+    bound_items = [item for item in existing_items if item.local_instance_id]
+    unbound_items = [item for item in existing_items if not item.local_instance_id]
+    ordered_items = bound_items + unbound_items
+
+    assigned_rule_item_ids = set()
+
+    for item in ordered_items:
         property_id: Optional[int] = None
 
         if item.local_instance_id:
@@ -283,27 +320,31 @@ def _rebuild_magento_attribute_set_items(*, attribute_set, rule):
         elif getattr(item.remote_property, "local_instance_id", None):
             property_id = item.remote_property.local_instance_id
 
-        if property_id is None:
-            MagentoAttributeSetAttribute.objects.create(
-                multi_tenant_company=attribute_set.multi_tenant_company,
-                sales_channel=attribute_set.sales_channel,
-                magento_rule=attribute_set,
-                remote_property=item.remote_property,
-                local_instance=None,
-            )
-            continue
-
         rule_item = rule_items_by_property.get(property_id)
-        if not rule_item:
-            continue
-
-        MagentoAttributeSetAttribute.objects.create(
-            multi_tenant_company=attribute_set.multi_tenant_company,
-            sales_channel=attribute_set.sales_channel,
-            magento_rule=attribute_set,
-            remote_property=item.remote_property,
-            local_instance=rule_item,
+        keep_existing_assignment = bool(
+            rule_item and item.local_instance_id == rule_item.id
         )
+
+        if rule_item:
+            if rule_item.id in assigned_rule_item_ids and not keep_existing_assignment:
+                rule_item = None
+            else:
+                assigned_rule_item_ids.add(rule_item.id)
+
+        new_local_instance_id = rule_item.id if rule_item else None
+
+        updates = {}
+        if item.local_instance_id != new_local_instance_id:
+            updates["local_instance"] = rule_item
+        if item.sales_channel_id != attribute_set.sales_channel_id:
+            updates["sales_channel"] = attribute_set.sales_channel
+        if item.multi_tenant_company_id != attribute_set.multi_tenant_company_id:
+            updates["multi_tenant_company"] = attribute_set.multi_tenant_company
+        if item.magento_rule_id != attribute_set.id:
+            updates["magento_rule"] = attribute_set
+
+        if updates:
+            MagentoAttributeSetAttribute.objects.filter(pk=item.pk).update(**updates)
 
 
 def rebind_magento_attribute_set_to_rule(*, attribute_set, rule):
