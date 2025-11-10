@@ -38,7 +38,8 @@ def properties__property_select_value_translation__rename_rule(sender, instance,
         try:
             rule = ProductPropertiesRule.objects.get(
                 product_type=instance.propertyselectvalue,
-                multi_tenant_company=property_instance.multi_tenant_company
+                multi_tenant_company=property_instance.multi_tenant_company,
+                sales_channel__isnull=True
             )
             product_properties_rule_rename.send(sender=rule.__class__, instance=rule)
         except ProductPropertiesRule.DoesNotExist:
@@ -65,6 +66,25 @@ def delete_product_type_property_select_value(sender, instance, **kwargs):
     After a ProductPropertiesRule is deleted force delete the associated PropertySelectValue to avoid orphaned records.
     """
     value = instance.product_type
+    if value is None:
+        return
+
+    if instance.sales_channel_id is None:
+        ProductPropertiesRule.objects.filter(
+            product_type=value,
+            sales_channel__isnull=False,
+        ).delete()
+
+    has_other_rules = ProductPropertiesRule.objects.filter(product_type=value).exists()
+    if has_other_rules:
+        return
+
+    if ProductProperty.objects.filter(value_select=value).exists():
+        return
+
+    if ProductProperty.objects.filter(value_multi_select=value).exists():
+        return
+
     value.delete(force_delete=True)
 
 

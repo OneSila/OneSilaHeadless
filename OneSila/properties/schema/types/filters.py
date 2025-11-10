@@ -211,6 +211,7 @@ class ProductPropertyTextTranslationFilter:
 class ProductPropertiesRuleFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto
     product_type: Optional[PropertyFilter]
+    sales_channel: Optional[lazy['SalesChannelFilter', "sales_channels.schema.types.filters"]]
 
 
 @filter(ProductPropertiesRuleItem)

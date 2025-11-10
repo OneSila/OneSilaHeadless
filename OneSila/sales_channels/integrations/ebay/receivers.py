@@ -35,6 +35,7 @@ from sales_channels.integrations.ebay.tasks import (
 )
 from sales_channels.integrations.ebay.flows.tasks_runner import run_single_ebay_product_task_flow
 from sales_channels.models import SalesChannelViewAssign
+from sales_channels.helpers import rebind_ebay_product_type_to_rule
 
 
 _PENDING_PRODUCT_DELETE_COUNTS: Counter[int] = Counter()
@@ -125,6 +126,23 @@ def sales_channels__ebay_product_type__propagate_remote_id(sender, instance: Eba
 
     factory = EbayProductTypeRemoteMappingFactory(product_type=instance)
     factory.run()
+
+
+@receiver(post_update, sender='ebay.EbayProductType')
+def sales_channels__ebay_product_type__ensure_specific_rule(sender, instance: EbayProductType, **kwargs):
+    if not instance.is_dirty_field(
+        'local_instance',
+        check_relationship=True,
+    ):
+        return
+
+    if not instance.local_instance:
+        return
+
+    rebind_ebay_product_type_to_rule(
+        product_type=instance,
+        rule=instance.local_instance,
+    )
 
 
 @receiver(post_update, sender='ebay.EbayProductType')
@@ -342,3 +360,26 @@ def ebay__product__delete(sender, instance, **kwargs):
 
     if scheduled:
         _PENDING_PRODUCT_DELETE_COUNTS[product_id] += scheduled
+
+
+@receiver(post_create, sender='ebay.EbayProductCategory')
+@receiver(post_update, sender='ebay.EbayProductCategory')
+def ebay__product_category__propagate_to_variations(sender, instance, **kwargs):
+    """
+    When an eBay category is assigned to a configurable (parent) product,
+    automatically propagate it to all its variations.
+    """
+    from sales_channels.integrations.ebay.models.categories import EbayProductCategory
+
+    if not instance.product.is_configurable():
+        return
+
+    variations = instance.product.get_configurable_variations(active_only=False)
+    for variation in variations:
+        EbayProductCategory.objects.get_or_create(
+            multi_tenant_company=instance.multi_tenant_company,
+            product=variation,
+            sales_channel=instance.sales_channel,
+            view=instance.view,
+            defaults={'remote_id': instance.remote_id},
+        )

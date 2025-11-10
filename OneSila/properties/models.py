@@ -274,12 +274,21 @@ class ProductPropertiesRule(models.Model):
         on_delete=models.PROTECT,
         verbose_name=_('Product Type'),
     )
+    sales_channel = models.ForeignKey(
+        'sales_channels.SalesChannel',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        default=None,
+        verbose_name=_('Sales Channel'),
+    )
     require_ean_code = models.BooleanField(default=False)
 
     objects = ProductPropertiesRuleManager()
 
     def __str__(self):
-        return f"{self.product_type} <{self.multi_tenant_company}>"
+        sales_channel_display = f" [{self.sales_channel}]" if self.sales_channel else ""
+        return f"{self.product_type} <{self.multi_tenant_company}>{sales_channel_display}"
 
     @property
     def value(self):
@@ -302,7 +311,13 @@ class ProductPropertiesRule(models.Model):
 
     class Meta:
         verbose_name_plural = _("Product Properties Rules")
-        unique_together = ("product_type", "multi_tenant_company")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("product_type", "multi_tenant_company", "sales_channel"),
+                name="unique_product_properties_rule_per_sales_channel",
+                nulls_distinct=False,
+            )
+        ]
         search_terms = ['product_type__propertyselectvaluetranslation__value']
 
 

@@ -1113,7 +1113,9 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
 
             parent_rule = import_instance.rule
             if parent_rule is None and remote_parent.local_instance is not None:
-                parent_rule = remote_parent.local_instance.get_product_rule()
+                parent_rule = remote_parent.local_instance.get_product_rule(
+                    sales_channel=self.sales_channel,
+                )
 
             if parent_rule is None or remote_parent.local_instance is None:
                 continue
@@ -1379,7 +1381,9 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
 
         rule = None
         if remote_product and remote_product.local_instance:
-            existing_rule = remote_product.local_instance.get_product_rule()
+            existing_rule = remote_product.local_instance.get_product_rule(
+                sales_channel=self.sales_channel,
+            )
             if existing_rule:
                 rule = existing_rule
 

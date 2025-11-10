@@ -58,18 +58,22 @@ def update_configurators_for_product_property_db_task(parent_product_id, propert
     parent_product = Product.objects.get(id=parent_product_id)
     property = Property.objects.get(id=property_id)
 
-    product_rule = parent_product.get_product_rule()
-    optional_properties = parent_product.get_optional_in_configurator_properties(product_rule)
-
-    if property not in optional_properties.values_list('property', flat=True):
-        return  # safety exit
-
     remote_products = RemoteProduct.objects.filter(
         local_instance=parent_product,
         multi_tenant_company=parent_product.multi_tenant_company
     )
 
     for remote_product in remote_products.iterator():
+
+        product_rule = parent_product.get_product_rule(sales_channel=remote_product.sales_channel)
+        optional_properties = parent_product.get_optional_in_configurator_properties(
+            product_rule=product_rule,
+            sales_channel=remote_product.sales_channel,
+        )
+
+        if property not in optional_properties.values_list('property', flat=True):
+            continue
+
         if remote_product.configurator:
             remote_product.configurator.update_if_needed(rule=product_rule, send_sync_signal=True)
 

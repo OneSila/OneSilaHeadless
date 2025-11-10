@@ -50,7 +50,7 @@ class AmazonProductContentUpdateFactory(GetAmazonAPIMixin, RemoteProductContentU
         return super().preflight_check()
 
     def _get_product_type(self):
-        rule = self.local_instance.get_product_rule()
+        rule = self.local_instance.get_product_rule(sales_channel=self.sales_channel)
         if not rule:
             raise ValueError("Product has no product rule mapped")
         return AmazonProductType.objects.get(

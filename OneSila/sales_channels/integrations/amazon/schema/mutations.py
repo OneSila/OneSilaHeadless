@@ -320,7 +320,7 @@ class AmazonSalesChannelMutation:
             AmazonSalesChannel,
             AmazonProductType,
         )
-        from properties.models import ProductPropertiesRule
+        from sales_channels.helpers import get_all_product_rules_for_sales_channel
 
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
 
@@ -330,9 +330,7 @@ class AmazonSalesChannelMutation:
         )
 
         product_types: list[AmazonProductType] = []
-        for rule in ProductPropertiesRule.objects.filter(
-            multi_tenant_company=multi_tenant_company
-        ).iterator():
+        for rule in get_all_product_rules_for_sales_channel(sales_channel=sales_channel):
             product_type, _ = AmazonProductType.objects.get_or_create_from_local_instance(
                 local_instance=rule,
                 sales_channel=sales_channel,

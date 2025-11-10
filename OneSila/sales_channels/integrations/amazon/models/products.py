@@ -48,7 +48,7 @@ class AmazonProduct(RemoteProduct):
     def get_remote_rule(self):
         from sales_channels.integrations.amazon.models import AmazonProductType
 
-        local_rule = self.local_instance.get_product_rule()
+        local_rule = self.local_instance.get_product_rule(sales_channel=self.sales_channel)
         if local_rule is None:
             raise Exception("Product rule not found.")
 
@@ -218,7 +218,7 @@ class AmazonVariationTheme(models.Model):
         if self.product.type != LocalProduct.CONFIGURABLE:
             raise ValidationError("Variation themes are only allowed for configurable products.")
 
-        rule = self.product.get_product_rule()
+        rule = self.product.get_product_rule(sales_channel=self.view.sales_channel)
         if rule is None:
             raise ValidationError("Product type not set.")
 

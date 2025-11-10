@@ -190,3 +190,89 @@ def validate_amazon_assignment(data, info):
                         )
                     }
                 )
+
+
+def validate_ebay_assignment(data, info):
+    from sales_channels.integrations.ebay.models import (
+        EbaySalesChannel,
+        EbaySalesChannelView,
+        EbayProductCategory,
+        EbayProductType,
+    )
+
+    def has_required_ebay_mapping(p, has_type_mapping):
+        """Check for a category or, if present, a global product type mapping."""
+        if has_type_mapping:
+            return True
+
+        return EbayProductCategory.objects.filter(
+            product=p,
+            view=view,
+        ).exists()
+
+    product = data['product']
+    view = data['sales_channel_view']
+    sales_channel = view.sales_channel.get_real_instance()
+
+    # ✅ 1. Exit early if not eBay
+    if not isinstance(sales_channel, EbaySalesChannel):
+        return
+
+    # ✅ 2. Ensure required eBay policies exist
+    # @TODO: This is duplicate code, make a helper instead
+    fulfillment_id = getattr(view, "fulfillment_policy_id", None)
+    payment_id = getattr(view, "payment_policy_id", None)
+    return_id = getattr(view, "return_policy_id", None)
+
+    missing = []
+    if not fulfillment_id:
+        missing.append("fulfillment policy")
+    if not payment_id:
+        missing.append("payment policy")
+    if not return_id:
+        missing.append("return policy")
+
+    if missing:
+        raise ValidationError(
+            {
+                "__all__": _(
+                    "Missing eBay listing policies (%(missing)s). Please configure the marketplace policies before pushing products."
+                )
+                % {"missing": ", ".join(missing)}
+            }
+        )
+
+    # ✅ 3. Get the product rule once and check mappings
+    product_rule = product.get_product_rule(sales_channel=sales_channel)
+
+    has_type_mapping = False
+    if product_rule:
+        has_type_mapping = EbayProductType.objects.filter(
+            local_instance=product_rule,
+            marketplace=view,
+        ).exists()
+
+
+    # ✅ 4. Validate per product type
+    if product.is_configurable():
+        variations = product.get_configurable_variations(active_only=True)
+        missing_skus = [v.sku or str(v.pk) for v in variations if not has_required_ebay_mapping(v, has_type_mapping)]
+
+        if missing_skus:
+            raise ValidationError(
+                {
+                    "__all__": _(
+                        "eBay configurable products require each variation to have either a mapped product type or a category assigned. Missing for SKU(s): %(skus)s."
+                    )
+                    % {"skus": ", ".join(missing_skus)}
+                }
+            )
+    else:
+        if not has_required_ebay_mapping(product, has_type_mapping):
+            raise ValidationError(
+                {
+                    "__all__": _(
+                        "eBay products require either a mapped product type (EbayProductType) or a category (EbayProductCategory) before listing."
+                    )
+                }
+            )

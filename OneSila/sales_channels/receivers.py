@@ -9,6 +9,8 @@ from inventory.models import Inventory
 from media.models import Media, MediaProductThrough
 from properties.signals import (
     product_properties_rule_configurator_updated,
+    product_properties_rule_created,
+    product_properties_rule_updated,
     property_created,
     property_select_value_created,
 )
@@ -20,7 +22,11 @@ from .integrations.magento2.models import MagentoProduct
 from .models import RemoteProduct, SalesChannelImport
 # from .models import ImportProcess
 from .models.sales_channels import SalesChannelViewAssign
-from .helpers import mark_remote_products_for_feed_updates
+from .helpers import (
+    mark_remote_products_for_feed_updates,
+    rebind_amazon_product_types_for_rule,
+    rebind_ebay_product_types_for_rule, rebind_magento_attribute_sets_for_rule,
+)
 from .flows.gpt_feed import mark_product_property_for_gpt_feed_update
 from .signals import (
     create_remote_property,
@@ -81,6 +87,16 @@ def sales_channels__gpt_feed_flag__image_delete(sender, instance, **kwargs):
         MediaProductThrough.objects.filter(media=instance).values_list("product_id", flat=True)
     )
     mark_remote_products_for_feed_updates(product_ids=product_ids)
+
+
+@receiver(product_properties_rule_created, sender='properties.ProductPropertiesRule')
+def sales_channels__sync_remote_product_types(sender, instance, **kwargs):
+    if not instance.sales_channel_id:
+        return
+
+    rebind_amazon_product_types_for_rule(instance)
+    rebind_ebay_product_types_for_rule(instance)
+    rebind_magento_attribute_sets_for_rule(rule=instance)
 
 
 @receiver(delete_remote_product, sender='sales_channels.SalesChannelViewAssign')

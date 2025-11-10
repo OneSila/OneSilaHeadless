@@ -42,7 +42,7 @@ class AmazonPriceUpdateFactory(GetAmazonAPIMixin, RemotePriceUpdateFactory):
         return self.local_instance
 
     def _get_list_price_config(self):
-        rule = self.local_instance.get_product_rule()
+        rule = self.local_instance.get_product_rule(sales_channel=self.sales_channel)
         if not rule:
             return "value_with_tax"
 

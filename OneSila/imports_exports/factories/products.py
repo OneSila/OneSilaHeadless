@@ -332,7 +332,9 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
 
     def update_product_rule(self):
 
-        if self.rule and self.instance and self.rule != self.instance.get_product_rule():
+        if self.rule and self.instance and self.rule != self.instance.get_product_rule(
+            sales_channel=self.sales_channel,
+        ):
             product_type_property = Property.objects.get(
                 multi_tenant_company=self.multi_tenant_company,
                 is_product_type=True

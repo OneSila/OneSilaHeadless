@@ -1,8 +1,10 @@
+from django.db import transaction
+
+from integrations.helpers import get_import_path
+from integrations.tasks import add_task_to_queue
+from properties.models import ProductPropertiesRule
 from sales_channels.integrations.magento2.models import MagentoSalesChannel
 from sales_channels.models import RemoteProduct
-from integrations.tasks import add_task_to_queue
-from integrations.helpers import get_import_path
-from django.db import transaction
 
 
 def run_generic_sales_channel_task_flow(task_func, multi_tenant_company, number_of_remote_requests=None, sales_channels_filter_kwargs=None, sales_channel_class=MagentoSalesChannel, **kwargs):
@@ -34,6 +36,68 @@ def run_generic_sales_channel_task_flow(task_func, multi_tenant_company, number_
                 task_func_path=get_import_path(task_func),
                 task_kwargs=lb_task_kwargs,
                 number_of_remote_requests=number_of_remote_requests
+           )
+        )
+
+
+def run_rule_scoped_sales_channel_task_flow(
+    *,
+    task_func,
+    rule,
+    number_of_remote_requests=None,
+    sales_channels_filter_kwargs=None,
+    sales_channel_class=MagentoSalesChannel,
+    **kwargs,
+):
+    """Queue tasks for sales channels that rely on the provided rule.
+
+    When the rule is channel specific we only queue for its direct channel.
+    When the rule is a default one (no channel), we skip channels that already
+    have their own specialized rule for the same product type.
+    """
+
+    multi_tenant_company = rule.multi_tenant_company
+
+    if sales_channels_filter_kwargs is None:
+        filter_kwargs = {
+            "active": True,
+            "multi_tenant_company": multi_tenant_company,
+        }
+    else:
+        filter_kwargs = {
+            **sales_channels_filter_kwargs,
+        }
+        if "active" not in filter_kwargs:
+            filter_kwargs["active"] = True
+        filter_kwargs["multi_tenant_company"] = multi_tenant_company
+
+    specialized_channel_ids = set()
+    if rule.sales_channel_id:
+        filter_kwargs["id"] = rule.sales_channel.id
+    else:
+        specialized_channel_ids = set(
+            ProductPropertiesRule.objects.filter(
+                multi_tenant_company=multi_tenant_company,
+                product_type=rule.product_type,
+                sales_channel__isnull=False,
+            ).values_list("sales_channel_id", flat=True)
+        )
+
+    for sales_channel in sales_channel_class.objects.filter(**filter_kwargs):
+        if not rule.sales_channel_id and sales_channel.id in specialized_channel_ids:
+            continue
+
+        task_kwargs = {
+            "sales_channel_id": sales_channel.id,
+            **kwargs,
+        }
+
+        transaction.on_commit(
+            lambda lb_task_kwargs=task_kwargs, integration_id=sales_channel.id: add_task_to_queue(
+                integration_id=integration_id,
+                task_func_path=get_import_path(task_func),
+                task_kwargs=lb_task_kwargs,
+                number_of_remote_requests=number_of_remote_requests,
             )
         )
 

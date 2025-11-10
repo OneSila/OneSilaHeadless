@@ -215,7 +215,7 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
     # ------------------------------------------------------------------
     def build_payload(self):
         main_code = self.remote_property.main_code
-        rule = self.local_instance.product.get_product_rule()
+        rule = self.local_instance.product.get_product_rule(sales_channel=self.sales_channel)
         if not rule:
             raise ValueError("Product has no product rule mapped")
         product_type = self._get_product_type(rule)
