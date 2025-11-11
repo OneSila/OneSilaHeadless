@@ -1,5 +1,7 @@
 """Model package for the Shein integration."""
 
+from .categories import SheinCategory
+from .properties import SheinProductType
 from .sales_channels import (
     SheinRemoteCurrency,
     SheinRemoteLanguage,
@@ -8,6 +10,8 @@ from .sales_channels import (
 )
 
 __all__ = [
+    "SheinCategory",
+    "SheinProductType",
     "SheinRemoteCurrency",
     "SheinRemoteLanguage",
     "SheinSalesChannel",
