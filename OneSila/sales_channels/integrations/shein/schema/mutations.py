@@ -8,13 +8,17 @@ from core.schema.core.extensions import default_extensions
 from core.schema.core.helpers import get_multi_tenant_company
 from core.schema.core.mutations import List, create, type, update
 from sales_channels.integrations.shein.schema.types.input import (
+    SheinRemoteCurrencyPartialInput,
     SheinSalesChannelInput,
     SheinSalesChannelPartialInput,
+    SheinSalesChannelViewPartialInput,
     SheinValidateAuthInput,
 )
 from sales_channels.integrations.shein.schema.types.types import (
+    SheinRemoteCurrencyType,
     SheinRedirectUrlType,
     SheinSalesChannelType,
+    SheinSalesChannelViewType,
 )
 
 
@@ -26,6 +30,8 @@ class SheinSalesChannelMutation:
     create_shein_sales_channels: List[SheinSalesChannelType] = create(SheinSalesChannelInput)
 
     update_shein_sales_channel: SheinSalesChannelType = update(SheinSalesChannelPartialInput)
+    update_shein_sales_channel_view: SheinSalesChannelViewType = update(SheinSalesChannelViewPartialInput)
+    update_shein_remote_currency: SheinRemoteCurrencyType = update(SheinRemoteCurrencyPartialInput)
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def get_shein_redirect_url(

@@ -89,10 +89,10 @@ class SheinSalesChannel(SalesChannel):
     def __str__(self) -> str:
         return f"Shein Store: {self.hostname}"
 
-    def connect(self) -> None:
-        """Future hook for establishing API connectivity."""
-        # No-op until OAuth credentials are stored.
-        return None
+    def connect(self) -> bool:
+        """Report whether OAuth credentials (secret key) are available."""
+
+        return bool(self.secret_key)
 
     def save(self, *args, **kwargs):
         if not self.state:
@@ -100,43 +100,9 @@ class SheinSalesChannel(SalesChannel):
         super().save(*args, **kwargs)
 
 
-class SheinRemoteMarketplace(RemoteObjectMixin, models.Model):
-    """Mirror the set of marketplaces (main sites) exposed by Shein."""
-
-    name = models.CharField(
-        max_length=255,
-        help_text="Human friendly name returned by Shein for the marketplace.",
-    )
-    is_default = models.BooleanField(
-        default=False,
-        help_text="Marks the default marketplace reported for the store.",
-    )
-
-    class Meta:
-        verbose_name = "Shein Remote Marketplace"
-        verbose_name_plural = "Shein Remote Marketplaces"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["sales_channel", "remote_id"],
-                name="unique_shein_marketplace_per_channel",
-            ),
-        ]
-
-    def __str__(self) -> str:
-        return f"{self.remote_id or '?'} @ {self.sales_channel.hostname}"
-
-
 class SheinSalesChannelView(SalesChannelView):
     """Representation of a Shein storefront / sub-site."""
 
-    marketplace = models.ForeignKey(
-        "shein.SheinRemoteMarketplace",
-        on_delete=models.CASCADE,
-        related_name="views",
-        null=True,
-        blank=True,
-        help_text="Marketplace grouping returned by Shein for this storefront.",
-    )
     site_status = models.IntegerField(
         null=True,
         blank=True,

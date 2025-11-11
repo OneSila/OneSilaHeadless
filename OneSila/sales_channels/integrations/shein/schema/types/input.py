@@ -1,7 +1,11 @@
 """Input definitions for the Shein GraphQL schema."""
 
 from core.schema.core.types.input import NodeInput, input, partial, strawberry_input
-from sales_channels.integrations.shein.models import SheinSalesChannel
+from sales_channels.integrations.shein.models import (
+    SheinRemoteCurrency,
+    SheinSalesChannel,
+    SheinSalesChannelView,
+)
 
 
 @strawberry_input
@@ -21,4 +25,16 @@ class SheinSalesChannelInput:
 @partial(SheinSalesChannel, fields="__all__")
 class SheinSalesChannelPartialInput(NodeInput):
     """Partial input used for updates and lookups."""
+    pass
+
+
+@partial(SheinSalesChannelView, fields="__all__")
+class SheinSalesChannelViewPartialInput(NodeInput):
+    """Partial input for updating Shein storefront metadata."""
+    pass
+
+
+@partial(SheinRemoteCurrency, fields="__all__")
+class SheinRemoteCurrencyPartialInput(NodeInput):
+    """Partial input for updating Shein remote currencies."""
     pass

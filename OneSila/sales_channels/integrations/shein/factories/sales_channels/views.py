@@ -4,7 +4,6 @@ from sales_channels.factories.mixins import PullRemoteInstanceMixin
 
 from sales_channels.integrations.shein.factories.mixins import SheinSiteListMixin
 from sales_channels.integrations.shein.models import (
-    SheinRemoteMarketplace,
     SheinSalesChannelView,
 )
 
@@ -99,20 +98,6 @@ class SheinSalesChannelViewPullFactory(SheinSiteListMixin, PullRemoteInstanceMix
 
         self.remote_instances = remote_instances
 
-    def add_fields_to_remote_instance_mirror(self, remote_data, remote_instance_mirror):
-        marketplace_remote_id = remote_data.get("marketplace_remote_id")
-        marketplace = None
-
-        if marketplace_remote_id:
-            marketplace = SheinRemoteMarketplace.objects.filter(
-                sales_channel=self.sales_channel,
-                remote_id=marketplace_remote_id,
-            ).first()
-
-        if remote_instance_mirror.marketplace_id != (marketplace.id if marketplace else None):
-            remote_instance_mirror.marketplace = marketplace
-
     def create_remote_instance_mirror(self, remote_data, remote_instance_mirror):
         super().create_remote_instance_mirror(remote_data, remote_instance_mirror)
-        self.add_fields_to_remote_instance_mirror(remote_data, remote_instance_mirror)
         remote_instance_mirror.save()

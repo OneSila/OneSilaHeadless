@@ -3,7 +3,6 @@
 from .sales_channels import (
     SheinRemoteCurrency,
     SheinRemoteLanguage,
-    SheinRemoteMarketplace,
     SheinSalesChannel,
     SheinSalesChannelView,
 )
@@ -11,7 +10,6 @@ from .sales_channels import (
 __all__ = [
     "SheinRemoteCurrency",
     "SheinRemoteLanguage",
-    "SheinRemoteMarketplace",
     "SheinSalesChannel",
     "SheinSalesChannelView",
 ]
