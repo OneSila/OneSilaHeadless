@@ -27,7 +27,7 @@ class EbaySalesChannelViewPullFactory(GetEbayAPIMixin, PullRemoteInstanceMixin):
             subscription_marketplace_ids = self.get_subscription_marketplace_ids()
         except Exception:
             subscription_marketplace_ids = None
-        if isinstance(subscription_marketplace_ids, list):
+        if isinstance(subscription_marketplace_ids, list) and subscription_marketplace_ids:
             marketplaces = list(dict.fromkeys(subscription_marketplace_ids))
         else:
             marketplaces = self.get_marketplace_ids()
