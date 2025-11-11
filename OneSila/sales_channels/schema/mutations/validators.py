@@ -210,8 +210,8 @@ def validate_ebay_assignment(data, info):
             view=view,
         ).exists()
 
-    product = data['product']
-    view = data['sales_channel_view']
+    product = data['product'].pk
+    view = data['sales_channel_view'].pk
     sales_channel = view.sales_channel.get_real_instance()
 
     # ✅ 1. Exit early if not eBay
