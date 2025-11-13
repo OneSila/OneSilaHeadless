@@ -2,6 +2,10 @@
 
 from typing import Optional
 
+from django.utils.translation import gettext_lazy as _
+
+from properties.models import Property
+
 DEFAULT_TEST_API_BASE_URL = "https://openapi-test01.sheincorp.cn"
 DEFAULT_PROD_API_BASE_URL = "https://openapi.sheincorp.com"
 
@@ -123,5 +127,68 @@ SHEIN_LANGUAGE_CATALOG: list[dict[str, str]] = [
         "shein_domain": "www.shein.co.uk",
         "language_code": "en",
         "language_name": "English",
+    },
+]
+
+
+# ---------------------------------------------------------------------------
+# Internal property definitions
+# ---------------------------------------------------------------------------
+
+SHEIN_INTERNAL_PROPERTY_DEFINITIONS = [
+    {
+        "code": "reference_product_link",
+        "name": _("Reference product link"),
+        "type": Property.TYPES.TEXT,
+        "payload_field": "competing_product_link",
+    },
+    {
+        "code": "sample_spec",
+        "name": _("Sample information"),
+        "type": Property.TYPES.TEXT,
+        "payload_field": "sample_info",
+    },
+    {
+        "code": "proof_of_stock",
+        "name": _("Proof of stock"),
+        "type": Property.TYPES.TEXT,
+        "payload_field": "proof_of_stock_list",
+    },
+    {
+        "code": "shelf_require",
+        "name": _("Mandatory shelf requirement"),
+        "type": Property.TYPES.TEXT,
+        "payload_field": "shelf_require",
+    },
+    {
+        "code": "brand_code",
+        "name": _("Brand"),
+        "type": Property.TYPES.SELECT,
+        "payload_field": "brand_code",
+        "options_source": "brand_list",
+    },
+    {
+        "code": "skc_title",
+        "name": _("SKC title"),
+        "type": Property.TYPES.TEXT,
+        "payload_field": "skc_title",
+    },
+    {
+        "code": "minimum_stock_quantity",
+        "name": _("Minimum stock quantity"),
+        "type": Property.TYPES.INT,
+        "payload_field": "minimum_stock_quantity",
+    },
+    {
+        "code": "product_detail_picture",
+        "name": _("Product detail picture"),
+        "type": Property.TYPES.TEXT,
+        "payload_field": "site_detail_image_info_list",
+    },
+    {
+        "code": "quantity_info",
+        "name": _("Quantity info"),
+        "type": Property.TYPES.BOOLEAN,
+        "payload_field": "quantity_info",
     },
 ]

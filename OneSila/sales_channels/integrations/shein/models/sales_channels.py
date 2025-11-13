@@ -172,6 +172,19 @@ class SheinRemoteCurrency(RemoteCurrency):
 
 
 class SheinRemoteLanguage(RemoteLanguage):
-    """Placeholder for future Shein language mirrors."""
+    """Remote language metadata exposed for a Shein storefront."""
 
-    pass
+    remote_name = models.CharField(
+        max_length=128,
+        null=True,
+        blank=True,
+        help_text="Display name for the remote language.",
+    )
+    sales_channel_view = models.ForeignKey(
+        SheinSalesChannelView,
+        on_delete=models.SET_NULL,
+        related_name='remote_languages',
+        null=True,
+        blank=True,
+        help_text="Storefront associated with this language, if known.",
+    )

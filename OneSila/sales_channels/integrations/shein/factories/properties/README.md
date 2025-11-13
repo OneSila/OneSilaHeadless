@@ -509,7 +509,7 @@ Response:
 }
 
 
-If the categories have permission for custom values (this also depend on the rule so it will probably be added inside the SheinCategoryItem) then we can add custom values with:
+If the categories have permission for custom values (this also depend on the rule so it will probably be added inside the SheinProductTypeItem) then we can add custom values with:
 
 /open-api/goods/add-custom-attribute-value
 

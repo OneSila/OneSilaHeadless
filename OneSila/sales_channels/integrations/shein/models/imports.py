@@ -1,11 +1,11 @@
-"""eBay-specific import models."""
+"""Shein-specific import models."""
 
 from core import models
 from sales_channels.models.imports import SalesChannelImport
 
 
-class EbaySalesChannelImport(SalesChannelImport):
-    """Import process tailored for the eBay integration."""
+class SheinSalesChannelImport(SalesChannelImport):
+    """Import process tailored for the Shein integration."""
 
     TYPE_SCHEMA = "schema"
     TYPE_PRODUCTS = "products"
@@ -18,5 +18,5 @@ class EbaySalesChannelImport(SalesChannelImport):
     type = models.CharField(max_length=32, choices=TYPE_CHOICES)
 
     class Meta:
-        verbose_name = "eBay Sales Channel Import"
-        verbose_name_plural = "eBay Sales Channel Imports"
+        verbose_name = "Shein Sales Channel Import"
+        verbose_name_plural = "Shein Sales Channel Imports"

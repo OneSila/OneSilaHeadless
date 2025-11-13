@@ -1,25 +1,49 @@
 """GraphQL mutation mixins for the Shein integration."""
 
+from typing import Optional
+
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
+from media.models import Image
+from media.schema.types.input import ImagePartialInput
 from strawberry import Info
 import strawberry_django
 
-from django.utils.translation import gettext_lazy as _
 from core.schema.core.extensions import default_extensions
 from core.schema.core.helpers import get_multi_tenant_company
 from core.schema.core.mutations import List, create, type, update
+from sales_channels.integrations.shein.factories.sales_channels import (
+    SheinCategorySuggestionFactory,
+)
 from sales_channels.integrations.shein.schema.types.input import (
+    SheinInternalPropertyOptionPartialInput,
+    SheinInternalPropertyPartialInput,
+    SheinPropertyPartialInput,
+    SheinPropertySelectValuePartialInput,
+    SheinProductTypePartialInput,
     SheinRemoteCurrencyPartialInput,
+    SheinSalesChannelImportInput,
+    SheinSalesChannelImportPartialInput,
     SheinSalesChannelInput,
     SheinSalesChannelPartialInput,
     SheinSalesChannelViewPartialInput,
     SheinValidateAuthInput,
 )
 from sales_channels.integrations.shein.schema.types.types import (
+    SheinInternalPropertyOptionType,
+    SheinInternalPropertyType,
+    SheinPropertySelectValueType,
+    SheinPropertyType,
+    SheinProductTypeType,
     SheinRemoteCurrencyType,
     SheinRedirectUrlType,
+    SheinSalesChannelImportType,
     SheinSalesChannelType,
     SheinSalesChannelViewType,
+    SuggestedSheinCategory,
+    SuggestedSheinCategoryEntry,
 )
+from sales_channels.schema.types.input import SalesChannelViewPartialInput
 
 
 @type(name="Mutation")
@@ -32,6 +56,23 @@ class SheinSalesChannelMutation:
     update_shein_sales_channel: SheinSalesChannelType = update(SheinSalesChannelPartialInput)
     update_shein_sales_channel_view: SheinSalesChannelViewType = update(SheinSalesChannelViewPartialInput)
     update_shein_remote_currency: SheinRemoteCurrencyType = update(SheinRemoteCurrencyPartialInput)
+    update_shein_property: SheinPropertyType = update(SheinPropertyPartialInput)
+    update_shein_property_select_value: SheinPropertySelectValueType = update(
+        SheinPropertySelectValuePartialInput,
+    )
+    update_shein_product_type: SheinProductTypeType = update(SheinProductTypePartialInput)
+    update_shein_internal_property: SheinInternalPropertyType = update(
+        SheinInternalPropertyPartialInput,
+    )
+    update_shein_internal_property_option: SheinInternalPropertyOptionType = update(
+        SheinInternalPropertyOptionPartialInput,
+    )
+    create_shein_import_process: SheinSalesChannelImportType = create(
+        SheinSalesChannelImportInput,
+    )
+    update_shein_import_process: SheinSalesChannelImportType = update(
+        SheinSalesChannelImportPartialInput,
+    )
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def get_shein_redirect_url(
@@ -86,3 +127,68 @@ class SheinSalesChannelMutation:
         factory.run()
 
         return sales_channel
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def suggest_shein_category(
+        self,
+        marketplace: SalesChannelViewPartialInput,
+        info: Info,
+        name: Optional[str] = None,
+        image: Optional[ImagePartialInput] = None,
+        external_image_url: Optional[str] = None,
+    ) -> SuggestedSheinCategory:
+        """Return category suggestions for a Shein marketplace."""
+        from sales_channels.models import SalesChannelView
+        from sales_channels.integrations.shein.models import SheinSalesChannelView
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        view = SalesChannelView.objects.select_related("sales_channel").get(
+            id=marketplace.id.node_id,
+            sales_channel__multi_tenant_company=multi_tenant_company,
+        )
+        shein_view = view.get_real_instance()
+        if not isinstance(shein_view, SheinSalesChannelView):
+            raise ValidationError(_("Provided marketplace is not a Shein storefront."))
+
+        image_instance: Image | None = None
+        if image is not None:
+            if image.id is None:
+                raise ValidationError(_("Image identifier is required."))
+            try:
+                image_instance = Image.objects.get(
+                    id=image.id.node_id,
+                    multi_tenant_company=multi_tenant_company,
+                )
+            except Image.DoesNotExist as exc:  # pragma: no cover - defensive guard path
+                raise ValidationError(_("Image could not be found.")) from exc
+
+        query = (name or "").strip()
+        explicit_image_url = (external_image_url or "").strip()
+        if not any([query, explicit_image_url, image_instance]):
+            raise ValidationError(_("Provide a name or an image to fetch suggestions."))
+
+        factory = SheinCategorySuggestionFactory(
+            view=shein_view,
+            query=query,
+            image_url=explicit_image_url,
+            image=image_instance,
+        )
+        factory.run()
+
+        categories = [
+            SuggestedSheinCategoryEntry(
+                category_id=entry["category_id"],
+                category_name=entry["category_name"],
+                category_path=entry["category_path"],
+                leaf=entry["leaf"],
+                order=entry["order"],
+                vote=entry["vote"],
+            )
+            for entry in factory.categories
+        ]
+
+        return SuggestedSheinCategory(
+            site_remote_id=shein_view.remote_id or "",
+            categories=categories,
+        )

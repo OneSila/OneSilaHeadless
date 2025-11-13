@@ -1,7 +1,3 @@
-"""Public Shein category tree representation."""
-
-from __future__ import annotations
-
 from core import models
 
 
@@ -52,6 +48,63 @@ class SheinCategory(models.SharedModel):
         default=dict,
         blank=True,
         help_text="Original payload returned by Shein for this category (without children).",
+    )
+    default_language = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        help_text="Default mandatory language configured by Shein for this category.",
+    )
+    currency = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        help_text="Currency that Shein expects for supply prices in this category.",
+    )
+    reference_info_required = models.BooleanField(
+        default=False,
+        help_text="Indicates whether Shein marks the reference info module as required for publishing.",
+    )
+    reference_product_link_required = models.BooleanField(
+        default=False,
+        help_text="Indicates whether a competitor product link is mandatory when publishing.",
+    )
+    proof_of_stock_required = models.BooleanField(
+        default=False,
+        help_text="Indicates whether proof of stock is mandatory when publishing.",
+    )
+    shelf_require_required = models.BooleanField(
+        default=False,
+        help_text="Indicates whether shelf requirements must be provided when publishing.",
+    )
+    brand_code_required = models.BooleanField(
+        default=False,
+        help_text="Indicates whether a brand code is mandatory when publishing.",
+    )
+    skc_title_required = models.BooleanField(
+        default=False,
+        help_text="Indicates whether the SKC title is mandatory when publishing.",
+    )
+    minimum_stock_quantity_required = models.BooleanField(
+        default=False,
+        help_text="Indicates whether a minimum stock quantity is mandatory when publishing.",
+    )
+    product_detail_picture_required = models.BooleanField(
+        default=False,
+        help_text="Indicates whether detailed product images are mandatory when publishing.",
+    )
+    quantity_info_required = models.BooleanField(
+        default=False,
+        help_text="Indicates whether SKU quantity information must be provided when publishing.",
+    )
+    sample_spec_required = models.BooleanField(
+        default=False,
+        help_text="Indicates whether sample information is mandatory when publishing.",
+    )
+    picture_config = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Picture configuration flags returned by Shein for this category.",
     )
 
     class Meta:
