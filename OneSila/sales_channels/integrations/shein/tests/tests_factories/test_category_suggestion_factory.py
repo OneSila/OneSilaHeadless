@@ -72,6 +72,7 @@ class SheinCategorySuggestionFactoryTests(TestCase):
             parent=self.child,
             parent_remote_id=self.child.remote_id,
             is_leaf=True,
+            product_type_remote_id="1080",
         )
 
     def test_run_returns_normalized_entries_with_local_metadata(self) -> None:
@@ -98,6 +99,7 @@ class SheinCategorySuggestionFactoryTests(TestCase):
         self.assertEqual(len(factory.categories), 2)
         first = factory.categories[0]
         self.assertEqual(first["category_id"], "300")
+        self.assertEqual(first["product_type_id"], "1080")
         self.assertEqual(first["category_name"], "Leaf")
         self.assertEqual(first["category_path"], "Root > Child > Leaf")
         self.assertTrue(first["leaf"])
@@ -107,6 +109,7 @@ class SheinCategorySuggestionFactoryTests(TestCase):
         self.assertEqual(second["category_name"], "")
         self.assertEqual(second["category_path"], "")
         self.assertFalse(second["leaf"])
+        self.assertEqual(second["product_type_id"], "")
 
     def test_run_skips_api_call_without_payload(self) -> None:
         factory = SheinCategorySuggestionFactory(view=self.view, query="  ")

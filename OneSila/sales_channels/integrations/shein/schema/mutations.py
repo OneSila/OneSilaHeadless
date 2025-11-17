@@ -179,6 +179,7 @@ class SheinSalesChannelMutation:
         categories = [
             SuggestedSheinCategoryEntry(
                 category_id=entry["category_id"],
+                product_type_id=str(entry.get("product_type_id", "") or ""),
                 category_name=entry["category_name"],
                 category_path=entry["category_path"],
                 leaf=entry["leaf"],

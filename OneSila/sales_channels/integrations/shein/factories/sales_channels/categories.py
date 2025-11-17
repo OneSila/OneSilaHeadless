@@ -134,8 +134,12 @@ class SheinCategorySuggestionFactory(SheinSignatureMixin):
         category_name = self._safe_string(getattr(category, "name", ""))
         category_path = self._build_category_path(category)
         leaf = bool(getattr(category, "is_leaf", False))
+        product_type_id = self._normalize_identifier(
+            getattr(category, "product_type_remote_id", None),
+        ) or ""
         return {
             "category_id": remote_id,
+            "product_type_id": product_type_id,
             "category_name": category_name,
             "category_path": category_path,
             "leaf": leaf,

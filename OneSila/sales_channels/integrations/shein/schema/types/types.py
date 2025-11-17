@@ -227,6 +227,7 @@ class SuggestedSheinCategoryEntry:
     """Normalized Shein category suggestion entry."""
 
     category_id: str
+    product_type_id: str
     category_name: str
     category_path: str
     leaf: bool

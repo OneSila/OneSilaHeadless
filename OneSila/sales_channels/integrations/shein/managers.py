@@ -13,7 +13,7 @@ class SheinInternalPropertyQuerySet(_MappingQuerySetMixin, MultiTenantQuerySet):
     mapped_field = "remote_id"
 
 
-class SheinPropertySelectValueQuerySet(_MappingQuerySetMixin, MultiTenantQuerySet):
+class SheinPropertySelectValueQuerySet(_MappingQuerySetMixin, PolymorphicQuerySet, MultiTenantQuerySet):
     mapped_field = "remote_id"
 
     def annotate_mapping(self):
@@ -42,7 +42,7 @@ class SheinInternalPropertyManager(_MappingManagerMixin, MultiTenantManager):
     queryset_class = SheinInternalPropertyQuerySet
 
 
-class SheinPropertySelectValueManager(_MappingManagerMixin, MultiTenantManager):
+class SheinPropertySelectValueManager(_MappingManagerMixin, PolymorphicManager, MultiTenantManager):
     queryset_class = SheinPropertySelectValueQuerySet
 
 
