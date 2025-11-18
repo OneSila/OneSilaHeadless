@@ -86,14 +86,14 @@ def sales_channels__ebay__handle_pull(sender, instance, **kwargs):
     if not isinstance(instance.get_real_instance(), EbaySalesChannel):
         return
 
-    views_factory = EbaySalesChannelViewPullFactory(sales_channel=instance)
-    views_factory.run()
-
-    languages_factory = EbayRemoteLanguagePullFactory(sales_channel=instance)
-    languages_factory.run()
-
-    currencies_factory = EbayRemoteCurrencyPullFactory(sales_channel=instance)
-    currencies_factory.run()
+    # views_factory = EbaySalesChannelViewPullFactory(sales_channel=instance)
+    # views_factory.run()
+    #
+    # languages_factory = EbayRemoteLanguagePullFactory(sales_channel=instance)
+    # languages_factory.run()
+    #
+    # currencies_factory = EbayRemoteCurrencyPullFactory(sales_channel=instance)
+    # currencies_factory.run()
 
     ensure_internal_properties_flow(instance)
 
