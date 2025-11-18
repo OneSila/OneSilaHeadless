@@ -2802,6 +2802,73 @@ class AmazonProductFallbackValuesTest(DisableWooCommerceSignalsMixin, TestCase, 
             [{"value": "BN1", "marketplace_id": self.view.remote_id}],
         )
 
+    def test_child_exemption_created_from_parent(self):
+        self.product.type = Product.CONFIGURABLE
+        self.product.save()
+        AmazonGtinExemption.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            view=self.view,
+            value=True,
+        )
+
+        child = baker.make(
+            "products.Product",
+            sku="CHILD-GTIN",
+            type="SIMPLE",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=child,
+            property=self.product_type_property,
+            value_select=self.product_type_value,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ConfigurableVariation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            parent=self.product,
+            variation=child,
+        )
+        AmazonExternalProductId.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=child,
+            view=self.view,
+            value="ASINCHILD-GTIN",
+        )
+        child_remote = AmazonProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=child,
+            remote_parent_product=self.remote_product,
+            remote_sku="CHILD-GTIN",
+            is_variation=True,
+        )
+
+        self.assertFalse(
+            AmazonGtinExemption.objects.filter(
+                product=child,
+                view=self.view,
+            ).exists()
+        )
+
+        factory = AmazonProductBaseFactory(
+            sales_channel=self.sales_channel,
+            local_instance=child,
+            parent_local_instance=self.product,
+            remote_parent_product=self.remote_product,
+            remote_instance=child_remote,
+            view=self.view,
+        )
+
+        exemption_value = factory._get_gtin_exemption(create=True)
+        self.assertTrue(exemption_value)
+
+        created_exemption = AmazonGtinExemption.objects.get(
+            product=child,
+            view=self.view,
+        )
+        self.assertTrue(created_exemption.value)
+
 
 class AmazonProductOwnerFlagTest(DisableWooCommerceSignalsMixin, TransactionTestCase, AmazonProductTestMixin):
     def setUp(self):
