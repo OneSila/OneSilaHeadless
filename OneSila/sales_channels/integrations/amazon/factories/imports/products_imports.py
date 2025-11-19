@@ -440,7 +440,6 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
     def get__product_data(self, product_data, is_variation, product_instance=None):
         summary = self._get_summary(product_data)
         asin = summary.get("asin")
-        status = summary.get("status") or []
         sku = product_data.get("sku")
         type = infer_product_type(product_data, is_variation)
         marketplace_id = summary.get("marketplace_id")
@@ -483,7 +482,6 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
         structured = {
             "name": name,
             "sku": sku,
-            "active": "BUYABLE" in status,
             "type": type
         }
 

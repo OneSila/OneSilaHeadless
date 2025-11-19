@@ -143,7 +143,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
     # ------------------------------------------------------------------
     # Public helpers
     # ------------------------------------------------------------------
-    def build_inventory_payload(self) -> Dict[str, Any]:
+    def build_inventory_payload(self, is_parent=False) -> Dict[str, Any]:
         """Return the full payload expected by eBay inventory item endpoints."""
 
         product = getattr(self.remote_product, "local_instance", None)
@@ -181,7 +181,10 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         if subtitle:
             product_section["subtitle"] = subtitle[:80]
         if description:
-            product_section["description"] = description
+            if is_parent:
+                product_section["description"] = listing_description
+            else:
+                product_section["description"] = description
         if language_code:
             product_section["locale"] = self._get_content_language()
         if aspects:
@@ -276,7 +279,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         return child_products
 
     def _build_inventory_group_payload(self) -> Dict[str, Any]:
-        base_payload = self.build_inventory_payload()
+        base_payload = self.build_inventory_payload(is_parent=True)
         product_section = base_payload.get("product", {})
         product = getattr(self.remote_product, "local_instance", None)
 

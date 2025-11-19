@@ -12,6 +12,7 @@ from django.conf import settings
 import json
 
 from ebay_rest import API
+from ebay_rest.error import Error as EbayAPIError
 from ebay_rest.api import commerce_identity
 from ebay_rest.reference import Reference
 from ebay_rest.api.sell_marketing.api_client import ApiClient
@@ -396,41 +397,48 @@ class GetEbayAPIMixin:
 
             product_aspects = self._extract_product_aspects(product=product)
 
-            for offer in self._paginate_api_results(
-                self.api.sell_inventory_get_offers,
-                limit=offers_limit,
-                record_key="record",
-                records_key="offers",
-                sku=sku,
-            ):
-                if not isinstance(offer, dict):
-                    continue
-
-                marketplace_id = offer.get("marketplace_id")
-                if not marketplace_id:
-                    continue
-
-                category_id = offer.get("category_id")
-                if not category_id:
-                    continue
-
-                marketplace_key = str(marketplace_id)
-                marketplace_categories = category_map.setdefault(marketplace_key, {})
-
-                category_key = str(category_id)
-                category_details = marketplace_categories.setdefault(
-                    category_key,
-                    {"category_id": category_key, "aspects": {}},
+            try:
+                offers_iterator = self._paginate_api_results(
+                    self.api.sell_inventory_get_offers,
+                    limit=offers_limit,
+                    record_key="record",
+                    records_key="offers",
+                    sku=sku,
                 )
 
-                aspects_map = category_details.setdefault("aspects", {})
+                for offer in offers_iterator:
+                    if not isinstance(offer, dict):
+                        continue
 
-                if not product_aspects:
+                    marketplace_id = offer.get("marketplace_id")
+                    if not marketplace_id:
+                        continue
+
+                    category_id = offer.get("category_id")
+                    if not category_id:
+                        continue
+
+                    marketplace_key = str(marketplace_id)
+                    marketplace_categories = category_map.setdefault(marketplace_key, {})
+
+                    category_key = str(category_id)
+                    category_details = marketplace_categories.setdefault(
+                        category_key,
+                        {"category_id": category_key, "aspects": {}},
+                    )
+
+                    aspects_map = category_details.setdefault("aspects", {})
+
+                    if not product_aspects:
+                        continue
+
+                    for aspect_name, aspect_values in product_aspects.items():
+                        value_set = aspects_map.setdefault(aspect_name, set())
+                        value_set.update(aspect_values)
+            except EbayAPIError as exc:
+                if getattr(exc, "number", None) == 99404:
                     continue
-
-                for aspect_name, aspect_values in product_aspects.items():
-                    value_set = aspects_map.setdefault(aspect_name, set())
-                    value_set.update(aspect_values)
+                raise
 
         return category_map
 
@@ -483,4 +491,3 @@ class GetEbayAPIMixin:
                 normalized[key] = normalized_values
 
         return normalized
-
