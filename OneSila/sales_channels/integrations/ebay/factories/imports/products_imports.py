@@ -857,6 +857,8 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
 
         if isinstance(product_section, Mapping):
             ean_value = product_section.get("ean")
+            if isinstance(ean_value, (list, tuple)):
+                ean_value = ean_value[0] if ean_value else None
             if isinstance(ean_value, str):
                 ean_value = ean_value.strip()
             if ean_value:
