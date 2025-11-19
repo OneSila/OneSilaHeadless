@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from django.test import override_settings
+from django.utils import timezone
+
 from core.tests import TestCase
 from imports_exports.models import Import
 from model_bakery import baker
+from properties.models import Property, PropertySelectValue
 
 from sales_channels.integrations.ebay.factories.imports.products_imports import (
     EbayProductsImportProcessor,
@@ -18,9 +22,16 @@ from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
     EbaySalesChannelView,
 )
-from properties.models import Property, PropertySelectValue
 from sales_channels.models.sales_channels import SalesChannelViewAssign
-from django.utils import timezone
+
+
+EBAY_TEST_SETTINGS = {
+    "EBAY_CLIENT_ID": "test-ebay-client-id",
+    "EBAY_CLIENT_SECRET": "test-ebay-client-secret",
+    "EBAY_DEV_ID": "test-ebay-dev-id",
+    "EBAY_RU_NAME": "test-ebay-ru-name",
+    "EBAY_APPLICATION_SCOPES": ["https://api.ebay.com/oauth/api_scope"],
+}
 
 
 class DummyImportInstance:
@@ -30,6 +41,7 @@ class DummyImportInstance:
         self.data: dict[str, str] = {}
 
 
+@override_settings(**EBAY_TEST_SETTINGS)
 class EbayProductsImportProcessorAssignmentsTest(TestCase):
     """Verify sales channel view assignments create offer records."""
 
@@ -103,6 +115,7 @@ class EbayProductsImportProcessorAssignmentsTest(TestCase):
         self.assertEqual(offer.multi_tenant_company_id, self.multi_tenant_company.id)
 
 
+@override_settings(**EBAY_TEST_SETTINGS)
 class EbayProductsImportProcessorTranslationsTest(TestCase):
     """Validate translation parsing edge cases for eBay product imports."""
 
@@ -189,6 +202,7 @@ class EbayProductsImportProcessorTranslationsTest(TestCase):
         self.assertEqual(translations[0]["description"], "Parent description")
 
 
+@override_settings(**EBAY_TEST_SETTINGS)
 class EbayProductsImportProcessorParentSkuTest(TestCase):
     """Ensure variation payloads expose configurable parent metadata."""
 
@@ -246,6 +260,7 @@ class EbayProductsImportProcessorParentSkuTest(TestCase):
         self.assertEqual(set(structured["configurable_parent_skus"]), {"CFG-100"})
 
 
+@override_settings(**EBAY_TEST_SETTINGS)
 class EbayProductsImportProcessorAttributesTest(TestCase):
     """Ensure internal property options map to local select values."""
 
