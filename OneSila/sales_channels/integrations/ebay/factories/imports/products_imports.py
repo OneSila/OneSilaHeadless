@@ -10,19 +10,24 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 from django.db import IntegrityError
 from django.db.models import Q
+
+from core.mixins import TemporaryDisableInspectorSignalsMixin
 from properties.models import Property, ProductProperty
 from products.product_types import CONFIGURABLE, SIMPLE
 
 from currencies.models import Currency
 from imports_exports.factories.imports import AsyncProductImportMixin
 from imports_exports.factories.products import ImportProductInstance
-from imports_exports.helpers import append_broken_record
+from imports_exports.helpers import append_broken_record, increment_processed_records
 from core.helpers import ensure_serializable
 from sales_channels.integrations.ebay.constants import EBAY_INTERNAL_PROPERTY_DEFAULTS
+from ebay_rest.error import Error as EbayAPIError
+
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
 from sales_channels.integrations.ebay.helpers import get_is_product_variation
 from sales_channels.integrations.ebay.models import (
     EbayProduct,
+    EbayProductOffer,
     EbayInternalProperty,
     EbayProperty,
     EbayPropertySelectValue,
@@ -42,7 +47,7 @@ from sales_channels.models.products import RemoteProductConfigurator
 logger = logging.getLogger(__name__)
 
 
-class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
+class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannelImportMixin, GetEbayAPIMixin):
     """Base processor that will orchestrate eBay product imports."""
 
     import_properties = False
@@ -89,19 +94,26 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
             if not sku:
                 continue
 
-            offers_iterator = self._paginate_api_results(
-                self.api.sell_inventory_get_offers,
-                limit=None,
-                record_key="record",
-                records_key="offers",
-                sku=sku,
-            )
+            product = self.api.sell_inventory_get_inventory_item(sku=sku)
 
-            for offer in offers_iterator:
-                if not isinstance(offer, dict):
+            try:
+                offers_iterator = self._paginate_api_results(
+                    self.api.sell_inventory_get_offers,
+                    limit=None,
+                    record_key="record",
+                    records_key="offers",
+                    sku=sku,
+                )
+
+                for offer in offers_iterator:
+                    if not isinstance(offer, dict):
+                        continue
+
+                    yield {"product": product, "offer": offer}
+            except EbayAPIError as exc:
+                if getattr(exc, "number", None) == 99404:
                     continue
-
-                yield {"product": product, "offer": offer}
+                raise
 
     def get_product_rule(
         self,
@@ -272,6 +284,8 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
         self,
         *,
         product_data: dict[str, Any],
+        offer_data: dict[str, Any] | None = None,
+        child_product_data: dict[str, Any] | None = None,
     ) -> tuple[list[dict[str, Any]], str | None]:
         """Extract translation payloads and detected language."""
 
@@ -284,14 +298,17 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
             if not isinstance(inventory_item, dict):
                 return [], None
 
-        locale = inventory_item.get("locale")
+        locale = product_data.get("locale")
+        if (not isinstance(locale, str) or not locale) and isinstance(child_product_data, Mapping):
+            locale = child_product_data.get("locale")
+
         if not isinstance(locale, str) or not locale:
             raise ValueError("Missing locale on eBay inventory item payload")
 
         remote_language = (
             EbayRemoteLanguage.objects.filter(
                 sales_channel=self.sales_channel,
-                remote_code__iexact=locale,
+                remote_code__iexact=locale.replace('_','-'),
             )
             .exclude(local_instance__isnull=True)
             .exclude(local_instance="")
@@ -327,28 +344,12 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
             description = None
 
         listing_description = None
-        offers_data = product_data.get("offers")
-        if isinstance(offers_data, list):
-            offer_iterable = offers_data
-        elif isinstance(offers_data, dict):
-            offer_iterable = [offers_data]
-        else:
-            offer_iterable = []
-
-        for offer in offer_iterable:
-            if not isinstance(offer, dict):
-                continue
-            value = offer.get("listing_description")
-            if isinstance(value, str) and value.strip():
-                listing_description = value.strip()
-                break
-
-        if listing_description is None:
-            offer = product_data.get("offer")
-            if isinstance(offer, dict):
-                value = offer.get("listing_description")
+        if child_product_data is None and isinstance(offer_data, Mapping):
+            for key in ("listing_description", "listingDescription"):
+                value = offer_data.get(key)
                 if isinstance(value, str) and value.strip():
                     listing_description = value.strip()
+                    break
 
         if listing_description:
             description = listing_description
@@ -427,7 +428,7 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
         if not isinstance(product_section, Mapping):
             product_section = {}
 
-        package_weight_size = product_data.get("packageWeightAndSize")
+        package_weight_size = product_data.get("package_weight_and_size")
         if not isinstance(package_weight_size, Mapping):
             package_weight_size = {}
 
@@ -448,6 +449,8 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
                 sales_channel=self.sales_channel,
                 code__in=internal_codes,
             )
+            .select_related("local_instance")
+            .prefetch_related("options__local_instance")
         }
 
         internal_properties: dict[str, EbayInternalProperty] = {}
@@ -496,8 +499,8 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
             "packageWeightAndSize__dimensions__width": _normalize_single(dimensions.get("width")),
             "packageWeightAndSize__dimensions__height": _normalize_single(dimensions.get("height")),
             "packageWeightAndSize__weight__value": _normalize_single(weight.get("value")),
-            "packageWeightAndSize__packageType": _normalize_single(package_weight_size.get("packageType")),
-            "packageWeightAndSize__shippingIrregular": _normalize_single(package_weight_size.get("shippingIrregular")),
+            "packageWeightAndSize__packageType": _normalize_single(package_weight_size.get("package_type")),
+            "packageWeightAndSize__shippingIrregular": _normalize_single(package_weight_size.get("shipping_irregular")),
         }
 
         for code, value in internal_values.items():
@@ -508,10 +511,32 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
             if not internal_property or not internal_property.local_instance:
                 continue
 
-            attributes.append({
+            attribute_payload: dict[str, Any] = {
                 "property": internal_property.local_instance,
                 "value": value,
-            })
+            }
+
+            options_manager = getattr(internal_property, "options", None)
+            if options_manager is not None:
+                try:
+                    normalized_value = str(value).strip().casefold()
+                except Exception:
+                    normalized_value = None
+
+                if normalized_value:
+                    for option in options_manager.all():
+                        option_value = (option.value or "").strip()
+                        if not option_value:
+                            continue
+                        if option_value.casefold() != normalized_value:
+                            continue
+                        local_instance_id = getattr(option, "local_instance_id", None)
+                        if local_instance_id:
+                            attribute_payload["value"] = local_instance_id
+                            attribute_payload["value_is_id"] = True
+                        break
+
+            attributes.append(attribute_payload)
 
         aspect_payload: dict[str, Any]
         if "product" in product_data and isinstance(product_data["product"], Mapping):
@@ -746,50 +771,6 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
 
         return None
 
-    def _extract_group_inventory_items(
-        self,
-        response: Any,
-        *,
-        exclude_sku: str | None = None,
-    ) -> list[dict[str, Any]]:
-        items: list[tuple[str | None, dict[str, Any]]] = []
-
-        def _collect(candidate: Any) -> None:
-            if isinstance(candidate, Mapping):
-                sku = self._extract_sku(candidate)
-                if sku or "product" in candidate:
-                    items.append((sku, dict(candidate)))
-                for key in (
-                    "inventory_items",
-                    "inventoryItems",
-                    "members",
-                    "inventory_item_group",
-                    "inventoryItemGroup",
-                ):
-                    nested = candidate.get(key)
-                    if nested is not None:
-                        _collect(nested)
-            elif isinstance(candidate, (list, tuple, set)):
-                for entry in candidate:
-                    _collect(entry)
-
-        _collect(response)
-
-        unique_items: list[dict[str, Any]] = []
-        seen_skus: set[str] = set()
-        excluded = exclude_sku.strip() if isinstance(exclude_sku, str) else None
-
-        for sku, payload in items:
-            normalized = sku.strip() if isinstance(sku, str) else None
-            if normalized and excluded and normalized == excluded:
-                continue
-            key = normalized or str(id(payload))
-            if key in seen_skus:
-                continue
-            seen_skus.add(key)
-            unique_items.append(payload)
-
-        return unique_items
 
     def get__product_data(
         self,
@@ -799,6 +780,8 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
         is_variation: bool,
         is_configurable: bool,
         product_instance: Any | None = None,
+        child_product_data: dict[str, Any] | None = None,
+        parent_skus: set[str] | None = None,
     ) -> tuple[dict[str, Any], str | None, EbaySalesChannelView | None]:
         """Return the structured payload, language, and view for an eBay product."""
 
@@ -872,6 +855,13 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
             "type": CONFIGURABLE if is_configurable else SIMPLE,
         }
 
+        if isinstance(product_section, Mapping):
+            ean_value = product_section.get("ean")
+            if isinstance(ean_value, str):
+                ean_value = ean_value.strip()
+            if ean_value:
+                structured["ean_code"] = ean_value
+
         images = self._parse_images(product_data=normalized_product)
         if images:
             structured["images"] = images
@@ -897,6 +887,8 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
 
         translations, language = self._parse_translations(
             product_data=normalized_product,
+            offer_data=offer_data,
+            child_product_data=child_product_data,
         )
         if translations:
             structured["translations"] = translations
@@ -907,6 +899,15 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
             )
             if configurator_values:
                 structured["configurator_select_values"] = configurator_values
+
+        if is_variation and parent_skus:
+            structured["configurable_parent_skus"] = [
+                normalized
+                for normalized in (
+                    str(parent_sku).strip() for parent_sku in parent_skus if parent_sku is not None
+                )
+                if normalized
+            ]
 
         structured["__marketplace_id"] = marketplace_id
 
@@ -1148,6 +1149,22 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
     ) -> None:
         """Attach imported products to their eBay marketplace assignments."""
 
+        def _extract_listing_details(*, payload: Mapping[str, Any] | None) -> tuple[str | None, str | None]:
+            if not isinstance(payload, Mapping):
+                return None, None
+
+            listing = payload.get("listing") if isinstance(payload, Mapping) else None
+            if isinstance(listing, Mapping):
+                listing_id = listing.get("listing_id") or listing.get("listingId")
+                listing_status = listing.get("listing_status") or listing.get("listingStatus")
+            else:
+                listing_id = payload.get("listing_id") or payload.get("listingId")
+                listing_status = payload.get("listing_status") or payload.get("listingStatus")
+
+            normalized_id = str(listing_id).strip() if listing_id else None
+            normalized_status = str(listing_status).strip() if listing_status else None
+            return normalized_id or None, normalized_status or None
+
         remote_product = getattr(import_instance, "remote_instance", None)
         local_product = getattr(import_instance, "instance", None)
 
@@ -1192,45 +1209,68 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
 
         offer_id: str | None = None
         listing_id: str | None = None
+        listing_status: str | None = None
         for payload in offer_payloads:
-            if not payload:
+            if not isinstance(payload, Mapping):
                 continue
 
-            candidate = payload.get("offer_id")
-            if candidate is None:
-                continue
+            if offer_id is None:
+                candidate = payload.get("offer_id")
+                if candidate is not None:
+                    normalized = str(candidate).strip()
+                    if normalized:
+                        offer_id = normalized
 
-            normalized = str(candidate).strip()
-            if normalized:
-                offer_id = normalized
-                break
+            lid, lstatus = _extract_listing_details(payload=payload)
+            if listing_id is None and lid:
+                listing_id = lid
+            if listing_status is None and lstatus:
+                listing_status = lstatus
 
         if offer_id and assign.remote_id != offer_id:
             assign.remote_id = offer_id
             updated_fields.append("remote_id")
 
-        def _extract_listing_id(payload: Mapping[str, Any]) -> str | None:
-            listing = payload.get("listing") if isinstance(payload, Mapping) else None
-            if isinstance(listing, Mapping):
-                lid = listing.get("listing_id") or listing.get("listingId")
-            else:
-                lid = payload.get("listing_id") or payload.get("listingId")
-
-            return str(lid).strip() if lid else None
-
-        for payload in offer_payloads:
-            if not isinstance(payload, Mapping):
-                continue
-            lid = _extract_listing_id(payload)
-            if lid and not listing_id:
-                listing_id = lid
-
-        if listing_id and assign.listing_id != listing_id:
-            assign.listing_id = listing_id
-            updated_fields.append("listing_id")
-
         if updated_fields:
             assign.save(update_fields=updated_fields)
+
+        offer_record = self._ensure_product_offer(
+            remote_product=remote_product,
+            sales_channel_view=resolved_view,
+        )
+
+        if offer_record is not None:
+            offer_fields: list[str] = []
+            if offer_id and offer_record.remote_id != offer_id:
+                offer_record.remote_id = offer_id
+                offer_fields.append("remote_id")
+            if listing_id and offer_record.listing_id != listing_id:
+                offer_record.listing_id = listing_id
+                offer_fields.append("listing_id")
+            if listing_status and offer_record.listing_status != listing_status:
+                offer_record.listing_status = listing_status
+                offer_fields.append("listing_status")
+
+            if offer_fields:
+                offer_record.save(update_fields=offer_fields)
+
+    def _ensure_product_offer(
+        self,
+        *,
+        remote_product: Any | None,
+        sales_channel_view: EbaySalesChannelView | None,
+    ) -> EbayProductOffer | None:
+        if remote_product is None or sales_channel_view is None:
+            return None
+
+        offer, _ = EbayProductOffer.objects.get_or_create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            remote_product=remote_product,
+            sales_channel_view=sales_channel_view,
+        )
+
+        return offer
 
     def update_remote_product(
         self,
@@ -1282,6 +1322,7 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
         product_data: dict[str, Any],
         offer_data: dict[str, Any] | None = None,
         child_offer_data: dict[str, Any] | None = None,
+        child_product_data: dict[str, Any] | None = None,
     ) -> None:
         """Process a single serialized product payload."""
 
@@ -1322,47 +1363,48 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
 
         if parent_skus and child_offer_data is None:
             for parent_sku in parent_skus:
-                normalized_parent = parent_sku.strip() if isinstance(parent_sku, str) else str(parent_sku)
+                normalized_parent_sku = parent_sku.strip() if isinstance(parent_sku, str) else str(parent_sku)
 
-                if not normalized_parent:
+                if not normalized_parent_sku:
                     continue
 
-                if normalized_parent == sku or normalized_parent in self._processed_parent_skus:
+                if normalized_parent_sku == sku or normalized_parent_sku in self._processed_parent_skus:
                     continue
 
-                self._processed_parent_skus.add(normalized_parent)
+                self._processed_parent_skus.add(normalized_parent_sku)
 
                 try:
                     group_response = self.api.sell_inventory_get_inventory_item_group(
-                        inventory_item_group_key=normalized_parent,
+                        inventory_item_group_key=normalized_parent_sku,
                     )
                 except Exception as exc:  # pragma: no cover - defensive logging
                     logger.warning(
-                        "Failed to fetch inventory item group %s for SKU %s", normalized_parent, sku, exc_info=exc
+                        "Failed to fetch inventory item group %s for SKU %s", normalized_parent_sku, sku, exc_info=exc
                     )
                     self._add_broken_record(
                         code=self.ERROR_PARENT_FETCH_FAILED,
                         message="Unable to fetch parent inventory item group",
-                        data={"sku": sku, "parent_sku": normalized_parent},
+                        data={"sku": sku, "parent_sku": normalized_parent_sku},
                         exc=exc,
                     )
                     continue
 
-                parent_items = self._extract_group_inventory_items(
-                    group_response,
-                    exclude_sku=sku,
-                )
-
-                if not parent_items:
+                if not isinstance(group_response, Mapping):
                     self._add_broken_record(
                         code=self.ERROR_PARENT_FETCH_FAILED,
-                        message="Parent inventory group returned no items",
-                        data={"sku": sku, "parent_sku": normalized_parent},
+                        message="Parent inventory group returned invalid data",
+                        data={"sku": sku, "parent_sku": normalized_parent_sku},
                     )
                     continue
 
-                for parent_item in parent_items:
-                    self.process_product_item(parent_item, child_offer_data=offer_data)
+                parent_payload = dict(group_response)
+                parent_payload.setdefault("sku", normalized_parent_sku)
+
+                self.process_product_item(
+                    parent_payload,
+                    child_offer_data=offer_data,
+                    child_product_data=product_data,
+                )
 
         active_offer = offer_data if isinstance(offer_data, dict) else None
         if active_offer is None and isinstance(child_offer_data, dict):
@@ -1376,8 +1418,7 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
             )
             return
 
-        is_parent_product = child_offer_data is not None and not is_variation
-        is_configurable = bool(is_parent_product)
+        is_configurable = child_offer_data is not None and not is_variation
 
         rule = None
         if remote_product and remote_product.local_instance:
@@ -1397,6 +1438,8 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
                 is_variation=is_variation,
                 is_configurable=is_configurable,
                 product_instance=product_instance,
+                child_product_data=child_product_data,
+                parent_skus=parent_skus,
             )
         except ValueError as exc:
             self._add_broken_record(
@@ -1422,11 +1465,8 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
             rule=rule,
             sales_channel=self.sales_channel,
             instance=product_instance,
-            update_current_rule=True,
+            update_current_rule=False,
         )
-
-        if instance.data.get("type") != CONFIGURABLE:
-            instance.update_only = True
 
         instance.prepare_mirror_model_class(
             mirror_model_class=EbayProduct,
@@ -1476,7 +1516,7 @@ class EbayProductsImportProcessor(SalesChannelImportMixin, GetEbayAPIMixin):
 
         self.update_remote_product(instance, product_data, view, is_variation)
 
-        if not is_parent_product:
+        if not is_configurable:
             self.handle_ean_code(import_instance=instance)
             self.handle_translations(import_instance=instance)
             self.handle_prices(import_instance=instance)
@@ -1504,7 +1544,7 @@ class EbayProductsAsyncImportProcessor(AsyncProductImportMixin, EbayProductsImpo
         task_kwargs = {
             "import_process_id": self.import_process.id,
             "sales_channel_id": self.sales_channel.id,
-            "product_data": data,
+            "data": data,
             "is_last": is_last,
             "updated_with": updated_with,
         }
@@ -1519,6 +1559,7 @@ class EbayProductItemFactory(EbayProductsImportProcessor):
         self,
         *,
         product_data: dict[str, Any],
+        offer_data: dict[str, Any],
         import_process,
         sales_channel,
         is_last: bool = False,
@@ -1527,10 +1568,28 @@ class EbayProductItemFactory(EbayProductsImportProcessor):
         super().__init__(import_process=import_process, sales_channel=sales_channel)
 
         self.product_data = product_data
+        self.offer_data = offer_data
         self.is_last = is_last
         self.updated_with = updated_with
 
     def run(self) -> None:
         """Execute the product import for the provided payload."""
+        self.disable_inspector_signals()
 
-        pass
+        try:
+            self.process_product_item(product_data=self.product_data, offer_data=self.offer_data)
+        except Exception as exc:  # capture unexpected errors
+            self._add_broken_record(
+                code="UNKNOWN_ERROR",
+                message="Unexpected error while processing product",
+                data=self.product_data,
+                exc=exc,
+            )
+        finally:
+            self.refresh_inspector_status(run_inspection=False)
+
+        if self.updated_with:
+            increment_processed_records(self.import_process.id, delta=self.updated_with)
+        if self.is_last:
+            self.mark_success()
+            self.process_completed()

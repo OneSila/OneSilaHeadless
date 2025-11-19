@@ -411,7 +411,7 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
             if image_import_instance.instance is not None:
                 images_instances_ids.append(image_import_instance.instance.id)
 
-            if hasattr(image_import_instance, 'media_assign'):
+            if hasattr(image_import_instance, 'media_assign') and image_import_instance.media_assign is not None:
                 images_instances_associations_ids.append(image_import_instance.media_assign.id)
 
         self.image_instances = Image.objects.filter(id__in=images_instances_ids)
@@ -530,28 +530,68 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
             rule_product_property.value_select = self.rule.product_type
             rule_product_property.save()
 
+    def _extract_parent_sku_values(self, candidate):
+        if candidate is None:
+            return []
+
+        if isinstance(candidate, (list, tuple, set)):
+            iterable = candidate
+        else:
+            iterable = [candidate]
+
+        skus: list[str] = []
+        for value in iterable:
+            if value is None:
+                continue
+            normalized = str(value).strip()
+            if normalized:
+                skus.append(normalized)
+        return skus
+
+    def _link_configurable_parent(self, parent_sku: str) -> bool:
+        if not parent_sku:
+            return False
+
+        parent = Product.objects.filter(sku=parent_sku, multi_tenant_company=self.multi_tenant_company).first()
+        if parent and parent.is_configurable():
+            ConfigurableVariation.objects.get_or_create(
+                parent=parent,
+                variation=self.instance,
+                multi_tenant_company=self.multi_tenant_company,
+            )
+            return True
+        return False
+
+    def _link_bundle_parent(self, parent_sku: str) -> bool:
+        if not parent_sku:
+            return False
+
+        parent = Product.objects.filter(sku=parent_sku, multi_tenant_company=self.multi_tenant_company).first()
+        if parent and parent.is_bundle():
+            BundleVariation.objects.get_or_create(
+                parent=parent,
+                variation=self.instance,
+                multi_tenant_company=self.multi_tenant_company,
+            )
+            return True
+        return False
+
     @timeit_and_log(logger)
     def _handle_parent_sku_links(self):
-        parent_sku = self.data.get("configurable_parent_sku")
-        if parent_sku:
-            parent = Product.objects.filter(sku=parent_sku, multi_tenant_company=self.multi_tenant_company).first()
-            if parent and parent.is_configurable():
-                ConfigurableVariation.objects.get_or_create(
-                    parent=parent,
-                    variation=self.instance,
-                    multi_tenant_company=self.multi_tenant_company,
-                )
+        configurable_parent_values = []
+        configurable_parent_values.extend(self._extract_parent_sku_values(self.data.get("configurable_parent_sku")))
+        configurable_parent_values.extend(self._extract_parent_sku_values(self.data.get("configurable_parent_skus")))
+
+        for parent_sku in configurable_parent_values:
+            if self._link_configurable_parent(parent_sku):
                 return
 
-        parent_sku = self.data.get("bundle_parent_sku")
-        if parent_sku:
-            parent = Product.objects.filter(sku=parent_sku, multi_tenant_company=self.multi_tenant_company).first()
-            if parent and parent.is_bundle():
-                BundleVariation.objects.get_or_create(
-                    parent=parent,
-                    variation=self.instance,
-                    multi_tenant_company=self.multi_tenant_company,
-                )
+        bundle_parent_values = []
+        bundle_parent_values.extend(self._extract_parent_sku_values(self.data.get("bundle_parent_sku")))
+        bundle_parent_values.extend(self._extract_parent_sku_values(self.data.get("bundle_parent_skus")))
+
+        for parent_sku in bundle_parent_values:
+            if self._link_bundle_parent(parent_sku):
                 return
 
     @timeit_and_log(logger)
