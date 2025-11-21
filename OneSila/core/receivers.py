@@ -4,6 +4,7 @@ from core.models.multi_tenant import MultiTenantUser, MultiTenantCompany
 from core.signals import post_create, post_update
 from core.schema.core.subscriptions import refresh_subscription_receiver
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
+from core.factories.dashboard import DashboardDefaultsFactory
 
 
 @receiver(post_save)
@@ -30,6 +31,12 @@ def core__post_create_update_triggers(sender, instance, created, **kwargs):
         post_create.send(sender=instance.__class__, instance=instance)
     else:
         post_update.send(sender=instance.__class__, instance=instance)
+
+
+@receiver(post_create, sender=MultiTenantUser)
+def core__multi_tenant_user__dashboard_defaults(sender, instance: MultiTenantUser, **kwargs):
+    factory = DashboardDefaultsFactory(user=instance)
+    factory.work()
 
 
 @receiver(pre_save, sender=MultiTenantCompany)
