@@ -31,8 +31,10 @@ class GetAmazonRedirectUrlFactory:
             "application_id": settings.AMAZON_APP_ID,
             "state": self.sales_channel.state,
         }
-        if settings.DEBUG:
-            params["version"] = "beta"
+
+        #if settings.DEBUG: #@TODO: Come back when our app is not in Draft anymore and change this
+        params["version"] = "beta"
+
         base_url = self.get_base_url()
         self.redirect_url = f"{base_url}/apps/authorize/consent?{urlencode(params)}"
 
