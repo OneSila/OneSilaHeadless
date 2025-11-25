@@ -7,7 +7,9 @@ import traceback
 
 from collections.abc import Iterator, Mapping
 from decimal import Decimal, InvalidOperation
+from html.parser import HTMLParser
 from typing import Any
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import Q
 
@@ -37,7 +39,7 @@ from sales_channels.integrations.ebay.models import (
     EbayMediaThroughProduct,
     EbayPrice,
     EbayProductContent,
-    EbayEanCode, EbayProductProperty,
+    EbayEanCode, EbayProductProperty, EbayProductCategory,
 )
 from sales_channels.models import SalesChannelIntegrationPricelist, SalesChannelViewAssign
 from sales_prices.models import SalesPrice
@@ -45,6 +47,92 @@ from sales_channels.factories.imports import SalesChannelImportMixin
 from sales_channels.models.products import RemoteProductConfigurator
 
 logger = logging.getLogger(__name__)
+
+
+class _HtmlClassExtractor(HTMLParser):
+    """Utility parser that captures the first element matching a CSS class."""
+
+    def __init__(self, target_class: str) -> None:
+        super().__init__(convert_charrefs=False)
+        self._target_class = target_class.casefold()
+        self._capture_depth = 0
+        self._buffer: list[str] = []
+        self._completed = False
+
+    def _has_target_class(self, attrs: list[tuple[str, str | None]]) -> bool:
+        for attr_name, attr_value in attrs:
+            if attr_name and attr_name.casefold() == "class" and attr_value:
+                classes = {
+                    chunk.strip().casefold()
+                    for chunk in attr_value.split()
+                    if chunk and chunk.strip()
+                }
+                if self._target_class in classes:
+                    return True
+        return False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if self._completed:
+            return
+
+        if self._capture_depth > 0:
+            self._capture_depth += 1
+            self._buffer.append(self.get_starttag_text())
+            return
+
+        if self._has_target_class(attrs):
+            self._capture_depth = 1
+            self._buffer.append(self.get_starttag_text())
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if self._completed:
+            return
+
+        if self._capture_depth > 0:
+            self._buffer.append(self.get_starttag_text())
+            return
+
+        if self._has_target_class(attrs):
+            self._buffer.append(self.get_starttag_text())
+            self._completed = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if self._capture_depth == 0:
+            return
+
+        self._buffer.append(f"</{tag}>")
+        self._capture_depth -= 1
+        if self._capture_depth == 0:
+            self._completed = True
+
+    def handle_data(self, data: str) -> None:
+        if self._capture_depth > 0:
+            self._buffer.append(data)
+
+    def handle_entityref(self, name: str) -> None:
+        if self._capture_depth > 0:
+            self._buffer.append(f"&{name};")
+
+    def handle_charref(self, name: str) -> None:
+        if self._capture_depth > 0:
+            self._buffer.append(f"&#{name};")
+
+    def handle_comment(self, data: str) -> None:
+        if self._capture_depth > 0:
+            self._buffer.append(f"<!--{data}-->")
+
+    def handle_decl(self, decl: str) -> None:
+        if self._capture_depth > 0:
+            self._buffer.append(f"<!{decl}>")
+
+    def handle_pi(self, data: str) -> None:
+        if self._capture_depth > 0:
+            self._buffer.append(f"<?{data}>")
+
+    def get_content(self) -> str | None:
+        if not self._buffer:
+            return None
+        return "".join(self._buffer)
 
 
 class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannelImportMixin, GetEbayAPIMixin):
@@ -59,6 +147,7 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
     ERROR_MISSING_MARKETPLACE = "MISSING_MARKETPLACE"
     ERROR_PARENT_FETCH_FAILED = "PARENT_FETCH_FAILED"
     ERROR_INVALID_PRODUCT_DATA = "INVALID_PRODUCT_DATA"
+    ERROR_INVALID_CATEGORY_ASSIGNMENT = "INVALID_CATEGORY_ASSIGNMENT"
 
     remote_ean_code_class = EbayEanCode
     remote_product_content_class = EbayProductContent
@@ -73,9 +162,47 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
         )
 
         self.language = language
+        self._content_class_filter = self._normalize_content_class(
+            getattr(self.import_process, "content_class", None)
+        )
         self.multi_tenant_company = sales_channel.multi_tenant_company
         self._processed_parent_skus: set[str] = set()
         self._parent_child_sku_map: dict[str, set[str]] = {}
+
+    @staticmethod
+    def _normalize_content_class(value: Any | None) -> str | None:
+        if not isinstance(value, str):
+            return None
+
+        normalized = value.strip()
+        if normalized.startswith("."):
+            normalized = normalized[1:]
+        normalized = normalized.strip()
+
+        return normalized or None
+
+    def _filter_description_by_content_class(self, description: str | None) -> str | None:
+
+        if not description or not self._content_class_filter:
+            return description
+
+        parser = _HtmlClassExtractor(self._content_class_filter)
+        try:
+            parser.feed(description)
+            parser.close()
+        except Exception:  # pragma: no cover - defensive
+            logger.debug(
+                "Failed to extract content class %s from eBay description",
+                self._content_class_filter,
+                exc_info=True,
+            )
+            return description
+
+        extracted = parser.get_content()
+        if extracted:
+            return extracted.strip()
+
+        return description
 
 
     def get_total_instances(self) -> int:
@@ -353,6 +480,8 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
 
         if listing_description:
             description = listing_description
+
+        description = self._filter_description_by_content_class(description)
 
         if not name:
             return [], language_code
@@ -1256,6 +1385,12 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
             if offer_fields:
                 offer_record.save(update_fields=offer_fields)
 
+        self._sync_product_category(
+            product=local_product,
+            view=resolved_view,
+            offer_payloads=offer_payloads,
+        )
+
     def _ensure_product_offer(
         self,
         *,
@@ -1273,6 +1408,79 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
         )
 
         return offer
+
+    def _extract_offer_category_id(self, *offer_payloads: Mapping[str, Any] | None) -> str | None:
+        """Return the normalized category_id from the first payload that declares it."""
+
+        for payload in offer_payloads:
+            if not isinstance(payload, Mapping):
+                continue
+
+            for key in ("category_id", "categoryId"):
+                raw_value = payload.get(key)
+                if raw_value is None:
+                    continue
+
+                normalized = str(raw_value).strip()
+                if normalized:
+                    return normalized
+
+        return None
+
+    def _sync_product_category(
+        self,
+        *,
+        product: Any | None,
+        view: EbaySalesChannelView | None,
+        offer_payloads: tuple[Mapping[str, Any] | None, ...],
+    ) -> None:
+        """Ensure the local product has an EbayProductCategory entry for the offer."""
+
+        if product is None or view is None:
+            return
+
+        category_id = self._extract_offer_category_id(*offer_payloads)
+        if not category_id:
+            return
+
+        try:
+            mapping, created = EbayProductCategory.objects.get_or_create(
+                multi_tenant_company=self.multi_tenant_company,
+                product=product,
+                sales_channel=self.sales_channel,
+                view=view,
+                defaults={"remote_id": category_id},
+            )
+        except ValidationError as exc:
+            self._add_broken_record(
+                code=self.ERROR_INVALID_CATEGORY_ASSIGNMENT,
+                message="Invalid eBay category returned by offer",
+                data={
+                    "category_id": category_id,
+                    "sku": getattr(product, "sku", None),
+                },
+                context={"product_id": getattr(product, "id", None), "view_id": view.id},
+                exc=exc,
+            )
+            return
+
+        if created or mapping.remote_id == category_id:
+            return
+
+        mapping.remote_id = category_id
+        try:
+            mapping.save(update_fields=["remote_id"])
+        except ValidationError as exc:
+            self._add_broken_record(
+                code=self.ERROR_INVALID_CATEGORY_ASSIGNMENT,
+                message="Invalid eBay category returned by offer",
+                data={
+                    "category_id": category_id,
+                    "sku": getattr(product, "sku", None),
+                },
+                context={"product_id": getattr(product, "id", None), "view_id": view.id},
+                exc=exc,
+            )
 
     def update_remote_product(
         self,

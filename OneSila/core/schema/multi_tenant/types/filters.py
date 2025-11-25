@@ -17,6 +17,7 @@ from strawberry_django import filter_field as custom_filter
 
 @filter(MultiTenantUser)
 class MultiTenantUserFilter:
+    id: auto
     first_name: auto
     last_name: auto
     username: auto

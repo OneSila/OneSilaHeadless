@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import html
 from contextlib import contextmanager
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, datetime
 import json
 import logging
 import pprint
+import re
 from typing import Any, Dict, List, Tuple, Optional
 
 from django.db.models import Q
@@ -45,6 +47,9 @@ from sales_channels.integrations.ebay.models.taxes import EbayCurrency
 
 
 logger = logging.getLogger(__name__)
+
+_FALLBACK_DESCRIPTION_PATTERN = re.compile(r"<.*?>", flags=re.DOTALL)
+_FALLBACK_DESCRIPTION_LIMIT = 4000
 
 
 def _extract_ebay_api_error_message(*, exc: Exception) -> str:
@@ -184,7 +189,12 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             if is_parent:
                 product_section["description"] = listing_description
             else:
-                product_section["description"] = description
+                cleaned_description = self._clean_fallback_description(
+                    description=description
+                )
+                if cleaned_description:
+                    product_section["description"] = cleaned_description
+
         if language_code:
             product_section["locale"] = self._get_content_language()
         if aspects:
@@ -207,6 +217,25 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
 
         self._latest_listing_description = listing_description or description
         return payload
+
+    def _clean_fallback_description(self, *, description: str | None) -> str | None:
+        """Return a plain-text fallback description trimmed to eBay limits."""
+
+        if not isinstance(description, str):
+            return None
+
+        # If already short enough, return as-is
+        if len(description) < _FALLBACK_DESCRIPTION_LIMIT:
+            return description
+
+        unescaped = html.unescape(description)
+        stripped = _FALLBACK_DESCRIPTION_PATTERN.sub(" ", unescaped)
+        normalized = " ".join(stripped.split()).strip()
+        if not normalized:
+
+            return None
+
+        return normalized[:_FALLBACK_DESCRIPTION_LIMIT]
 
     # ------------------------------------------------------------------
     # Logging helpers
