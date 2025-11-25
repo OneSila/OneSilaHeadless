@@ -481,6 +481,9 @@ class Product(TranslatedModelMixin, models.Model):
             self.save()
 
     def save(self, *args, **kwargs):
+        if isinstance(self.sku, str):
+            stripped_sku = self.sku.strip()
+            self.sku = stripped_sku or None
 
         if not self.sku:
             self._generate_sku()

@@ -17,6 +17,7 @@ class EbaySalesChannelImport(SalesChannelImport):
     ]
 
     type = models.CharField(max_length=32, choices=TYPE_CHOICES)
+    content_class = models.CharField(max_length=512, null=True, blank=True)
 
     class Meta:
         verbose_name = "eBay Sales Channel Import"

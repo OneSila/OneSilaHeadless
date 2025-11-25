@@ -14,9 +14,11 @@ from sales_channels.integrations.ebay.factories.imports.products_imports import 
     EbayProductsImportProcessor,
 )
 from sales_channels.integrations.ebay.models import (
+    EbayCategory,
     EbayInternalProperty,
     EbayInternalPropertyOption,
     EbayProduct,
+    EbayProductCategory,
     EbayProductOffer,
     EbayRemoteLanguage,
     EbaySalesChannel,
@@ -59,16 +61,19 @@ class EbayProductsImportProcessorAssignmentsTest(TestCase):
             import_process=self.import_process,
             sales_channel=self.sales_channel,
         )
+        self.category_tree_id = "EBAY_TREE"
         self.view = baker.make(
             EbaySalesChannelView,
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
             remote_id="EBAY_TEST",
+            default_category_tree_id=self.category_tree_id,
         )
         self.local_product = baker.make(
             "products.Product",
             multi_tenant_company=self.multi_tenant_company,
             sku="LISTING-SKU",
+            type='SIMPLE'
         )
         self.remote_product = baker.make(
             EbayProduct,
@@ -79,6 +84,17 @@ class EbayProductsImportProcessorAssignmentsTest(TestCase):
         self.import_instance = DummyImportInstance(
             remote_instance=self.remote_product,
             instance=self.local_product,
+        )
+
+    def _create_leaf_category(self, remote_id: str) -> EbayCategory:
+        return baker.make(
+            EbayCategory,
+            marketplace_default_tree_id=self.category_tree_id,
+            remote_id=remote_id,
+            name=f"Leaf {remote_id}",
+            full_name=f"Leaf {remote_id}",
+            has_children=False,
+            is_root=False,
         )
 
     def test_creates_offer_records_with_listing_details(self) -> None:
@@ -113,6 +129,49 @@ class EbayProductsImportProcessorAssignmentsTest(TestCase):
         self.assertEqual(offer.listing_status, "ACTIVE")
         self.assertEqual(offer.sales_channel_id, self.sales_channel.id)
         self.assertEqual(offer.multi_tenant_company_id, self.multi_tenant_company.id)
+
+    def test_creates_product_category_mapping_from_offer(self) -> None:
+        category = self._create_leaf_category("123456")
+        offer_payload = {"category_id": category.remote_id}
+
+        self.processor.handle_sales_channels_views(
+            import_instance=self.import_instance,
+            structured_data={"__marketplace_id": self.view.remote_id},
+            view=self.view,
+            offer_data=offer_payload,
+        )
+
+        mapping = EbayProductCategory.objects.get(
+            product=self.local_product,
+            view=self.view,
+        )
+        self.assertEqual(mapping.remote_id, category.remote_id)
+        self.assertEqual(mapping.sales_channel_id, self.sales_channel.id)
+        self.assertEqual(mapping.multi_tenant_company_id, self.multi_tenant_company.id)
+
+    def test_updates_existing_product_category_when_offer_changes(self) -> None:
+        old_category = self._create_leaf_category("111222")
+        new_category = self._create_leaf_category("333444")
+        mapping = baker.make(
+            EbayProductCategory,
+            product=self.local_product,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id=old_category.remote_id,
+        )
+
+        offer_payload = {"category_id": new_category.remote_id}
+
+        self.processor.handle_sales_channels_views(
+            import_instance=self.import_instance,
+            structured_data={"__marketplace_id": self.view.remote_id},
+            view=self.view,
+            offer_data=offer_payload,
+        )
+
+        mapping.refresh_from_db()
+        self.assertEqual(mapping.remote_id, new_category.remote_id)
 
 
 @override_settings(**EBAY_TEST_SETTINGS)
@@ -200,6 +259,50 @@ class EbayProductsImportProcessorTranslationsTest(TestCase):
         )
 
         self.assertEqual(translations[0]["description"], "Parent description")
+
+    def test_parse_translations_filters_description_with_content_class(self) -> None:
+        self.import_process.content_class = "content"
+        processor = EbayProductsImportProcessor(
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+        )
+
+        product_payload = {
+            "locale": "en_US",
+            "product": {
+                "title": "HTML Item",
+                "description": (
+                    '<div class="header">Ignore me</div>'
+                    '<div class="product">'
+                    '<div class="content"><p>Test 123</p></div>'
+                    "</div>"
+                ),
+            },
+        }
+
+        translations, _ = processor._parse_translations(product_data=product_payload)
+        self.assertEqual(
+            translations[0]["description"],
+            '<div class="content"><p>Test 123</p></div>',
+        )
+
+    def test_parse_translations_returns_original_when_content_class_missing(self) -> None:
+        self.import_process.content_class = "missing"
+        processor = EbayProductsImportProcessor(
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+        )
+
+        product_payload = {
+            "locale": "en_US",
+            "product": {
+                "title": "HTML Item",
+                "description": "<div><p>No class match</p></div>",
+            },
+        }
+
+        translations, _ = processor._parse_translations(product_data=product_payload)
+        self.assertEqual(translations[0]["description"], "<div><p>No class match</p></div>")
 
 
 @override_settings(**EBAY_TEST_SETTINGS)

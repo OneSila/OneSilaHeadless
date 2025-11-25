@@ -1,7 +1,13 @@
-from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser, \
-    MultiTenantUserLoginToken
+from core.models.multi_tenant import (
+    MultiTenantCompany,
+    MultiTenantUser,
+    MultiTenantUserLoginToken,
+    DashboardSection,
+    DashboardCard,
+)
 from core.schema.core.types.types import auto
 from core.schema.core.types.input import input, partial, strawberry_input, NodeInput
+from strawberry.relay import GlobalID
 
 
 @input(MultiTenantCompany)
@@ -83,3 +89,22 @@ class UpdateOnboardingStatusInput:
 @partial(MultiTenantUserLoginToken)
 class MultiTenantUserAuthenticateTokenInput:
     token: auto
+
+
+@input(DashboardSection, fields="__all__")
+class DashboardSectionInput:
+    pass
+
+@partial(DashboardSection, fields="__all__")
+class DashboardSectionPartialInput(NodeInput):
+    pass
+
+
+@input(DashboardCard, fields="__all__")
+class DashboardCardInput:
+    pass
+
+
+@partial(DashboardCard, fields="__all__")
+class DashboardCardPartialInput(NodeInput):
+    pass

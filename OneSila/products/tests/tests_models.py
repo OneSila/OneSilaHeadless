@@ -165,6 +165,23 @@ class ProductModelTest(TestCase):
         self.assertTrue(bundle_product.id in bundle_product.get_parent_products(ids_only=True))
         self.assertTrue(bundle_product_two.id in bundle_product.get_parent_products(ids_only=True))
 
+    def test_explicit_sku_is_trimmed(self):
+        product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sku="  CUSTOM-SKU  ",
+        )
+        product.refresh_from_db()
+        self.assertEqual(product.sku, "CUSTOM-SKU")
+
+    def test_whitespace_only_sku_generates_new_value(self):
+        product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sku="   ",
+        )
+        product.refresh_from_db()
+        self.assertTrue(product.sku)
+        self.assertEqual(product.sku, product.sku.strip())
+
 
 class DuplicateProductTestCase(TestCase):
     def setUp(self):
