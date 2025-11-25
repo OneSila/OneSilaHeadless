@@ -286,6 +286,34 @@ class EbayProductsImportProcessorTranslationsTest(TestCase):
             '<div class="content"><p>Test 123</p></div>',
         )
 
+    def test_parse_translations_decodes_escaped_html_description(self) -> None:
+        self.import_process.content_class = "ebaysummary"
+        processor = EbayProductsImportProcessor(
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+        )
+
+        escaped_description = (
+            r'<div class=\"ebaysummary\"><div vocab=\"https://schema.org/\" typeof=\"Product\">'
+            r"<span property=\"description\">IRISH ST PATRICK\'S DAY\r\nINCLUDES</span></div></div>"
+        )
+
+        translations, _ = processor._parse_translations(
+            product_data={
+                "locale": "en_US",
+                "product": {
+                    "title": "Escaped Description",
+                    "description": escaped_description,
+                },
+            }
+        )
+
+        self.assertEqual(
+            translations[0]["description"],
+            '<div class="ebaysummary"><div vocab="https://schema.org/" typeof="Product">'
+            "<span property=\"description\">IRISH ST PATRICK'S DAY\r\nINCLUDES</span></div></div>",
+        )
+
     def test_parse_translations_returns_original_when_content_class_missing(self) -> None:
         self.import_process.content_class = "missing"
         processor = EbayProductsImportProcessor(

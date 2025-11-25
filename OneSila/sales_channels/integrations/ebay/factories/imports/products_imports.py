@@ -181,9 +181,27 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
 
         return normalized or None
 
+    @staticmethod
+    def _unescape_description_html(*, description: str) -> str:
+        """Decode escaped HTML fragments returned as JSON-safe strings."""
+
+        if "\\'" not in description and '\\"' not in description:
+            return description
+
+        try:
+            return description.encode("utf-8").decode("unicode_escape")
+        except UnicodeDecodeError:  # pragma: no cover - defensive
+            logger.debug("Failed to unescape eBay description", exc_info=True)
+            return description
+
     def _filter_description_by_content_class(self, description: str | None) -> str | None:
 
-        if not description or not self._content_class_filter:
+        if not description:
+            return description
+
+        description = self._unescape_description_html(description=description)
+
+        if not self._content_class_filter:
             return description
 
         parser = _HtmlClassExtractor(self._content_class_filter)
