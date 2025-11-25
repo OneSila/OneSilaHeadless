@@ -73,6 +73,7 @@ class EbayProductsImportProcessorAssignmentsTest(TestCase):
             "products.Product",
             multi_tenant_company=self.multi_tenant_company,
             sku="LISTING-SKU",
+            type='SIMPLE'
         )
         self.remote_product = baker.make(
             EbayProduct,
