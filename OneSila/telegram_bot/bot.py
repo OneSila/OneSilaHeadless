@@ -8,18 +8,18 @@ from telegram import Update
 from telegram.ext import filters, Application, CommandHandler, MessageHandler, CallbackContext,\
     ApplicationBuilder
 from django.conf import settings
+
 from .actions import restart_huey
 from core.models.multi_tenant import MultiTenantUser
 
 logger = logging.getLogger(__name__)
 
 # Load default spaCy model
-nlp = spacy.load("en_core_web_sm")
-# try:
-#     nlp = spacy.load("en_core_web_sm")
-# except OSError:
-#     logger.warning("spaCy model en_core_web_sm missing; using blank 'en' pipeline.")
-#     nlp = spacy.blank("en")
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    logger.warning("spaCy model en_core_web_sm missing; using blank 'en' pipeline.")
+    nlp = spacy.blank("en")
 # nlp = spacy.load("telegram_bot/en_core_web_sm_james_extend_model")
 
 # Store user context
