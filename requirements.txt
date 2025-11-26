@@ -58,4 +58,4 @@ ebay_rest
 
 python-telegram-bot
 spacy
-spacy-lookups-dat
+# spacy-lookups-dat
