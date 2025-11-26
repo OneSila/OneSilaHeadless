@@ -122,3 +122,4 @@ EBAY_RU_NAME = 'Name'
 EBAY_ACCOUNT_DELETION_VERIFICATION_TOKEN = "replace-with-onesila-ebay-verification-token-123456"
 
 TEST_WEBHOOK_SECRET = "test-secret"
+TELEGRAM_BOT_TOKEN = "your-telegram-bot-token"
