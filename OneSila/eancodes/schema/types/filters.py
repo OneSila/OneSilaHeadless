@@ -13,4 +13,4 @@ class EanCodeFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     ean_code: auto
     internal: auto
     already_used: auto
-    product:  Optional[ProductFilter]
+    product: Optional[ProductFilter]

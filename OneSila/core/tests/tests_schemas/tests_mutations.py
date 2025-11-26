@@ -291,6 +291,28 @@ class AccountsTestCase(TransactionTestCaseMixin, TransactionTestCase):
         self.assertTrue(resp.data['inviteUser']['isActive'])
         self.assertFalse(resp.data['inviteUser']['invitationAccepted'])
 
+        invited_user_email = username
+        invited_user = MultiTenantUser.objects.get(username=invited_user_email)
+        invited_user_id = to_base64("MultiTenantUserType", invited_user.id)
+
+        # we should resend the invite.
+        resend_mutation = """
+            mutation resendInvite($id: GlobalID!){
+              resendInvite(data: {id: $id}){
+                username
+              }
+            }
+        """
+
+        resp = self.strawberry_test_client(
+            query=resend_mutation,
+            variables={"id": invited_user_id}
+        )
+
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data['resendInvite']['username'] == invited_user_email)
+
+        # And finally accept the invite.
         resp = self.strawberry_test_client(
             query=LOGOUT_MUTATION,
             variables={}

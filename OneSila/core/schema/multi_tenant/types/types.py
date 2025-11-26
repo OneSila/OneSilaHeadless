@@ -1,15 +1,29 @@
 import strawberry
-from django.contrib.auth import get_user_model
 
-from core.schema.core.types.types import type, relay, auto, lazy, Annotated, field
+from core.schema.core.types.types import type, relay, lazy, Annotated, field, strawberry_type
 from core.schema.core.mixins import GetQuerysetMultiTenantMixin
+from core.schema.core.helpers import get_current_user
 
-from core.schema.multi_tenant.types.ordering import MultiTenantUserOrder
-from core.schema.multi_tenant.types.filters import MultiTenantUserFilter
-from core.models.multi_tenant import MultiTenantCompany, MultiTenantUser, MultiTenantUserLoginToken
+from core.schema.multi_tenant.types.ordering import (
+    MultiTenantUserOrder,
+    DashboardSectionOrder,
+    DashboardCardOrder,
+)
+from core.schema.multi_tenant.types.filters import (
+    MultiTenantUserFilter,
+    DashboardSectionFilter,
+    DashboardCardFilter,
+)
+from core.models.multi_tenant import (
+    MultiTenantCompany,
+    MultiTenantUser,
+    MultiTenantUserLoginToken,
+    DashboardSection,
+    DashboardCard,
+)
 
 from strawberry_django.fields.types import DjangoImageType
-from typing import List, TYPE_CHECKING, Dict
+from typing import List, TYPE_CHECKING
 
 from core.typing import TimezoneType
 
@@ -24,6 +38,7 @@ class MinimalMultiTenantUserType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def full_name(self, info) -> str | None:
         return self.full_name
+
 
 @type(MultiTenantUser, filters=MultiTenantUserFilter, order=MultiTenantUserOrder, pagination=True, fields='__all__')
 class MultiTenantUserType(relay.Node):
@@ -47,6 +62,17 @@ class MultiTenantCompanyType(relay.Node):
     def full_address(self, info) -> str:
         return self.full_address
 
+    @field()
+    def has_amazon_integration(self, info) -> bool:
+        from sales_channels.integrations.amazon.models.sales_channels import AmazonSalesChannel
+        return AmazonSalesChannel.objects.filter(multi_tenant_company=self, active=True).exists()
+
+    @field()
+    def has_ebay_integration(self, info) -> bool:
+        from sales_channels.integrations.ebay.models.sales_channels import EbaySalesChannel
+        return EbaySalesChannel.objects.filter(multi_tenant_company=self, active=True).exists()
+
+
 @type(MultiTenantUserLoginToken, exclude=['token'])
 class MultiTenantUserLoginTokenType(relay.Node):
     pass
@@ -55,3 +81,21 @@ class MultiTenantUserLoginTokenType(relay.Node):
 @strawberry.type
 class HasDemoDataType:
     has_demo_data: bool
+
+
+@strawberry_type
+class UserCredentialsType:
+    username: str
+    password: str
+
+
+@type(DashboardSection, filters=DashboardSectionFilter, order=DashboardSectionOrder, pagination=True, fields='__all__')
+class DashboardSectionType(relay.Node, GetQuerysetMultiTenantMixin):
+    user: Annotated['MultiTenantUserType', lazy("core.schema.multi_tenant.types.types")]
+    cards: List[Annotated['DashboardCardType', lazy("core.schema.multi_tenant.types.types")]]
+
+
+@type(DashboardCard, filters=DashboardCardFilter, order=DashboardCardOrder, pagination=True, fields='__all__')
+class DashboardCardType(relay.Node, GetQuerysetMultiTenantMixin):
+    user: Annotated['MultiTenantUserType', lazy("core.schema.multi_tenant.types.types")]
+    section: Annotated['DashboardSectionType', lazy("core.schema.multi_tenant.types.types")]

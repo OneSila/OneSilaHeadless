@@ -16,6 +16,7 @@ def resolve_function(path: str) -> Callable:
     module = importlib.import_module(module_path)
     return getattr(module, func_name)
 
+
 def get_import_path(obj):
     """
     Returns the import path of an object (function or class) as a string.
@@ -45,4 +46,3 @@ def get_import_path(obj):
         return f"{module_path}.{obj.__name__}"
     else:
         raise ValueError(f"Could not determine the name for object {obj}")
-

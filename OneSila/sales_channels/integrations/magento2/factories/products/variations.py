@@ -19,7 +19,7 @@ class MagentoProductVariationAddFactory(GetMagentoAPIMixin, RemoteProductVariati
         if self.configurator_properties is None:
             self.configurator_properties = []
             for remote_property in self.remote_parent_product.configurator.remote_properties.all():
-                magento_property =  self.api.product_attributes.by_code(remote_property.attribute_code)
+                magento_property = self.api.product_attributes.by_code(remote_property.attribute_code)
                 self.configurator_properties.append(magento_property)
 
         self.magento_product: Product = self.api.products.by_sku(self.remote_instance.remote_sku)

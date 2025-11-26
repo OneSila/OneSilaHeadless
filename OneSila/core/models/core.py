@@ -3,7 +3,8 @@ from django.db.models import Model as OldModel
 from dirtyfields import DirtyFieldsMixin
 from core.models.multi_tenant import MultiTenantAwareMixin
 from strawberry.relay import to_base64
-
+from get_absolute_url.helpers import reverse_lazy
+from .mixins import TimeStampMixin
 import logging
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,19 @@ class GlobalIDMixin(OldModel):
         abstract = True
 
 
+class GetAbsoluteURLMixin:
+    def get_absolute_url(self):
+        """
+        Get the absolute url for the product. Keep in mind that the PK is a UUID for graphql.
+        """
+        # Get the url string from the class Meta.url_detail_page_string
+        try:
+            url_string = self._meta.url_detail_page_string
+            return reverse_lazy(url_string, kwargs={'pk': self.global_id})
+        except AttributeError:
+            return None
+
+
 class OnlySaveOnChangeMixin(DirtyFieldsMixin, OldModel):
     created_at = DateTimeField(auto_now_add=True)
     updated_at = DateTimeField(auto_now=True)
@@ -28,25 +42,17 @@ class OnlySaveOnChangeMixin(DirtyFieldsMixin, OldModel):
         if self.is_dirty(check_relationship=True) or force_save:
             super().save(*args, **kwargs)
 
-    def is_dirty_field(self, field):
-        return field in self.get_dirty_fields().keys()
+    def is_dirty_field(self, field, check_relationship=False):
+        return field in self.get_dirty_fields(check_relationship=check_relationship).keys()
 
-    def is_any_field_dirty(self, fields: list) -> bool:
-        return any(self.is_dirty_field(field) for field in fields)
-
-    class Meta:
-        abstract = True
-
-
-class TimeStampMixin(OldModel):
-    created_at = DateTimeField(auto_now_add=True)
-    updated_at = DateTimeField(auto_now=True)
+    def is_any_field_dirty(self, fields: list, check_relationship=False) -> bool:
+        return any(self.is_dirty_field(field, check_relationship=check_relationship) for field in fields)
 
     class Meta:
         abstract = True
 
 
-class Model(GlobalIDMixin, OnlySaveOnChangeMixin, TimeStampMixin, MultiTenantAwareMixin, OldModel):
+class Model(GlobalIDMixin, OnlySaveOnChangeMixin, TimeStampMixin, MultiTenantAwareMixin, GetAbsoluteURLMixin, OldModel):
     class Meta:
         abstract = True
 

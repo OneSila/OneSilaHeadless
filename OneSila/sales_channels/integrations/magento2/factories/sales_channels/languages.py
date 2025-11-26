@@ -11,6 +11,7 @@ class MagentoRemoteLanguagePullFactory(GetMagentoAPIMixin, PullRemoteInstanceMix
     field_mapping = {
         'remote_id': 'id',
         'remote_code': 'locale',
+        'store_view_code': 'code'
     }
     update_field_mapping = field_mapping
     get_or_create_fields = ['remote_id', 'locale']
@@ -21,6 +22,21 @@ class MagentoRemoteLanguagePullFactory(GetMagentoAPIMixin, PullRemoteInstanceMix
     allow_update = True
     allow_delete = True
     is_model_response = True
+
+    def preflight_check(self):
+        """
+        Load website mapping (id → code) before processing.
+        """
+        active = self.sales_channel.active
+        if not active:
+            return active
+
+        self.website_map = {
+            int(website.id): website.code
+            for website in self.api.store.websites
+        }
+
+        return active
 
     def allow_process(self, remote_data):
         return int(remote_data.id) != 0
@@ -34,47 +50,80 @@ class MagentoRemoteLanguagePullFactory(GetMagentoAPIMixin, PullRemoteInstanceMix
     def update_get_or_create_lookup(self, lookup, remote_data):
 
         sales_channel_view = MagentoSalesChannelView.objects.filter(
-            code=remote_data.code,
+            remote_id=remote_data.website_id,
             sales_channel=self.sales_channel
         ).first()
 
         lookup['sales_channel_view'] = sales_channel_view
         return lookup
 
-    def get_or_create_remote_currency(self, remote_data, sales_channel_view):
+    def get_or_create_remote_currency(self, remote_data):
         """
-        Handles the retrieval or creation of the Magento remote currency based on the remote data.
-
-        :param remote_data: Data from the remote system containing currency information.
-        :param sales_channel_view: The sales channel view associated with the remote currency.
+        Retrieves or creates a MagentoCurrency scoped at website level.
         """
-        # Extract the base currency code
+        website_code = self.website_map.get(int(remote_data.website_id))
         base_currency_code = remote_data.base_currency_code
 
-        if base_currency_code:
-            local_currency = Currency.objects.filter(
-                iso_code=base_currency_code,
-                multi_tenant_company=self.sales_channel.multi_tenant_company
-            ).first()
+        if not website_code or not base_currency_code:
+            return
 
-            # Create or get the remote currency mirror, setting local_instance if available
-            magento_currency, created = MagentoCurrency.objects.get_or_create(
-                local_instance=local_currency,
+        local_currency = Currency.objects.filter(
+            iso_code=base_currency_code,
+            multi_tenant_company=self.sales_channel.multi_tenant_company
+        ).first()
+
+        magento_currency, created = MagentoCurrency.objects.get_or_create(
+            website_code=website_code,
+            remote_id=remote_data.website_id,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.sales_channel.multi_tenant_company
+        )
+
+        update_fields = []
+
+        if magento_currency.remote_code != base_currency_code:
+            magento_currency.remote_code = base_currency_code
+            update_fields.append('remote_code')
+
+        if not magento_currency.local_instance and local_currency:
+            magento_currency.local_instance = local_currency
+            update_fields.append('local_instance')
+
+        # Set is_default to True if this is the first default
+        if not MagentoCurrency.objects.filter(
                 sales_channel=self.sales_channel,
-                sales_channel_view=sales_channel_view,
-                remote_code=base_currency_code,
-                multi_tenant_company=self.sales_channel.multi_tenant_company
-            )
+                is_default=True
+        ).exclude(id=magento_currency.id).exists():
+            if not magento_currency.is_default:
+                magento_currency.is_default = True
+                update_fields.append('is_default')
 
-            if created:
-                identifier, _ = self.get_identifiers()
-                self.log_action_for_instance(
-                    magento_currency,
-                    RemoteLog.ACTION_CREATE,
-                    remote_data,
-                    {'base_currency_code': base_currency_code},
-                    identifier
-                )
+        # Update store_view_codes list
+        if remote_data.code and remote_data.code not in magento_currency.store_view_codes:
+            magento_currency.store_view_codes.append(remote_data.code)
+            update_fields.append('store_view_codes')
+
+        if update_fields:
+            magento_currency.save(update_fields=update_fields)
+
+        # Optional: log creation / update
+        identifier, _ = self.get_identifiers()
+        if created:
+            self.log_action_for_instance(
+                magento_currency,
+                RemoteLog.ACTION_CREATE,
+                remote_data,
+                {'base_currency_code': base_currency_code},
+                identifier
+            )
+        elif update_fields:
+            self.log_action_for_instance(
+                magento_currency,
+                RemoteLog.ACTION_UPDATE,
+                remote_data,
+                {'updated_fields': update_fields},
+                identifier
+            )
 
     def process_remote_instance(self, remote_data, remote_instance_mirror, created):
         """
@@ -86,4 +135,4 @@ class MagentoRemoteLanguagePullFactory(GetMagentoAPIMixin, PullRemoteInstanceMix
             sales_channel_view.url = remote_data.base_url
             sales_channel_view.save()
 
-        self.get_or_create_remote_currency(remote_data, sales_channel_view)
+        self.get_or_create_remote_currency(remote_data)

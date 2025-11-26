@@ -1,15 +1,18 @@
 import logging
 from datetime import datetime
+import json
 from typing import Optional, Tuple, Dict
 
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
+from django.core.serializers.json import DjangoJSONEncoder
 
 from core.huey import DEFAULT_PRIORITY
 from integrations.helpers import resolve_function
 from integrations.models import IntegrationTaskQueue, Integration
 
 logger = logging.getLogger(__name__)
+
 
 class TaskQueueFactory:
     def __init__(self,
@@ -55,7 +58,8 @@ class TaskQueueFactory:
         """
         Determine and set the number of remote requests for the task.
         """
-        self.remote_requests = self.number_of_remote_requests if self.number_of_remote_requests is not None else getattr(self.task_func, 'number_of_remote_requests', 1)
+        self.remote_requests = self.number_of_remote_requests if self.number_of_remote_requests is not None else getattr(
+            self.task_func, 'number_of_remote_requests', 1)
 
     def set_active_requests(self):
         """
@@ -84,6 +88,9 @@ class TaskQueueFactory:
         """
         return IntegrationTaskQueue.PROCESSING if self.process_now else IntegrationTaskQueue.PENDING
 
+    def _serialize(self, data):
+        return json.loads(json.dumps(data, cls=DjangoJSONEncoder))
+
     def create_task_queue_item(self):
         """
         Create the IntegrationTaskQueue entry and set it as a class attribute.
@@ -98,8 +105,8 @@ class TaskQueueFactory:
         self.task_queue_item = IntegrationTaskQueue.objects.create(
             integration=self.integration,
             task_name=self.task_func_path,
-            task_args=self.task_args,
-            task_kwargs=self.task_kwargs,
+            task_args=self._serialize(self.task_args),
+            task_kwargs=self._serialize(self.task_kwargs),
             status=task_status,
             number_of_remote_requests=self.remote_requests,
             priority=task_priority,
@@ -115,7 +122,7 @@ class TaskQueueFactory:
         Dispatch the task if conditions allow, using the created task_queue_item.
         """
         if self.process_now and self.task_queue_item:
-            self.task_queue_item.dispatch()
+            self.task_queue_item.safe_dispatch()
 
     def run(self):
         """
@@ -149,9 +156,23 @@ class ProcessIntegrationTasksFactory:
     def dispatch_tasks(self, integration, pending_tasks):
         """
         Dispatch the pending tasks for the current integration.
+        If the integration is inactive, mark tasks as skipped.
         """
+        if not integration.active:
+
+            for task in pending_tasks:
+                task.status = IntegrationTaskQueue.SKIPPED
+
+            IntegrationTaskQueue.objects.bulk_update(pending_tasks, ['status'])
+            logger.info(
+                f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
+                f"Integration '{integration.hostname}' is inactive — skipped {len(pending_tasks)} task(s)."
+            )
+            return
+
+        # If active, continue with normal dispatch
         for task_queue_item in pending_tasks:
-            task_queue_item.dispatch()
+            task_queue_item.safe_dispatch()
             logger.info(
                 f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
                 f"Dispatched task '{task_queue_item.task_name}' for Integration '{integration.hostname}'"

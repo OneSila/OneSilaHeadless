@@ -1,0 +1,222 @@
+from typing import Optional
+
+from core.schema.core.types.filters import filter, SearchFilterMixin
+from strawberry_django import filter_field as custom_filter
+from django.db.models import Q
+from strawberry import UNSET
+from core.managers import QuerySet
+from core.schema.core.types.types import auto
+from sales_channels.integrations.amazon.managers import AmazonPropertyQuerySet, AmazonPropertySelectValueQuerySet
+from sales_channels.integrations.amazon.models import (
+    AmazonSalesChannel,
+    AmazonProperty,
+    AmazonPropertySelectValue,
+    AmazonProduct,
+    AmazonProductProperty,
+    AmazonProductType,
+    AmazonSalesChannelImport,
+    AmazonProductTypeItem,
+    AmazonDefaultUnitConfigurator,
+    AmazonRemoteLog,
+    AmazonProductIssue,
+    AmazonBrowseNode,
+    AmazonProductBrowseNode,
+    AmazonExternalProductId,
+    AmazonGtinExemption,
+    AmazonVariationTheme,
+    AmazonImportBrokenRecord,
+)
+from properties.schema.types.filters import (
+    PropertyFilter,
+    PropertySelectValueFilter,
+    ProductPropertiesRuleFilter,
+    ProductPropertiesRuleItemFilter,
+    ProductPropertyFilter,
+)
+from products.schema.types.filters import ProductFilter
+from sales_channels.schema.types.filter_mixins import (
+    DependentMappedLocallyFilterMixin,
+    GeneralMappedLocallyFilterMixin,
+    GeneralMappedRemotelyFilterMixin,
+)
+from sales_channels.schema.types.filters import (
+    SalesChannelFilter,
+    SalesChannelViewFilter,
+    RemoteProductFilter,
+)
+from imports_exports.schema.types.filters import ImportFilter
+from sales_channels.integrations.amazon.models import AmazonSalesChannelView
+
+
+@filter(AmazonSalesChannel)
+class AmazonSalesChannelFilter(SearchFilterMixin):
+    id: auto
+    active: auto
+    hostname: auto
+
+
+@filter(AmazonSalesChannelView)
+class AmazonSalesChannelViewFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    is_default: auto
+
+
+@filter(AmazonProperty)
+class AmazonPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: Optional[PropertyFilter]
+    allows_unmapped_values: auto
+    type: auto
+
+    def get_mapped_locally_querysets(self):
+        return (
+            (AmazonPropertyQuerySet, "filter_mapped_locally"),
+            (AmazonPropertySelectValueQuerySet, "filter_amazon_property_mapped_locally"),
+        )
+
+
+@filter(AmazonPropertySelectValue)
+class AmazonPropertySelectValueFilter(SearchFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    amazon_property: Optional[AmazonPropertyFilter]
+    local_instance: Optional[PropertySelectValueFilter]
+    marketplace: Optional[SalesChannelViewFilter]
+
+
+@filter(AmazonProductType)
+class AmazonProductTypeFilter(SearchFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
+    id: auto
+    product_type_code: auto
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: Optional[ProductPropertiesRuleFilter]
+
+
+@filter(AmazonProductTypeItem)
+class AmazonProductTypeItemFilter(SearchFilterMixin):
+    id: auto
+    amazon_rule: Optional[AmazonProductTypeFilter]
+    local_instance: Optional[ProductPropertiesRuleItemFilter]
+    remote_property: Optional[AmazonPropertyFilter]
+    remote_type: auto
+
+
+@filter(AmazonProduct)
+class AmazonProductFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: Optional[ProductFilter]
+    remote_parent_product: Optional[RemoteProductFilter]
+
+
+@filter(AmazonProductProperty)
+class AmazonProductPropertyFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: Optional[ProductPropertyFilter]
+    remote_select_value: Optional[AmazonPropertySelectValueFilter]
+    remote_product: Optional[AmazonProductFilter]
+
+
+@filter(AmazonSalesChannelImport)
+class AmazonSalesChannelImportFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    status: auto
+    type: auto
+
+
+@filter(AmazonDefaultUnitConfigurator)
+class AmazonDefaultUnitConfiguratorFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    marketplace: Optional[SalesChannelViewFilter]
+
+    @custom_filter
+    def mapped_locally(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
+        if value not in (None, UNSET):
+            queryset = queryset.filter(selected_unit__isnull=not value)
+
+        return queryset, Q()
+
+
+@filter(AmazonRemoteLog)
+class AmazonRemoteLogFilter(SearchFilterMixin):
+    id: auto
+    remote_product: Optional[RemoteProductFilter]
+
+
+@filter(AmazonProductIssue)
+class AmazonProductIssueFilter(SearchFilterMixin):
+    id: auto
+    is_validation_issue: auto
+    view: Optional[SalesChannelViewFilter]
+    remote_product: Optional[RemoteProductFilter]
+
+
+@filter(AmazonBrowseNode)
+class AmazonBrowseNodeFilter(SearchFilterMixin):
+    remote_id: auto
+    marketplace_id: auto
+    name: auto
+    context_name: auto
+    path_depth: auto
+    is_root: auto
+    parent_node: Optional["AmazonBrowseNodeFilter"]
+
+
+@filter(AmazonProductBrowseNode)
+class AmazonProductBrowseNodeFilter(SearchFilterMixin):
+    id: auto
+    product: Optional[ProductFilter]
+    sales_channel: Optional[SalesChannelFilter]
+    view: Optional[SalesChannelViewFilter]
+    recommended_browse_node_id: auto
+
+
+@filter(AmazonExternalProductId)
+class AmazonExternalProductIdFilter(SearchFilterMixin):
+    id: auto
+    product: Optional[ProductFilter]
+    view: Optional[SalesChannelViewFilter]
+    value: auto
+    type: auto
+    created_asin: auto
+
+
+@filter(AmazonGtinExemption)
+class AmazonGtinExemptionFilter(SearchFilterMixin):
+    id: auto
+    product: Optional[ProductFilter]
+    view: Optional[SalesChannelViewFilter]
+    value: auto
+
+
+@filter(AmazonVariationTheme)
+class AmazonVariationThemeFilter(SearchFilterMixin):
+    id: auto
+    product: Optional[ProductFilter]
+    view: Optional[SalesChannelViewFilter]
+    theme: auto
+
+
+@filter(AmazonImportBrokenRecord)
+class AmazonImportBrokenRecordFilter(SearchFilterMixin):
+    id: auto
+    import_process: Optional[ImportFilter]
+
+    @custom_filter
+    def code(self, queryset, value: str, prefix: str) -> tuple[QuerySet, Q]:
+        if value not in (None, UNSET):
+            queryset = queryset.filter(record__code=value)
+        return queryset, Q()
+
+    @custom_filter
+    def exclude_unknown_issues(
+        self, queryset, value: bool, prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value not in (None, UNSET, False):
+            queryset = queryset.exclude(record__code="UNKNOWN_ERROR")
+        return queryset, Q()

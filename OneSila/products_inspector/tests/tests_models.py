@@ -7,6 +7,9 @@ from eancodes.models import EanCode
 from eancodes.signals import ean_code_released_for_product
 from inventory.models import Inventory, InventoryLocation
 from products.models import ConfigurableProduct, SimpleProduct, BundleVariation, BundleProduct, ConfigurableVariation
+from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel, WoocommerceSalesChannelView
+from sales_channels.models import SalesChannelViewAssign
+from unittest.mock import patch
 from media.models import MediaProductThrough, Media
 from products_inspector.constants import *
 from products_inspector.models import Inspector
@@ -35,7 +38,8 @@ class InspectorBlockHasImageTestCase(TestCase):
         media = Media.objects.create(
             type=Media.IMAGE,
             image=image,
-            owner=self.user
+            owner=self.user,
+            multi_tenant_company=self.multi_tenant_company
         )
 
         MediaProductThrough.objects.create(
@@ -50,6 +54,60 @@ class InspectorBlockHasImageTestCase(TestCase):
         inspector_block.refresh_from_db()
 
         # Step 5: Recheck the inspector's has_missing_information - it should now be False
+        self.assertTrue(inspector_block.successfully_checked)
+
+    def test_simple_product_assignment_requires_images(self):
+        product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company
+        )
+
+        inspector_block = product.inspector.blocks.get(error_code=HAS_IMAGES_ERROR)
+        self.assertTrue(inspector_block.successfully_checked)
+
+        with patch('sales_channels.integrations.woocommerce.models.WoocommerceSalesChannel.connect', lambda self: None):
+            sales_channel = WoocommerceSalesChannel.objects.create(
+                hostname='https://example.com',
+                api_key='k',
+                api_secret='s',
+                api_version=WoocommerceSalesChannel.API_VERSION_3,
+                timeout=5,
+                active=False,
+                multi_tenant_company=self.multi_tenant_company,
+            )
+            view = WoocommerceSalesChannelView.objects.create(
+                sales_channel=sales_channel,
+                multi_tenant_company=self.multi_tenant_company,
+                name='Main',
+                url='https://example.com'
+            )
+            SalesChannelViewAssign.objects.create(
+                product=product,
+                sales_channel=sales_channel,
+                sales_channel_view=view,
+                multi_tenant_company=self.multi_tenant_company,
+            )
+
+        inspector_block.refresh_from_db()
+        self.assertFalse(inspector_block.successfully_checked)
+
+        image = SimpleUploadedFile('img.jpg', b'img', content_type='image/jpeg')
+
+        media = Media.objects.create(
+            type=Media.IMAGE,
+            image=image,
+            owner=self.user,
+            multi_tenant_company=self.multi_tenant_company
+        )
+
+        MediaProductThrough.objects.create(
+            product=product,
+            media=media,
+            sort_order=1,
+            is_main_image=True,
+            multi_tenant_company=self.multi_tenant_company
+        )
+
+        inspector_block.refresh_from_db()
         self.assertTrue(inspector_block.successfully_checked)
 
 
@@ -76,7 +134,6 @@ class InspectorBlockMissingPricesTestCase(TestCase):
         # Step 5: Recheck the inspector block's successfully_checked field - it should now be False (since no price exists)
         self.assertFalse(inspector_block.successfully_checked)
 
-
     def test_inspector_block_for_price_create_and_delete(self):
         # Step 1: Create a required product (e.g., SimpleProduct)
         product = SimpleProduct.objects.create(
@@ -88,7 +145,7 @@ class InspectorBlockMissingPricesTestCase(TestCase):
         inspector_block = product.inspector.blocks.get(error_code=MISSING_PRICES_ERROR)
         self.assertFalse(inspector_block.successfully_checked)
 
-        currency = Currency.objects.create(is_default_currency=True, multi_tenant_company=self.multi_tenant_company, **currencies['BE'])
+        currency, _ = Currency.objects.get_or_create(is_default_currency=True, multi_tenant_company=self.multi_tenant_company, **currencies['GB'])
         # Step 3: Add a SalesPrice to the product
         SalesPrice.objects.create(
             product=product,
@@ -296,7 +353,6 @@ class InspectorBlockMissingComponentsTest(TestCase):
         self.assertTrue(inspector_block.successfully_checked)
 
 
-
 class InspectorBlockMissingSupplierProductsTest(TestCase):
 
     def setUp(self):
@@ -350,9 +406,7 @@ class InspectorBlockMissingEanCodeTest(TestCase):
             value_select=self.product_type_value
         )
 
-
         self.ean_code = "1234567890123"
-
 
     def test_inspector_block_for_ean_code_creation_with_product(self):
         # Step 1: Create an EAN code associated with the product
@@ -371,7 +425,6 @@ class InspectorBlockMissingEanCodeTest(TestCase):
 
         # Step 3: Check the inspector block's successfully_checked field - it should be True
         self.assertTrue(inspector_block.successfully_checked)
-
 
     def test_inspector_block_for_ean_code_update_with_product(self):
         # Step 1: Create an EAN code associated with the product
@@ -699,7 +752,7 @@ class InspectorBlockMissingManualPriceListOverrideTest(TestCase):
             active=True,
         )
 
-        self.currency = Currency.objects.create(is_default_currency=True, multi_tenant_company=self.multi_tenant_company, **currencies['BE'])
+        self.currency, _ = Currency.objects.get_or_create(is_default_currency=True, multi_tenant_company=self.multi_tenant_company, **currencies['GB'])
 
         # Set up a SalesPriceList
         self.sales_price_list = SalesPriceList.objects.create(
@@ -859,57 +912,6 @@ class InspectorBlockProductTypeMismatchTest(TestCase):
         inspector_block.refresh_from_db()
         self.assertTrue(inspector_block.successfully_checked)
 
-        product_property_2.value_select = self.product_type_value_2
-        product_property_2.save()
-
-        inspector_block.refresh_from_db()
-        self.assertFalse(inspector_block.successfully_checked)
-
-        future_broken.delete()
-        inspector_block.refresh_from_db()
-        self.assertTrue(inspector_block.successfully_checked)
-
-    def test_items_mismatch_product_type(self):
-        # Assign product type to bundle product
-        ProductProperty.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            product=self.bundle_product,
-            property=self.product_type_property,
-            value_select=self.product_type_value_1
-        )
-
-        # Assign same product type to items
-        product_property_1 = ProductProperty.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            product=self.simple_product_1,
-            property=self.product_type_property,
-            value_select=self.product_type_value_1
-        )
-        product_property_2 = ProductProperty.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            product=self.simple_product_2,
-            property=self.product_type_property,
-            value_select=self.product_type_value_1
-        )
-
-        # Link items to bundle product
-        BundleVariation.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            parent=self.bundle_product,
-            variation=self.simple_product_1
-        )
-        future_broken = BundleVariation.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            parent=self.bundle_product,
-            variation=self.simple_product_2
-        )
-
-        # Check if the inspector block is successfully checked
-        inspector_block = self.bundle_product.inspector.blocks.get(error_code=ITEMS_MISMATCH_PRODUCT_TYPE_ERROR)
-        inspector_block.refresh_from_db()
-        self.assertTrue(inspector_block.successfully_checked)
-
-        # Change one item's product type to a different value
         product_property_2.value_select = self.product_type_value_2
         product_property_2.save()
 
@@ -1248,4 +1250,96 @@ class InspectorBlockDuplicateVariationsTest(TestCase):
         inspector_block.refresh_from_db()
 
         # The inspector block should now pass since there is only one variation left
+        self.assertTrue(inspector_block.successfully_checked)
+
+
+class AmazonValidationIssuesInspectorBlockTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        from sales_channels.integrations.amazon.models import (
+            AmazonSalesChannel,
+            AmazonSalesChannelView,
+            AmazonProduct,
+        )
+
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="GB",
+        )
+        self.product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.remote_product = AmazonProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_sku="SKU1",
+        )
+
+    def test_validation_issue_block(self):
+        from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteValidationIssueFactory
+        from products_inspector.constants import AMAZON_VALIDATION_ISSUES_ERROR
+
+        inspector_block = self.product.inspector.blocks.get(error_code=AMAZON_VALIDATION_ISSUES_ERROR)
+        self.assertTrue(inspector_block.successfully_checked)
+
+        issues = [{"code": "V", "message": "bad", "severity": "ERROR"}]
+        FetchRemoteValidationIssueFactory(remote_product=self.remote_product, view=self.view, issues=issues).run()
+
+        inspector_block.refresh_from_db()
+        self.assertFalse(inspector_block.successfully_checked)
+
+        FetchRemoteValidationIssueFactory(remote_product=self.remote_product, view=self.view, issues=[]).run()
+        inspector_block.refresh_from_db()
+        self.assertTrue(inspector_block.successfully_checked)
+
+
+class AmazonRemoteIssuesInspectorBlockTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        from sales_channels.integrations.amazon.models import (
+            AmazonSalesChannel,
+            AmazonSalesChannelView,
+            AmazonProduct,
+        )
+
+        self.sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="SELLER",
+        )
+        self.view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="GB",
+        )
+        self.product = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.remote_product = AmazonProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_sku="SKU1",
+        )
+
+    def test_remote_issue_block(self):
+        from sales_channels.integrations.amazon.factories.sales_channels.issues import FetchRemoteIssuesFactory
+        from products_inspector.constants import AMAZON_REMOTE_ISSUES_ERROR
+
+        inspector_block = self.product.inspector.blocks.get(error_code=AMAZON_REMOTE_ISSUES_ERROR)
+        self.assertTrue(inspector_block.successfully_checked)
+
+        response = {"issues": [{"code": "X", "message": "bad", "severity": "ERROR"}]}
+        FetchRemoteIssuesFactory(remote_product=self.remote_product, view=self.view, response_data=response).run()
+        inspector_block.refresh_from_db()
+        self.assertFalse(inspector_block.successfully_checked)
+
+        response = {"issues": []}
+        FetchRemoteIssuesFactory(remote_product=self.remote_product, view=self.view, response_data=response).run()
+        inspector_block.refresh_from_db()
         self.assertTrue(inspector_block.successfully_checked)

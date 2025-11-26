@@ -1,23 +1,36 @@
-from decimal import Decimal
-from typing import List, Optional
-from core.schema.core.types.input import NodeInput, input, partial
-from core.schema.core.types.types import Annotated, lazy
+from typing import List
 
-from products.models import Product, BundleProduct, ConfigurableProduct, SimpleProduct, \
-    ProductTranslation, ConfigurableVariation, BundleVariation
+import strawberry
+
+from core.schema.core.types.input import NodeInput, input, partial
+from products.models import (
+    Product,
+    BundleProduct,
+    ConfigurableProduct,
+    SimpleProduct,
+    ProductTranslation,
+    ConfigurableVariation,
+    BundleVariation,
+    ProductTranslationBulletPoint,
+)
+from properties.schema.types.input import (
+    ProductPropertiesRulePartialInput,
+    PropertySelectValuePartialInput,
+)
+
 
 @input(Product, fields="__all__")
 class ProductInput:
     name: str
+    alias_copy_images: bool
+    alias_copy_product_properties: bool
+    alias_copy_content: bool = True
 
 
 @partial(Product, fields="__all__")
 class ProductPartialInput(NodeInput):
     pass
 
-@partial(Product, fields="__all__")
-class ProductAiContentInput(NodeInput):
-    language: str
 
 @input(BundleProduct, fields="__all__")
 class BundleProductInput:
@@ -77,3 +90,15 @@ class BundleVariationInput:
 @partial(BundleVariation, fields="__all__")
 class BundleVariationPartialInput(NodeInput):
     pass
+
+
+@input(ProductTranslationBulletPoint, fields="__all__")
+class ProductTranslationBulletPointInput:
+    pass
+
+
+@partial(ProductTranslationBulletPoint, fields="__all__")
+class ProductTranslationBulletPointPartialInput(NodeInput):
+    pass
+
+

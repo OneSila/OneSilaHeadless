@@ -25,7 +25,7 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
 
     def fetch_remote_instances(self):
         """
-        Fetch remote instances using the Magento API's `all_in_memory` method, 
+        Fetch remote instances using the Magento API's `all_in_memory` method,
         which retrieves all relevant orders since the specified number of hours ago,
         with a fallback to the `sync_orders_after` date if it is more recent.
         """
@@ -34,7 +34,6 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
         self.remote_instances = self.api.orders.\
             add_criteria('status', MagentoApiOrder.STATUS_COMPLETE).\
             all_in_memory()
-
 
     def process_remote_instance(self, remote_data: MagentoApiOrder, remote_instance_mirror: MagentoOrder, created: bool):
         """
@@ -50,13 +49,11 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
         self.set_sales_view(remote_data)
 
         # Set the remote language and currency
-        self.set_remote_language(remote_data)
         self.set_remote_currency(remote_data)
 
         local_order = self.create_local_order(remote_data)
         self.assign_local_order(remote_instance_mirror, local_order)
         self.populate_items(local_order, remote_data, remote_instance_mirror)
-
 
     def set_sales_view(self, remote_data):
         """
@@ -74,24 +71,12 @@ class MagentoOrderPullFactory(GetMagentoAPIMixin, RemoteOrderPullFactory):
         if not self.sales_view:
             raise ValueError(f"Sales Channel View not found for store ID {store_id} in sales channel {self.sales_channel}.")
 
-    def set_remote_language(self, remote_data):
-        """
-        Sets the remote language for the order using the sales view and sales channel.
-        """
-        self.remote_language = MagentoRemoteLanguage.objects.filter(
-            sales_channel_view=self.sales_view,
-            sales_channel=self.sales_channel
-        ).first()
-
-        if not self.remote_language:
-            raise ValueError(f"Remote language not found for sales view {self.sales_view} in sales channel {self.sales_channel}.")
-
     def set_remote_currency(self, remote_data):
         """
         Sets the remote currency for the order using the sales view and sales channel.
         """
         self.remote_currency = MagentoCurrency.objects.filter(
-            sales_channel_view=self.sales_view,
+            website_code=self.sales_view.code,
             sales_channel=self.sales_channel
         ).first()
 

@@ -13,6 +13,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='multitenantuser',
             name='onboarding_status',
-            field=models.CharField(choices=[('GENERATE_DEMO_DATA', 'Generate Demo Data'), ('ADD_COMPANY', 'Add Company'), ('ADD_CURRENCY', 'Add Currency'), ('CONFIRM_VAT_RATE', 'Confirm VAT Rate'), ('DASHBOARD_CARDS_PRESENTATION', 'Dashboard Cards Presentation'), ('COMPLETE_DASHBOARD_CARDS', 'Complete Dashboard Cards'), ('DONE', 'Done')], default='ADD_COMPANY', max_length=30),
+            field=models.CharField(choices=[('GENERATE_DEMO_DATA', 'Generate Demo Data'), ('ADD_COMPANY', 'Add Company'), ('ADD_CURRENCY', 'Add Currency'), ('CONFIRM_VAT_RATE', 'Confirm VAT Rate'), (
+                'DASHBOARD_CARDS_PRESENTATION', 'Dashboard Cards Presentation'), ('COMPLETE_DASHBOARD_CARDS', 'Complete Dashboard Cards'), ('DONE', 'Done')], default='ADD_COMPANY', max_length=30),
         ),
     ]

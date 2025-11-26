@@ -22,6 +22,7 @@ class InventoryFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     quantity: auto
     inventorylocation: InventoryLocationFilter | None
 
+
 @filter(InventoryMovement)
 class InventoryMovementFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     id: auto

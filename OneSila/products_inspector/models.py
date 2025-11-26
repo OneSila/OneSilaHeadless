@@ -1,13 +1,16 @@
 from core import models
 from products.models import Product
 from django.utils.translation import gettext_lazy as _
+
+from products.product_types import ALIAS
 from products_inspector.managers import InspectorBlockHasImagesManager, InspectorBlockMissingPricesManager, \
     MissingVariationInspectorBlockManager, MissingBundleItemsInspectorBlockManager, \
     InactiveBundleItemsInspectorBlockManager, MissingEanCodeInspectorBlockManager, \
     MissingProductTypeInspectorBlockManager, MissingRequiredPropertiesInspectorBlockManager, MissingOptionalPropertiesInspectorBlockManager, \
     MissingStockManager, MissingManualPriceListOverrideManager, VariationMismatchProductTypeManager, \
     ItemsMismatchProductTypeManager, ItemsMissingMandatoryInformationManager, VariationsMissingMandatoryInformationManager, \
-    DuplicateVariationsManager, NonConfigurableRuleInspectorBlockManager
+    DuplicateVariationsManager, NonConfigurableRuleInspectorBlockManager, AmazonValidationIssuesInspectorBlockManager, \
+    AmazonRemoteIssuesInspectorBlockManager
 
 
 class Inspector(models.Model):
@@ -26,6 +29,40 @@ class Inspector(models.Model):
 
     def __str__(self):
         return f"Inspector for {self.product.sku}"
+
+    def completion_percentage(self) -> tuple[int, list[dict]]:
+        """Return completion percentage and block info.
+
+        The percentage is rounded to the nearest whole number and only
+        considers blocks marked as REQUIRED or OPTIONAL. The blocks list
+        includes dictionaries with ``code`` and ``completed`` keys for the
+        applicable blocks.
+        """
+        from products_inspector.constants import REQUIRED, OPTIONAL
+
+        total_blocks = 0
+        completed_blocks = 0
+        blocks = []
+
+        for block in self.blocks.all():
+            target_field = block.get_target_field_key()
+            if not target_field:
+                continue
+
+            applicability = getattr(block, target_field, None)
+            if applicability in (REQUIRED, OPTIONAL):
+                total_blocks += 1
+                completed = block.successfully_checked
+                if completed:
+                    completed_blocks += 1
+                blocks.append({"code": block.error_code, "completed": completed})
+
+        if total_blocks == 0:
+            percentage = 100
+        else:
+            percentage = round((completed_blocks / total_blocks) * 100)
+
+        return percentage, blocks
 
 
 class InspectorBlock(models.Model):
@@ -66,7 +103,10 @@ class InspectorBlock(models.Model):
             CONFIGURABLE: 'configurable_product_applicability',
         }
 
-        return product_type_map.get(self.inspector.product.type)
+        if self.inspector.product.type == ALIAS:
+            return product_type_map.get(self.inspector.product.alias_parent_product.type)
+        else:
+            return product_type_map.get(self.inspector.product.type)
 
     def __str__(self):
         return f"{self.get_error_code_display()} for {self.inspector.product.sku} ({self.successfully_checked})"
@@ -170,6 +210,7 @@ class MissingOptionalPropertiesInspectorBlock(InspectorBlock):
         proxy = True
         verbose_name = _("Inspector Block Missing Optional Properties")
 
+
 class MissingStockInspectorBlock(InspectorBlock):
     from .constants import missing_stock_block
 
@@ -201,17 +242,6 @@ class VariationMismatchProductTypeInspectorBlock(InspectorBlock):
     class Meta:
         proxy = True
         verbose_name = _("Inspector Block Variation Mismatch Product Type")
-
-
-class ItemsMismatchProductTypeInspectorBlock(InspectorBlock):
-    from .constants import items_mismatch_product_type_block
-
-    objects = ItemsMismatchProductTypeManager()
-    proxy_filter_fields = items_mismatch_product_type_block
-
-    class Meta:
-        proxy = True
-        verbose_name = _("Inspector Block Items Mismatch Product Type")
 
 
 class ItemsMissingMandatoryInformationInspectorBlock(InspectorBlock):
@@ -256,3 +286,25 @@ class NonConfigurableRuleInspectorBlock(InspectorBlock):
     class Meta:
         proxy = True
         verbose_name = _("Inspector Block Non-Configurable Rule")
+
+
+class AmazonValidationIssuesInspectorBlock(InspectorBlock):
+    from .constants import amazon_validation_issues_block
+
+    objects = AmazonValidationIssuesInspectorBlockManager()
+    proxy_filter_fields = amazon_validation_issues_block
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Inspector Block Amazon Validation Issues")
+
+
+class AmazonRemoteIssuesInspectorBlock(InspectorBlock):
+    from .constants import amazon_remote_issues_block
+
+    objects = AmazonRemoteIssuesInspectorBlockManager()
+    proxy_filter_fields = amazon_remote_issues_block
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Inspector Block Amazon Remote Issues")

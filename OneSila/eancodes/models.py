@@ -17,7 +17,9 @@ class EanCode(models.Model):
         null=True,
         blank=True,
     )
-    ean_code = models.CharField(max_length=14, blank=True, null=True)
+
+    # we will let max_length 126 and do sone frontend validation
+    ean_code = models.CharField(max_length=126, blank=True, null=True)
     internal = models.BooleanField(default=True, help_text='Generated from the prefix')
     already_used = models.BooleanField(default=False)
 
@@ -42,7 +44,7 @@ class EanCode(models.Model):
     class Meta:
         unique_together = (
             ('product', 'ean_code'),
-            ('product', 'multi_tenant_company'), # a product can only have one ean code
+            ('product', 'multi_tenant_company'),  # a product can only have one ean code
         )
         constraints = [
             models.UniqueConstraint(

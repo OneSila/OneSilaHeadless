@@ -1,5 +1,6 @@
 import traceback
 import inspect
+import sys
 
 from django.db import IntegrityError
 
@@ -11,19 +12,20 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class IntegrationInstanceOperationMixin:
     """
     Mixin providing common operations for remote instance factories.
     Includes methods for API interaction, response handling, logging, and error management.
     """
-    integration_key = 'integration' # the name of the main integration key ex sales_channel / remote_account
+    integration_key = 'integration'  # the name of the main integration key ex sales_channel / remote_account
 
     def get_api(self):
         """
         Retrieves the API client or wrapper based on the sales channel.
         This method should be overridden to return the appropriate API client.
         """
-        raise NotImplementedError("Subclasses must implement the get_api method to return the API client.")
+        raise NotImplementedError(f"{self.__class__.__name__} must implement the get_api method to return the API client.")
 
     def set_api(self):
         if not hasattr(self, 'api') or self.api is None:
@@ -48,11 +50,9 @@ class IntegrationInstanceOperationMixin:
         if fixing_caller and fixing_class:
             fixing_identifier = f"{fixing_class.__name__}:{fixing_caller}"
 
-
         return f"{class_name}:{caller}", fixing_identifier
 
-
-    def log_action_for_instance(self, remote_instance, action, response_data, payload, identifier):
+    def log_action_for_instance(self, remote_instance, action, response_data, payload, identifier, **extra):
         if not remote_instance:
             raise ValueError("A valid remote_instance must be provided for logging.")
 
@@ -61,19 +61,29 @@ class IntegrationInstanceOperationMixin:
             response=response_data,
             payload=payload,
             identifier=identifier,
-            remote_product=getattr(self, 'remote_product', None)
+            remote_product=getattr(self, 'remote_product', None),
+            **extra
         )
 
-    def log_action(self, action, response_data, payload, identifier):
+    def log_action(self, action, response_data, payload, identifier, **extra):
         """
         Logs actions for remote instance operations.
         """
-        self.remote_instance.add_log(
+        remote_instance = getattr(self, "remote_instance", None)
+        if not remote_instance:
+            logger.warning(
+                "Skipping action log for %s because remote_instance is missing",
+                identifier,
+            )
+            return
+
+        remote_instance.add_log(
             action=action,
             response=response_data,
             payload=payload,
             identifier=identifier,
-            remote_product=getattr(self, 'remote_product', None)
+            remote_product=getattr(self, 'remote_product', None),
+            **extra
         )
 
     def log_error(self, exception, action, identifier, payload, fixing_identifier=None):
@@ -84,8 +94,17 @@ class IntegrationInstanceOperationMixin:
         error_message = str(exception)
         payload = clean_json_data(payload)
 
+        remote_instance = getattr(self, "remote_instance", None)
+        if remote_instance is None:
+            logger.warning(
+                "Skipping error log for %s because remote_instance is missing: %s",
+                identifier,
+                error_message,
+            )
+            return
+
         if hasattr(self.integration._meta, 'user_exceptions') and isinstance(exception, self.integration._meta.user_exceptions):
-            self.remote_instance.add_user_error(
+            remote_instance.add_user_error(
                 action=action,
                 response=error_message,
                 payload=payload,
@@ -95,7 +114,7 @@ class IntegrationInstanceOperationMixin:
                 fixing_identifier=fixing_identifier
             )
         else:
-            self.remote_instance.add_admin_error(
+            remote_instance.add_admin_error(
                 action=action,
                 response=error_message,
                 payload=payload,
@@ -125,12 +144,16 @@ class IntegrationInstanceOperationMixin:
         result = data
 
         for field in fields:
-            if is_model:
-                result = getattr(result, field, None)
-            else:
-                result = result.get(field, None)
-            if result is None:
-                break
+            try:
+                if is_model:
+                    result = getattr(result, field, None)
+                else:
+                    result = result.get(field, None)
+
+                if result is None:
+                    break
+            except Exception as e:
+                raise e.__class__(f"Field {field} not found in data {data}") from e
 
         return result
 
@@ -162,13 +185,13 @@ class IntegrationInstanceOperationMixin:
         """
         raise NotImplementedError("Subclasses should implement this method to get the remote product.")
 
-
     def post_action_payload_modify(self):
         """
         A method where we can modify the payload after is used so it is saved with new data used to then be compared
         in needs update
         """
         pass
+
 
 class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
     local_model_class = None  # The Sila Model
@@ -186,7 +209,6 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
     already_exists_exception = None  # Set to a custom exception type if applicable, or None
     update_factory_class = None  # Update factory to use if remote already exists
     update_if_not_exists = False  # Whether to trigger an update flow if the remote instance is already present
-
 
     def __init__(self, integration, local_instance=None, api=None):
         self.local_instance = local_instance  # Instance of the local model
@@ -242,7 +264,6 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
         """
         return self.remote_instance_data
 
-
     def initialize_remote_instance(self):
         """
         Initialize the remote instance based on the remote instance data & save so we can add logs to it
@@ -273,7 +294,14 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
         Sets the remote ID based on the response data using the mapping provided.
         """
         # Retrieve remote_id using the get_mapped_field utility function
-        self.remote_instance.remote_id = self.get_mapped_field(response_data, self.remote_id_map)
+        logger.debug(f"{self.__class__.__name__}: Trying to find remote id for {response_data=} with {self.local_instance=}")
+        if response_data is None:
+            raise ValueError(f"No response data provided for {self.local_instance}")
+
+        try:
+            self.remote_instance.remote_id = self.get_mapped_field(response_data, self.remote_id_map)
+        except Exception as e:
+            raise e.__class__(f"Failed to set/find remote id for {self.local_instance}") from e
 
     def create_remote(self):
         """
@@ -292,7 +320,6 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
 
         # Call the API method with the payload
         return api_method(**self.payload)
-
 
     def post_create_process(self):
         """
@@ -322,14 +349,45 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
         """
         return self.serialize_response(response)
 
+    def get_update_factory_class(self):
+        """
+        Check if update_factory_class is a class or a string.
+        If it's a class, return it directly.
+        If it's a string, import it dynamically.
+        """
+        if isinstance(self.update_factory_class, property):
+            # If it's a property, call the getter method
+            return self.update_factory_class.__get__(self, type(self))
+        elif isinstance(self.update_factory_class, type):
+            # If it's already a class, return it
+            return self.update_factory_class
+        elif isinstance(self.update_factory_class, str):
+            # If it's a string, import it dynamically
+            # Handle case where update_factory_class is in the same file
+            # or is a relative import without full path
+            if '.' not in self.update_factory_class:
+                # Try to get the class from the current module
+                current_module = sys.modules[self.__class__.__module__]
+                if hasattr(current_module, self.update_factory_class):
+                    return getattr(current_module, self.update_factory_class)
+
+            # If not in current module, we'll fall through to the standard import
+            module_path, class_name = self.update_factory_class.rsplit('.', 1)
+            module = __import__(module_path, fromlist=[class_name])
+            return getattr(module, class_name)
+        else:
+            # Default case
+            return self.update_factory_class
+
     def upload_flow(self):
         """
         Flow to trigger the update factory. This can be overrided
         """
-        update_factory = self.update_factory_class(self.integration,
-                                                   self.local_instance,
-                                                   api=self.api,
-                                                   remote_instance=self.remote_instance)
+        update_factory_class = self.get_update_factory_class()
+        update_factory = update_factory_class(self.integration,
+           self.local_instance,
+           api=self.api,
+           remote_instance=self.remote_instance)
         update_factory.run()
 
     def create(self):
@@ -357,7 +415,6 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
                     require_update = True
                 else:
                     raise e
-
             self.set_remote_id(response_data)
             self.modify_remote_instance(response_data)
 
@@ -380,8 +437,8 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
         finally:
             self.remote_instance.successfully_created = self.successfully_created
             self.remote_instance.save()
-            logger.debug(f"Finished create process with success status: {self.successfully_created}")
 
+            logger.debug(f"Finished create process with success status: {self.successfully_created}")
 
         # After creation, if configured to trigger an update flow for an existing instance,
         # do so only if successfully_created is True.
@@ -409,7 +466,7 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
     remote_model_class = None  # The Mirror Model
     field_mapping = {}  # Mapping of local fields to remote fields, should be overridden in subclasses
     updatable_fields = []  # Fields that are allowed to be updated
-    local_product_map = 'local_instance__product' # the way we go to the local product from the current instance (if possible)
+    local_product_map = 'local_instance__product'  # the way we go to the local product from the current instance (if possible)
 
     # Configurable API details
     api_package_name = None  # The package name (e.g., 'properties')
@@ -419,7 +476,6 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
     create_factory_class = None  # Should be overridden in subclasses with the specific Create Factory
     create_if_not_exists = False  # Configurable parameter to create the instance if not found
 
-
     def __init__(self, integration, local_instance=None, api=None, remote_instance=None, **kwargs):
         self.local_instance = local_instance  # Instance of the local model
         self.integration = integration  # Sales channel associated with the sync
@@ -427,7 +483,13 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
         self.payload = {}  # Will hold the payload data
         self.api = api
 
+        if not hasattr(self, '_remote_instance_additional_filters'):
+            self._remote_instance_additional_filters = {}
+
         setattr(self, self.integration_key, self.integration.get_real_instance())
+
+        if not self.remote_model_class:
+            raise ValueError(f"{self.__class__.__name__} must have remote_model_class to point at your remote product class mirror model.")
 
         # we can give both the remote_instance as an id (from tasks) or the real instance
         if isinstance(remote_instance, self.remote_model_class):
@@ -459,20 +521,27 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
         Retrieve the remote instance based on the local instance and sales channel.
         Does not handle creation or deletion logic.
         """
+        lookup_payload = None
         try:
             if self.remote_instance is None:
                 if self.remote_instance_id is not None:
-                    self.remote_instance = self.remote_model_class.objects.get(id=self.remote_instance_id)
+                    lookup_payload = {'id': self.remote_instance_id}
+                    self.remote_instance = self.remote_model_class.objects.get(**lookup_payload)
                 else:
-                    get_payload = {
+                    lookup_payload = {
                         'local_instance': self.local_instance,
                         self.integration_key: self.integration
                     }
-                    self.remote_instance = self.remote_model_class.objects.get(**get_payload)
+                    if self._remote_instance_additional_filters:
+                        lookup_payload.update(self._remote_instance_additional_filters)
+                    self.remote_instance = self.remote_model_class.objects.get(**lookup_payload)
 
             logger.debug(f"Fetched remote instance: {self.remote_instance}")
         except self.remote_model_class.DoesNotExist:
             self.remote_instance = None
+        except self.remote_model_class.MultipleObjectsReturned as exc:
+            formatted_kwargs = ', '.join(f"{key}={value!r}" for key, value in (lookup_payload or {}).items()) or 'No lookup kwargs captured'
+            raise self.remote_model_class.MultipleObjectsReturned(f"{exc} | lookup kwargs: {formatted_kwargs}") from exc
 
     def handle_remote_instance_creation(self):
         """
@@ -490,6 +559,8 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
             self.remote_instance.delete()
             self.create_remote_instance()
             self.successfully_updated = False
+        else:
+            logger.debug(f"Integration instance found for {self.local_instance} in {self.__class__.__name__}")
 
     def create_remote_instance(self):
         """
@@ -541,7 +612,6 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
 
         # Call the API method with the payload
         return api_method(**self.payload)
-
 
     def needs_update(self):
         """
@@ -608,7 +678,6 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
         if not self.successfully_updated:
             return
 
-
         self.build_payload()
         self.customize_payload()
         if self.needs_update() and self.additional_update_check():
@@ -619,7 +688,7 @@ class IntegrationInstanceDeleteFactory(IntegrationInstanceOperationMixin):
     local_model_class = None  # The Sila Model
     remote_model_class = None  # The Mirror Model
     delete_field_mapping = {}  # Default mapping for deletion payload
-    local_product_map = 'local_instance__product' # the way we go to the local product from the current instance (if possible)
+    local_product_map = 'local_instance__product'  # the way we go to the local product from the current instance (if possible)
     delete_remote_instance = True
 
     # Configurable API details
@@ -634,10 +703,14 @@ class IntegrationInstanceDeleteFactory(IntegrationInstanceOperationMixin):
 
         setattr(self, self.integration_key, self.integration.get_real_instance())
 
+        if not self.remote_model_class:
+            raise ValueError("You must set the remote_model_class to point at your remote product class mirror model.")
+
         if isinstance(remote_instance, self.remote_model_class):
             self.remote_instance = remote_instance
             self.remote_instance_id = remote_instance.id
         else:
+            # Order matters. get_remote_instance() will use self.remote_instance_id
             self.remote_instance_id = remote_instance
             self.remote_instance = self.get_remote_instance()
 
@@ -740,4 +813,3 @@ class IntegrationInstanceDeleteFactory(IntegrationInstanceOperationMixin):
         self.preflight_process()
         self.delete()
         self.delete_remote_instance_process()
-

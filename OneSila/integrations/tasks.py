@@ -1,11 +1,12 @@
 from typing import Optional, Tuple, Dict
 from huey import crontab
-from huey.contrib.djhuey import db_task, periodic_task
+from huey.contrib.djhuey import db_task, periodic_task, db_periodic_task
 
 from integrations.models import IntegrationTaskQueue
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 @db_task()
 def add_task_to_queue(
@@ -30,7 +31,7 @@ def add_task_to_queue(
     fac.run()
 
 
-@periodic_task(crontab(minute="*"))
+@db_periodic_task(crontab(minute="*"))
 def sales_channels_process_remote_tasks_queue():
     """
     Periodically process the task queue for all active integrations.
@@ -41,7 +42,7 @@ def sales_channels_process_remote_tasks_queue():
     fac.run()
 
 
-@periodic_task(crontab(hour=2, minute=0, day='1,15'))
+@db_periodic_task(crontab(hour=2, minute=0, day='1,15'))
 def clean_up_processed_tasks():
     deleted_count, _ = IntegrationTaskQueue.objects.filter(status=IntegrationTaskQueue.PROCESSED).delete()
     logger.info(f"Cleaned up {deleted_count} processed tasks.")

@@ -20,6 +20,7 @@ jobs:
           key: ${{ secrets.MASTER_SECRET_KEY_SSH }}
           port: 22
           script: |
+            set -e
             source venv/bin/activate
             cd /home/${{ secrets.MASTER_USERNAME }}/OneSilaHeadless/
             git config pull.rebase false
@@ -30,7 +31,7 @@ jobs:
             cd OneSila
             ./manage.py migrate
             ./manage.py collectstatic --noinput
-            sudo supervisorctl restart hypercornctl
-            sudo chmod 777 /home/${{ secrets.MASTER_USERNAME }}/hypercorn.sock
+            echo "Reload Gunicorn for 0-downtime"
+            /home/${{ secrets.MASTER_USERNAME }}/./reload_gunicorn.sh
             sudo supervisorctl restart huey
             sudo supervisorctl restart telegram_bot

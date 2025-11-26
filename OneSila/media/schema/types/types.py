@@ -1,12 +1,11 @@
+from strawberry import lazy
+
 from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field
 from strawberry_django.fields.types import DjangoImageType
 from strawberry.relay.utils import to_base64
-from typing import List
-
+from typing import List, Optional, Annotated
 from media.models import Media, Image, Video, MediaProductThrough, File
-
 from core.schema.multi_tenant.types.types import MultiTenantUserType
-from products.schema.types.types import ProductType
 from .filters import MediaFilter, ImageFilter, VideoFilter, \
     MediaProductThroughFilter, FileFilter
 from .ordering import MediaOrder, ImageOrder, VideoOrder, \
@@ -19,7 +18,7 @@ class MediaType(relay.Node, GetQuerysetMultiTenantMixin):
     image_web_url: str | None
     file_url: str | None
     onesila_thumbnail_url: str | None
-    owner: MultiTenantUserType
+    owner: Optional[MultiTenantUserType]
 
     @field()
     def proxy_id(self, info) -> str:
@@ -41,17 +40,17 @@ class ImageType(relay.Node, GetQuerysetMultiTenantMixin):
     image_web_url: str | None
     image_url: str | None
     onesila_thumbnail_url: str | None
-    owner: MultiTenantUserType
+    owner: Optional[MultiTenantUserType]
 
 
 @type(Video, filters=VideoFilter, order=VideoOrder, pagination=True, fields="__all__")
 class VideoType(relay.Node, GetQuerysetMultiTenantMixin):
-    owner: MultiTenantUserType
+    owner: Optional[MultiTenantUserType]
 
 
 @type(File, filters=FileFilter, order=FileOrder, pagination=True, fields="__all__")
 class FileType(relay.Node, GetQuerysetMultiTenantMixin):
-    owner: MultiTenantUserType
+    owner: Optional[MultiTenantUserType]
     file_url: str | None
 
 
@@ -59,10 +58,13 @@ class FileType(relay.Node, GetQuerysetMultiTenantMixin):
     order=MediaProductThroughOrder, pagination=True, fields="__all__")
 class MediaProductThroughType(relay.Node, GetQuerysetMultiTenantMixin):
     media: MediaType
-    product: ProductType
+    product: Optional[Annotated['ProductType', lazy("products.schema.types.types")]]
+    sales_channel: Optional[Annotated['SalesChannelType', lazy("sales_channels.schema.types.types")]]
 
     @field()
     def product_id(self, info) -> str:
+        from products.schema.types.types import ProductType
+
         return to_base64(ProductType, self.product.id)
 
     @field()

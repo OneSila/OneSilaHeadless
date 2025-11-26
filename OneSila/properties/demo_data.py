@@ -10,22 +10,28 @@ def create_property_structure(multi_tenant_company):
 
     # Create Properties with translations
     properties_data = [
-        {'type': Property.TYPES.SELECT, 'name': 'Size', 'values': ['Small', 'Medium', 'Large']},
-        {'type': Property.TYPES.SELECT, 'name': 'Color', 'values': ['Red', 'Green', 'Blue']},
-        {'type': Property.TYPES.SELECT, 'name': 'Materials', 'values': ['Wood', 'Metal', 'Plastic']},
-        {'type': Property.TYPES.INT, 'name': 'Weight'},
-        {'type': Property.TYPES.DATE, 'name': 'Manufacture Date'},
+        {'type': Property.TYPES.SELECT, 'name': 'Size', 'values': ['Small', 'Medium', 'Large'], 'internal_name': 'size'},
+        {'type': Property.TYPES.SELECT, 'name': 'Color', 'values': ['Red', 'Green', 'Blue'], 'internal_name': 'color'},
+        {'type': Property.TYPES.SELECT, 'name': 'Materials', 'values': ['Wood', 'Metal', 'Plastic'], 'internal_name': 'materials'},
+        {'type': Property.TYPES.FLOAT, 'name': 'Weight', 'internal_name': 'weight'},
+        {'type': Property.TYPES.DATE, 'name': 'Manufacture Date', 'internal_name': 'manufacture_date'},
         {'type': Property.TYPES.MULTISELECT, 'name': 'Usage',
-         'values': ['Indoor', 'Outdoor', 'Office', 'Garden', 'Restaurant', 'Hotel']},
+         'values': ['Indoor', 'Outdoor', 'Office', 'Garden', 'Restaurant', 'Hotel'], 'internal_name': 'usage'},
     ]
 
     property_map = {}
 
     for prop_data in properties_data:
-        property = Property.objects.create(
+        property, created = Property.objects.get_or_create(
             multi_tenant_company=multi_tenant_company,
-            type=prop_data['type']
+            type=prop_data['type'],
+            internal_name=prop_data['internal_name']
         )
+
+        if not created:
+            property_map[prop_data['name']] = property
+            continue
+
         CreatePrivateDataRelationMixin.create_demo_data_relation(property)
 
         translation = PropertyTranslation.objects.create(
@@ -122,6 +128,7 @@ def create_property_structure(multi_tenant_company):
 
             CreatePrivateDataRelationMixin.create_demo_data_relation(rule_item)
             registry.create_demo_data_relation(rule_item)
+
 
 create_property_structure.priority = 100
 registry.register_private_app(create_property_structure)

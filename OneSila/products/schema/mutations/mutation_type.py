@@ -1,17 +1,42 @@
-import strawberry_django
-from strawberry.relay import from_base64
+from typing import Optional, List as TypingList
 
-from core.schema.core.extensions import default_extensions
 from .fields import create_product
-from ..types.types import ProductType, BundleProductType, ConfigurableProductType, \
-    SimpleProductType, ProductTranslationType, ConfigurableVariationType, \
-    BundleVariationType, AiContent
-from ..types.input import ProductInput, BundleProductInput, ConfigurableProductInput, \
-    SimpleProductInput, ProductTranslationInput, ConfigurableVariationInput, \
-    BundleVariationInput, ProductPartialInput, ConfigurableProductPartialInput, \
-    BundleProductPartialInput, SimpleProductPartialInput, \
-    ProductTranslationPartialInput, ConfigurableVariationPartialInput, \
-    BundleVariationPartialInput, ProductAiContentInput
+from strawberry import Info
+import strawberry_django
+from core.schema.core.extensions import default_extensions
+from core.schema.core.helpers import get_multi_tenant_company
+from products.models import Product
+from ..types.types import (
+    ProductType,
+    BundleProductType,
+    ConfigurableProductType,
+    SimpleProductType,
+    ProductTranslationType,
+    ConfigurableVariationType,
+    BundleVariationType,
+    ProductTranslationBulletPointType,
+    ProductVariationsTaskResponse,
+)
+from ..types.input import (
+    ProductInput,
+    BundleProductInput,
+    ConfigurableProductInput,
+    SimpleProductInput,
+    ProductTranslationInput,
+    ConfigurableVariationInput,
+    BundleVariationInput,
+    ProductPartialInput,
+    ConfigurableProductPartialInput,
+    BundleProductPartialInput,
+    SimpleProductPartialInput,
+    ProductTranslationPartialInput,
+    ConfigurableVariationPartialInput,
+    BundleVariationPartialInput,
+    ProductTranslationBulletPointInput,
+    ProductTranslationBulletPointPartialInput,
+    ProductPropertiesRulePartialInput,
+    PropertySelectValuePartialInput,
+)
 from core.schema.core.mutations import create, update, delete, type, List
 
 
@@ -21,7 +46,7 @@ class ProductsMutation:
     create_products: List[ProductType] = create(ProductInput)
     update_product: ProductType = update(ProductPartialInput)
     delete_product: ProductType = delete()
-    delete_products: List[ProductType] = delete()
+    delete_products: List[ProductType] = delete(is_bulk=True)
 
     create_bundle_product: BundleProductType = create(BundleProductInput)
     create_bundle_products: List[BundleProductType] = create(BundleProductInput)
@@ -54,20 +79,81 @@ class ProductsMutation:
     delete_configurable_variations: List[ConfigurableVariationType] = delete()
 
     create_bundle_variation: BundleVariationType = create(BundleVariationInput)
-    create_bundle_variations: List[BundleVariationType] = create(BundleVariationInput)
+    create_bundle_variations: List[BundleVariationType] = create(List[BundleVariationInput])
     update_bundle_variation: BundleVariationType = update(BundleVariationPartialInput)
     delete_bundle_variation: BundleVariationType = delete()
     delete_bundle_variations: List[BundleVariationType] = delete()
 
+    create_product_translation_bullet_point: ProductTranslationBulletPointType = create(ProductTranslationBulletPointInput)
+    create_product_translation_bullet_points: List[ProductTranslationBulletPointType] = create(List[ProductTranslationBulletPointInput])
+    update_product_translation_bullet_point: ProductTranslationBulletPointType = update(ProductTranslationBulletPointPartialInput)
+    delete_product_translation_bullet_point: ProductTranslationBulletPointType = delete()
+    delete_product_translation_bullet_points: List[ProductTranslationBulletPointType] = delete(is_bulk=True)
+
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
-    def generate_product_ai_content(self, instance: ProductAiContentInput) -> AiContent:
+    def generate_product_variations(
+        self,
+        info: Info,
+        rule_product_type: PropertySelectValuePartialInput,
+        product: ProductPartialInput,
+        select_values: TypingList[PropertySelectValuePartialInput],
+        language_code: str | None = None,
+    ) -> ProductVariationsTaskResponse:
+        from products.tasks import products__generate_variations_task
         from products.models import Product
-        from products.flows.generate_prompt import AIGenerateContentFlow
+        from properties.models import ProductPropertiesRule, PropertySelectValue
 
-        language = instance.language
-        product = Product.objects.get(id=instance.id.node_id)
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
 
-        content_generator = AIGenerateContentFlow(product=product, language=language)
-        content_generator.flow()
+        rule_obj = ProductPropertiesRule.objects.get(
+            product_type_id=rule_product_type.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+            sales_channel__isnull=True
+        )
 
-        return AiContent(content=content_generator.generated_content, points=content_generator.used_points)
+        config_product_obj = Product.objects.get(
+            id=product.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        value_ids = [sv.id.node_id for sv in select_values]
+        select_value_ids = list(
+            PropertySelectValue.objects.filter(
+                id__in=value_ids,
+                multi_tenant_company=multi_tenant_company,
+            ).values_list("id", flat=True)
+        )
+
+        products__generate_variations_task(
+            rule_id=rule_obj.id,
+            config_product_id=config_product_obj.id,
+            select_value_ids=select_value_ids,
+            language=language_code,
+        )
+
+        return ProductVariationsTaskResponse(success=True)
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def duplicate_product(
+        self,
+        info: Info,
+        product: ProductPartialInput,
+        sku: str | None = None,
+        create_as_alias: bool = False,
+        create_relationships: bool = True,
+    ) -> ProductType:
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        try:
+            instance = Product.objects.get(
+                id=product.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            )
+        except Product.DoesNotExist:
+            raise PermissionError("Invalid company")
+        duplicated = Product.objects.duplicate_product(
+            instance,
+            sku=sku,
+            create_as_alias=create_as_alias,
+            create_relationships=create_relationships,
+        )
+        return duplicated

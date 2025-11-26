@@ -14,12 +14,14 @@ from pathlib import Path
 from django.utils.translation import gettext_lazy as _
 from operator import itemgetter
 import os
+import sys
 
 SECRET_KEY = "FAKE-KEY-DONT-KEEP-THIS-YOU-SHOULD-SET-A-NEW-ONE"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DEBUG = False
+TESTING = 'test' in sys.argv
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -51,18 +53,25 @@ INSTALLED_LOCAL_APPS = [
     'billing',
     'eancodes',
     'lead_times',
+    'imports_exports',
+    'llm',
     'media',
     'notifications',
     'integrations',
     'inventory',
     'sales_channels',
     'sales_channels.integrations.magento2',
+    'sales_channels.integrations.shopify',
+    'sales_channels.integrations.woocommerce',
+    'sales_channels.integrations.amazon',
+    'sales_channels.integrations.ebay',
     'sales_prices',
     'properties',
     'orders',
     'telegram_bot',
 
     'huey.contrib.djhuey',
+    'webhooks'
 ]
 
 INSTALLED_APPS += INSTALLED_LOCAL_APPS
@@ -115,6 +124,35 @@ DATABASES = {
     }
 }
 
+#
+# Session settings. Effort to fix session issues across multiple workers.
+# By default we keep the default django cache stuff.
+# but sessions let's move the elsewhere.
+#
+
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "onesila_session_cache"
+
+REDIS_HOST = os.getenv('REDIS_HOST', "127.0.0.1")
+REDIS_PORT = os.getenv('REDIS_PORT', 6379)
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    },
+    "onesila_session_cache": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/2",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -134,6 +172,12 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+#
+# Core upload path settings
+#
+
+UPLOAD_TENANT_PATH_DEPTH = 3
+UPLOAD_TENANT_PATH_SEGMENT_LENGTH = 2
 
 # Internationalization of the interfaces
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
@@ -143,10 +187,52 @@ LOCALE_PATHS = (
 )
 
 LANGUAGE_CODE = 'en'
-LANGUAGES = (
-    ('nl', _('Nederlands')),
+
+# the languages the interface is translated on
+INTERFACE_LANGUAGES = (
     ('en', _('English')),
-    # ('en-gb', _('English GB')),
+    ('nl', _('Dutch')),
+)
+
+LANGUAGES = (
+    ('en', _('English')),
+    ('fr', _('French')),
+    ('nl', _('Dutch')),
+    ('de', _('German')),
+    ('it', _('Italian')),
+    ('es', _('Spanish')),
+    ('pt', _('Portuguese')),
+    ('pl', _('Polish')),
+    ('ro', _('Romanian')),
+    ('bg', _('Bulgarian')),
+    ('hr', _('Croatian')),
+    ('cs', _('Czech')),
+    ('da', _('Danish')),
+    ('et', _('Estonian')),
+    ('fi', _('Finnish')),
+    ('el', _('Greek')),
+    ('hu', _('Hungarian')),
+    ('lv', _('Latvian')),
+    ('lt', _('Lithuanian')),
+    ('sk', _('Slovak')),
+    ('sl', _('Slovenian')),
+    ('sv', _('Swedish')),
+    ('th', _('Thai')),
+    ('ja', _('Japanese')),
+    ('zh-hans', _('Chinese (Simplified)')),
+    ('hi', _('Hindi')),
+    ('pt-br', _('Portuguese (Brazil)')),
+    ('ru', _('Russian')),
+    ('af', _('Afrikaans')),
+    ('ar', _('Arabic')),
+    ('he', _('Hebrew')),
+    ('tr', _('Turkish')),
+    ('id', _('Indonesian')),
+    ('ko', _('Korean')),
+    ('ms', _('Malay')),
+    ('vi', _('Vietnamese')),
+    ('fa', _('Persian')),
+    ('ur', _('Urdu')),
 )
 
 
@@ -174,6 +260,7 @@ MEDIA_URL = 'media/'
 
 # Forced here for test-deployment purposes
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 SAVE_TEST_FILES_ROOT = os.path.join(BASE_DIR, 'test_files_root')
 
 # Default primary key field type
@@ -200,7 +287,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(os.getenv('REDIS_HOST', "127.0.0.1"), os.getenv('REDIS_PORT', 6379))],
+            "hosts": [f"redis://{REDIS_HOST}:{REDIS_PORT}/3"],
         },
     },
 }
@@ -224,9 +311,37 @@ CORS_ALLOWED_METHODS = [
     '*'
 ]
 
+#
+# Default User Agent.  Used by integrations to identify the source of the request.
+#
 
+ONESILA_DEFAULT_USER_AGENT = "OneSila.com PIM/1.0"
+
+
+#
+# Integrations test settings
+#
+
+SALES_CHANNELS_INTEGRATIONS_TEST_STORES = {
+    'WOOCOMMERCE': {
+        'hostname': os.getenv('INTEGRATIONS_TEST_STORES_WOOCOMMERCE_HOSTNAME'),
+        'api_key': os.getenv('INTEGRATIONS_TEST_STORES_WOOCOMMERCE_API_KEY'),
+        'api_secret': os.getenv('INTEGRATIONS_TEST_STORES_WOOCOMMERCE_API_SECRET'),
+        'verify_ssl': False,
+        'requests_per_minute': 60,
+        'active': True,
+        'import_products': True,
+        'import_orders': True,
+        'api_version': 'wc/v3',
+        'timeout': 10,
+    }
+}
+
+#
+# Huey settings
+#
 HUEY = {
-    'huey_class': 'huey.RedisHuey',
+    'huey_class': 'huey.PriorityRedisHuey',
     'name': 'hueyonesilaheadless',
     'results': True,  # Store return values of tasks.
     'store_none': False,
@@ -234,8 +349,8 @@ HUEY = {
     'utc': True,
     'blocking': True,  # Perform blocking pop rather than poll Redis.
     'connection': {
-        'host': 'localhost',
-        'port': 6379,
+        'host': REDIS_HOST,
+        'port': REDIS_PORT,
         'db': 0,
         'connection_pool': None,  # Definitely you should use pooling!
         # ... tons of other options, see redis-py for details.
@@ -256,3 +371,107 @@ HUEY = {
         'health_check_interval': 1,
     },
 }
+
+
+#
+# Admin url suffix.
+#
+
+ADMIN_ROUTE_SUFFIX = os.getenv('ADMIN_ROUTE_SUFFIX', "")
+
+#
+# Magento integration settings (sales_channels.integrations.magento2)
+#
+
+MAGENTO_LOG_DIR_PATH = os.getenv('MAGENTO_LOG_DIR_PATH', '/var/log/OneSilaHeadless/magento')
+
+
+#
+# Shopify integration Settings (sales_channels.integrations.shopify)
+#
+
+SHOPIFY_SCOPES = ['read_products', 'write_products', 'read_locales', 'read_orders', 'read_publications', 'write_publications']
+SHOPIFY_API_VERSION = "2025-04"
+SHOPIFY_TEST_REDIRECT_URI = os.getenv('SHOPIFY_TEST_REDIRECT_URI')
+SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
+SHOPIFY_API_SECRET = os.getenv('SHOPIFY_API_SECRET')
+
+
+#
+# OpenAI settings. (llm)
+#
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+REPLICATE_API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
+AI_POINT_PRICE = os.getenv('AI_POINT_PRICE', 0.1)
+
+#
+# Telegram settings. (notifications)
+#
+
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[%(asctime)s] %(levelname)s:%(name)s.%(funcName)20s() %(lineno)d: %(message)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+            'level': 'DEBUG',
+        },
+        'amazon_log_file': {
+            # Fake handler for automated tests.  You should adjust your local
+            # local.py settings file to soemthing like this;
+            # 'class': 'logging.FileHandler',
+            # 'formatter': 'verbose',
+            # 'level': 'DEBUG',
+            # 'filename': '/var/log/OneSilaHeadless/sales_channels_integrations_amazon.log',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+            'level': 'DEBUG',
+        },
+    },
+    'loggers': {
+        # The amazon package has a bug that shows you a log of the
+        # request x-times every time you do a request.
+        # This stops that flood to ensure we can actually use logs
+        # without loosing track.
+        # Keep both http.client + urllib3.connectinpool + requests.packages.urllib3.connectionpool
+        # to ensure we cover all bases.
+        'http.client': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'urllib3.connectionpool': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        # optional redundancy
+        'requests.packages.urllib3.connectionpool': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+    },
+
+    # The amazon package has a bug that shows you a log of the
+    # request x-times every time you do a request. The 'root' logger
+    # config is for the same purpose of the remarks above in 'loggers'
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+}
+
+
+WEBHOOKS_SIGNATURE_SKEW_SECONDS = 300
+WEBHOOKS_GZIP_THRESHOLD_BYTES = 16384
+WEBHOOKS_DEFAULT_TIMEOUT_MS = 10000

@@ -6,8 +6,11 @@ from ..models.sales_channels import SalesChannelViewAssign
 from ..models.logs import RemoteLog
 import logging
 from eancodes.models import EanCode
+from ..exceptions import PreFlightCheckError
+from currencies.models import Currency
 
 logger = logging.getLogger(__name__)
+
 
 class RemoteInstanceCreateFactory(IntegrationInstanceCreateFactory):
     integration_key = 'sales_channel'
@@ -23,6 +26,7 @@ class RemoteInstanceUpdateFactory(IntegrationInstanceUpdateFactory):
 
     def __init__(self, sales_channel, local_instance=None, api=None, remote_instance=None, **kwargs):
         super().__init__(integration=sales_channel, local_instance=local_instance, api=api, remote_instance=remote_instance, **kwargs)
+
 
 class RemoteInstanceDeleteFactory(IntegrationInstanceDeleteFactory):
     integration_key = 'sales_channel'
@@ -63,6 +67,8 @@ class ProductAssignmentMixin:
                 sales_channel=self.sales_channel
             ).exists()
 
+        logger.debug(f"{assign_exists=}, {self.remote_product=}, {self.sales_channel=}")
+
         return assign_exists
 
 
@@ -75,23 +81,32 @@ class RemotePropertyEnsureMixin:
             # Attempt to get the associated RemoteProperty instance using self.local_property
             self.remote_property = self.remote_property_factory.remote_model_class.objects.get(
                 local_instance=self.local_property,
-                sales_channel=self.sales_channel
+                sales_channel=self.sales_channel,
             )
+            logger.info(f"{self.__class__.__name__} preflight_process found and existing remote_property")
         except self.remote_property_factory.remote_model_class.DoesNotExist:
             # If the RemoteProperty does not exist, create it using the provided factory
             property_create_factory = self.remote_property_factory(
                 self.sales_channel,
                 self.local_property,
+                api=self.api
             )
             property_create_factory.run()
+            logger.info(f"{self.__class__.__name__} preflight_process tried to create a remote_property")
 
             self.remote_property = property_create_factory.remote_instance
+
+        if not hasattr(self, 'remote_property') or not self.remote_property:
+            # A remote factory should always have a remote_property.
+            # If it does not, then most it seem stuff is broken.
+            raise PreFlightCheckError(f"Failed to create remote property for {self.local_property}")
 
     def get_select_values(self):
         self.remote_select_values = []
         # For select or multi-select properties, ensure RemotePropertySelectValue exists
         if self.local_property.type in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
-            select_values = self.local_instance.value_multi_select.all() if self.local_property.type == Property.TYPES.MULTISELECT else [self.local_instance.value_select]
+            select_values = self.local_instance.value_multi_select.all() if self.local_property.type == Property.TYPES.MULTISELECT else [
+                self.local_instance.value_select]
 
             for value in select_values:
                 try:
@@ -104,6 +119,7 @@ class RemotePropertyEnsureMixin:
                     select_value_create_factory = self.remote_property_select_value_factory(
                         local_instance=value,
                         sales_channel=self.sales_channel,
+                        api=self.api
                     )
                     select_value_create_factory.run()
                     remote_select_value = select_value_create_factory.remote_instance
@@ -117,7 +133,7 @@ class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
     update_field_mapping = {}  # Sometime we want to update only certain fields not all that been created
     api_package_name = None  # The package name (e.g., 'properties')
     api_method_name = None  # The method name (e.g., 'fetch')
-    api_method_is_property = False # for some integrations this can be a property / field not a method
+    api_method_is_property = False  # for some integrations this can be a property / field not a method
     get_or_create_fields = []  # Fields used by get_or_create operations
 
     allow_create = True  # Allow creation of new instances
@@ -271,8 +287,8 @@ class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
         Override to implement custom comparison logic.
         """
         for local_field, remote_field in self.update_field_mapping.items():
-                if getattr(remote_instance_mirror, local_field) != self.get_remote_field_value(remote_data, remote_field):
-                    return True
+            if getattr(remote_instance_mirror, local_field) != self.get_remote_field_value(remote_data, remote_field):
+                return True
         return False
 
     def process_remote_instance(self, remote_data, remote_instance_mirror, created):
@@ -290,8 +306,10 @@ class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
             if int(remote_instance_mirror.remote_id) not in existing_remote_ids:
                 self.log_action_for_instance(remote_instance_mirror, RemoteLog.ACTION_DELETE, {}, {}, self.get_identifiers()[0])
                 remote_instance_mirror.delete()
-                logger.debug(f"Deleted remote instance mirror: {remote_instance_mirror}")
+                logger.debug(f"Deleted remote instance mirror: {remote_instance_mirror}")\
 
+    def post_pull_action(self):
+        pass
 
     def run(self):
         """
@@ -304,6 +322,8 @@ class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
         self.build_payload()
         self.fetch_remote_instances()
         self.process_remote_instances()
+        self.post_pull_action()
+
 
 class EanCodeValueMixin:
     def get_ean_code_value(self) -> Optional[str]:
@@ -347,11 +367,44 @@ class SyncProgressMixin:
         self.remote_instance.set_new_sync_percentage(self.current_progress)
         logger.debug(f"Updated sync progress to {self.current_progress}%.")
 
-
     def finalize_progress(self):
 
         if self.remote_instance is None:
             return
 
         self.remote_instance.set_new_sync_percentage(100)
+
+
+class LocalCurrencyMappingMixin:
+    """Mixin to map pulled currency codes to local ``Currency`` instances."""
+
+    def _get_remote_code_field(self) -> str:
+        """Return the key used in ``remote_data`` for the currency code."""
+        return getattr(self, "field_mapping", {}).get("remote_code", "code")
+
+    def add_local_currency(self) -> None:
+        """Attach a matching ``Currency`` instance to each remote record."""
+        code_field = self._get_remote_code_field()
+
+        for remote_data in self.remote_instances:
+            code = remote_data.get(code_field)
+
+            if not code:
+                continue
+
+            currency = Currency.objects.filter(
+                iso_code=code,
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+            ).first()
+
+            remote_data["local_currency"] = currency
+
+
+    def create_remote_instance_mirror(self, remote_data, remote_instance_mirror):
+        super().create_remote_instance_mirror(remote_data, remote_instance_mirror)
+        currency = remote_data.get('local_currency')
+
+        if currency and not remote_instance_mirror.local_instance:
+            remote_instance_mirror.local_instance = currency
+            remote_instance_mirror.save(update_fields=['local_instance'])
 

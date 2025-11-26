@@ -1,10 +1,15 @@
+import decimal
 import json
 
 from django.conf import settings
 from django.http import HttpResponse
 import os
+import datetime
 from get_absolute_url.helpers import reverse_lazy
 from io import BytesIO
+import zipfile
+
+from core.models import Model
 
 
 def get_languages():
@@ -107,6 +112,7 @@ def get_nested_attr(instance, attr_path):
     except AttributeError:
         return None
 
+
 def clean_json_data(data):
     """
     Recursively cleans the data to remove or transform non-serializable objects.
@@ -118,6 +124,7 @@ def clean_json_data(data):
     else:
         return data if is_json_serializable(data) else str(data)
 
+
 def is_json_serializable(value):
     """
     Checks if a value is JSON-serializable.
@@ -127,3 +134,47 @@ def is_json_serializable(value):
         return True
     except (TypeError, OverflowError):
         return False
+
+
+def ensure_serializable(value, *, _seen=None):
+    """Recursively convert objects to JSON‐friendly types, avoiding circular refs."""
+    if _seen is None:
+        _seen = set()
+
+    if isinstance(value, (datetime.datetime, datetime.date)):
+        return value.isoformat()
+
+    if isinstance(value, decimal.Decimal):
+        return float(value)
+
+    if isinstance(value, Model):
+        return str(value)
+
+    value_id = id(value)
+    if value_id in _seen:
+        return f"<circular {type(value).__name__}>"
+
+    _seen.add(value_id)
+    try:
+        if isinstance(value, dict):
+            return {k: ensure_serializable(v, _seen=_seen) for k, v in value.items()}
+
+        if isinstance(value, (list, tuple, set)):
+            return [ensure_serializable(v, _seen=_seen) for v in value]
+
+        if hasattr(value, "__dict__"):
+            return ensure_serializable(vars(value), _seen=_seen)
+    finally:
+        _seen.discard(value_id)
+
+    return value
+
+
+
+def safe_run_task(task_func, *args, **kwargs):
+    from django.db import transaction, connection
+
+    if connection.in_atomic_block:
+        transaction.on_commit(lambda: task_func(*args, **kwargs))
+    else:
+        task_func(*args, **kwargs)

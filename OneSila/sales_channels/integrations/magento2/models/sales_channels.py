@@ -3,9 +3,11 @@ from sales_channels.models.sales_channels import (
     SalesChannelView,
     RemoteLanguage
 )
+from sales_channels.exceptions import VariationAlreadyExistsOnWebsite
 
 from core import models
 from django.utils.translation import gettext_lazy as _
+
 
 class MagentoSalesChannel(SalesChannel):
     """
@@ -34,10 +36,23 @@ class MagentoSalesChannel(SalesChannel):
     class Meta:
         verbose_name = 'Magento Sales Channel'
         verbose_name_plural = 'Magento Sales Channels'
-        user_exceptions = ()
+        user_exceptions = (VariationAlreadyExistsOnWebsite,)
 
     def __str__(self):
         return f"Magento Sales Channel: {self.hostname}"
+
+    def connect(self):
+        from sales_channels.integrations.magento2.factories.sales_channels.sales_channel import TryConnection
+
+        required_fields = {'hostname', 'host_api_username', 'host_api_key', 'authentication_method'}
+
+        if required_fields.intersection(self.get_dirty_fields().keys()):
+            try:
+                TryConnection(sales_channel=self)
+            except Exception:
+                raise Exception(
+                    _("Could not connect to the Magento server. Make sure all the details are correctly completed.")
+                )
 
 
 class MagentoSalesChannelView(SalesChannelView):
@@ -57,3 +72,4 @@ class MagentoRemoteLanguage(RemoteLanguage):
         related_name='remote_languages',
         help_text="The sales channel view associated with this remote language."
     )
+    store_view_code = models.CharField(max_length=126, help_text="The language code store view (will be used as scope).")

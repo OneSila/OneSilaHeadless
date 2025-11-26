@@ -1,8 +1,13 @@
 from django.core.exceptions import ValidationError
+from django.db.models import Subquery, OuterRef, Value, CharField
+from django.db.models.functions import Coalesce
 from django.utils.text import slugify
+from django.conf import settings
+import difflib
 from django.utils.translation import gettext_lazy as _
 from core.managers import MultiTenantManager, MultiTenantQuerySet
-from django.db import transaction
+from django.db import transaction, IntegrityError
+from .helpers import generate_unique_internal_name, _is_code_like, _norm_code, _tokens
 
 
 class PropertyQuerySet(MultiTenantQuerySet):
@@ -18,13 +23,12 @@ class PropertyQuerySet(MultiTenantQuerySet):
 
         language = multi_tenant_company.language
         name = get_product_type_name(language)
-        internal_name = slugify(name).replace('-', '_')
 
         property_instance = self.create(
             type='SELECT',  # we are using the text instead the constant because it created issues in the migration command
             is_public_information=True,
             is_product_type=True,
-            internal_name=internal_name,
+            internal_name='product_type',
             multi_tenant_company=multi_tenant_company
         )
 
@@ -36,10 +40,81 @@ class PropertyQuerySet(MultiTenantQuerySet):
         )
         return property_instance
 
+    def create_brand(self, multi_tenant_company):
+        from core.defaults import get_brand_name
+        from .models import PropertyTranslation
+
+        language = multi_tenant_company.language
+        name = get_brand_name(language)
+
+        property_instance = self.create(
+            type='SELECT',
+            is_public_information=True,
+            internal_name='brand',
+            non_deletable=True,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        PropertyTranslation.objects.create(
+            property=property_instance,
+            language=language,
+            name=name,
+            multi_tenant_company=multi_tenant_company,
+        )
+        return property_instance
+
     def delete(self, *args, **kwargs):
+
         if self.filter(is_product_type=True).exists():
             raise ValidationError(_("You cannot delete the product type property."))
+
+        if self.filter(non_deletable=True).exists():
+            raise ValidationError(_("You cannot delete one or more system properties."))
+
         super().delete(*args, **kwargs)
+
+    def with_translated_name(self, language_code=None):
+        from .models import PropertyTranslation
+
+        language_field = language_code if language_code is not None else OuterRef('multi_tenant_company__language')
+        name_in_language = PropertyTranslation.objects.filter(
+            property=OuterRef('pk'),
+            language=language_field,
+        ).values('name')[:1]
+
+        any_name = PropertyTranslation.objects.filter(
+            property=OuterRef('pk'),
+        ).values('name')[:1]
+
+        return self.annotate(
+            translated_name=Coalesce(
+                Subquery(name_in_language, output_field=CharField()),
+                Subquery(any_name, output_field=CharField()),
+                Value('No Name Set'),
+            )
+        )
+
+    def find_duplicates(self, name, language_code=None, threshold=0.8):
+        """Return properties with a name similar to the given value."""
+        from .models import PropertyTranslation
+
+        if language_code is None:
+            language_code = settings.LANGUAGE_CODE
+
+        processed_name = slugify(name).replace("-", "").lower()
+        translations = PropertyTranslation.objects.filter(
+            property__in=self,
+            language=language_code,
+        ).select_related("property")
+
+        matched_ids = set()
+        for translation in translations:
+            processed = slugify(translation.name).replace("-", "").lower()
+            ratio = difflib.SequenceMatcher(None, processed_name, processed).ratio()
+            if ratio >= threshold:
+                matched_ids.add(translation.property_id)
+
+        return self.filter(id__in=matched_ids).order_by('id').distinct('id')
 
 
 class PropertyManager(MultiTenantManager):
@@ -55,6 +130,40 @@ class PropertyManager(MultiTenantManager):
     def create_product_type(self, multi_tenant_company):
         return self.get_queryset().create_product_type(multi_tenant_company)
 
+    def create_brand(self, multi_tenant_company):
+        return self.get_queryset().create_brand(multi_tenant_company)
+
+    def check_for_duplicates(self, name, multi_tenant_company, threshold=0.8):
+        qs = self.filter(multi_tenant_company=multi_tenant_company)
+        return qs.find_duplicates(name, language_code=multi_tenant_company.language, threshold=threshold)
+
+    def get_or_create(self, **kwargs):
+        internal_name = kwargs.get("internal_name")
+        if not internal_name and "defaults" in kwargs:
+            internal_name = kwargs["defaults"].get("internal_name")
+
+        if not internal_name:
+            return super().get_or_create(**kwargs)
+
+        base_name = slugify(internal_name).replace("-", "_")
+        counter = 0
+
+        while True:
+            candidate = base_name if counter == 0 else f"{base_name}_{counter}"
+
+            if "internal_name" in kwargs:
+                kwargs["internal_name"] = candidate
+            else:
+                kwargs.setdefault("defaults", {})["internal_name"] = candidate
+
+            try:
+                return super().get_or_create(**kwargs)
+            except IntegrityError as exc:
+                if "unique_internal_name_per_company" in str(exc):
+                    counter += 1
+                    continue
+                raise
+
 
 class PropertySelectValueQuerySet(MultiTenantQuerySet):
     def delete(self, *args, **kwargs):
@@ -65,12 +174,164 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
 
         return super().delete(*args, **kwargs)
 
+    def with_translated_value(self, language_code=None):
+        from .models import PropertySelectValueTranslation
+
+        language_field = language_code if language_code is not None else OuterRef('property__multi_tenant_company__language')
+        value_in_language = PropertySelectValueTranslation.objects.filter(
+            propertyselectvalue=OuterRef('pk'),
+            language=language_field,
+        ).values('value')[:1]
+
+        any_value = PropertySelectValueTranslation.objects.filter(
+            propertyselectvalue=OuterRef('pk'),
+        ).values('value')[:1]
+
+        return self.annotate(
+            translated_value=Coalesce(
+                Subquery(value_in_language, output_field=CharField()),
+                Subquery(any_value, output_field=CharField()),
+                Value('No Value Set'),
+            )
+        )
+
+    def find_duplicates(self, value, property_instance, language_code=None, threshold=0.88):
+        """
+        Return property select values similar to `value` within the same property.
+
+        Rules:
+          - If EITHER side looks code-like (any token has letters+digits), require exact match
+            after collapsing non-alnum (prevents ath_s700bt ~ ath_s200bt).
+          - Otherwise (labels), require EXACT equality of numeric token sets; only then:
+              * match if token sets are equal (order/sep-insensitive), or
+              * fall back to fuzzy on TEXT tokens only (numbers already matched).
+        """
+        from .models import PropertySelectValueTranslation
+
+        if language_code is None:
+            language_code = settings.LANGUAGE_CODE
+
+        probe_is_code = _is_code_like(value)
+        probe_code_key = _norm_code(value) if probe_is_code else None
+
+        # Precompute probe tokens & split into numeric/text
+        probe_all_tokens = _tokens(value)
+        probe_num_set = {t for t in probe_all_tokens if t.isdigit()}
+        probe_text_set = set(t for t in probe_all_tokens if not t.isdigit())
+        probe_tokens_sorted = sorted(probe_text_set | probe_num_set)  # for exact set compare when needed
+        probe_text_key = " ".join(sorted(probe_text_set))  # for fuzzy on text only
+
+        translations = (
+            PropertySelectValueTranslation.objects
+            .filter(
+                propertyselectvalue__in=self,
+                propertyselectvalue__property=property_instance,
+                language=language_code,
+            )
+            .select_related("propertyselectvalue")
+        )
+
+        matched_ids = set()
+
+        for t in translations:
+            raw = t.value or ""
+            cand_is_code = _is_code_like(raw)
+
+            if probe_is_code or cand_is_code:
+                # CODE COMPARATOR: strict equality after collapsing
+                if probe_code_key and probe_code_key == _norm_code(raw):
+                    matched_ids.add(t.propertyselectvalue_id)
+                continue
+
+            # LABEL COMPARATOR
+            cand_all_tokens = _tokens(raw)
+            cand_num_set = {x for x in cand_all_tokens if x.isdigit()}
+            cand_text_set = set(x for x in cand_all_tokens if not x.isdigit())
+
+            # 1) Different numeric tokens => NOT a duplicate (e.g., 50 vs 60 Hertz)
+            if probe_num_set != cand_num_set:
+                continue
+
+            # 2) Exact token set equality (numbers + text), order/sep-insensitive
+            cand_tokens_sorted = sorted(cand_text_set | cand_num_set)
+            if probe_tokens_sorted == cand_tokens_sorted:
+                matched_ids.add(t.propertyselectvalue_id)
+                continue
+
+            # 3) Conservative fuzzy on TEXT ONLY (numbers already proven equal)
+            cand_text_key = " ".join(sorted(cand_text_set))
+            if difflib.SequenceMatcher(None, probe_text_key, cand_text_key).ratio() >= threshold:
+                matched_ids.add(t.propertyselectvalue_id)
+
+        return self.filter(id__in=matched_ids).order_by('id').distinct('id')
+
+    def merge(self, target):
+        from .models import PropertySelectValue
+
+        if isinstance(target, (int, str)):
+            target = PropertySelectValue.objects.get(pk=target)
+
+        sources = self.exclude(pk=target.pk)
+
+        if sources.exclude(property_id=target.property_id).exists():
+            raise ValidationError(_("Property select values must belong to the same property."))
+
+        with transaction.atomic():
+            for source in sources:
+                for relation in PropertySelectValue._meta.related_objects:
+                    if relation.related_model.__name__ == "PropertySelectValueTranslation":
+                        continue
+                    if relation.one_to_many or relation.one_to_one:
+                        qs = relation.related_model._default_manager.filter(
+                            **{relation.field.name: source}
+                        )
+                        for obj in qs:
+                            setattr(obj, relation.field.name, target)
+                            try:
+                                with transaction.atomic():
+                                    obj.save()
+                            except IntegrityError:
+                                obj.delete()
+                    elif relation.many_to_many:
+                        # @TODO: Seems that the many_to_many merge doesn't work
+                        through = relation.through._default_manager
+                        source_field = relation.field.m2m_reverse_field_name()
+                        for through_obj in through.filter(**{source_field: source.pk}):
+                            setattr(through_obj, source_field, target.pk)
+                            try:
+                                with transaction.atomic():
+                                    through_obj.save()
+                            except IntegrityError:
+                                through_obj.delete()
+                source.delete(force_delete=True)
+            return target
+
+
 class PropertySelectValueManager(MultiTenantManager):
     def get_queryset(self):
         return PropertySelectValueQuerySet(self.model, using=self._db)
 
+    def check_for_duplicates(self, value, property_instance, multi_tenant_company, threshold=0.8):
+        qs = self.filter(
+            multi_tenant_company=multi_tenant_company,
+            property=property_instance,
+        )
+        return qs.find_duplicates(
+            value,
+            property_instance,
+            language_code=multi_tenant_company.language,
+            threshold=threshold,
+        )
+
+    def merge(self, sources, target):
+        if hasattr(sources, "merge"):
+            return sources.merge(target)
+        ids = [s if isinstance(s, (int, str)) else s.pk for s in sources]
+        return self.filter(id__in=ids).merge(target)
+
+
 class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
-    def create_rule(self, multi_tenant_company, product_type, require_ean_code, items):
+    def create_rule(self, multi_tenant_company, product_type, require_ean_code, items, sales_channel=None):
         from .models import ProductPropertiesRuleItem
         from .signals import product_properties_rule_created
         from strawberry_django.mutations.types import ParsedObject
@@ -78,6 +339,11 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
         # we make sure it have both backend and frontend compatability
         if isinstance(product_type, ParsedObject):
             product_type = product_type.pk
+
+        if isinstance(sales_channel, ParsedObject):
+            sales_channel = sales_channel.pk
+        elif hasattr(sales_channel, "pk"):
+            sales_channel = sales_channel.pk
 
         # we want to make sure we keep the sort order right but we start creating the REQUIRED_IN_CONFIGURATOR
         # to avoid errors
@@ -93,6 +359,7 @@ class ProductPropertiesRuleQuerySet(MultiTenantQuerySet):
             rule, _ = self.get_or_create(
                 product_type=product_type,
                 multi_tenant_company=multi_tenant_company,
+                sales_channel=sales_channel,
             )
 
             if rule.require_ean_code != require_ean_code:
@@ -199,11 +466,67 @@ class ProductPropertiesRuleManager(MultiTenantManager):
     def get_queryset(self):
         return ProductPropertiesRuleQuerySet(self.model, using=self._db)
 
-    def create_rule(self, multi_tenant_company, product_type, require_ean_code, items):
-        return self.get_queryset().create_rule(multi_tenant_company, product_type, require_ean_code, items)
+    def create_rule(self, multi_tenant_company, product_type, require_ean_code, items, sales_channel=None):
+        return self.get_queryset().create_rule(
+            multi_tenant_company,
+            product_type,
+            require_ean_code,
+            items,
+            sales_channel=sales_channel,
+        )
 
     def update_rule_items(self, rule, items):
         return self.get_queryset().update_rule_items(rule, items)
 
     def delete(self, *args, **kwargs):
         return self.get_queryset().delete(*args, **kwargs)
+
+
+class ProductPropertyQuerySet(MultiTenantQuerySet):
+    def filter_for_configurator(self, *, sales_channel=None):
+        from .models import ProductPropertiesRuleItem, Property, ProductPropertiesRule, \
+            PropertySelectValue
+
+        # Narrow down to the product-type properties for the current queryset.
+        product_type_prod_props = self.filter(property__is_product_type=True)
+        product_type_selects = PropertySelectValue.objects.filter(
+            property__in=product_type_prod_props.values('property')
+        )
+
+        rules_qs = ProductPropertiesRule.objects.filter(
+            multi_tenant_company__in=self.values('multi_tenant_company'),
+            product_type__in=product_type_selects,
+        )
+
+        if sales_channel is not None:
+            channel_rules_qs = rules_qs.filter(sales_channel=sales_channel)
+            if channel_rules_qs.exists():
+                rules_qs = channel_rules_qs
+            else:
+                rules_qs = rules_qs.filter(sales_channel__isnull=True)
+        else:
+            rules_qs = rules_qs.filter(sales_channel__isnull=True)
+
+        rule_items = ProductPropertiesRuleItem.objects.filter(
+            rule__in=rules_qs,
+            type__in=[
+                ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
+                ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
+            ],
+            multi_tenant_company__in=self.all().values('multi_tenant_company')
+        )
+
+        properties = Property.objects.filter(
+            multi_tenant_company__in=self.all().values('multi_tenant_company'),
+            id__in=rule_items.values_list('property_id', flat=True)
+        )
+
+        return self.filter(property__in=properties)
+
+
+class ProductPropertyManager(MultiTenantManager):
+    def get_queryset(self):
+        return ProductPropertyQuerySet(self.model, using=self._db)
+
+    def filter_for_configurator(self, *, sales_channel=None):
+        return self.get_queryset().filter_for_configurator(sales_channel=sales_channel)

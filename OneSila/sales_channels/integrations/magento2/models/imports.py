@@ -1,5 +1,5 @@
 from core import models
-from sales_channels.models.imports import ImportableModel
+from imports_exports.models import ImportableModel
 
 
 class MagentoAttributeSetImport(ImportableModel):
@@ -10,7 +10,8 @@ class MagentoAttributeSetImport(ImportableModel):
     remote_attribute_set = models.ForeignKey(
         'magento2.MagentoAttributeSet',
         on_delete=models.CASCADE,
-        help_text="The remote attribute set associated with this import process."
+        help_text="The remote attribute set associated with this import process.",
+        null=True, blank=True
     )
 
     class Meta:
@@ -20,6 +21,7 @@ class MagentoAttributeSetImport(ImportableModel):
     def __str__(self):
         return f"Import process for {self.remote_attribute_set}"
 
+
 class MagentoAttributeSetAttributeImport(ImportableModel):
     """
     Model representing the import process for attributes within a Magento Attribute Set.
@@ -28,7 +30,8 @@ class MagentoAttributeSetAttributeImport(ImportableModel):
     remote_attribute = models.ForeignKey(
         'magento2.MagentoAttributeSetAttribute',
         on_delete=models.CASCADE,
-        help_text="The remote attribute associated with this import process."
+        help_text="The remote attribute associated with this import process.",
+        null=True, blank=True
     )
 
     class Meta:

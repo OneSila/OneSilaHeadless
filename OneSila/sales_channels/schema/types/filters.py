@@ -1,10 +1,40 @@
 from typing import Optional
 
+from core.managers import QuerySet
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin
+from core.schema.core.types.filters import custom_filter, filter, SearchFilterMixin, lazy
+from django.db.models import Q
+from strawberry import UNSET
 from products.schema.types.filters import ProductFilter
 
-from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
+from sales_channels.models import (
+    ImportCurrency,
+    ImportImage,
+    SalesChannelImport,
+    ImportProduct,
+    ImportProperty,
+    ImportPropertySelectValue,
+    ImportVat,
+    RemoteCategory,
+    RemoteCurrency,
+    RemoteCustomer,
+    RemoteImage,
+    RemoteImageProductAssociation,
+    RemoteInventory,
+    RemoteLog,
+    RemoteOrder,
+    RemoteProduct,
+    RemoteProductContent,
+    RemoteProductProperty,
+    RemoteProperty,
+    RemotePropertySelectValue,
+    RemoteVat,
+    SalesChannel,
+    SalesChannelIntegrationPricelist,
+    SalesChannelView,
+    SalesChannelViewAssign,
+    SalesChannelContentTemplate,
+)
 from sales_channels.models.sales_channels import RemoteLanguage
 
 
@@ -68,11 +98,6 @@ class RemoteOrderFilter(SearchFilterMixin):
     pass
 
 
-@filter(RemotePrice)
-class RemotePriceFilter(SearchFilterMixin):
-    pass
-
-
 @filter(RemoteProduct)
 class RemoteProductFilter(SearchFilterMixin):
     id: auto
@@ -109,7 +134,6 @@ class RemoteLogFilter(SearchFilterMixin):
     remote_product: Optional[RemoteProductFilter]
 
 
-
 @filter(SalesChannel)
 class SalesChannelFilter(SearchFilterMixin):
     id: auto
@@ -119,22 +143,29 @@ class SalesChannelFilter(SearchFilterMixin):
 @filter(SalesChannelIntegrationPricelist)
 class SalesChannelIntegrationPricelistFilter(SearchFilterMixin):
     id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    price_list: Optional[lazy['SalesPriceListFilter', "sales_prices.schema.types.filters"]]
+
 
 @filter(RemoteCurrency)
 class RemoteCurrencyFilter(SearchFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
 
-@filter(ImportProcess)
-class ImportProcessFilter(SearchFilterMixin):
+
+@filter(SalesChannelImport)
+class SalesChannelImportFilter(SearchFilterMixin):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
 
+
 @filter(SalesChannelView)
 class SalesChannelViewFilter(SearchFilterMixin):
+    search: Optional[str]
     id: auto
-    active: auto
+    remote_id: auto
     sales_channel: Optional[SalesChannelFilter]
+
 
 @filter(RemoteLanguage)
 class RemoteLanguageFilter(SearchFilterMixin):
@@ -149,3 +180,21 @@ class SalesChannelViewAssignFilter(SearchFilterMixin):
     sales_channel_view: Optional[SalesChannelViewFilter]
     product: Optional[ProductFilter]
 
+    @custom_filter
+    def status(
+        self,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) :
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        return queryset.filter_by_status(status=str(value)), Q()
+
+
+@filter(SalesChannelContentTemplate)
+class SalesChannelContentTemplateFilter(SearchFilterMixin):
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    language: auto

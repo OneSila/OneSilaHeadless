@@ -1,3 +1,5 @@
+from django.db.models import UniqueConstraint, Q
+from django.db.utils import NotSupportedError
 from model_bakery.recipe import related
 
 from core import models
@@ -7,13 +9,25 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from ..signals import sync_remote_product
 from django.utils.translation import gettext_lazy as _
 
+
 class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the remote mirror of a Product.
     """
 
-    local_instance = models.ForeignKey('products.Product', on_delete=models.SET_NULL, null=True, db_index=True, help_text="The local Product instance associated with this remote product.")
-    remote_sku = models.CharField(max_length=255, help_text="The SKU of the product in the remote system.")
+    STATUS_COMPLETED = "COMPLETED"
+    STATUS_FAILED = "FAILED"
+    STATUS_PROCESSING = "PROCESSING"
+
+    STATUS_CHOICES = (
+        (STATUS_COMPLETED, _("Completed")),
+        (STATUS_FAILED, _("Failed")),
+        (STATUS_PROCESSING, _("Processing")),
+    )
+
+    local_instance = models.ForeignKey('products.Product', on_delete=models.SET_NULL, null=True, db_index=True,
+                                       help_text="The local Product instance associated with this remote product.")
+    remote_sku = models.CharField(max_length=255, help_text="The SKU of the product in the remote system.", null=True, blank=True)
     is_variation = models.BooleanField(default=False, help_text="Indicates if this product is a variation.")
     remote_parent_product = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, help_text="The remote parent product for variations.")
     syncing_current_percentage = models.PositiveSmallIntegerField(
@@ -21,9 +35,27 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         validators=[MinValueValidator(0), MaxValueValidator(100)],
         help_text="Current sync progress percentage (0-100)."
     )
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_PROCESSING,
+        db_index=True,
+        help_text="Current sync status derived from progress and sync errors.",
+    )
+    required_feed_sync = models.BooleanField(
+        default=False,
+        help_text="Indicates if the GPT product feed needs to be refreshed for this remote product.",
+    )
 
     class Meta:
-        unique_together = (('sales_channel', 'local_instance', 'remote_parent_product'), ('sales_channel', 'remote_sku'),)
+        unique_together = (('sales_channel', 'local_instance', 'remote_parent_product'),)
+        constraints = [
+            UniqueConstraint(
+                fields=['sales_channel', 'remote_sku', 'is_variation', 'remote_parent_product'],
+                condition=Q(remote_sku__isnull=False),
+                name='unique_remote_sku_per_channel_with_parent_if_present'
+            ),
+        ]
         verbose_name = 'Remote Product'
         verbose_name_plural = 'Remote Products'
 
@@ -36,6 +68,7 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         """
         if not (0 <= new_percentage <= 100):
             raise ValueError("Sync percentage must be between 0 and 100.")
+
         self.syncing_current_percentage = new_percentage
         self.save(update_fields=['syncing_current_percentage'])
 
@@ -80,13 +113,62 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         sales_channel = self.sales_channel.hostname if hasattr(self, 'sales_channel') and self.sales_channel else "N/A"
         return f"Remote product {local_name} (SKU: {remote_sku}) on {sales_channel}"
 
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        if is_new and getattr(self.sales_channel, "gpt_enable", False):
+            self.required_feed_sync = True
+        previous_status = self.status
+        computed_status = self._determine_status()
+        status_changed = previous_status != computed_status
+        self.status = computed_status
+
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            mutable_fields = list(dict.fromkeys(update_fields))
+            if status_changed and "status" not in mutable_fields:
+                mutable_fields.append("status")
+            if is_new and getattr(self.sales_channel, "gpt_enable", False) and "required_feed_sync" not in mutable_fields:
+                mutable_fields.append("required_feed_sync")
+            kwargs["update_fields"] = mutable_fields
+
+        super().save(*args, **kwargs)
+
+    def refresh_status(self, *, commit: bool = True) -> str:
+        computed_status = self._determine_status()
+        if computed_status != self.status:
+            self.status = computed_status
+            if commit and self.pk:
+                self.save(update_fields=["status"])
+        return self.status
+
+    def _determine_status(self) -> str:
+        if self._has_unresolved_errors():
+            return self.STATUS_FAILED
+        if self.syncing_current_percentage != 100:
+            return self.STATUS_PROCESSING
+        return self.STATUS_COMPLETED
+
+    def _has_unresolved_errors(self) -> bool:
+        from integrations.models import IntegrationLog
+
+        try:
+            return self.errors.exists()
+        except NotSupportedError:
+            if not self.pk:
+                return False
+            return IntegrationLog.objects.filter(
+                remote_product=self,
+                status=IntegrationLog.STATUS_FAILED,
+            ).exists()
+
 
 class RemoteInventory(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the remote mirror of a product's inventory.
     """
 
-    remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='inventory', on_delete=models.CASCADE, help_text="The remote product associated with this inventory.")
+    remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='inventory',
+                                          on_delete=models.CASCADE, help_text="The remote product associated with this inventory.")
     quantity = models.IntegerField(help_text="The quantity of the product available in the remote system.", null=True, blank=True)
 
     class Meta:
@@ -103,9 +185,9 @@ class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
     Polymorphic model representing the remote mirror of a product's price.
     """
 
-    remote_product = models.OneToOneField('sales_channels.RemoteProduct',related_name='price', on_delete=models.CASCADE, help_text="The remote product associated with this price.")
-    price = models.DecimalField(max_digits=10, decimal_places=2, help_text="The price of the product in the remote system.", null=True, blank=True,) # null for configurable products
-    discount_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="The discounted price of the product in the remote system, if any.")
+    remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='price', on_delete=models.CASCADE,
+                                          help_text="The remote product associated with this price.")
+    price_data = models.JSONField(default=dict, blank=True, help_text="Multi-currency price and discount data.")
 
     class Meta:
         unique_together = ('remote_product',)
@@ -113,14 +195,27 @@ class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
         verbose_name_plural = 'Remote Prices'
 
     def __str__(self):
-        return f"Price for {self.remote_product} - {self.price}"
+        return f"Price for {self.remote_product} - {self.frontend_name}"
+
+    def get_price_for_currency(self, currency_code):
+        return self.price_data.get(currency_code, {})
 
     @property
     def frontend_name(self):
-        if self.discount_price is not None:
-            return f"{self.price} - {self.discount_price}"
 
-        return f"{self.price}"
+        if not self.price_data:
+            return "No prices"
+
+        parts = []
+        for currency_code, values in self.price_data.items():
+            price = values.get("price")
+            discount = values.get("discount_price")
+            if discount is not None:
+                parts.append(f"{currency_code}: {price} → {discount}")
+            else:
+                parts.append(f"{currency_code}: {price}")
+
+        return " | ".join(parts)
 
 
 class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
@@ -128,7 +223,8 @@ class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
     Polymorphic model representing the synchronization state of a product's content with a remote system.
     """
 
-    remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='content', on_delete=models.CASCADE, help_text="The remote product associated with this content.")
+    remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='content', on_delete=models.CASCADE,
+                                          help_text="The remote product associated with this content.")
 
     class Meta:
         unique_together = ('remote_product',)
@@ -157,10 +253,17 @@ class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Mode
         help_text="The remote product associated with this configurator."
     )
 
-    remote_properties = models.ManyToManyField(
-        'sales_channels.RemoteProperty',
+    properties = models.ManyToManyField(
+        'properties.Property',
         related_name='configurators',
-        help_text="The remote properties associated with this configurator."
+        help_text="Local properties used for configurator logic."
+    )
+
+    amazon_theme = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Amazon variation theme associated with this configurator.",
     )
 
     objects = RemoteProductConfiguratorManager()
@@ -174,107 +277,112 @@ class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Mode
     def frontend_name(self):
         return (_(f"Configurator for {self.remote_product.local_instance.name}"))
 
+    @property
+    def remote_properties(self):
+        from sales_channels.models import RemoteProperty
+
+        return RemoteProperty.objects.filter(
+            local_instance__in=self.properties.all(),
+            sales_channel=self.remote_product.sales_channel
+        )
+
     def __str__(self):
         return f"Configurator for {self.remote_product}"
 
     @classmethod
-    def _get_all_remote_properties(cls, local_product, sales_channel, rule=None, variations=None):
+    def _get_all_properties(cls, local_product, sales_channel, rule=None, variations=None):
         """
-        Helper method to get all remote properties needed for the configurator.
-        Returns a list of RemoteProperty instances.
+        Helper method to get all local properties (Property instances) needed for the configurator.
+        These are properties that must be mirrored to remote channels.
         """
-        from properties.models import ProductPropertiesRuleItem, ProductProperty
-        from sales_channels.models import RemoteProperty
+        from properties.models import ProductPropertiesRuleItem, ProductProperty, Property
         from django.db.models import Count
 
-        # Get the product rule if not provided
         if rule is None:
-            rule = local_product.get_product_rule()
+            rule = local_product.get_product_rule(sales_channel=sales_channel)
 
         if rule is None:
             raise ValueError(f"No product properties rule found for {local_product.name}")
 
-        # Get required and optional properties for configurator
-        configurator_properties = local_product.get_configurator_properties(product_rule=rule)
+        configurator_properties = local_product.get_configurator_properties(
+            product_rule=rule,
+            sales_channel=sales_channel,
+        )
 
-        # Separate required and optional in-configurator properties
-        required_props_ids = configurator_properties.filter(
+        required_ids = configurator_properties.filter(
             type=ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR
         ).values_list('property_id', flat=True)
 
-        optional_props_ids = configurator_properties.filter(
+        optional_ids = configurator_properties.filter(
             type=ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR
         ).values_list('property_id', flat=True)
 
-        # Fetch RemoteProperty instances for required properties
-        remote_required_props = list(RemoteProperty.objects.filter(
-            local_instance_id__in=required_props_ids,
-            sales_channel=sales_channel
-        ))
-
-        # For optional properties, check if variations have different values
-        remote_optional_props = []
-        if optional_props_ids:
+        # For optional properties, determine which vary
+        varying_optional_ids = []
+        if optional_ids:
             if variations is None:
-                # Fetch variations if not provided
                 variations = local_product.get_configurable_variations(active_only=True)
 
             variation_ids = variations.values_list('id', flat=True)
 
-            # Fetch property values for variations
             prop_values = ProductProperty.objects.filter(
                 product_id__in=variation_ids,
-                property_id__in=optional_props_ids
+                property_id__in=optional_ids
             ).values('property_id').annotate(
                 distinct_values=Count('value_select', distinct=True)
             )
 
-            # Include properties where the count of distinct values is greater than 1
-            varying_props_ids = [
+            varying_optional_ids = [
                 pv['property_id'] for pv in prop_values if pv['distinct_values'] > 1
             ]
 
-            # Fetch RemoteProperty instances for these varying optional properties
-            if varying_props_ids:
-                remote_optional_props = list(RemoteProperty.objects.filter(
-                    local_instance_id__in=varying_props_ids,
-                    sales_channel=sales_channel
-                ))
+        all_ids = list(required_ids) + varying_optional_ids
 
-        # Combine required and optional RemoteProperties
-        all_remote_props = remote_required_props + remote_optional_props
+        return list(Property.objects.filter(id__in=all_ids))
 
-        return all_remote_props
-
-    def update_if_needed(self, rule=None, variations=None, send_sync_signal=True):
+    def update_if_needed(self, rule=None, variations=None, send_sync_signal=True, amazon_theme=None):
         """
-        Updates the remote_properties if there are changes based on the current rule and variations.
+        Updates the `properties` (local Property instances) if there are changes based on the current rule and variations.
         """
         local_product = self.remote_product.local_instance
         sales_channel = self.remote_product.sales_channel
 
-        # Use the helper method to get all remote properties
-        all_remote_props = self._get_all_remote_properties(
-            local_product, sales_channel, rule=rule, variations=variations
+        all_props = self._get_all_properties(
+            local_product,
+            sales_channel,
+            rule=rule,
+            variations=variations
         )
 
-        # Update the configurator's remote_properties if needed
-        existing_remote_props_ids = set(self.remote_properties.values_list('id', flat=True))
-        new_remote_props_ids = set(rp.id for rp in all_remote_props)
+        existing_prop_ids = set(self.properties.values_list('id', flat=True))
+        new_prop_ids = set(p.id for p in all_props)
 
-        if existing_remote_props_ids != new_remote_props_ids:
-            self.remote_properties.set(all_remote_props)
+        changed = False
+
+        if existing_prop_ids != new_prop_ids:
+            self.properties.set(all_props)
+            changed = True
+
+        if amazon_theme is not None and self.amazon_theme != amazon_theme:
+            self.amazon_theme = amazon_theme
+            changed = True
+
+        if changed:
             self.save()
 
-            if send_sync_signal:
-                sync_remote_product.send(sender=self.remote_product.local_instance.__class__, instance=self.remote_product.local_instance.product)
+            if send_sync_signal and not self.remote_product.local_instance.inspector.has_missing_information:
+                sync_remote_product.send(
+                    sender=self.remote_product.local_instance.__class__,
+                    instance=self.remote_product.local_instance
+                )
 
 
 class RemoteImage(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the remote mirror of an image in the media library.
     """
-    local_instance = models.ForeignKey('media.Media', on_delete=models.SET_NULL, null=True, help_text="The local media instance associated with this remote image.")
+    local_instance = models.ForeignKey('media.Media', on_delete=models.SET_NULL, null=True,
+                                       help_text="The local media instance associated with this remote image.")
 
     class Meta:
         unique_together = ('local_instance', 'sales_channel',)
@@ -293,9 +401,12 @@ class RemoteImageProductAssociation(PolymorphicModel, RemoteObjectMixin, models.
     """
     Polymorphic model representing the association of a remote image with a remote product.
     """
-    local_instance = models.ForeignKey('media.MediaProductThrough', on_delete=models.SET_NULL, null=True, help_text="The local MediaProductThrough instance associated with this remote association.")
-    remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.CASCADE, help_text="The remote product associated with this image assignment.")
-    remote_image = models.ForeignKey(RemoteImage, on_delete=models.CASCADE, null=True, blank=True, help_text="The remote image being assigned to the remote product. Optional for direct links.")
+    local_instance = models.ForeignKey('media.MediaProductThrough', on_delete=models.SET_NULL, null=True,
+                                       help_text="The local MediaProductThrough instance associated with this remote association.")
+    remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.CASCADE,
+                                       help_text="The remote product associated with this image assignment.")
+    remote_image = models.ForeignKey(RemoteImage, on_delete=models.CASCADE, null=True, blank=True,
+                                     help_text="The remote image being assigned to the remote product. Optional for direct links.")
 
     class Meta:
         unique_together = ('local_instance', 'sales_channel', 'remote_product',)
@@ -349,6 +460,10 @@ class RemoteEanCode(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     @property
     def frontend_name(self):
+
+        if self.ean_code is None:
+            return "N/A"
+
         return self.ean_code
 
     def __str__(self):

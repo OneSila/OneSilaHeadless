@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from .managers import SalesPriceManager, SalesPriceListItemManager, SalesPriceListManager
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 
 class SalesPrice(models.Model):
@@ -45,19 +45,20 @@ class SalesPrice(models.Model):
         ]
 
     def get_real_price(self):
-        """Which is applicable?  RRP or Price?"""
+        """Which is applicable? RRP or Price?"""
         prices = []
 
-        if self.rrp:
-            prices.append(self.rrp)
+        for field in [self.rrp, self.price]:
+            if field:
+                try:
+                    prices.append(Decimal(field))
+                except (InvalidOperation, TypeError):
+                    continue
 
-        if self.price:
-            prices.append(self.price)
-
-        return min(prices)
+        return min(prices) if prices else None
 
     def __str__(self):
-        return '{} {}'.format(self.rrp, self.currency)
+        return '{} {}'.format(self.get_real_price(), self.currency)
 
     def clean(self):
         super().clean()
@@ -125,13 +126,10 @@ class SalesPriceList(models.Model):
     name = models.CharField(max_length=100)
     start_date = models.DateField(_("start date"), blank=True, null=True)
     end_date = models.DateField(_("end date"), blank=True, null=True)
-    customers = models.ManyToManyField('contacts.Company', blank=True)
 
-    # FIXME: What happens if the relevant pricelist doesnt match with the customer currency
-    # Answer: The order should be set the the detected pricelist currency
     currency = models.ForeignKey('currencies.Currency', on_delete=models.PROTECT)
     vat_included = models.BooleanField(_("Price list includes VAT"),
-        default=False)
+        default=True)
     auto_update_prices = models.BooleanField(_("Auto Update Price and Discount Price"),
         default=True)
     auto_add_products = models.BooleanField(_("Auto add all products"),
@@ -143,6 +141,26 @@ class SalesPriceList(models.Model):
     notes = models.TextField(blank=True, null=True)
 
     objects = SalesPriceListManager()
+
+    def clean(self):
+        super().clean()
+        if (self.start_date and not self.end_date) or (
+            self.end_date and not self.start_date
+        ):
+            raise ValidationError(
+                {
+                    'date_range': _("Please select both a start and end date for this price list."),
+                }
+            )
+
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValidationError(
+                {'date_range': _('End date cannot be before start date.')}
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return '{} {}'.format(self.name, self.currency)

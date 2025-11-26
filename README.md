@@ -20,7 +20,13 @@ cp OneSila/settings/local_template.py OneSila/settings/local.py
 ```
 
 And create a postgres db + set the settings in your local.py setting file.
+Also add CORS settings to your local file.
 
+```
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # check the right port from your frontend npm run dev.
+]
+```
 
 Next, migrate your db:
 
@@ -98,6 +104,23 @@ will yield:
 }
 ```
 
+### Importing images via GraphQL
+
+Images can be uploaded in bulk by calling the `uploadImagesFromUrls` mutation. Each entry accepts the image URL, type, and an optional title:
+
+```graphql
+mutation uploadImagesFromUrls {
+  uploadImagesFromUrls(
+    urls: [
+      { url: "https://example.com/product.jpg", type: "PACK", title: "Front shot" }
+    ]
+  ) {
+    id
+    title
+  }
+}
+```
+
 ## Running tests
 
 Runings tests, including coverage:
@@ -117,3 +140,9 @@ Or with html
 ```bash
 coverage html
 ```
+
+## Supported Currencies
+
+The list of available currencies can be found in `currencies/currencies.py`.
+Each entry contains the ISO code, human readable name and symbol. Recent
+additions include codes such as `AFN` (Afghan Afghani) and `CHF` (Swiss Franc).

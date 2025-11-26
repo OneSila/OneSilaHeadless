@@ -1,7 +1,34 @@
 from core.schema.core.types.ordering import order
 from core.schema.core.types.types import auto
 
-from sales_channels.models import ImportCurrency, ImportImage, ImportProcess, ImportProduct, ImportProperty, ImportPropertySelectValue, ImportVat, RemoteCategory, RemoteCurrency, RemoteCustomer, RemoteImage, RemoteImageProductAssociation, RemoteInventory, RemoteLog, RemoteOrder, RemotePrice, RemoteProduct, RemoteProductContent, RemoteProductProperty, RemoteProperty, RemotePropertySelectValue, RemoteVat, SalesChannel, SalesChannelIntegrationPricelist, SalesChannelView, SalesChannelViewAssign
+from sales_channels.models import (
+    ImportCurrency,
+    ImportImage,
+    SalesChannelImport,
+    ImportProduct,
+    ImportProperty,
+    ImportPropertySelectValue,
+    ImportVat,
+    RemoteCategory,
+    RemoteCurrency,
+    RemoteCustomer,
+    RemoteImage,
+    RemoteImageProductAssociation,
+    RemoteInventory,
+    RemoteLog,
+    RemoteOrder,
+    RemoteProduct,
+    RemoteProductContent,
+    RemoteProductProperty,
+    RemoteProperty,
+    RemotePropertySelectValue,
+    RemoteVat,
+    SalesChannel,
+    SalesChannelIntegrationPricelist,
+    SalesChannelView,
+    SalesChannelViewAssign,
+    SalesChannelContentTemplate,
+)
 from sales_channels.models.sales_channels import RemoteLanguage
 
 
@@ -15,8 +42,8 @@ class ImportImageOrder:
     id: auto
 
 
-@order(ImportProcess)
-class ImportProcessOrder:
+@order(SalesChannelImport)
+class SalesChannelImportOrder:
     id: auto
 
 
@@ -80,11 +107,6 @@ class RemoteOrderOrder:
     id: auto
 
 
-@order(RemotePrice)
-class RemotePriceOrder:
-    id: auto
-
-
 @order(RemoteProduct)
 class RemoteProductOrder:
     id: auto
@@ -129,11 +151,17 @@ class SalesChannelIntegrationPricelistOrder:
 class SalesChannelViewOrder:
     id: auto
 
+
 @order(RemoteLanguage)
 class RemoteLanguageOrder:
     id: auto
+
 
 @order(SalesChannelViewAssign)
 class SalesChannelViewAssignOrder:
     id: auto
 
+
+@order(SalesChannelContentTemplate)
+class SalesChannelContentTemplateOrder:
+    id: auto

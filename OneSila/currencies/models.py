@@ -15,6 +15,9 @@ class PublicCurrency(models.SharedModel):
     def __str__(self):
         return self.iso_code
 
+    class Meta:
+        verbose_name_plural = _('Public Currencies')
+
 
 class Currency(models.Model):
     '''
@@ -31,7 +34,7 @@ class Currency(models.Model):
     exchange_rate = models.FloatField(default=1, null=True, blank=True)
     exchange_rate_official = models.FloatField(default=1, null=True, blank=True)
     follow_official_rate = models.BooleanField(default=False)
-    round_prices_up_to = models.IntegerField(default=1, null=True, blank=True)
+    round_prices_up_to = models.FloatField(default=1, null=True, blank=True)
     is_default_currency = models.BooleanField(default=False)
     comment = models.TextField(null=True, blank=True)
 

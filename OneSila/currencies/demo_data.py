@@ -24,7 +24,6 @@ class CurrencyDefaultDataGenerator(PrivateStructuredDataGenerator):
             },
         ]
 
-
     def preflight_check(self, pre_kwargs):
         is_default_currency = pre_kwargs.get('is_default_currency')
         if is_default_currency and Currency.objects.filter(is_default_currency=is_default_currency, multi_tenant_company=self.multi_tenant_company).exists():

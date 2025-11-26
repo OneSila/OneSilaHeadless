@@ -1,5 +1,11 @@
 from django.utils.translation import gettext_lazy as _
 
+# Inspector status choices for
+# the frontend.  Mainly used in graphql.
+RED = 3
+ORANGE = 2
+GREEN = 1
+
 # APPLICABILITY SECTION
 REQUIRED = 'REQUIRED'
 OPTIONAL = 'OPTIONAL'
@@ -24,11 +30,12 @@ MISSING_OPTIONAL_PROPERTIES_ERROR = 112
 MISSING_STOCK_ERROR = 114
 MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR = 116
 VARIATION_MISMATCH_PRODUCT_TYPE_ERROR = 117
-ITEMS_MISMATCH_PRODUCT_TYPE_ERROR = 118
 ITEMS_MISSING_MANDATORY_INFORMATION_ERROR = 120
 VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR = 121
 DUPLICATE_VARIATIONS_ERROR = 123
 NON_CONFIGURABLE_RULE_ERROR = 124
+AMAZON_VALIDATION_ISSUES_ERROR = 125
+AMAZON_REMOTE_ISSUES_ERROR = 126
 
 ERROR_TYPES = (
     (HAS_IMAGES_ERROR, _('Product is missing required images')),
@@ -43,23 +50,24 @@ ERROR_TYPES = (
     (MISSING_STOCK_ERROR, _('Product is active, missing stock, and does not allow backorder')),
     (MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, _('Manual price list price should have at least override price')),
     (VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, _('Variations do not have the same product type')),
-    (ITEMS_MISMATCH_PRODUCT_TYPE_ERROR, _('Items do not have the same product type')),
     (ITEMS_MISSING_MANDATORY_INFORMATION_ERROR, _('Items have inspectors missing mandatory information')),
     (VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR, _('Variations have inspectors missing mandatory information')),
     (DUPLICATE_VARIATIONS_ERROR, _('Configurable product has duplicate variations')),
     (NON_CONFIGURABLE_RULE_ERROR, _('Configurable product has no applicable configurator rules')),
+    (AMAZON_VALIDATION_ISSUES_ERROR, _('Product has amazon validation issues')),
+    (AMAZON_REMOTE_ISSUES_ERROR, _('Product on amazon has remote issues')),
 )
 
 
 # BLOCKS CONFIG SECTION
 has_image_block = {
     'error_code': HAS_IMAGES_ERROR,
-    'simple_product_applicability': NONE,
+    'simple_product_applicability': REQUIRED,
     'configurable_product_applicability': REQUIRED,
-    'manufacturable_product_applicability': NONE,
-    'bundle_product_applicability': NONE,
-    'dropship_product_applicability': NONE,
-    'supplier_product_applicability': NONE,
+    'manufacturable_product_applicability': REQUIRED,
+    'bundle_product_applicability': REQUIRED,
+    'dropship_product_applicability': REQUIRED,
+    'supplier_product_applicability': REQUIRED,
 }
 
 missing_prices_block = {
@@ -77,7 +85,7 @@ inactive_bundle_items_block = {
     'simple_product_applicability': NONE,
     'configurable_product_applicability': NONE,
     'manufacturable_product_applicability': NONE,
-    'bundle_product_applicability': REQUIRED,
+    'bundle_product_applicability': OPTIONAL,
     'dropship_product_applicability': NONE,
     'supplier_product_applicability': NONE,
 }
@@ -172,22 +180,12 @@ variation_mismatch_product_type_block = {
     'supplier_product_applicability': NONE,
 }
 
-items_mismatch_product_type_block = {
-    'error_code': ITEMS_MISMATCH_PRODUCT_TYPE_ERROR,
-    'simple_product_applicability': NONE,
-    'configurable_product_applicability': NONE,
-    'manufacturable_product_applicability': NONE,
-    'bundle_product_applicability': REQUIRED,
-    'dropship_product_applicability': NONE,
-    'supplier_product_applicability': NONE,
-}
-
 items_missing_mandatory_information_block = {
     'error_code': ITEMS_MISSING_MANDATORY_INFORMATION_ERROR,
     'simple_product_applicability': NONE,
     'configurable_product_applicability': NONE,
     'manufacturable_product_applicability': NONE,
-    'bundle_product_applicability': REQUIRED,
+    'bundle_product_applicability': OPTIONAL,
     'dropship_product_applicability': NONE,
     'supplier_product_applicability': NONE,
 }
@@ -222,6 +220,26 @@ non_configurable_rule_block = {
     'supplier_product_applicability': NONE,
 }
 
+amazon_validation_issues_block = {
+    'error_code': AMAZON_VALIDATION_ISSUES_ERROR,
+    'simple_product_applicability': OPTIONAL,
+    'configurable_product_applicability': OPTIONAL,
+    'manufacturable_product_applicability': OPTIONAL,
+    'bundle_product_applicability': OPTIONAL,
+    'dropship_product_applicability': OPTIONAL,
+    'supplier_product_applicability': NONE,
+}
+
+amazon_remote_issues_block = {
+    'error_code': AMAZON_REMOTE_ISSUES_ERROR,
+    'simple_product_applicability': OPTIONAL,
+    'configurable_product_applicability': OPTIONAL,
+    'manufacturable_product_applicability': OPTIONAL,
+    'bundle_product_applicability': OPTIONAL,
+    'dropship_product_applicability': OPTIONAL,
+    'supplier_product_applicability': NONE,
+}
+
 
 blocks = [
     has_image_block,
@@ -236,9 +254,10 @@ blocks = [
     missing_stock_block,
     missing_manual_pricelist_override_block,
     variation_mismatch_product_type_block,
-    items_mismatch_product_type_block,
     items_missing_mandatory_information_block,
     variations_missing_mandatory_information_block,
     duplicate_variations_block,
-    non_configurable_rule_block
+    non_configurable_rule_block,
+    amazon_validation_issues_block,
+    amazon_remote_issues_block
 ]

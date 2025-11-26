@@ -1,7 +1,10 @@
-from huey.contrib.djhuey import db_task
+from huey import crontab
+from huey.contrib.djhuey import db_periodic_task, db_task
 from products.product_types import CONFIGURABLE
 
-# @TODO: Create factories for this tasks
+# @TODO: Create flows for these tasks
+
+
 @db_task()
 def update_configurators_for_rule_db_task(rule):
     from products.models import Product
@@ -28,6 +31,7 @@ def update_configurators_for_rule_db_task(rule):
         except RemoteProduct.configurator.RelatedObjectDoesNotExist:
             pass
 
+
 @db_task()
 def update_configurators_for_parent_product_db_task(parent_product):
     from sales_channels.models import RemoteProduct
@@ -41,37 +45,68 @@ def update_configurators_for_parent_product_db_task(parent_product):
 
     # Step 2: Iterate through remote products and update configurators
     for remote_product in remote_products.iterator():
-        if remote_product.configurator:
+        if hasattr(remote_product, 'configurator') and remote_product.configurator:
             remote_product.configurator.update_if_needed(send_sync_signal=True)
 
+
 @db_task()
-def update_configurators_for_product_property_db_task(product, property):
+def update_configurators_for_product_property_db_task(parent_product_id, property_id):
     from sales_channels.models import RemoteProduct
     from products.models import Product
+    from properties.models import Property
 
-    # Step 1: Get all parent product IDs where this product is a variation
-    parent_product_ids = product.configurablevariation_through_variations.values_list('parent_id', flat=True)
+    parent_product = Product.objects.get(id=parent_product_id)
+    property = Property.objects.get(id=property_id)
 
-    # Step 2: Retrieve all parent products in a single query
-    parent_products = Product.objects.filter(id__in=parent_product_ids)
+    remote_products = RemoteProduct.objects.filter(
+        local_instance=parent_product,
+        multi_tenant_company=parent_product.multi_tenant_company
+    )
 
-    # Step 3: Iterate through each parent product and check if we need to update the configurator
-    for parent_product in parent_products:
-        # Get the product rule for the parent product
-        product_rule = parent_product.get_product_rule()
+    for remote_product in remote_products.iterator():
 
-        # Check if the property is optional in the configurator
-        optional_properties_in_configurator = parent_product.get_optional_in_configurator_properties(product_rule)
-        if property not in optional_properties_in_configurator.values_list('property', flat=True):
-            continue  # Skip if the property is not optional in configurator
-
-        # Step 4: Retrieve remote products for the parent product
-        remote_products = RemoteProduct.objects.filter(
-            local_instance=parent_product,
-            multi_tenant_company=parent_product.multi_tenant_company
+        product_rule = parent_product.get_product_rule(sales_channel=remote_product.sales_channel)
+        optional_properties = parent_product.get_optional_in_configurator_properties(
+            product_rule=product_rule,
+            sales_channel=remote_product.sales_channel,
         )
 
-        # Step 5: Iterate through remote products and update configurators
-        for remote_product in remote_products.iterator():
-            if remote_product.configurator:
-                remote_product.configurator.update_if_needed(rule=product_rule, send_sync_signal=True)
+        if property not in optional_properties.values_list('property', flat=True):
+            continue
+
+        if remote_product.configurator:
+            remote_product.configurator.update_if_needed(rule=product_rule, send_sync_signal=True)
+
+
+@db_periodic_task(crontab(minute='*/20'))
+def sales_channels__tasks__sync_gpt_feed__cronjob():
+    from .flows.gpt_feed import sync_gpt_feed
+
+    sync_gpt_feed(sync_all=False)
+
+
+@db_periodic_task(crontab(hour='0', minute='0'))
+def sales_channels__tasks__sync_gpt_feed_full__cronjob():
+    from .flows.gpt_feed import sync_gpt_feed
+
+    sync_gpt_feed(sync_all=True)
+
+
+@db_task()
+def sales_channels__tasks__sync_gpt_feed_for_channel(*, sales_channel_id: int, sync_all: bool) -> None:
+    from .flows.gpt_feed import sync_gpt_feed
+
+    sync_gpt_feed(
+        sales_channel_id=sales_channel_id,
+        sync_all=sync_all,
+    )
+
+
+@db_task()
+def sales_channels__tasks__remove_from_gpt_feed(*, sales_channel_id: int, sku: str) -> None:
+    from .flows.gpt_feed import remove_from_gpt_feed
+
+    remove_from_gpt_feed(
+        sales_channel_id=sales_channel_id,
+        sku=sku,
+    )

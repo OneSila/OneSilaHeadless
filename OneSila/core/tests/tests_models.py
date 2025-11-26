@@ -1,4 +1,7 @@
 from django.utils import timezone
+from django.core.files import File
+from django.conf import settings
+import os
 
 from core.models.multi_tenant import MultiTenantUserLoginToken
 from core.tests import TestCase
@@ -31,3 +34,14 @@ class TestMultiTenantUserLoginTokenTestCase(TestCase):
 
         self.assertTrue(token.expires_at is not None)
         self.assertTrue(token.is_valid())
+
+
+class TestMultiTenantUserAvatarUploadPath(TestCase):
+    def test_avatar_upload_path(self):
+        image_path = os.path.join(settings.BASE_DIR.parent, 'core', 'tests', 'image_files', 'red.png')
+        with open(image_path, 'rb') as f:
+            self.user.avatar.save('red.png', File(f))
+        parts = self.user.avatar.name.split('/')
+        self.assertEqual(parts[0], str(self.multi_tenant_company.id))
+        self.assertEqual(parts[1], 'avatars')
+        self.assertEqual(len(parts), 6)

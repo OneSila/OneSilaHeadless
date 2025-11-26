@@ -1,14 +1,16 @@
 from django.db import transaction
 from django.db.models import Q
+
+from core import models
 from media.models import MediaProductThrough
 from .inspector import InspectorCreateOrUpdateFactory, SaveInspectorMixin
 from ..exceptions import InspectorBlockFailed
 from products_inspector.constants import HAS_IMAGES_ERROR, MISSING_PRICES_ERROR, NONE, MISSING_VARIATION_ERROR, \
     MISSING_BUNDLE_ITEMS_ERROR, INACTIVE_BUNDLE_ITEMS_ERROR, MISSING_EAN_CODE_ERROR, \
     MISSING_PRODUCT_TYPE_ERROR, MISSING_REQUIRED_PROPERTIES_ERROR, MISSING_OPTIONAL_PROPERTIES_ERROR, MISSING_STOCK_ERROR, \
-    MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, ITEMS_MISMATCH_PRODUCT_TYPE_ERROR, \
+    MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, \
     ITEMS_MISSING_MANDATORY_INFORMATION_ERROR, VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR, \
-    DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR
+    DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR, AMAZON_VALIDATION_ISSUES_ERROR, AMAZON_REMOTE_ISSUES_ERROR
 from products_inspector.models import InspectorBlock
 from products_inspector.signals import *
 from ..constants import blocks
@@ -62,7 +64,6 @@ class InspectorBlockCreateOrUpdateFactory(InspectorCreateOrUpdateFactory):
         else:
             logger.info(f"InspectorBlock (error_code={self.error_code}) already exists for product {self.product.sku}")
 
-    @transaction.atomic
     def run(self):
         self._create_or_update_block()
 
@@ -151,7 +152,6 @@ class InspectorBlockFactory(SaveInspectorMixin):
 
         self.save_inspector()
 
-    @transaction.atomic
     def run(self):
         """
         Runs the inspection block process.
@@ -167,8 +167,22 @@ class HasImagesInspectorBlockFactory(InspectorBlockFactory):
         super().__init__(block, success_signal=inspector_has_images_success, failure_signal=inspector_has_images_failed, save_inspector=save_inspector)
 
     def _check(self):
-        if MediaProductThrough.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product).count() == 0:
-            raise InspectorBlockFailed("Product does not have required images.")
+        images_count = (
+            MediaProductThrough.objects.filter_multi_tenant(self.multi_tenant_company)
+            .get_product_images(product=self.product, sales_channel=None)
+            .count()
+        )
+
+        if self.product.is_configurable():
+            if images_count == 0:
+                raise InspectorBlockFailed("Product does not have required images.")
+            return
+
+        from sales_channels.models import SalesChannelViewAssign
+
+        if SalesChannelViewAssign.objects.filter(multi_tenant_company=self.multi_tenant_company, product=self.product).exists():
+            if images_count == 0:
+                raise InspectorBlockFailed("Product does not have required images.")
 
 
 @InspectorBlockFactoryRegistry.register(MISSING_PRICES_ERROR)
@@ -179,9 +193,21 @@ class MissingPricesInspectorBlockFactory(InspectorBlockFactory):
     def _check(self):
         from sales_prices.models import SalesPrice
 
-        if self.product.active:
-            if SalesPrice.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product).count() == 0:
-                raise InspectorBlockFailed("Product is missing default price.")
+        if not self.product.active:
+            return
+
+        prices_qs = SalesPrice.objects.filter_multi_tenant(self.multi_tenant_company).filter(product=self.product)
+
+        if not prices_qs.exists():
+            raise InspectorBlockFailed("Product is missing default price.")
+
+        # All entries are placeholders
+        valid_prices_exist = prices_qs.filter(
+            models.Q(price__isnull=False, price__gt=0) | models.Q(rrp__isnull=False, rrp__gt=0)
+        ).exists()
+
+        if not valid_prices_exist:
+            raise InspectorBlockFailed("Product has only placeholder prices (RRP and Price are missing or zero).")
 
 
 @InspectorBlockFactoryRegistry.register(INACTIVE_BUNDLE_ITEMS_ERROR)
@@ -218,7 +244,11 @@ class MissingBundleItemsInspectorBlockFactory(InspectorBlockFactory):
         from products.models import BundleVariation
         if not BundleVariation.objects.filter_multi_tenant(self.multi_tenant_company).filter(parent=self.product).exists():
             raise InspectorBlockFailed(f"Bundle Product have no items")
+
+
 8
+
+
 @InspectorBlockFactoryRegistry.register(MISSING_EAN_CODE_ERROR)
 class MissingEanCodeInspectorBlockFactory(InspectorBlockFactory):
     def __init__(self, block, save_inspector=True):
@@ -230,7 +260,7 @@ class MissingEanCodeInspectorBlockFactory(InspectorBlockFactory):
 
         rule = self.product.get_product_rule()
         if rule is None:
-            return # we cannot tell if this is necessary or not
+            return  # we cannot tell if this is necessary or not
 
         if not rule.require_ean_code:
             return  # if the rule doesn't require ean code we just skip
@@ -259,13 +289,41 @@ class MissingRequiredPropertiesInspectorBlockFactory(InspectorBlockFactory):
                          save_inspector=save_inspector)
 
     def _check(self):
-        from properties.models import ProductProperty
+        from properties.models import ProductProperty, ProductPropertiesRule, ProductPropertiesRuleItem
 
-        rule_item_properties_ids = self.product.get_required_properties().values_list('property_id', flat=True)
+        product_type_value = ProductProperty.objects.filter_multi_tenant(self.multi_tenant_company).filter(
+            product=self.product,
+            property__is_product_type=True,
+        ).select_related('value_select').first()
+
+        if not product_type_value or not product_type_value.value_select_id:
+            raise InspectorBlockFailed("Product is missing a required product type property.")
+
+        rules = ProductPropertiesRule.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            product_type_id=product_type_value.value_select_id,
+        )
+
+        rule_property_ids = set(
+            ProductPropertiesRuleItem.objects.filter(
+                rule__in=rules,
+                type__in=[
+                    ProductPropertiesRuleItem.REQUIRED,
+                    ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
+                    ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR,
+                ],
+            ).values_list('property_id', flat=True)
+        )
+
+        if not rule_property_ids:
+            return
+
         product_properties = ProductProperty.objects.filter_multi_tenant(self.multi_tenant_company). \
-            filter(product=self.product, property_id__in=rule_item_properties_ids)
+            filter(product=self.product, property_id__in=rule_property_ids)
 
-        if product_properties.count() != rule_item_properties_ids.count():
+        existing_property_ids = set(product_properties.values_list('property_id', flat=True))
+
+        if rule_property_ids - existing_property_ids:
             raise InspectorBlockFailed(f"Product is missing required propertes")
 
 
@@ -276,13 +334,40 @@ class MissingOptionalPropertiesInspectorBlockFactory(InspectorBlockFactory):
                          save_inspector=save_inspector)
 
     def _check(self):
-        from properties.models import ProductProperty
+        from properties.models import ProductProperty, ProductPropertiesRule, ProductPropertiesRuleItem
 
-        rule_item_properties_ids = self.product.get_optional_properties().values_list('property_id', flat=True)
+        product_type_value = ProductProperty.objects.filter_multi_tenant(self.multi_tenant_company).filter(
+            product=self.product,
+            property__is_product_type=True,
+        ).select_related('value_select').first()
+
+        if not product_type_value or not product_type_value.value_select_id:
+            return
+
+        rules = ProductPropertiesRule.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            product_type_id=product_type_value.value_select_id,
+        )
+
+        rule_property_ids = set(
+            ProductPropertiesRuleItem.objects.filter(
+                rule__in=rules,
+                type__in=[
+                    ProductPropertiesRuleItem.OPTIONAL,
+                    ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR,
+                ],
+            ).values_list('property_id', flat=True)
+        )
+
+        if not rule_property_ids:
+            return
+
         product_properties = ProductProperty.objects.filter_multi_tenant(self.multi_tenant_company). \
-            filter(product=self.product, property_id__in=rule_item_properties_ids)
+            filter(product=self.product, property_id__in=rule_property_ids)
 
-        if product_properties.count() != rule_item_properties_ids.count():
+        existing_property_ids = set(product_properties.values_list('property_id', flat=True))
+
+        if rule_property_ids - existing_property_ids:
             raise InspectorBlockFailed(f"Product is missing optional propertes")
 
 
@@ -344,40 +429,6 @@ class VariationMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
         else:
             if variations_product_type_value.first() != product_type_value_id:
                 raise InspectorBlockFailed("Variations product type mismatch")
-
-
-@InspectorBlockFactoryRegistry.register(ITEMS_MISMATCH_PRODUCT_TYPE_ERROR)
-class ItemsMismatchProductTypeInspectorBlockFactory(InspectorBlockFactory):
-    def __init__(self, block, save_inspector=True):
-        super().__init__(block, success_signal=inspector_items_mismatch_product_type_success, failure_signal=inspector_items_mismatch_product_type_failed,
-                         save_inspector=save_inspector)
-
-    def _check(self):
-        from properties.models import ProductProperty
-        from products.models import BundleVariation
-
-        product_type_value_id = ProductProperty.objects.filter(
-            multi_tenant_company=self.multi_tenant_company,
-            product=self.product,
-            property__is_product_type=True
-        ).values_list('value_select', flat=True).first()
-
-        item_ids = BundleVariation.objects.filter_multi_tenant(self.multi_tenant_company). \
-            filter(parent=self.product).values_list('variation_id', flat=True)
-
-        items_product_type_value = ProductProperty.objects.filter(multi_tenant_company=self.multi_tenant_company,
-                                                                  product_id__in=item_ids,
-                                                                  property__is_product_type=True).\
-            values_list('value_select', flat=True).distinct()
-
-        if items_product_type_value.count() == 0 or product_type_value_id is None:
-            return
-
-        if items_product_type_value.count() != 1:
-            raise InspectorBlockFailed("Items products type mismatch")
-        else:
-            if items_product_type_value.first() != product_type_value_id:
-                raise InspectorBlockFailed("Items products type mismatch")
 
 
 @InspectorBlockFactoryRegistry.register(ITEMS_MISSING_MANDATORY_INFORMATION_ERROR)
@@ -459,3 +510,45 @@ class NonConfigurableRuleInspectorBlockFactory(InspectorBlockFactory):
 
         if configurator_properties_count == 0:
             raise InspectorBlockFailed("Configurable product has no applicable configurator rules.")
+
+
+@InspectorBlockFactoryRegistry.register(AMAZON_VALIDATION_ISSUES_ERROR)
+class AmazonValidationIssuesInspectorBlockFactory(InspectorBlockFactory):
+    def __init__(self, block, save_inspector=True):
+        super().__init__(
+            block,
+            success_signal=inspector_amazon_validation_issues_success,
+            failure_signal=inspector_amazon_validation_issues_failed,
+            save_inspector=save_inspector,
+        )
+
+    def _check(self):
+        from sales_channels.integrations.amazon.models import AmazonProductIssue
+
+        if AmazonProductIssue.objects.filter_multi_tenant(self.multi_tenant_company).filter(
+            remote_product__local_instance=self.product,
+            is_validation_issue=True,
+            severity="ERROR",
+        ).exists():
+            raise InspectorBlockFailed("Product has amazon validation issues.")
+
+
+@InspectorBlockFactoryRegistry.register(AMAZON_REMOTE_ISSUES_ERROR)
+class AmazonRemoteIssuesInspectorBlockFactory(InspectorBlockFactory):
+    def __init__(self, block, save_inspector=True):
+        super().__init__(
+            block,
+            success_signal=inspector_amazon_remote_issues_success,
+            failure_signal=inspector_amazon_remote_issues_failed,
+            save_inspector=save_inspector,
+        )
+
+    def _check(self):
+        from sales_channels.integrations.amazon.models import AmazonProductIssue
+
+        if AmazonProductIssue.objects.filter_multi_tenant(self.multi_tenant_company).filter(
+            remote_product__local_instance=self.product,
+            is_validation_issue=False,
+            severity="ERROR",
+        ).exists():
+            raise InspectorBlockFailed("Product on amazon has remote issues.")

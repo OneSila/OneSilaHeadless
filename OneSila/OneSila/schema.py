@@ -19,12 +19,23 @@ from media.schema import MediaQuery, MediaMutation, MediaSubscription
 from products.schema import ProductsQuery, ProductsMutation, ProductsSubscription
 from products_inspector.schema import ProductsInspectorSubscription, ProductsInspectorMutation
 from properties.schema import PropertiesQuery, PropertiesMutation, PropertiesSubscription
+from sales_channels.integrations.ebay.schema import EbaySalesChannelMutation, EbaySalesChannelsQuery, \
+        EbaySalesChannelsSubscription
 from sales_prices.schema import SalesPricesQuery, SalesPricesMutation, SalesPriceSubscription
 from sales_channels.schema import SalesChannelsQuery, SalesChannelsMutation, SalesChannelsSubscription
-from sales_channels.integrations.magento2.schema import MagentoSalesChannelMutation
+from sales_channels.integrations.magento2.schema import MagentoSalesChannelMutation, MagentoSalesChannelsQuery, \
+    MagentoSalesChannelsSubscription
+from sales_channels.integrations.shopify.schema import ShopifySalesChannelMutation, ShopifySalesChannelsQuery, \
+    ShopifySalesChannelsSubscription
+from sales_channels.integrations.woocommerce.schema import WoocommerceSalesChannelMutation, WoocommerceSalesChannelsQuery, \
+    WoocommerceSalesChannelsSubscription
+from sales_channels.integrations.amazon.schema import AmazonSalesChannelMutation, AmazonSalesChannelsQuery, \
+    AmazonSalesChannelsSubscription
 from taxes.schema import TaxesQuery, TaxesMutation, TaxSubscription
 from translations.schema import TranslationsQuery
 from integrations.schema import IntegrationsQuery, IntegrationsMutation
+from llm.schema import LlmMutation, LlmQuery
+from webhooks.schema import WebhooksQuery, WebhooksMutation
 
 
 #
@@ -32,24 +43,75 @@ from integrations.schema import IntegrationsQuery, IntegrationsMutation
 #
 
 @strawberry.type
-class Query(CurrenciesQuery, CountryQuery, EanCodesQuery, IntegrationsQuery,
-        LanguageQuery, LeadTimesQuery, MediaQuery, MultiTenantQuery,
-        ProductsQuery, PropertiesQuery, SalesPricesQuery, SalesChannelsQuery,
-        TaxesQuery, TimeZoneQuery, TranslationsQuery):
+class Query(
+        AmazonSalesChannelsQuery,
+        CurrenciesQuery,
+        CountryQuery,
+        EanCodesQuery,
+        IntegrationsQuery,
+        LanguageQuery,
+        LeadTimesQuery,
+        MediaQuery,
+        MultiTenantQuery,
+        MagentoSalesChannelsQuery,
+        ShopifySalesChannelsQuery,
+        WoocommerceSalesChannelsQuery,
+        EbaySalesChannelsQuery,
+        ProductsQuery,
+        PropertiesQuery,
+        SalesPricesQuery,
+        SalesChannelsQuery,
+        TaxesQuery,
+        TimeZoneQuery,
+        TranslationsQuery,
+        LlmQuery,
+        WebhooksQuery,
+):
     pass
 
 
 @strawberry.type
-class Mutation(CurrenciesMutation, EanCodesMutation,MediaMutation, MultiTenantMutation,
-       ProductsInspectorMutation, ProductsMutation, PropertiesMutation, IntegrationsMutation,
-        SalesPricesMutation, SalesChannelsMutation, MagentoSalesChannelMutation, TaxesMutation):
+class Mutation(
+        AmazonSalesChannelMutation,
+        CurrenciesMutation,
+        EanCodesMutation,
+        MediaMutation,
+        MultiTenantMutation,
+        ShopifySalesChannelMutation,
+        WoocommerceSalesChannelMutation,
+        EbaySalesChannelMutation,
+        ProductsInspectorMutation,
+        ProductsMutation,
+        PropertiesMutation,
+        IntegrationsMutation,
+        LlmMutation,
+        SalesPricesMutation,
+        SalesChannelsMutation,
+        MagentoSalesChannelMutation,
+        TaxesMutation,
+        WebhooksMutation,
+):
     pass
 
 
 @strawberry.type
-class Subscription(CurrenciesSubscription,EanCodesSubscription, MediaSubscription, MultiTenantSubscription,
-        ProductsInspectorSubscription, ProductsSubscription, PropertiesSubscription, SalesPriceSubscription,
-        SalesChannelsSubscription, TaxSubscription):
+class Subscription(
+        AmazonSalesChannelsSubscription,
+        CurrenciesSubscription,
+        EanCodesSubscription,
+        MediaSubscription,
+        MultiTenantSubscription,
+        ProductsInspectorSubscription,
+        ProductsSubscription,
+        PropertiesSubscription,
+        SalesPriceSubscription,
+        MagentoSalesChannelsSubscription,
+        SalesChannelsSubscription,
+        TaxSubscription,
+        ShopifySalesChannelsSubscription,
+        WoocommerceSalesChannelsSubscription,
+        EbaySalesChannelsSubscription,
+):
     pass
 
 #
@@ -61,5 +123,5 @@ schema = strawberry.Schema(
     query=Query,
     mutation=Mutation,
     subscription=Subscription,
-    extensions=[DjangoOptimizerExtension()]
+    extensions=[DjangoOptimizerExtension]
 )

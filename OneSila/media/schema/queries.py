@@ -1,4 +1,4 @@
-from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, type
+from core.schema.core.queries import node, connection, DjangoListConnection, type
 from typing import List
 
 from .types.types import MediaType, ImageType, VideoType, MediaProductThroughType, FileType
@@ -7,16 +7,16 @@ from .types.types import MediaType, ImageType, VideoType, MediaProductThroughTyp
 @type(name="Query")
 class MediaQuery:
     media: MediaType = node()
-    medias: ListConnectionWithTotalCount[MediaType] = connection()
+    medias: DjangoListConnection[MediaType] = connection()
 
     image: ImageType = node()
-    images: ListConnectionWithTotalCount[ImageType] = connection()
+    images: DjangoListConnection[ImageType] = connection()
 
     file: FileType = node()
-    files: ListConnectionWithTotalCount[FileType] = connection()
+    files: DjangoListConnection[FileType] = connection()
 
     video: VideoType = node()
-    videos: ListConnectionWithTotalCount[VideoType] = connection()
+    videos: DjangoListConnection[VideoType] = connection()
 
     media_product_through: MediaProductThroughType = node()
-    media_product_throughs: ListConnectionWithTotalCount[MediaProductThroughType] = connection()
+    media_product_throughs: DjangoListConnection[MediaProductThroughType] = connection()

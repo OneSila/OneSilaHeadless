@@ -1,4 +1,5 @@
 from django.contrib import admin
+from core.admin import ModelAdmin
 from polymorphic.admin import PolymorphicChildModelFilter, PolymorphicParentModelAdmin
 
 from integrations.models import Integration, IntegrationTaskQueue, IntegrationLog
@@ -8,7 +9,6 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.contrib import messages
 import json
-from django.contrib import admin
 from pygments import highlight
 from pygments.lexers import JsonLexer
 from pygments.formatters import HtmlFormatter
@@ -31,8 +31,9 @@ def retry_task_action(modeladmin, request, queryset):
     for task in queryset:
         task.retry_task(retry_now=True)
 
+
 @admin.register(IntegrationTaskQueue)
-class RemoteTaskQueueAdmin(admin.ModelAdmin):
+class RemoteTaskQueueAdmin(ModelAdmin):
     list_display = ['__str__', 'status', 'priority', 'sent_to_queue_at_display']
     list_filter = ['status', 'integration', 'task_name']
     actions = [retry_task_action]
@@ -108,14 +109,12 @@ class RemoteTaskQueueAdmin(admin.ModelAdmin):
         'error_traceback', 'number_of_remote_requests', 'retry_button', 'history'
     ]
 
-
     def get_readonly_fields(self, request, obj=None):
 
         readonly = list(self.readonly_fields)
         if obj is not None:  # If editing an existing object
             return readonly
         return readonly
-
 
     def has_delete_permission(self, request, obj=None):
         # Allow deletion of tasks
@@ -130,8 +129,10 @@ class IntegrationLogAdmin(PolymorphicParentModelAdmin):
     list_filter = ('status', 'action', 'integration', PolymorphicChildModelFilter)
     search_fields = ('content_object__name', 'identifier')
     ordering = ('-created_at',)
-    fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type', 'object_id', 'related_object_str', 'integration', 'remote_product', 'action', 'status', 'identifier']
-    readonly_fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type', 'object_id', 'related_object_str', 'integration', 'action', 'status', 'identifier', 'remote_product']
+    fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type',
+        'object_id', 'related_object_str', 'integration', 'remote_product', 'action', 'status', 'identifier']
+    readonly_fields = ['payload', 'response', 'error_traceback', 'user_error', 'content_object', 'content_type',
+        'object_id', 'related_object_str', 'integration', 'action', 'status', 'identifier', 'remote_product']
 
     base_fieldsets = (
         (None, {

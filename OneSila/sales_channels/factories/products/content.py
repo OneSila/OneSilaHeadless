@@ -1,11 +1,16 @@
 from products.models import Product
 from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
 
+
+import logging
+logger = logging.getLogger(__name__)
+
+
 class RemoteProductContentUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = Product
     local_product_map = 'local_instance'
 
-    def __init__(self, sales_channel, local_instance, remote_product, api=None, skip_checks=False, remote_instance=None):
+    def __init__(self, sales_channel, local_instance, remote_product, api=None, skip_checks=False, remote_instance=None, language=None):
         super().__init__(sales_channel, local_instance, api=api, remote_product=remote_product)
 
         self.remote_instance = remote_instance
@@ -13,7 +18,7 @@ class RemoteProductContentUpdateFactory(ProductAssignmentMixin, RemoteInstanceUp
             raise ValueError("Factory has skip checks enabled without providing the remote product.")
 
         self.skip_checks = skip_checks
-
+        self.language = language
 
     def preflight_check(self):
         """
@@ -24,17 +29,21 @@ class RemoteProductContentUpdateFactory(ProductAssignmentMixin, RemoteInstanceUp
             return True
 
         if not self.remote_product:
+            logger.error(f"{self.__class__.__name__} remote product is missing.")
             return False
 
         if not self.assigned_to_website():
+            logger.error(f"{self.__class__.__name__} product is not assigned to a website.")
             return False
 
         # Set the remote_instance for the factory based on existing data
         try:
-            self.remote_instance = self.remote_model_class.objects.get(
-                remote_product=self.remote_product
-            )
+            if not self.remote_instance:
+                self.remote_instance = self.remote_model_class.objects.get(
+                    remote_product=self.remote_product
+                )
         except self.remote_model_class.DoesNotExist:
+            logger.error(f"{self.__class__.__name__} remote instance does not exist.")
             return False
 
         return True

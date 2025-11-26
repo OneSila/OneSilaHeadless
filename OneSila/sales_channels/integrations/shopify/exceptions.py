@@ -1,0 +1,2 @@
+class ShopifyGraphqlException(Exception):
+    pass

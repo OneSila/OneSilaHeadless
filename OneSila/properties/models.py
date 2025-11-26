@@ -1,11 +1,13 @@
 from core import models
 from django.utils.translation import gettext_lazy as _
 
-from properties.managers import PropertyManager, ProductPropertiesRuleManager, PropertySelectValueManager
+from properties.managers import PropertyManager, ProductPropertiesRuleManager, \
+    PropertySelectValueManager, ProductPropertyManager
 from translations.models import TranslationFieldsMixin, TranslatedModelMixin
 from builtins import property as django_property  # in this file we will use property as django property because we have fields named property
 from django.db.models import Q
 from django.core.exceptions import ValidationError
+
 
 class Property(TranslatedModelMixin, models.Model):
     """https://github.com/TweaveTech/django-classifier/blob/master/classifier/models.py"""
@@ -43,6 +45,7 @@ class Property(TranslatedModelMixin, models.Model):
     add_to_filters = models.BooleanField(default=True)
     is_product_type = models.BooleanField(default=False)
     has_image = models.BooleanField(default=False)
+    non_deletable = models.BooleanField(default=False)
 
     # advanced tab
     value_validator = models.CharField(
@@ -54,17 +57,26 @@ class Property(TranslatedModelMixin, models.Model):
     )
     # the name that will be used in integration. Consider making it a foreign key with integrations in the future. for now is enough
     # it will be the snake case version of the name in default language "Product Type" => "product_type"
+    # This internal name is auto-populated via siganls once the tranlsation is saved.
     internal_name = models.CharField(max_length=255, null=True, blank=True, verbose_name=_('Internal Name'))
 
     objects = PropertyManager()
 
     @django_property
     def name(self):
-        return self._get_translated_value(field_name='name', related_name='propertytranslation_set')
+        if hasattr(self, 'translated_name'):
+            return self.translated_name
+        return self._get_translated_value(field_name='name', related_name='propertytranslation_set', fallback='No Name Set')
 
     def delete(self, *args, **kwargs):
-        if self.is_product_type:
+
+        force_delete = kwargs.pop('force_delete', False)
+        if self.is_product_type and not force_delete:
             raise ValidationError(_("Product type cannot be deleted."))
+
+        if self.non_deletable and not force_delete:
+            raise ValidationError(_("This property cannot be deleted."))
+
         super().delete(*args, **kwargs)
 
     def save(self, *args, **kwargs):
@@ -74,17 +86,24 @@ class Property(TranslatedModelMixin, models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.multi_tenant_company} -> {self.name}"
+        return f"{self.multi_tenant_company} -> {self.name} ({self.type})"
 
     class Meta:
         verbose_name_plural = _("Properties")
         search_terms = ['propertytranslation__name']
+        ordering = ('propertytranslation__name',)
         constraints = [
             models.UniqueConstraint(
                 fields=['multi_tenant_company'],
                 condition=Q(is_product_type=True),
                 name='unique_is_product_type',
                 violation_error_message=_("You can only have one product type per multi-tenant company.")
+            ),
+            models.UniqueConstraint(
+                fields=['multi_tenant_company', 'internal_name'],
+                condition=Q(internal_name__isnull=False),
+                name='unique_internal_name_per_company',
+                violation_error_message=_("This internal name already exists for this company.")
             ),
         ]
 
@@ -96,19 +115,35 @@ class PropertyTranslation(TranslationFieldsMixin, models.Model):
     class Meta:
         translated_field = 'property'
         search_terms = ['name']
-        unique_together = ("name", "language", "multi_tenant_company")
+        indexes = [
+            models.Index(fields=['property', 'language']),
+        ]
 
 
 class PropertySelectValue(TranslatedModelMixin, models.Model):
     property = models.ForeignKey(Property, on_delete=models.PROTECT)
     image = models.ForeignKey('media.Image', null=True, blank=True, on_delete=models.CASCADE)
 
-
     objects = PropertySelectValueManager()
 
     @django_property
     def value(self, language=None):
-        return self._get_translated_value(field_name='value', related_name='propertyselectvaluetranslation_set', language=language)
+        if language is None and hasattr(self, 'translated_value'):
+            return self.translated_value
+        return self._get_translated_value(field_name='value', related_name='propertyselectvaluetranslation_set', language=language, fallback='No Value Set')
+
+    def value_by_language_code(self, *, language=None):
+        """Return the translated value for the given language code when available."""
+        if language:
+            translated = self._get_translated_value(
+                field_name='value',
+                related_name='propertyselectvaluetranslation_set',
+                language=language,
+                fallback=None,
+            )
+            if translated not in (None, ''):
+                return translated
+        return self.value
 
     def __str__(self):
         return f"{self.value} <{self.property}>"
@@ -125,15 +160,19 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
 
     class Meta:
         search_terms = ['propertyselectvaluetranslation__value']
+        ordering = ('id',)
 
 
 class PropertySelectValueTranslation(TranslationFieldsMixin, models.Model):
     propertyselectvalue = models.ForeignKey(PropertySelectValue, on_delete=models.CASCADE)
-    value = models.CharField(max_length=200, verbose_name=_('Value'))
+    value = models.CharField(max_length=255, verbose_name=_('Value'))
 
     class Meta:
         translated_field = 'propertyselectvalue'
         search_terms = ['value']
+        indexes = [
+            models.Index(fields=['propertyselectvalue', 'language']),
+        ]
         # added language as well because some words translates the same in different languages
         # the issue with that is that we also kinda need to do propertyselectvalue__property but this is not possible because we can have the same translation
         # on the value but for different properties
@@ -149,13 +188,15 @@ class ProductProperty(TranslatedModelMixin, models.Model):
     value_float = models.FloatField(null=True, blank=True)
     value_date = models.DateField(null=True, blank=True)
     value_datetime = models.DateTimeField(null=True, blank=True)
-    value_select = models.ForeignKey(PropertySelectValue, on_delete=models.CASCADE, related_name='value_select_set', null=True, blank=True)
+    value_select = models.ForeignKey(PropertySelectValue, on_delete=models.PROTECT, related_name='value_select_set', null=True, blank=True)
     value_multi_select = models.ManyToManyField(PropertySelectValue, related_name='value_multi_select_set', blank=True)
+
+    objects = ProductPropertyManager()
 
     def __str__(self):
         return f"{self.product} {self.property} > {self.get_value()}"
 
-    def get_value(self):
+    def get_value(self, language=None):
         """
         Converts the various values and returns you the right type/value for the given property.
         """
@@ -164,12 +205,23 @@ class ProductProperty(TranslatedModelMixin, models.Model):
         if type == Property.TYPES.MULTISELECT:
             type = 'multi_select'
 
-        return getattr(self, 'get_value_{}'.format(type.lower()))()
+        method = getattr(self, 'get_value_{}'.format(type.lower()))
+        return method(language)
 
-    def get_value_int(self):
+    def get_serialised_value(self, language=None):
+        value = self.get_value(language)
+
+        if self.property.type == Property.TYPES.MULTISELECT:
+            value = list({value.value for value in self.value_multi_select.all()})
+        elif self.property.type == Property.TYPES.SELECT:
+            value = value.value
+
+        return value
+
+    def get_value_int(self, language=None):
         return self.value_int
 
-    def get_value_float(self):
+    def get_value_float(self, language=None):
         return self.value_float
 
     def get_value_text(self, language=None):
@@ -178,24 +230,28 @@ class ProductProperty(TranslatedModelMixin, models.Model):
     def get_value_description(self, language=None):
         return self._get_translated_value(field_name='value_description', related_name='productpropertytexttranslation_set', language=language)
 
-    def get_value_boolean(self):
+    def get_value_boolean(self, language=None):
         return self.value_boolean
 
-    def get_value_date(self):
+    def get_value_date(self, language=None):
         return self.value_date
 
-    def get_value_datetime(self):
+    def get_value_datetime(self, language=None):
         return self.value_datetime
 
-    def get_value_select(self):
+    def get_value_select(self, language=None):
         return self.value_select
 
-    def get_value_multi_select(self):
+    def get_value_multi_select(self, language=None):
         return self.value_multi_select
 
     class Meta:
         verbose_name_plural = _("Product Properties")
         unique_together = ("product", "property")
+        indexes = [
+            models.Index(fields=['product', 'property']),
+            models.Index(fields=['property', 'value_select']),
+        ]
 
 
 class ProductPropertyTextTranslation(TranslationFieldsMixin, models.Model):
@@ -207,6 +263,9 @@ class ProductPropertyTextTranslation(TranslationFieldsMixin, models.Model):
         translated_field = 'product_property'
         search_terms = ['value_text', 'value_description']
         unique_together = ("product_property", "language")
+        indexes = [
+            models.Index(fields=['product_property', 'language']),
+        ]
 
 
 class ProductPropertiesRule(models.Model):
@@ -215,12 +274,25 @@ class ProductPropertiesRule(models.Model):
         on_delete=models.PROTECT,
         verbose_name=_('Product Type'),
     )
+    sales_channel = models.ForeignKey(
+        'sales_channels.SalesChannel',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        default=None,
+        verbose_name=_('Sales Channel'),
+    )
     require_ean_code = models.BooleanField(default=False)
 
     objects = ProductPropertiesRuleManager()
 
     def __str__(self):
-        return f"{self.product_type} <{self.multi_tenant_company}>"
+        sales_channel_display = f" [{self.sales_channel}]" if self.sales_channel else ""
+        return f"{self.product_type} <{self.multi_tenant_company}>{sales_channel_display}"
+
+    @property
+    def value(self):
+        return self.product_type.value
 
     def save(self, *args, **kwargs):
 
@@ -239,7 +311,14 @@ class ProductPropertiesRule(models.Model):
 
     class Meta:
         verbose_name_plural = _("Product Properties Rules")
-        unique_together = ("product_type", "multi_tenant_company")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("product_type", "multi_tenant_company", "sales_channel"),
+                name="unique_product_properties_rule_per_sales_channel",
+                nulls_distinct=False,
+            )
+        ]
+        search_terms = ['product_type__propertyselectvaluetranslation__value']
 
 
 class ProductPropertiesRuleItem(models.Model):
@@ -267,11 +346,7 @@ class ProductPropertiesRuleItem(models.Model):
 
         # Ensure that if type is REQUIRED_IN_CONFIGURATOR, property type must be SELECT or MULTISELECT
         if self.type in [self.REQUIRED_IN_CONFIGURATOR, self.OPTIONAL_IN_CONFIGURATOR] and self.property.type != Property.TYPES.SELECT:
-            raise ValidationError(_("Property must be of type SELECT."))
-
-        # Ensure rule cannot have OPTIONAL_IN_CONFIGURATOR without a REQUIRED_IN_CONFIGURATOR
-        if self.type == self.OPTIONAL_IN_CONFIGURATOR and not self.rule.items.filter(type=self.REQUIRED_IN_CONFIGURATOR).exists():
-            raise ValidationError(_("Cannot have optional in configurator without a required in configurator."))
+            raise ValidationError(_(f"Property {self.property.name} ({self.property.type}) must be of type SELECT."))
 
         super().save(*args, **kwargs)
 

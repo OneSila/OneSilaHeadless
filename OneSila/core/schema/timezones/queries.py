@@ -1,13 +1,8 @@
 from strawberry_django import auth, field
 
-from django.contrib.auth.models import AnonymousUser
 from django.utils import timezone
-from django.conf import settings
 
-from core.schema.core.helpers import get_multi_tenant_company
-from core.schema.multi_tenant.types.types import MultiTenantUserType, MultiTenantCompanyType
-from core.schema.core.queries import node, connection, ListConnectionWithTotalCount, \
-    type, field, default_extensions, Info, anonymous_field
+from core.schema.core.queries import type, field, anonymous_field
 
 from typing import List
 

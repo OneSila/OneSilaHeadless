@@ -1,6 +1,6 @@
 import importlib
 
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 
 from core.exceptions import NotDemoDataGeneratorError
 from core.models import DemoDataRelation
@@ -81,7 +81,6 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
             'priority': priority
         }
 
-
     def register_public_app(self, method):
         method_name = self.method_name(method)
 
@@ -145,17 +144,24 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
         self.populate_db(multi_tenant_company=multi_tenant_company)
 
     def delete_traversed_content_object(self, content_object):
+
         try:
-            content_object.delete()
+            with transaction.atomic():  # isolate delete
+                content_object.delete()
         except ProtectedError as e:
-            for protected_intance in e.protected_objects:
-                self.delete_traversed_content_object(protected_intance)
+            for protected_instance in e.protected_objects:
+                self.delete_traversed_content_object(protected_instance)
 
-            self.delete_traversed_content_object(content_object)
+            try:
+                with transaction.atomic():
+                    content_object.delete()
+            except ProtectedError as e2:
+                for protected_instance in e2.protected_objects:
+                    self.delete_traversed_content_object(protected_instance)
+
         except ValidationError as e:
-
             if 'removed directly' in str(e):
-                pass # this is for select values that are deleted by deleting the rule
+                pass  # known expected case
 
     def delete_demo_data(self, *, multi_tenant_company):
         # we reverse the sequence, to avoid dealing with protected instances.
@@ -167,6 +173,7 @@ class DemoDataRegistryMixin(CreatePrivateDataRelationMixin):
             except AttributeError:
                 # Already deleted.
                 pass
+
             instance.delete()
 
 
@@ -212,6 +219,9 @@ class DemoDataGeneratorMixin:
         return baker_kwargs
 
     def create_instance(self, **kwargs):
+
+        logger.info(f"{self.__class__.__name__} create_instance: {kwargs=}")
+
         Model = self.get_model()
 
         if not self.use_baker:
@@ -246,6 +256,7 @@ class PrivateDataGenerator(DemoDataGeneratorMixin, CreatePrivateDataRelationMixi
         return kwargs
 
     def create_instance(self, **kwargs):
+        logger.info(f"{self.__class__.__name__} create_instance: {kwargs=}")
         instance = super().create_instance(**kwargs)
         self.create_demo_data_relation(instance)
         return instance
@@ -271,6 +282,9 @@ class PrivateStructuredDataGenerator(PrivateDataGenerator):
         structure = self.get_structure()
         for i in structure:
             pre_kwargs = i['instance_data']
+
+            logger.info(f"{self.__class__.__name__} pre_kwargs: {pre_kwargs}")
+
             pre_kwargs.setdefault('multi_tenant_company', self.multi_tenant_company)
 
             if not self.preflight_check(pre_kwargs):

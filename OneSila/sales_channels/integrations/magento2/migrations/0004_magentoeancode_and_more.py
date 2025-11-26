@@ -15,7 +15,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='MagentoEanCode',
             fields=[
-                ('remoteeancode_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteeancode')),
+                ('remoteeancode_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE,
+                 parent_link=True, primary_key=True, serialize=False, to='sales_channels.remoteeancode')),
             ],
             options={
                 'verbose_name': 'Magento EAN Code',

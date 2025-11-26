@@ -2,9 +2,10 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import get_language_info
-
+from core.models.mixins import TimeStampMixin
 
 from core.validators import phone_regex
 from imagekit.models import ImageSpecField
@@ -16,13 +17,14 @@ from core.helpers import get_languages
 from core.managers import MultiTenantManager, MultiTenantUserLoginTokenManager
 from core.validators import phone_regex, validate_image_extension, \
     no_dots_in_filename
+from core.upload_paths import tenant_upload_to
 
 from get_absolute_url.helpers import generate_absolute_url
 from hashlib import shake_256
 import shortuuid
 
 
-class MultiTenantCompany(models.Model):
+class MultiTenantCompany(TimeStampMixin, models.Model):
     '''
     Class that holds company information and sales-conditions.
     '''
@@ -37,14 +39,16 @@ class MultiTenantCompany(models.Model):
     city = models.CharField(max_length=100, null=True, blank=True)
     country = models.CharField(max_length=3, choices=COUNTRY_CHOICES, null=True, blank=True)
     language = models.CharField(max_length=7, choices=LANGUAGE_CHOICES, default=settings.LANGUAGE_CODE)
+    languages = models.JSONField(default=list, blank=True, help_text="List of enabled language codes for this company.")
 
     email = models.EmailField(blank=True, null=True)
     phone_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
     vat_number = models.CharField(max_length=30, null=True, blank=True)
     website = models.URLField(blank=True, null=True)
 
-    ai_points = models.IntegerField(default=0, help_text="Points allocated for AI processes.")
-
+    ai_points = models.IntegerField(default=20, help_text="Points allocated for AI processes.")
+    # Active flag has no real logic behind it aside from sorting thins for us somewhat.
+    active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -140,8 +144,12 @@ class MultiTenantUser(AbstractUser, MultiTenantAwareMixin):
     telegram_number = models.CharField(validators=[phone_regex], max_length=17, blank=True, null=True)
     onboarding_status = models.CharField(max_length=30, choices=ONBOARDING_STATUS_CHOICES, default=ADD_COMPANY)
 
-    avatar = models.ImageField(upload_to='avatars', null=True, blank=True,
-        validators=[validate_image_extension, no_dots_in_filename])
+    avatar = models.ImageField(
+        upload_to=tenant_upload_to('avatars'),
+        null=True,
+        blank=True,
+        validators=[validate_image_extension, no_dots_in_filename],
+    )
     avatar_resized = ImageSpecField(source='avatar',
                             processors=[ResizeToFill(100, 100)],
                             format='JPEG',
@@ -229,3 +237,89 @@ class MultiTenantUserLoginToken(models.Model):
 
     def is_valid(self, now=timezone.now()):
         return self.expires_at >= now
+
+
+class DashboardSection(TimeStampMixin, MultiTenantAwareMixin):
+    user = models.ForeignKey(
+        "core.MultiTenantUser",
+        on_delete=models.CASCADE,
+        related_name="dashboard_sections",
+    )
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    sort_order = models.PositiveIntegerField(default=10)
+
+    class Meta:
+        ordering = ("sort_order",)
+
+    def __str__(self):
+        return self.title
+
+    def clean(self):
+        super().clean()
+        if (
+            self.user_id
+            and self.multi_tenant_company_id
+            and self.user.multi_tenant_company_id != self.multi_tenant_company_id
+        ):
+            raise ValidationError(_("Dashboard section user must be part of the company."))
+
+
+class DashboardCard(TimeStampMixin, MultiTenantAwareMixin):
+    class Colors(models.TextChoices):
+        RED = "RED", _("Red")
+        ORANGE = "ORANGE", _("Orange")
+        YELLOW = "YELLOW", _("Yellow")
+
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    color = models.CharField(max_length=16, choices=Colors.choices)
+    query = models.TextField()
+    variables = models.JSONField(default=dict, blank=True)
+    query_key = models.CharField(max_length=255)
+    url = models.URLField(blank=True)
+    section = models.ForeignKey(
+        DashboardSection,
+        on_delete=models.CASCADE,
+        related_name="cards",
+    )
+    user = models.ForeignKey(
+        "core.MultiTenantUser",
+        on_delete=models.CASCADE,
+        related_name="dashboard_cards",
+    )
+    sort_order = models.PositiveIntegerField(default=10)
+
+    class Meta:
+        ordering = ("sort_order",)
+
+    def __str__(self):
+        return f"{self.title} ({self.get_color_display()})"
+
+    def clean(self):
+        super().clean()
+        errors = {}
+
+        if (
+            self.user_id
+            and self.multi_tenant_company_id
+            and self.user.multi_tenant_company_id != self.multi_tenant_company_id
+        ):
+            errors["user"] = _("Dashboard card user must be part of the company.")
+
+        if (
+            self.section_id
+            and self.multi_tenant_company_id
+            and self.section.multi_tenant_company_id != self.multi_tenant_company_id
+        ):
+            errors["section"] = _("Dashboard card section must belong to the same company.")
+
+        if (
+            self.section_id
+            and self.user_id
+            and self.section.user_id != self.user_id
+        ):
+            errors["user"] = _("Dashboard card user must match the section owner.")
+
+        if errors:
+            raise ValidationError(errors)

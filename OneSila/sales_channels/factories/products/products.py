@@ -1,17 +1,30 @@
 from integrations.models import IntegrationLog
+from types import SimpleNamespace
 from media.models import MediaProductThrough, Media
 from products.models import Product
 from properties.models import ProductProperty
-from sales_channels.exceptions import SwitchedToSyncException, SwitchedToCreateException
+from django.template import TemplateSyntaxError
+from sales_channels.exceptions import (
+    SwitchedToSyncException,
+    SwitchedToCreateException,
+    ConfigurationMissingError,
+)
 from sales_channels.factories.mixins import IntegrationInstanceOperationMixin, RemoteInstanceDeleteFactory, \
     EanCodeValueMixin, SyncProgressMixin
 import logging
 
-from sales_channels.models import RemoteLog, SalesChannel, RemoteImageProductAssociation
+from sales_channels.content_templates import (
+    build_content_template_context,
+    get_sales_channel_content_template,
+    get_sales_channel_content_template_iframe,
+    render_sales_channel_content_template,
+)
+from sales_channels.models import RemoteLog, SalesChannel, RemoteImageProductAssociation, RemoteCurrency
 from sales_channels.models.products import RemoteProductConfigurator, RemoteProduct
 from sales_channels.models.sales_channels import RemoteLanguage, SalesChannelViewAssign
 
 logger = logging.getLogger(__name__)
+
 
 class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMixin, SyncProgressMixin):
     remote_model_class = None  # This should be set in subclasses
@@ -33,6 +46,10 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     add_variation_factory = None
     accepted_variation_already_exists_error = None
 
+    # Determines whether the sales channel allows duplicate SKUs across
+    # standalone products and variations.
+    sales_channel_allow_duplicate_sku = False
+
     field_mapping = {}  # Mapping of local fields to remote fields, should be overridden in subclasses
 
     api_package_name = 'products'  # The package name (e.g., 'products')
@@ -47,10 +64,10 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     fixing_identifier_class = None
 
     def __init__(self, sales_channel: SalesChannel, local_instance: Product,
-                 api=None, remote_instance=None, parent_local_instance=None, remote_parent_product=None):
+                 api=None, remote_instance=None, parent_local_instance=None, remote_parent_product=None, is_switched=False):
         self.local_instance = local_instance  # Instance of the Product model
         self.sales_channel = sales_channel   # Sales channel associated with the sync
-        self.integration = sales_channel # to make it work with other mixins
+        self.integration = sales_channel  # to make it work with other mixins
         self.api = api
         self.parent_local_instance = parent_local_instance  # Optional: parent product instance for variations
         self.remote_parent_product = remote_parent_product  # Optional: If it comes from a  create factory of configurable it will save some queries
@@ -58,10 +75,16 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.is_variation = parent_local_instance is not None  # Determine if this is a variation
         self.payload = {}
         self.remote_product_properties = []
-
+        self.local_type = self.local_instance.type
+        self.is_create = False
+        self.is_switched = is_switched
+        self._content_template_media_assignments = None
+        self._content_template_cache = {}
 
     def set_local_assigns(self):
         to_assign = SalesChannelViewAssign.objects.filter(product=self.local_instance, sales_channel=self.sales_channel, remote_product__isnull=True)
+        logger.info(f"Detected products assigns: {to_assign}")
+        logger.info(f"Remote product {self.remote_instance}")
         for assign in to_assign:
             assign.remote_product = self.remote_instance
             assign.save()
@@ -69,6 +92,9 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     def preflight_check(self):
         return True
 
+    def sanity_check(self):
+        """Run pre-sync validations."""
+        return True
 
     def add_field_in_payload(self, field_name, value):
         """
@@ -81,6 +107,64 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         if remote_key:
             self.payload[remote_key] = value
 
+    def _get_sales_channel_content_template(self, *, language):
+        if not language:
+            return None
+        if language not in self._content_template_cache:
+            self._content_template_cache[language] = get_sales_channel_content_template(
+                sales_channel=self.sales_channel,
+                language=language,
+            )
+        return self._content_template_cache[language]
+
+    def _render_content_template(
+        self,
+        *,
+        description,
+        language,
+        title,
+        price=None,
+        discount_price=None,
+        currency=None,
+    ):
+        template = self._get_sales_channel_content_template(language=language)
+        if not template or not template.template.strip():
+            return description
+
+        try:
+            context = build_content_template_context(
+                product=self.local_instance,
+                sales_channel=self.sales_channel,
+                description=description,
+                language=language,
+                title=title or "",
+                media_assignments=self._content_template_media_assignments,
+                product_properties=list(getattr(self, 'product_properties', []) or []),
+                price=price,
+                discount_price=discount_price,
+                currency=currency,
+            )
+            iframe_markup = get_sales_channel_content_template_iframe(
+                template=template,
+                product=self.local_instance,
+            )
+            if iframe_markup:
+                context["iframe"] = iframe_markup
+            rendered = render_sales_channel_content_template(
+                template_string=template.template,
+                context=context,
+            )
+        except TemplateSyntaxError as exc:
+            logger.warning(
+                "Failed to render content template for %s (%s): %s",
+                self.local_instance,
+                language or 'default',
+                exc,
+            )
+            return description
+
+        return rendered or description
+
     def initialize_remote_product(self):
         """
         Attempts to retrieve the remote product instance. If not found, it should
@@ -91,7 +175,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         if self.remote_instance is not None:
             self.remote_parent_product = self.remote_instance.remote_parent_product
-            self.parent_local_instance = self.remote_parent_product.local_instance
+            self.parent_local_instance = self.remote_parent_product.local_instance if self.remote_parent_product is not None else None
             self.is_variation = self.remote_instance.remote_parent_product is not None
             return
 
@@ -105,16 +189,15 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         except self.remote_model_class.DoesNotExist as e:
             raise SwitchedToCreateException(f'{str(e)}. Switch to create mode...')
 
-
     def set_remote_product_for_logging(self):
-        self.remote_product = self.remote_parent_product if self.remote_parent_product is not  None else self.remote_instance
+        self.remote_product = self.remote_parent_product if self.remote_parent_product is not None else self.remote_instance
 
     def set_rule(self):
         """
         Sets the product rule for the current local instance.
         If no rule is found, raises a ValueError as the rule is required.
         """
-        self.rule = self.local_instance.get_product_rule()
+        self.rule = self.local_instance.get_product_rule(sales_channel=self.sales_channel)
 
         if not self.rule:
             raise ValueError(f"Product rule is required for {self.local_instance.name}. "
@@ -125,9 +208,20 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         Retrieves and sets the required and optional properties for the product.
         Raises an exception if no properties are found, as properties are mandatory for the sync process.
         """
-        rule_properties_ids = self.local_instance.get_required_and_optional_properties(product_rule=self.rule).values_list('property_id', flat=True)
-        self.product_properties = ProductProperty.objects.filter_multi_tenant(self.sales_channel.multi_tenant_company). \
-            filter(product=self.local_instance, property_id__in=rule_properties_ids)
+        if self.local_instance.is_configurable():
+            self.product_properties = self.local_instance.get_properties_for_configurable_product(
+                product_rule=self.rule,
+                sales_channel=self.sales_channel,
+            )
+        else:
+            rule_properties_ids = self.local_instance.get_required_and_optional_properties(
+                product_rule=self.rule,
+                sales_channel=self.sales_channel,
+            ).values_list('property_id', flat=True)
+            self.product_properties = ProductProperty.objects.filter_multi_tenant(self.sales_channel.multi_tenant_company). \
+                filter(product=self.local_instance, property_id__in=rule_properties_ids)
+
+        logger.debug(f"Setting product properties {self.product_properties}")
 
     def process_product_properties(self):
         """
@@ -135,16 +229,21 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         such as adding to payload, creating or updating remote instances, etc.
         """
         existing_remote_property_ids = []
+        skip_remote_mirror = self.should_skip_remote_product_property_mirror()
 
         for product_property in self.product_properties:
             # Attempt to process the product property
-            remote_property_id = self.process_single_property(product_property)
-            existing_remote_property_ids.append(remote_property_id)
+            remote_property_id = self.process_single_property(product_property, skip_remote_mirror=skip_remote_mirror)
 
-        # Delete any remote properties that no longer exist locally
-        self.delete_non_existing_remote_product_property(existing_remote_property_ids)
+            # in the marketplaces some might be skipped if not mapped
+            if not skip_remote_mirror and remote_property_id:
+                existing_remote_property_ids.append(remote_property_id)
 
-    def process_single_property(self, product_property):
+        # Delete any remote properties that no longer exist locally when mirrors are persisted
+        if not skip_remote_mirror:
+            self.delete_non_existing_remote_product_property(existing_remote_property_ids)
+
+    def process_single_property(self, product_property, *, skip_remote_mirror=False):
         """
         Processes a single product property. Attempts to update if it exists, otherwise creates it.
         Also checks if the property needs to be updated and adds it to remote_product_properties.
@@ -152,6 +251,14 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         :param product_property: The product property to process.
         :return: The remote product property ID.
         """
+        if skip_remote_mirror:
+            remote_payload = self.collect_property_payload_without_mirror(product_property)
+
+            if remote_payload:
+                self.remote_product_properties.append(remote_payload)
+
+            return None
+
         # Try to fetch an existing remote product property
         try:
             remote_property = self.remote_product_property_class.objects.get(
@@ -181,6 +288,9 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         except self.remote_product_property_class.DoesNotExist:
             # If the remote product property does not exist, create it
+            # This create factory is configured to not remotely actually create the property,
+            # but only to return the payload if it exists. (get_value_only=True)
+            # Skip check will ignore the pre-flight checks.
             create_factory = self.remote_product_property_create_factory(
                 local_instance=product_property,
                 sales_channel=self.sales_channel,
@@ -198,17 +308,61 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         # If the remote property does not need updating, return its ID
         return remote_property.id
 
+    def should_skip_remote_product_property_mirror(self):
+        """Allow subclasses to skip persisting remote product property mirrors."""
+        return False
+
+    def collect_property_payload_without_mirror(self, product_property):
+        """
+        Build a lightweight structure containing the remote property definition and value without
+        creating or updating remote mirror models.
+        """
+        if not self.remote_product_property_create_factory:
+            return None
+
+        factory = self.remote_product_property_create_factory(
+            local_instance=product_property,
+            sales_channel=self.sales_channel,
+            remote_product=self.remote_instance,
+            api=self.api,
+            get_value_only=True,
+            skip_checks=True,
+        )
+
+        factory.set_api()
+        if not factory.preflight_check():
+            return None
+
+        factory.preflight_process()
+        remote_property = getattr(factory, 'remote_property', None)
+        if remote_property is None:
+            return None
+
+        remote_value = factory.get_remote_value()
+        if remote_value is None:
+            return None
+
+        return SimpleNamespace(remote_property=remote_property, remote_value=str(remote_value))
+
     def delete_non_existing_remote_product_property(self, existing_remote_property_ids):
         """
         Deletes remote product properties that exist in the remote system but are no longer present locally.
 
         :param existing_remote_property_ids: The list of existing remote property IDs to keep.
         """
+
+        # on create they weren't even created
+        if self.is_create:
+            return
+
         # Find remote product properties that are not in the list of existing IDs
-        remote_properties_to_delete = self.remote_product_property_class.objects.filter(
-            remote_product=self.remote_instance,
-            sales_channel=self.sales_channel
-        ).exclude(id__in=existing_remote_property_ids)
+        try:
+            remote_properties_to_delete = self.remote_product_property_class.objects.filter(
+                remote_product=self.remote_instance,
+                sales_channel=self.sales_channel
+            ).exclude(id__in=existing_remote_property_ids)
+        except AttributeError:
+            raise ConfigurationMissingError(f"Did you forget to set `remote_product_property_class`?")
 
         # Run the delete factory for each property that needs to be removed
         for remote_property in remote_properties_to_delete:
@@ -226,9 +380,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         Determines the remote product type based on the local product type
         and sets it in the payload.
         """
-        local_type = self.local_instance.type
 
-        if local_type == Product.CONFIGURABLE:
+        if self.local_type == Product.CONFIGURABLE:
             self.remote_type = self.REMOTE_TYPE_CONFIGURABLE
         else:
             # All other types default to simple
@@ -242,7 +395,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         Sets the name for the product or variation in the payload.
         For variations, it delegates to set_variation_name.
         """
-        self.name = self.local_instance.name
+        self.name = self.local_instance._get_translated_value(
+            field_name='name', related_name='translations', sales_channel=self.sales_channel)
 
         if self.is_variation:
             self.set_variation_name()
@@ -255,7 +409,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         This method can be overridden for custom naming logic for variations.
         """
         if self.is_variation and self.sales_channel.use_configurable_name:
-            self.name = self.parent_local_instance.name
+            self.name = self.parent_local_instance._get_translated_value(
+                field_name='name', related_name='translations', sales_channel=self.sales_channel)
 
     def set_sku(self):
         """Sets the SKU for the product or variation in the payload."""
@@ -266,13 +421,16 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         self.add_field_in_payload('sku', self.sku)
 
+    def get_variation_sku(self):
+        return self.local_instance.sku
+
     def set_variation_sku(self):
         """Sets the SKU for variations, defaulting to parent_sku-child_sku."""
-        self.sku = f"{self.parent_local_instance.sku}-{self.local_instance.sku}"
+        self.sku = self.get_variation_sku()
 
     def set_visibility(self):
         """Sets the visibility for the product or variation in the payload."""
-        pass # this is needed only for some of the integrations so we don't have a clear way to get it (type dependend)
+        pass  # this is needed only for some of the integrations so we don't have a clear way to get it (type dependend)
 
     def set_variation_visibility(self):
         """Sets the visibility for variations, allowing for overrides."""
@@ -294,7 +452,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     def set_stock(self):
         """Sets the stock for the product or variation in the payload."""
 
-        return # @TODO: Come back after we decide with inventory
+        return  # @TODO: Come back after we decide with inventory
         self.stock = self.local_instance.inventory.salable()
 
         if self.is_variation:
@@ -323,7 +481,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     def set_short_description(self):
         """Sets the short description for the product or variation in the payload."""
         self.short_description = self.local_instance._get_translated_value(
-            field_name='short_description', related_name='translations')
+            field_name='short_description', related_name='translations', sales_channel=self.sales_channel)
 
         if self.is_variation:
             self.set_variation_short_description()
@@ -337,7 +495,10 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     def set_description(self):
         """Sets the description for the product or variation in the payload."""
         self.description = self.local_instance._get_translated_value(
-            field_name='description', related_name='translations')
+            field_name='description',
+            related_name='translations',
+            sales_channel=self.sales_channel,
+        )
 
         if self.is_variation:
             self.set_variation_description()
@@ -350,7 +511,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
     def set_url_key(self):
         """Sets the URL key for the product or variation in the payload."""
-        self.url_key = self.local_instance._get_translated_value(field_name='url_key', related_name='translations')
+        self.url_key = self.local_instance._get_translated_value(field_name='url_key', related_name='translations', sales_channel=self.sales_channel)
 
         if self.is_variation:
             self.set_variation_url_key()
@@ -380,9 +541,22 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """
         pass
 
+    def set_vat_rate(self):
+        """Sets the status for the product or variation in the payload."""
+        self.vat_rate = self.local_instance.vat_rate
+
+        if self.is_variation:
+            self.set_variation_vat_rate()
+
+        self.add_field_in_payload('vat_rate', self.vat_rate)
+
+    def set_variation_vat_rate(self):
+        """Sets the status for variations, allowing for overrides."""
+        pass
+
     def set_categories(self):
         """Sets the categories for the product or variation in the payload."""
-        pass # @TODO: Pass for now
+        pass  # @TODO: Pass for now
 
     def set_variation_categories(self):
         """Sets the categories for variations, allowing for overrides."""
@@ -398,24 +572,44 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         pass
 
     def set_price(self):
-        """Sets the price for the product or variation in the payload."""
+        """Sets the price(s) for the product or variation in the payload, supporting multiple currencies."""
 
         if not self.sales_channel.sync_prices:
             return
 
-        self.price, self.discount = self.local_instance.get_price_for_sales_channel(self.sales_channel)
+        self.prices_data = {}
+        self.default_currency_code = None
 
-        # Convert price and discount to float if they are not None
-        if self.price is not None:
-            self.price = float(self.price)
-        if self.discount is not None:
-            self.discount = float(self.discount)
+        remote_currencies = RemoteCurrency.objects.filter(sales_channel=self.sales_channel)
 
-        if self.is_variation:
-            self.set_variation_price()
+        for remote_currency in remote_currencies:
+            local_currency = remote_currency.local_instance
 
-        self.add_field_in_payload('price', self.price)
-        self.add_field_in_payload('discount', self.discount)
+            if not local_currency:
+                continue
+
+            full_price, discounted_price = self.local_instance.get_price_for_sales_channel(
+                self.sales_channel, currency=local_currency
+            )
+
+            price = float(full_price) if full_price is not None else None
+            discount = float(discounted_price) if discounted_price is not None else None
+
+            self.prices_data[local_currency.iso_code] = {
+                "price": price,
+                "discount_price": discount,
+            }
+
+        # Legacy payload (used by Magento create or flat fallback)
+        first_currency_code = next(iter(self.prices_data), None)
+        if first_currency_code:
+            self.default_currency_code = first_currency_code
+            self.price = self.prices_data[first_currency_code]['price']
+            self.discount = self.prices_data[first_currency_code]['discount_price']
+            self.add_field_in_payload('price', self.price)
+            self.add_field_in_payload('discount', self.discount)
+
+        logger.debug(f"Set price for {self.local_instance.name}: {self.price}")
 
     def set_variation_price(self):
         """Sets the price for variations, allowing for overrides."""
@@ -442,6 +636,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
                 setter_method()
             else:
                 logger.warning(f"Setter method set_{field} not found.")
+
+        logger.debug(f"Build payload inspection for {self.local_instance.name}: {self.payload}")
 
     def set_variation_allow_backorder(self):
         """
@@ -521,6 +717,12 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """
         pass
 
+    def get_remote_languages(self):
+        return RemoteLanguage.objects.filter(
+            sales_channel=self.sales_channel,
+            local_instance__isnull=False
+        )
+
     def set_content_translations(self):
         """
         Sets the content translations for the product or variation in all supported languages.
@@ -528,26 +730,41 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         if not self.sales_channel.sync_contents:
             return
 
-        remote_languages = RemoteLanguage.objects.filter(sales_channel=self.sales_channel)
-
-        for remote_language in remote_languages:
+        for remote_language in self.get_remote_languages():
             # Fetch translations for each content field
             short_description = self.local_instance._get_translated_value(
                 field_name='short_description',
                 language=remote_language.local_instance,
-                related_name='translations'
+                related_name='translations',
+                sales_channel=self.sales_channel
             )
 
             description = self.local_instance._get_translated_value(
                 field_name='description',
                 language=remote_language.local_instance,
-                related_name='translations'
+                related_name='translations',
+                sales_channel=self.sales_channel
+            )
+
+            description = self._render_content_template(
+                description=description,
+                language=remote_language.local_instance,
+                title=self.local_instance._get_translated_value(
+                    field_name='name',
+                    language=remote_language.local_instance,
+                    related_name='translations',
+                    sales_channel=self.sales_channel,
+                ),
+                price=getattr(self, 'price', None),
+                discount_price=getattr(self, 'discount', None),
+                currency=getattr(self, 'default_currency_code', None),
             )
 
             url_key = self.local_instance._get_translated_value(
                 field_name='url_key',
                 language=remote_language.local_instance,
-                related_name='translations'
+                related_name='translations',
+                sales_channel=self.sales_channel
             )
 
             self.process_content_translation(
@@ -560,14 +777,25 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         # Optional: Additional handling or finalization of content translations
         self.finalize_content_translations()
 
+    def get_medias(self):
+        medias = (
+            MediaProductThrough.objects.get_product_images(
+                product=self.local_instance,
+                sales_channel=self.sales_channel,
+            )
+            .filter(media__type=Media.IMAGE)
+            .order_by('-is_main_image', 'sort_order')
+        )
+
+        self._content_template_media_assignments = medias
+
+        return medias
+
     def assign_images(self):
         """
         Assigns images to the remote product.
         """
-        media_throughs = MediaProductThrough.objects.filter(
-            product=self.local_instance,
-            media__type=Media.IMAGE
-        ).order_by('-is_main_image', 'sort_order')
+        media_throughs = self.get_medias()
 
         # For each MediaProductThrough instance, process the image assignment
         existing_remote_images_ids = []
@@ -585,7 +813,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
                 # If does not exist, use the create factory
                 remote_image = self.create_image_assignment(media_through)
 
-            existing_remote_images_ids.append(remote_image.id)
+            if remote_image:
+                existing_remote_images_ids.append(remote_image.id)
 
         remote_images_to_delete = RemoteImageProductAssociation.objects.filter(
             remote_product=self.remote_instance,
@@ -655,12 +884,18 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """
         if hasattr(self.remote_instance, 'configurator'):
             self.configurator = self.remote_instance.configurator
-            self.configurator.update_if_needed(rule=self.rule, variations=self.variations, send_sync_signal=False)
+            self.configurator.update_if_needed(
+                rule=self.rule,
+                variations=self.variations,
+                send_sync_signal=False,
+                amazon_theme=getattr(self, "amazon_theme", None),
+            )
         else:
             self.configurator = RemoteProductConfigurator.objects.create_from_remote_product(
                 remote_product=self.remote_instance,
                 rule=self.rule,
-                variations=self.variations
+                variations=self.variations,
+                amazon_theme=getattr(self, "amazon_theme", None),
             )
             logger.debug(f"Created new configurator for {self.local_instance.name}")
 
@@ -668,9 +903,9 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         """
         Synchronizes each variation (child product) associated with the configurable product.
         """
-        existing_remote_variation_ids = []
 
         for variation in self.variations:
+
             # Try to get the remote variation
             try:
                 remote_variation = self.remote_model_class.objects.get(
@@ -686,12 +921,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
                 remote_variation = self.create_child(variation)
 
             self.update_progress()
-
-            # Keep track of existing remote variation IDs
-            existing_remote_variation_ids.append(remote_variation.id)
-
-        # After processing all variations, delete any remote variations not in the local set
-        self.delete_removed_variations(existing_remote_variation_ids)
 
     def update_child(self, variation, remote_variation):
         """
@@ -742,7 +971,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             factory.run()
         except Exception as e:
             if (self.accepted_variation_already_exists_error
-                and isinstance(e, self.accepted_variation_already_exists_error)) or self.is_accepted_variation_error(e):
+                    and isinstance(e, self.accepted_variation_already_exists_error)) or self.is_accepted_variation_error(e):
                 logger.debug("Variation already exists; skipping addition.")
             else:
                 raise
@@ -759,19 +988,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         )
         factory.run()
 
-    def delete_removed_variations(self, existing_remote_variation_ids):
-        """
-        Deletes remote variations that are no longer present in the local variations.
-        """
-        # Get all remote variations linked to this remote parent product, excluding the existing ones
-        remote_variations_to_delete = self.remote_model_class.objects.filter(
-            remote_parent_product=self.remote_instance,
-            sales_channel=self.sales_channel
-        ).exclude(id__in=existing_remote_variation_ids)
-
-        for remote_variation in remote_variations_to_delete:
-            self.delete_child(remote_variation)
-
     def assign_ean_code(self):
         """
         Assigns the EAN code for the remote product by running the remote EAN code update factory.
@@ -782,8 +998,10 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.logger.debug("remote_eancode_update_factory is not defined; skipping EAN code assignment.")
             return None
 
-
-        ean_mirror = self.remote_eancode_update_factory.remote_model_class.objects.get(remote_product=self.remote_instance)
+        ean_mirror, _ = self.remote_eancode_update_factory.remote_model_class.objects.get_or_create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            remote_product=self.remote_instance)
 
         # Instantiate the factory with the fetched remote_instance.
         fac = self.remote_eancode_update_factory(
@@ -806,7 +1024,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         if self.create_product_factory is None:
             raise ValueError("create_product_factory must be specified in the RemoteProductSyncFactory.")
 
-        fac = self.create_product_factory(self.sales_channel, self.local_instance, api=self.api)
+        fac = self.create_product_factory(self.sales_channel, self.local_instance, api=self.api, is_switched=True)
         fac.run()
         self.remote_instance = fac.remote_instance
 
@@ -816,6 +1034,9 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         while trying to be created.
         """
         raise NotImplementedError("Subclasses must implement run_sync_flow method.")
+
+    def update_multi_currency_prices(self):
+        raise NotImplementedError("Subclasses must implement update_multi_currency_prices method.")
 
     def run(self):
 
@@ -831,15 +1052,21 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.initialize_remote_product()
             self.set_remote_product_for_logging()
 
-            if self.remote_type == self.REMOTE_TYPE_CONFIGURABLE:
+            if self.local_type == Product.CONFIGURABLE:
                 self.get_variations()
+
+            self.sanity_check()
 
             self.precalculate_progress_step_increment(4)
             self.set_local_assigns()
-            self.set_rule() # we put this here since if is not present we will stop the process
-            self.build_payload()
+            self.set_rule()  # we put this here since if is not present we will stop the process
             self.set_product_properties()
+            self.build_payload()
             self.process_product_properties()
+
+            if self.local_type == Product.CONFIGURABLE:
+                self.set_remote_configurator()
+
             self.customize_payload()
             self.pre_action_process()
             self.update_progress()
@@ -853,10 +1080,13 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.update_progress()
             self.assign_ean_code()
             self.assign_saleschannels()
+
+            if not self.sales_channel.is_single_currency() and len(self.prices_data.keys()) > 1:
+                self.update_multi_currency_prices()
+
             self.update_progress()
 
-            if self.remote_type == self.REMOTE_TYPE_CONFIGURABLE:
-                self.set_remote_configurator()
+            if self.local_type == Product.CONFIGURABLE:
                 self.create_or_update_children()
 
             if self.is_variation:
@@ -867,10 +1097,16 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         except SwitchedToCreateException as stc:
             logger.debug(stc)
+            if self.is_switched:
+                raise stc
+            self.is_switched = True
             self.run_create_flow()
 
         except SwitchedToSyncException as sts:
             logger.debug(sts)
+            if self.is_switched:
+                raise sts
+            self.is_switched = True
             self.run_sync_flow()
 
         except Exception as e:
@@ -879,6 +1115,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         finally:
             self.finalize_progress()
+
 
 class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
 
@@ -895,6 +1132,7 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
         try:
             self.initialize_remote_product()
             self.set_remote_product_for_logging()
+            self.sanity_check()
             self.precalculate_progress_step_increment(2)
             self.set_rule()
             self.build_payload()
@@ -911,6 +1149,9 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
 
         except SwitchedToCreateException as stc:
             logger.debug(stc)
+            if self.is_switched:
+                raise stc
+            self.is_switched = True
             self.run_create_flow()
 
         except Exception as e:
@@ -919,6 +1160,7 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
 
         finally:
             self.finalize_progress()
+
 
 class RemoteProductCreateFactory(RemoteProductSyncFactory):
     """
@@ -934,6 +1176,10 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
     sync_product_factory = None
     action_log = RemoteLog.ACTION_CREATE
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.is_create = True
+
     def initialize_remote_product(self):
         """
         Initializes the RemoteProduct instance.
@@ -945,7 +1191,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
         """
         remote_sku = self.local_instance.sku
         if self.is_variation:
-            remote_sku = f"{self.parent_local_instance.sku}-{self.local_instance.sku}"
+            remote_sku = self.get_variation_sku()
             if self.remote_parent_product is None:
                 self.remote_parent_product = self.remote_model_class.objects.get(
                     local_instance=self.parent_local_instance,
@@ -970,6 +1216,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
         try:
             response = self.get_saleschannel_remote_object(remote_sku)
             remote_data = self.serialize_response(response)
+
             if remote_data:
                 # Remote product exists but wasn't linked locally
                 self.remote_instance.remote_id = self.extract_remote_id(remote_data)
@@ -981,14 +1228,15 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
                 # Remote product doesn't exist; proceed with creation
                 logger.debug(f"Proceeding with creation of new remote product for {self.local_instance.name}")
 
-        except Exception as e: # @TODO: This can be improved to give the type of the exception from the subclasses
+        except Exception as e:  # @TODO: This can be improved to give the type of the exception from the subclasses
             logger.debug(f"Product {self.local_instance.name} doesn't already exists. Ready for create.")
-
+            logger.error("Exception raised: {}".format(e))
 
     def run_sync_flow(self):
         """
         Runs the sync/update flow.
         """
+
         if self.sync_product_factory is None:
             raise ValueError("sync_product_factory must be specified in the RemoteProductCreateFactory.")
 
@@ -999,6 +1247,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
             parent_local_instance=self.parent_local_instance,
             remote_parent_product=self.remote_parent_product,
             api=self.api,
+            is_switched=True,
         )
         sync_factory.run()
 
@@ -1051,7 +1300,8 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
                 multi_tenant_company=self.sales_channel.multi_tenant_company
             )
             logger.debug(f"Created RemoteProductContent for {self.remote_instance}")
-
+        else:
+            raise NotImplementedError("No remote_product_content_class found in {self.__class__.__name__}")
 
     def set_ean_code(self):
         super().set_ean_code()
@@ -1065,9 +1315,8 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
 
             logger.debug(f"Set remote EAN code to {self.ean_code} for product {self.remote_instance}")
 
-
     def set_stock(self):
-        return # @TODO: Come back after we decide with inventory
+        return  # @TODO: Come back after we decide with inventory
         super().set_stock()
 
         if self.remote_inventory_class:
@@ -1080,21 +1329,28 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
             logger.debug(f"Created RemoteInventory for {self.remote_instance}")
 
     def set_price(self):
-
         if not self.sales_channel.sync_prices:
             return
 
         super().set_price()
 
         if self.remote_price_class:
-            self.remote_instance.price, _ = self.remote_price_class.objects.get_or_create(
+            # Get or create the RemotePrice object
+            remote_price_obj, _ = self.remote_price_class.objects.get_or_create(
                 remote_product=self.remote_instance,
-                price=self.price,
-                discount_price=self.discount_price if hasattr(self, 'discount_price') else None,
                 sales_channel=self.sales_channel,
-                multi_tenant_company=self.sales_channel.multi_tenant_company
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
             )
-            logger.debug(f"Created RemotePrice for {self.remote_instance}")
+
+            # Update the price_data JSON field with the current self.prices_data
+            if hasattr(self, "prices_data"):
+                remote_price_obj.price_data = self.prices_data
+                remote_price_obj.save(update_fields=["price_data"])
+                logger.debug(f"Updated price_data for {self.remote_instance} → {self.prices_data}")
+        else:
+            msg = f"No remote_price_class found in {self.__class__.__name__}"
+            logger.error(msg)
+            raise AttributeError(msg)
 
     def perform_non_subclassed_remote_action(self):
         """

@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError
 from polymorphic.models import PolymorphicModel
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
 from core import models
 import logging
 from django.utils.timezone import now
@@ -11,15 +11,22 @@ import json
 from datetime import datetime
 from django.utils.translation import gettext_lazy as _
 
-logger = logging.getLogger(__name__)
+from integrations.validators import hostname_validator
 
+logger = logging.getLogger(__name__)
 
 
 class Integration(PolymorphicModel, models.Model):
     """
     Polymorphic model representing a integration like sales channel, such as a website or marketplace or accounting accounts.
     """
-    hostname = models.URLField()
+    # !IMPORTANT: Marketplaces don't need this mandatory. This will be more like a "name" instead, an identifier
+    # we keep it like this because it is very deep in the code so we changed from URL field to CharField with
+    # a validator to be url that can be overridden in the integrations
+    hostname = models.CharField(
+        max_length=255,
+        help_text="Hostname or identifier for the integration (e.g. domain name or marketplace slug)"
+    )
     active = models.BooleanField(default=True)
     verify_ssl = models.BooleanField(default=True)
     requests_per_minute = models.IntegerField(default=60)
@@ -30,26 +37,40 @@ class Integration(PolymorphicModel, models.Model):
         help_text="Maximum number of task retries (between 1 and 20)"
     )
 
+    def clean(self):
+        from sales_channels.integrations.amazon.models import AmazonSalesChannel
+        from sales_channels.integrations.ebay.models import EbaySalesChannel
+
+        if not isinstance(self, AmazonSalesChannel) and not isinstance(self, EbaySalesChannel):
+            validator = URLValidator(schemes=['http', 'https'])
+            try:
+                validator(self.hostname)
+            except ValidationError:
+                raise ValidationError({'hostname': 'Enter a valid URL (e.g. https://example.com)'})
+
     class Meta:
         unique_together = ('multi_tenant_company', 'hostname')
         verbose_name = 'Integration'
         verbose_name_plural = 'Integrations'
         search_terms = ['hostname']
 
-
     def __str__(self):
         return f"{self.hostname} @ {self.multi_tenant_company}"
+
 
 class IntegrationTaskQueue(models.Model):
     PENDING = 'PENDING'
     PROCESSING = 'PROCESSING'
     PROCESSED = 'PROCESSED'
-    FAILED = 'FAILED'  # New status
+    FAILED = 'FAILED'
+    SKIPPED = 'SKIPPED'
+
     STATUS_CHOICES = [
         (PENDING, 'Pending'),
         (PROCESSING, 'Processing'),
         (PROCESSED, 'Processed'),
-        (FAILED, 'Failed'),  # New status choice
+        (FAILED, 'Failed'),
+        (SKIPPED, 'Skipped'),
     ]
 
     integration = models.ForeignKey(Integration, null=True, blank=True, on_delete=models.SET_NULL)
@@ -62,7 +83,7 @@ class IntegrationTaskQueue(models.Model):
     error_message = models.TextField(null=True, blank=True)
     error_traceback = models.TextField(null=True, blank=True)
     error_history = models.JSONField(default=dict, blank=True)
-    number_of_remote_requests = models.IntegerField(default=1) # how many remote requests does this task do?
+    number_of_remote_requests = models.IntegerField(default=1)  # how many remote requests does this task do?
     priority = models.IntegerField(default=DEFAULT_PRIORITY)
 
     @property
@@ -164,6 +185,10 @@ class IntegrationTaskQueue(models.Model):
         else:
             logger.error(f"Task '{self.task_name}' not found.")
 
+    def safe_dispatch(self):
+        from django.db import transaction
+        transaction.on_commit(lambda: self.dispatch())
+
     def retry_task(self, retry_now=False):
         self.retry = 0
 
@@ -207,7 +232,8 @@ class IntegrationLog(PolymorphicModel, models.Model):
     content_object = GenericForeignKey('content_type', 'object_id')
 
     integration = models.ForeignKey(Integration, null=True, blank=True, on_delete=models.SET_NULL)
-    remote_product = models.ForeignKey('sales_channels.RemoteProduct',on_delete=models.SET_NULL, null=True, blank=True) # linked remote_product (if any) so we can filter on it
+    remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.SET_NULL, null=True,
+                                       blank=True)  # linked remote_product (if any) so we can filter on it
     action = models.CharField(max_length=32, choices=ACTION_CHOICES)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES)
     payload = models.JSONField(null=True, blank=True, help_text="The API call payload associated with this log.")
@@ -215,9 +241,10 @@ class IntegrationLog(PolymorphicModel, models.Model):
     error_traceback = models.TextField(null=True, blank=True, help_text="Detailed error traceback if the action failed.")
     user_error = models.BooleanField(default=False)  # Boolean field to indicate if the error is user-facing
     identifier = models.CharField(max_length=255, null=True, blank=True)  # Field to store a unique identifier for the log entry
-    fixing_identifier = models.CharField(max_length=255, null=True, blank=True, help_text=_("Identifier used by a later log to indicate this error has been fixed."))
+    fixing_identifier = models.CharField(max_length=255, null=True, blank=True, help_text=_(
+        "Identifier used by a later log to indicate this error has been fixed."))
     keep = models.BooleanField(default=False, help_text="Whether to keep this log permanently.")
-    related_object_str = models.CharField(max_length=556, null=True, blank=True, help_text="String representation of the related object.")
+    related_object_str = models.CharField(max_length=1056, null=True, blank=True, help_text="String representation of the related object.")
 
     class Meta:
         verbose_name = 'Integration Log'
@@ -226,7 +253,7 @@ class IntegrationLog(PolymorphicModel, models.Model):
 
     def __str__(self):
         return f"Log for {self.content_object} - Action: {self.action}, Status: {self.status}"
-    
+
     @property
     def frontend_name(self):
         """
@@ -250,6 +277,7 @@ class IntegrationLog(PolymorphicModel, models.Model):
         """
         return self.response if self.user_error else None
 
+
 class IntegrationObjectMixin(models.Model):
     """
     Mixin that adds a remote_id field to track objects in remote systems,
@@ -267,7 +295,6 @@ class IntegrationObjectMixin(models.Model):
     # they all need to be success for this to be true
     outdated = models.BooleanField(default=False, help_text="Indicates if the remote product is outdated due to an error.")
     outdated_since = models.DateTimeField(null=True, blank=True, help_text="Timestamp indicating when the object became outdated.")
-
 
     class Meta:
         abstract = True
@@ -329,7 +356,7 @@ class IntegrationObjectMixin(models.Model):
         ).order_by('-created_at').first()
         return last_log.payload if last_log else {}
 
-    def add_log(self, action, response, payload, identifier, remote_product=None,  **kwargs):
+    def add_log(self, action, response, payload, identifier, remote_product=None, **kwargs):
         """
         Method to add a successful log entry.
         """
@@ -340,7 +367,7 @@ class IntegrationObjectMixin(models.Model):
             payload=payload,
             identifier=identifier,
             remote_product=remote_product,
-           **kwargs
+            **kwargs
         )
 
     def add_error(self, action, response, payload, error_traceback, identifier, user_error=False, remote_product=None, fixing_identifier=None, **kwargs):
@@ -397,9 +424,14 @@ class IntegrationObjectMixin(models.Model):
         Method to create a log entry.
         """
         from sales_channels.models import RemoteLog
+        from sales_channels.integrations.amazon.models import AmazonSalesChannel
+        from sales_channels.integrations.amazon.models import AmazonRemoteLog
 
-        # @TODO: the class here should be configurable but for now we will let the RemoteLog
-        RemoteLog.objects.create(
+        log_model = (
+            AmazonRemoteLog if isinstance(self.integration, AmazonSalesChannel) else RemoteLog
+        )
+
+        log_model.objects.create(
             content_type=ContentType.objects.get_for_model(self),
             object_id=self.pk,
             content_object=self,

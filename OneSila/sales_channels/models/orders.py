@@ -2,6 +2,7 @@ from core import models
 from polymorphic.models import PolymorphicModel
 from .mixins import RemoteObjectMixin
 
+
 class RemoteOrder(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the remote mirror of an Order.
@@ -61,13 +62,15 @@ class RemoteOrderItem(PolymorphicModel, RemoteObjectMixin, models.Model):
         local_order_reference = self.remote_order.local_instance.reference if self.remote_order.local_instance else 'N/A'
         return f"Remote order item for order {local_order_reference} on {self.remote_order.sales_channel.hostname}"
 
+
 class RemoteCustomer(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the remote mirror of a Customer.
     This model tracks the synchronization status and data for remote customers.
     """
 
-    local_instance = models.ForeignKey('contacts.Customer', on_delete=models.SET_NULL, null=True, help_text="The local customer associated with this remote customer.")
+    local_instance = models.ForeignKey('contacts.Customer', on_delete=models.SET_NULL, null=True,
+                                       help_text="The local customer associated with this remote customer.")
     shipping_address = models.ForeignKey(
         'contacts.ShippingAddress',
         on_delete=models.SET_NULL,

@@ -2,6 +2,7 @@ from sales_channels.factories.products.eancodes import RemoteEanCodeUpdateFactor
 from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin
 from sales_channels.integrations.magento2.models.products import MagentoEanCode
 
+
 class MagentoEanCodeUpdateFactory(GetMagentoAPIMixin, RemoteEanCodeUpdateFactory):
     """
     Magento-specific factory for updating remote EAN codes.

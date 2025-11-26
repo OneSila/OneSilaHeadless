@@ -1,9 +1,12 @@
-from core.schema.core.types.types import relay, type, GetQuerysetMultiTenantMixin, field, Annotated, lazy
+from core.schema.core.types.types import relay, type, field, Annotated, lazy
+import strawberry
+from core.schema.core.mixins import (
+    GetPropertyQuerysetMultiTenantMixin,
+    GetPropertySelectValueQuerysetMultiTenantMixin,
+    GetQuerysetMultiTenantMixin,
+)
 
 from typing import List, Optional
-
-from media.schema.types.types import ImageType
-from products.schema.types.types import ProductType
 from properties.models import Property, PropertyTranslation, \
     PropertySelectValue, ProductProperty, ProductPropertyTextTranslation, PropertySelectValueTranslation, ProductPropertiesRule, ProductPropertiesRuleItem
 from .filters import PropertyFilter, PropertyTranslationFilter, \
@@ -15,7 +18,8 @@ from .ordering import PropertyOrder, PropertyTranslationOrder, \
 
 
 @type(Property, filters=PropertyFilter, order=PropertyOrder, pagination=True, fields="__all__")
-class PropertyType(relay.Node, GetQuerysetMultiTenantMixin):
+class PropertyType(relay.Node, GetPropertyQuerysetMultiTenantMixin):
+    propertytranslation_set: List[Annotated['PropertyTranslationType', lazy("properties.schema.types.types")]]
 
     @field()
     def name(self, info) -> str | None:
@@ -28,13 +32,19 @@ class PropertyTranslationType(relay.Node, GetQuerysetMultiTenantMixin):
 
 
 @type(PropertySelectValue, filters=PropertySelectValueFilter, order=PropertySelectValueOrder, pagination=True, fields="__all__")
-class PropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
+class PropertySelectValueType(relay.Node, GetPropertySelectValueQuerysetMultiTenantMixin):
     property: PropertyType
-    image: Optional[ImageType]
+    image: Optional[Annotated['ImageType', lazy("media.schema.types.types")]]
+    productpropertiesrule_set: List[Annotated['ProductPropertiesRuleType', lazy("properties.schema.types.types")]]
+    propertyselectvaluetranslation_set: List[Annotated['PropertySelectValueTranslationType', lazy("properties.schema.types.types")]]
 
     @field()
     def value(self, info) -> str | None:
         return self.value
+
+    @field()
+    def full_value_name(self, info) -> str | None:
+        return f"{self.property.name} > {self.value}"
 
     @field()
     def thumbnail_url(self, info) -> str | None:
@@ -52,7 +62,7 @@ class PropertySelectValueTranslationType(relay.Node, GetQuerysetMultiTenantMixin
 
 @type(ProductProperty, filters=ProductPropertyFilter, order=ProductPropertyOrder, pagination=True, fields="__all__")
 class ProductPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
-    product: Optional[ProductType]
+    product: Optional[Annotated['ProductType', lazy("products.schema.types.types")]]
     property: Optional[PropertyType]
     value_select: Optional[PropertySelectValueType]
     value_multi_select: List[Annotated['PropertySelectValueType', lazy("properties.schema.types.types")]]
@@ -67,10 +77,27 @@ class ProductPropertyTextTranslationType(relay.Node, GetQuerysetMultiTenantMixin
 @type(ProductPropertiesRule, filters=ProductPropertiesRuleFilter, order=ProductPropertiesRuleOrder, pagination=True, fields="__all__")
 class ProductPropertiesRuleType(relay.Node, GetQuerysetMultiTenantMixin):
     product_type: PropertySelectValueType
+    sales_channel: Optional[Annotated['SalesChannelType', lazy("sales_channels.schema.types.types")]]
     items: List[Annotated['ProductPropertiesRuleItemType', lazy("properties.schema.types.types")]]
+
+    @field()
+    def value(self, info) -> str:
+        return self.value
 
 
 @type(ProductPropertiesRuleItem, filters=ProductPropertiesRuleItemFilter, order=ProductPropertiesRuleItemOrder, pagination=True, fields="__all__")
 class ProductPropertiesRuleItemType(relay.Node, GetQuerysetMultiTenantMixin):
     rule: ProductPropertiesRuleType
     property: PropertyType
+
+
+@strawberry.type
+class PropertyDuplicatesType:
+    duplicate_found: bool
+    duplicates: List[PropertyType]
+
+
+@strawberry.type
+class PropertySelectValueDuplicatesType:
+    duplicate_found: bool
+    duplicates: List[PropertySelectValueType]

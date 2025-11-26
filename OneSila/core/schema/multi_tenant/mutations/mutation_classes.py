@@ -7,7 +7,7 @@ from django.db import transaction
 from core.schema.core.mixins import GetCurrentUserMixin, GetMultiTenantCompanyMixin
 from core.schema.core.mutations import DjangoUpdateMutation, DjangoCreateMutation, Info, models, Any
 from core.factories.multi_tenant import InviteUserFactory, AcceptUserInviteFactory, EnableUserFactory, DisableUserFactory, RequestLoginTokenFactory, \
-    RecoveryTokenFactory, ChangePasswordFactory
+    RecoveryTokenFactory, ChangePasswordFactory, ResendInviteFactory
 from core.models.multi_tenant import MultiTenantUser, MultiTenantUserLoginToken
 from django.utils.translation import gettext_lazy as _
 
@@ -27,12 +27,16 @@ class RequestLoginTokenMutation(CleanupDataMixin, DjangoCreateMutation):
     def create_token(self, *, user):
         fac = RequestLoginTokenFactory(user)
         fac.run()
-        
+
         return MultiTenantUserLoginToken.objects.get(id=fac.token.id)
 
     def create(self, data: dict[str, Any], *, info: Info):
         with DjangoOptimizerExtension.disabled():
-            user = MultiTenantUser.objects.get(username=data['username'])
+            try:
+                user = MultiTenantUser.objects.get(username=data['username'])
+            except MultiTenantUser.DoesNotExist:
+                raise ValueError(_("User does not exist"))
+
             data = self.cleanup_data(data)
             return self.create_token(user=user)
 
@@ -50,11 +54,19 @@ class InviteUserMutation(CleanupDataMixin, GetMultiTenantCompanyMixin, DjangoCre
             return MultiTenantUser.objects.get(id=fac.user.id)
 
 
+class ResendInviteMutation(CleanupDataMixin, DjangoUpdateMutation):
+    def update(self, info: Info, instance: models.Model, data: dict[str, Any]):
+        fac = ResendInviteFactory(user=instance)
+        fac.run()
+
+        return instance
+
+
 class RecoveryTokenMutation(RequestLoginTokenMutation):
     def create_token(self, *, user):
         fac = RecoveryTokenFactory(user)
         fac.run()
-        
+
         return MultiTenantUserLoginToken.objects.get(id=fac.token.id)
 
 

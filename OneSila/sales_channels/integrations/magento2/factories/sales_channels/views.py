@@ -11,12 +11,11 @@ class MagentoSalesChannelViewPullFactory(GetMagentoAPIMixin, PullRemoteInstanceM
     field_mapping = {
         'remote_id': 'id',
         'code': 'code',
-        'name': 'name',
     }
     update_field_mapping = field_mapping
     get_or_create_fields = ['remote_id', 'code']
     api_package_name = 'store'
-    api_method_name = 'views'
+    api_method_name = 'websites'
     api_method_is_property = True
     allow_create = True
     allow_update = True
@@ -24,8 +23,13 @@ class MagentoSalesChannelViewPullFactory(GetMagentoAPIMixin, PullRemoteInstanceM
     is_model_response = True
 
     def allow_process(self, remote_data):
-        return int(remote_data.id) != 0 and remote_data.is_active
+        return int(remote_data.id) != 0
 
+    def process_remote_instance(self, remote_data, remote_instance_mirror, created):
+
+        if created:
+            remote_instance_mirror.name = remote_data.name
+            remote_instance_mirror.save()
 
     def serialize_response(self, response):
         """

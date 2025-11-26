@@ -1,4 +1,5 @@
-from sales_channels.factories.mixins import RemoteInstanceUpdateFactory
+from products.models import Product
+from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, RemoteInstanceDeleteFactory
 from sales_channels.models.products import RemoteProduct
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 
@@ -48,7 +49,6 @@ class RemoteProductVariationAddFactory(RemoteInstanceUpdateFactory):
         except RemoteProduct.DoesNotExist:
             return False
 
-
         # Check if the remote variation product itself exists in the sales channel
         try:
             self.remote_instance = RemoteProduct.objects.get(
@@ -64,7 +64,7 @@ class RemoteProductVariationAddFactory(RemoteInstanceUpdateFactory):
                     sales_channel=self.sales_channel,
                     local_instance=self.local_instance,
                     parent_local_instance=self.parent_product,
-                    api=self.api
+                    api=self.api,
                 )
                 factory.run()
                 self.remote_instance = factory.remote_instance
@@ -80,4 +80,11 @@ class RemoteProductVariationAddFactory(RemoteInstanceUpdateFactory):
         return self.remote_instance
 
     def needs_update(self):
-        return True # the actual check is done in preflight_check
+        return True  # the actual check is done in preflight_check
+
+
+class RemoteProductVariationDeleteFactory(RemoteInstanceDeleteFactory):
+    """
+    Generic factory for deleting a product variation mirror instance.
+    """
+    local_model_class = Product

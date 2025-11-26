@@ -7,7 +7,7 @@ from strawberry_django.permissions import IsAuthenticated
 
 from strawberry_django.mutations.fields import DjangoCreateMutation, \
     DjangoUpdateMutation, DjangoDeleteMutation, get_pk
-from typing import TYPE_CHECKING, Any, Iterable, Union
+from typing import TYPE_CHECKING, Any, Iterable, Union, Callable
 from strawberry.types import Info
 from strawberry import type, field
 from typing import List
@@ -17,6 +17,7 @@ from .mixins import GetMultiTenantCompanyMixin, GetCurrentUserMixin
 from .extensions import default_extensions
 from ...signals import mutation_update, mutation_create
 from strawberry_django.permissions import get_with_perms
+
 
 class BulkDjangoDeleteMutation(DjangoDeleteMutation):
     """
@@ -74,10 +75,19 @@ class BulkDjangoDeleteMutation(DjangoDeleteMutation):
             info, instance, resolvers.parse_input(info, vdata, key_attr=self.key_attr)
         )
 
+
 class CreateMutation(GetMultiTenantCompanyMixin, GetCurrentUserMixin, DjangoCreateMutation):
     """
     Every create needs to include the company a user is assigned to.
     """
+
+    def __init__(self, *args, validators: list[Callable[[dict[str, Any], Info], None]] | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.validators = validators or []
+
+    def run_validations(self, data: dict[str, Any], info: Info):
+        for validator in self.validators:
+            validator(data, info)
 
     def create(self, data: dict[str, Any], *, info: Info):
         multi_tenant_company = self.get_multi_tenant_company(info, fail_silently=False)
@@ -85,6 +95,7 @@ class CreateMutation(GetMultiTenantCompanyMixin, GetCurrentUserMixin, DjangoCrea
         data['multi_tenant_company'] = multi_tenant_company
         data['created_by_multi_tenant_user'] = multi_tenant_user
         data['last_update_by_multi_tenant_user'] = multi_tenant_user
+        self.run_validations(data, info)
         created_instance = super().create(data=data, info=info)
         mutation_create.send(sender=created_instance.__class__, instance=created_instance)
         return created_instance
@@ -114,9 +125,9 @@ class DeleteMutation(GetMultiTenantCompanyMixin, BulkDjangoDeleteMutation):
         return super().delete(info=info, instance=instance)
 
 
-def create(input_type):
+def create(input_type, validators=None):
     extensions = default_extensions
-    return CreateMutation(input_type, extensions=extensions)
+    return CreateMutation(input_type, extensions=extensions, validators=validators)
 
 
 def update(input_type):
@@ -124,7 +135,7 @@ def update(input_type):
     return UpdateMutation(input_type, extensions=extensions)
 
 
-def delete(is_bulk = False):
+def delete(is_bulk=False):
 
     input_type = List[strawberry_django.NodeInput] if is_bulk else strawberry_django.NodeInput
     extensions = default_extensions
