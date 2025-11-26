@@ -1,24 +1,26 @@
 # FIXME: This bot really needs ensuring a user is actually part of the admin-team.
 
-import spacy
 import logging
-import asyncio
+from typing import TYPE_CHECKING
+
+import spacy
 from telegram import Update
 from telegram.ext import filters, Application, CommandHandler, MessageHandler, CallbackContext,\
     ApplicationBuilder
 from django.conf import settings
 from .actions import restart_huey
+from core.models.multi_tenant import MultiTenantUser
 
-import logging
 logger = logging.getLogger(__name__)
 
 # Load default spaCy model
 nlp = spacy.load("en_core_web_sm")
-# nlp = spacy.load("telegram_bot/en_core_web_sm_james_extend_model") 
 # try:
-#     nlp = spacy.load("telegram_bot/en_core_web_sm_james_extend_model") 
-# except:
 #     nlp = spacy.load("en_core_web_sm")
+# except OSError:
+#     logger.warning("spaCy model en_core_web_sm missing; using blank 'en' pipeline.")
+#     nlp = spacy.blank("en")
+# nlp = spacy.load("telegram_bot/en_core_web_sm_james_extend_model")
 
 # Store user context
 user_context = {}
@@ -83,6 +85,41 @@ def detect_intent_from_training_data(user_message):
     return predicted_intent if confidence > 0.7 else None  # Adjust threshold if needed
 
 
+def _build_user_creation_message(*, user: "MultiTenantUser") -> str:
+    company = getattr(user, "multi_tenant_company", None)
+    lines = [
+        "🚀 New user registered",
+        f"Email: {user.username}",
+    ]
+
+    if company:
+        lines.append(f"Company: {company.name}")
+        if company.language:
+            language_label = getattr(company, "get_language_display", lambda: company.language)()
+            lines.append(f"Company language: {language_label} ({company.language})")
+        if company.full_address:
+            lines.append(f"Company address: {company.full_address}")
+        lines.append(f"Company id: {company.id}")
+    else:
+        lines.append("Company: No company linked yet.")
+
+    return "\n".join(lines)
+
+
+async def notify_new_user_creation(*, chat_id: str, user: "MultiTenantUser"):
+
+    if not bot:
+        logger.warning("Telegram bot token missing; cannot notify admins for %s", user)
+        return
+
+    if not chat_id:
+        logger.warning("Empty chat id for Telegram notification about %s", user)
+        return
+
+    message = _build_user_creation_message(user=user)
+    await bot.bot.send_message(chat_id=chat_id, text=message)
+
+
 # Telegram command: /start
 async def start(update: Update, context: CallbackContext) -> None:
     user_id = update.message.chat_id
@@ -124,10 +161,12 @@ async def error_handler(update: Update, context: CallbackContext):
 
 
 
-bot = ApplicationBuilder().token(settings.TELEGRAM_BOT_TOKEN).build()
-
-bot.add_handler(CommandHandler("start", start))
-bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-bot.add_error_handler(error_handler)
-logger.info("James is now polling for messages...")
+bot = None
+if getattr(settings, "TELEGRAM_BOT_TOKEN", None):
+    bot = ApplicationBuilder().token(settings.TELEGRAM_BOT_TOKEN).build()
+    bot.add_handler(CommandHandler("start", start))
+    bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    bot.add_error_handler(error_handler)
+    logger.info("James is now polling for messages...")
+else:
+    logger.warning("TELEGRAM_BOT_TOKEN is not configured; Telegram bot is disabled.")
