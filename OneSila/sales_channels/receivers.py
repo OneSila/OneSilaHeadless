@@ -19,6 +19,7 @@ from sales_prices.signals import price_changed
 from .integrations.amazon.models import AmazonSalesChannel, AmazonSalesChannelImport
 from .integrations.ebay.models import EbaySalesChannel, EbaySalesChannelImport
 from .integrations.magento2.models import MagentoProduct
+from .integrations.shein.models import SheinSalesChannel
 from .integrations.shein.models.imports import SheinSalesChannelImport
 from .models import RemoteProduct, SalesChannelImport
 # from .models import ImportProcess
@@ -241,7 +242,7 @@ def import_process_post_create_receiver(sender, instance: SalesChannelImport, **
     elif isinstance(sales_channel, EbaySalesChannel):
         refresh_subscription_receiver(sales_channel)
         ebay_import_db_task(import_process=instance, sales_channel=sales_channel)
-    elif isinstance(sales_channel, EbaySalesChannel):
+    elif isinstance(sales_channel, SheinSalesChannel):
         refresh_subscription_receiver(sales_channel)
         shein_import_db_task(import_process=instance, sales_channel=sales_channel)
 
