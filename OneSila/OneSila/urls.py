@@ -23,6 +23,7 @@ from django.conf.urls.static import static
 from webhooks.views import test_receiver
 from sales_channels.views import sales_channel_content_template_preview
 
+
 urlpatterns = [
     path('', include('core.urls')),
     path(f'admin{settings.ADMIN_ROUTE_SUFFIX}/', admin.site.urls),

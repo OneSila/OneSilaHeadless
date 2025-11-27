@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import get_language_info
 from core.models.mixins import TimeStampMixin
@@ -236,3 +237,89 @@ class MultiTenantUserLoginToken(models.Model):
 
     def is_valid(self, now=timezone.now()):
         return self.expires_at >= now
+
+
+class DashboardSection(TimeStampMixin, MultiTenantAwareMixin):
+    user = models.ForeignKey(
+        "core.MultiTenantUser",
+        on_delete=models.CASCADE,
+        related_name="dashboard_sections",
+    )
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    sort_order = models.PositiveIntegerField(default=10)
+
+    class Meta:
+        ordering = ("sort_order",)
+
+    def __str__(self):
+        return self.title
+
+    def clean(self):
+        super().clean()
+        if (
+            self.user_id
+            and self.multi_tenant_company_id
+            and self.user.multi_tenant_company_id != self.multi_tenant_company_id
+        ):
+            raise ValidationError(_("Dashboard section user must be part of the company."))
+
+
+class DashboardCard(TimeStampMixin, MultiTenantAwareMixin):
+    class Colors(models.TextChoices):
+        RED = "RED", _("Red")
+        ORANGE = "ORANGE", _("Orange")
+        YELLOW = "YELLOW", _("Yellow")
+
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    color = models.CharField(max_length=16, choices=Colors.choices)
+    query = models.TextField()
+    variables = models.JSONField(default=dict, blank=True)
+    query_key = models.CharField(max_length=255)
+    url = models.URLField(blank=True)
+    section = models.ForeignKey(
+        DashboardSection,
+        on_delete=models.CASCADE,
+        related_name="cards",
+    )
+    user = models.ForeignKey(
+        "core.MultiTenantUser",
+        on_delete=models.CASCADE,
+        related_name="dashboard_cards",
+    )
+    sort_order = models.PositiveIntegerField(default=10)
+
+    class Meta:
+        ordering = ("sort_order",)
+
+    def __str__(self):
+        return f"{self.title} ({self.get_color_display()})"
+
+    def clean(self):
+        super().clean()
+        errors = {}
+
+        if (
+            self.user_id
+            and self.multi_tenant_company_id
+            and self.user.multi_tenant_company_id != self.multi_tenant_company_id
+        ):
+            errors["user"] = _("Dashboard card user must be part of the company.")
+
+        if (
+            self.section_id
+            and self.multi_tenant_company_id
+            and self.section.multi_tenant_company_id != self.multi_tenant_company_id
+        ):
+            errors["section"] = _("Dashboard card section must belong to the same company.")
+
+        if (
+            self.section_id
+            and self.user_id
+            and self.section.user_id != self.user_id
+        ):
+            errors["user"] = _("Dashboard card user must match the section owner.")
+
+        if errors:
+            raise ValidationError(errors)

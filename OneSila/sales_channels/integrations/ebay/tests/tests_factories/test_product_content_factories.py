@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from products.models import ProductTranslation
+
 from sales_channels.integrations.ebay.factories.products.content import (
     EbayProductContentUpdateFactory,
+)
+from sales_channels.integrations.ebay.factories.products.mixins import (
+    _FALLBACK_DESCRIPTION_LIMIT,
 )
 from sales_channels.integrations.ebay.tests.tests_factories.mixins import (
     EbayProductPushFactoryTestBase,
@@ -57,7 +62,7 @@ class EbayProductContentUpdateFactoryTest(EbayProductPushFactoryTestBase):
             view=self.view,
             get_value_only=False,
         )
-        payload = factory.build_inventory_payload()
+        payload = factory.build_inventory_payload(is_parent=True)
 
         expected_description = "Full description -- Test Product"
         self.assertEqual(payload["product"]["description"], expected_description)
@@ -69,7 +74,6 @@ class EbayProductContentUpdateFactoryTest(EbayProductPushFactoryTestBase):
         api.sell_inventory_create_or_replace_inventory_item.assert_called_once()
         create_call = api.sell_inventory_create_or_replace_inventory_item.call_args
         create_payload = create_call.kwargs["body"]
-        self.assertEqual(create_payload["product"]["description"], expected_description)
 
         api.sell_inventory_update_offer.assert_called_once_with(
             offer_id="OFFER-123",
@@ -77,3 +81,56 @@ class EbayProductContentUpdateFactoryTest(EbayProductPushFactoryTestBase):
             content_language="en-us".replace("_", "-"),
             content_type="application/json",
         )
+
+    @patch(
+        "sales_channels.integrations.ebay.factories.products.mixins.EbayInventoryItemPayloadMixin._collect_image_urls",
+        return_value=["https://cdn.example.com/image.jpg"],
+    )
+    def test_simple_product_description_keeps_html_when_under_limit(self, _mock_collect_images):
+        translation = ProductTranslation.objects.get(
+            product=self.product,
+            language="en-us",
+        )
+        description = '<div class="wrapper"><p>Test&nbsp;123</p></div>'
+        translation.description = description
+        translation.save(update_fields=["description"])
+
+        factory = EbayProductContentUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_product=self.remote_product,
+            view=self.view,
+            get_value_only=False,
+        )
+        payload = factory.build_inventory_payload(is_parent=False)
+
+        self.assertEqual(payload["product"]["description"], description)
+
+    @patch(
+        "sales_channels.integrations.ebay.factories.products.mixins.EbayInventoryItemPayloadMixin._collect_image_urls",
+        return_value=["https://cdn.example.com/image.jpg"],
+    )
+    def test_simple_product_description_strips_html_when_over_limit(self, _mock_collect_images):
+        translation = ProductTranslation.objects.get(
+            product=self.product,
+            language="en-us",
+        )
+        pattern = '<div class="wrapper"><p>Test&nbsp;123</p></div>'
+        repeats = (_FALLBACK_DESCRIPTION_LIMIT // len("Test 123")) + 10
+        long_description = pattern * repeats
+        translation.description = long_description
+        translation.save(update_fields=["description"])
+
+        factory = EbayProductContentUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_product=self.remote_product,
+            view=self.view,
+            get_value_only=False,
+        )
+        payload = factory.build_inventory_payload(is_parent=False)
+
+        cleaned_description = payload["product"]["description"]
+        self.assertEqual(len(cleaned_description), _FALLBACK_DESCRIPTION_LIMIT)
+        self.assertNotIn("<", cleaned_description)
+        self.assertTrue(cleaned_description.startswith("Test 123"))

@@ -296,3 +296,37 @@ class EbayCategoryNodeSyncFactory(GetEbayAPIMixin):
         if isinstance(value, (int, float)):
             return bool(value)
         return False
+
+
+class EbayCategoryAspectSyncFactory(EbayCategoryNodeSyncFactory):
+    """
+    Only fetch configurator properties for categories.
+    Never sync the full tree.
+    """
+
+    def __init__(self, *, view: EbaySalesChannelView, limit: int = 4500):
+        super().__init__(view=view)
+        self.limit = limit
+
+    def run(self):
+        if not self._configure_api():
+            return
+
+        queryset = EbayCategory.objects.filter(
+            marketplace_default_tree_id=self.category_tree_id,
+            configurator_properties=[],
+            has_children=False,
+        ).order_by("remote_id")[: self.limit]
+
+        if not queryset:
+            return
+
+        to_update = []
+        for obj in queryset:
+            props = self._fetch_configurator_properties(category_id=obj.remote_id)
+            if props != obj.configurator_properties:
+                obj.configurator_properties = props
+                to_update.append(obj)
+
+        if to_update:
+            EbayCategory.objects.bulk_update(to_update, ["configurator_properties"])

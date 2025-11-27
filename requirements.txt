@@ -55,3 +55,7 @@ amzn-sp-api
 python-amazon-sp-api
 deepdiff
 ebay_rest
+
+python-telegram-bot
+spacy
+# spacy-lookups-dat

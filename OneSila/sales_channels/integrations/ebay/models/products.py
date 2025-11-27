@@ -76,13 +76,6 @@ class EbayProductOffer(RemoteObjectMixin, models.Model):
             self.sales_channel = self.remote_product.sales_channel
             forced_fields.add("sales_channel")
 
-        expected_company = None
-        if self.remote_product_id and hasattr(self.remote_product, "multi_tenant_company"):
-            expected_company = getattr(self.remote_product, "multi_tenant_company", None)
-        if expected_company and getattr(self, "multi_tenant_company_id", None) != getattr(expected_company, "id", None):
-            self.multi_tenant_company = expected_company
-            forced_fields.add("multi_tenant_company")
-
         if forced_fields and update_fields is not None:
             kwargs["update_fields"] = list(set(update_fields) | forced_fields)
 

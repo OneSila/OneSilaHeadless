@@ -69,6 +69,7 @@ INSTALLED_LOCAL_APPS = [
     'sales_prices',
     'properties',
     'orders',
+    'telegram_bot',
 
     'huey.contrib.djhuey',
     'webhooks'

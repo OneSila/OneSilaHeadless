@@ -1,0 +1,69 @@
+{
+    "intents": [
+        {
+            "intent": "weather",
+            "examples": [
+                "What's the weather like?",
+                "Tell me the forecast",
+                "Is it hot today?",
+                "Will it rain?",
+                "How is the climate?",
+                "Check the temperature",
+                "Do I need an umbrella?",
+                "What's the humidity level?",
+                "Give me today's weather report"
+            ]
+        },
+        {
+            "intent": "greeting",
+            "examples": [
+                "Hi",
+                "Hello",
+                "Hey",
+                "Good morning",
+                "Good evening",
+                "What's up?",
+                "Hi there!",
+                "Hello James",
+                "Hey bot!",
+                "Howdy"
+            ]
+        },
+        {
+            "intent": "goodbye",
+            "examples": [
+                "See you later",
+                "Goodbye!",
+                "Take care",
+                "Bye!",
+                "Later!",
+                "See you soon",
+                "I'm off",
+                "Catch you later",
+                "cya"
+            ]
+        },
+        {
+            "intent": "restart_huey",
+            "examples": [
+                "restart huey",
+                "restart the task queue",
+                "reset the workers",
+                "restart background jobs",
+                "refresh huey",
+                "restart the worker process",
+                "restart task execution",
+                "Restart the Huey process",
+                "Can you restart Huey?",
+                "Please restart the Huey worker",
+                "I need to restart Huey",
+                "Reboot the Huey process",
+                "Restart Huey now",
+                "Kill and restart the Huey service",
+                "Can you reboot the Huey task runner?",
+                "Restart the job queue process",
+                "Flush and restart Huey"
+            ]
+        }
+    ]
+}

@@ -78,6 +78,9 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
         )
         self.remote_product = remote_instance
 
+        # Ensure create/update factories share the same fixing identifier for log retries.
+        type(self).fixing_identifier_class = EbayProductBaseFactory
+
     # ------------------------------------------------------------------
     # Base utilities
     # ------------------------------------------------------------------

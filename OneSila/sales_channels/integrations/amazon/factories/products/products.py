@@ -100,7 +100,6 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         self.image_attributes: Dict = {}
         self.prices_data = {}
         self.external_product_id = self._get_external_product_id()
-        self.gtin_exemption = self._get_gtin_exemption()
         self.ean_for_payload = self._get_ean_for_payload()
         self.recommended_browse_node_id = self._get_recommended_browse_node_id()
 
@@ -112,7 +111,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             return False
         if self.is_create:
             if (
-                not self.gtin_exemption
+                not self._get_gtin_exemption()
                 and not self.external_product_id
                 and not self.ean_for_payload
                 and not self.local_instance.is_configurable()
@@ -226,27 +225,72 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                         break
         return asin
 
-    def _get_gtin_exemption(self) -> bool | None:
+    def _get_gtin_exemption(
+        self,
+        *,
+        product=None,
+        view=None,
+        create: bool = False,
+        remote_parent_product=None,
+        check_parent: bool = True,
+    ) -> bool | None:
         from sales_channels.integrations.amazon.models import AmazonGtinExemption
 
-        try:
-            exemption = AmazonGtinExemption.objects.get(
-                product=self.local_instance,
-                view=self.view,
-            )
-        except AmazonGtinExemption.DoesNotExist:
-            default_view = self._get_default_view()
-            if default_view:
-                try:
-                    exemption = AmazonGtinExemption.objects.get(
-                        product=self.local_instance,
-                        view=default_view,
-                    )
-                except AmazonGtinExemption.DoesNotExist:
-                    return None
-            else:
+        product = product or self.local_instance
+        view = view or self.view
+        if check_parent:
+            remote_parent_product = remote_parent_product or getattr(self, "remote_parent_product", None)
+
+        def _get_exemption(*, target_product, target_view):
+            if not target_product or not target_view:
                 return None
-        return exemption.value
+            try:
+                return AmazonGtinExemption.objects.get(
+                    product=target_product,
+                    view=target_view,
+                )
+            except AmazonGtinExemption.DoesNotExist:
+                return None
+
+        value = None
+        exemption = _get_exemption(target_product=product, target_view=view)
+        if exemption:
+            value = exemption.value
+
+        if value is None:
+            default_view = self._get_default_view()
+            if default_view and default_view != view:
+                default_exemption = _get_exemption(target_product=product, target_view=default_view)
+                if default_exemption:
+                    value = default_exemption.value
+
+        if value is None and remote_parent_product:
+            parent_value = self._get_gtin_exemption(
+                product=remote_parent_product.local_instance,
+                view=view,
+                remote_parent_product=None,
+                check_parent=False,
+            )
+            if parent_value is None:
+                default_view = self._get_default_view()
+                if default_view and default_view != view:
+                    parent_value = self._get_gtin_exemption(
+                        product=remote_parent_product.local_instance,
+                        view=default_view,
+                        remote_parent_product=None,
+                        check_parent=False,
+                    )
+            if parent_value is not None:
+                if create:
+                    AmazonGtinExemption.objects.get_or_create(
+                        multi_tenant_company=product.multi_tenant_company,
+                        product=product,
+                        view=view,
+                        defaults={"value": parent_value},
+                    )
+                value = parent_value
+
+        return value
 
     def _get_recommended_browse_node_id(self) -> str | None:
         from sales_channels.integrations.amazon.models import AmazonProductBrowseNode
@@ -303,7 +347,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
                     }
                 ]
 
-        exemption = self.gtin_exemption
+        exemption = self._get_gtin_exemption(create=bool(self.remote_parent_product))
         if exemption:
             attrs["supplier_declared_has_product_identifier_exemption"] = [
                 {"value": True, "marketplace_id": self.view.remote_id}

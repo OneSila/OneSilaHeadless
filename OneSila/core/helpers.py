@@ -136,32 +136,37 @@ def is_json_serializable(value):
         return False
 
 
-def ensure_serializable(value):
-    """Recursively convert objects to JSON‐friendly types."""
-    # 1) Dates → ISO strings
+def ensure_serializable(value, *, _seen=None):
+    """Recursively convert objects to JSON‐friendly types, avoiding circular refs."""
+    if _seen is None:
+        _seen = set()
+
     if isinstance(value, (datetime.datetime, datetime.date)):
         return value.isoformat()
 
-    # 2) Dict → recurse
-    if isinstance(value, dict):
-        return {k: ensure_serializable(v) for k, v in value.items()}
-
-    # 3) Sequence → recurse
-    if isinstance(value, (list, tuple, set)):
-        return [ensure_serializable(v) for v in value]
-
-    # 4) Any object with __dict__ → treat as its own dict
-    if hasattr(value, "__dict__"):
-        return ensure_serializable(vars(value))
-
-    # 5) If Decimal convert to float
     if isinstance(value, decimal.Decimal):
         return float(value)
 
     if isinstance(value, Model):
         return str(value)
 
-    # 6) Fallback (primitives, etc.)
+    value_id = id(value)
+    if value_id in _seen:
+        return f"<circular {type(value).__name__}>"
+
+    _seen.add(value_id)
+    try:
+        if isinstance(value, dict):
+            return {k: ensure_serializable(v, _seen=_seen) for k, v in value.items()}
+
+        if isinstance(value, (list, tuple, set)):
+            return [ensure_serializable(v, _seen=_seen) for v in value]
+
+        if hasattr(value, "__dict__"):
+            return ensure_serializable(vars(value), _seen=_seen)
+    finally:
+        _seen.discard(value_id)
+
     return value
 
 

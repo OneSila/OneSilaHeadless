@@ -1,7 +1,7 @@
 import math
 from django.db import transaction
-from django.db.models import F, Case, When, IntegerField
-from django.db.models.functions import Cast
+from django.db.models import F, Case, When, IntegerField, Value
+from django.db.models.functions import Cast, Least
 
 from sales_channels.integrations.amazon.models import AmazonImportBrokenRecord
 from .models import Import, ImportBrokenRecord
@@ -14,9 +14,13 @@ def increment_processed_records(process_id: int, delta: int = 1) -> None:
         percentage=Case(
             When(
                 total_records__gt=0,
-                then=Cast(
-                    ((F("processed_records") + delta) * 100) / F("total_records"),
-                    IntegerField(),
+                then=Least(
+                    Cast(
+                        ((F("processed_records") + delta) * 100) / F("total_records"),
+                        IntegerField(),
+                    ),
+                    Value(100),
+                    output_field=IntegerField(),
                 ),
             ),
             default=F("percentage"),

@@ -6,6 +6,9 @@ from sales_channels.exceptions import VariationAlreadyExistsOnWebsite
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.shopify.models import ShopifySalesChannel
 
+AMAZON_MIN_TITLE_LENGTH = 150
+AMAZON_MIN_DESCRIPTION_LENGTH = 1000
+
 
 def validate_sku_conflicts(data, info):
     product = data['product'].pk
@@ -90,6 +93,52 @@ def validate_amazon_assignment(data, info):
             .exclude(value__exact="")
             .exists()
         )
+
+        remote_language_code = None
+        remote_languages = getattr(view, "remote_languages", None)
+        if remote_languages is not None:
+            remote_language = remote_languages.exclude(local_instance__isnull=True).first()
+            if remote_language:
+                remote_language_code = remote_language.local_instance
+
+        if not remote_language_code:
+            remote_language_code = getattr(sales_channel.multi_tenant_company, "language", None)
+
+        localized_title = product._get_translated_value(
+            field_name='name',
+            language=remote_language_code,
+            related_name='translations',
+            sales_channel=sales_channel,
+        )
+        localized_description = product._get_translated_value(
+            field_name='description',
+            language=remote_language_code,
+            related_name='translations',
+            sales_channel=sales_channel,
+        )
+
+        title_length = len((localized_title or '').strip())
+        description_length = len((localized_description or '').strip())
+
+        if title_length < AMAZON_MIN_TITLE_LENGTH:
+            raise ValidationError(
+                {
+                    '__all__': _(
+                        'Amazon titles must have at least %(minimum)d characters for the selected marketplace. Current length: %(length)d.'
+                    )
+                    % {'minimum': AMAZON_MIN_TITLE_LENGTH, 'length': title_length}
+                }
+            )
+
+        if description_length < AMAZON_MIN_DESCRIPTION_LENGTH:
+            raise ValidationError(
+                {
+                    '__all__': _(
+                        'Amazon descriptions must have at least %(minimum)d characters for the selected marketplace. Current length: %(length)d.'
+                    )
+                    % {'minimum': AMAZON_MIN_DESCRIPTION_LENGTH, 'length': description_length}
+                }
+            )
 
         has_ean_code = bool(product.ean_code)
         is_configurable = product.is_configurable()

@@ -101,4 +101,5 @@ CHANNEL_LAYERS = {
 MIGRATION_MODULES = {
     "amazon": "sales_channels.integrations.amazon.migrations_agent",
     "woocommerce": "sales_channels.integrations.woocommerce.migrations_agent",
+    "telegram_bot": None,
 }

@@ -2,9 +2,17 @@ from strawberry_django import auth, field
 import secrets
 import uuid
 
-from core.models import MultiTenantUser
-from core.schema.core.helpers import get_multi_tenant_company
-from core.schema.multi_tenant.types.types import MultiTenantUserType, MultiTenantCompanyType, HasDemoDataType, MinimalMultiTenantUserType, UserCredentialsType
+from core.models import MultiTenantUser, DashboardSection, DashboardCard
+from core.schema.core.helpers import get_multi_tenant_company, get_current_user
+from core.schema.multi_tenant.types.types import (
+    MultiTenantUserType,
+    MultiTenantCompanyType,
+    HasDemoDataType,
+    MinimalMultiTenantUserType,
+    UserCredentialsType,
+    DashboardSectionType,
+    DashboardCardType,
+)
 from core.schema.core.queries import connection, DjangoListConnection, \
     type, field, Info, List, anonymous_field
 
@@ -44,6 +52,29 @@ def generate_user_credentials_resolver(info: Info, identifier: str | None = None
     return UserCredentialsType(username=username, password=password)
 
 
+def dashboard_sections_resolver(info: Info):
+    user = get_current_user(info)
+    if user is None:
+        return DashboardSection.objects.none()
+    return (
+        DashboardSection.objects.filter(
+            multi_tenant_company=user.multi_tenant_company,
+            user=user,
+        )
+        .select_related("user")
+        .prefetch_related("cards__user", "cards__section")
+    )
+
+
+def dashboard_cards_resolver(info: Info):
+    user = get_current_user(info)
+    if user is None:
+        return DashboardCard.objects.none()
+    return DashboardCard.objects.filter(
+        multi_tenant_company=user.multi_tenant_company,
+        user=user,
+    ).select_related("user", "section")
+
 
 @type(name="Query")
 class MultiTenantQuery:
@@ -51,6 +82,8 @@ class MultiTenantQuery:
     my_multi_tenant_company: MultiTenantCompanyType = field(resolver=my_multi_tenant_company_resolver)
     users: DjangoListConnection[MinimalMultiTenantUserType] = connection()
     has_demo_data: HasDemoDataType = anonymous_field(resolver=has_demo_data)
+    dashboard_sections: DjangoListConnection[DashboardSectionType] = connection()
+    dashboard_cards: DjangoListConnection[DashboardCardType] = connection()
 
     generate_user_credentials: UserCredentialsType = anonymous_field(
         resolver=generate_user_credentials_resolver

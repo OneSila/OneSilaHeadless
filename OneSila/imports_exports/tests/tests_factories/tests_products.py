@@ -835,6 +835,27 @@ class ImportProductInstanceParentLinkingTest(TestCase):
         link = ConfigurableVariation.objects.filter(parent__sku="CFG-001", variation__sku="VAR-001").first()
         self.assertIsNotNone(link)
 
+    def test_link_simple_to_configurable_parent_from_plural_field(self):
+        parent_data = {
+            "name": "Configurable Product",
+            "sku": "CFG-001",
+            "type": Product.CONFIGURABLE,
+            "product_type": "Chair",
+        }
+        ImportProductInstance(parent_data, self.import_process).process()
+
+        child_data = {
+            "name": "Variant B",
+            "sku": "VAR-002",
+            "type": Product.SIMPLE,
+            "product_type": "Chair",
+            "configurable_parent_skus": ["CFG-UNKNOWN", "CFG-001"],
+        }
+        ImportProductInstance(child_data, self.import_process).process()
+
+        link = ConfigurableVariation.objects.filter(parent__sku="CFG-001", variation__sku="VAR-002").first()
+        self.assertIsNotNone(link)
+
     def test_link_simple_to_bundle_parent(self):
         parent_data = {
             "name": "Bundle Base",
@@ -856,6 +877,27 @@ class ImportProductInstanceParentLinkingTest(TestCase):
         link = BundleVariation.objects.filter(parent__sku="BND-001", variation__sku="ITM-001").first()
         self.assertIsNotNone(link)
         self.assertEqual(link.quantity, 1)
+
+    def test_link_simple_to_bundle_parent_from_plural_field(self):
+        parent_data = {
+            "name": "Bundle Base",
+            "sku": "BND-001",
+            "type": Product.BUNDLE,
+            "product_type": "Chair",
+        }
+        ImportProductInstance(parent_data, self.import_process).process()
+
+        child_data = {
+            "name": "Bundle Item",
+            "sku": "ITM-002",
+            "type": Product.SIMPLE,
+            "product_type": "Chair",
+            "bundle_parent_skus": ["BND-UNKNOWN", "BND-001"],
+        }
+        ImportProductInstance(child_data, self.import_process).process()
+
+        link = BundleVariation.objects.filter(parent__sku="BND-001", variation__sku="ITM-002").first()
+        self.assertIsNotNone(link)
 
     def test_link_alias_to_parent_using_sku(self):
         parent_data = {

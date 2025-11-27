@@ -30,20 +30,18 @@ def ebay_import_db_task(import_process, sales_channel):
         )
         factory.run()
     elif import_type == EbaySalesChannelImport.TYPE_PRODUCTS:
-        # factory = EbayProductsAsyncImportProcessor(
-        #     import_process=import_process,
-        #     sales_channel=sales_channel,
-        # )
-        # factory.run()
-        # @TODO: Temporary disabled this until propert testing
-        pass
+        factory = EbayProductsAsyncImportProcessor(
+            import_process=import_process,
+            sales_channel=sales_channel,
+        )
+        factory.run()
 
 
 @db_task()
 def ebay_product_import_item_task(
     import_process_id: int,
     sales_channel_id: int,
-    product_data: dict,
+    data: dict,
     is_last: bool = False,
     updated_with: int | None = None,
 ):
@@ -56,7 +54,8 @@ def ebay_product_import_item_task(
     process = Import.objects.get(id=import_process_id)
     channel = EbaySalesChannel.objects.get(id=sales_channel_id)
     factory = EbayProductItemFactory(
-        product_data=product_data,
+        product_data=data["product"],
+        offer_data=data["offer"],
         import_process=process,
         sales_channel=channel,
         is_last=is_last,
