@@ -62,6 +62,7 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         self.sales_channel = sales_channel
         self.sales_channel_id = getattr(sales_channel, "pk", None)
         self.view = view
+        self.view_id = getattr(view, "pk", None)
         self.site_remote_id = self._normalize_identifier(getattr(view, "remote_id", None)) if view else ""
         self.language = language
         self.synced_categories: list[SheinCategory] = []
@@ -70,12 +71,27 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         self._attribute_template_cache: dict[str, list[dict[str, Any]]] = {}
         self._custom_value_permission_cache: dict[str, dict[str, bool]] = {}
 
+    def _print_debug(self, message: str) -> None:
+        print(
+            f"[SheinSync channel={self.sales_channel_id} view={self.view_id or 'all'}] {message}",
+            flush=True,
+        )
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
     def run(self, *, tree: Optional[list[dict[str, Any]]] = None) -> list[SheinCategory]:
         """Fetch the remote tree (when not provided) and persist all nodes."""
 
+        logger.info(
+            "Shein schema sync starting for channel=%s view=%s language=%s",
+            self.sales_channel_id,
+            self.view_id or "all",
+            self.language or "auto",
+        )
+        self._print_debug(
+            f"Starting schema sync (language={self.language or 'auto'})",
+        )
         nodes = tree if tree is not None else self.fetch_remote_category_tree()
         normalized_nodes = [node for node in nodes if isinstance(node, dict)]
 
@@ -83,18 +99,48 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         self.synced_product_types = []
 
         if not normalized_nodes:
+            logger.info(
+                "Shein schema sync aborted for channel=%s view=%s: no nodes returned",
+                self.sales_channel_id,
+                self.view_id or "all",
+            )
+            self._print_debug("No nodes returned from remote tree; aborting run.")
             return []
 
+        logger.info(
+            "Shein schema sync will process %s nodes for channel=%s view=%s",
+            len(normalized_nodes),
+            self.sales_channel_id,
+            self.view_id or "all",
+        )
+        self._print_debug(f"Processing {len(normalized_nodes)} nodes from remote tree.")
         with transaction.atomic():
             for node in normalized_nodes:
                 self._sync_node(node=node, parent=None)
 
+        logger.info(
+            "Shein schema sync finished for channel=%s view=%s: %s categories, %s product types",
+            self.sales_channel_id,
+            self.view_id or "all",
+            len(self.synced_categories),
+            len(self.synced_product_types),
+        )
+        self._print_debug(
+            f"Finished schema sync: categories={len(self.synced_categories)} product_types={len(self.synced_product_types)}"
+        )
         return self.synced_categories
 
     def fetch_remote_category_tree(self) -> list[dict[str, Any]]:
         """Call Shein and return the raw category tree."""
 
         payload = self._build_request_payload()
+        logger.info(
+            "Requesting Shein category tree for channel=%s view=%s payload=%s",
+            self.sales_channel_id,
+            self.view_id or "all",
+            payload,
+        )
+        self._print_debug(f"Requesting category tree with payload={payload}")
 
         try:
             response = self.shein_post(path=self.category_tree_path, payload=payload or None)
@@ -125,7 +171,15 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         if not isinstance(records, list):
             return []
 
-        return [record for record in records if isinstance(record, dict)]
+        normalized = [record for record in records if isinstance(record, dict)]
+        logger.info(
+            "Fetched %s remote Shein category nodes for channel=%s view=%s",
+            len(normalized),
+            self.sales_channel_id,
+            self.view_id or "all",
+        )
+        self._print_debug(f"Received {len(normalized)} nodes from category tree response.")
+        return normalized
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -177,6 +231,15 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         product_type = self._sync_product_type(category=category, node=node)
         if product_type is not None:
             self.synced_product_types.append(product_type)
+            logger.info(
+                "Linked Shein category %s to product type %s (channel=%s)",
+                category.remote_id,
+                product_type.remote_id,
+                self.sales_channel_id,
+            )
+            self._print_debug(
+                f"Category {category.remote_id} linked to product type {product_type.remote_id}."
+            )
 
         return category
 
@@ -311,14 +374,43 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
 
         attribute_records = self._attribute_template_cache.get(remote_id)
         if attribute_records is None:
+            logger.info(
+                "Attribute template cache miss for product type %s (channel=%s)",
+                remote_id,
+                self.sales_channel_id,
+            )
+            self._print_debug(f"Attribute template cache miss for product type {remote_id}.")
             attribute_records = self._fetch_attribute_template(product_type_id=remote_id)
             self._attribute_template_cache[remote_id] = attribute_records
+        else:
+            logger.info(
+                "Attribute template cache hit for product type %s (channel=%s)",
+                remote_id,
+                self.sales_channel_id,
+            )
+            self._print_debug(f"Attribute template cache hit for product type {remote_id}.")
 
         if not attribute_records:
+            logger.info(
+                "No attribute definitions returned for product type %s (channel=%s)",
+                remote_id,
+                self.sales_channel_id,
+            )
+            self._print_debug(f"No attribute definitions returned for product type {remote_id}.")
             return
 
         seen_property_ids: set[int] = set()
 
+        logger.info(
+            "Syncing %s attribute definitions for product type %s (category=%s, channel=%s)",
+            len(attribute_records),
+            remote_id,
+            product_type.category_id or "n/a",
+            self.sales_channel_id,
+        )
+        self._print_debug(
+            f"Syncing {len(attribute_records)} attributes for product type {remote_id} (category={product_type.category_id or 'n/a'})."
+        )
         for attribute in attribute_records:
             if not isinstance(attribute, dict):
                 continue
@@ -342,6 +434,15 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
                 .exclude(property_id__in=seen_property_ids)
                 .delete()
             )
+        logger.info(
+            "Finished syncing product type %s: %s attributes mapped (channel=%s)",
+            remote_id,
+            len(seen_property_ids),
+            self.sales_channel_id,
+        )
+        self._print_debug(
+            f"Finished product type {remote_id}: mapped {len(seen_property_ids)} attributes."
+        )
 
     def _get_category_custom_value_permissions(
         self,
@@ -354,13 +455,36 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
 
         cached = self._custom_value_permission_cache.get(normalized_category)
         if cached is None:
+            logger.info(
+                "Fetching custom value permissions for category %s (channel=%s)",
+                normalized_category,
+                self.sales_channel_id,
+            )
+            self._print_debug(
+                f"Fetching custom attribute permissions for category {normalized_category}."
+            )
             cached = self._fetch_custom_attribute_permissions(category_id=normalized_category)
             self._custom_value_permission_cache[normalized_category] = cached
+        else:
+            logger.info(
+                "Using cached custom value permissions for category %s (channel=%s)",
+                normalized_category,
+                self.sales_channel_id,
+            )
+            self._print_debug(
+                f"Using cached custom attribute permissions for category {normalized_category}."
+            )
 
         return cached
 
     def _fetch_attribute_template(self, *, product_type_id: str) -> list[dict[str, Any]]:
         payload = {"product_type_id_list": [self._coerce_int(value=product_type_id)]}
+        logger.info(
+            "Requesting attribute template for product type %s (channel=%s)",
+            product_type_id,
+            self.sales_channel_id,
+        )
+        self._print_debug(f"Requesting attribute template for product type {product_type_id}.")
 
         try:
             response = self.shein_post(path=self.attribute_template_path, payload=payload)
@@ -401,8 +525,26 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
 
             attribute_infos = record.get("attribute_infos")
             if isinstance(attribute_infos, list):
-                return [info for info in attribute_infos if isinstance(info, dict)]
+                attributes = [info for info in attribute_infos if isinstance(info, dict)]
+                logger.info(
+                    "Received %s attribute definitions for product type %s (channel=%s)",
+                    len(attributes),
+                    product_type_id,
+                    self.sales_channel_id,
+                )
+                self._print_debug(
+                    f"Received {len(attributes)} attribute definitions for product type {product_type_id}."
+                )
+                return attributes
 
+        logger.info(
+            "Attribute template response did not include product type %s (channel=%s)",
+            product_type_id,
+            self.sales_channel_id,
+        )
+        self._print_debug(
+            f"Attribute template response missing product type {product_type_id}."
+        )
         return []
 
     def _fetch_custom_attribute_permissions(
@@ -411,6 +553,12 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         category_id: str,
     ) -> dict[str, bool]:
         payload = {"category_id_list": [self._coerce_int(value=category_id)]}
+        logger.info(
+            "Requesting custom attribute permissions for category %s (channel=%s)",
+            category_id,
+            self.sales_channel_id,
+        )
+        self._print_debug(f"Requesting custom attribute permissions for category {category_id}.")
 
         try:
             response = self.shein_post(
@@ -461,6 +609,15 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
 
             permissions[attribute_id] = self._to_bool(record.get("has_permission"))
 
+        logger.info(
+            "Received %s custom attribute permission entries for category %s (channel=%s)",
+            len(permissions),
+            category_id,
+            self.sales_channel_id,
+        )
+        self._print_debug(
+            f"Received {len(permissions)} custom attribute permission entries for category {category_id}."
+        )
         return permissions
 
     def _sync_property_definition(
@@ -588,6 +745,12 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             return None
 
         payload = {"category_id": category_id}
+        logger.info(
+            "Requesting publish fill-in standard for category %s (channel=%s)",
+            category_id,
+            self.sales_channel_id,
+        )
+        self._print_debug(f"Requesting publish fill-in standard for category {category_id}.")
 
         try:
             response = self.shein_post(path=self.publish_standard_path, payload=payload)
@@ -614,6 +777,14 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         if not isinstance(info, dict):
             return None
 
+        logger.info(
+            "Received publish standard payload for category %s (channel=%s)",
+            category_id,
+            self.sales_channel_id,
+        )
+        self._print_debug(
+            f"Received publish fill-in standard for category {category_id}."
+        )
         return info
 
     def _build_product_type_item_identifier(
