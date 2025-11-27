@@ -122,6 +122,39 @@ def amazon_translate_select_value_task(select_value_id: int):
     instance.save(update_fields=["translated_remote_name"])
 
 
+def run_amazon_sales_channel_mapping_sync(
+    *,
+    source_sales_channel_id: int,
+    target_sales_channel_id: int,
+) -> dict:
+    """Run the mapping sync factory for two Amazon sales channels."""
+    from sales_channels.integrations.amazon.models import AmazonSalesChannel
+    from sales_channels.integrations.amazon.factories.sync import (
+        AmazonSalesChannelMappingSyncFactory,
+    )
+
+    source = AmazonSalesChannel.objects.get(id=source_sales_channel_id)
+    target = AmazonSalesChannel.objects.get(id=target_sales_channel_id)
+
+    factory = AmazonSalesChannelMappingSyncFactory(
+        source_sales_channel=source,
+        target_sales_channel=target,
+    )
+    return factory.run()
+
+
+@db_task()
+def amazon_sync_sales_channel_mappings_task(
+    source_sales_channel_id: int,
+    target_sales_channel_id: int,
+):
+    """Huey task wrapper for AmazonSalesChannelMappingSyncFactory."""
+    return run_amazon_sales_channel_mapping_sync(
+        source_sales_channel_id=source_sales_channel_id,
+        target_sales_channel_id=target_sales_channel_id,
+    )
+
+
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def create_amazon_product_db_task(
