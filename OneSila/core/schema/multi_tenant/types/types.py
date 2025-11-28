@@ -72,6 +72,11 @@ class MultiTenantCompanyType(relay.Node):
         from sales_channels.integrations.ebay.models.sales_channels import EbaySalesChannel
         return EbaySalesChannel.objects.filter(multi_tenant_company=self, active=True).exists()
 
+    @field()
+    def has_shein_integration(self, info) -> bool:
+        from sales_channels.integrations.shein.models.sales_channels import SheinSalesChannel
+        return SheinSalesChannel.objects.filter(multi_tenant_company=self, active=True).exists()
+
 
 @type(MultiTenantUserLoginToken, exclude=['token'])
 class MultiTenantUserLoginTokenType(relay.Node):

@@ -12,6 +12,7 @@ from core.models.multi_tenant import MultiTenantUser, MultiTenantUserLoginToken
 from django.utils.translation import gettext_lazy as _
 
 from core.tasks import core__demo_data__create_task, core__demo_data__delete_task
+from core.signals import multi_tenant_company_created
 
 
 class CleanupDataMixin:
@@ -105,6 +106,11 @@ class MyMultiTenantCompanyCreateMutation(GetCurrentUserMixin, DjangoCreateMutati
             user.multi_tenant_company = obj
             user.save()
 
+            multi_tenant_company_created.send(
+                sender=user.__class__,
+                instance=user,
+                multi_tenant_company=obj,
+            )
             return obj
 
 

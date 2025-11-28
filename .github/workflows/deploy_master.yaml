@@ -27,9 +27,11 @@ jobs:
             git pull
             pip install --upgrade pip
             pip install -r requirements.txt --upgrade
+            python -m spacy download en_core_web_sm
             cd OneSila
             ./manage.py migrate
             ./manage.py collectstatic --noinput
             echo "Reload Gunicorn for 0-downtime"
             /home/${{ secrets.MASTER_USERNAME }}/./reload_gunicorn.sh
             sudo supervisorctl restart huey
+            sudo supervisorctl restart telegram_bot

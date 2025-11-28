@@ -58,9 +58,21 @@ LOGGING["handlers"]["console"] = {
     "formatter": "verbose",
     "level": "DEBUG",
 }
+LOGGING["handlers"]["amazon_log_file"] = {
+    "class": "logging.StreamHandler",
+    "formatter": "verbose",
+    "level": "DEBUG",
+}
 LOGGING["root"] = {
     "handlers": ["console"],
     "level": "INFO",
+}
+
+LOGGING.setdefault("loggers", {})
+LOGGING["loggers"]["sales_channels.integrations.amazon"] = {
+    "handlers": ["console", "amazon_log_file"],
+    "level": "INFO",
+    "propagate": True,
 }
 
 # Dummy values for required keys
@@ -89,4 +101,5 @@ CHANNEL_LAYERS = {
 MIGRATION_MODULES = {
     "amazon": "sales_channels.integrations.amazon.migrations_agent",
     "woocommerce": "sales_channels.integrations.woocommerce.migrations_agent",
+    "telegram_bot": None,
 }

@@ -1,0 +1,9 @@
+{
+  "labels":[
+    "weather",
+    "greeting",
+    "goodbye",
+    "restart_huey"
+  ],
+  "threshold":0.5
+}

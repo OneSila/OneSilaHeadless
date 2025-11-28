@@ -114,6 +114,10 @@ AMAZON_CLIENT_ID = None
 AMAZON_CLIENT_SECRET = None
 AMAZON_APP_ID = None
 
+SHEIN_APP_ID = None
+SHEIN_REDIRECT_URI = "https://your-domain/integrations/shein/oauth/callback"
+SHEIN_APP_SECRET = None
+
 EBAY_CLIENT_ID = None
 EBAY_CLIENT_SECRET = None
 EBAY_DEV_ID = None
@@ -122,3 +126,4 @@ EBAY_RU_NAME = 'Name'
 EBAY_ACCOUNT_DELETION_VERIFICATION_TOKEN = "replace-with-onesila-ebay-verification-token-123456"
 
 TEST_WEBHOOK_SECRET = "test-secret"
+TELEGRAM_BOT_TOKEN = "your-telegram-bot-token"

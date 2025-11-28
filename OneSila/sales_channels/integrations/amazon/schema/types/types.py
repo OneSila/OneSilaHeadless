@@ -78,6 +78,13 @@ class AmazonRedirectUrlType:
     redirect_url: str
 
 
+@strawberry_type
+class AmazonSalesChannelMappingSyncPayload:
+    success: bool
+
+
+
+
 @type(AmazonSalesChannel, filters=AmazonSalesChannelFilter, order=AmazonSalesChannelOrder, pagination=True, fields="__all__")
 class AmazonSalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
 
