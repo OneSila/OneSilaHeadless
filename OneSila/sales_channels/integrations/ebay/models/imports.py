@@ -1,7 +1,6 @@
 """eBay-specific import models."""
 
-from django.db import models
-
+from core import models
 from sales_channels.models.imports import SalesChannelImport
 
 

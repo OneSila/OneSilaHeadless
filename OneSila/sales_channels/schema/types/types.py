@@ -99,6 +99,7 @@ from .ordering import (
 )
 from ...integrations.amazon.models import AmazonSalesChannelImport, AmazonSalesChannel
 from ...integrations.ebay.models import EbaySalesChannelImport
+from ...integrations.shein.models.imports import SheinSalesChannelImport
 from ...models.sales_channels import RemoteLanguage
 
 
@@ -138,6 +139,10 @@ class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def ebay_imports(self) -> List[Annotated['EbaySalesChannelImportType', lazy("sales_channels.integrations.ebay.schema.types.types")]]:
         return EbaySalesChannelImport.objects.filter(sales_channel=self)
+
+    @field()
+    def shein_imports(self) -> List[Annotated['SheinSalesChannelImportType', lazy("sales_channels.integrations.shein.schema.types.types")]]:
+        return SheinSalesChannelImport.objects.filter(sales_channel=self)
 
     @field()
     def type(self, info) -> str:

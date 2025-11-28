@@ -27,6 +27,8 @@ from sales_channels.integrations.magento2.schema import MagentoSalesChannelMutat
     MagentoSalesChannelsSubscription
 from sales_channels.integrations.shopify.schema import ShopifySalesChannelMutation, ShopifySalesChannelsQuery, \
     ShopifySalesChannelsSubscription
+from sales_channels.integrations.shein.schema import SheinSalesChannelMutation, SheinSalesChannelsQuery, \
+    SheinSalesChannelsSubscription
 from sales_channels.integrations.woocommerce.schema import WoocommerceSalesChannelMutation, WoocommerceSalesChannelsQuery, \
     WoocommerceSalesChannelsSubscription
 from sales_channels.integrations.amazon.schema import AmazonSalesChannelMutation, AmazonSalesChannelsQuery, \
@@ -55,6 +57,7 @@ class Query(
         MultiTenantQuery,
         MagentoSalesChannelsQuery,
         ShopifySalesChannelsQuery,
+        SheinSalesChannelsQuery,
         WoocommerceSalesChannelsQuery,
         EbaySalesChannelsQuery,
         ProductsQuery,
@@ -78,6 +81,7 @@ class Mutation(
         MediaMutation,
         MultiTenantMutation,
         ShopifySalesChannelMutation,
+        SheinSalesChannelMutation,
         WoocommerceSalesChannelMutation,
         EbaySalesChannelMutation,
         ProductsInspectorMutation,
@@ -109,6 +113,7 @@ class Subscription(
         SalesChannelsSubscription,
         TaxSubscription,
         ShopifySalesChannelsSubscription,
+        SheinSalesChannelsSubscription,
         WoocommerceSalesChannelsSubscription,
         EbaySalesChannelsSubscription,
 ):

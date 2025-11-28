@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models.signals import post_delete, pre_delete, pre_save
 from typing import Iterable
 
@@ -19,6 +20,8 @@ from sales_prices.signals import price_changed
 from .integrations.amazon.models import AmazonSalesChannel, AmazonSalesChannelImport
 from .integrations.ebay.models import EbaySalesChannel, EbaySalesChannelImport
 from .integrations.magento2.models import MagentoProduct
+from .integrations.shein.models import SheinSalesChannel
+from .integrations.shein.models.imports import SheinSalesChannelImport
 from .models import RemoteProduct, SalesChannelImport
 # from .models import ImportProcess
 from .models.sales_channels import SalesChannelViewAssign
@@ -204,7 +207,8 @@ def import_process_avoid_duplicate_pre_create_receiver(sender, instance: SalesCh
 @receiver(post_create, sender=SalesChannelImport)
 @receiver(post_create, sender=AmazonSalesChannelImport)
 @receiver(post_create, sender=EbaySalesChannelImport)
-def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelImport, **kwargs):
+@receiver(post_create, sender=SheinSalesChannelImport)
+def import_process_post_create_receiver(sender, instance: SalesChannelImport, **kwargs):
     """
     This receiver is used to handle the post_create signal for the SalesChannelImport model.
     It is used to trigger the import process for the sales channel upon creation.
@@ -219,6 +223,7 @@ def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelI
     from sales_channels.integrations.woocommerce.tasks import woocommerce_import_db_task
     from sales_channels.integrations.amazon.tasks import amazon_import_db_task
     from sales_channels.integrations.ebay.tasks import ebay_import_db_task
+    from sales_channels.integrations.shein.tasks import shein_import_db_task
 
     # NOTE: Magento does not trigger after creation.  The import flow will first set
     # some settings (possibly property stuff) and manually triggger the import via the status.
@@ -238,6 +243,15 @@ def import_process_ashopify_post_create_receiver(sender, instance: SalesChannelI
     elif isinstance(sales_channel, EbaySalesChannel):
         refresh_subscription_receiver(sales_channel)
         ebay_import_db_task(import_process=instance, sales_channel=sales_channel)
+    elif isinstance(sales_channel, SheinSalesChannel):
+        refresh_subscription_receiver(sales_channel)
+        transaction.on_commit(
+            lambda import_process=instance, channel=sales_channel: shein_import_db_task(
+                import_process=import_process,
+                sales_channel=channel,
+            )
+        )
+
     else:
         logger.warning(f"Sales channel {type(sales_channel)} is not supported in post_create.")
 
@@ -263,6 +277,8 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
     from sales_channels.integrations.amazon.tasks import amazon_import_db_task
     from sales_channels.integrations.ebay.models import EbaySalesChannel
     from sales_channels.integrations.ebay.tasks import ebay_import_db_task
+    from sales_channels.integrations.shein.tasks import shein_import_db_task
+    from sales_channels.integrations.shein.models.imports import SheinSalesChannelImport
     from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
     from sales_channels.integrations.woocommerce.tasks import woocommerce_import_db_task
 
@@ -278,6 +294,13 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
             amazon_import_db_task(import_process=instance, sales_channel=sales_channel)
         elif isinstance(sales_channel, EbaySalesChannel):
             ebay_import_db_task(import_process=instance, sales_channel=sales_channel)
+        elif isinstance(sales_channel, SheinSalesChannelImport):
+            transaction.on_commit(
+                lambda import_process=instance, channel=sales_channel: shein_import_db_task(
+                    import_process=import_process,
+                    sales_channel=channel,
+                )
+            )
         else:
             logger.warning(f"Sales channel {type(sales_channel)} is not supported in post_update.")
 
@@ -285,6 +308,7 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
 @receiver(post_update, sender=SalesChannelImport)
 @receiver(post_update, sender=AmazonSalesChannelImport)
 @receiver(post_update, sender=EbaySalesChannelImport)
+@receiver(post_update, sender=SheinSalesChannelImport)
 def syncing_current_import_percentage_real_time_sync__post_update_receiver(sender, instance, **kwargs):
     """
     Update real time percentage when is changed to the sales channe.

@@ -68,6 +68,13 @@ LOGGING["root"] = {
     "level": "INFO",
 }
 
+LOGGING.setdefault("loggers", {})
+LOGGING["loggers"]["sales_channels.integrations.amazon"] = {
+    "handlers": ["console", "amazon_log_file"],
+    "level": "INFO",
+    "propagate": True,
+}
+
 # Dummy values for required keys
 LOCAL_HOST = "localhost:8000"
 AI_POINT_PRICE = 0
