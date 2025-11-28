@@ -159,7 +159,7 @@ class PropertySelectValue(TranslatedModelMixin, models.Model):
         super().delete(*args, **kwargs)
 
     class Meta:
-        search_terms = ['propertyselectvaluetranslation__value']
+        search_terms = ['propertyselectvaluetranslation__value', 'property__propertytranslation__name']
         ordering = ('id',)
 
 
