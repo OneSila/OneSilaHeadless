@@ -39,11 +39,13 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonDefaultUnitConfiguratorType,
     AmazonSalesChannelViewType,
     AmazonProductType as AmazonProductGraphqlType,
-    SuggestedAmazonProductType, SuggestedAmazonProductTypeEntry,
+    SuggestedAmazonProductType,
+    SuggestedAmazonProductTypeEntry,
     AmazonProductBrowseNodeType,
     AmazonExternalProductIdType,
     AmazonGtinExemptionType,
     AmazonVariationThemeType,
+    AmazonSalesChannelMappingSyncPayload,
 )
 from sales_channels.schema.types.input import SalesChannelViewPartialInput
 from products.schema.types.input import ProductPartialInput
@@ -109,6 +111,37 @@ class AmazonSalesChannelMutation:
     update_amazon_default_unit_configurator: AmazonDefaultUnitConfiguratorType = update(AmazonDefaultUnitConfiguratorPartialInput)
 
     update_amazon_sales_channel_view: AmazonSalesChannelViewType = update(AmazonSalesChannelViewPartialInput)
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def sync_amazon_sales_channel_mappings(
+        self,
+        source_sales_channel: AmazonSalesChannelPartialInput,
+        target_sales_channel: AmazonSalesChannelPartialInput,
+        info: Info,
+    ) -> AmazonSalesChannelMappingSyncPayload:
+        """Enqueue mapping sync between two Amazon sales channels."""
+        from sales_channels.integrations.amazon.models import AmazonSalesChannel
+        from sales_channels.integrations.amazon.tasks import (
+            amazon_sync_sales_channel_mappings_task,
+        )
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        source = AmazonSalesChannel.objects.get(
+            id=source_sales_channel.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+        target = AmazonSalesChannel.objects.get(
+            id=target_sales_channel.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        amazon_sync_sales_channel_mappings_task(
+            source_sales_channel_id=source.id,
+            target_sales_channel_id=target.id,
+        )
+
+        return AmazonSalesChannelMappingSyncPayload(success=True)
 
     create_amazon_import_process: AmazonSalesChannelImportType = create(AmazonSalesChannelImportInput)
     update_amazon_import_process: AmazonSalesChannelImportType = update(AmazonSalesChannelImportPartialInput)
