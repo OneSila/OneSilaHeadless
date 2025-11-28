@@ -1,11 +1,9 @@
 """Factories to mirror Shein category trees and product types locally."""
 
 import logging
+import math
 from typing import Any, Optional
 from urllib.parse import urlparse
-
-from django.db import transaction
-
 from core.helpers import get_languages
 
 from sales_channels.integrations.shein import constants
@@ -58,6 +56,7 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         sales_channel: SheinSalesChannel,
         view: Optional[SheinSalesChannelView] = None,
         language: Optional[str] = None,
+        import_process=None,
     ) -> None:
         self.sales_channel = sales_channel
         self.sales_channel_id = getattr(sales_channel, "pk", None)
@@ -70,6 +69,10 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         self._remote_language_cache: set[tuple[Optional[int], str]] = set()
         self._attribute_template_cache: dict[str, list[dict[str, Any]]] = {}
         self._custom_value_permission_cache: dict[str, dict[str, bool]] = {}
+        self.import_process = import_process
+        self._import_total_nodes = 0
+        self._import_processed_nodes = 0
+        self._import_last_percentage = 0
 
     def _print_debug(self, message: str) -> None:
         print(
@@ -94,7 +97,6 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         )
         nodes = tree if tree is not None else self.fetch_remote_category_tree()
         normalized_nodes = [node for node in nodes if isinstance(node, dict)]
-
         self.synced_categories = []
         self.synced_product_types = []
 
@@ -114,9 +116,10 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             self.view_id or "all",
         )
         self._print_debug(f"Processing {len(normalized_nodes)} nodes from remote tree.")
-        with transaction.atomic():
-            for node in normalized_nodes:
-                self._sync_node(node=node, parent=None)
+        self._prepare_import_progress(nodes=normalized_nodes)
+
+        for node in normalized_nodes:
+            self._sync_node(node=node, parent=None)
 
         logger.info(
             "Shein schema sync finished for channel=%s view=%s: %s categories, %s product types",
@@ -184,10 +187,61 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+    def _prepare_import_progress(self, *, nodes: list[dict[str, Any]]) -> None:
+        print('----------------------------------------------------- PREPARE TOTAL')
+        if not self.import_process:
+            return
+
+        total = 0
+        for node in nodes:
+            total += self._count_category_nodes(node=node)
+
+        self._import_total_nodes = total
+        self._import_processed_nodes = 0
+        print('--------------------------------------------------- TOTAL')
+        print(total)
+        self._import_last_percentage = getattr(self.import_process, "percentage", 0) or 0
+        self.import_process.total_records = total
+        self.import_process.save()
+
+    def _count_category_nodes(self, *, node: dict[str, Any]) -> int:
+        total = 0
+        if isinstance(node, dict) and self._normalize_identifier(node.get("category_id")):
+            total += 1
+
+        children = node.get("children")
+        if isinstance(children, list):
+            for child in children:
+                total += self._count_category_nodes(node=child)
+        return total
+
+    def _increment_import_progress(self) -> None:
+        if not self.import_process or not self._import_total_nodes:
+            return
+
+        self._import_processed_nodes += 1
+        new_percentage = math.floor(
+            (self._import_processed_nodes / self._import_total_nodes) * 100
+        )
+        print('---------------------------------------- _increment_import_progress')
+        if new_percentage <= self._import_last_percentage:
+            return
+
+        print('--------------------------------------------------- PROCCESSED NUMBER')
+        print(self._import_processed_nodes)
+        print(new_percentage)
+
+        self._import_last_percentage = new_percentage
+        self.import_process.processed_records = self._import_processed_nodes
+        self.import_process.percentage = new_percentage
+        self.import_process.save()
+
     def _sync_node(self, *, node: dict[str, Any], parent: Optional[SheinCategory]) -> None:
         category = self._sync_category(node=node, parent=parent)
         if category is None:
             return
+
+        self._increment_import_progress()
 
         children = node.get("children")
         if not isinstance(children, list):
@@ -277,6 +331,8 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             return
 
         fill_in_records = info.get("fill_in_standard_list")
+        print('------------------------------------------- FILL IN RECORDS')
+        print(fill_in_records)
 
         field_flags = {attr: False for attr in PUBLISH_FIELD_FLAG_MAP.values()}
         module_flags = {attr: False for attr in PUBLISH_MODULE_FLAG_MAP.values()}
@@ -516,6 +572,8 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             return []
 
         normalized_remote_id = str(product_type_id)
+        print('------------------------------------------------ ATTRIBUTE TEMPLATE')
+        print(records)
         for record in records:
             if not isinstance(record, dict):
                 continue
@@ -594,6 +652,8 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
 
         normalized_category = self._normalize_identifier(category_id)
         permissions: dict[str, bool] = {}
+        print('---------------------------------------------- CUSTOM ATTRIBUTE PERMISSIONS')
+        print(records)
 
         for record in records:
             if not isinstance(record, dict):
@@ -649,6 +709,7 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             "raw_data": raw_attribute,
         }
 
+        print('------------------------------------------------------------------ ABOUT TO CREATE SHEIN PROPERTY ')
         property_obj, _ = SheinProperty.objects.update_or_create(
             multi_tenant_company=self.sales_channel.multi_tenant_company,
             sales_channel=self.sales_channel,

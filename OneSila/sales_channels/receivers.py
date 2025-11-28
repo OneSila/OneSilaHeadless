@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models.signals import post_delete, pre_delete, pre_save
 from typing import Iterable
 
@@ -244,7 +245,12 @@ def import_process_post_create_receiver(sender, instance: SalesChannelImport, **
         ebay_import_db_task(import_process=instance, sales_channel=sales_channel)
     elif isinstance(sales_channel, SheinSalesChannel):
         refresh_subscription_receiver(sales_channel)
-        shein_import_db_task(import_process=instance, sales_channel=sales_channel)
+        transaction.on_commit(
+            lambda import_process=instance, channel=sales_channel: shein_import_db_task(
+                import_process=import_process,
+                sales_channel=channel,
+            )
+        )
 
     else:
         logger.warning(f"Sales channel {type(sales_channel)} is not supported in post_create.")
@@ -289,7 +295,12 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
         elif isinstance(sales_channel, EbaySalesChannel):
             ebay_import_db_task(import_process=instance, sales_channel=sales_channel)
         elif isinstance(sales_channel, SheinSalesChannelImport):
-            shein_import_db_task(import_process=instance, sales_channel=sales_channel)
+            transaction.on_commit(
+                lambda import_process=instance, channel=sales_channel: shein_import_db_task(
+                    import_process=import_process,
+                    sales_channel=channel,
+                )
+            )
         else:
             logger.warning(f"Sales channel {type(sales_channel)} is not supported in post_update.")
 
@@ -297,6 +308,7 @@ def import_process_post_update_receiver(sender, instance: SalesChannelImport, **
 @receiver(post_update, sender=SalesChannelImport)
 @receiver(post_update, sender=AmazonSalesChannelImport)
 @receiver(post_update, sender=EbaySalesChannelImport)
+@receiver(post_update, sender=SheinSalesChannelImport)
 def syncing_current_import_percentage_real_time_sync__post_update_receiver(sender, instance, **kwargs):
     """
     Update real time percentage when is changed to the sales channe.

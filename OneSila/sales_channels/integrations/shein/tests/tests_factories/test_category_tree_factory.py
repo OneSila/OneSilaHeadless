@@ -21,6 +21,7 @@ from sales_channels.integrations.shein.models import (
     SheinSalesChannel,
     SheinSalesChannelView,
 )
+from sales_channels.integrations.shein.models.imports import SheinSalesChannelImport
 
 
 CATEGORY_TREE_PAYLOAD = {
@@ -383,6 +384,26 @@ class SheinCategoryTreeFactoryTests(TestCase):
         self.assertEqual(remote_language.local_instance, PUBLISH_STANDARD_INFO["default_language"])
         self.assertEqual(remote_language.remote_name, "English")
         self.assertEqual(SheinRemoteLanguage.objects.count(), 1)
+
+    def test_run_updates_import_process_percentage_when_provided(self) -> None:
+        import_process = baker.make(
+            SheinSalesChannelImport,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            percentage=0,
+        )
+        factory = SheinCategoryTreeSyncFactory(
+            sales_channel=self.sales_channel,
+            view=self.view,
+            import_process=import_process,
+        )
+        nodes = CATEGORY_TREE_PAYLOAD["info"]["data"]
+        factory._sync_category = Mock(return_value=object())  # type: ignore[attr-defined]
+
+        factory.run(tree=nodes)
+
+        import_process.refresh_from_db()
+        self.assertEqual(import_process.percentage, 100)
 
     def test_run_uses_provided_tree_without_remote_call(self) -> None:
         tree = CATEGORY_TREE_PAYLOAD["info"]["data"]

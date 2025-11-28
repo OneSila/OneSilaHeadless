@@ -165,11 +165,18 @@ class SheinPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
 
     @field()
     def mapped_locally(self, info) -> bool:
-        return self.mapped_locally
+        annotated_value = getattr(self, "mapped_locally", None)
+        if annotated_value is None:
+            return bool(getattr(self, "local_instance_id", None))
+        return annotated_value
 
     @field()
     def mapped_remotely(self, info) -> bool:
-        return self.mapped_remotely
+        annotated_value = getattr(self, "mapped_remotely", None)
+        if annotated_value is None:
+            remote_id = getattr(self, "remote_id", None)
+            return bool(remote_id)
+        return annotated_value
 
 
 @type(
@@ -178,6 +185,7 @@ class SheinPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
     order=SheinPropertySelectValueOrder,
     pagination=True,
     fields="__all__",
+    disable_optimization=True,
 )
 class SheinPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
     remote_property: Annotated[
@@ -191,11 +199,17 @@ class SheinPropertySelectValueType(relay.Node, GetQuerysetMultiTenantMixin):
 
     @field()
     def mapped_locally(self, info) -> bool:
-        return self.mapped_locally
+        annotated_value = getattr(self, "mapped_locally", None)
+        if annotated_value is None:
+            return bool(getattr(self, "local_instance_id", None))
+        return annotated_value
 
     @field()
     def mapped_remotely(self, info) -> bool:
-        return self.mapped_remotely
+        annotated_value = getattr(self, "mapped_remotely", None)
+        if annotated_value is None:
+            return bool(getattr(self, "remote_id", None))
+        return annotated_value
 
 
 @type(
@@ -266,11 +280,18 @@ class SheinProductTypeType(relay.Node, GetQuerysetMultiTenantMixin):
 
     @field()
     def mapped_locally(self, info) -> bool:
-        return self.mapped_locally
+        annotated_value = getattr(self, "mapped_locally", None)
+        if annotated_value is None:
+            return bool(getattr(self, "local_instance_id", None))
+        return annotated_value
 
     @field()
     def mapped_remotely(self, info) -> bool:
-        return self.mapped_remotely
+        annotated_value = getattr(self, "mapped_remotely", None)
+        if annotated_value is None:
+            remote_id = getattr(self, "remote_id", None)
+            return bool(remote_id)
+        return annotated_value
 
 
 @type(
@@ -318,11 +339,18 @@ class SheinInternalPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
 
     @field()
     def mapped_locally(self, info) -> bool:
-        return self.mapped_locally
+        annotated_value = getattr(self, "mapped_locally", None)
+        if annotated_value is None:
+            return bool(getattr(self, "local_instance_id", None))
+        return annotated_value
 
     @field()
     def mapped_remotely(self, info) -> bool:
-        return self.mapped_remotely
+        annotated_value = getattr(self, "mapped_remotely", None)
+        if annotated_value is None:
+            remote_id = getattr(self, "remote_id", None)
+            return bool(remote_id)
+        return annotated_value
 
 
 @type(

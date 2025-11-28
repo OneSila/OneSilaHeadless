@@ -1,7 +1,5 @@
 """Import processors for pulling Shein schema metadata."""
 
-from __future__ import annotations
-
 import logging
 from typing import Optional
 
@@ -32,6 +30,7 @@ class SheinSchemaImportProcessor(ImportMixin):
         self.view = view
         self.initial_active = bool(getattr(sales_channel, "active", True))
         self.initial_is_importing = bool(getattr(sales_channel, "is_importing", False))
+        self.import_process = self.import_process.get_real_instance()
 
     def prepare_import_process(self) -> None:
         self.sales_channel.active = False
@@ -65,6 +64,7 @@ class SheinSchemaImportProcessor(ImportMixin):
             sales_channel=self.sales_channel,
             view=self.view,
             language=self.language,
+            import_process=self.import_process,
         )
         factory.run()
         print(
@@ -79,4 +79,3 @@ class SheinSchemaImportProcessor(ImportMixin):
             len(factory.synced_categories),
             len(factory.synced_product_types),
         )
-        self.update_percentage(self.total_import_instances_cnt)

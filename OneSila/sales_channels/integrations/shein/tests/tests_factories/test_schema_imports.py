@@ -47,6 +47,7 @@ class SheinSchemaImportProcessorTest(TestCase):
             sales_channel=self.sales_channel,
             view=None,
             language=None,
+            import_process=self.import_process,
         )
         factory_instance.run.assert_called_once_with()
 

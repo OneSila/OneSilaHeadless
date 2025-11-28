@@ -7,6 +7,11 @@ from typing import Optional
 from core.schema.core.types.filters import SearchFilterMixin, filter
 from core.schema.core.types.types import auto
 from currencies.schema.types.filters import CurrencyFilter
+from sales_channels.integrations.shein.managers import (
+    SheinInternalPropertyQuerySet,
+    SheinPropertyQuerySet,
+    SheinPropertySelectValueQuerySet,
+)
 from sales_channels.integrations.shein.models import (
     SheinCategory,
     SheinInternalProperty,
@@ -82,6 +87,12 @@ class SheinPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin, 
     value_mode: auto
     type: auto
 
+    def get_mapped_locally_querysets(self):
+        return (
+            (SheinPropertyQuerySet, "filter_mapped_locally"),
+            (SheinPropertySelectValueQuerySet, "filter_shein_property_mapped_locally"),
+        )
+
 
 @filter(SheinPropertySelectValue)
 class SheinPropertySelectValueFilter(SearchFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
@@ -131,6 +142,11 @@ class SheinInternalPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilte
     code: auto
     is_root: auto
     type: auto
+
+    def get_mapped_locally_querysets(self):
+        return (
+            (SheinInternalPropertyQuerySet, "filter_mapped_locally"),
+        )
 
 
 @filter(SheinInternalPropertyOption)

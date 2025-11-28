@@ -76,12 +76,8 @@ class SheinInternalPropertyOptionPartialInput(NodeInput):
     pass
 
 
-@input(
-    SheinSalesChannelImport,
-    exclude=["saleschannelimport_ptr", "import_ptr"],
-)
+@input(SheinSalesChannelImport, exclude=["saleschannelimport_ptr", "import_ptr"])
 class SheinSalesChannelImportInput:
-    """Create Shein import process input."""
     pass
 
 
