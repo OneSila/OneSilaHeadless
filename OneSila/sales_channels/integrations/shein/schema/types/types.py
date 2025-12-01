@@ -61,6 +61,13 @@ class SheinRedirectUrlType:
     redirect_url: str
 
 
+@strawberry_type
+class SheinSalesChannelMappingSyncPayload:
+    """Result payload for Shein mapping sync."""
+
+    success: bool
+
+
 @type(
     SheinCategory,
     filters=SheinCategoryFilter,

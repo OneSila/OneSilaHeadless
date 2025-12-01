@@ -59,3 +59,7 @@ ebay_rest
 python-telegram-bot
 spacy
 # spacy-lookups-dat
+
+# For shein
+pycryptodome== 3.23.0
+pycryptodomex== 3.23.0
