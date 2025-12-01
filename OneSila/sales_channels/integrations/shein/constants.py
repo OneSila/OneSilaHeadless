@@ -191,4 +191,28 @@ SHEIN_INTERNAL_PROPERTY_DEFINITIONS = [
         "type": Property.TYPES.BOOLEAN,
         "payload_field": "quantity_info",
     },
+    {
+        "code": "height",
+        "name": _("Package height (cm)"),
+        "type": Property.TYPES.FLOAT,
+        "payload_field": "height",
+    },
+    {
+        "code": "length",
+        "name": _("Package length (cm)"),
+        "type": Property.TYPES.FLOAT,
+        "payload_field": "length",
+    },
+    {
+        "code": "width",
+        "name": _("Package width (cm)"),
+        "type": Property.TYPES.FLOAT,
+        "payload_field": "width",
+    },
+    {
+        "code": "weight",
+        "name": _("Package weight (g)"),
+        "type": Property.TYPES.INT,
+        "payload_field": "weight",
+    },
 ]

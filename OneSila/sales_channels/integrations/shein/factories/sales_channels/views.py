@@ -1,10 +1,14 @@
 """Factories handling Shein storefront metadata."""
 
+from typing import Any, Optional
+
 from sales_channels.factories.mixins import PullRemoteInstanceMixin
+from currencies.models import Currency
 
 from sales_channels.integrations.shein.factories.mixins import SheinSiteListMixin
 from sales_channels.integrations.shein.models import (
     SheinSalesChannelView,
+    SheinRemoteCurrency,
 )
 
 
@@ -19,6 +23,8 @@ class SheinSalesChannelViewPullFactory(SheinSiteListMixin, PullRemoteInstanceMix
         "store_type": "store_type",
         "url": "url",
         "is_default": "is_default",
+        "merchant_location_key": "merchant_location_key",
+        "merchant_location_choices": "merchant_location_choices",
     }
     update_field_mapping = field_mapping
     get_or_create_fields = ["remote_id"]
@@ -39,6 +45,8 @@ class SheinSalesChannelViewPullFactory(SheinSiteListMixin, PullRemoteInstanceMix
 
     def fetch_remote_instances(self):
         records = self.fetch_site_records()
+        self._sync_currencies(records=records)
+        warehouse_key, warehouse_choices = self._sync_warehouses()
         channel_domain = self.get_channel_domain()
 
         remote_instances: list[dict] = []
@@ -75,6 +83,8 @@ class SheinSalesChannelViewPullFactory(SheinSiteListMixin, PullRemoteInstanceMix
                         "symbol_left": sub_site.get("symbol_left"),
                         "symbol_right": sub_site.get("symbol_right"),
                         "is_default": False,
+                        "merchant_location_key": warehouse_key,
+                        "merchant_location_choices": warehouse_choices,
                     }
                 )
 
@@ -98,6 +108,81 @@ class SheinSalesChannelViewPullFactory(SheinSiteListMixin, PullRemoteInstanceMix
 
         self.remote_instances = remote_instances
 
+    # ------------------------------------------------------------------
+    # Currency handling
+    # ------------------------------------------------------------------
+    def _sync_currencies(self, *, records):
+        if not isinstance(records, list):
+            return
+
+        for marketplace in records:
+            sub_sites = marketplace.get("sub_site_list") if isinstance(marketplace, dict) else []
+            if not isinstance(sub_sites, list):
+                continue
+
+            for sub_site in sub_sites:
+                if not isinstance(sub_site, dict):
+                    continue
+                remote_code = (sub_site.get("currency") or "").strip()
+                if not remote_code:
+                    continue
+
+                local_currency = Currency.objects.filter(
+                    iso_code=remote_code,
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
+                ).first()
+
+                defaults = {
+                    "local_instance": local_currency,
+                    "symbol_left": sub_site.get("symbol_left") or "",
+                    "symbol_right": sub_site.get("symbol_right") or "",
+                }
+
+                SheinRemoteCurrency._base_manager.update_or_create(
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    remote_code=remote_code,
+                    defaults=defaults,
+                )
+
+    def _sync_warehouses(self) -> tuple[Optional[str], list[dict[str, Any]]]:
+        selected_key: Optional[str] = None
+        choices: list[dict[str, Any]] = []
+
+        try:
+            response = self.shein_post(path="/open-api/msc/warehouse/list", payload={})
+            data = response.json() if hasattr(response, "json") else {}
+            info = data.get("info") if isinstance(data, dict) else {}
+            warehouses = info.get("list") if isinstance(info, dict) else []
+        except Exception:
+            warehouses = []
+
+        if isinstance(warehouses, list):
+            for entry in warehouses:
+                if not isinstance(entry, dict):
+                    continue
+                code = (entry.get("warehouseCode") or "").strip()
+                if not code:
+                    continue
+                cleaned = {
+                    "warehouseCode": code,
+                    "warehouseName": entry.get("warehouseName"),
+                    "saleCountryList": entry.get("saleCountryList") or [],
+                    "createType": entry.get("createType"),
+                    "warehouseType": entry.get("warehouseType"),
+                    "authServiceCode": entry.get("authServiceCode"),
+                    "authServiceName": entry.get("authServiceName"),
+                }
+                choices.append(cleaned)
+                if selected_key is None:
+                    selected_key = code
+
+        return selected_key, choices
+
     def create_remote_instance_mirror(self, remote_data, remote_instance_mirror):
         super().create_remote_instance_mirror(remote_data, remote_instance_mirror)
+        remote_instance_mirror.raw_data = remote_data or {}
         remote_instance_mirror.save()
+
+    def add_fields_to_remote_instance_mirror(self, remote_data, remote_instance_mirror):
+        remote_instance_mirror.raw_data = remote_data or {}

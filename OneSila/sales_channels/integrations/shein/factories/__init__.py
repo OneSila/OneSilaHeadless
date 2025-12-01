@@ -17,6 +17,7 @@ from .products import (
     SheinMediaProductThroughDeleteFactory,
     SheinProductCreateFactory,
     SheinProductUpdateFactory,
+    SheinProductDeleteFactory,
 )
 
 __all__ = [
@@ -35,4 +36,5 @@ __all__ = [
     "SheinMediaProductThroughDeleteFactory",
     "SheinProductCreateFactory",
     "SheinProductUpdateFactory",
+    "SheinProductDeleteFactory",
 ]

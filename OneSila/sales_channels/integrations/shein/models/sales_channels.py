@@ -117,6 +117,17 @@ class SheinSalesChannelView(SalesChannelView):
         default=False,
         help_text="Marks the default storefront for this Shein sales channel.",
     )
+    merchant_location_key = models.CharField(
+        max_length=128,
+        null=True,
+        blank=True,
+        help_text="Selected warehouse code for this storefront.",
+    )
+    merchant_location_choices = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Available warehouse codes returned by Shein.",
+    )
 
     class Meta:
         verbose_name = "Shein Sales Channel View"

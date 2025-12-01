@@ -12,6 +12,7 @@ from sales_channels.factories.properties.properties import (
     RemoteProductPropertyUpdateFactory,
 )
 from sales_channels.models.properties import RemoteProductProperty
+from sales_channels.integrations.shein.factories.mixins import SheinSignatureMixin
 
 from sales_channels.integrations.shein.models import (
     SheinProductTypeItem,
@@ -55,7 +56,7 @@ class SheinRemotePropertySelectValueEnsureFactory:
         )
 
 
-class SheinProductPropertyValueMixin:
+class SheinProductPropertyValueMixin(SheinSignatureMixin):
     """Shared helpers to render Shein-ready attribute payloads."""
 
     remote_property_factory = SheinRemotePropertyEnsureFactory
@@ -130,6 +131,79 @@ class SheinProductPropertyValueMixin:
 
         return value
 
+    def _prepare_translation_payload(self, *, value) -> list[dict[str, str]]:
+        translations = getattr(value, "propertyselectvaluetranslation_set", None)
+        entries: list[dict[str, str]] = []
+        if translations:
+            for t in translations.all():
+                if not t.value:
+                    continue
+                entries.append(
+                    {
+                        "language": t.language,
+                        "attribute_value_name_multi": t.value,
+                    }
+                )
+        return entries
+
+    def _create_remote_custom_value(
+        self,
+        *,
+        product_type_item: SheinProductTypeItem,
+        shein_property: SheinProperty,
+        value,
+        language_code: Optional[str],
+    ) -> Optional[SheinPropertySelectValue]:
+        category_id = getattr(product_type_item.product_type, "category_id", None)
+        attribute_id = self._normalize_identifier(value=shein_property.remote_id)
+        translated_value = value.value_by_language_code(language=language_code) or value.value
+        if not translated_value or attribute_id is None or not category_id:
+            return None
+
+        payload: dict[str, Any] = {
+            "attribute_id": attribute_id,
+            "attribute_value": translated_value,
+            "category_id": category_id,
+        }
+        translation_payload = self._prepare_translation_payload(value=value)
+        if translation_payload:
+            payload["attribute_value_name_multis"] = translation_payload
+
+        try:
+            response = self.shein_post(
+                path="/open-api/goods/add-custom-attribute-value",
+                payload=payload,
+            )
+            data = response.json() if hasattr(response, "json") else {}
+            info = data.get("info") if isinstance(data, dict) else {}
+            remote_id = info.get("attribute_value_id") if isinstance(info, dict) else None
+        except Exception:
+            remote_id = None
+
+        normalized_id = self._normalize_identifier(value=remote_id)
+        if normalized_id is None:
+            return None
+
+        defaults = {
+            "value": translated_value,
+            "value_en": translated_value,
+            "is_custom_value": True,
+            "is_visible": True,
+            "raw_data": info if isinstance(info, dict) else {},
+        }
+        shein_value, _ = SheinPropertySelectValue.objects.update_or_create(
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_property=shein_property,
+            remote_id=normalized_id,
+            defaults=defaults,
+        )
+        if value:
+            shein_value.local_instance = value
+            shein_value.save(update_fields=["local_instance"])
+
+        return shein_value
+
     def _collect_select_payload(
         self,
         *,
@@ -137,6 +211,7 @@ class SheinProductPropertyValueMixin:
         shein_property: SheinProperty,
         allow_custom_values: bool,
         language_code: Optional[str],
+        product_type_item: SheinProductTypeItem,
     ) -> tuple[list[Any], list[str]]:
         if product_property.property.type == Property.TYPES.MULTISELECT:
             local_values: Iterable = product_property.value_multi_select.all()
@@ -168,6 +243,19 @@ class SheinProductPropertyValueMixin:
                 raise RemotePropertyValueNotMapped(
                     f"Value '{local_label}' for Shein property '{prop_label}' is not mapped and custom values are not allowed."
                 )
+
+            if self.create_remote_custom_values:
+                remote_val = self._create_remote_custom_value(
+                    product_type_item=product_type_item,
+                    shein_property=shein_property,
+                    value=value,
+                    language_code=language_code,
+                )
+                if remote_val:
+                    normalized = self._normalize_identifier(value=remote_val.remote_id)
+                    if normalized is not None:
+                        remote_ids.append(normalized)
+                    continue
 
             translated_value = value.value_by_language_code(language=language_code) or value.value
             if translated_value not in (None, ""):
@@ -227,6 +315,7 @@ class SheinProductPropertyValueMixin:
                 shein_property=shein_property,
                 allow_custom_values=allow_custom_values,
                 language_code=language_code,
+                product_type_item=product_type_item,
             )
 
             if product_property.property.type == Property.TYPES.SELECT:
@@ -287,6 +376,7 @@ class SheinProductPropertyCreateFactory(
     ):
         self.product_type_item = product_type_item
         self.remote_property = getattr(product_type_item, "property", None)
+        self.create_remote_custom_values = False
         super().__init__(
             sales_channel,
             local_instance,
@@ -339,6 +429,7 @@ class SheinProductPropertyUpdateFactory(
         language=None,
     ):
         self.product_type_item = product_type_item
+        self.create_remote_custom_values = True
         super().__init__(
             sales_channel,
             local_instance,

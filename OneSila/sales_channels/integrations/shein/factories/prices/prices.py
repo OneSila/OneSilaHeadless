@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from sales_channels.factories.prices.prices import RemotePriceUpdateFactory
+from sales_channels.integrations.shein.factories.mixins import SheinSignatureMixin
+from sales_channels.models import SalesChannelViewAssign
 from sales_channels.integrations.shein.models.sales_channels import SheinRemoteCurrency
 from sales_channels.models.products import RemotePrice
 
 
-class SheinPriceUpdateFactory(RemotePriceUpdateFactory):
+class SheinPriceUpdateFactory(SheinSignatureMixin, RemotePriceUpdateFactory):
     """Compute Shein price payloads with optional value-only mode."""
 
     remote_model_class = RemotePrice
@@ -25,6 +27,7 @@ class SheinPriceUpdateFactory(RemotePriceUpdateFactory):
     ) -> None:
         self.get_value_only = get_value_only
         self.value: Optional[Dict[str, Any]] = None
+        self.price_payload: List[Dict[str, Any]] = []
         super().__init__(
             sales_channel=sales_channel,
             local_instance=local_instance,
@@ -87,14 +90,52 @@ class SheinPriceUpdateFactory(RemotePriceUpdateFactory):
 
         return price_info_list
 
+    def _build_product_price_payload(self) -> List[Dict[str, Any]]:
+        assigns = SalesChannelViewAssign.objects.filter(
+            sales_channel=self.sales_channel,
+            product=self.local_instance,
+        ).select_related("sales_channel_view")
+
+        product_code = getattr(self.remote_product, "remote_id", None) or self.remote_product.remote_sku
+        payload: List[Dict[str, Any]] = []
+
+        for site_entry in assigns:
+            site_code = getattr(site_entry.sales_channel_view, "remote_id", None)
+            if not site_code:
+                continue
+
+            for currency_code, values in self.price_data.items():
+                base_price = values.get("price")
+                if base_price is None:
+                    continue
+                entry: Dict[str, Any] = {
+                    "currencyCode": currency_code,
+                    "productCode": product_code,
+                    "site": site_code,
+                    "shopPrice": base_price,
+                    "specialPrice": values.get("discount_price"),
+                    "riseReason": None,
+                }
+                payload.append(entry)
+
+        return payload
+
     def update_remote(self):
         price_info_list = self._build_price_info_list()
+        self.price_payload = self._build_product_price_payload()
 
         if self.get_value_only:
             self.value = {"price_info_list": price_info_list}
             return self.value
 
-        return price_info_list
+        if not self.price_payload:
+            return {}
+
+        response = self.shein_post(
+            path="/open-api/openapi-business-backend/product/price/save",
+            payload={"productPriceList": self.price_payload},
+        )
+        return response.json() if hasattr(response, "json") else {}
 
     def serialize_response(self, response):
         return response or {}

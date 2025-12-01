@@ -8,10 +8,11 @@ from sales_channels.factories.products.images import (
     RemoteMediaProductThroughDeleteFactory,
     RemoteMediaProductThroughUpdateFactory,
 )
+from sales_channels.integrations.shein.factories.mixins import SheinSignatureMixin
 from sales_channels.models.products import RemoteImageProductAssociation
 
 
-class SheinMediaProductThroughBase:
+class SheinMediaProductThroughBase(SheinSignatureMixin):
     """Build Shein-ready image payloads for product assignments."""
 
     remote_model_class = RemoteImageProductAssociation
@@ -24,6 +25,7 @@ class SheinMediaProductThroughBase:
     ) -> None:
         self.get_value_only = get_value_only
         self.value: Optional[Dict[str, Any]] = None
+        self._transformed_cache: dict[str, str] = {}
         super().__init__(*args, **kwargs)
 
     # ------------------------------------------------------------------
@@ -62,6 +64,28 @@ class SheinMediaProductThroughBase:
                 return thumb
         return None
 
+    def _transform_image(self, *, url: str, image_type: int) -> Optional[str]:
+        if not url:
+            return None
+        cached = self._transformed_cache.get(url)
+        if cached:
+            return cached
+
+        try:
+            response = self.shein_post(
+                path="/open-api/goods/transform-pic",
+                payload={"image_type": image_type, "original_url": url},
+            )
+            data = response.json() if hasattr(response, "json") else {}
+            info = data.get("info") if isinstance(data, dict) else {}
+            transformed = info.get("transformed") if isinstance(info, dict) else None
+        except Exception:
+            transformed = None
+
+        final_url = transformed or url
+        self._transformed_cache[url] = final_url
+        return final_url
+
     def _build_image_entries(self) -> List[Dict[str, Any]]:
         entries: List[Dict[str, Any]] = []
         for idx, through in enumerate(self._collect_image_throughs(), start=1):
@@ -71,11 +95,15 @@ class SheinMediaProductThroughBase:
 
             image_type = 1 if through.is_main_image else 2
 
+            transformed_url = self._transform_image(url=image_url, image_type=image_type)
+            if not transformed_url:
+                continue
+
             entries.append(
                 {
                     "image_sort": through.sales_channels_sort_order if hasattr(through, "sales_channels_sort_order") else idx,
                     "image_type": image_type,
-                    "image_url": image_url,
+                    "image_url": transformed_url,
                 }
             )
 

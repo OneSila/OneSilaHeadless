@@ -63,14 +63,22 @@ class SheinMediaProductThroughFactoryTest(TestCase):
         self._make_image("https://example.com/main.jpg", sort=0, is_main=True)
         self._make_image("https://example.com/detail.jpg", sort=1, is_main=False)
 
-        factory = SheinMediaProductThroughCreateFactory(
-            sales_channel=self.sales_channel,
-            local_instance=MediaProductThrough.objects.first(),
-            remote_product=self.remote_product,
-            get_value_only=True,
-            skip_checks=True,
-        )
-        factory.run()
+        with patch.object(
+            SheinMediaProductThroughCreateFactory,
+            "shein_post",
+            autospec=True,
+        ) as mock_transform:
+            mock_transform.return_value.json.return_value = {
+                "info": {"transformed": "https://shein.example/main.jpg"}
+            }
+            factory = SheinMediaProductThroughCreateFactory(
+                sales_channel=self.sales_channel,
+                local_instance=MediaProductThrough.objects.first(),
+                remote_product=self.remote_product,
+                get_value_only=True,
+                skip_checks=True,
+            )
+            factory.run()
 
         assoc = RemoteImageProductAssociation.objects.get(
             remote_product=self.remote_product,
@@ -81,7 +89,7 @@ class SheinMediaProductThroughFactoryTest(TestCase):
         self.assertEqual(len(payload["image_info"]["image_info_list"]), 2)
         first = payload["image_info"]["image_info_list"][0]
         self.assertEqual(first["image_type"], 1)
-        self.assertEqual(first["image_url"], "https://example.com/main.jpg")
+        self.assertEqual(first["image_url"], "https://shein.example/main.jpg")
         self.assertEqual(first["image_sort"], 1)
 
         self.assertEqual(assoc.local_instance.product, self.product)
@@ -102,9 +110,17 @@ class SheinMediaProductThroughFactoryTest(TestCase):
             get_value_only=True,
             skip_checks=True,
         )
-        factory.run()
+        with patch.object(
+            SheinMediaProductThroughUpdateFactory,
+            "shein_post",
+            autospec=True,
+        ) as mock_transform:
+            mock_transform.return_value.json.return_value = {
+                "info": {"transformed": "https://shein.example/main.jpg"}
+            }
+            factory.run()
 
-        self.assertEqual(factory.value["image_info"]["image_info_list"][0]["image_url"], "https://example.com/main.jpg")
+        self.assertEqual(factory.value["image_info"]["image_info_list"][0]["image_url"], "https://shein.example/main.jpg")
 
     def test_delete_factory_returns_payload(self):
         through = self._make_image("https://example.com/main.jpg", sort=0, is_main=True)
