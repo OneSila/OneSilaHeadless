@@ -188,7 +188,6 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
     # Internal helpers
     # ------------------------------------------------------------------
     def _prepare_import_progress(self, *, nodes: list[dict[str, Any]]) -> None:
-        print('----------------------------------------------------- PREPARE TOTAL')
         if not self.import_process:
             return
 
@@ -198,8 +197,6 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
 
         self._import_total_nodes = total
         self._import_processed_nodes = 0
-        print('--------------------------------------------------- TOTAL')
-        print(total)
         self._import_last_percentage = getattr(self.import_process, "percentage", 0) or 0
         self.import_process.total_records = total
         self.import_process.save()
@@ -223,13 +220,8 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         new_percentage = math.floor(
             (self._import_processed_nodes / self._import_total_nodes) * 100
         )
-        print('---------------------------------------- _increment_import_progress')
         if new_percentage <= self._import_last_percentage:
             return
-
-        print('--------------------------------------------------- PROCCESSED NUMBER')
-        print(self._import_processed_nodes)
-        print(new_percentage)
 
         self._import_last_percentage = new_percentage
         self.import_process.processed_records = self._import_processed_nodes
@@ -331,9 +323,6 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             return
 
         fill_in_records = info.get("fill_in_standard_list")
-        print('------------------------------------------- FILL IN RECORDS')
-        print(fill_in_records)
-
         field_flags = {attr: False for attr in PUBLISH_FIELD_FLAG_MAP.values()}
         module_flags = {attr: False for attr in PUBLISH_MODULE_FLAG_MAP.values()}
 
@@ -572,8 +561,6 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             return []
 
         normalized_remote_id = str(product_type_id)
-        print('------------------------------------------------ ATTRIBUTE TEMPLATE')
-        print(records)
         for record in records:
             if not isinstance(record, dict):
                 continue
@@ -652,9 +639,6 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
 
         normalized_category = self._normalize_identifier(category_id)
         permissions: dict[str, bool] = {}
-        print('---------------------------------------------- CUSTOM ATTRIBUTE PERMISSIONS')
-        print(records)
-
         for record in records:
             if not isinstance(record, dict):
                 continue
@@ -709,7 +693,6 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             "raw_data": raw_attribute,
         }
 
-        print('------------------------------------------------------------------ ABOUT TO CREATE SHEIN PROPERTY ')
         property_obj, _ = SheinProperty.objects.update_or_create(
             multi_tenant_company=self.sales_channel.multi_tenant_company,
             sales_channel=self.sales_channel,

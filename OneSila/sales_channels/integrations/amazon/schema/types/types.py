@@ -266,6 +266,12 @@ class AmazonSalesChannelViewType(relay.Node, GetQuerysetMultiTenantMixin):
     def active(self, info) -> bool:
         return self.sales_channel.active
 
+    @field()
+    def proxy_id(self, info) -> str:
+        from sales_channels.schema.types.types import SalesChannelViewType
+
+        return to_base64(SalesChannelViewType, self.pk)
+
 
 @type(
     AmazonProduct,
