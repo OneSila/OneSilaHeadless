@@ -4,6 +4,7 @@ from .mixins import SheinSignatureMixin
 from .sales_channels import SheinCategorySuggestionFactory
 from .sales_channels.oauth import GetSheinRedirectUrlFactory, ValidateSheinAuthFactory
 from .imports import SheinSchemaImportProcessor
+from .sync import SheinSalesChannelMappingSyncFactory
 
 __all__ = [
     "SheinSignatureMixin",
@@ -11,4 +12,5 @@ __all__ = [
     "SheinCategorySuggestionFactory",
     "ValidateSheinAuthFactory",
     "SheinSchemaImportProcessor",
+    "SheinSalesChannelMappingSyncFactory",
 ]

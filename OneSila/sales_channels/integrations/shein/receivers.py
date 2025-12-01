@@ -16,9 +16,7 @@ def sales_channels__shein__handle_pull(sender, instance, **kwargs):
     if not isinstance(real_instance, SheinSalesChannel):
         return
 
-    from sales_channels.integrations.shein.factories.sales_channels import (
-        SheinMarketplacePullFactory,
-    )
+    from sales_channels.integrations.shein.factories.sales_channels import  SheinSalesChannelViewPullFactory
 
-    SheinMarketplacePullFactory(sales_channel=instance).run()
+    SheinSalesChannelViewPullFactory(sales_channel=instance).run()
     ensure_internal_properties_flow(real_instance)

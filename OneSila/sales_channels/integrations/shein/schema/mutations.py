@@ -37,6 +37,7 @@ from sales_channels.integrations.shein.schema.types.types import (
     SheinProductTypeType,
     SheinRemoteCurrencyType,
     SheinRedirectUrlType,
+    SheinSalesChannelMappingSyncPayload,
     SheinSalesChannelImportType,
     SheinSalesChannelType,
     SheinSalesChannelViewType,
@@ -73,6 +74,37 @@ class SheinSalesChannelMutation:
     update_shein_import_process: SheinSalesChannelImportType = update(
         SheinSalesChannelImportPartialInput,
     )
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def sync_shein_sales_channel_mappings(
+        self,
+        source_sales_channel: SheinSalesChannelPartialInput,
+        target_sales_channel: SheinSalesChannelPartialInput,
+        info: Info,
+    ) -> SheinSalesChannelMappingSyncPayload:
+        """Enqueue mapping sync between two Shein sales channels."""
+        from sales_channels.integrations.shein.models import SheinSalesChannel
+        from sales_channels.integrations.shein.tasks import (
+            shein_sync_sales_channel_mappings_task,
+        )
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        source = SheinSalesChannel.objects.get(
+            id=source_sales_channel.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+        target = SheinSalesChannel.objects.get(
+            id=target_sales_channel.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        shein_sync_sales_channel_mappings_task(
+            source_sales_channel_id=source.id,
+            target_sales_channel_id=target.id,
+        )
+
+        return SheinSalesChannelMappingSyncPayload(success=True)
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def get_shein_redirect_url(
