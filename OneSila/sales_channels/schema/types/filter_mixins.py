@@ -50,3 +50,34 @@ class GeneralMappedLocallyFilterMixin(AnnotationMergerMixin):
         if value not in (None, UNSET):
             queryset = queryset.filter_mapped_locally(value)
         return queryset, Q()
+
+
+class DependentUsedInProductsFilterMixin(AnnotationMergerMixin):
+    used_in_products: Optional[bool]
+
+    def get_used_in_products_querysets(self) -> Iterable[tuple[type[QuerySet], str]]:
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement get_used_in_products_querysets()",
+        )
+
+    @custom_filter
+    def used_in_products(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
+        if value not in (None, UNSET):
+            for queryset_class, method_name in self.get_used_in_products_querysets():
+                if isinstance(queryset, queryset_class):
+                    queryset = getattr(queryset, method_name)(value)
+                    break
+            else:
+                raise Exception(f"Unexpected queryset class: {type(queryset)}")
+
+        return queryset, Q()
+
+
+class GeneralUsedInProductsFilterMixin(AnnotationMergerMixin):
+    used_in_products: Optional[bool]
+
+    @custom_filter
+    def used_in_products(self, queryset, value: bool, prefix: str) -> tuple[QuerySet, Q]:
+        if value not in (None, UNSET):
+            queryset = queryset.used_in_products(value)
+        return queryset, Q()

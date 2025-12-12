@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Subquery, OuterRef, Value, CharField
+from django.db.models import Subquery, OuterRef, Value, CharField, Exists
 from django.db.models.functions import Coalesce
 from django.utils.text import slugify
 from django.conf import settings
@@ -11,6 +11,23 @@ from .helpers import generate_unique_internal_name, _is_code_like, _norm_code, _
 
 
 class PropertyQuerySet(MultiTenantQuerySet):
+    def with_product_usage(self, *, multi_tenant_company_id: int):
+        from .models import ProductProperty
+
+        usage_qs = ProductProperty._base_manager.filter(
+            multi_tenant_company_id=multi_tenant_company_id,
+            property_id=OuterRef("pk"),
+        ).only("pk")
+
+        return self.annotate(has_usage=Exists(usage_qs))
+
+    def used_in_products(self, *, multi_tenant_company_id: int, used: bool):
+        return (
+            self.filter(multi_tenant_company_id=multi_tenant_company_id)
+            .with_product_usage(multi_tenant_company_id=multi_tenant_company_id)
+            .filter(has_usage=used)
+        )
+
     def is_public_information(self):
         return self.filter(is_public_information=True)
 
@@ -121,6 +138,12 @@ class PropertyManager(MultiTenantManager):
     def get_queryset(self):
         return PropertyQuerySet(self.model, using=self._db)
 
+    def used_in_products(self, *, multi_tenant_company_id: int, used: bool):
+        return self.get_queryset().used_in_products(
+            multi_tenant_company_id=multi_tenant_company_id,
+            used=used,
+        )
+
     def is_public_information(self):
         return self.get_queryset().is_public_information()
 
@@ -166,6 +189,39 @@ class PropertyManager(MultiTenantManager):
 
 
 class PropertySelectValueQuerySet(MultiTenantQuerySet):
+    def with_product_usage(self, *, multi_tenant_company_id: int):
+        from .models import ProductProperty
+
+        usage_select_qs = ProductProperty._base_manager.filter(
+            multi_tenant_company_id=multi_tenant_company_id,
+            value_select_id=OuterRef("pk"),
+        ).only("pk")
+
+        exists_expr = Exists(usage_select_qs)
+
+        m2m_field = ProductProperty._meta.get_field("value_multi_select")
+        through = m2m_field.remote_field.through
+        src_fk_name = m2m_field.m2m_field_name()
+        tgt_fk_name = m2m_field.m2m_reverse_field_name()
+
+        usage_multi_qs = through._base_manager.filter(
+            **{
+                f"{src_fk_name}__multi_tenant_company_id": multi_tenant_company_id,
+                f"{tgt_fk_name}_id": OuterRef("pk"),
+            }
+        ).only("pk")
+
+        exists_expr = exists_expr | Exists(usage_multi_qs)
+
+        return self.annotate(has_usage=exists_expr)
+
+    def used_in_products(self, *, multi_tenant_company_id: int, used: bool):
+        return (
+            self.filter(multi_tenant_company_id=multi_tenant_company_id)
+            .with_product_usage(multi_tenant_company_id=multi_tenant_company_id)
+            .filter(has_usage=used)
+        )
+
     def delete(self, *args, **kwargs):
         if self.filter(property__is_product_type=True).exists():
             raise ValidationError(
@@ -310,6 +366,12 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
 class PropertySelectValueManager(MultiTenantManager):
     def get_queryset(self):
         return PropertySelectValueQuerySet(self.model, using=self._db)
+
+    def used_in_products(self, *, multi_tenant_company_id: int, used: bool):
+        return self.get_queryset().used_in_products(
+            multi_tenant_company_id=multi_tenant_company_id,
+            used=used,
+        )
 
     def check_for_duplicates(self, value, property_instance, multi_tenant_company, threshold=0.8):
         qs = self.filter(

@@ -2,15 +2,71 @@ from django.conf import settings
 from time import perf_counter
 
 from core.tests import TestCase
+from model_bakery import baker
+from core.models import MultiTenantCompany
+from products.models import Product
 from properties.models import (
     Property,
     PropertyTranslation,
     PropertySelectValue,
     PropertySelectValueTranslation,
+    ProductProperty,
 )
 
 
 class PropertyQuerySetTest(TestCase):
+    def test_used_in_products(self):
+        prop_used = Property.objects.create(
+            type=Property.TYPES.BOOLEAN,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        prop_unused = Property.objects.create(
+            type=Property.TYPES.BOOLEAN,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        product = Product.objects.create(
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=product,
+            property=prop_used,
+            value_boolean=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        other_mtc = baker.make(MultiTenantCompany)
+        other_prop_used = Property.objects.create(
+            type=Property.TYPES.BOOLEAN,
+            multi_tenant_company=other_mtc,
+        )
+        other_product = Product.objects.create(
+            type=Product.SIMPLE,
+            multi_tenant_company=other_mtc,
+        )
+        ProductProperty.objects.create(
+            product=other_product,
+            property=other_prop_used,
+            value_boolean=True,
+            multi_tenant_company=other_mtc,
+        )
+
+        qs_used = Property.objects.used_in_products(
+            multi_tenant_company_id=self.multi_tenant_company.id,
+            used=True,
+        )
+        self.assertIn(prop_used, qs_used)
+        self.assertNotIn(prop_unused, qs_used)
+        self.assertNotIn(other_prop_used, qs_used)
+
+        qs_unused = Property.objects.used_in_products(
+            multi_tenant_company_id=self.multi_tenant_company.id,
+            used=False,
+        )
+        self.assertIn(prop_unused, qs_unused)
+        self.assertNotIn(prop_used, qs_unused)
+
     def test_with_translated_name_single_query(self):
         props = []
         for i in range(2):
@@ -64,6 +120,89 @@ class PropertyQuerySetTest(TestCase):
 
 
 class PropertySelectValueQuerySetTest(TestCase):
+    def test_used_in_products(self):
+        prop_select = Property.objects.create(
+            type=Property.TYPES.SELECT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        select_used = PropertySelectValue.objects.create(
+            property=prop_select,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        select_unused = PropertySelectValue.objects.create(
+            property=prop_select,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        prop_multi = Property.objects.create(
+            type=Property.TYPES.MULTISELECT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        multi_used = PropertySelectValue.objects.create(
+            property=prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        multi_unused = PropertySelectValue.objects.create(
+            property=prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        product = Product.objects.create(
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=product,
+            property=prop_select,
+            value_select=select_used,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        pp_multi = ProductProperty.objects.create(
+            product=product,
+            property=prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        pp_multi.value_multi_select.add(multi_used)
+
+        other_mtc = baker.make(MultiTenantCompany)
+        other_prop = Property.objects.create(
+            type=Property.TYPES.SELECT,
+            multi_tenant_company=other_mtc,
+        )
+        other_value_used = PropertySelectValue.objects.create(
+            property=other_prop,
+            multi_tenant_company=other_mtc,
+        )
+        other_product = Product.objects.create(
+            type=Product.SIMPLE,
+            multi_tenant_company=other_mtc,
+        )
+        ProductProperty.objects.create(
+            product=other_product,
+            property=other_prop,
+            value_select=other_value_used,
+            multi_tenant_company=other_mtc,
+        )
+
+        qs_used = PropertySelectValue.objects.used_in_products(
+            multi_tenant_company_id=self.multi_tenant_company.id,
+            used=True,
+        )
+        self.assertIn(select_used, qs_used)
+        self.assertIn(multi_used, qs_used)
+        self.assertNotIn(select_unused, qs_used)
+        self.assertNotIn(multi_unused, qs_used)
+        self.assertNotIn(other_value_used, qs_used)
+
+        qs_unused = PropertySelectValue.objects.used_in_products(
+            multi_tenant_company_id=self.multi_tenant_company.id,
+            used=False,
+        )
+        self.assertIn(select_unused, qs_unused)
+        self.assertIn(multi_unused, qs_unused)
+        self.assertNotIn(select_used, qs_unused)
+        self.assertNotIn(multi_used, qs_unused)
+
     def test_with_translated_value_single_query(self):
         prop = Property.objects.create(
             type=Property.TYPES.SELECT,

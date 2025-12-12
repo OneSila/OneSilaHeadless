@@ -26,7 +26,7 @@ from sales_channels.integrations.shein.models import (
     SheinSalesChannelImport,
 )
 from sales_channels.schema.types.filter_mixins import GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin, \
-    DependentMappedLocallyFilterMixin
+    DependentMappedLocallyFilterMixin, DependentUsedInProductsFilterMixin, GeneralUsedInProductsFilterMixin
 from sales_channels.schema.types.filters import SalesChannelFilter
 from properties.schema.types.filters import (
     ProductPropertiesRuleFilter,
@@ -77,7 +77,12 @@ class SheinRemoteCurrencyFilter(SearchFilterMixin):
 
 
 @filter(SheinProperty)
-class SheinPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
+class SheinPropertyFilter(
+    SearchFilterMixin,
+    DependentMappedLocallyFilterMixin,
+    DependentUsedInProductsFilterMixin,
+    GeneralMappedRemotelyFilterMixin,
+):
     """Filter Shein attribute definitions."""
 
     id: auto
@@ -93,9 +98,20 @@ class SheinPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin, 
             (SheinPropertySelectValueQuerySet, "filter_shein_property_mapped_locally"),
         )
 
+    def get_used_in_products_querysets(self):
+        return (
+            (SheinPropertyQuerySet, "used_in_products"),
+            (SheinPropertySelectValueQuerySet, "filter_shein_property_used_in_products"),
+        )
+
 
 @filter(SheinPropertySelectValue)
-class SheinPropertySelectValueFilter(SearchFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
+class SheinPropertySelectValueFilter(
+    SearchFilterMixin,
+    GeneralUsedInProductsFilterMixin,
+    GeneralMappedLocallyFilterMixin,
+    GeneralMappedRemotelyFilterMixin,
+):
     """Filter Shein enumeration values for an attribute."""
 
     id: auto

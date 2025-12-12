@@ -38,6 +38,8 @@ from sales_channels.schema.types.filter_mixins import (
     DependentMappedLocallyFilterMixin,
     GeneralMappedLocallyFilterMixin,
     GeneralMappedRemotelyFilterMixin,
+    DependentUsedInProductsFilterMixin,
+    GeneralUsedInProductsFilterMixin,
 )
 from sales_channels.schema.types.filters import (
     SalesChannelFilter,
@@ -63,7 +65,12 @@ class AmazonSalesChannelViewFilter(SearchFilterMixin):
 
 
 @filter(AmazonProperty)
-class AmazonPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
+class AmazonPropertyFilter(
+    SearchFilterMixin,
+    DependentMappedLocallyFilterMixin,
+    DependentUsedInProductsFilterMixin,
+    GeneralMappedRemotelyFilterMixin,
+):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
@@ -76,9 +83,20 @@ class AmazonPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin,
             (AmazonPropertySelectValueQuerySet, "filter_amazon_property_mapped_locally"),
         )
 
+    def get_used_in_products_querysets(self):
+        return (
+            (AmazonPropertyQuerySet, "used_in_products"),
+            (AmazonPropertySelectValueQuerySet, "filter_amazon_property_used_in_products"),
+        )
+
 
 @filter(AmazonPropertySelectValue)
-class AmazonPropertySelectValueFilter(SearchFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
+class AmazonPropertySelectValueFilter(
+    SearchFilterMixin,
+    GeneralUsedInProductsFilterMixin,
+    GeneralMappedLocallyFilterMixin,
+    GeneralMappedRemotelyFilterMixin,
+):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     amazon_property: Optional[AmazonPropertyFilter]

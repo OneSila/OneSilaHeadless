@@ -5,18 +5,40 @@ from django.db.models import Manager as DjangoManager
 from django.db.models import QuerySet as DjangoQuerySet
 from polymorphic.managers import PolymorphicManager, PolymorphicQuerySet
 
-from sales_channels.managers import _MappingManagerMixin, _MappingQuerySetMixin
+from sales_channels.managers import (
+    _MappingManagerMixin,
+    _MappingQuerySetMixin,
+    _RemotePropertyUsedInProductsQuerySetMixin,
+    _RemoteSelectValueUsedInProductsQuerySetMixin,
+)
 
 
-class EbayPropertyQuerySet(_MappingQuerySetMixin, PolymorphicQuerySet, MultiTenantQuerySet):
+class EbayPropertyQuerySet(
+    _RemotePropertyUsedInProductsQuerySetMixin,
+    _MappingQuerySetMixin,
+    PolymorphicQuerySet,
+    MultiTenantQuerySet,
+):
     mapped_field = "remote_id"
+
+    def used_in_products(self, value: bool = True):
+        from sales_channels.integrations.ebay.models import EbayProductProperty
+
+        return super().used_in_products(
+            remote_product_property_model=EbayProductProperty,
+            used=value,
+        )
 
 
 class EbayInternalPropertyQuerySet(_MappingQuerySetMixin, MultiTenantQuerySet):
     mapped_field = "remote_id"
 
 
-class EbayPropertySelectValueQuerySet(_MappingQuerySetMixin, MultiTenantQuerySet):
+class EbayPropertySelectValueQuerySet(
+    _RemoteSelectValueUsedInProductsQuerySetMixin,
+    _MappingQuerySetMixin,
+    MultiTenantQuerySet,
+):
     mapped_field = "remote_id"
 
     def annotate_mapping(self):
@@ -31,6 +53,24 @@ class EbayPropertySelectValueQuerySet(_MappingQuerySetMixin, MultiTenantQuerySet
 
     def filter_ebay_property_mapped_locally(self, value: bool = True):
         return self.annotate_mapping().filter(ebay_property_mapped_locally=value)
+
+    def used_in_products(self, value: bool = True):
+        from sales_channels.integrations.ebay.models import EbayProductProperty
+
+        return super().used_in_products_by_remote_property(
+            remote_product_property_model=EbayProductProperty,
+            used=value,
+            related_remote_property_field="ebay_property",
+        )
+
+    def filter_ebay_property_used_in_products(self, value: bool = True):
+        from sales_channels.integrations.ebay.models import EbayProductProperty
+
+        return super().remote_property_used_in_products(
+            remote_product_property_model=EbayProductProperty,
+            related_remote_property_field="ebay_property",
+            used=value,
+        )
 
 
 class EbayProductTypeQuerySet(_MappingQuerySetMixin, MultiTenantQuerySet):
