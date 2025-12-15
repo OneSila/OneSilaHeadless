@@ -169,9 +169,31 @@ class AmazonRemoteLogFilter(SearchFilterMixin):
 @filter(AmazonProductIssue)
 class AmazonProductIssueFilter(SearchFilterMixin):
     id: auto
+    code: auto
+    severity: auto
     is_validation_issue: auto
+    is_suppressed: auto
+    enforcement_exemption_status: auto
     view: Optional[SalesChannelViewFilter]
     remote_product: Optional[RemoteProductFilter]
+
+    @custom_filter
+    def category(self, queryset, value: str, prefix: str) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+        return queryset.filter(categories__contains=[str(value)]), Q()
+
+    @custom_filter
+    def enforcement_action(self, queryset, value: str, prefix: str) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+        return queryset.filter(enforcement_actions__contains=[str(value)]), Q()
+
+    @custom_filter
+    def enforcement_attribute_name(self, queryset, value: str, prefix: str) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+        return queryset.filter(enforcement_attribute_names__contains=[str(value)]), Q()
 
 
 @filter(AmazonBrowseNode)

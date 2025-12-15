@@ -19,6 +19,12 @@ class AmazonProductIssue(models.Model):
     code = models.CharField(max_length=255, null=True, blank=True)
     message = models.TextField(null=True, blank=True)
     severity = models.CharField(max_length=255, null=True, blank=True)
+    categories = models.JSONField(default=list, blank=True)
+    enforcement_actions = models.JSONField(default=list, blank=True)
+    enforcement_exemption_status = models.CharField(max_length=32, null=True, blank=True)
+    enforcement_exemption_expiry_date = models.DateTimeField(null=True, blank=True)
+    enforcement_attribute_names = models.JSONField(default=list, blank=True)
+    is_suppressed = models.BooleanField(default=False, db_index=True)
     is_validation_issue = models.BooleanField(default=False)
     raw_data = models.JSONField(default=dict, blank=True)
 

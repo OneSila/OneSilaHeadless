@@ -34,8 +34,8 @@ ITEMS_MISSING_MANDATORY_INFORMATION_ERROR = 120
 VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR = 121
 DUPLICATE_VARIATIONS_ERROR = 123
 NON_CONFIGURABLE_RULE_ERROR = 124
-AMAZON_VALIDATION_ISSUES_ERROR = 125
-AMAZON_REMOTE_ISSUES_ERROR = 126
+AMAZON_VALIDATION_ISSUES_ERROR = 125 # deprecated (replaced by channel-specific issue dashboards)
+AMAZON_REMOTE_ISSUES_ERROR = 126 # deprecated (replaced by channel-specific issue dashboards)
 
 ERROR_TYPES = (
     (HAS_IMAGES_ERROR, _('Product is missing required images')),
@@ -54,8 +54,6 @@ ERROR_TYPES = (
     (VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR, _('Variations have inspectors missing mandatory information')),
     (DUPLICATE_VARIATIONS_ERROR, _('Configurable product has duplicate variations')),
     (NON_CONFIGURABLE_RULE_ERROR, _('Configurable product has no applicable configurator rules')),
-    (AMAZON_VALIDATION_ISSUES_ERROR, _('Product has amazon validation issues')),
-    (AMAZON_REMOTE_ISSUES_ERROR, _('Product on amazon has remote issues')),
 )
 
 
@@ -220,26 +218,6 @@ non_configurable_rule_block = {
     'supplier_product_applicability': NONE,
 }
 
-amazon_validation_issues_block = {
-    'error_code': AMAZON_VALIDATION_ISSUES_ERROR,
-    'simple_product_applicability': OPTIONAL,
-    'configurable_product_applicability': OPTIONAL,
-    'manufacturable_product_applicability': OPTIONAL,
-    'bundle_product_applicability': OPTIONAL,
-    'dropship_product_applicability': OPTIONAL,
-    'supplier_product_applicability': NONE,
-}
-
-amazon_remote_issues_block = {
-    'error_code': AMAZON_REMOTE_ISSUES_ERROR,
-    'simple_product_applicability': OPTIONAL,
-    'configurable_product_applicability': OPTIONAL,
-    'manufacturable_product_applicability': OPTIONAL,
-    'bundle_product_applicability': OPTIONAL,
-    'dropship_product_applicability': OPTIONAL,
-    'supplier_product_applicability': NONE,
-}
-
 
 blocks = [
     has_image_block,
@@ -258,6 +236,4 @@ blocks = [
     variations_missing_mandatory_information_block,
     duplicate_variations_block,
     non_configurable_rule_block,
-    amazon_validation_issues_block,
-    amazon_remote_issues_block
 ]
