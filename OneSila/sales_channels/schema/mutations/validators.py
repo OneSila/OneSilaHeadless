@@ -216,29 +216,6 @@ def validate_amazon_assignment(data, info):
                         )
                     }
                 )
-        else:
-            has_asin = (
-                AmazonExternalProductId.objects.filter(
-                    product=product,
-                    view__in=views,
-                )
-                .exclude(value__isnull=True)
-                .exclude(value__exact="")
-                .filter(
-                    Q(created_asin__isnull=False) & ~Q(created_asin__exact="")
-                    | Q(type=AmazonExternalProductId.TYPE_ASIN)
-                )
-                .exists()
-            )
-
-            if not has_asin:
-                raise ValidationError(
-                    {
-                        '__all__': _(
-                            'To create a new Amazon assignment there must be at least one completed assignment validated by Amazon with an ASIN. Wait for validation or provide an ASIN manually.'
-                        )
-                    }
-                )
 
 
 def validate_ebay_assignment(data, info):

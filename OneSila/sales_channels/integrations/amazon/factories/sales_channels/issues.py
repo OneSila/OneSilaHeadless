@@ -41,6 +41,7 @@ class FetchRemoteIssuesFactory(GetAmazonAPIMixin):
             issues_data = getattr(response, "issues", []) or []
             summaries = getattr(response, "summaries", []) or []
 
+        asin = None
         if summaries:
             summary = summaries[0]
             asin = summary.get("asin") if isinstance(summary, dict) else getattr(summary, "asin", None)
@@ -85,6 +86,9 @@ class FetchRemoteIssuesFactory(GetAmazonAPIMixin):
                 error_code=AMAZON_REMOTE_ISSUES_ERROR,
                 run_async=False,
             )
+
+        override_status = self.remote_product.STATUS_APPROVAL_REJECTED if (not asin and issues_data) else None
+        self.remote_product.refresh_status(commit=True, override_status=override_status)
 
         child_products = (
             AmazonProduct.objects.filter(remote_parent_product=self.remote_product)

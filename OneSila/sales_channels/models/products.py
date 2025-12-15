@@ -17,11 +17,17 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     STATUS_COMPLETED = "COMPLETED"
     STATUS_FAILED = "FAILED"
+    STATUS_APPROVAL_REJECTED = "APPROVAL_REJECTED"
+    STATUS_PARTIALLY_LISTED = "PARTIALLY_LISTED"
+    STATUS_PENDING_APPROVAL = "PENDING_APPROVAL"
     STATUS_PROCESSING = "PROCESSING"
 
     STATUS_CHOICES = (
         (STATUS_COMPLETED, _("Completed")),
         (STATUS_FAILED, _("Failed")),
+        (STATUS_APPROVAL_REJECTED, _("Approval rejected")),
+        (STATUS_PARTIALLY_LISTED, _("Partially listed")),
+        (STATUS_PENDING_APPROVAL, _("Pending approval")),
         (STATUS_PROCESSING, _("Processing")),
     )
 
@@ -36,7 +42,7 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         help_text="Current sync progress percentage (0-100)."
     )
     status = models.CharField(
-        max_length=16,
+        max_length=17,
         choices=STATUS_CHOICES,
         default=STATUS_PROCESSING,
         db_index=True,
@@ -118,9 +124,14 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         if is_new and getattr(self.sales_channel, "gpt_enable", False):
             self.required_feed_sync = True
         previous_status = self.status
-        computed_status = self._determine_status()
-        status_changed = previous_status != computed_status
-        self.status = computed_status
+
+        do_status_check = kwargs.pop("skip_status_check", True)
+        if do_status_check:
+            computed_status = self._determine_status()
+            status_changed = previous_status != computed_status
+            self.status = computed_status
+        else:
+            status_changed = True
 
         update_fields = kwargs.get("update_fields")
         if update_fields is not None:
@@ -133,12 +144,12 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
 
         super().save(*args, **kwargs)
 
-    def refresh_status(self, *, commit: bool = True) -> str:
-        computed_status = self._determine_status()
+    def refresh_status(self, *, commit: bool = True, override_status: str | None = None) -> str:
+        computed_status = override_status or self._determine_status()
         if computed_status != self.status:
             self.status = computed_status
             if commit and self.pk:
-                self.save(update_fields=["status"])
+                self.save(update_fields=["status"], skip_status_check=False)
         return self.status
 
     def _determine_status(self) -> str:

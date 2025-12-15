@@ -167,6 +167,9 @@ class SalesChannelViewAssignQuerySet(PolymorphicQuerySet, MultiTenantQuerySet):
         valid_statuses = {
             RemoteProduct.STATUS_COMPLETED,
             RemoteProduct.STATUS_FAILED,
+            RemoteProduct.STATUS_APPROVAL_REJECTED,
+            RemoteProduct.STATUS_PARTIALLY_LISTED,
+            RemoteProduct.STATUS_PENDING_APPROVAL,
             RemoteProduct.STATUS_PROCESSING,
         }
 
