@@ -49,3 +49,14 @@ def shein_sync_sales_channel_mappings_task(
         source_sales_channel_id=source_sales_channel_id,
         target_sales_channel_id=target_sales_channel_id,
     )
+
+
+@db_task()
+def shein_map_perfect_match_select_values_db_task(*, sales_channel_id: int):
+    from sales_channels.integrations.shein.factories.auto_import import (
+        SheinPerfectMatchSelectValueMappingFactory,
+    )
+    from sales_channels.integrations.shein.models import SheinSalesChannel
+
+    sales_channel = SheinSalesChannel.objects.get(id=sales_channel_id)
+    SheinPerfectMatchSelectValueMappingFactory(sales_channel=sales_channel).run()

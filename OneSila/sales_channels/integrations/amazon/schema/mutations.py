@@ -261,6 +261,26 @@ class AmazonSalesChannelMutation:
         return existing_remote_product
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def map_amazon_perfect_match_select_values(
+        self,
+        sales_channel: AmazonSalesChannelPartialInput,
+        info: Info,
+    ) -> bool:
+        from sales_channels.integrations.amazon.models import AmazonSalesChannel
+        from sales_channels.integrations.amazon.tasks import (
+            amazon_map_perfect_match_select_values_db_task,
+        )
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        channel = AmazonSalesChannel.objects.get(
+            id=sales_channel.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        amazon_map_perfect_match_select_values_db_task(sales_channel_id=channel.id)
+        return True
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def resync_amazon_product(
         self,
         remote_product: AmazonProductPartialInput,
