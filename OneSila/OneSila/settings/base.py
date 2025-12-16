@@ -16,6 +16,11 @@ from operator import itemgetter
 import os
 import sys
 
+from core.exceptions import ValidationError
+from sentry_sdk.integrations.huey import HueyIntegration
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.strawberry import StrawberryIntegration
+
 SECRET_KEY = "FAKE-KEY-DONT-KEEP-THIS-YOU-SHOULD-SET-A-NEW-ONE"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -504,3 +509,13 @@ LOGGING = {
 WEBHOOKS_SIGNATURE_SKEW_SECONDS = 300
 WEBHOOKS_GZIP_THRESHOLD_BYTES = 16384
 WEBHOOKS_DEFAULT_TIMEOUT_MS = 10000
+
+SENTRY_CONFIG = {
+    "dsn": "test",
+    "send_default_pii": True,
+    "environment": "test",
+    "traces_sample_rate": 1.0,
+    "profiles_sample_rate": 1.0,
+    "ignore_errors": [ValidationError],
+    "integrations": [DjangoIntegration(), HueyIntegration(), StrawberryIntegration(async_execution=True)],
+}
