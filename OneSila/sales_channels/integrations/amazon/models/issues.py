@@ -32,6 +32,7 @@ class AmazonProductIssue(models.Model):
         verbose_name = 'Amazon Product Issue'
         verbose_name_plural = 'Amazon Product Issues'
         ordering = ('remote_product_id', 'view_id')
+        search_terms = ("code", "message", "severity")
 
     def __str__(self) -> str:  # pragma: no cover - simple repr
         return f"{self.remote_product_id}:{self.code}"
