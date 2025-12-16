@@ -171,6 +171,9 @@ def sales_channels__amazon_property_select_value__auto_import(sender, instance: 
     if not instance.is_dirty_field('local_instance', check_relationship=True):
         return
 
+    if not instance.local_instance:
+        return
+
     from sales_channels.integrations.amazon.tasks import amazon_auto_import_select_value_task
 
     amazon_auto_import_select_value_task(instance.id)

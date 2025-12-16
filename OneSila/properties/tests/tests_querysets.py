@@ -203,6 +203,113 @@ class PropertySelectValueQuerySetTest(TestCase):
         self.assertNotIn(select_used, qs_unused)
         self.assertNotIn(multi_used, qs_unused)
 
+    def test_merge_updates_product_property_value_select(self):
+        prop_select = Property.objects.create(
+            type=Property.TYPES.SELECT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        source1 = PropertySelectValue.objects.create(
+            property=prop_select,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        source2 = PropertySelectValue.objects.create(
+            property=prop_select,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        target = PropertySelectValue.objects.create(
+            property=prop_select,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        product = Product.objects.create(
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product_property = ProductProperty.objects.create(
+            product=product,
+            property=prop_select,
+            value_select=source1,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        PropertySelectValue.objects.filter(id__in=[source1.id, source2.id]).merge(target)
+
+        product_property.refresh_from_db()
+        self.assertEqual(product_property.value_select_id, target.id)
+        self.assertFalse(PropertySelectValue.objects.filter(id__in=[source1.id, source2.id]).exists())
+
+    def test_merge_updates_product_property_value_multi_select(self):
+        prop_multi = Property.objects.create(
+            type=Property.TYPES.MULTISELECT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        source1 = PropertySelectValue.objects.create(
+            property=prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        source2 = PropertySelectValue.objects.create(
+            property=prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        target = PropertySelectValue.objects.create(
+            property=prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        product = Product.objects.create(
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product_property = ProductProperty.objects.create(
+            product=product,
+            property=prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product_property.value_multi_select.add(source1, source2)
+
+        PropertySelectValue.objects.filter(id__in=[source1.id, source2.id]).merge(target)
+
+        product_property.refresh_from_db()
+        self.assertSetEqual(
+            set(product_property.value_multi_select.values_list("id", flat=True)),
+            {target.id},
+        )
+        self.assertFalse(PropertySelectValue.objects.filter(id__in=[source1.id, source2.id]).exists())
+
+    def test_merge_multi_select_when_target_already_assigned(self):
+        prop_multi = Property.objects.create(
+            type=Property.TYPES.MULTISELECT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        source = PropertySelectValue.objects.create(
+            property=prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        target = PropertySelectValue.objects.create(
+            property=prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        product = Product.objects.create(
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product_property = ProductProperty.objects.create(
+            product=product,
+            property=prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product_property.value_multi_select.add(source, target)
+
+        PropertySelectValue.objects.filter(id=source.id).merge(target)
+
+        product_property.refresh_from_db()
+        self.assertSetEqual(
+            set(product_property.value_multi_select.values_list("id", flat=True)),
+            {target.id},
+        )
+        self.assertFalse(PropertySelectValue.objects.filter(id=source.id).exists())
+
     def test_with_translated_value_single_query(self):
         prop = Property.objects.create(
             type=Property.TYPES.SELECT,
