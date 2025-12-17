@@ -47,6 +47,7 @@ from sales_channels.integrations.amazon.models.properties import (
 )
 from sales_channels.integrations.amazon.models import AmazonCurrency
 from sales_channels.exceptions import SwitchedToCreateException, SwitchedToSyncException
+from sales_channels.exceptions import SkipSyncBecauseOfStatusException
 from spapi import ListingsApi
 
 import logging
@@ -123,6 +124,16 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         # allow variations to be added separately from the configurable product
         # in amazon we can add in different vierws
         pass
+
+    def check_status(self):
+        if (
+            getattr(self.remote_product, "status", None) == AmazonProduct.STATUS_PENDING_APPROVAL
+            and not self.force_full_update
+            and not self.force_validation_only
+        ):
+            raise SkipSyncBecauseOfStatusException(
+                f"Skipping Amazon sync for {self.remote_product} because status is {AmazonProduct.STATUS_PENDING_APPROVAL}."
+            )
 
     def initialize_remote_product(self):
 

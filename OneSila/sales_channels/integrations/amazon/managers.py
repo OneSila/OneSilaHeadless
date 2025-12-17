@@ -2,14 +2,36 @@ from django.db.models import Case, When, Value, BooleanField
 
 from core.managers import MultiTenantManager, MultiTenantQuerySet
 from polymorphic.managers import PolymorphicManager, PolymorphicQuerySet
-from sales_channels.managers import _MappingManagerMixin, _MappingQuerySetMixin
+from sales_channels.managers import (
+    _MappingManagerMixin,
+    _MappingQuerySetMixin,
+    _RemotePropertyUsedInProductsQuerySetMixin,
+    _RemoteSelectValueUsedInProductsQuerySetMixin,
+)
 
 
-class AmazonPropertyQuerySet(_MappingQuerySetMixin, PolymorphicQuerySet, MultiTenantQuerySet):
+class AmazonPropertyQuerySet(
+    _RemotePropertyUsedInProductsQuerySetMixin,
+    _MappingQuerySetMixin,
+    PolymorphicQuerySet,
+    MultiTenantQuerySet,
+):
     mapped_field = "code"
 
+    def used_in_products(self, value: bool = True):
+        from sales_channels.integrations.amazon.models import AmazonProductProperty
 
-class AmazonPropertySelectValueQuerySet(_MappingQuerySetMixin, MultiTenantQuerySet):
+        return super().used_in_products(
+            remote_product_property_model=AmazonProductProperty,
+            used=value,
+        )
+
+
+class AmazonPropertySelectValueQuerySet(
+    _RemoteSelectValueUsedInProductsQuerySetMixin,
+    _MappingQuerySetMixin,
+    MultiTenantQuerySet,
+):
     mapped_field = "remote_value"
 
     def annotate_mapping(self):
@@ -24,6 +46,24 @@ class AmazonPropertySelectValueQuerySet(_MappingQuerySetMixin, MultiTenantQueryS
 
     def filter_amazon_property_mapped_locally(self, value: bool = True):
         return self.annotate_mapping().filter(amazon_property_mapped_locally=value)
+
+    def used_in_products(self, value: bool = True):
+        from sales_channels.integrations.amazon.models import AmazonProductProperty
+
+        return super().used_in_products_by_remote_property(
+            remote_product_property_model=AmazonProductProperty,
+            used=value,
+            related_remote_property_field="amazon_property",
+        )
+
+    def filter_amazon_property_used_in_products(self, value: bool = True):
+        from sales_channels.integrations.amazon.models import AmazonProductProperty
+
+        return super().remote_property_used_in_products(
+            remote_product_property_model=AmazonProductProperty,
+            related_remote_property_field="amazon_property",
+            used=value,
+        )
 
 
 class AmazonProductTypeQuerySet(_MappingQuerySetMixin, MultiTenantQuerySet):
@@ -51,4 +91,3 @@ class AmazonProductTypeManager(_MappingManagerMixin, MultiTenantManager):
                 "imported": False,
             },
         )
-

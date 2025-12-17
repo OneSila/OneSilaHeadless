@@ -1,5 +1,7 @@
 from typing import Optional
 
+from strawberry_django.auth.utils import get_current_user
+
 from core.schema.core.types.types import auto
 from core.schema.core.types.filters import (
     filter,
@@ -25,21 +27,16 @@ class PropertyFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
     internal_name: auto
 
     @custom_filter
-    def used_in_products(
-        self,
-        queryset: QuerySet,
-        value: bool,
-        prefix: str,
-    ) -> tuple[QuerySet, Q]:
-        if value not in (None, UNSET):
-            usage_qs = ProductProperty._base_manager.filter(
-                property_id=OuterRef("pk"),
-                multi_tenant_company_id=OuterRef("multi_tenant_company_id"),
-            )
-            queryset = queryset.annotate(
-                has_usage=Exists(usage_qs)
-            ).filter(has_usage=value)
+    def used_in_products(self, queryset: QuerySet, info, value: bool, prefix: str) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
 
+        user = get_current_user(info)
+        if user is None:
+            return queryset.none(), Q()
+
+        mtc_id = user.multi_tenant_company_id
+        queryset = queryset.used_in_products(multi_tenant_company_id=mtc_id, used=value)
         return queryset, Q()
 
     @custom_filter
@@ -99,21 +96,22 @@ class PropertySelectValueFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
 
     @custom_filter
     def used_in_products(
-        self,
-        queryset: QuerySet,
-        value: bool,
-        prefix: str,
+            self,
+            queryset: QuerySet,
+            info,
+            value: bool,
+            prefix: str,
     ) -> tuple[QuerySet, Q]:
-        if value not in (None, UNSET):
-            usage_qs = ProductProperty._base_manager.filter(
-                Q(value_select_id=OuterRef("pk"))
-                | Q(value_multi_select=OuterRef("pk")),
-                multi_tenant_company_id=OuterRef("multi_tenant_company_id"),
-            )
-            queryset = queryset.annotate(
-                has_usage=Exists(usage_qs)
-            ).filter(has_usage=value)
+        if value in (None, UNSET):
+            return queryset, Q()
 
+        user = get_current_user(info)
+        if user is None:
+            return queryset.none(), Q()
+
+        mtc_id = user.multi_tenant_company_id
+
+        queryset = queryset.used_in_products(multi_tenant_company_id=mtc_id, used=value)
         return queryset, Q()
 
     @custom_filter

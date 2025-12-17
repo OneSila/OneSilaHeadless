@@ -5,6 +5,11 @@ ALLOWED_HOSTS = ['myonesilaserver.com']
 CSRF_TRUSTED_ORIGINS = [f"https://{domain}" for domain in ALLOWED_HOSTS]
 DEBUG = True
 
+import sentry_sdk
+SENTRY_DSN = "xxx"
+SENTRY_CONFIG["dsn"] = SENTRY_DSN
+sentry_sdk.init(**SENTRY_CONFIG)
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',

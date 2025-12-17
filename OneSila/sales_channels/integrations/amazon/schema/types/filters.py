@@ -38,6 +38,8 @@ from sales_channels.schema.types.filter_mixins import (
     DependentMappedLocallyFilterMixin,
     GeneralMappedLocallyFilterMixin,
     GeneralMappedRemotelyFilterMixin,
+    DependentUsedInProductsFilterMixin,
+    GeneralUsedInProductsFilterMixin,
 )
 from sales_channels.schema.types.filters import (
     SalesChannelFilter,
@@ -63,7 +65,12 @@ class AmazonSalesChannelViewFilter(SearchFilterMixin):
 
 
 @filter(AmazonProperty)
-class AmazonPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
+class AmazonPropertyFilter(
+    SearchFilterMixin,
+    DependentMappedLocallyFilterMixin,
+    DependentUsedInProductsFilterMixin,
+    GeneralMappedRemotelyFilterMixin,
+):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
@@ -76,9 +83,20 @@ class AmazonPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin,
             (AmazonPropertySelectValueQuerySet, "filter_amazon_property_mapped_locally"),
         )
 
+    def get_used_in_products_querysets(self):
+        return (
+            (AmazonPropertyQuerySet, "used_in_products"),
+            (AmazonPropertySelectValueQuerySet, "filter_amazon_property_used_in_products"),
+        )
+
 
 @filter(AmazonPropertySelectValue)
-class AmazonPropertySelectValueFilter(SearchFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
+class AmazonPropertySelectValueFilter(
+    SearchFilterMixin,
+    GeneralUsedInProductsFilterMixin,
+    GeneralMappedLocallyFilterMixin,
+    GeneralMappedRemotelyFilterMixin,
+):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     amazon_property: Optional[AmazonPropertyFilter]
@@ -151,9 +169,31 @@ class AmazonRemoteLogFilter(SearchFilterMixin):
 @filter(AmazonProductIssue)
 class AmazonProductIssueFilter(SearchFilterMixin):
     id: auto
+    code: auto
+    severity: auto
     is_validation_issue: auto
+    is_suppressed: auto
+    enforcement_exemption_status: auto
     view: Optional[SalesChannelViewFilter]
     remote_product: Optional[RemoteProductFilter]
+
+    @custom_filter
+    def category(self, queryset, value: str, prefix: str) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+        return queryset.filter(categories__contains=[str(value)]), Q()
+
+    @custom_filter
+    def enforcement_action(self, queryset, value: str, prefix: str) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+        return queryset.filter(enforcement_actions__contains=[str(value)]), Q()
+
+    @custom_filter
+    def enforcement_attribute_name(self, queryset, value: str, prefix: str) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+        return queryset.filter(enforcement_attribute_names__contains=[str(value)]), Q()
 
 
 @filter(AmazonBrowseNode)

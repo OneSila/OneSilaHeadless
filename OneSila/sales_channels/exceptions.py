@@ -38,3 +38,8 @@ class ConfiguratorPropertyNotFilterable(Exception):
 class RemotePropertyValueNotMapped(Exception):
     """Raised when a property value lacks a remote mapping and custom values are not allowed."""
     pass
+
+
+class SkipSyncBecauseOfStatusException(Exception):
+    """Raised when a remote product is in a status that should skip sync/update/create flows."""
+    pass

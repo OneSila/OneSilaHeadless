@@ -1,6 +1,7 @@
 from core import models
 from core.helpers import ensure_serializable
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from sales_channels.models.products import (
     RemoteProduct,
     RemoteInventory,
@@ -85,6 +86,51 @@ class AmazonProduct(RemoteProduct):
         """Return only validation issues with severity 'ERROR' for this product in a given marketplace."""
         issues = self.get_issues(view, is_validation=True)
         return [i for i in issues if i.get("severity") == "ERROR"]
+
+    def _determine_status(self) -> str:
+        if self._has_unresolved_errors():
+            return self.STATUS_FAILED
+        if self.syncing_current_percentage != 100:
+            return self.STATUS_PROCESSING
+
+        from sales_channels.models.sales_channels import SalesChannelViewAssign
+
+        if not getattr(self, "local_instance_id", None):
+            return self.STATUS_COMPLETED
+
+        asin_view_ids = set(
+            AmazonExternalProductId.objects.filter(product_id=self.local_instance_id)
+            .exclude(value__isnull=True)
+            .exclude(value__exact="")
+            .filter(
+                Q(created_asin__isnull=False) & ~Q(created_asin__exact="")
+                | Q(type=AmazonExternalProductId.TYPE_ASIN)
+            )
+            .values_list("view_id", flat=True)
+            .distinct()
+        )
+
+        if not asin_view_ids:
+            return self.STATUS_PENDING_APPROVAL
+
+        assigned_views = list(
+            SalesChannelViewAssign.objects.filter(remote_product=self).values_list(
+                "sales_channel_view_id",
+                "sales_channel_view__remote_id",
+            )
+        )
+        assigned_view_ids = {view_id for view_id, _ in assigned_views if view_id}
+        assigned_marketplaces = {remote_id for _, remote_id in assigned_views if remote_id}
+        created_marketplaces = set(self.created_marketplaces or [])
+
+        marketplaces_ready = assigned_marketplaces.issubset(created_marketplaces)
+
+        asins_ready = assigned_view_ids.issubset(asin_view_ids)
+
+        if marketplaces_ready and asins_ready:
+            return self.STATUS_COMPLETED
+
+        return self.STATUS_PARTIALLY_LISTED
 
 
 class AmazonInventory(RemoteInventory):

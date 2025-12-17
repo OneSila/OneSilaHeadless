@@ -973,7 +973,7 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
             listing_data = {}
 
         listing_status = listing_data.get("listing_status")
-        is_active = bool(listing_status and str(listing_status).upper() == "ACTIVE")
+        is_active = True if is_configurable else bool(listing_status and str(listing_status).upper() == "ACTIVE")
 
         marketplace_id = offer_data.get("marketplace_id") if isinstance(offer_data, Mapping) else None
         if marketplace_id is not None:
