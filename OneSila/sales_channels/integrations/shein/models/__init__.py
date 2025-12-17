@@ -18,6 +18,7 @@ from .sales_channels import (
 )
 
 from .imports import SheinSalesChannelImport
+from .issues import SheinProductIssue
 
 __all__ = [
     "SheinCategory",
@@ -32,4 +33,5 @@ __all__ = [
     "SheinSalesChannel",
     "SheinSalesChannelView",
     "SheinSalesChannelImport",
+    "SheinProductIssue",
 ]

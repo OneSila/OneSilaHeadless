@@ -68,6 +68,8 @@ CATEGORY_TREE_PAYLOAD = {
 PUBLISH_STANDARD_INFO = {
     "default_language": "en",
     "currency": "GBP",
+    "support_sale_attribute_sort": False,
+    "fill_configuration_tags": ["PACKAGE_TYPE_TO_SKU"],
     "picture_config_list": [
         {"field_key": "spu_image_detail_show", "is_true": True},
         {"field_key": "skc_image_square_required", "is_true": False},
@@ -125,6 +127,18 @@ PUBLISH_STANDARD_INFO = {
             "module": "basic_info",
             "field_key": "sample_spec",
             "required": False,
+            "show": True,
+        },
+        {
+            "module": "supplier_info",
+            "field_key": "package_type",
+            "required": False,
+            "show": True,
+        },
+        {
+            "module": "supplier_info",
+            "field_key": "supplier_barcode",
+            "required": True,
             "show": True,
         },
     ],
@@ -319,6 +333,10 @@ class SheinCategoryTreeFactoryTests(TestCase):
         self.assertFalse(root_category.quantity_info_required)
         self.assertFalse(root_category.sample_spec_required)
         self.assertEqual(root_category.picture_config, PUBLISH_STANDARD_INFO["picture_config_list"])
+        self.assertFalse(root_category.support_sale_attribute_sort)
+        self.assertTrue(root_category.package_type_required)
+        self.assertTrue(root_category.supplier_barcode_required)
+        self.assertEqual(root_category.configurator_properties, [])
 
         leaf_category = SheinCategory.objects.get(remote_id="1727")
         self.assertTrue(leaf_category.is_leaf)
@@ -338,6 +356,10 @@ class SheinCategoryTreeFactoryTests(TestCase):
         self.assertFalse(leaf_category.quantity_info_required)
         self.assertFalse(leaf_category.sample_spec_required)
         self.assertEqual(leaf_category.picture_config, PUBLISH_STANDARD_INFO["picture_config_list"])
+        self.assertFalse(leaf_category.support_sale_attribute_sort)
+        self.assertTrue(leaf_category.package_type_required)
+        self.assertTrue(leaf_category.supplier_barcode_required)
+        self.assertEqual({entry.get("property_id") for entry in leaf_category.configurator_properties}, {"27", "87"})
 
         product_type = SheinProductType.objects.get(remote_id="1080")
         self.assertEqual(product_type.category_id, leaf_category.remote_id)

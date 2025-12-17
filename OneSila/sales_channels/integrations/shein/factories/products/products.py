@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, Iterable, List, Optional
-
-from django.db.models import Sum
 
 from properties.models import ProductProperty, Property
 from sales_channels.factories.products.products import (
@@ -26,9 +25,11 @@ from sales_channels.models.products import RemoteProduct
 from sales_channels.models.logs import RemoteLog
 from sales_channels.models import SalesChannelViewAssign
 
-from inventory.models import Inventory
 from translations.models import TranslationFieldsMixin
-from sales_channels.integrations.shein.models import SheinSalesChannelView
+from sales_channels.integrations.shein.models import (
+    SheinInternalPropertyOption,
+    SheinSalesChannelView,
+)
 
 
 class SheinProductBaseFactory(
@@ -41,8 +42,11 @@ class SheinProductBaseFactory(
     remote_model_class = RemoteProduct
     action_log = RemoteLog.ACTION_UPDATE
     publish_permission_path = "/open-api/goods/product/check-publish-permission"
+    publish_or_edit_path = "/open-api/goods/product/publishOrEdit"
     default_dimension_value = "10"
     default_weight_value = 10
+    supplier_barcode_type = "EAN"
+    _EAN_DIGITS_RE = re.compile(r"\D+")
 
     def __init__(
         self,
@@ -257,30 +261,19 @@ class SheinProductBaseFactory(
         )
         return default_assign or (assigns[0] if assigns else None)
 
-    def _build_stock_info_list(self, *, assigns: list[SalesChannelViewAssign]) -> list[dict[str, Any]]:
-        quantity = (
-            Inventory.objects.filter(product=self.local_instance).aggregate(total=Sum("quantity")).get("total") or 0
-        )
+    def _get_starting_stock_quantity(self) -> int:
+        starting_stock = getattr(self.sales_channel, "starting_stock", None)
+        if starting_stock is None:
+            return 0
+        if not getattr(self.local_instance, "active", True):
+            return 0
+        try:
+            return max(int(starting_stock), 0)
+        except (TypeError, ValueError):
+            return 0
 
-        default_assign = self._resolve_default_view_assign(assigns=assigns)
-        supplier_warehouse_id: Optional[str] = None
-        supplier_warehouse_name: Optional[str] = None
-
-        if default_assign and isinstance(default_assign.sales_channel_view, SheinSalesChannelView):
-            supplier_warehouse_id = default_assign.sales_channel_view.merchant_location_key
-            choices = default_assign.sales_channel_view.merchant_location_choices or []
-            for choice in choices:
-                if choice.get("warehouseCode") == supplier_warehouse_id:
-                    supplier_warehouse_name = choice.get("warehouseName")
-                    break
-
-        stock_entry = {
-            "inventory_num": int(quantity),
-            "supplier_warehouse_id": supplier_warehouse_id,
-            "supplier_warehouse_name": supplier_warehouse_name,
-        }
-
-        return [{k: v for k, v in stock_entry.items() if v not in (None, "", [])}]
+    def _build_stock_info_list(self) -> list[dict[str, Any]]:
+        return [{"inventory_num": self._get_starting_stock_quantity()}]
 
     def _build_sku_price_info_list(self, *, assigns: list[SalesChannelViewAssign]) -> list[dict[str, Any]]:
         if not self.price_info_list:
@@ -340,6 +333,62 @@ class SheinProductBaseFactory(
         value = product_property.get_value()
         return value if value not in (None, "", []) else default
 
+    def _get_internal_property_option_value(self, *, code: str) -> str | None:
+        internal_prop = (
+            SheinInternalProperty.objects.filter(
+                sales_channel=self.sales_channel,
+                code=code,
+            )
+            .select_related("local_instance")
+            .first()
+        )
+        if not internal_prop or not internal_prop.local_instance:
+            return None
+
+        product_property = (
+            ProductProperty.objects.filter(
+                product=self.local_instance,
+                property=internal_prop.local_instance,
+            )
+            .select_related("value_select")
+            .first()
+        )
+        if not product_property or not product_property.value_select_id:
+            return None
+
+        option = (
+            SheinInternalPropertyOption.objects.filter(
+                internal_property=internal_prop,
+                local_instance_id=product_property.value_select_id,
+            )
+            .only("value")
+            .first()
+        )
+        if not option or not option.value:
+            return None
+        return str(option.value)
+
+    def _build_supplier_barcode(self) -> dict[str, str] | None:
+        raw_ean = self.get_ean_code_value()
+        if not raw_ean:
+            return None
+
+        digits = self._EAN_DIGITS_RE.sub("", str(raw_ean))
+        if not digits:
+            return None
+
+        return {
+            "barcode": digits[:32],
+            "barcode_type": self.supplier_barcode_type,
+        }
+
+    def _build_fill_configuration_info(self, *, package_type: str | None) -> dict[str, Any] | None:
+        if not package_type:
+            return None
+        return {
+            "fill_configuration_tags": ["PACKAGE_TYPE_TO_SKU"],
+        }
+
     def _coerce_dimension_value(self, *, value: Any) -> str:
         try:
             numeric = float(value)
@@ -383,19 +432,22 @@ class SheinProductBaseFactory(
         }
 
     def _build_sku_list(self, *, assigns: list[SalesChannelViewAssign]) -> list[dict[str, Any]]:
-        price_info_list = self._build_sku_price_info_list(assigns=assigns)
-        stock_info_list = self._build_stock_info_list(assigns=assigns)
+        price_info_list = self._build_sku_price_info_list(assigns=assigns) if self.is_create else []
+        stock_info_list = self._build_stock_info_list() if self.is_create else []
         height, length, width, weight = self._resolve_dimensions()
+        supplier_barcode = self._build_supplier_barcode()
+        package_type = self._get_internal_property_option_value(code="package_type")
 
         sku_entry: dict[str, Any] = {
             "mall_state": 1 if self.local_instance.active else 2,
-            "sku_code": getattr(self.remote_instance, "remote_id", None) or getattr(self.remote_instance, "remote_sku", None),
             "supplier_sku": self.local_instance.sku,
             "stop_purchase": 1,
             "height": height,
             "length": length,
             "width": width,
             "weight": weight,
+            "supplier_barcode": supplier_barcode,
+            "package_type": package_type,
             "price_info_list": price_info_list or None,
             "sale_attribute_list": self.sale_attribute_list or None,
             "stock_info_list": stock_info_list or None,
@@ -434,25 +486,28 @@ class SheinProductBaseFactory(
         self._build_translations()
         self._build_skc_list()
 
-        self.site_list = self.build_site_list(product=self.local_instance)
+        self.site_list = self.build_site_list(product=self.local_instance) if self.is_create else []
+        package_type = self._get_internal_property_option_value(code="package_type")
+        fill_configuration_info = self._build_fill_configuration_info(package_type=package_type)
 
-        self.payload = {
+        self.payload: dict[str, Any] = {
             "category_id": self.remote_rule.category_id,
             "product_type_id": self.remote_rule.remote_id,
             "supplier_code": self.local_instance.sku,
             "source_system": "openapi",
-            "spu_name": getattr(self.remote_instance, "remote_id", "") or self.local_instance.name,
-            "site_list": self.site_list,
+            "site_list": self.site_list or None,
             "multi_language_name_list": self.multi_language_name_list or None,
             "multi_language_desc_list": self.multi_language_desc_list or None,
-            "price_info_list": self.price_info_list or None,
             "image_info": self.image_info or None,
             "sale_attribute": self.sale_attribute,
             "sale_attribute_list": self.sale_attribute_list or None,
             "size_attribute_list": self.size_attribute_list or None,
             "product_attribute_list": self.product_attribute_list or None,
             "skc_list": self.skc_list or None,
+            "fill_configuration_info": fill_configuration_info,
         }
+        if not self.is_create:
+            self.payload["spu_name"] = getattr(self.remote_instance, "remote_id", "") or ""
 
         # Clean None entries
         self.payload = {k: v for k, v in self.payload.items() if v not in (None, [], {})}
@@ -462,12 +517,39 @@ class SheinProductBaseFactory(
     # Remote actions
     # ------------------------------------------------------------------
     def perform_remote_action(self):
-        # No-op stub until API client is wired; store computed payload.
         self.value = getattr(self, "payload", {})
-        if self.get_value_only and self.remote_instance:
-            self.remote_instance.remote_value = json.dumps(self.value)
-            self.remote_instance.save(update_fields=["remote_value"])
-        return self.value
+        if self.get_value_only:
+            return self.value
+
+        response = self.shein_post(
+            path=self.publish_or_edit_path,
+            payload=self.value,
+        )
+        response_data = response.json() if hasattr(response, "json") else {}
+        self._log_submission_tracking(response_data=response_data)
+        return response_data
+
+    def _log_submission_tracking(self, *, response_data: Any) -> None:
+        if not self.remote_instance or not isinstance(response_data, dict):
+            return
+
+        info = response_data.get("info")
+        if not isinstance(info, dict):
+            info = response_data
+
+        version = info.get("version")
+        document_sn = info.get("document_sn") or info.get("documentSn")
+
+        if not version and not document_sn:
+            return
+
+        self.remote_instance.add_log(
+            action=self.action_log,
+            response={"version": version, "document_sn": document_sn},
+            payload={"version": version, "document_sn": document_sn},
+            identifier="SheinProductSubmission",
+            remote_product=self.remote_instance,
+        )
 
     def set_discount(self):
         """Shein payload includes special_price directly; nothing extra."""
@@ -491,6 +573,10 @@ class SheinProductCreateFactory(SheinProductBaseFactory, RemoteProductCreateFact
 
     def create_remote(self):
         return self.perform_remote_action()
+
+    def set_remote_id(self, response_data):  # type: ignore[override]
+        # Shein assigns spu_name asynchronously; webhook updates remote_id later.
+        return
 
 
 class SheinProductDeleteFactory(SheinSignatureMixin, RemoteProductDeleteFactory):

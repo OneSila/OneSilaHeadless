@@ -57,6 +57,11 @@ class SheinInternalPropertiesFlowTests(TestCase):
         self.assertEqual(values, {"abc123", "def456"})
         self.assertTrue(options.filter(label="First Brand", is_active=True).exists())
 
+        package_property = properties.get(code="package_type")
+        package_options = SheinInternalPropertyOption.objects.filter(internal_property=package_property, is_active=True)
+        self.assertEqual(package_options.count(), 5)
+        self.assertTrue(package_options.filter(value="0", label="Clear packaging").exists())
+
     def test_flow_gracefully_handles_missing_credentials(self) -> None:
         with patch.object(SheinInternalPropertiesFlow, "shein_post", side_effect=ValueError):
             ensure_internal_properties_flow(self.sales_channel)
@@ -64,8 +69,11 @@ class SheinInternalPropertiesFlowTests(TestCase):
         properties = SheinInternalProperty.objects.filter(sales_channel=self.sales_channel)
         # Internal definitions are still created even if the brand call fails.
         self.assertEqual(properties.count(), len(constants.SHEIN_INTERNAL_PROPERTY_DEFINITIONS))
-        self.assertFalse(
+        self.assertFalse(SheinInternalPropertyOption.objects.filter(sales_channel=self.sales_channel, value="abc123").exists())
+        self.assertTrue(
             SheinInternalPropertyOption.objects.filter(
                 sales_channel=self.sales_channel,
+                internal_property__code="package_type",
+                is_active=True,
             ).exists()
         )

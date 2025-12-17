@@ -8,6 +8,7 @@ from .images import (
 from .assigns import SheinSalesChannelAssignFactoryMixin
 from .products import SheinProductCreateFactory, SheinProductUpdateFactory
 from .products import SheinProductDeleteFactory
+from .document_state import SheinProductDocumentStateFactory
 
 __all__ = [
     "SheinMediaProductThroughCreateFactory",
@@ -17,4 +18,5 @@ __all__ = [
     "SheinProductCreateFactory",
     "SheinProductUpdateFactory",
     "SheinProductDeleteFactory",
+    "SheinProductDocumentStateFactory",
 ]

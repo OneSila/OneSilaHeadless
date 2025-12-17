@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 from core import models
 
 
@@ -122,3 +126,40 @@ class SheinCategory(models.SharedModel):
         site_suffix = f" @ {self.site_remote_id}" if self.site_remote_id else ""
         label = self.name or self.remote_id or "Unknown"
         return f"{label}{site_suffix}"
+
+    def get_publish_standard(self, *, default: Any | None = None) -> dict[str, Any]:
+        raw_data = self.raw_data or {}
+        if not isinstance(raw_data, dict):
+            return default if isinstance(default, dict) else {}
+
+        publish_standard = raw_data.get("publish_standard")
+        if isinstance(publish_standard, dict):
+            return publish_standard
+
+        return default if isinstance(default, dict) else {}
+
+    @property
+    def configurator_properties(self) -> list[dict[str, Any]]:
+        publish_standard = self.get_publish_standard(default={})
+        configurator_properties = publish_standard.get("configurator_properties")
+        if isinstance(configurator_properties, list):
+            return [entry for entry in configurator_properties if isinstance(entry, dict)]
+        return []
+
+    @property
+    def support_sale_attribute_sort(self) -> bool | None:
+        publish_standard = self.get_publish_standard(default={})
+        value = publish_standard.get("support_sale_attribute_sort")
+        if value is None:
+            return None
+        return bool(value)
+
+    @property
+    def package_type_required(self) -> bool:
+        publish_standard = self.get_publish_standard(default={})
+        return bool(publish_standard.get("package_type_required", False))
+
+    @property
+    def supplier_barcode_required(self) -> bool:
+        publish_standard = self.get_publish_standard(default={})
+        return bool(publish_standard.get("supplier_barcode_required", False))
