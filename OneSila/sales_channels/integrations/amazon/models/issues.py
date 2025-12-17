@@ -19,6 +19,12 @@ class AmazonProductIssue(models.Model):
     code = models.CharField(max_length=255, null=True, blank=True)
     message = models.TextField(null=True, blank=True)
     severity = models.CharField(max_length=255, null=True, blank=True)
+    categories = models.JSONField(default=list, blank=True)
+    enforcement_actions = models.JSONField(default=list, blank=True)
+    enforcement_exemption_status = models.CharField(max_length=32, null=True, blank=True)
+    enforcement_exemption_expiry_date = models.DateTimeField(null=True, blank=True)
+    enforcement_attribute_names = models.JSONField(default=list, blank=True)
+    is_suppressed = models.BooleanField(default=False, db_index=True)
     is_validation_issue = models.BooleanField(default=False)
     raw_data = models.JSONField(default=dict, blank=True)
 
@@ -26,6 +32,7 @@ class AmazonProductIssue(models.Model):
         verbose_name = 'Amazon Product Issue'
         verbose_name_plural = 'Amazon Product Issues'
         ordering = ('remote_product_id', 'view_id')
+        search_terms = ("code", "message", "severity")
 
     def __str__(self) -> str:  # pragma: no cover - simple repr
         return f"{self.remote_product_id}:{self.code}"

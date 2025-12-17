@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Subquery, OuterRef, Value, CharField
+from django.db.models import Subquery, OuterRef, Value, CharField, Exists, Min
 from django.db.models.functions import Coalesce
 from django.utils.text import slugify
 from django.conf import settings
@@ -11,6 +11,23 @@ from .helpers import generate_unique_internal_name, _is_code_like, _norm_code, _
 
 
 class PropertyQuerySet(MultiTenantQuerySet):
+    def with_product_usage(self, *, multi_tenant_company_id: int):
+        from .models import ProductProperty
+
+        usage_qs = ProductProperty._base_manager.filter(
+            multi_tenant_company_id=multi_tenant_company_id,
+            property_id=OuterRef("pk"),
+        ).only("pk")
+
+        return self.annotate(has_usage=Exists(usage_qs))
+
+    def used_in_products(self, *, multi_tenant_company_id: int, used: bool):
+        return (
+            self.filter(multi_tenant_company_id=multi_tenant_company_id)
+            .with_product_usage(multi_tenant_company_id=multi_tenant_company_id)
+            .filter(has_usage=used)
+        )
+
     def is_public_information(self):
         return self.filter(is_public_information=True)
 
@@ -121,6 +138,12 @@ class PropertyManager(MultiTenantManager):
     def get_queryset(self):
         return PropertyQuerySet(self.model, using=self._db)
 
+    def used_in_products(self, *, multi_tenant_company_id: int, used: bool):
+        return self.get_queryset().used_in_products(
+            multi_tenant_company_id=multi_tenant_company_id,
+            used=used,
+        )
+
     def is_public_information(self):
         return self.get_queryset().is_public_information()
 
@@ -166,6 +189,39 @@ class PropertyManager(MultiTenantManager):
 
 
 class PropertySelectValueQuerySet(MultiTenantQuerySet):
+    def with_product_usage(self, *, multi_tenant_company_id: int):
+        from .models import ProductProperty
+
+        usage_select_qs = ProductProperty._base_manager.filter(
+            multi_tenant_company_id=multi_tenant_company_id,
+            value_select_id=OuterRef("pk"),
+        ).only("pk")
+
+        exists_expr = Exists(usage_select_qs)
+
+        m2m_field = ProductProperty._meta.get_field("value_multi_select")
+        through = m2m_field.remote_field.through
+        src_fk_name = m2m_field.m2m_field_name()
+        tgt_fk_name = m2m_field.m2m_reverse_field_name()
+
+        usage_multi_qs = through._base_manager.filter(
+            **{
+                f"{src_fk_name}__multi_tenant_company_id": multi_tenant_company_id,
+                f"{tgt_fk_name}_id": OuterRef("pk"),
+            }
+        ).only("pk")
+
+        exists_expr = exists_expr | Exists(usage_multi_qs)
+
+        return self.annotate(has_usage=exists_expr)
+
+    def used_in_products(self, *, multi_tenant_company_id: int, used: bool):
+        return (
+            self.filter(multi_tenant_company_id=multi_tenant_company_id)
+            .with_product_usage(multi_tenant_company_id=multi_tenant_company_id)
+            .filter(has_usage=used)
+        )
+
     def delete(self, *args, **kwargs):
         if self.filter(property__is_product_type=True).exists():
             raise ValidationError(
@@ -267,6 +323,7 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
 
     def merge(self, target):
         from .models import PropertySelectValue
+        from .models import ProductProperty
 
         if isinstance(target, (int, str)):
             target = PropertySelectValue.objects.get(pk=target)
@@ -277,12 +334,62 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
             raise ValidationError(_("Property select values must belong to the same property."))
 
         with transaction.atomic():
+            source_ids = list(sources.values_list("pk", flat=True))
+
+            if source_ids:
+                ProductProperty._base_manager.filter(
+                    value_select_id__in=source_ids,
+                ).update(value_select_id=target.pk)
+
+                m2m_field = ProductProperty._meta.get_field("value_multi_select")
+                through = m2m_field.remote_field.through
+                through_pk = through._meta.pk.name
+
+                through_manager = through._base_manager
+
+                src_fk_name = m2m_field.m2m_field_name()
+                tgt_fk_name = m2m_field.m2m_reverse_field_name()
+                src_fk_id = f"{src_fk_name}_id"
+                tgt_fk_id = f"{tgt_fk_name}_id"
+
+                # We must ensure there are no lingering m2m references to source ids before deleting them.
+                # Avoid tenant-scoped filtering here: the through table doesn't carry tenant info, and
+                # legacy/nullable product_property.multi_tenant_company would otherwise leave references behind.
+                product_properties_with_target = through_manager.filter(
+                    **{tgt_fk_id: target.pk}
+                ).values_list(src_fk_id, flat=True).distinct()
+
+                # If a product property already has the target value, drop any source rows for it.
+                if product_properties_with_target:
+                    through_manager.filter(
+                        **{
+                            tgt_fk_id + "__in": source_ids,
+                            src_fk_id + "__in": product_properties_with_target,
+                        }
+                    ).delete()
+
+                # For the remaining product properties, collapse multiple source rows down to a single row,
+                # then repoint that row to the target.
+                remaining_through_qs = through_manager.filter(
+                    **{tgt_fk_id + "__in": source_ids}
+                ).exclude(**{src_fk_id + "__in": product_properties_with_target})
+                keeper_ids = list(
+                    remaining_through_qs.values(src_fk_id).annotate(keep_pk=Min(through_pk)).values_list("keep_pk", flat=True)
+                )
+                if keeper_ids:
+                    through_manager.filter(**{f"{through_pk}__in": keeper_ids}).update(**{tgt_fk_id: target.pk})
+
+                # Delete any leftover source rows (e.g. duplicates within the same product property).
+                through_manager.filter(**{tgt_fk_id + "__in": source_ids}).delete()
+
             for source in sources:
                 for relation in PropertySelectValue._meta.related_objects:
                     if relation.related_model.__name__ == "PropertySelectValueTranslation":
                         continue
+                    if relation.related_model.__name__ == "ProductProperty":
+                        continue
                     if relation.one_to_many or relation.one_to_one:
-                        qs = relation.related_model._default_manager.filter(
+                        qs = relation.related_model._base_manager.filter(
                             **{relation.field.name: source}
                         )
                         for obj in qs:
@@ -293,8 +400,7 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
                             except IntegrityError:
                                 obj.delete()
                     elif relation.many_to_many:
-                        # @TODO: Seems that the many_to_many merge doesn't work
-                        through = relation.through._default_manager
+                        through = relation.through._base_manager
                         source_field = relation.field.m2m_reverse_field_name()
                         for through_obj in through.filter(**{source_field: source.pk}):
                             setattr(through_obj, source_field, target.pk)
@@ -310,6 +416,12 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
 class PropertySelectValueManager(MultiTenantManager):
     def get_queryset(self):
         return PropertySelectValueQuerySet(self.model, using=self._db)
+
+    def used_in_products(self, *, multi_tenant_company_id: int, used: bool):
+        return self.get_queryset().used_in_products(
+            multi_tenant_company_id=multi_tenant_company_id,
+            used=used,
+        )
 
     def check_for_duplicates(self, value, property_instance, multi_tenant_company, threshold=0.8):
         qs = self.filter(

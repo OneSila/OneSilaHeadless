@@ -22,6 +22,7 @@ jobs:
           script: |
             set -e
             source venv/bin/activate
+            python --version
             cd /home/${{ secrets.DEVELOPMENT_USERNAME }}/OneSilaHeadless/
             git config pull.rebase false
             git pull

@@ -225,3 +225,23 @@ class SheinSalesChannelMutation:
             site_remote_id=shein_view.remote_id or "",
             categories=categories,
         )
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def map_shein_perfect_match_select_values(
+        self,
+        sales_channel: SheinSalesChannelPartialInput,
+        info: Info,
+    ) -> bool:
+        from sales_channels.integrations.shein.models import SheinSalesChannel
+        from sales_channels.integrations.shein.tasks import (
+            shein_map_perfect_match_select_values_db_task,
+        )
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        channel = SheinSalesChannel.objects.get(
+            id=sales_channel.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        shein_map_perfect_match_select_values_db_task(sales_channel_id=channel.id)
+        return True

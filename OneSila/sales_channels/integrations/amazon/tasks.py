@@ -122,6 +122,16 @@ def amazon_translate_select_value_task(select_value_id: int):
     instance.save(update_fields=["translated_remote_name"])
 
 
+@db_task()
+def amazon_map_perfect_match_select_values_db_task(*, sales_channel_id: int):
+    from sales_channels.integrations.amazon.factories.auto_import import (
+        AmazonPerfectMatchSelectValueMappingFactory,
+    )
+    from sales_channels.integrations.amazon.models import AmazonSalesChannel
+
+    sales_channel = AmazonSalesChannel.objects.get(id=sales_channel_id)
+    AmazonPerfectMatchSelectValueMappingFactory(sales_channel=sales_channel).run()
+
 def run_amazon_sales_channel_mapping_sync(
     *,
     source_sales_channel_id: int,

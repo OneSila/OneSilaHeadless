@@ -9,8 +9,7 @@ from products_inspector.managers import InspectorBlockHasImagesManager, Inspecto
     MissingProductTypeInspectorBlockManager, MissingRequiredPropertiesInspectorBlockManager, MissingOptionalPropertiesInspectorBlockManager, \
     MissingStockManager, MissingManualPriceListOverrideManager, VariationMismatchProductTypeManager, \
     ItemsMismatchProductTypeManager, ItemsMissingMandatoryInformationManager, VariationsMissingMandatoryInformationManager, \
-    DuplicateVariationsManager, NonConfigurableRuleInspectorBlockManager, AmazonValidationIssuesInspectorBlockManager, \
-    AmazonRemoteIssuesInspectorBlockManager
+    DuplicateVariationsManager, NonConfigurableRuleInspectorBlockManager
 
 
 class Inspector(models.Model):
@@ -287,24 +286,3 @@ class NonConfigurableRuleInspectorBlock(InspectorBlock):
         proxy = True
         verbose_name = _("Inspector Block Non-Configurable Rule")
 
-
-class AmazonValidationIssuesInspectorBlock(InspectorBlock):
-    from .constants import amazon_validation_issues_block
-
-    objects = AmazonValidationIssuesInspectorBlockManager()
-    proxy_filter_fields = amazon_validation_issues_block
-
-    class Meta:
-        proxy = True
-        verbose_name = _("Inspector Block Amazon Validation Issues")
-
-
-class AmazonRemoteIssuesInspectorBlock(InspectorBlock):
-    from .constants import amazon_remote_issues_block
-
-    objects = AmazonRemoteIssuesInspectorBlockManager()
-    proxy_filter_fields = amazon_remote_issues_block
-
-    class Meta:
-        proxy = True
-        verbose_name = _("Inspector Block Amazon Remote Issues")

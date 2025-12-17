@@ -8,6 +8,7 @@ from sales_channels.exceptions import (
     SwitchedToSyncException,
     SwitchedToCreateException,
     ConfigurationMissingError,
+    SkipSyncBecauseOfStatusException,
 )
 from sales_channels.factories.mixins import IntegrationInstanceOperationMixin, RemoteInstanceDeleteFactory, \
     EanCodeValueMixin, SyncProgressMixin
@@ -191,6 +192,9 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
     def set_remote_product_for_logging(self):
         self.remote_product = self.remote_parent_product if self.remote_parent_product is not None else self.remote_instance
+
+    def check_status(self):
+        return
 
     def set_rule(self):
         """
@@ -1051,6 +1055,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         try:
             self.initialize_remote_product()
             self.set_remote_product_for_logging()
+            self.check_status()
 
             if self.local_type == Product.CONFIGURABLE:
                 self.get_variations()
@@ -1095,6 +1100,11 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.final_process()
             self.log_action(self.action_log, {}, self.payload, log_identifier)
 
+        except SkipSyncBecauseOfStatusException as skip:
+            logger.debug(skip)
+            self.set_local_assigns()
+            return
+
         except SwitchedToCreateException as stc:
             logger.debug(stc)
             if self.is_switched:
@@ -1132,6 +1142,7 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
         try:
             self.initialize_remote_product()
             self.set_remote_product_for_logging()
+            self.check_status()
             self.sanity_check()
             self.precalculate_progress_step_increment(2)
             self.set_rule()
@@ -1146,6 +1157,10 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
             self.assign_saleschannels()
             self.final_process()
             self.log_action(self.action_log, {}, self.payload, log_identifier)
+
+        except SkipSyncBecauseOfStatusException as skip:
+            logger.debug(skip)
+            return
 
         except SwitchedToCreateException as stc:
             logger.debug(stc)

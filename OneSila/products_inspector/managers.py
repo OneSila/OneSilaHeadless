@@ -178,20 +178,3 @@ class NonConfigurableRuleInspectorBlockManager(InspectorBlockManager):
     def get_queryset(self):
         return NonConfigurableRuleInspectorBlockQuerySet(self.model, using=self._db)
 
-
-class AmazonValidationIssuesQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
-    pass
-
-
-class AmazonValidationIssuesInspectorBlockManager(InspectorBlockManager):
-    def get_queryset(self):
-        return AmazonValidationIssuesQuerySet(self.model, using=self._db)
-
-
-class AmazonRemoteIssuesQuerySet(QuerySetProxyModelMixin, InspectorBlockQuerySet):
-    pass
-
-
-class AmazonRemoteIssuesInspectorBlockManager(InspectorBlockManager):
-    def get_queryset(self):
-        return AmazonRemoteIssuesQuerySet(self.model, using=self._db)

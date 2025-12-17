@@ -33,6 +33,8 @@ from sales_channels.schema.types.filter_mixins import (
     DependentMappedLocallyFilterMixin,
     GeneralMappedLocallyFilterMixin,
     GeneralMappedRemotelyFilterMixin,
+    DependentUsedInProductsFilterMixin,
+    GeneralUsedInProductsFilterMixin,
 )
 
 
@@ -82,7 +84,12 @@ class EbayProductTypeItemFilter(SearchFilterMixin):
 
 
 @filter(EbayProperty)
-class EbayPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
+class EbayPropertyFilter(
+    SearchFilterMixin,
+    DependentMappedLocallyFilterMixin,
+    DependentUsedInProductsFilterMixin,
+    GeneralMappedRemotelyFilterMixin,
+):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
@@ -93,6 +100,12 @@ class EbayPropertyFilter(SearchFilterMixin, DependentMappedLocallyFilterMixin, G
         return (
             (EbayPropertyQuerySet, "filter_mapped_locally"),
             (EbayPropertySelectValueQuerySet, "filter_ebay_property_mapped_locally"),
+        )
+
+    def get_used_in_products_querysets(self):
+        return (
+            (EbayPropertyQuerySet, "used_in_products"),
+            (EbayPropertySelectValueQuerySet, "filter_ebay_property_used_in_products"),
         )
 
 
@@ -122,7 +135,12 @@ class EbayInternalPropertyOptionFilter(SearchFilterMixin):
 
 
 @filter(EbayPropertySelectValue)
-class EbayPropertySelectValueFilter(SearchFilterMixin, GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin):
+class EbayPropertySelectValueFilter(
+    SearchFilterMixin,
+    GeneralUsedInProductsFilterMixin,
+    GeneralMappedLocallyFilterMixin,
+    GeneralMappedRemotelyFilterMixin,
+):
     id: auto
     sales_channel: Optional[SalesChannelFilter]
     ebay_property: Optional[EbayPropertyFilter]

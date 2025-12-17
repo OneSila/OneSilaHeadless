@@ -392,6 +392,87 @@ class EbayProductsImportProcessorParentSkuTest(TestCase):
 
 
 @override_settings(**EBAY_TEST_SETTINGS)
+class EbayProductsImportProcessorActiveFlagTest(TestCase):
+    """Ensure missing listing status does not deactivate configurables."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.import_process = baker.make(Import, multi_tenant_company=self.multi_tenant_company)
+        self.sales_channel = baker.make(
+            EbaySalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            refresh_token_expiration=timezone.now() + timezone.timedelta(days=1),
+            refresh_token='123',
+            hostname="active-flag.ebay.local",
+        )
+        self.view = baker.make(
+            EbaySalesChannelView,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="EBAY_ACTIVE",
+        )
+        baker.make(
+            EbayRemoteLanguage,
+            sales_channel=self.sales_channel,
+            sales_channel_view=self.view,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_code="en-us",
+            local_instance="en",
+        )
+        self.processor = EbayProductsImportProcessor(
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+        )
+
+    def test_configurable_defaults_to_active_without_listing_status(self) -> None:
+        product_payload = {
+            "sku": "CFG-100",
+            "variant_skus": ["VAR-101"],
+            "product": {"title": "Configurable", "description": "Parent"},
+            "locale": "en_US",
+        }
+        offer_payload = {
+            "marketplace_id": self.view.remote_id,
+            "listing": {},
+        }
+
+        structured, _, _ = self.processor.get__product_data(
+            product_data=product_payload,
+            offer_data=offer_payload,
+            is_variation=False,
+            is_configurable=True,
+            product_instance=None,
+            child_product_data=None,
+            parent_skus=None,
+        )
+
+        self.assertTrue(structured["active"])
+
+    def test_simple_remains_inactive_without_listing_status(self) -> None:
+        product_payload = {
+            "sku": "SIMPLE-100",
+            "product": {"title": "Simple", "description": "Simple"},
+            "locale": "en_US",
+        }
+        offer_payload = {
+            "marketplace_id": self.view.remote_id,
+            "listing": {},
+        }
+
+        structured, _, _ = self.processor.get__product_data(
+            product_data=product_payload,
+            offer_data=offer_payload,
+            is_variation=False,
+            is_configurable=False,
+            product_instance=None,
+            child_product_data=None,
+            parent_skus=None,
+        )
+
+        self.assertFalse(structured["active"])
+
+
+@override_settings(**EBAY_TEST_SETTINGS)
 class EbayProductsImportProcessorAttributesTest(TestCase):
     """Ensure internal property options map to local select values."""
 

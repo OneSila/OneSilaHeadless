@@ -16,6 +16,11 @@ from operator import itemgetter
 import os
 import sys
 
+from core.exceptions import ValidationError
+from sentry_sdk.integrations.huey import HueyIntegration
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.strawberry import StrawberryIntegration
+
 SECRET_KEY = "FAKE-KEY-DONT-KEEP-THIS-YOU-SHOULD-SET-A-NEW-ONE"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -397,6 +402,34 @@ SHOPIFY_TEST_REDIRECT_URI = os.getenv('SHOPIFY_TEST_REDIRECT_URI')
 SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
 SHOPIFY_API_SECRET = os.getenv('SHOPIFY_API_SECRET')
 
+#
+# eBay integration settings (sales_channels.integrations.ebay)
+#
+
+EBAY_APPLICATION_SCOPES = [
+    "https://api.ebay.com/oauth/api_scope",
+    "https://api.ebay.com/oauth/api_scope/sell.marketing.readonly",
+    "https://api.ebay.com/oauth/api_scope/sell.marketing",
+    "https://api.ebay.com/oauth/api_scope/sell.inventory.readonly",
+    "https://api.ebay.com/oauth/api_scope/sell.inventory",
+    "https://api.ebay.com/oauth/api_scope/sell.account.readonly",
+    "https://api.ebay.com/oauth/api_scope/sell.account",
+    "https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly",
+    "https://api.ebay.com/oauth/api_scope/sell.fulfillment",
+    "https://api.ebay.com/oauth/api_scope/sell.analytics.readonly",
+    "https://api.ebay.com/oauth/api_scope/sell.finances",
+    "https://api.ebay.com/oauth/api_scope/sell.payment.dispute",
+    "https://api.ebay.com/oauth/api_scope/commerce.identity.readonly",
+    "https://api.ebay.com/oauth/api_scope/sell.reputation",
+    "https://api.ebay.com/oauth/api_scope/sell.reputation.readonly",
+    "https://api.ebay.com/oauth/api_scope/commerce.notification.subscription",
+    "https://api.ebay.com/oauth/api_scope/commerce.notification.subscription.readonly",
+    "https://api.ebay.com/oauth/api_scope/sell.stores",
+    "https://api.ebay.com/oauth/api_scope/sell.stores.readonly",
+    "https://api.ebay.com/oauth/scope/sell.edelivery",
+    "https://api.ebay.com/oauth/api_scope/commerce.vero",
+]
+
 
 #
 # OpenAI settings. (llm)
@@ -476,3 +509,13 @@ LOGGING = {
 WEBHOOKS_SIGNATURE_SKEW_SECONDS = 300
 WEBHOOKS_GZIP_THRESHOLD_BYTES = 16384
 WEBHOOKS_DEFAULT_TIMEOUT_MS = 10000
+
+SENTRY_CONFIG = {
+    "dsn": "test",
+    "send_default_pii": True,
+    "environment": "test",
+    "traces_sample_rate": 1.0,
+    "profiles_sample_rate": 1.0,
+    "ignore_errors": [ValidationError],
+    "integrations": [DjangoIntegration(), HueyIntegration(), StrawberryIntegration(async_execution=True)],
+}

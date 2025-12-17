@@ -1,5 +1,5 @@
 from core.managers import MultiTenantManager, MultiTenantQuerySet
-from django.db.models import BooleanField, Case, Value, When
+from django.db.models import BooleanField, Case, Exists, OuterRef, Q, Value, When
 from polymorphic.managers import PolymorphicManager, PolymorphicQuerySet
 
 
@@ -39,6 +39,64 @@ class _MappingManagerMixin:
 
     def filter_mapped_remotely(self, value: bool = True):
         return self.get_queryset().filter_mapped_remotely(value)
+
+
+class _RemotePropertyUsedInProductsQuerySetMixin:
+    def with_remote_product_usage(self, *, remote_product_property_model):
+        usage_qs = remote_product_property_model._base_manager.filter(
+            sales_channel_id=OuterRef("sales_channel_id"),
+        ).filter(
+            Q(remote_property_id=OuterRef("pk"))
+            | Q(local_instance__property_id=OuterRef("local_instance_id"))
+        ).only("pk")
+
+        return self.annotate(has_usage=Exists(usage_qs))
+
+    def used_in_products(self, *, remote_product_property_model, used: bool):
+        return self.with_remote_product_usage(
+            remote_product_property_model=remote_product_property_model,
+        ).filter(has_usage=used)
+
+
+class _RemoteSelectValueUsedInProductsQuerySetMixin:
+    def with_remote_product_usage_by_remote_property(
+        self,
+        *,
+        remote_product_property_model,
+        related_remote_property_field: str,
+    ):
+        usage_qs = remote_product_property_model._base_manager.filter(
+            sales_channel_id=OuterRef("sales_channel_id"),
+            remote_property_id=OuterRef(f"{related_remote_property_field}_id"),
+        ).only("pk")
+
+        return self.annotate(has_usage=Exists(usage_qs))
+
+    def used_in_products_by_remote_property(
+        self,
+        *,
+        remote_product_property_model,
+        related_remote_property_field: str,
+        used: bool,
+    ):
+        return self.with_remote_product_usage_by_remote_property(
+            remote_product_property_model=remote_product_property_model,
+            related_remote_property_field=related_remote_property_field,
+        ).filter(has_usage=used)
+
+    def remote_property_used_in_products(
+        self,
+        *,
+        remote_product_property_model,
+        related_remote_property_field: str,
+        used: bool,
+    ):
+        usage_qs = remote_product_property_model._base_manager.filter(
+            sales_channel_id=OuterRef("sales_channel_id"),
+            remote_property_id=OuterRef(f"{related_remote_property_field}_id"),
+        ).only("pk")
+
+        return self.annotate(has_usage=Exists(usage_qs)).filter(has_usage=used)
 
 class RemoteProductConfiguratorQuerySet(PolymorphicQuerySet, MultiTenantQuerySet):
     """
@@ -109,6 +167,9 @@ class SalesChannelViewAssignQuerySet(PolymorphicQuerySet, MultiTenantQuerySet):
         valid_statuses = {
             RemoteProduct.STATUS_COMPLETED,
             RemoteProduct.STATUS_FAILED,
+            RemoteProduct.STATUS_APPROVAL_REJECTED,
+            RemoteProduct.STATUS_PARTIALLY_LISTED,
+            RemoteProduct.STATUS_PENDING_APPROVAL,
             RemoteProduct.STATUS_PROCESSING,
         }
 

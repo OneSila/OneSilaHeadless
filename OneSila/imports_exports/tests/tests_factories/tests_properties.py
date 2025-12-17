@@ -882,7 +882,7 @@ class ImportProductPropertiesRuleItemInstanceProcessTest(TestCase):
         instance.process()
 
         updated_item = instance.instance
-        self.assertNotEquals(updated_item.id, initial_rule_item.id)
+        self.assertNotEqual(updated_item.id, initial_rule_item.id)
         self.assertEqual(instance.rule.id, self.existing_rule.id)
         self.assertEqual(initial_item_cnt + 1, ProductPropertiesRuleItem.objects.filter(rule=self.existing_rule).count())
 
