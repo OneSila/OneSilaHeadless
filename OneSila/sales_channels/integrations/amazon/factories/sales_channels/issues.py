@@ -1,6 +1,8 @@
 from core.helpers import ensure_serializable
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.models import AmazonProduct, AmazonProductIssue
+from sales_channels.integrations.amazon.flows.tasks_runner import run_single_amazon_product_task_flow
+from sales_channels.integrations.amazon.tasks import resync_amazon_product_db_task
 
 
 class FetchRemoteIssuesFactory(GetAmazonAPIMixin):
@@ -80,6 +82,8 @@ class FetchRemoteIssuesFactory(GetAmazonAPIMixin):
         override_status = self.remote_product.STATUS_APPROVAL_REJECTED if (not asin and issues_data) else None
         self.remote_product.refresh_status(commit=True, override_status=override_status)
 
+        self._auto_fix_partially_listed()
+
         child_products = (
             AmazonProduct.objects.filter(remote_parent_product=self.remote_product)
             .select_related("local_instance", "sales_channel")
@@ -87,6 +91,38 @@ class FetchRemoteIssuesFactory(GetAmazonAPIMixin):
 
         for child_product in child_products.iterator():
             FetchRemoteIssuesFactory(remote_product=child_product, view=self.view).run()
+
+    def _auto_fix_partially_listed(self) -> None:
+        if self.remote_product.status != self.remote_product.STATUS_PARTIALLY_LISTED:
+            return
+
+        if not getattr(self.remote_product, "local_instance_id", None):
+            return
+
+        from sales_channels.integrations.amazon.models import AmazonSalesChannelView
+        from sales_channels.models.sales_channels import SalesChannelViewAssign
+
+        created_marketplaces = set(self.remote_product.created_marketplaces or [])
+        missing_view_ids = list(
+            SalesChannelViewAssign.objects.filter(remote_product=self.remote_product)
+            .exclude(sales_channel_view__remote_id__in=created_marketplaces)
+            .values_list("sales_channel_view_id", flat=True)
+            .distinct()
+        )
+        if not missing_view_ids:
+            return
+
+        count = 1 + (getattr(self.remote_product.local_instance, "get_configurable_variations", lambda: [])().count())
+        for view in AmazonSalesChannelView.objects.filter(id__in=missing_view_ids).select_related("sales_channel"):
+            run_single_amazon_product_task_flow(
+                task_func=resync_amazon_product_db_task,
+                view=view,
+                number_of_remote_requests=count,
+                product_id=self.remote_product.local_instance_id,
+                remote_product_id=self.remote_product.id,
+                force_validation_only=False,
+                force_full_update=True,
+            )
 
 
 class FetchRemoteValidationIssueFactory:

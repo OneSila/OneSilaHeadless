@@ -16,4 +16,4 @@ def get_multi_tenant_company(info: Info, fail_silently=True):
 
 
 async def aget_multi_tenant_company(info: Info, fail_silently=True):
-    return sync_to_async(get_multi_tenant_company)(info=info, fail_silently=fail_silently)
+    return await sync_to_async(get_multi_tenant_company)(info=info, fail_silently=fail_silently)

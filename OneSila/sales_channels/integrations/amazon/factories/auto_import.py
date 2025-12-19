@@ -71,6 +71,26 @@ class AmazonPerfectMatchSelectValueMappingFactory(BasePerfectMatchSelectValueMap
     def __init__(self, *, sales_channel):
         super().__init__(sales_channel=sales_channel)
 
+    def get_cross_language_code(self, *, remote_language_code: str):
+        multi_tenant_company = getattr(self.sales_channel, "multi_tenant_company", None)
+        if not multi_tenant_company:
+            return None
+        return multi_tenant_company.language
+
+    def iter_candidate_match_values(self, *, remote_instance):
+        remote_name = getattr(remote_instance, "remote_name", None)
+        if remote_name:
+            value = remote_name.strip()
+            if value:
+                yield value
+
+    def iter_candidate_cross_language_match_values(self, *, remote_instance):
+        translated_remote_name = getattr(remote_instance, "translated_remote_name", None)
+        if translated_remote_name:
+            value = translated_remote_name.strip()
+            if value:
+                yield value
+
     def get_remote_languages_in_order(self):
         return (
             AmazonRemoteLanguage.objects.filter(

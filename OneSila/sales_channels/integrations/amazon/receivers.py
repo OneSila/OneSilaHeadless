@@ -50,27 +50,13 @@ from sales_channels.integrations.amazon.constants import (
 from sales_channels.helpers import rebind_amazon_product_type_to_rule
 from imports_exports.signals import import_success
 from sales_channels.integrations.amazon.factories.imports.products_imports import AmazonConfigurableVariationsFactory
-from sales_channels.integrations.amazon.flows.tasks_runner import run_single_amazon_product_task_flow
+from sales_channels.integrations.amazon.flows.tasks_runner import (
+    run_product_amazon_sales_channel_task_flow,
+    run_single_amazon_product_task_flow,
+)
 
 
 logger = logging.getLogger(__name__)
-
-
-def _log_amazon_product_signal(event_name, product, context=None):
-    remote_product_ids = list(
-        AmazonProduct.objects.filter(local_instance=product).values_list('id', flat=True)
-    )
-    sanitized_context = {}
-    if context:
-        sanitized_context = {key: value for key, value in context.items() if value is not None}
-
-    logger.info(
-        'Amazon receiver triggered: %s product_id=%s remote_product_ids=%s context=%s',
-        event_name,
-        getattr(product, 'id', None),
-        remote_product_ids,
-        sanitized_context,
-    )
 
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
@@ -326,20 +312,32 @@ def amazon__assign__update(sender, instance, sales_channel, view, **kwargs):
 
 @receiver(update_remote_product, sender='products.Product')
 def amazon__product__update(sender, instance, **kwargs):
-    _log_amazon_product_signal(
-        'update_remote_product',
-        instance,
-        context={'payload_keys': sorted(kwargs.keys())},
+    from sales_channels.integrations.amazon.tasks_receiver_audit import (
+        amazon__product__update_db_task,
+    )
+
+    run_product_amazon_sales_channel_task_flow(
+        task_func=amazon__product__update_db_task,
+        multi_tenant_company=instance.multi_tenant_company,
+        product=instance,
+        number_of_remote_requests=0,
+        context={"payload_keys": sorted(kwargs.keys())},
     )
 
 
 @receiver(create_remote_product_property, sender='properties.ProductProperty')
 def amazon__product_property__create(sender, instance, **kwargs):
+    from sales_channels.integrations.amazon.tasks_receiver_audit import (
+        amazon__product_property__create_db_task,
+    )
+
     product = instance.product
     property_obj = getattr(instance, 'property', None)
-    _log_amazon_product_signal(
-        'create_remote_product_property',
-        product,
+    run_product_amazon_sales_channel_task_flow(
+        task_func=amazon__product_property__create_db_task,
+        multi_tenant_company=product.multi_tenant_company,
+        product=product,
+        number_of_remote_requests=0,
         context={
             'product_property_id': instance.id,
             'property_id': getattr(property_obj, 'id', None),
@@ -350,11 +348,17 @@ def amazon__product_property__create(sender, instance, **kwargs):
 
 @receiver(update_remote_product_property, sender='properties.ProductProperty')
 def amazon__product_property__update(sender, instance, **kwargs):
+    from sales_channels.integrations.amazon.tasks_receiver_audit import (
+        amazon__product_property__update_db_task,
+    )
+
     product = instance.product
     property_obj = getattr(instance, 'property', None)
-    _log_amazon_product_signal(
-        'update_remote_product_property',
-        product,
+    run_product_amazon_sales_channel_task_flow(
+        task_func=amazon__product_property__update_db_task,
+        multi_tenant_company=product.multi_tenant_company,
+        product=product,
+        number_of_remote_requests=0,
         context={
             'product_property_id': instance.id,
             'property_id': getattr(property_obj, 'id', None),
@@ -366,11 +370,17 @@ def amazon__product_property__update(sender, instance, **kwargs):
 
 @receiver(delete_remote_product_property, sender='properties.ProductProperty')
 def amazon__product_property__delete(sender, instance, **kwargs):
+    from sales_channels.integrations.amazon.tasks_receiver_audit import (
+        amazon__product_property__delete_db_task,
+    )
+
     product = instance.product
     property_obj = getattr(instance, 'property', None)
-    _log_amazon_product_signal(
-        'delete_remote_product_property',
-        product,
+    run_product_amazon_sales_channel_task_flow(
+        task_func=amazon__product_property__delete_db_task,
+        multi_tenant_company=product.multi_tenant_company,
+        product=product,
+        number_of_remote_requests=0,
         context={
             'product_property_id': instance.id,
             'property_id': getattr(property_obj, 'id', None),
@@ -381,10 +391,16 @@ def amazon__product_property__delete(sender, instance, **kwargs):
 
 @receiver(update_remote_price, sender='products.Product')
 def amazon__price__update(sender, instance, **kwargs):
+    from sales_channels.integrations.amazon.tasks_receiver_audit import (
+        amazon__price__update_db_task,
+    )
+
     currency = kwargs.get('currency')
-    _log_amazon_product_signal(
-        'update_remote_price',
-        instance,
+    run_product_amazon_sales_channel_task_flow(
+        task_func=amazon__price__update_db_task,
+        multi_tenant_company=instance.multi_tenant_company,
+        product=instance,
+        number_of_remote_requests=0,
         context={
             'currency_id': getattr(currency, 'id', None),
             'currency_code': getattr(currency, 'code', None),
@@ -395,10 +411,16 @@ def amazon__price__update(sender, instance, **kwargs):
 
 @receiver(update_remote_product_content, sender='products.Product')
 def amazon__content__update(sender, instance, **kwargs):
+    from sales_channels.integrations.amazon.tasks_receiver_audit import (
+        amazon__content__update_db_task,
+    )
+
     language = kwargs.get('language')
-    _log_amazon_product_signal(
-        'update_remote_product_content',
-        instance,
+    run_product_amazon_sales_channel_task_flow(
+        task_func=amazon__content__update_db_task,
+        multi_tenant_company=instance.multi_tenant_company,
+        product=instance,
+        number_of_remote_requests=0,
         context={
             'language_id': getattr(language, 'id', None),
             'language_code': getattr(language, 'code', None),
@@ -409,14 +431,30 @@ def amazon__content__update(sender, instance, **kwargs):
 
 @receiver(update_remote_product_eancode, sender='products.Product')
 def amazon__ean_code__update(sender, instance, **kwargs):
-    _log_amazon_product_signal('update_remote_product_eancode', instance)
+    from sales_channels.integrations.amazon.tasks_receiver_audit import (
+        amazon__ean_code__update_db_task,
+    )
+
+    run_product_amazon_sales_channel_task_flow(
+        task_func=amazon__ean_code__update_db_task,
+        multi_tenant_company=instance.multi_tenant_company,
+        product=instance,
+        number_of_remote_requests=0,
+        context=None,
+    )
 
 
 @receiver(add_remote_product_variation, sender='products.ConfigurableVariation')
 def amazon__variation__add(sender, parent_product, variation_product, **kwargs):
-    _log_amazon_product_signal(
-        'add_remote_product_variation',
-        parent_product,
+    from sales_channels.integrations.amazon.tasks_receiver_audit import (
+        amazon__variation__add_db_task,
+    )
+
+    run_product_amazon_sales_channel_task_flow(
+        task_func=amazon__variation__add_db_task,
+        multi_tenant_company=parent_product.multi_tenant_company,
+        product=parent_product,
+        number_of_remote_requests=0,
         context={
             'parent_product_id': getattr(parent_product, 'id', None),
             'variation_product_id': getattr(variation_product, 'id', None),
@@ -426,9 +464,15 @@ def amazon__variation__add(sender, parent_product, variation_product, **kwargs):
 
 @receiver(remove_remote_product_variation, sender='products.ConfigurableVariation')
 def amazon__variation__remove(sender, parent_product, variation_product, **kwargs):
-    _log_amazon_product_signal(
-        'remove_remote_product_variation',
-        parent_product,
+    from sales_channels.integrations.amazon.tasks_receiver_audit import (
+        amazon__variation__remove_db_task,
+    )
+
+    run_product_amazon_sales_channel_task_flow(
+        task_func=amazon__variation__remove_db_task,
+        multi_tenant_company=parent_product.multi_tenant_company,
+        product=parent_product,
+        number_of_remote_requests=0,
         context={
             'parent_product_id': getattr(parent_product, 'id', None),
             'variation_product_id': getattr(variation_product, 'id', None),
@@ -438,11 +482,17 @@ def amazon__variation__remove(sender, parent_product, variation_product, **kwarg
 
 @receiver(create_remote_image_association, sender='media.MediaProductThrough')
 def amazon__image_assoc__create(sender, instance, **kwargs):
+    from sales_channels.integrations.amazon.tasks_receiver_audit import (
+        amazon__image_assoc__create_db_task,
+    )
+
     product = instance.product
     media = getattr(instance, 'media', None)
-    _log_amazon_product_signal(
-        'create_remote_image_association',
-        product,
+    run_product_amazon_sales_channel_task_flow(
+        task_func=amazon__image_assoc__create_db_task,
+        multi_tenant_company=product.multi_tenant_company,
+        product=product,
+        number_of_remote_requests=0,
         context={
             'media_product_through_id': instance.id,
             'media_id': getattr(media, 'id', None),
@@ -453,11 +503,17 @@ def amazon__image_assoc__create(sender, instance, **kwargs):
 
 @receiver(update_remote_image_association, sender='media.MediaProductThrough')
 def amazon__image_assoc__update(sender, instance, **kwargs):
+    from sales_channels.integrations.amazon.tasks_receiver_audit import (
+        amazon__image_assoc__update_db_task,
+    )
+
     product = instance.product
     media = getattr(instance, 'media', None)
-    _log_amazon_product_signal(
-        'update_remote_image_association',
-        product,
+    run_product_amazon_sales_channel_task_flow(
+        task_func=amazon__image_assoc__update_db_task,
+        multi_tenant_company=product.multi_tenant_company,
+        product=product,
+        number_of_remote_requests=0,
         context={
             'media_product_through_id': instance.id,
             'media_id': getattr(media, 'id', None),
@@ -469,11 +525,17 @@ def amazon__image_assoc__update(sender, instance, **kwargs):
 
 @receiver(delete_remote_image_association, sender='media.MediaProductThrough')
 def amazon__image_assoc__delete(sender, instance, **kwargs):
+    from sales_channels.integrations.amazon.tasks_receiver_audit import (
+        amazon__image_assoc__delete_db_task,
+    )
+
     product = instance.product
     media = getattr(instance, 'media', None)
-    _log_amazon_product_signal(
-        'delete_remote_image_association',
-        product,
+    run_product_amazon_sales_channel_task_flow(
+        task_func=amazon__image_assoc__delete_db_task,
+        multi_tenant_company=product.multi_tenant_company,
+        product=product,
+        number_of_remote_requests=0,
         context={
             'media_product_through_id': instance.id,
             'media_id': getattr(media, 'id', None),
@@ -484,15 +546,22 @@ def amazon__image_assoc__delete(sender, instance, **kwargs):
 
 @receiver(delete_remote_image, sender='media.Media')
 def amazon__image__delete(sender, instance, **kwargs):
-    product_ids = list(instance.products.values_list('id', flat=True))
-    remote_products = AmazonProduct.objects.filter(local_instance_id__in=product_ids)
-    remote_map = {}
-    for remote_product in remote_products:
-        remote_map.setdefault(remote_product.local_instance_id, []).append(remote_product.id)
-
-    logger.info(
-        'Amazon receiver triggered: delete_remote_image image_id=%s product_ids=%s remote_product_ids=%s',
-        instance.id,
-        product_ids,
-        remote_map,
+    from products.models import Product
+    from sales_channels.integrations.amazon.tasks_receiver_audit import (
+        amazon__image__delete_db_task,
     )
+
+    product_ids = list(instance.products.values_list("id", flat=True))
+    products = Product.objects.filter(id__in=product_ids).only("id", "multi_tenant_company_id")
+
+    for product in products.iterator():
+        run_product_amazon_sales_channel_task_flow(
+            task_func=amazon__image__delete_db_task,
+            multi_tenant_company=product.multi_tenant_company,
+            product=product,
+            number_of_remote_requests=0,
+            context={
+                "image_id": instance.id,
+                "product_id": product.id,
+            },
+        )

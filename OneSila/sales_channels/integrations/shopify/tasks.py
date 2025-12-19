@@ -186,7 +186,11 @@ def update_shopify_product_eancode_db_task(
 @remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=2)
 @db_task()
 def add_shopify_product_variation_db_task(
-    task_queue_item_id, sales_channel_id, parent_product_id, variation_product_id
+    task_queue_item_id,
+    sales_channel_id,
+    parent_product_id,
+    variation_product_id,
+    remote_product_id=None,
 ):
     from .factories.products import ShopifyProductVariationAddFactory
 
@@ -209,7 +213,11 @@ def add_shopify_product_variation_db_task(
 @remote_task(priority=HIGH_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def remove_shopify_product_variation_db_task(
-    task_queue_item_id, sales_channel_id, parent_product_id, variation_product_id
+    task_queue_item_id,
+    sales_channel_id,
+    parent_product_id,
+    variation_product_id,
+    remote_product_id=None,
 ):
     from sales_channels.models import RemoteProduct
     from .factories.products import ShopifyProductDeleteFactory
@@ -219,23 +227,34 @@ def remove_shopify_product_variation_db_task(
     def actual_task():
         sales_channel = ShopifySalesChannel.objects.get(id=sales_channel_id)
 
-        parent_remote = RemoteProduct.objects.get(
-            local_instance_id=parent_product_id,
-            sales_channel=sales_channel,
-            is_variation=False
-        )
-        variant_remote = RemoteProduct.objects.get(
-            local_instance_id=variation_product_id,
-            remote_parent_product=parent_remote,
-            is_variation=True,
-            sales_channel=sales_channel
-        )
+        try:
+            if remote_product_id:
+                parent_remote = RemoteProduct.objects.get(
+                    id=remote_product_id,
+                    sales_channel=sales_channel,
+                    is_variation=False,
+                )
+            else:
+                parent_remote = RemoteProduct.objects.get(
+                    local_instance_id=parent_product_id,
+                    sales_channel=sales_channel,
+                    is_variation=False,
+                )
 
-        factory = ShopifyProductDeleteFactory(
-            sales_channel=sales_channel,
-            remote_instance=variant_remote
-        )
-        factory.run()
+            variant_remote = RemoteProduct.objects.get(
+                local_instance_id=variation_product_id,
+                remote_parent_product=parent_remote,
+                is_variation=True,
+                sales_channel=sales_channel,
+            )
+
+            factory = ShopifyProductDeleteFactory(
+                sales_channel=sales_channel,
+                remote_instance=variant_remote,
+            )
+            factory.run()
+        except RemoteProduct.DoesNotExist:
+            return
 
     task.execute(actual_task)
 
