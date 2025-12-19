@@ -9,6 +9,19 @@ from sales_channels.signals import (
     create_remote_product,
     delete_remote_product,
     sales_view_assign_updated,
+    update_remote_product,
+    create_remote_product_property,
+    update_remote_product_property,
+    delete_remote_product_property,
+    update_remote_price,
+    update_remote_product_content,
+    update_remote_product_eancode,
+    add_remote_product_variation,
+    remove_remote_product_variation,
+    create_remote_image_association,
+    update_remote_image_association,
+    delete_remote_image_association,
+    delete_remote_image,
 )
 from sales_channels.integrations.ebay.models import (
     EbaySalesChannel,
@@ -33,7 +46,10 @@ from sales_channels.integrations.ebay.tasks import (
     delete_ebay_assign_offers_db_task,
     delete_ebay_product_db_task,
 )
-from sales_channels.integrations.ebay.flows.tasks_runner import run_single_ebay_product_task_flow
+from sales_channels.integrations.ebay.flows.tasks_runner import (
+    run_product_ebay_sales_channel_task_flow,
+    run_single_ebay_product_task_flow,
+)
 from sales_channels.models import SalesChannelViewAssign
 from sales_channels.helpers import rebind_ebay_product_type_to_rule
 
@@ -71,6 +87,263 @@ def _queue_delete_product_task(*, product, sales_channel, view) -> bool:
         product_id=product.id,
     )
     return True
+
+
+@receiver(update_remote_product, sender='products.Product')
+def ebay__product__update(sender, instance, **kwargs):
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__product__update_db_task,
+    )
+
+    run_product_ebay_sales_channel_task_flow(
+        task_func=ebay__product__update_db_task,
+        multi_tenant_company=instance.multi_tenant_company,
+        product=instance,
+        number_of_remote_requests=0,
+        context={"payload_keys": sorted(kwargs.keys())},
+    )
+
+
+@receiver(create_remote_product_property, sender='properties.ProductProperty')
+def ebay__product_property__create(sender, instance, **kwargs):
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__product_property__create_db_task,
+    )
+
+    product = instance.product
+    property_obj = getattr(instance, "property", None)
+    run_product_ebay_sales_channel_task_flow(
+        task_func=ebay__product_property__create_db_task,
+        multi_tenant_company=product.multi_tenant_company,
+        product=product,
+        number_of_remote_requests=0,
+        context={
+            "product_property_id": instance.id,
+            "property_id": getattr(property_obj, "id", None),
+            "property_code": getattr(property_obj, "code", None),
+        },
+    )
+
+
+@receiver(update_remote_product_property, sender='properties.ProductProperty')
+def ebay__product_property__update(sender, instance, **kwargs):
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__product_property__update_db_task,
+    )
+
+    product = instance.product
+    property_obj = getattr(instance, "property", None)
+    run_product_ebay_sales_channel_task_flow(
+        task_func=ebay__product_property__update_db_task,
+        multi_tenant_company=product.multi_tenant_company,
+        product=product,
+        number_of_remote_requests=0,
+        context={
+            "product_property_id": instance.id,
+            "property_id": getattr(property_obj, "id", None),
+            "property_code": getattr(property_obj, "code", None),
+            "payload_keys": sorted(kwargs.keys()),
+        },
+    )
+
+
+@receiver(delete_remote_product_property, sender='properties.ProductProperty')
+def ebay__product_property__delete(sender, instance, **kwargs):
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__product_property__delete_db_task,
+    )
+
+    product = instance.product
+    property_obj = getattr(instance, "property", None)
+    run_product_ebay_sales_channel_task_flow(
+        task_func=ebay__product_property__delete_db_task,
+        multi_tenant_company=product.multi_tenant_company,
+        product=product,
+        number_of_remote_requests=0,
+        context={
+            "product_property_id": instance.id,
+            "property_id": getattr(property_obj, "id", None),
+            "property_code": getattr(property_obj, "code", None),
+        },
+    )
+
+
+@receiver(update_remote_price, sender='products.Product')
+def ebay__price__update(sender, instance, **kwargs):
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__price__update_db_task,
+    )
+
+    currency = kwargs.get("currency")
+    run_product_ebay_sales_channel_task_flow(
+        task_func=ebay__price__update_db_task,
+        multi_tenant_company=instance.multi_tenant_company,
+        product=instance,
+        number_of_remote_requests=0,
+        context={
+            "currency_id": getattr(currency, "id", None),
+            "currency_code": getattr(currency, "code", None),
+            "currency_iso_code": getattr(currency, "iso_code", None),
+        },
+    )
+
+
+@receiver(update_remote_product_content, sender='products.Product')
+def ebay__content__update(sender, instance, **kwargs):
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__content__update_db_task,
+    )
+
+    language = kwargs.get("language")
+    run_product_ebay_sales_channel_task_flow(
+        task_func=ebay__content__update_db_task,
+        multi_tenant_company=instance.multi_tenant_company,
+        product=instance,
+        number_of_remote_requests=0,
+        context={
+            "language_id": getattr(language, "id", None),
+            "language_code": getattr(language, "code", None),
+            "language_iso_code": getattr(language, "iso_code", None),
+        },
+    )
+
+
+@receiver(update_remote_product_eancode, sender='products.Product')
+def ebay__ean_code__update(sender, instance, **kwargs):
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__ean_code__update_db_task,
+    )
+
+    run_product_ebay_sales_channel_task_flow(
+        task_func=ebay__ean_code__update_db_task,
+        multi_tenant_company=instance.multi_tenant_company,
+        product=instance,
+        number_of_remote_requests=0,
+        context=None,
+    )
+
+
+@receiver(add_remote_product_variation, sender='products.ConfigurableVariation')
+def ebay__variation__add(sender, parent_product, variation_product, **kwargs):
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__variation__add_db_task,
+    )
+
+    run_product_ebay_sales_channel_task_flow(
+        task_func=ebay__variation__add_db_task,
+        multi_tenant_company=parent_product.multi_tenant_company,
+        product=parent_product,
+        number_of_remote_requests=0,
+        context={
+            "parent_product_id": getattr(parent_product, "id", None),
+            "variation_product_id": getattr(variation_product, "id", None),
+        },
+    )
+
+
+@receiver(remove_remote_product_variation, sender='products.ConfigurableVariation')
+def ebay__variation__remove(sender, parent_product, variation_product, **kwargs):
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__variation__remove_db_task,
+    )
+
+    run_product_ebay_sales_channel_task_flow(
+        task_func=ebay__variation__remove_db_task,
+        multi_tenant_company=parent_product.multi_tenant_company,
+        product=parent_product,
+        number_of_remote_requests=0,
+        context={
+            "parent_product_id": getattr(parent_product, "id", None),
+            "variation_product_id": getattr(variation_product, "id", None),
+        },
+    )
+
+
+@receiver(create_remote_image_association, sender='media.MediaProductThrough')
+def ebay__image_assoc__create(sender, instance, **kwargs):
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__image_assoc__create_db_task,
+    )
+
+    product = instance.product
+    media = getattr(instance, "media", None)
+    run_product_ebay_sales_channel_task_flow(
+        task_func=ebay__image_assoc__create_db_task,
+        multi_tenant_company=product.multi_tenant_company,
+        product=product,
+        number_of_remote_requests=0,
+        context={
+            "media_product_through_id": instance.id,
+            "media_id": getattr(media, "id", None),
+            "media_type": getattr(media, "type", None),
+        },
+    )
+
+
+@receiver(update_remote_image_association, sender='media.MediaProductThrough')
+def ebay__image_assoc__update(sender, instance, **kwargs):
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__image_assoc__update_db_task,
+    )
+
+    product = instance.product
+    media = getattr(instance, "media", None)
+    run_product_ebay_sales_channel_task_flow(
+        task_func=ebay__image_assoc__update_db_task,
+        multi_tenant_company=product.multi_tenant_company,
+        product=product,
+        number_of_remote_requests=0,
+        context={
+            "media_product_through_id": instance.id,
+            "media_id": getattr(media, "id", None),
+            "media_type": getattr(media, "type", None),
+            "payload_keys": sorted(kwargs.keys()),
+        },
+    )
+
+
+@receiver(delete_remote_image_association, sender='media.MediaProductThrough')
+def ebay__image_assoc__delete(sender, instance, **kwargs):
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__image_assoc__delete_db_task,
+    )
+
+    product = instance.product
+    media = getattr(instance, "media", None)
+    run_product_ebay_sales_channel_task_flow(
+        task_func=ebay__image_assoc__delete_db_task,
+        multi_tenant_company=product.multi_tenant_company,
+        product=product,
+        number_of_remote_requests=0,
+        context={
+            "media_product_through_id": instance.id,
+            "media_id": getattr(media, "id", None),
+            "media_type": getattr(media, "type", None),
+        },
+    )
+
+
+@receiver(delete_remote_image, sender='media.Media')
+def ebay__image__delete(sender, instance, **kwargs):
+    from products.models import Product
+    from sales_channels.integrations.ebay.tasks_receiver_audit import (
+        ebay__image__delete_db_task,
+    )
+
+    product_ids = list(instance.products.values_list("id", flat=True))
+    products = Product.objects.filter(id__in=product_ids).only("id", "multi_tenant_company_id")
+
+    for product in products.iterator():
+        run_product_ebay_sales_channel_task_flow(
+            task_func=ebay__image__delete_db_task,
+            multi_tenant_company=product.multi_tenant_company,
+            product=product,
+            number_of_remote_requests=0,
+            context={
+                "image_id": instance.id,
+                "product_id": product.id,
+            },
+        )
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
 @receiver(refresh_website_pull_models, sender='ebay.EbaySalesChannel')

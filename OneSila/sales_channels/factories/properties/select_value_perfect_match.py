@@ -87,20 +87,43 @@ class BasePerfectMatchSelectValueMappingFactory:
     ) -> int:
         property_ids: set[int] = set()
         values: set[str] = set()
+        cross_language_values: set[str] = set()
+        cross_language_code = self.get_cross_language_code(remote_language_code=language_code)
 
         for candidate in candidates:
             property_ids.add(candidate.local_property_id)
             values.update(self.iter_candidate_match_values(remote_instance=candidate.remote_instance))
+            if cross_language_code:
+                cross_language_values.update(
+                    self.iter_candidate_cross_language_match_values(remote_instance=candidate.remote_instance)
+                )
 
-        if not property_ids or not values:
+        if not property_ids or (not values and not cross_language_values):
             return 0
 
-        translation_map, select_value_id_to_property_id = self._build_translation_map(
-            language_code=language_code,
-            local_property_ids=list(property_ids),
-            values=list(values),
-        )
-        if not translation_map:
+        translation_map: Dict[Tuple[int, str], int] = {}
+        select_value_id_to_property_id: Dict[int, int] = {}
+
+        if values:
+            translation_map, select_value_id_to_property_id = self._build_translation_map(
+                language_code=language_code,
+                local_property_ids=list(property_ids),
+                values=list(values),
+            )
+
+        cross_language_translation_map: Dict[Tuple[int, str], int] = {}
+        if cross_language_code and cross_language_values:
+            if cross_language_code == language_code:
+                cross_language_translation_map = translation_map
+            else:
+                cross_language_translation_map, cross_select_value_id_to_property_id = self._build_translation_map(
+                    language_code=cross_language_code,
+                    local_property_ids=list(property_ids),
+                    values=list(cross_language_values),
+                )
+                select_value_id_to_property_id.update(cross_select_value_id_to_property_id)
+
+        if not translation_map and not cross_language_translation_map:
             return 0
 
         mapped = 0
@@ -113,6 +136,12 @@ class BasePerfectMatchSelectValueMappingFactory:
                 local_select_value_id = translation_map.get((candidate.local_property_id, value))
                 if local_select_value_id:
                     break
+
+            if not local_select_value_id and cross_language_translation_map:
+                for value in self.iter_candidate_cross_language_match_values(remote_instance=candidate.remote_instance):
+                    local_select_value_id = cross_language_translation_map.get((candidate.local_property_id, value))
+                    if local_select_value_id:
+                        break
 
             if not local_select_value_id:
                 continue
@@ -173,6 +202,23 @@ class BasePerfectMatchSelectValueMappingFactory:
             value = translated_remote_name.strip()
             if value:
                 yield value
+
+    def get_cross_language_code(self, *, remote_language_code: str) -> Optional[str]:
+        """
+        If provided, translated/cross-language candidate values will be looked up against
+        PropertySelectValueTranslation rows for this language (in addition to `remote_language_code`).
+
+        Default: no cross-language lookups.
+        """
+        return None
+
+    def iter_candidate_cross_language_match_values(self, *, remote_instance: models.Model) -> Iterator[str]:
+        """
+        Values yielded here will be matched using `get_cross_language_code()`.
+
+        Default: no cross-language match values.
+        """
+        yield from ()
 
     def get_remote_languages_in_order(self) -> Iterable[Any]:
         raise NotImplementedError
