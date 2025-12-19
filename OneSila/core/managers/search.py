@@ -14,6 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 class SearchQuerySetMixin:
+    def _is_polymorphic_queryset(self, *, queryset) -> bool:
+        try:
+            from polymorphic.query import PolymorphicQuerySet
+        except Exception:
+            return False
+
+        return isinstance(queryset, PolymorphicQuerySet)
     def _build_orm_lookups(self, *, search_fields, is_literal):
         def construct_search(field_name):
             if is_literal:
@@ -76,8 +83,9 @@ class SearchQuerySetMixin:
         may_have_duplicates = self.lookup_needs_distinct(self, orm_lookups)
 
         base_manager = self.model._default_manager.using(queryset.db)
+        is_polymorphic_queryset = self._is_polymorphic_queryset(queryset=queryset)
 
-        for bit in smart_split(search_term):
+        for bit_index, bit in enumerate(smart_split(search_term)):
             if bit.startswith(('"', "'")) and bit[0] == bit[-1]:
                 bit = unescape_string_literal(bit)
 
@@ -93,7 +101,15 @@ class SearchQuerySetMixin:
             if not exists_clauses:
                 continue
 
-            queryset = queryset.filter(reduce(operator.or_, exists_clauses))
+            if is_polymorphic_queryset:
+                match_expr = models.ExpressionWrapper(reduce(operator.or_, exists_clauses), output_field=models.BooleanField())
+                annotation_name = f"_search_match_{bit_index}"
+                if hasattr(queryset, 'alias'):
+                    queryset = queryset.alias(**{annotation_name: match_expr}).filter(**{annotation_name: True})
+                else:
+                    queryset = queryset.annotate(**{annotation_name: match_expr}).filter(**{annotation_name: True})
+            else:
+                queryset = queryset.filter(reduce(operator.or_, exists_clauses))
 
         return queryset, may_have_duplicates
 

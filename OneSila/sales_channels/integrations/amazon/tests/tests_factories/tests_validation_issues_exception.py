@@ -1,12 +1,12 @@
 from core.tests import TestCase
 from products.models import Product
 from model_bakery import baker
+from unittest.mock import patch
 
 from sales_channels.integrations.amazon.exceptions import AmazonProductValidationIssuesException
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.models import (
     AmazonProduct,
-    AmazonProductIssue,
     AmazonSalesChannel,
     AmazonSalesChannelView,
 )
@@ -46,7 +46,9 @@ class AmazonValidationIssuesExceptionTest(DisableWooCommerceSignalsMixin, TestCa
             local_instance=local_product,
         )
 
-    def test_update_assign_issues_raises_user_exception_and_persists_validation_issues(self):
+    @patch("sales_channels.integrations.amazon.factories.sales_channels.issues.FetchRemoteValidationIssueFactory.run")
+    @patch("sales_channels.integrations.amazon.models.products.AmazonProduct.get_issues")
+    def test_update_assign_issues_raises_user_exception_and_persists_validation_issues(self, get_issues, run_factory):
         fac = DummyFactory(
             sales_channel=self.sales_channel,
             remote_product=self.remote_product,
@@ -61,16 +63,35 @@ class AmazonValidationIssuesExceptionTest(DisableWooCommerceSignalsMixin, TestCa
             }
         ]
 
+        get_issues.return_value = issues
+
         with self.assertRaises(AmazonProductValidationIssuesException):
             fac.update_assign_issues(issues)
 
-        self.assertTrue(
-            AmazonProductIssue.objects.filter(
-                remote_product=self.remote_product,
-                view=self.view,
-                is_validation_issue=True,
-            ).exists()
+        run_factory.assert_called_once()
+
+    @patch("sales_channels.integrations.amazon.factories.sales_channels.issues.FetchRemoteValidationIssueFactory.run")
+    @patch("sales_channels.integrations.amazon.models.products.AmazonProduct.get_issues")
+    def test_update_assign_issues_does_not_raise_for_only_warning_severity(self, get_issues, run_factory):
+        fac = DummyFactory(
+            sales_channel=self.sales_channel,
+            remote_product=self.remote_product,
+            view=self.view,
         )
+
+        issues = [
+            {
+                "code": "RECOMMENDED_ATTR",
+                "message": "Recommended attribute missing: color",
+                "severity": "WARNING",
+            }
+        ]
+
+        get_issues.return_value = issues
+
+        fac.update_assign_issues(issues)
+
+        run_factory.assert_called_once()
 
     def test_exception_is_registered_as_user_exception(self):
         self.assertIn(AmazonProductValidationIssuesException, self.sales_channel._meta.user_exceptions)

@@ -85,7 +85,7 @@ class AmazonProduct(RemoteProduct):
     def get_error_validation_issues(self, view):
         """Return only validation issues with severity 'ERROR' for this product in a given marketplace."""
         issues = self.get_issues(view, is_validation=True)
-        return [i for i in issues if i.get("severity") == "ERROR"]
+        return [i for i in issues if (i.get("severity") or "").upper() == "ERROR"]
 
     def _determine_status(self) -> str:
         if self._has_unresolved_errors():
