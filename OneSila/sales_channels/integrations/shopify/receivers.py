@@ -276,9 +276,10 @@ def shopify__ean_code__update(sender, instance, **kwargs):
 #
 @receiver(add_remote_product_variation, sender='products.ConfigurableVariation')
 def shopify__variation__add(sender, parent_product, variation_product, **kwargs):
-    run_generic_sales_channel_task_flow(
+    run_product_specific_sales_channel_task_flow(
         task_func=add_shopify_product_variation_db_task,
         multi_tenant_company=parent_product.multi_tenant_company,
+        product=parent_product,
         sales_channel_class=ShopifySalesChannel,
         parent_product_id=parent_product.id,
         variation_product_id=variation_product.id,
@@ -287,9 +288,10 @@ def shopify__variation__add(sender, parent_product, variation_product, **kwargs)
 
 @receiver(remove_remote_product_variation, sender='products.ConfigurableVariation')
 def shopify__variation__remove(sender, parent_product, variation_product, **kwargs):
-    run_generic_sales_channel_task_flow(
+    run_product_specific_sales_channel_task_flow(
         task_func=remove_shopify_product_variation_db_task,
         multi_tenant_company=parent_product.multi_tenant_company,
+        product=parent_product,
         sales_channel_class=ShopifySalesChannel,
         parent_product_id=parent_product.id,
         variation_product_id=variation_product.id,

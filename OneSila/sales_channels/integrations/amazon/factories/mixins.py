@@ -11,7 +11,10 @@ from sp_api.base import SellingApiException
 from spapi import SellersApi, SPAPIConfig, SPAPIClient, DefinitionsApi, ListingsApi
 from spapi.rest import ApiException
 from sales_channels.integrations.amazon.decorators import throttle_safe
-from sales_channels.integrations.amazon.exceptions import AmazonResponseException
+from sales_channels.integrations.amazon.exceptions import (
+    AmazonProductValidationIssuesException,
+    AmazonResponseException,
+)
 from sales_channels.integrations.amazon.models import AmazonSalesChannelView
 from sales_channels.models.logs import RemoteLog
 from deepdiff import DeepDiff
@@ -73,14 +76,19 @@ class GetAmazonAPIMixin:
             if self.remote_product.id != self.remote_instance.id:
                 self.remote_product = self.remote_instance
 
+        issues_list = issues or []
+        if isinstance(issues, dict):
+            issues_list = issues.get("issues") or []
+
         FetchRemoteValidationIssueFactory(
             remote_product=self.remote_product,
             view=self.view,
-            issues=issues,
+            issues=issues_list,
         ).run()
 
+        stored_validation_issues = None
         if action_log and log_identifier:
-            stored = self.remote_product.get_issues(self.view)
+            stored_validation_issues = self.remote_product.get_issues(self.view, is_validation=True)
             self.log_action(
                 action_log,
                 {},
@@ -88,8 +96,13 @@ class GetAmazonAPIMixin:
                 log_identifier,
                 submission_id=submission_id,
                 processing_status=processing_status,
-                issues=stored,
+                issues=stored_validation_issues,
             )
+
+        if issues_list:
+            if stored_validation_issues is None:
+                stored_validation_issues = self.remote_product.get_issues(self.view, is_validation=True)
+            raise AmazonProductValidationIssuesException(issues=stored_validation_issues)
 
     def _get_client(self):
         config = SPAPIConfig(

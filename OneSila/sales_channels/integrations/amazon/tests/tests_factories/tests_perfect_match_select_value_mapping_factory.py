@@ -97,8 +97,8 @@ class AmazonPerfectMatchSelectValueMappingFactoryTest(DisableWooCommerceSignalsM
         PropertySelectValueTranslation.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             propertyselectvalue=local_value,
-            language="en",
-            value="Vermilion",
+            language="de",
+            value="Zinnoberrot",
         )
         remote_select_value = AmazonPropertySelectValue.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -107,7 +107,7 @@ class AmazonPerfectMatchSelectValueMappingFactoryTest(DisableWooCommerceSignalsM
             marketplace=self.view,
             remote_value="vermilion",
             remote_name=None,
-            translated_remote_name="Vermilion",
+            translated_remote_name="Zinnoberrot",
         )
 
         AmazonPerfectMatchSelectValueMappingFactory(sales_channel=self.sales_channel).run()
@@ -145,3 +145,45 @@ class AmazonPerfectMatchSelectValueMappingFactoryTest(DisableWooCommerceSignalsM
 
         remote_select_value.refresh_from_db()
         self.assertIsNone(remote_select_value.local_instance)
+
+    def test_run_maps_by_translated_remote_name_in_company_language_even_when_marketplace_language_differs(self):
+        spanish_view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="VIEW_ES",
+            is_default=False,
+        )
+        AmazonRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            sales_channel_view=spanish_view,
+            local_instance="es",
+            remote_code="es_ES",
+            remote_id="LANG_ES",
+        )
+
+        local_value = baker.make(
+            PropertySelectValue,
+            property=self.property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            propertyselectvalue=local_value,
+            language="de",
+            value="Rot",
+        )
+        remote_select_value = AmazonPropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            amazon_property=self.remote_property,
+            marketplace=spanish_view,
+            remote_value="roja",
+            remote_name="Roja",
+            translated_remote_name="Rot",
+        )
+
+        AmazonPerfectMatchSelectValueMappingFactory(sales_channel=self.sales_channel).run()
+
+        remote_select_value.refresh_from_db()
+        self.assertEqual(remote_select_value.local_instance, local_value)
