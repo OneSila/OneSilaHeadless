@@ -43,3 +43,21 @@ class AmazonPropertyModelTest(TestCase):
             local_instance=local_property,
         )
         self.assertIsNotNone(amazon_property.pk)
+
+    def test_search_works_with_polymorphic_queryset(self):
+        baker.make(
+            AmazonProperty,
+            sales_channel=self.sales_channel,
+            name="Primary color",
+            code="color__primary",
+        )
+        baker.make(
+            AmazonProperty,
+            sales_channel=self.sales_channel,
+            name="Size",
+            code="size",
+        )
+
+        qs = AmazonProperty.objects.all().search("color")
+        self.assertEqual(qs.count(), 1)
+        self.assertEqual(qs.first().code, "color__primary")

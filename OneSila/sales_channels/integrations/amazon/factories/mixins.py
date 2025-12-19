@@ -102,7 +102,13 @@ class GetAmazonAPIMixin:
         if issues_list:
             if stored_validation_issues is None:
                 stored_validation_issues = self.remote_product.get_issues(self.view, is_validation=True)
-            raise AmazonProductValidationIssuesException(issues=stored_validation_issues)
+            error_issues = [
+                issue
+                for issue in (stored_validation_issues or [])
+                if (issue.get("severity") or "").upper() == "ERROR"
+            ]
+            if error_issues:
+                raise AmazonProductValidationIssuesException(issues=error_issues)
 
     def _get_client(self):
         config = SPAPIConfig(
