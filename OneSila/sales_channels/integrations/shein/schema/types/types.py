@@ -10,6 +10,7 @@ from core.schema.core.types.types import (
     strawberry_type,
     type,
 )
+from strawberry.scalars import JSON
 from strawberry.relay import to_base64
 from imports_exports.schema.queries import ImportType
 
@@ -17,6 +18,8 @@ from sales_channels.integrations.shein.models import (
     SheinCategory,
     SheinInternalProperty,
     SheinInternalPropertyOption,
+    SheinProductCategory,
+    SheinProductIssue,
     SheinProductType,
     SheinProductTypeItem,
     SheinProperty,
@@ -30,6 +33,8 @@ from sales_channels.integrations.shein.schema.types.filters import (
     SheinCategoryFilter,
     SheinInternalPropertyFilter,
     SheinInternalPropertyOptionFilter,
+    SheinProductCategoryFilter,
+    SheinProductIssueFilter,
     SheinProductTypeFilter,
     SheinProductTypeItemFilter,
     SheinPropertyFilter,
@@ -43,6 +48,8 @@ from sales_channels.integrations.shein.schema.types.ordering import (
     SheinCategoryOrder,
     SheinInternalPropertyOptionOrder,
     SheinInternalPropertyOrder,
+    SheinProductCategoryOrder,
+    SheinProductIssueOrder,
     SheinProductTypeItemOrder,
     SheinProductTypeOrder,
     SheinPropertyOrder,
@@ -86,6 +93,46 @@ class SheinCategoryType(relay.Node):
         'SheinCategoryType',
         lazy("sales_channels.integrations.shein.schema.types.types")
     ]]
+
+    @field(name="configuratorProperties")
+    def configurator_properties_field(self, info) -> JSON:
+        return self.configurator_properties
+
+
+@type(
+    SheinProductCategory,
+    filters=SheinProductCategoryFilter,
+    order=SheinProductCategoryOrder,
+    pagination=True,
+    fields="__all__",
+)
+class SheinProductCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
+    """Expose the selected Shein category per product and sales channel."""
+
+    product: Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]
+    sales_channel: Annotated[
+        'SheinSalesChannelType',
+        lazy("sales_channels.integrations.shein.schema.types.types")
+    ]
+
+
+@type(
+    SheinProductIssue,
+    filters=SheinProductIssueFilter,
+    order=SheinProductIssueOrder,
+    pagination=True,
+    fields="__all__",
+)
+class SheinProductIssueType(relay.Node, GetQuerysetMultiTenantMixin):
+    """Expose Shein review/audit issues for remote products."""
+
+    remote_product: Annotated[
+        "RemoteProductType",
+        lazy("sales_channels.schema.types.types")
+    ]
 
 
 @type(

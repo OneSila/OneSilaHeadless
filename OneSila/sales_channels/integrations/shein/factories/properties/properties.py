@@ -22,6 +22,25 @@ from sales_channels.integrations.shein.models import (
 )
 
 
+def _describe_local_instance(*, local_instance: Any) -> str:
+    if local_instance is None:
+        return ""
+
+    class_name = local_instance.__class__.__name__
+    pk = getattr(local_instance, "pk", None) or getattr(local_instance, "id", None)
+    identifier = f"{class_name}#{pk}" if pk is not None else class_name
+
+    product = getattr(local_instance, "product", None)
+    sku = getattr(product, "sku", None) if product is not None else None
+    sku_label = f" product={sku}" if sku else ""
+
+    prop = getattr(local_instance, "property", None)
+    prop_name = getattr(prop, "name", None) if prop is not None else None
+    prop_label = f" property={prop_name}" if prop_name else ""
+
+    return f" (local_instance={identifier}{sku_label}{prop_label})"
+
+
 class SheinRemotePropertyEnsureFactory:
     """Guard rail enforcing that Shein properties are imported and mapped before push."""
 
@@ -34,8 +53,9 @@ class SheinRemotePropertyEnsureFactory:
         self.remote_instance = None
 
     def run(self):  # pragma: no cover - defensive path
+        details = _describe_local_instance(local_instance=self.local_instance)
         raise PreFlightCheckError(
-            "Import Shein attributes and map them locally before syncing product properties."
+            "Import Shein attributes and map them locally before syncing product properties." + details
         )
 
 
@@ -51,8 +71,9 @@ class SheinRemotePropertySelectValueEnsureFactory:
         self.remote_instance = None
 
     def run(self):  # pragma: no cover - defensive path
+        details = _describe_local_instance(local_instance=self.local_instance)
         raise PreFlightCheckError(
-            "Import Shein attribute values and map them locally before syncing product properties."
+            "Import Shein attribute values and map them locally before syncing product properties." + details
         )
 
 
@@ -440,6 +461,28 @@ class SheinProductPropertyUpdateFactory(
             skip_checks=skip_checks,
             language=language,
         )
+
+    def create_remote_instance(self):  # type: ignore[override]
+        if self.create_factory_class is None:
+            raise ValueError("Create factory class must be specified to recreate remote instances.")
+        if self.product_type_item is None:
+            raise PreFlightCheckError(
+                "Shein product type item is missing; cannot create a remote product property payload. "
+                "Import Shein schema mappings and ensure the product is mapped to a Shein product type."
+            )
+
+        create_factory = self.create_factory_class(
+            self.sales_channel,
+            self.local_instance,
+            self.remote_product,
+            product_type_item=self.product_type_item,
+            api=self.api,
+            skip_checks=getattr(self, "skip_checks", False),
+            get_value_only=getattr(self, "get_value_only", False),
+            language=getattr(self, "language", None),
+        )
+        create_factory.run()
+        self.remote_instance = create_factory.remote_instance
 
     def get_remote_value(self):
         fallback_items: Sequence[SheinProductTypeItem] = ()

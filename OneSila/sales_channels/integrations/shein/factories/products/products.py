@@ -16,11 +16,17 @@ from sales_channels.integrations.shein.factories.products.assigns import SheinSa
 from sales_channels.integrations.shein.factories.products.images import SheinMediaProductThroughUpdateFactory
 from sales_channels.integrations.shein.factories.prices import SheinPriceUpdateFactory
 from sales_channels.integrations.shein.factories.properties import SheinProductPropertyUpdateFactory
+from sales_channels.integrations.shein.exceptions import SheinPreValidationError, SheinResponseException
+from sales_channels.exceptions import PreFlightCheckError
 from sales_channels.integrations.shein.models import (
+    SheinCategory,
     SheinInternalProperty,
+    SheinProduct,
+    SheinProductCategory,
     SheinProductType,
     SheinProductTypeItem,
 )
+from sales_channels.integrations.shein.models.sales_channels import SheinRemoteCurrency
 from sales_channels.models.products import RemoteProduct
 from sales_channels.models.logs import RemoteLog
 from sales_channels.models import SalesChannelViewAssign
@@ -39,7 +45,7 @@ class SheinProductBaseFactory(
 ):
     """Assemble Shein product payloads using existing value-only factories."""
 
-    remote_model_class = RemoteProduct
+    remote_model_class = SheinProduct
     action_log = RemoteLog.ACTION_UPDATE
     publish_permission_path = "/open-api/goods/product/check-publish-permission"
     publish_or_edit_path = "/open-api/goods/product/publishOrEdit"
@@ -65,6 +71,7 @@ class SheinProductBaseFactory(
         self.view = view
         self.get_value_only = get_value_only
         self.skip_checks = skip_checks
+        self.prices_data: dict[str, dict[str, Any]] = {}
         self.price_info_list: list[dict[str, Any]] = []
         self.image_info: dict[str, Any] = {}
         self.sale_attribute: Optional[dict[str, Any]] = None
@@ -95,6 +102,35 @@ class SheinProductBaseFactory(
             return
         super().set_api()
 
+    def serialize_response(self, response):  # type: ignore[override]
+        if response is None:
+            return {}
+        if isinstance(response, dict):
+            return response
+        json_getter = getattr(response, "json", None)
+        if callable(json_getter):
+            try:
+                return json_getter() or {}
+            except Exception:
+                return {}
+        return {}
+
+    def get_saleschannel_remote_object(self, remote_sku):  # type: ignore[override]
+        """Shein does not provide a reliable lookup by SKU for this integration."""
+        return None
+
+    def process_product_properties(self):  # type: ignore[override]
+        """Shein properties are embedded into the publish payload; skip remote mirror processing."""
+        return
+
+    def assign_images(self):  # type: ignore[override]
+        """Shein images are embedded into the publish payload; skip remote media assignments."""
+        return
+
+    def assign_ean_code(self):  # type: ignore[override]
+        """Shein barcode is embedded into the SKU payload; skip remote EAN mirror processing."""
+        return
+
     def preflight_check(self):
         if self.skip_checks:
             return True
@@ -106,14 +142,16 @@ class SheinProductBaseFactory(
                 can_publish = info.get("canPublishProduct", True)
                 if not can_publish:
                     reason = info.get("reason", "Publishing not allowed.")
-                    self.sales_channel.add_user_error(
-                        action=self.action_log,
-                        response=reason,
-                        payload={},
-                        error_traceback="",
-                        identifier=f"{self.__class__.__name__}:preflight",
-                        remote_product=getattr(self, "remote_instance", None),
-                    )
+                    remote_product = getattr(self, "remote_instance", None)
+                    if remote_product is not None and hasattr(remote_product, "add_user_error"):
+                        remote_product.add_user_error(
+                            action=self.action_log,
+                            response=reason,
+                            payload={},
+                            error_traceback="",
+                            identifier=f"{self.__class__.__name__}:preflight",
+                            remote_product=remote_product,
+                        )
                     return False
         except Exception:
             # If the check fails, proceed to allow iterative development.
@@ -121,21 +159,120 @@ class SheinProductBaseFactory(
         return True
 
     def set_rule(self):
-        self.rule = self.local_instance.get_product_rule(sales_channel=self.sales_channel)
-        if not self.rule:
-            raise ValueError("Product has no ProductPropertiesRule mapped for Shein.")
+        self.rule = None
+        self.selected_category_id = ""
+        self.selected_product_type_id = ""
+        self.selected_site_remote_id = ""
+        self.use_spu_pic = False
 
-        product_type = (
-            SheinProductType.objects.filter(
+        mapping = (
+            SheinProductCategory.objects.filter(
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
                 sales_channel=self.sales_channel,
-                local_instance=self.rule,
+                product=self.local_instance,
             )
-            .exclude(remote_id__isnull=True)
+            .exclude(remote_id__in=(None, ""))
+            .only("remote_id", "product_type_remote_id", "site_remote_id")
             .first()
         )
-        if not product_type:
-            raise ValueError("Shein product type mapping is missing for the product rule.")
-        self.remote_rule = product_type
+
+        if mapping is not None:
+            self.selected_category_id = str(getattr(mapping, "remote_id", "") or "").strip()
+            self.selected_product_type_id = str(getattr(mapping, "product_type_remote_id", "") or "").strip()
+
+            if self.selected_category_id and not self.selected_product_type_id:
+                site_remote_id = str(getattr(mapping, "site_remote_id", "") or "").strip()
+                category_qs = SheinCategory.objects.filter(remote_id=self.selected_category_id)
+                if site_remote_id:
+                    category_qs = category_qs.filter(site_remote_id=site_remote_id)
+                inferred = (
+                    category_qs.exclude(product_type_remote_id__in=(None, ""))
+                    .values_list("product_type_remote_id", flat=True)
+                    .first()
+                )
+                if inferred:
+                    self.selected_product_type_id = str(inferred).strip()
+
+        if not self.selected_category_id or not self.selected_product_type_id:
+            explicit_remote_rule = getattr(self, "remote_rule", None)
+            if explicit_remote_rule is not None:
+                if not self.selected_category_id:
+                    self.selected_category_id = str(getattr(explicit_remote_rule, "category_id", "") or "").strip()
+                if not self.selected_product_type_id:
+                    self.selected_product_type_id = str(getattr(explicit_remote_rule, "remote_id", "") or "").strip()
+
+        if not self.selected_category_id or not self.selected_product_type_id:
+            self.rule = self.local_instance.get_product_rule(sales_channel=self.sales_channel)
+            if not self.rule:
+                raise ValueError("Product has no ProductPropertiesRule mapped for Shein.")
+
+            fallback = (
+                SheinProductType.objects.filter(
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    local_instance=self.rule,
+                )
+                .exclude(remote_id__in=(None, ""))
+                .first()
+            )
+            if fallback is not None:
+                if not self.selected_category_id:
+                    self.selected_category_id = str(getattr(fallback, "category_id", "") or "").strip()
+                if not self.selected_product_type_id:
+                    self.selected_product_type_id = str(getattr(fallback, "remote_id", "") or "").strip()
+
+        if not self.selected_category_id or not self.selected_product_type_id:
+            raise ValueError(
+                "Shein category/product type is missing. Set it via SheinProductCategory (category + product_type_id) "
+                "or ensure the product rule is mapped to a SheinProductType."
+            )
+
+        self.selected_site_remote_id = self._resolve_site_remote_id()
+        self.use_spu_pic = self._resolve_use_spu_pic()
+
+    def _resolve_site_remote_id(self) -> str:
+        value = (
+            SalesChannelViewAssign.objects.filter(
+                sales_channel=self.sales_channel,
+                product=self.local_instance,
+            )
+            .exclude(sales_channel_view__remote_id__in=(None, ""))
+            .values_list("sales_channel_view__remote_id", flat=True)
+            .first()
+        )
+        return str(value).strip() if value else ""
+
+    @staticmethod
+    def _is_blank_html(value: str) -> bool:
+        trimmed = (value or "").strip()
+        if not trimmed:
+            return True
+        lowered = trimmed.lower()
+        return lowered in {"<p><br></p>", "<p><br/></p>", "<br>", "<br/>"}
+
+    def _resolve_use_spu_pic(self) -> bool:
+        if not self.selected_category_id:
+            return False
+
+        categories = SheinCategory.objects.filter(remote_id=self.selected_category_id)
+        if self.selected_site_remote_id:
+            categories = categories.filter(site_remote_id=self.selected_site_remote_id)
+
+        category = categories.only("picture_config").first()
+        if category is None:
+            return False
+
+        picture_config = getattr(category, "picture_config", None) or []
+        if not isinstance(picture_config, list):
+            return False
+
+        for entry in picture_config:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("field_key") == "switch_spu_picture":
+                return bool(entry.get("is_true"))
+
+        return False
 
     # ------------------------------------------------------------------
     # Payload builders
@@ -151,21 +288,29 @@ class SheinProductBaseFactory(
 
         default_language = self._get_default_language()
 
-        name_entries: list[dict[str, str]] = []
-        desc_entries: list[dict[str, str]] = []
+        name_by_language: dict[str, str] = {}
+        desc_by_language: dict[str, str] = {}
 
         for translation in translations:
             language = translation.language or default_language
-            if translation.name:
-                name_entries.append({"language": language, "name": translation.name})
+            if translation.name and language not in name_by_language:
+                name_by_language[language] = translation.name
             description = translation.description or translation.short_description
             if description:
-                desc_entries.append({"language": language, "name": description})
+                existing = desc_by_language.get(language)
+                if existing is None or (self._is_blank_html(existing) and not self._is_blank_html(description)):
+                    desc_by_language[language] = description
 
-        if name_entries:
-            self.multi_language_name_list = name_entries
-        if desc_entries:
-            self.multi_language_desc_list = desc_entries
+        if name_by_language:
+            self.multi_language_name_list = [
+                {"language": language, "name": value}
+                for language, value in name_by_language.items()
+            ]
+        if desc_by_language:
+            self.multi_language_desc_list = [
+                {"language": language, "name": value}
+                for language, value in desc_by_language.items()
+            ]
 
     def _collect_product_properties(self) -> Iterable[ProductProperty]:
         if self.local_instance.is_configurable():
@@ -190,7 +335,8 @@ class SheinProductBaseFactory(
     ) -> Optional[SheinProductTypeItem]:
         return (
             SheinProductTypeItem.objects.filter(
-                product_type=self.remote_rule,
+                product_type__sales_channel=self.sales_channel,
+                product_type__remote_id=self.selected_product_type_id,
                 property__local_instance=product_property.property,
             )
             .select_related("property")
@@ -233,14 +379,22 @@ class SheinProductBaseFactory(
                 self.product_attribute_list.append(payload)
 
     def _build_prices(self):
+        assigns = list(
+            SalesChannelViewAssign.objects.filter(
+                sales_channel=self.sales_channel,
+                product=self.local_instance,
+            ).select_related("sales_channel_view")
+        )
         price_factory = SheinPriceUpdateFactory(
             sales_channel=self.sales_channel,
             local_instance=self.local_instance,
             remote_product=self.remote_instance,
             get_value_only=True,
             skip_checks=True,
+            assigns=assigns,
         )
         price_factory.run()
+        self.prices_data = getattr(price_factory, "price_data", {}) or {}
         self.price_info_list = price_factory.value.get("price_info_list", []) if price_factory.value else []
 
     def _build_media(self):
@@ -272,39 +426,123 @@ class SheinProductBaseFactory(
         except (TypeError, ValueError):
             return 0
 
-    def _build_stock_info_list(self) -> list[dict[str, Any]]:
-        return [{"inventory_num": self._get_starting_stock_quantity()}]
+    def _resolve_supplier_warehouse_id(self, *, assigns: list[SalesChannelViewAssign]) -> str:
+        for assign in assigns:
+            view = getattr(assign, "sales_channel_view", None)
+            resolved = view.get_real_instance() if hasattr(view, "get_real_instance") else view
+            key = getattr(resolved, "merchant_location_key", None) if resolved is not None else None
+            if key:
+                value = str(key).strip()
+                if value:
+                    return value
+        return ""
+
+    def _build_stock_info_list(self, *, assigns: list[SalesChannelViewAssign]) -> list[dict[str, Any]]:
+        entry: dict[str, Any] = {"inventory_num": self._get_starting_stock_quantity()}
+        warehouse_id = self._resolve_supplier_warehouse_id(assigns=assigns)
+        if warehouse_id:
+            entry["supplier_warehouse_id"] = warehouse_id
+        return [entry]
+
+    def _get_assign_currency_map(self, *, assigns: list[SalesChannelViewAssign]) -> dict[str, str]:
+        """Map sub_site -> currency ISO code (e.g. shein-us -> USD)."""
+        view_pairs: list[tuple[str, Any]] = []
+        view_ids: list[int] = []
+
+        for assign in assigns:
+            sub_site = getattr(assign.sales_channel_view, "remote_id", None)
+            if not sub_site:
+                continue
+            view = getattr(assign, "sales_channel_view", None)
+            resolved_view = view.get_real_instance() if hasattr(view, "get_real_instance") else view
+            if resolved_view is None:
+                continue
+            view_pairs.append((str(sub_site).strip(), resolved_view))
+            if getattr(resolved_view, "id", None):
+                view_ids.append(resolved_view.id)
+
+        global_currency_code: Optional[str] = None
+        global_codes = (
+            SheinRemoteCurrency.objects.filter(
+                sales_channel=self.sales_channel,
+                sales_channel_view__isnull=True,
+            )
+            .exclude(remote_code__in=(None, ""))
+            .values_list("remote_code", flat=True)
+            .distinct()
+        )
+        if global_codes.count() == 1:
+            global_currency_code = str(global_codes.first()).strip()  # type: ignore[arg-type]
+
+        currency_by_view_id: dict[int, str] = {}
+        if view_ids:
+            rows = (
+                SheinRemoteCurrency.objects.filter(
+                    sales_channel=self.sales_channel,
+                    sales_channel_view_id__in=view_ids,
+                )
+                .exclude(remote_code__in=(None, ""))
+                .values_list("sales_channel_view_id", "remote_code")
+            )
+            currency_by_view_id = {view_id: str(code).strip() for view_id, code in rows if view_id and code}
+
+        currency_map: dict[str, str] = {}
+        for sub_site, resolved_view in view_pairs:
+            code = currency_by_view_id.get(getattr(resolved_view, "id", None))
+            if not code:
+                raw_data = getattr(resolved_view, "raw_data", {}) or {}
+                if isinstance(raw_data, dict):
+                    code = raw_data.get("currency")
+            if not code and global_currency_code:
+                code = global_currency_code
+            if code:
+                currency_map[sub_site] = str(code).strip()
+
+        return {k: v for k, v in currency_map.items() if k and v}
 
     def _build_sku_price_info_list(self, *, assigns: list[SalesChannelViewAssign]) -> list[dict[str, Any]]:
         if not self.price_info_list:
             return []
 
+        currency_map = self._get_assign_currency_map(assigns=assigns)
+        if assigns and not currency_map:
+            raise PreFlightCheckError(
+                "Shein currency mapping is missing for assigned sub-sites. Pull Shein site list metadata first."
+            )
+
+        price_by_currency = {entry.get("currency"): entry for entry in self.price_info_list if entry.get("currency")}
+
         entries: list[dict[str, Any]] = []
+        missing: list[str] = []
         for assign in assigns:
             sub_site = getattr(assign.sales_channel_view, "remote_id", None)
             if not sub_site:
                 continue
 
-            # Try to map currency per site; fall back to all price entries.
-            view_currency_code: Optional[str] = None
-            if isinstance(assign.sales_channel_view, SheinSalesChannelView):
-                raw_data = getattr(assign.sales_channel_view, "raw_data", {}) or {}
-                view_currency_code = raw_data.get("currency")
+            sub_site_code = str(sub_site).strip()
+            currency_code = currency_map.get(sub_site_code)
+            if not currency_code:
+                missing.append(sub_site_code)
+                continue
 
-            for price in self.price_info_list:
-                currency = price.get("currency")
-                if view_currency_code and currency and currency != view_currency_code:
-                    continue
+            price = price_by_currency.get(currency_code)
+            if not price:
+                continue
 
-                entry = {
-                    "currency": currency,
-                    "base_price": price.get("base_price"),
-                    "special_price": price.get("special_price"),
-                    "sub_site": sub_site,
-                }
-                if entry["base_price"] is None:
-                    continue
-                entries.append({k: v for k, v in entry.items() if v not in (None, "", [])})
+            entry = {
+                "currency": currency_code,
+                "base_price": price.get("base_price"),
+                "special_price": price.get("special_price"),
+                "sub_site": sub_site_code,
+            }
+            if entry["base_price"] is None:
+                continue
+            entries.append({k: v for k, v in entry.items() if v not in (None, "", [])})
+
+        if missing:
+            raise PreFlightCheckError(
+                "Shein currency mapping is missing for sub-sites: " + ", ".join(sorted(set(missing)))
+            )
 
         return entries
 
@@ -420,20 +658,30 @@ class SheinProductBaseFactory(
             self._coerce_weight_value(value=weight),
         )
 
-    def _build_suggested_retail_price(self) -> Optional[dict[str, Any]]:
+    def _build_suggested_retail_price(self, *, assigns: list[SalesChannelViewAssign]) -> Optional[dict[str, Any]]:
         if not self.price_info_list:
             return None
-        first = self.price_info_list[0]
-        if not first.get("base_price"):
-            return None
-        return {
-            "currency": first.get("currency"),
-            "price": first.get("base_price"),
-        }
+
+        preferred_currency: Optional[str] = None
+        default_assign = self._resolve_default_view_assign(assigns=assigns)
+        if default_assign is not None:
+            currency_map = self._get_assign_currency_map(assigns=[default_assign])
+            preferred_currency = next(iter(currency_map.values()), None)
+
+        candidates = self.price_info_list
+        if preferred_currency:
+            candidates = [entry for entry in candidates if entry.get("currency") == preferred_currency]
+
+        for entry in candidates:
+            if entry.get("base_price") is None:
+                continue
+            return {"currency": entry.get("currency"), "price": entry.get("base_price")}
+
+        return None
 
     def _build_sku_list(self, *, assigns: list[SalesChannelViewAssign]) -> list[dict[str, Any]]:
         price_info_list = self._build_sku_price_info_list(assigns=assigns) if self.is_create else []
-        stock_info_list = self._build_stock_info_list() if self.is_create else []
+        stock_info_list = self._build_stock_info_list(assigns=assigns) if self.is_create else []
         height, length, width, weight = self._resolve_dimensions()
         supplier_barcode = self._build_supplier_barcode()
         package_type = self._get_internal_property_option_value(code="package_type")
@@ -465,21 +713,24 @@ class SheinProductBaseFactory(
             self.skc_list = []
             return
 
+        include_skc_images = not getattr(self, "use_spu_pic", False)
         skc_entry: dict[str, Any] = {
             "shelf_way": "1",
-            "image_info": self.image_info or None,
+            "image_info": (self.image_info or None) if include_skc_images else None,
             "sale_attribute": self.sale_attribute,
             "supplier_code": self.local_instance.sku,
             "sku_list": self._build_sku_list(assigns=assigns),
         }
 
-        suggested_price = self._build_suggested_retail_price()
+        suggested_price = self._build_suggested_retail_price(assigns=assigns)
         if suggested_price:
             skc_entry["suggested_retail_price"] = suggested_price
 
         self.skc_list = [{k: v for k, v in skc_entry.items() if v not in (None, "", [], {})}]
 
     def build_payload(self):
+        if not getattr(self, "selected_category_id", None):
+            self.set_rule()
         self._build_property_payloads()
         self._build_prices()
         self._build_media()
@@ -491,14 +742,15 @@ class SheinProductBaseFactory(
         fill_configuration_info = self._build_fill_configuration_info(package_type=package_type)
 
         self.payload: dict[str, Any] = {
-            "category_id": self.remote_rule.category_id,
-            "product_type_id": self.remote_rule.remote_id,
+            "category_id": self.selected_category_id,
+            "product_type_id": self.selected_product_type_id,
             "supplier_code": self.local_instance.sku,
             "source_system": "openapi",
             "site_list": self.site_list or None,
             "multi_language_name_list": self.multi_language_name_list or None,
             "multi_language_desc_list": self.multi_language_desc_list or None,
-            "image_info": self.image_info or None,
+            "is_spu_pic": True if getattr(self, "use_spu_pic", False) else None,
+            "image_info": (self.image_info or None) if getattr(self, "use_spu_pic", False) else None,
             "sale_attribute": self.sale_attribute,
             "sale_attribute_list": self.sale_attribute_list or None,
             "size_attribute_list": self.size_attribute_list or None,
@@ -521,11 +773,60 @@ class SheinProductBaseFactory(
         if self.get_value_only:
             return self.value
 
+        if getattr(self, "is_create", False):
+            try:
+                print("[Shein] publishOrEdit payload:", json.dumps(self.value, ensure_ascii=False, sort_keys=True))
+            except Exception:
+                print("[Shein] publishOrEdit payload:", self.value)
+
         response = self.shein_post(
             path=self.publish_or_edit_path,
             payload=self.value,
         )
         response_data = response.json() if hasattr(response, "json") else {}
+        if getattr(self, "is_create", False):
+            try:
+                print("[Shein] publishOrEdit response:", json.dumps(response_data, ensure_ascii=False, sort_keys=True))
+            except Exception:
+                print("[Shein] publishOrEdit response:", response_data)
+
+        if isinstance(response_data, dict):
+            code = response_data.get("code")
+            msg = (response_data.get("msg") or "").strip()
+            info = response_data.get("info")
+
+            is_ok_code = code in ("0", 0)
+            is_ok_msg = msg == "OK"
+
+            if isinstance(info, dict) and info.get("success") is False:
+                lines: list[str] = []
+                for record in info.get("pre_valid_result") or []:
+                    if not isinstance(record, dict):
+                        continue
+                    form_name = str(record.get("form_name") or record.get("form") or "").strip()
+                    messages = record.get("messages") or []
+                    if not isinstance(messages, list):
+                        messages = [messages]
+                    for message in messages:
+                        text = str(message or "").strip()
+                        if not text:
+                            continue
+                        if form_name:
+                            lines.append(f"{form_name}: {text}")
+                        else:
+                            lines.append(text)
+
+                combined = "\n".join(dict.fromkeys(lines)) if lines else "Shein pre-validation failed."
+                raise SheinPreValidationError(combined)
+
+            if info is None and not is_ok_msg:
+                raise SheinResponseException(msg or "Shein API returned an error response.")
+
+            if not is_ok_code and not is_ok_msg:
+                raise SheinResponseException(msg or f"Shein API returned error code {code}.")
+
+
+        self.set_remote_id(response_data)
         self._log_submission_tracking(response_data=response_data)
         return response_data
 
@@ -555,6 +856,34 @@ class SheinProductBaseFactory(
         """Shein payload includes special_price directly; nothing extra."""
         return
 
+    def update_multi_currency_prices(self):  # type: ignore[override]
+        """Update additional storefront currencies via the dedicated price API.
+
+        Shein publish payload already includes prices, but the base product factory expects a hook
+        to push additional currencies when multiple currencies are present.
+        """
+
+        assigns = list(
+            SalesChannelViewAssign.objects.filter(
+                sales_channel=self.sales_channel,
+                product=self.local_instance,
+            ).select_related("sales_channel_view")
+        )
+        currency_map = self._get_assign_currency_map(assigns=assigns)
+        used_currency_codes = {code for code in currency_map.values() if code}
+        if len(used_currency_codes) <= 1:
+            return
+
+        price_factory = SheinPriceUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.local_instance,
+            remote_product=self.remote_instance,
+            get_value_only=False,
+            skip_checks=True,
+            assigns=assigns,
+        )
+        price_factory.run()
+
 
 class SheinProductUpdateFactory(SheinProductBaseFactory, RemoteProductUpdateFactory):
     """Resync an existing Shein product."""
@@ -574,15 +903,56 @@ class SheinProductCreateFactory(SheinProductBaseFactory, RemoteProductCreateFact
     def create_remote(self):
         return self.perform_remote_action()
 
-    def set_remote_id(self, response_data):  # type: ignore[override]
-        # Shein assigns spu_name asynchronously; webhook updates remote_id later.
+    def set_remote_id(self, response_data):
+        print('------------------------------------------- SET REMOTE ID')
+        if not self.remote_instance or not isinstance(response_data, dict):
+            return
+
+        info = response_data.get("info")
+        if not isinstance(info, dict):
+            return
+
+        spu_name = (info.get("spu_name") or "").strip()
+        skc_list = info.get("skc_list") or []
+
+        skc_name: str = ""
+        sku_code: str = ""
+        if isinstance(skc_list, list) and skc_list:
+            first_skc = skc_list[0] if isinstance(skc_list[0], dict) else {}
+            skc_name = str(first_skc.get("skc_name") or "").strip()
+            sku_list = first_skc.get("sku_list") or []
+            if isinstance(sku_list, list) and sku_list:
+                first_sku = sku_list[0] if isinstance(sku_list[0], dict) else {}
+                sku_code = str(first_sku.get("sku_code") or "").strip()
+
+        update_fields: set[str] = set()
+        if spu_name:
+            self.remote_instance.remote_id = spu_name
+            setattr(self.remote_instance, "spu_name", spu_name)
+            update_fields.update({"remote_id", "spu_name"})
+        if skc_name:
+            setattr(self.remote_instance, "skc_name", skc_name)
+            update_fields.add("skc_name")
+        if sku_code:
+            setattr(self.remote_instance, "sku_code", sku_code)
+            update_fields.add("sku_code")
+
+        print('------------------------------------------ REMOTE ID SETTED')
+        print(spu_name)
+
+        if update_fields:
+            self.remote_instance.save(update_fields=list(update_fields))
+
+        # Default newly-published products to pending approval until document-state fetch/webhook updates it.
+        self.remote_instance.status = self.remote_instance.STATUS_PENDING_APPROVAL
+        self.remote_instance.save(update_fields=["status"], skip_status_check=False)
         return
 
 
 class SheinProductDeleteFactory(SheinSignatureMixin, RemoteProductDeleteFactory):
     """Withdraw Shein products under review."""
 
-    remote_model_class = RemoteProduct
+    remote_model_class = SheinProduct
     delete_remote_instance = True
     action_log = RemoteLog.ACTION_DELETE
     revoke_path = "/open-api/goods/revoke-product"

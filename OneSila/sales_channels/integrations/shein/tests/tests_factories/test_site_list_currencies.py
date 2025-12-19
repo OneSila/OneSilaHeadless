@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import PropertyMock, patch
 
 from core.tests import TestCase
 from currencies.models import Currency
@@ -6,7 +6,11 @@ from currencies.models import Currency
 from sales_channels.integrations.shein.factories.sales_channels.views import (
     SheinSalesChannelViewPullFactory,
 )
-from sales_channels.integrations.shein.models import SheinRemoteCurrency, SheinSalesChannel
+from sales_channels.integrations.shein.models import (
+    SheinRemoteCurrency,
+    SheinSalesChannel,
+    SheinSalesChannelView,
+)
 
 
 SITE_LIST_RESPONSE = [
@@ -40,6 +44,14 @@ SITE_LIST_RESPONSE = [
 class SheinSiteListCurrencySyncTest(TestCase):
     def setUp(self):
         super().setUp()
+        self.has_errors_patcher = patch(
+            "integrations.models.IntegrationObjectMixin.has_errors",
+            new_callable=PropertyMock,
+            return_value=False,
+        )
+        self.has_errors_patcher.start()
+        self.addCleanup(self.has_errors_patcher.stop)
+
         self.sales_channel = SheinSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             hostname="shein.test",
@@ -59,10 +71,14 @@ class SheinSiteListCurrencySyncTest(TestCase):
             "fetch_site_records",
             return_value=SITE_LIST_RESPONSE,
         ):
-            factory.fetch_remote_instances()
+            factory.run()
+
+        fr_view = SheinSalesChannelView.objects.get(sales_channel=self.sales_channel, remote_id="shein-fr")
+        pl_view = SheinSalesChannelView.objects.get(sales_channel=self.sales_channel, remote_id="shein-pl")
 
         eur_remote = SheinRemoteCurrency.objects.get(
             sales_channel=self.sales_channel,
+            sales_channel_view=fr_view,
             remote_code="EUR",
         )
         self.assertEqual(eur_remote.local_instance, self.eur)
@@ -70,6 +86,7 @@ class SheinSiteListCurrencySyncTest(TestCase):
 
         pln_remote = SheinRemoteCurrency.objects.get(
             sales_channel=self.sales_channel,
+            sales_channel_view=pl_view,
             remote_code="PLN",
         )
         self.assertIsNone(pln_remote.local_instance)

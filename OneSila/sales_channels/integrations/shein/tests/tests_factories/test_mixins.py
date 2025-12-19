@@ -138,6 +138,53 @@ class SheinSignatureMixinTests(TestCase):
         response.raise_for_status.assert_called_once_with()
         self.assertIs(result, response)
 
+    @override_settings(DEBUG=False)
+    @patch("sales_channels.integrations.shein.factories.mixins.requests.get")
+    def test_shein_get_executes_request_with_expected_arguments(self, get_mock: Mock) -> None:
+        response = Mock()
+        response.raise_for_status = Mock()
+        get_mock.return_value = response
+
+        with patch.object(
+            self.factory,
+            "build_shein_headers",
+            return_value=(
+                {
+                    "Content-Type": "application/json;charset=UTF-8",
+                    "x-lt-openKeyId": "open-key",
+                    "x-lt-timestamp": "1700000000000",
+                    "x-lt-signature": "signed-value",
+                    "language": "fr",
+                },
+                1700000000000,
+                "abcde",
+            ),
+        ) as headers_mock:
+            result = self.factory.shein_get(
+                path="/open-api/msc/warehouse/list",
+                payload={"page": 1},
+                add_language=True,
+                timeout=20,
+            )
+
+        headers_mock.assert_called_once_with(
+            path="/open-api/msc/warehouse/list",
+            add_language=True,
+            timestamp=None,
+            random_key=None,
+            extra_headers=None,
+        )
+
+        get_mock.assert_called_once_with(
+            "https://openapi.sheincorp.com/open-api/msc/warehouse/list",
+            params={"page": 1},
+            headers=headers_mock.return_value[0],
+            timeout=20,
+            verify=self.sales_channel.verify_ssl,
+        )
+        response.raise_for_status.assert_called_once_with()
+        self.assertIs(result, response)
+
     # @TODO: FIX THIS AFTER DEPLOY
     # @patch("sales_channels.integrations.shein.factories.mixins.requests.post")
     # def test_shein_post_network_error_raises_value_error(self, post_mock: Mock) -> None:
@@ -164,6 +211,20 @@ class SheinSignatureMixinTests(TestCase):
 
         result = self.factory.shein_post(
             path="/open-api/orders/sync",
+            raise_for_status=False,
+        )
+
+        self.assertIs(result, response)
+        response.raise_for_status.assert_not_called()
+
+    @patch("sales_channels.integrations.shein.factories.mixins.requests.get")
+    def test_shein_get_skip_raise_for_status(self, get_mock: Mock) -> None:
+        response = Mock()
+        response.raise_for_status.side_effect = requests.HTTPError("bad request")
+        get_mock.return_value = response
+
+        result = self.factory.shein_get(
+            path="/open-api/msc/warehouse/list",
             raise_for_status=False,
         )
 

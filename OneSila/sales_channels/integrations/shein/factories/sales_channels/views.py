@@ -45,7 +45,6 @@ class SheinSalesChannelViewPullFactory(SheinSiteListMixin, PullRemoteInstanceMix
 
     def fetch_remote_instances(self):
         records = self.fetch_site_records()
-        self._sync_currencies(records=records)
         warehouse_key, warehouse_choices = self._sync_warehouses()
         channel_domain = self.get_channel_domain()
 
@@ -108,49 +107,12 @@ class SheinSalesChannelViewPullFactory(SheinSiteListMixin, PullRemoteInstanceMix
 
         self.remote_instances = remote_instances
 
-    # ------------------------------------------------------------------
-    # Currency handling
-    # ------------------------------------------------------------------
-    def _sync_currencies(self, *, records):
-        if not isinstance(records, list):
-            return
-
-        for marketplace in records:
-            sub_sites = marketplace.get("sub_site_list") if isinstance(marketplace, dict) else []
-            if not isinstance(sub_sites, list):
-                continue
-
-            for sub_site in sub_sites:
-                if not isinstance(sub_site, dict):
-                    continue
-                remote_code = (sub_site.get("currency") or "").strip()
-                if not remote_code:
-                    continue
-
-                local_currency = Currency.objects.filter(
-                    iso_code=remote_code,
-                    multi_tenant_company=self.sales_channel.multi_tenant_company,
-                ).first()
-
-                defaults = {
-                    "local_instance": local_currency,
-                    "symbol_left": sub_site.get("symbol_left") or "",
-                    "symbol_right": sub_site.get("symbol_right") or "",
-                }
-
-                SheinRemoteCurrency._base_manager.update_or_create(
-                    multi_tenant_company=self.sales_channel.multi_tenant_company,
-                    sales_channel=self.sales_channel,
-                    remote_code=remote_code,
-                    defaults=defaults,
-                )
-
     def _sync_warehouses(self) -> tuple[Optional[str], list[dict[str, Any]]]:
         selected_key: Optional[str] = None
         choices: list[dict[str, Any]] = []
 
         try:
-            response = self.shein_post(path="/open-api/msc/warehouse/list", payload={})
+            response = self.shein_get(path="/open-api/msc/warehouse/list", payload={})
             data = response.json() if hasattr(response, "json") else {}
             info = data.get("info") if isinstance(data, dict) else {}
             warehouses = info.get("list") if isinstance(info, dict) else []
@@ -183,6 +145,35 @@ class SheinSalesChannelViewPullFactory(SheinSiteListMixin, PullRemoteInstanceMix
         super().create_remote_instance_mirror(remote_data, remote_instance_mirror)
         remote_instance_mirror.raw_data = remote_data or {}
         remote_instance_mirror.save()
+        self._sync_currency_for_view(remote_data=remote_data, view=remote_instance_mirror)
 
     def add_fields_to_remote_instance_mirror(self, remote_data, remote_instance_mirror):
         remote_instance_mirror.raw_data = remote_data or {}
+        remote_instance_mirror.save()
+        self._sync_currency_for_view(remote_data=remote_data, view=remote_instance_mirror)
+
+    def _sync_currency_for_view(self, *, remote_data: Any, view: SheinSalesChannelView) -> None:
+        if not isinstance(remote_data, dict):
+            return
+
+        remote_code = (remote_data.get("currency") or "").strip()
+        if not remote_code:
+            return
+
+        local_currency = Currency.objects.filter(
+            iso_code=remote_code,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+        ).first()
+
+        defaults = {
+            "local_instance": local_currency,
+            "symbol_left": remote_data.get("symbol_left") or "",
+            "symbol_right": remote_data.get("symbol_right") or "",
+        }
+
+        SheinRemoteCurrency._base_manager.update_or_create(
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            sales_channel_view=view,
+            defaults={**defaults, "remote_code": remote_code},
+        )

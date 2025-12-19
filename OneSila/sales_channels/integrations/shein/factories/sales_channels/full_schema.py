@@ -382,6 +382,18 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             category.picture_config = picture_config
             update_fields.append("picture_config")
 
+        if support_sale_attribute_sort != category.support_sale_attribute_sort:
+            category.support_sale_attribute_sort = support_sale_attribute_sort
+            update_fields.append("support_sale_attribute_sort")
+
+        if package_type_required != category.package_type_required:
+            category.package_type_required = package_type_required
+            update_fields.append("package_type_required")
+
+        if supplier_barcode_required != category.supplier_barcode_required:
+            category.supplier_barcode_required = supplier_barcode_required
+            update_fields.append("supplier_barcode_required")
+
         raw_data = category.raw_data or {}
         if isinstance(raw_data, dict):
             publish_standard = raw_data.get("publish_standard")

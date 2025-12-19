@@ -4,6 +4,7 @@ from core.schema.core.types.input import NodeInput, input, partial, strawberry_i
 from sales_channels.integrations.shein.models import (
     SheinInternalProperty,
     SheinInternalPropertyOption,
+    SheinProductCategory,
     SheinProperty,
     SheinPropertySelectValue,
     SheinProductType,
@@ -30,6 +31,18 @@ class SheinSalesChannelInput:
 
 @partial(SheinSalesChannel, fields="__all__")
 class SheinSalesChannelPartialInput(NodeInput):
+    """Partial input used for updates and lookups."""
+    pass
+
+
+@input(SheinProductCategory, fields="__all__")
+class SheinProductCategoryInput:
+    """Create a Shein product category mapping."""
+    pass
+
+
+@partial(SheinProductCategory, fields="__all__")
+class SheinProductCategoryPartialInput(NodeInput):
     """Partial input used for updates and lookups."""
     pass
 

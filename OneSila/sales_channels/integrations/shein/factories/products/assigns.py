@@ -18,22 +18,22 @@ class SheinSalesChannelAssignFactoryMixin:
         if not assigns:
             return []
 
-        default_assign = next(
-            (assign for assign in assigns if getattr(assign.sales_channel_view, "is_default", False)),
-            None,
-        ) or assigns[0]
-
-        main_site = getattr(default_assign.sales_channel_view, "remote_id", None)
         sub_sites: List[str] = []
-
         for assign in assigns:
             view_remote_id = getattr(assign.sales_channel_view, "remote_id", None)
-            if not view_remote_id or assign == default_assign:
+            if not view_remote_id:
                 continue
-            sub_sites.append(view_remote_id)
+            value = str(view_remote_id).strip()
+            if not value or value in sub_sites:
+                continue
+            sub_sites.append(value)
 
-        site_entry = {
-            "main_site": main_site,
-            "sub_site_list": sub_sites,
-        }
-        return [site_entry]
+        if not sub_sites:
+            return []
+
+        return [
+            {
+                "main_site": "shein",
+                "sub_site_list": sub_sites,
+            }
+        ]

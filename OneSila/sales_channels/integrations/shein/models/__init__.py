@@ -1,6 +1,6 @@
 """Model package for the Shein integration."""
 
-from .categories import SheinCategory
+from .categories import SheinCategory, SheinProductCategory
 from .properties import (
     SheinProductType,
     SheinProductTypeItem,
@@ -19,9 +19,11 @@ from .sales_channels import (
 
 from .imports import SheinSalesChannelImport
 from .issues import SheinProductIssue
+from .products import SheinImageProductAssociation, SheinProduct
 
 __all__ = [
     "SheinCategory",
+    "SheinProductCategory",
     "SheinProductType",
     "SheinProductTypeItem",
     "SheinProperty",
@@ -34,4 +36,6 @@ __all__ = [
     "SheinSalesChannelView",
     "SheinSalesChannelImport",
     "SheinProductIssue",
+    "SheinProduct",
+    "SheinImageProductAssociation",
 ]

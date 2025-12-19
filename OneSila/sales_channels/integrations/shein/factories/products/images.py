@@ -2,20 +2,32 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from django.conf import settings
+
 from media.models import Media, MediaProductThrough
+from sales_channels.exceptions import PreFlightCheckError
+from get_absolute_url.helpers import generate_absolute_url
 from sales_channels.factories.products.images import (
     RemoteMediaProductThroughCreateFactory,
     RemoteMediaProductThroughDeleteFactory,
     RemoteMediaProductThroughUpdateFactory,
 )
 from sales_channels.integrations.shein.factories.mixins import SheinSignatureMixin
-from sales_channels.models.products import RemoteImageProductAssociation
+from sales_channels.integrations.shein.models import SheinImageProductAssociation
 
 
 class SheinMediaProductThroughBase(SheinSignatureMixin):
     """Build Shein-ready image payloads for product assignments."""
 
-    remote_model_class = RemoteImageProductAssociation
+    remote_model_class = SheinImageProductAssociation
+
+    _TESTING_IMAGE_SIZES: dict[int, tuple[int, int]] = {
+        1: (1340, 1785),  # main
+        2: (1340, 1785),  # detail
+        5: (900, 900),  # square
+        6: (80, 80),  # color block
+        7: (900, 1200),  # detail page
+    }
 
     def __init__(
         self,
@@ -27,6 +39,12 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
         self.value: Optional[Dict[str, Any]] = None
         self._transformed_cache: dict[str, str] = {}
         super().__init__(*args, **kwargs)
+
+    def run(self):  # type: ignore[override]
+        if self.get_value_only:
+            self.value = self._build_value()
+            return self.value
+        return super().run()
 
     # ------------------------------------------------------------------
     # Helpers
@@ -44,7 +62,28 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
 
         return list(queryset.filter(media__type=Media.IMAGE).order_by("sort_order"))
 
-    def _resolve_image_url(self, media: Media) -> Optional[str]:
+    def _resolve_image_url(self, *, media: Media, image_type: int) -> Optional[str]:
+        if getattr(settings, "TESTING", False):
+            file_obj = getattr(media, "image_web", None)
+            name = getattr(file_obj, "name", "") if file_obj is not None else ""
+            fname = name.split("/")[-1] if name else ""
+            if fname:
+                width, height = self._TESTING_IMAGE_SIZES.get(image_type, (1340, 1785))
+                return f"https://www.onesila.com/testing/{fname}?w={width}&h={height}"
+
+        if media.image is not None:
+            spec_attr = {
+                1: "shein_main_image",
+                2: "shein_detail_image",
+                5: "shein_square_image",
+                6: "shein_color_block_image",
+                7: "shein_detail_page_image",
+            }.get(image_type, "shein_detail_image")
+            spec = getattr(media, spec_attr, None)
+            url = getattr(spec, "url", None) if spec is not None else None
+            if url:
+                return f"{generate_absolute_url(trailing_slash=False)}{url}"
+
         if hasattr(media, "image_url") and callable(getattr(media, "image_url")):
             url = media.image_url()
             if url:
@@ -58,16 +97,13 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
             return media.video_url
         if getattr(media, "description", None):
             return media.description
-        if hasattr(media, "onesila_thumbnail_url"):
-            thumb = media.onesila_thumbnail_url()
-            if thumb:
-                return thumb
         return None
 
     def _transform_image(self, *, url: str, image_type: int) -> Optional[str]:
         if not url:
             return None
-        cached = self._transformed_cache.get(url)
+        cache_key = f"{image_type}:{url}"
+        cached = self._transformed_cache.get(cache_key)
         if cached:
             return cached
 
@@ -79,33 +115,79 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
             data = response.json() if hasattr(response, "json") else {}
             info = data.get("info") if isinstance(data, dict) else {}
             transformed = info.get("transformed") if isinstance(info, dict) else None
+            failure_reason = info.get("failure_reason") if isinstance(info, dict) else None
+            code = data.get("code") if isinstance(data, dict) else None
+            msg = data.get("msg") if isinstance(data, dict) else None
         except Exception:
             transformed = None
+            failure_reason = None
+            code = None
+            msg = None
 
-        final_url = transformed or url
-        self._transformed_cache[url] = final_url
+        final_url = str(transformed or "").strip()
+        if not final_url:
+            details = failure_reason or msg or code or "Unknown Shein transform failure."
+            raise PreFlightCheckError(f"Shein image conversion failed: {details} (url={url})")
+
+        self._transformed_cache[cache_key] = final_url
         return final_url
 
     def _build_image_entries(self) -> List[Dict[str, Any]]:
-        entries: List[Dict[str, Any]] = []
-        for idx, through in enumerate(self._collect_image_throughs(), start=1):
-            image_url = self._resolve_image_url(through.media)
+        throughs = self._collect_image_throughs()
+        if not throughs:
+            return []
+
+        main_through = next((t for t in throughs if getattr(t, "is_main_image", False)), None) or throughs[0]
+
+        def build_entry(*, through: MediaProductThrough, image_type: int, sort: int) -> Optional[Dict[str, Any]]:
+            image_url = self._resolve_image_url(media=through.media, image_type=image_type)
             if not image_url:
-                continue
+                return None
 
-            image_type = 1 if through.is_main_image else 2
-
-            transformed_url = self._transform_image(url=image_url, image_type=image_type)
-            if not transformed_url:
-                continue
-
-            entries.append(
-                {
-                    "image_sort": through.sales_channels_sort_order if hasattr(through, "sales_channels_sort_order") else idx,
-                    "image_type": image_type,
-                    "image_url": transformed_url,
-                }
+            association, _ = self.remote_model_class.objects.get_or_create(
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                remote_product=self.remote_product,
+                local_instance=through,
             )
+
+            cached_remote_url = str(getattr(association, "remote_url", "") or "").strip()
+            cached_original_url = str(getattr(association, "original_url", "") or "").strip()
+            cached_type = getattr(association, "image_type", None)
+
+            if cached_remote_url and cached_original_url == image_url and cached_type == image_type:
+                transformed_url = cached_remote_url
+            else:
+                transformed_url = self._transform_image(url=image_url, image_type=image_type) or ""
+                association.original_url = image_url
+                association.image_type = image_type
+                association.remote_url = transformed_url
+                association.save(update_fields=["original_url", "image_type", "remote_url"])
+
+            return {
+                "image_sort": sort,
+                "image_type": image_type,
+                "image_url": transformed_url,
+            }
+
+        entries: List[Dict[str, Any]] = []
+
+        main_entry = build_entry(through=main_through, image_type=1, sort=1)
+        if main_entry:
+            entries.append(main_entry)
+
+        square_entry = build_entry(through=main_through, image_type=5, sort=2)
+        if square_entry:
+            entries.append(square_entry)
+
+        sort = 3
+        for through in throughs:
+            if through == main_through:
+                continue
+            detail_entry = build_entry(through=through, image_type=2, sort=sort)
+            if detail_entry:
+                entries.append(detail_entry)
+                sort += 1
 
         return entries
 

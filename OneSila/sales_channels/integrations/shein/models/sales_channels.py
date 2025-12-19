@@ -8,6 +8,8 @@ from django.utils.translation import gettext_lazy as _
 
 from core import models
 
+from sales_channels.exceptions import PreFlightCheckError
+from sales_channels.integrations.shein.exceptions import SheinPreValidationError, SheinResponseException
 from sales_channels.models.mixins import RemoteObjectMixin
 from sales_channels.models.sales_channels import (
     RemoteLanguage,
@@ -85,6 +87,7 @@ class SheinSalesChannel(SalesChannel):
     class Meta:
         verbose_name = "Shein Sales Channel"
         verbose_name_plural = "Shein Sales Channels"
+        user_exceptions = (SheinResponseException, SheinPreValidationError, PreFlightCheckError)
 
     def __str__(self) -> str:
         return f"Shein Store: {self.hostname}"
@@ -164,6 +167,14 @@ class SheinSalesChannelView(SalesChannelView):
 class SheinRemoteCurrency(RemoteCurrency):
     """Remote currency information advertised by Shein."""
 
+    sales_channel_view = models.ForeignKey(
+        "shein.SheinSalesChannelView",
+        on_delete=models.SET_NULL,
+        related_name="remote_currencies",
+        null=True,
+        blank=True,
+        help_text="Storefront/sub-site associated with this currency, if known.",
+    )
     symbol_left = models.CharField(
         max_length=16,
         null=True,
@@ -180,6 +191,13 @@ class SheinRemoteCurrency(RemoteCurrency):
     class Meta:
         verbose_name = "Shein Remote Currency"
         verbose_name_plural = "Shein Remote Currencies"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sales_channel_view"],
+                condition=models.Q(sales_channel_view__isnull=False),
+                name="unique_shein_currency_per_view",
+            )
+        ]
 
 
 class SheinRemoteLanguage(RemoteLanguage):

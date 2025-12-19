@@ -11,13 +11,16 @@ import strawberry_django
 
 from core.schema.core.extensions import default_extensions
 from core.schema.core.helpers import get_multi_tenant_company
-from core.schema.core.mutations import List, create, type, update
+from core.schema.core.mutations import List, create, delete, type, update
 from sales_channels.integrations.shein.factories.sales_channels import (
     SheinCategorySuggestionFactory,
+    FetchRemoteIssuesFactory,
 )
 from sales_channels.integrations.shein.schema.types.input import (
     SheinInternalPropertyOptionPartialInput,
     SheinInternalPropertyPartialInput,
+    SheinProductCategoryInput,
+    SheinProductCategoryPartialInput,
     SheinPropertyPartialInput,
     SheinPropertySelectValuePartialInput,
     SheinProductTypePartialInput,
@@ -32,6 +35,7 @@ from sales_channels.integrations.shein.schema.types.input import (
 from sales_channels.integrations.shein.schema.types.types import (
     SheinInternalPropertyOptionType,
     SheinInternalPropertyType,
+    SheinProductCategoryType,
     SheinPropertySelectValueType,
     SheinPropertyType,
     SheinProductTypeType,
@@ -45,6 +49,9 @@ from sales_channels.integrations.shein.schema.types.types import (
     SuggestedSheinCategoryEntry,
 )
 from sales_channels.schema.types.input import SalesChannelViewPartialInput
+from sales_channels.schema.types.input import RemoteProductPartialInput
+from sales_channels.schema.types.types import RemoteProductType
+from products.schema.types.input import ProductPartialInput
 
 
 @type(name="Mutation")
@@ -53,8 +60,10 @@ class SheinSalesChannelMutation:
 
     create_shein_sales_channel: SheinSalesChannelType = create(SheinSalesChannelInput)
     create_shein_sales_channels: List[SheinSalesChannelType] = create(SheinSalesChannelInput)
+    create_shein_product_category: SheinProductCategoryType = create(SheinProductCategoryInput)
 
     update_shein_sales_channel: SheinSalesChannelType = update(SheinSalesChannelPartialInput)
+    update_shein_product_category: SheinProductCategoryType = update(SheinProductCategoryPartialInput)
     update_shein_sales_channel_view: SheinSalesChannelViewType = update(SheinSalesChannelViewPartialInput)
     update_shein_remote_currency: SheinRemoteCurrencyType = update(SheinRemoteCurrencyPartialInput)
     update_shein_property: SheinPropertyType = update(SheinPropertyPartialInput)
@@ -74,6 +83,7 @@ class SheinSalesChannelMutation:
     update_shein_import_process: SheinSalesChannelImportType = update(
         SheinSalesChannelImportPartialInput,
     )
+    delete_shein_product_category: SheinProductCategoryType = delete()
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def sync_shein_sales_channel_mappings(
@@ -244,4 +254,83 @@ class SheinSalesChannelMutation:
         )
 
         shein_map_perfect_match_select_values_db_task(sales_channel_id=channel.id)
+        return True
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def refresh_shein_latest_issues(
+        self,
+        remote_product: RemoteProductPartialInput,
+        sales_channel: SheinSalesChannelPartialInput,
+        info: Info,
+    ) -> RemoteProductType:
+        """Refresh audit/issues for a specific Shein remote product."""
+        from sales_channels.models.products import RemoteProduct
+        from sales_channels.integrations.shein.models import SheinSalesChannel
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        remote_product_obj = RemoteProduct.objects.select_related("sales_channel").get(
+            id=remote_product.id.node_id,
+            sales_channel__multi_tenant_company=multi_tenant_company,
+        )
+
+        sales_channel_obj = SheinSalesChannel.objects.get(
+            id=sales_channel.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        factory = FetchRemoteIssuesFactory(
+            remote_product=remote_product_obj,
+            sales_channel=sales_channel_obj,
+        )
+        factory.run()
+
+        return remote_product_obj
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def force_update_shein_product(
+        self,
+        product: ProductPartialInput,
+        sales_channel: SheinSalesChannelPartialInput,
+        info: Info,
+    ) -> bool:
+        """Force an update by running the create flow (publishOrEdit) again."""
+        from products.models import Product
+        from sales_channels.integrations.shein.models import SheinSalesChannel, SheinSalesChannelView
+        from sales_channels.integrations.shein.flows.tasks_runner import (
+            run_single_shein_product_task_flow,
+        )
+        from sales_channels.integrations.shein.tasks import create_shein_product_db_task
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        product_obj = Product.objects.get(
+            id=product.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        channel = SheinSalesChannel.objects.get(
+            id=sales_channel.id.node_id,
+            multi_tenant_company=multi_tenant_company,
+        )
+
+        view_obj = (
+            SheinSalesChannelView.objects.filter(
+                sales_channel=channel,
+                is_default=True,
+            ).first()
+            or SheinSalesChannelView.objects.filter(sales_channel=channel).first()
+        )
+        if view_obj is None:
+            raise ValidationError(_("Shein sales channel has no storefront views. Pull marketplaces first."))
+
+        count = 1 + getattr(product_obj, "get_configurable_variations", lambda: [])().count()
+
+        run_single_shein_product_task_flow(
+            task_func=create_shein_product_db_task,
+            view=view_obj,
+            number_of_remote_requests=count,
+            product_id=product_obj.id,
+        )
+
         return True

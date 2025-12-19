@@ -148,6 +148,52 @@ class SheinSignatureMixin:
 
         return response
 
+    def shein_get(
+        self,
+        *,
+        path: str,
+        payload: Optional[Dict[str, Any]] = None,
+        add_language: bool = True,
+        timeout: Optional[int] = None,
+        raise_for_status: bool = True,
+        timestamp: Optional[int] = None,
+        random_key: Optional[str] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
+    ) -> requests.Response:
+        """Execute a GET request against the Shein Open API."""
+
+        headers, _, _ = self.build_shein_headers(
+            path=path,
+            add_language=add_language,
+            timestamp=timestamp,
+            random_key=random_key,
+            extra_headers=extra_headers,
+        )
+
+        url = self._build_shein_url(path=path)
+        request_timeout = timeout if timeout is not None else constants.DEFAULT_TIMEOUT
+
+        try:
+            response = requests.get(
+                url,
+                params=payload or {},
+                headers=headers,
+                timeout=request_timeout,
+                verify=self.sales_channel.verify_ssl,
+            )
+        except requests.RequestException as exc:  # pragma: no cover - network errors are mocked in tests
+            logger.exception("Shein GET request failed for path %s", path)
+            raise ValueError(_("Shein request failed: unable to reach remote service.")) from exc
+
+        if raise_for_status:
+            try:
+                response.raise_for_status()
+            except requests.HTTPError as exc:  # pragma: no cover - raised via mocks
+                logger.exception("Shein GET request returned HTTP error for path %s", path)
+                raise ValueError(_("Shein request returned an HTTP error.")) from exc
+
+        return response
+
     def _resolve_shein_language(self) -> str:
         company = getattr(self.sales_channel, "multi_tenant_company", None)
         language_code = getattr(company, "language", None) if company else None

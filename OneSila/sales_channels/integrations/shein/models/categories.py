@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.core.exceptions import ValidationError
+
 from core import models
+from products.models import Product
+from sales_channels.models import SalesChannel
 
 
 class SheinCategory(models.SharedModel):
@@ -110,6 +114,19 @@ class SheinCategory(models.SharedModel):
         blank=True,
         help_text="Picture configuration flags returned by Shein for this category.",
     )
+    support_sale_attribute_sort = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Whether sales attributes can be sorted (as reported by Shein).",
+    )
+    package_type_required = models.BooleanField(
+        default=False,
+        help_text="Indicates whether Shein requires package type information for publishing.",
+    )
+    supplier_barcode_required = models.BooleanField(
+        default=False,
+        help_text="Indicates whether Shein requires supplier barcode information for publishing.",
+    )
 
     class Meta:
         verbose_name = "Shein Category"
@@ -146,20 +163,63 @@ class SheinCategory(models.SharedModel):
             return [entry for entry in configurator_properties if isinstance(entry, dict)]
         return []
 
-    @property
-    def support_sale_attribute_sort(self) -> bool | None:
-        publish_standard = self.get_publish_standard(default={})
-        value = publish_standard.get("support_sale_attribute_sort")
-        if value is None:
-            return None
-        return bool(value)
 
-    @property
-    def package_type_required(self) -> bool:
-        publish_standard = self.get_publish_standard(default={})
-        return bool(publish_standard.get("package_type_required", False))
+class SheinProductCategory(models.Model):
+    """Link a product to a recommended Shein category per sales channel."""
 
-    @property
-    def supplier_barcode_required(self) -> bool:
-        publish_standard = self.get_publish_standard(default={})
-        return bool(publish_standard.get("supplier_barcode_required", False))
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    sales_channel = models.ForeignKey(SalesChannel, on_delete=models.CASCADE)
+    remote_id = models.CharField(max_length=255)
+    product_type_remote_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Optional Shein product type identifier for this category selection.",
+    )
+    site_remote_id = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text="Optional marketplace/site identifier to disambiguate category trees.",
+    )
+
+    class Meta:
+        unique_together = ("product", "sales_channel")
+        verbose_name = "Shein Product Category"
+        verbose_name_plural = "Shein Product Categories"
+        search_terms = ["remote_id", "product_type_remote_id", "site_remote_id", "product__sku"]
+
+    def __str__(self) -> str:
+        site_suffix = f" @ {self.site_remote_id}" if self.site_remote_id else ""
+        type_suffix = f" ({self.product_type_remote_id})" if self.product_type_remote_id else ""
+        return f"{self.product} @ {self.sales_channel}: {self.remote_id}{type_suffix}{site_suffix}"
+
+    def clean(self):
+        super().clean()
+
+        remote_id = (self.remote_id or "").strip()
+        if not remote_id:
+            return
+
+        queryset = SheinCategory.objects.filter(remote_id=remote_id)
+        site_remote_id = (self.site_remote_id or "").strip()
+        if site_remote_id:
+            queryset = queryset.filter(site_remote_id=site_remote_id)
+
+        try:
+            category = queryset.get()
+        except SheinCategory.DoesNotExist as exc:
+            raise ValidationError({"remote_id": "Shein category does not exist for the given remote ID."}) from exc
+        except SheinCategory.MultipleObjectsReturned as exc:
+            raise ValidationError(
+                {
+                    "remote_id": "Multiple Shein categories found for the given remote ID. Set site_remote_id to disambiguate.",
+                }
+            ) from exc
+
+        if not category.is_leaf:
+            raise ValidationError({"remote_id": "Only leaf Shein categories can be assigned."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)

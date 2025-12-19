@@ -1,4 +1,8 @@
 from huey.contrib.djhuey import db_task
+
+from core.huey import CRUCIAL_PRIORITY
+from integrations.factories.remote_task import BaseRemoteTask
+from sales_channels.decorators import remote_task
 from sales_channels.integrations.shein.models.imports import SheinSalesChannelImport
 
 
@@ -60,3 +64,70 @@ def shein_map_perfect_match_select_values_db_task(*, sales_channel_id: int):
 
     sales_channel = SheinSalesChannel.objects.get(id=sales_channel_id)
     SheinPerfectMatchSelectValueMappingFactory(sales_channel=sales_channel).run()
+
+
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
+@db_task()
+def create_shein_product_db_task(
+    task_queue_item_id,
+    *,
+    sales_channel_id: int,
+    product_id: int,
+    view_id: int,
+):
+    """Run the Shein product creation factory."""
+    from products.models import Product
+    from sales_channels.integrations.shein.factories.products.products import (
+        SheinProductCreateFactory,
+    )
+    from sales_channels.integrations.shein.models import (
+        SheinSalesChannel,
+        SheinSalesChannelView,
+    )
+
+    task = BaseRemoteTask(task_queue_item_id)
+
+    def actual_task() -> None:
+        factory = SheinProductCreateFactory(
+            sales_channel=SheinSalesChannel.objects.get(id=sales_channel_id),
+            local_instance=Product.objects.get(id=product_id),
+            view=SheinSalesChannelView.objects.get(id=view_id),
+        )
+        factory.run()
+
+    task.execute(actual_task)
+
+
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
+@db_task()
+def resync_shein_product_db_task(
+    task_queue_item_id,
+    *,
+    sales_channel_id: int,
+    product_id: int,
+    remote_product_id: int,
+    view_id: int,
+):
+    """Run the Shein product resync factory."""
+    from products.models import Product
+    from sales_channels.integrations.shein.factories.products.products import (
+        SheinProductUpdateFactory,
+    )
+    from sales_channels.integrations.shein.models import (
+        SheinSalesChannel,
+        SheinSalesChannelView,
+    )
+    from sales_channels.models.products import RemoteProduct
+
+    task = BaseRemoteTask(task_queue_item_id)
+
+    def actual_task() -> None:
+        factory = SheinProductUpdateFactory(
+            sales_channel=SheinSalesChannel.objects.get(id=sales_channel_id),
+            local_instance=Product.objects.get(id=product_id),
+            remote_instance=RemoteProduct.objects.get(id=remote_product_id),
+            view=SheinSalesChannelView.objects.get(id=view_id),
+        )
+        factory.run()
+
+    task.execute(actual_task)
