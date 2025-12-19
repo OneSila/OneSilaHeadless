@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ast import literal_eval
 from collections.abc import Iterable, Iterator, Mapping
+import time
 from typing import Any
 
 import requests
@@ -13,6 +14,7 @@ import json
 
 from ebay_rest import API
 from ebay_rest.error import Error as EbayAPIError
+from ebay_rest.api.sell_inventory.rest import ApiException
 from ebay_rest.api import commerce_identity
 from ebay_rest.reference import Reference
 from ebay_rest.api.sell_marketing.api_client import ApiClient
@@ -20,6 +22,7 @@ from ebay_rest.api.sell_marketing.configuration import Configuration
 
 from ebay_rest.api.commerce_identity.api.user_api import UserApi
 
+from sales_channels.integrations.ebay.exceptions import EbayTemporarySystemError
 from sales_channels.integrations.ebay.models import EbaySalesChannel, EbaySalesChannelView
 
 
@@ -296,7 +299,7 @@ class GetEbayAPIMixin:
             if offset:
                 request_kwargs["offset"] = offset
 
-            response = fetcher(**request_kwargs)
+            response = self._call_ebay_api(fetcher=fetcher, **request_kwargs)
 
             is_iterator_response = isinstance(response, Iterator)
             response_items = response if is_iterator_response else (response,)
@@ -308,7 +311,7 @@ class GetEbayAPIMixin:
                 # explicit limit so that we always process the complete result
                 # set and rely on the iterator to manage pagination.
                 if limit is not None and limit > 0 and "limit" in request_kwargs:
-                    response = fetcher(**dict(kwargs))
+                    response = self._call_ebay_api(fetcher=fetcher, **dict(kwargs))
                     response_items = response
                 else:
                     response_items = response
@@ -346,6 +349,73 @@ class GetEbayAPIMixin:
 
             if not yielded_any:
                 break
+
+    @staticmethod
+    def _extract_api_exception_error_ids(*, exc: ApiException) -> set[str]:
+        body = getattr(exc, "body", None)
+        if body is None:
+            return set()
+
+        if isinstance(body, (bytes, bytearray)):
+            try:
+                body = body.decode("utf-8")
+            except UnicodeDecodeError:
+                return set()
+
+        payload: dict[str, Any]
+        if isinstance(body, str):
+            try:
+                payload = json.loads(body)
+            except json.JSONDecodeError:
+                return set()
+        elif isinstance(body, dict):
+            payload = body
+        else:
+            return set()
+
+        errors = payload.get("errors")
+        if not isinstance(errors, list):
+            return set()
+
+        return {
+            str(error.get("errorId"))
+            for error in errors
+            if isinstance(error, dict) and error.get("errorId") is not None
+        }
+
+    def _is_retryable_api_exception(self, *, exc: ApiException) -> bool:
+        if getattr(exc, "status", None) != 500:
+            return False
+        return "25001" in self._extract_api_exception_error_ids(exc=exc)
+
+    def _call_ebay_api(
+        self,
+        fetcher,
+        *,
+        max_attempts: int = 3,
+        base_delay_seconds: float = 3.0,
+        **kwargs,
+    ) -> Any:
+        """Call an eBay REST SDK method with retry for temporary system errors."""
+
+        attempt = 1
+
+        while True:
+            try:
+                return fetcher(**kwargs)
+            except ApiException as exc:
+                if not self._is_retryable_api_exception(exc=exc):
+                    raise
+
+                if attempt >= max_attempts:
+                    raise EbayTemporarySystemError(
+                        f"eBay temporary system error after {attempt} attempts (status={getattr(exc, 'status', None)})"
+                    ) from exc
+
+                delay = base_delay_seconds * attempt
+
+                time.sleep(delay)
+                attempt += 1
 
     def get_all_products(self, limit: int | None = None) -> Iterator[dict[str, Any]]:
         """Yield all inventory items for the configured sales channel."""

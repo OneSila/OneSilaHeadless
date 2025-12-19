@@ -1,7 +1,6 @@
-"""Custom exception classes for eBay integration."""
+from __future__ import annotations
 
 
-class EbayResponseException(Exception):
-    """Raised when eBay returns a handled API error meant for end-users."""
+class EbayTemporarySystemError(Exception):
+    """Raised when eBay returns a temporary system error after retries."""
 
-    pass
