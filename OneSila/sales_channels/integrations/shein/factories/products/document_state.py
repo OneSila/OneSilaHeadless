@@ -123,6 +123,8 @@ class SheinProductDocumentStateFactory(SheinSignatureMixin):
         self.validate()
         payload = self.build_payload()
         self.response_data = self.fetch(payload=payload)
+        print('----------------------- DATA')
+        print(self.response_data )
         self.failures = self._extract_failures(response_data=self.response_data)
         self.persist_issues()
         self.update_remote_product_status()
