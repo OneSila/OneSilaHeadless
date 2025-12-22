@@ -286,6 +286,7 @@ class GetEbayAPIMixin:
         limit: int | None,
         record_key: str,
         records_key: str | None = None,
+        oauth_max_retries: int = 3,
         **kwargs,
     ) -> Iterator[Any]:
         """Yield records from paginated eBay endpoints."""
@@ -299,7 +300,11 @@ class GetEbayAPIMixin:
             if offset:
                 request_kwargs["offset"] = offset
 
-            response = self._call_ebay_api(fetcher=fetcher, **request_kwargs)
+            response = self._call_ebay_api(
+                fetcher=fetcher,
+                oauth_max_retries=oauth_max_retries,
+                **request_kwargs,
+            )
 
             is_iterator_response = isinstance(response, Iterator)
             response_items = response if is_iterator_response else (response,)
@@ -310,11 +315,59 @@ class GetEbayAPIMixin:
                 # number of records to yield overall. Re-fetch without the
                 # explicit limit so that we always process the complete result
                 # set and rely on the iterator to manage pagination.
+                iterator_kwargs = request_kwargs
                 if limit is not None and limit > 0 and "limit" in request_kwargs:
-                    response = self._call_ebay_api(fetcher=fetcher, **dict(kwargs))
-                    response_items = response
-                else:
-                    response_items = response
+                    iterator_kwargs = dict(kwargs)
+                    response = self._call_ebay_api(
+                        fetcher=fetcher,
+                        oauth_max_retries=oauth_max_retries,
+                        **iterator_kwargs,
+                    )
+                response_items = response
+
+                oauth_retries = 0
+                records_emitted = 0
+
+                while True:
+                    skip_records = records_emitted
+                    skipped = 0
+                    try:
+                        for item in response_items:
+                            records, total_available, records_yielded = self._extract_paginated_records(
+                                item,
+                                record_key=record_key,
+                                records_key=records_key,
+                            )
+
+                            if not records:
+                                continue
+
+                            for record in records:
+                                if skipped < skip_records:
+                                    skipped += 1
+                                    continue
+                                records_emitted += 1
+                                yield record
+
+                            increment = records_yielded if records_yielded is not None else len(records)
+                            if increment <= 0:
+                                continue
+                    except ApiException as exc:
+                        if not self._is_oauth_invalid_token_exception(exc=exc):
+                            raise
+                        oauth_retries += 1
+                        if oauth_retries >= oauth_max_retries:
+                            raise
+                        self._refresh_api_access_token()
+                        response_items = self._call_ebay_api(
+                            fetcher=fetcher,
+                            oauth_max_retries=oauth_max_retries,
+                            **iterator_kwargs,
+                        )
+                        continue
+                    break
+
+                break
 
             yielded_any = False
 
@@ -388,22 +441,86 @@ class GetEbayAPIMixin:
             return False
         return "25001" in self._extract_api_exception_error_ids(exc=exc)
 
+    def _is_oauth_invalid_token_exception(self, *, exc: ApiException) -> bool:
+        if getattr(exc, "status", None) != 401:
+            return False
+
+        if "1001" in self._extract_api_exception_error_ids(exc=exc):
+            return True
+
+        body = getattr(exc, "body", None)
+        if body is None:
+            return False
+
+        if isinstance(body, (bytes, bytearray)):
+            try:
+                body = body.decode("utf-8")
+            except UnicodeDecodeError:
+                return False
+
+        payload: dict[str, Any] | None = None
+        if isinstance(body, str):
+            try:
+                payload = json.loads(body)
+            except json.JSONDecodeError:
+                return "Invalid access token" in body
+        elif isinstance(body, dict):
+            payload = body
+        else:
+            return False
+
+        errors = payload.get("errors") if isinstance(payload, dict) else None
+        if not isinstance(errors, list):
+            return False
+
+        for error in errors:
+            if not isinstance(error, dict):
+                continue
+            message = str(error.get("message") or "")
+            long_message = str(error.get("longMessage") or "")
+            if "Invalid access token" in message or "Invalid access token" in long_message:
+                return True
+
+        return False
+
+    def _refresh_api_access_token(self, *, reason: str | None = None) -> None:
+        api = getattr(self, "api", None)
+        if api is None:
+            self.api = self.get_api()
+            return
+
+        user_token = getattr(api, "_user_token", None)
+        if user_token is None:
+            self.api = self.get_api()
+            return
+
+        user_token._refresh_user_token()
+
     def _call_ebay_api(
         self,
         fetcher,
         *,
         max_attempts: int = 3,
+        oauth_max_retries: int = 3,
         base_delay_seconds: float = 3.0,
         **kwargs,
     ) -> Any:
-        """Call an eBay REST SDK method with retry for temporary system errors."""
+        """Call an eBay REST SDK method with retry for temporary system errors and invalid tokens."""
 
         attempt = 1
+        oauth_retries = 0
 
         while True:
             try:
                 return fetcher(**kwargs)
             except ApiException as exc:
+                if self._is_oauth_invalid_token_exception(exc=exc):
+                    if oauth_retries >= oauth_max_retries:
+                        raise
+                    self._refresh_api_access_token()
+                    oauth_retries += 1
+                    continue
+
                 if not self._is_retryable_api_exception(exc=exc):
                     raise
 
