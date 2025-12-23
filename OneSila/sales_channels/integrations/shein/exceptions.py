@@ -4,3 +4,7 @@ class SheinResponseException(Exception):
 
 class SheinPreValidationError(SheinResponseException):
     """Raised when Shein returns success=false in the response info payload."""
+
+
+class SheinConfiguratorAttributesLimitError(SheinResponseException):
+    """Raised when too many configurator attributes are provided for a Shein product (more than three total)."""

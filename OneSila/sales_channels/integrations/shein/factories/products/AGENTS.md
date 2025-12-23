@@ -836,3 +836,380 @@ Full product publish or edit payload schema:
 }
 
 ```
+
+
+# SHEIN Product Model (SPU / SKC / SKU) — Practical Guide
+
+This document explains how SHEIN product publishing works in **real terms**, with concrete examples.
+It is intended for agents that generate tests, payloads, or integration code.
+
+---
+
+## Core Concepts
+
+### SPU — Product Concept
+- Represents the **overall product**
+- Example:
+  - “Basic T-Shirt”
+  - “Running Shoes”
+- One SPU can contain **multiple SKCs**
+
+---
+
+### SKC — Main Variant (Visual / Main Spec)
+- Represents **ONE value of the main sales attribute**
+- Usually **Color**, sometimes **Style**
+- Has:
+  - Its own image set
+  - One required `sale_attribute` (main spec)
+- Max **40 SKCs per SPU**
+
+**Example SKCs for a T-Shirt SPU**
+- Red
+- Blue
+- Green
+
+> SKC is **not** size, pack, or material  
+> SKC is the **primary visual selector**
+
+---
+
+### SKU — Actual Buyable Item
+- Represents a **specific purchasable combination**
+- Has:
+  - Price
+  - Stock
+  - Weight & dimensions
+  - Optional SKU-level attributes (size, pack, fit, etc.)
+- Max **200 SKUs per SKC**
+
+---
+
+## Rule Summary (Must Not Be Violated)
+
+- Every product **must have at least 1 SKC**
+- Every SKC **must have at least 1 SKU**
+- Color (or main spec) **must be SKC-level**
+- Size / Pack / Fit **must be SKU-level**
+- All SKUs under the same SKC **share the same main spec**
+- SKUs can differ by:
+  - sale attributes
+  - quantity_info
+  - price
+  - stock
+- Max **3 sales attributes total**: **1 at SKC level** (`sale_attribute`) + **up to 2 at SKU level** (`sale_attribute_list`)
+- `product_attribute_list` is **SPU-level**; for configurables only include attributes **common to all variations**
+- `size_attribute_list` is SPU-level; when SKUs exist, include `relate_sale_attribute_id` + `relate_sale_attribute_value_id` (omit those fields when there is no SKU-level sales attribute)
+- For **multi-select attributes**, send **one entry per selected value** (do not bundle multiple IDs in a single payload item)
+
+---
+
+## Example 1 — Simple Product (One Size, One Color)
+
+**Product:**  
+Basic T-Shirt, Red, One Size
+
+### Structure
+
+SPU: Basic T-Shirt  
+└─ SKC: Red  
+   └─ SKU: One Size  
+
+### Key Notes
+- Only **one SKC**
+- Only **one SKU**
+- No size attribute needed
+
+### Example payload (simplified but valid shape)
+
+```json
+{
+  "category_id": 20000000,
+  "site_list": [
+    {
+      "main_site": "shein",
+      "sub_site_list": ["shein-us"]
+    }
+  ],
+  "multi_language_name_list": [
+    { "language": "en", "name": "Basic T-Shirt" }
+  ],
+  "multi_language_desc_list": [
+    { "language": "en", "name": "Simple red t-shirt, one size." }
+  ],
+  "skc_list": [
+    {
+      "image_info": {
+        "image_info_list": [
+          { "image_sort": 1, "image_type": 1, "image_url": "https://img.shein.com/example_main_square.jpg" },
+          { "image_sort": 2, "image_type": 2, "image_url": "https://img.shein.com/example_detail_1.jpg" }
+        ]
+      },
+      "sale_attribute": {
+        "attribute_id": 1001,
+        "attribute_value_id": 2001
+      },
+      "supplier_code": "TSHIRT-RED",
+      "sku_list": [
+        {
+          "supplier_sku": "TSHIRT-RED-ONESIZE",
+          "mall_state": 1,
+          "height": "10",
+          "length": "10",
+          "width": "10",
+          "weight": 200,
+          "price_info_list": [
+            { "sub_site": "shein-us", "currency": "USD", "base_price": 14.99 }
+          ],
+          "stock_info_list": [
+            { "inventory_num": 20 }
+          ]
+        }
+      ]
+    }
+  ],
+  "source_system": "openapi"
+}
+```
+
+### Attribute meaning
+- `attribute_id: 1001` → **Color**
+- `attribute_value_id: 2001` → **Red**
+
+---
+
+## Example 2 — Color + Size
+
+**Product:**  
+T-Shirt with sizes **S / M / L** in **Red** and **Blue**
+
+### Structure
+
+SPU: T-Shirt  
+├─ SKC: Red  
+│  ├─ SKU: Red / S  
+│  ├─ SKU: Red / M  
+│  └─ SKU: Red / L  
+└─ SKC: Blue  
+   ├─ SKU: Blue / S  
+   ├─ SKU: Blue / M  
+   └─ SKU: Blue / L  
+
+### SKU-level attributes
+Size is a `sale_attribute_list` entry on the SKU.
+
+```json
+"sale_attribute_list": [
+  { "attribute_id": 1002, "attribute_value_id": 3001 }
+]
+```
+
+### Attribute meaning
+- `attribute_id: 1002` → **Size**
+- `3001=S`, `3002=M`, `3003=L`
+
+### Example payload (two SKCs, multiple SKUs)
+
+```json
+{
+  "category_id": 20000000,
+  "site_list": [
+    { "main_site": "shein", "sub_site_list": ["shein-us"] }
+  ],
+  "multi_language_name_list": [
+    { "language": "en", "name": "Basic T-Shirt" }
+  ],
+  "multi_language_desc_list": [
+    { "language": "en", "name": "T-shirt available in multiple colors and sizes." }
+  ],
+  "skc_list": [
+    {
+      "supplier_code": "TSHIRT-RED",
+      "sale_attribute": { "attribute_id": 1001, "attribute_value_id": 2001 },
+      "image_info": { "image_info_list": [{ "image_sort": 1, "image_type": 1, "image_url": "https://img.shein.com/red_square.jpg" }] },
+      "sku_list": [
+        {
+          "supplier_sku": "TSHIRT-RED-S",
+          "mall_state": 1,
+          "height": "10", "length": "10", "width": "10", "weight": 200,
+          "sale_attribute_list": [{ "attribute_id": 1002, "attribute_value_id": 3001 }],
+          "price_info_list": [{ "sub_site": "shein-us", "currency": "USD", "base_price": 14.99 }],
+          "stock_info_list": [{ "inventory_num": 10 }]
+        },
+        {
+          "supplier_sku": "TSHIRT-RED-M",
+          "mall_state": 1,
+          "height": "10", "length": "10", "width": "10", "weight": 210,
+          "sale_attribute_list": [{ "attribute_id": 1002, "attribute_value_id": 3002 }],
+          "price_info_list": [{ "sub_site": "shein-us", "currency": "USD", "base_price": 14.99 }],
+          "stock_info_list": [{ "inventory_num": 12 }]
+        },
+        {
+          "supplier_sku": "TSHIRT-RED-L",
+          "mall_state": 1,
+          "height": "10", "length": "10", "width": "10", "weight": 220,
+          "sale_attribute_list": [{ "attribute_id": 1002, "attribute_value_id": 3003 }],
+          "price_info_list": [{ "sub_site": "shein-us", "currency": "USD", "base_price": 14.99 }],
+          "stock_info_list": [{ "inventory_num": 8 }]
+        }
+      ]
+    },
+    {
+      "supplier_code": "TSHIRT-BLUE",
+      "sale_attribute": { "attribute_id": 1001, "attribute_value_id": 2002 },
+      "image_info": { "image_info_list": [{ "image_sort": 1, "image_type": 1, "image_url": "https://img.shein.com/blue_square.jpg" }] },
+      "sku_list": [
+        {
+          "supplier_sku": "TSHIRT-BLUE-S",
+          "mall_state": 1,
+          "height": "10", "length": "10", "width": "10", "weight": 200,
+          "sale_attribute_list": [{ "attribute_id": 1002, "attribute_value_id": 3001 }],
+          "price_info_list": [{ "sub_site": "shein-us", "currency": "USD", "base_price": 14.99 }],
+          "stock_info_list": [{ "inventory_num": 11 }]
+        },
+        {
+          "supplier_sku": "TSHIRT-BLUE-M",
+          "mall_state": 1,
+          "height": "10", "length": "10", "width": "10", "weight": 210,
+          "sale_attribute_list": [{ "attribute_id": 1002, "attribute_value_id": 3002 }],
+          "price_info_list": [{ "sub_site": "shein-us", "currency": "USD", "base_price": 14.99 }],
+          "stock_info_list": [{ "inventory_num": 13 }]
+        },
+        {
+          "supplier_sku": "TSHIRT-BLUE-L",
+          "mall_state": 1,
+          "height": "10", "length": "10", "width": "10", "weight": 220,
+          "sale_attribute_list": [{ "attribute_id": 1002, "attribute_value_id": 3003 }],
+          "price_info_list": [{ "sub_site": "shein-us", "currency": "USD", "base_price": 14.99 }],
+          "stock_info_list": [{ "inventory_num": 9 }]
+        }
+      ]
+    }
+  ],
+  "source_system": "openapi"
+}
+```
+
+**Attribute meaning for colors**
+- `attribute_id: 1001` → **Color**
+- `2001=Red`, `2002=Blue`
+
+---
+
+## Example 3 — Color + Size + Pack Quantity (IMPORTANT)
+
+This example explains **“200 SKUs per SKC”**.
+
+**Product:**  
+Red T-Shirt sold as:
+- 1-Pack
+- 3-Pack
+- 6-Pack  
+in sizes S / M / L
+
+### Structure
+
+SPU: T-Shirt  
+└─ SKC: Red  
+   ├─ SKU: Red / S / 1-Pack  
+   ├─ SKU: Red / S / 3-Pack  
+   ├─ SKU: Red / S / 6-Pack  
+   ├─ SKU: Red / M / 1-Pack  
+   ├─ SKU: Red / M / 3-Pack  
+   ├─ SKU: Red / M / 6-Pack  
+   ├─ SKU: Red / L / 1-Pack  
+   ├─ SKU: Red / L / 3-Pack  
+   └─ SKU: Red / L / 6-Pack  
+
+### Why this matters
+- 3 sizes × 3 pack options = **9 SKUs**
+- Add more sizes / packs / fits → can reach **200 SKUs**
+- Still ONE SKC (Red)
+
+---
+
+### Preferred way: `quantity_info`
+
+Used when `filled_quantity_to_sku = true` and release specs allow `quantity_info`.
+
+Example SKU: **Red / S / 3-Pack**
+
+```json
+{
+  "supplier_sku": "TSHIRT-RED-S-3P",
+  "mall_state": 1,
+  "height": "10",
+  "length": "10",
+  "width": "10",
+  "weight": 250,
+  "sale_attribute_list": [
+    { "attribute_id": 1002, "attribute_value_id": 3001 }
+  ],
+  "quantity_info": {
+    "quantity_type": 2,
+    "quantity_unit": 1,
+    "quantity": 3
+  },
+  "price_info_list": [
+    { "sub_site": "shein-us", "currency": "USD", "base_price": 34.99 }
+  ],
+  "stock_info_list": [
+    { "inventory_num": 6 }
+  ]
+}
+```
+
+#### `quantity_info` meaning
+- `quantity_type: 2` → multiple pieces
+- `quantity_unit: 1` → piece
+- `quantity: 3` → 3-Pack
+
+---
+
+### Alternative (only if `quantity_info` is not allowed)
+
+Pack is modeled as a second sale attribute:
+
+```json
+"sale_attribute_list": [
+  { "attribute_id": 1002, "attribute_value_id": 3001 },
+  { "attribute_id": 1003, "attribute_value_id": 4002 }
+]
+```
+
+⚠ Up to 2 sale attributes at the SKU level (in addition to the SKC-level attribute).
+
+---
+
+## What “200 SKUs per SKC” Means (Final Definition)
+
+Under one main variant (SKC, usually Color),
+you may define up to **200 distinct purchasable combinations**
+using size, pack quantity, fit, material, etc.
+
+It does NOT mean:
+- 200 colors
+- 200 independent dimensions
+
+---
+
+## Key Agent Rules (Enforce These)
+
+- Always generate at least:
+  - 1 SKC
+  - 1 SKU per SKC
+- Main spec (Color / Style) → SKC only
+- Size / Pack / Fit → SKU only
+- Do not exceed:
+  - 40 SKCs per SPU
+  - 200 SKUs per SKC
+- Prefer `quantity_info` over fake attributes for packs
+- All SKUs under an SKC share the same image set
+
+---
+
+## One-Sentence Mental Model
+
+SPU = product idea  
+SKC = main visual option (usually color)  
+SKU = what the customer actually buys
