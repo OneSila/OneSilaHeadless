@@ -1,15 +1,19 @@
-import json
 import base64
 import hashlib
 import hmac
+import json
 import logging
 
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
+from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from integrations.models import IntegrationLog
-from sales_channels.integrations.shein.models import SheinSalesChannel
+from sales_channels.integrations.shein.models import SheinSalesChannel, SheinProduct
 from sales_channels.integrations.shein.models import SheinProductIssue
+from sales_channels.integrations.shein import constants
+from integrations.models import IntegrationLog
 
 
 logger = logging.getLogger(__name__)
@@ -23,14 +27,26 @@ def _normalize_header(request, name: str) -> str | None:
     return text or None
 
 
+def _get_setting(name: str) -> str | None:
+    value = getattr(settings, name, None)
+    if not value:
+        return None
+    return str(value).strip()
+
+
 def _verify_shein_webhook_signature(*, sales_channel: SheinSalesChannel, request) -> bool:
     signature = _normalize_header(request, "x-lt-signature")
     timestamp = _normalize_header(request, "x-lt-timestamp")
     open_key_id = _normalize_header(request, "x-lt-openKeyId")
-    if not signature or not timestamp or not open_key_id:
+    app_id = _normalize_header(request, "x-lt-appid")
+    if not signature or not timestamp or not open_key_id or not app_id:
         return False
 
     if open_key_id != (sales_channel.open_key_id or ""):
+        return False
+
+    expected_app_id = _get_setting("SHEIN_APP_ID")
+    if not expected_app_id or app_id != expected_app_id:
         return False
 
     try:
@@ -38,15 +54,18 @@ def _verify_shein_webhook_signature(*, sales_channel: SheinSalesChannel, request
     except (TypeError, ValueError):
         return False
 
+    if len(signature) < 5:
+        return False
+
     random_key = signature[:5]
     if not random_key:
         return False
 
-    secret_key = sales_channel.secret_key
+    secret_key = _get_setting("SHEIN_APP_SECRET")
     if not secret_key:
         return False
 
-    value = f"{open_key_id}&{timestamp_int}&{request.path}"
+    value = f"{app_id}&{timestamp_int}&{request.path}"
     key = f"{secret_key}{random_key}"
 
     digest = hmac.new(key.encode("utf-8"), value.encode("utf-8"), hashlib.sha256).digest()
@@ -63,23 +82,46 @@ def _get_sales_channel_from_request(request) -> SheinSalesChannel | None:
     return SheinSalesChannel.objects.filter(open_key_id=open_key_id).first()
 
 
-def _resolve_remote_product_id(*, sales_channel: SheinSalesChannel, version: str | None, document_sn: str | None) -> int | None:
-    qs = IntegrationLog.objects.filter(
-        integration=sales_channel,
-        identifier="SheinProductSubmission",
-        status=IntegrationLog.STATUS_SUCCESS,
-    )
-    if version:
-        qs = qs.filter(payload__version=version)
-    elif document_sn:
-        qs = qs.filter(payload__document_sn=document_sn)
-    else:
+def _decrypt_event_data(*, event_data: str) -> dict | None:
+    secret_key = _get_setting("SHEIN_APP_SECRET")
+    if not secret_key:
         return None
 
-    log = qs.order_by("-created_at").first()
-    if not log:
+    iv_seed = constants.DEFAULT_AES_IV
+    if len(iv_seed.encode("utf-8")) < 16:
         return None
-    return log.object_id
+
+    key_bytes = secret_key.encode("utf-8")[:16]
+    iv_bytes = iv_seed.encode("utf-8")[:16]
+    padded = event_data + "=" * (-len(event_data) % 4)
+    try:
+        decoded = base64.b64decode(padded)
+        cipher = AES.new(key_bytes, AES.MODE_CBC, iv_bytes)
+        decrypted = cipher.decrypt(decoded)
+        plaintext = unpad(decrypted, AES.block_size).decode("utf-8")
+        payload = json.loads(plaintext)
+    except Exception:
+        return None
+
+    return payload if isinstance(payload, dict) else None
+
+
+def _extract_webhook_payload(request) -> dict | None:
+    event_data = request.POST.get("eventData") if hasattr(request, "POST") else None
+    if not event_data:
+        try:
+            body = json.loads(request.body or b"{}")
+        except ValueError:
+            body = None
+        if isinstance(body, dict):
+            event_data = body.get("eventData")
+            if not event_data:
+                return body
+
+    if event_data:
+        return _decrypt_event_data(event_data=str(event_data))
+
+    return None
 
 
 @csrf_exempt
@@ -91,39 +133,30 @@ def shein_product_document_audit_status_notice(request):
     if not _verify_shein_webhook_signature(sales_channel=sales_channel, request=request):
         return HttpResponse(status=401)
 
-    try:
-        payload = json.loads(request.body or b"{}")
-    except ValueError:
-        return HttpResponse(status=400)
-
+    payload = _extract_webhook_payload(request)
     if not isinstance(payload, dict):
         return HttpResponse(status=400)
 
     spu_name = payload.get("spu_name")
-    version = payload.get("version")
-    document_sn = payload.get("document_sn")
     audit_state = payload.get("audit_state")
     failed_reason = payload.get("failed_reason")
 
-    remote_product_id = _resolve_remote_product_id(
-        sales_channel=sales_channel,
-        version=version,
-        document_sn=document_sn,
-    )
-    if not remote_product_id:
-        logger.warning(
-            "Shein audit webhook could not resolve remote product (channel=%s version=%s document_sn=%s)",
-            getattr(sales_channel, "pk", None),
-            version,
-            document_sn,
-        )
+    if not spu_name:
         return HttpResponse(status=202)
 
     from sales_channels.models.products import RemoteProduct
     from django.db.utils import OperationalError, ProgrammingError
 
-    remote_product = RemoteProduct.objects.filter(pk=remote_product_id, sales_channel=sales_channel).first()
+    remote_product = SheinProduct.objects.filter(
+        sales_channel=sales_channel,
+        spu_name=str(spu_name),
+    ).first()
     if not remote_product:
+        logger.warning(
+            "Shein audit webhook could not resolve remote product (channel=%s spu_name=%s)",
+            getattr(sales_channel, "pk", None),
+            spu_name,
+        )
         return HttpResponse(status=202)
 
     updates: list[str] = []
@@ -148,7 +181,7 @@ def shein_product_document_audit_status_notice(request):
     remote_product.add_log(
         action=IntegrationLog.ACTION_UPDATE,
         response={"webhook": "product_document_audit_status_notice", "payload": payload},
-        payload={"version": version, "document_sn": document_sn, "audit_state": audit_state},
+        payload={"spu_name": spu_name, "audit_state": audit_state},
         identifier="SheinProductAuditWebhook",
         remote_product=remote_product,
     )
@@ -157,7 +190,7 @@ def shein_product_document_audit_status_notice(request):
         remote_product.add_user_error(
             action=IntegrationLog.ACTION_UPDATE,
             response={"failed_reason": failed_reason, "audit_state": audit_state},
-            payload={"version": version, "document_sn": document_sn},
+            payload={"spu_name": spu_name},
             error_traceback="",
             identifier="SheinProductAuditFailed",
             remote_product=remote_product,

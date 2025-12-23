@@ -3,14 +3,20 @@ import hashlib
 import hmac
 import json
 
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad
+from django.test import override_settings
+
 from core.tests import TestCase
 from model_bakery import baker
 
 from products.models import Product
-from sales_channels.integrations.shein.models import SheinSalesChannel
+from sales_channels.integrations.shein import constants
+from sales_channels.integrations.shein.models import SheinSalesChannel, SheinProduct
 from sales_channels.models.products import RemoteProduct
 
 
+@override_settings(SHEIN_APP_ID="app-id", SHEIN_APP_SECRET="app-secret-123456")
 class SheinWebhookTests(TestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -21,6 +27,8 @@ class SheinWebhookTests(TestCase):
             open_key_id="open-key",
             secret_key="secret-key",
         )
+        self.app_id = "app-id"
+        self.app_secret = "app-secret-123456"
         self.product = baker.make(
             Product,
             multi_tenant_company=self.multi_tenant_company,
@@ -28,35 +36,38 @@ class SheinWebhookTests(TestCase):
             active=True,
             sku="SKU-1",
         )
-        self.remote_product = RemoteProduct.objects.create(
+        self.remote_product = SheinProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             local_instance=self.product,
             remote_sku=self.product.sku,
+            spu_name="h23121539315"
         )
         self.webhook_path = "/direct/integrations/shein/product_document_audit_status_notice"
 
     def _build_signature(self, *, path: str, timestamp: int, random_key: str) -> str:
-        open_key_id = self.sales_channel.open_key_id
-        secret_key = self.sales_channel.secret_key
-        value = f"{open_key_id}&{timestamp}&{path}"
+        value = f"{self.app_id}&{timestamp}&{path}"
+        secret_key = self.app_secret
         key = f"{secret_key}{random_key}"
         digest = hmac.new(key.encode("utf-8"), value.encode("utf-8"), hashlib.sha256).digest()
         hex_signature = digest.hex()
         base64_signature = base64.b64encode(hex_signature.encode("utf-8")).decode("utf-8")
         return f"{random_key}{base64_signature}"
 
-    def test_audit_webhook_updates_remote_id_by_version(self) -> None:
+    def _encrypt_event_data(self, payload: dict) -> str:
+        raw = json.dumps(payload)
+        key_bytes = self.app_secret.encode("utf-8")[:16]
+        iv_bytes = constants.DEFAULT_AES_IV.encode("utf-8")[:16]
+        cipher = AES.new(key_bytes, AES.MODE_CBC, iv_bytes)
+        encrypted = cipher.encrypt(pad(raw.encode("utf-8"), AES.block_size))
+        return base64.b64encode(encrypted).decode("utf-8")
+
+    def test_audit_webhook_resolves_remote_product_by_spu_name(self) -> None:
         version = "SPMP231215009184753"
         document_sn = "SPMPA420231215003106"
 
-        self.remote_product.add_log(
-            action="CREATE",
-            response={"version": version, "document_sn": document_sn},
-            payload={"version": version, "document_sn": document_sn},
-            identifier="SheinProductSubmission",
-            remote_product=self.remote_product,
-        )
+        self.remote_product.remote_id = "h23121539315"
+        self.remote_product.save(update_fields=["remote_id"])
 
         body = {
             "spu_name": "h23121539315",
@@ -72,13 +83,14 @@ class SheinWebhookTests(TestCase):
         timestamp = 1700000000000
         random_key = "abc12"
         signature = self._build_signature(path=self.webhook_path, timestamp=timestamp, random_key=random_key)
+        event_data = self._encrypt_event_data(body)
 
         response = self.client.post(
             self.webhook_path,
-            data=json.dumps(body),
-            content_type="application/json",
+            data={"eventData": event_data},
             **{
                 "HTTP_X_LT_OPENKEYID": self.sales_channel.open_key_id,
+                "HTTP_X_LT_APPID": self.app_id,
                 "HTTP_X_LT_TIMESTAMP": str(timestamp),
                 "HTTP_X_LT_SIGNATURE": signature,
             },
@@ -87,4 +99,3 @@ class SheinWebhookTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.remote_product.refresh_from_db()
         self.assertEqual(self.remote_product.remote_id, "h23121539315")
-
