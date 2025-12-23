@@ -901,6 +901,7 @@ It is intended for agents that generate tests, payloads, or integration code.
 - `product_attribute_list` is **SPU-level**; for configurables only include attributes **common to all variations**
 - `size_attribute_list` is SPU-level; when SKUs exist, include `relate_sale_attribute_id` + `relate_sale_attribute_value_id` (omit those fields when there is no SKU-level sales attribute)
 - For **multi-select attributes**, send **one entry per selected value** (do not bundle multiple IDs in a single payload item)
+- `supplier_code` is mapped via the internal property `supplier_code` (TEXT) and must be set per SKC/SKU
 
 ---
 
@@ -1131,6 +1132,10 @@ SPU: T-Shirt
 ### Preferred way: `quantity_info`
 
 Used when `filled_quantity_to_sku = true` and release specs allow `quantity_info`.
+
+Internal properties used by the integration:
+- `quantity_info__unit` (SELECT): 1 = Piece, 2 = Pair
+- `quantity_info__quantity` (INTEGER): quantity value used to derive `quantity_type`
 
 Example SKU: **Red / S / 3-Pack**
 

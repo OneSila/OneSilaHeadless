@@ -2,7 +2,7 @@ from core.tests import TestCase
 from model_bakery import baker
 
 from products.models import Product
-from properties.models import ProductProperty, Property
+from properties.models import ProductProperty, ProductPropertyTextTranslation, Property
 from sales_channels.integrations.shein.factories.products import SheinProductCreateFactory
 from sales_channels.integrations.shein.models import SheinInternalProperty, SheinSalesChannel
 from sales_channels.models import SalesChannelView, SalesChannelViewAssign
@@ -43,19 +43,34 @@ class SheinProductDimensionMappingTest(TestCase):
             remote_product=self.remote_product,
         )
 
-    def _make_property(self, code: str, *, prop_type: str, float_value: float | None = None, int_value: int | None = None):
+    def _make_property(
+        self,
+        code: str,
+        *,
+        prop_type: str,
+        float_value: float | None = None,
+        int_value: int | None = None,
+        text_value: str | None = None,
+    ):
         prop = baker.make(
             Property,
             type=prop_type,
             multi_tenant_company=self.multi_tenant_company,
         )
-        ProductProperty.objects.create(
+        product_property = ProductProperty.objects.create(
             product=self.product,
             property=prop,
             value_float=float_value,
             value_int=int_value,
             multi_tenant_company=self.multi_tenant_company,
         )
+        if prop_type == Property.TYPES.TEXT and text_value is not None:
+            ProductPropertyTextTranslation.objects.create(
+                multi_tenant_company=self.multi_tenant_company,
+                product_property=product_property,
+                language=self.multi_tenant_company.language,
+                value_text=text_value,
+            )
         SheinInternalProperty.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
@@ -71,6 +86,7 @@ class SheinProductDimensionMappingTest(TestCase):
         self._make_property("length", prop_type=Property.TYPES.FLOAT, float_value=14.5)
         self._make_property("width", prop_type=Property.TYPES.FLOAT, float_value=9.8)
         self._make_property("weight", prop_type=Property.TYPES.INT, int_value=750)
+        self._make_property("supplier_code", prop_type=Property.TYPES.TEXT, text_value="SUP-DIM-1")
 
         factory = SheinProductCreateFactory(
             sales_channel=self.sales_channel,

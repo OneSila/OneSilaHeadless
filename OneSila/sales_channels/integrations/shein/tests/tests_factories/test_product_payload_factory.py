@@ -10,6 +10,7 @@ from properties.models import (
     ProductPropertiesRule,
     ProductPropertiesRuleItem,
     ProductProperty,
+    ProductPropertyTextTranslation,
     Property,
     PropertySelectValue,
 )
@@ -131,6 +132,42 @@ class SheinProductPayloadFactoryTests(TestCase):
             value=local_value.value or "",
         )
 
+    def _ensure_supplier_code_property(self) -> Property:
+        supplier_property = getattr(self, "_supplier_code_property", None)
+        if supplier_property is not None:
+            return supplier_property
+
+        supplier_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.TEXT,
+        )
+        SheinInternalProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="supplier_code",
+            name="Supplier code",
+            type=Property.TYPES.TEXT,
+            payload_field="supplier_code",
+            local_instance=supplier_property,
+        )
+        self._supplier_code_property = supplier_property
+        return supplier_property
+
+    def _assign_supplier_code(self, *, product: Product, value: str) -> None:
+        supplier_property = self._ensure_supplier_code_property()
+        product_property = ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            property=supplier_property,
+        )
+        ProductPropertyTextTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product_property=product_property,
+            language=self.multi_tenant_company.language,
+            value_text=value,
+        )
+
     def _create_variation(
         self,
         *,
@@ -169,6 +206,7 @@ class SheinProductPayloadFactoryTests(TestCase):
         return variation
 
     def test_shein_build_sku_list_includes_supplier_barcode_and_package_type(self) -> None:
+        self._assign_supplier_code(product=self.product, value="SUP-1")
         EanCode.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,
@@ -223,6 +261,84 @@ class SheinProductPayloadFactoryTests(TestCase):
         self.assertEqual(sku["supplier_barcode"]["barcode"], "1234567890123")
         self.assertEqual(sku["supplier_barcode"]["barcode_type"], "EAN")
         self.assertEqual(sku["package_type"], "3")
+        self.assertEqual(sku["supplier_code"], "SUP-1")
+
+    def test_shein_build_sku_list_includes_quantity_info(self) -> None:
+        self._assign_supplier_code(product=self.product, value="SUP-QTY-1")
+        unit_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        unit_value = baker.make(
+            PropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            property=unit_property,
+        )
+        quantity_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.INT,
+        )
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            property=unit_property,
+            value_select=unit_value,
+        )
+        ProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            property=quantity_property,
+            value_int=3,
+        )
+        unit_internal = SheinInternalProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="quantity_info__unit",
+            name="Quantity unit",
+            type=Property.TYPES.SELECT,
+            payload_field="quantity_unit",
+            local_instance=unit_property,
+        )
+        SheinInternalPropertyOption.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            internal_property=unit_internal,
+            sales_channel=self.sales_channel,
+            local_instance=unit_value,
+            value="1",
+            label="Piece",
+            sort_order=0,
+            raw_data={},
+        )
+        SheinInternalProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            code="quantity_info__quantity",
+            name="Quantity",
+            type=Property.TYPES.INT,
+            payload_field="quantity",
+            local_instance=quantity_property,
+        )
+
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            get_value_only=True,
+            skip_checks=True,
+        )
+        sku = factory._build_sku_list(assigns=[])[0]
+
+        self.assertEqual(
+            sku["quantity_info"],
+            {"quantity_type": 2, "quantity_unit": 1, "quantity": 3},
+        )
+        fill_configuration = factory._build_fill_configuration_info(
+            package_type=None,
+            filled_quantity_to_sku=factory.has_quantity_info,
+        )
+        self.assertEqual(fill_configuration, {"filled_quantity_to_sku": True})
 
     def test_shein_create_payload_omits_spu_name_and_includes_site_list(self) -> None:
         factory = SheinProductCreateFactory(
@@ -314,6 +430,8 @@ class SheinProductPayloadFactoryTests(TestCase):
             color_property=color_property,
             color_value=blue,
         )
+        self._assign_supplier_code(product=red_variation, value="SUP-RED-A")
+        self._assign_supplier_code(product=blue_variation, value="SUP-BLUE-A")
 
         remote_product = SheinProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -431,6 +549,8 @@ class SheinProductPayloadFactoryTests(TestCase):
             size_property=size_property,
             size_value=large,
         )
+        self._assign_supplier_code(product=red_small, value="SUP-RED-B")
+        self._assign_supplier_code(product=blue_large, value="SUP-BLUE-B")
 
         remote_product = SheinProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -626,6 +746,7 @@ class SheinProductPayloadFactoryTests(TestCase):
             active=True,
             sku="SIMPLE-1",
         )
+        self._assign_supplier_code(product=product, value="SUP-SIMPLE")
         remote_product = SheinProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
@@ -663,7 +784,7 @@ class SheinProductPayloadFactoryTests(TestCase):
         expected = {
             "category_id": "CAT-1",
             "product_type_id": "TYPE-1",
-            "supplier_code": product.sku,
+            "supplier_code": "SUP-SIMPLE",
             "source_system": "openapi",
             "site_list": [
                 {"main_site": "shein", "sub_site_list": ["shein-fr"]},
@@ -674,11 +795,12 @@ class SheinProductPayloadFactoryTests(TestCase):
                     "shelf_way": "1",
                     "image_info": image_info,
                     "sale_attribute": {"attribute_id": "COLOR", "attribute_value_id": "RED"},
-                    "supplier_code": product.sku,
+                    "supplier_code": "SUP-SIMPLE",
                     "sku_list": [
                         {
                             "mall_state": 1,
                             "supplier_sku": product.sku,
+                            "supplier_code": "SUP-SIMPLE",
                             "stop_purchase": 1,
                             "height": "10.0",
                             "length": "10.0",
@@ -746,6 +868,8 @@ class SheinProductPayloadFactoryTests(TestCase):
             color_property=color_property,
             color_value=blue,
         )
+        self._assign_supplier_code(product=red_variation, value="SUP-RED-1")
+        self._assign_supplier_code(product=blue_variation, value="SUP-BLUE-1")
 
         remote_product = SheinProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -788,11 +912,12 @@ class SheinProductPayloadFactoryTests(TestCase):
                 "shelf_way": "1",
                 "image_info": image_info,
                 "sale_attribute": {"attribute_id": "COLOR", "attribute_value_id": "BLUE-1"},
-                "supplier_code": blue_variation.sku,
+                "supplier_code": "SUP-BLUE-1",
                 "sku_list": [
                     {
                         "mall_state": 1,
                         "supplier_sku": blue_variation.sku,
+                        "supplier_code": "SUP-BLUE-1",
                         "stop_purchase": 1,
                         "height": "10.0",
                         "length": "10.0",
@@ -806,11 +931,12 @@ class SheinProductPayloadFactoryTests(TestCase):
                 "shelf_way": "1",
                 "image_info": image_info,
                 "sale_attribute": {"attribute_id": "COLOR", "attribute_value_id": "RED-1"},
-                "supplier_code": red_variation.sku,
+                "supplier_code": "SUP-RED-1",
                 "sku_list": [
                     {
                         "mall_state": 1,
                         "supplier_sku": red_variation.sku,
+                        "supplier_code": "SUP-RED-1",
                         "stop_purchase": 1,
                         "height": "10.0",
                         "length": "10.0",
@@ -825,7 +951,6 @@ class SheinProductPayloadFactoryTests(TestCase):
         expected = {
             "category_id": "CAT-2",
             "product_type_id": "TYPE-2",
-            "supplier_code": parent.sku,
             "source_system": "openapi",
             "site_list": [{"main_site": "shein", "sub_site_list": ["shein-fr"]}],
             "skc_list": expected_skc,
@@ -913,6 +1038,8 @@ class SheinProductPayloadFactoryTests(TestCase):
             size_property=size_property,
             size_value=large,
         )
+        self._assign_supplier_code(product=red_small, value="SUP-RED-2")
+        self._assign_supplier_code(product=blue_large, value="SUP-BLUE-2")
 
         remote_product = SheinProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -955,11 +1082,12 @@ class SheinProductPayloadFactoryTests(TestCase):
                 "shelf_way": "1",
                 "image_info": image_info,
                 "sale_attribute": {"attribute_id": "COLOR", "attribute_value_id": "BLUE-2"},
-                "supplier_code": blue_large.sku,
+                "supplier_code": "SUP-BLUE-2",
                 "sku_list": [
                     {
                         "mall_state": 1,
                         "supplier_sku": blue_large.sku,
+                        "supplier_code": "SUP-BLUE-2",
                         "stop_purchase": 1,
                         "height": "10.0",
                         "length": "10.0",
@@ -976,11 +1104,12 @@ class SheinProductPayloadFactoryTests(TestCase):
                 "shelf_way": "1",
                 "image_info": image_info,
                 "sale_attribute": {"attribute_id": "COLOR", "attribute_value_id": "RED-2"},
-                "supplier_code": red_small.sku,
+                "supplier_code": "SUP-RED-2",
                 "sku_list": [
                     {
                         "mall_state": 1,
                         "supplier_sku": red_small.sku,
+                        "supplier_code": "SUP-RED-2",
                         "stop_purchase": 1,
                         "height": "10.0",
                         "length": "10.0",
@@ -998,7 +1127,6 @@ class SheinProductPayloadFactoryTests(TestCase):
         expected = {
             "category_id": "CAT-3",
             "product_type_id": "TYPE-3",
-            "supplier_code": parent.sku,
             "source_system": "openapi",
             "site_list": [{"main_site": "shein", "sub_site_list": ["shein-fr"]}],
             "skc_list": expected_skc,
@@ -1109,6 +1237,8 @@ class SheinProductPayloadFactoryTests(TestCase):
             size_property=size_property,
             size_value=large,
         )
+        self._assign_supplier_code(product=red_small, value="SUP-RED-3")
+        self._assign_supplier_code(product=blue_large, value="SUP-BLUE-3")
         ProductProperty.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=red_small,
@@ -1163,11 +1293,12 @@ class SheinProductPayloadFactoryTests(TestCase):
                 "shelf_way": "1",
                 "image_info": image_info,
                 "sale_attribute": {"attribute_id": "COLOR", "attribute_value_id": "BLUE-3"},
-                "supplier_code": blue_large.sku,
+                "supplier_code": "SUP-BLUE-3",
                 "sku_list": [
                     {
                         "mall_state": 1,
                         "supplier_sku": blue_large.sku,
+                        "supplier_code": "SUP-BLUE-3",
                         "stop_purchase": 1,
                         "height": "10.0",
                         "length": "10.0",
@@ -1185,11 +1316,12 @@ class SheinProductPayloadFactoryTests(TestCase):
                 "shelf_way": "1",
                 "image_info": image_info,
                 "sale_attribute": {"attribute_id": "COLOR", "attribute_value_id": "RED-3"},
-                "supplier_code": red_small.sku,
+                "supplier_code": "SUP-RED-3",
                 "sku_list": [
                     {
                         "mall_state": 1,
                         "supplier_sku": red_small.sku,
+                        "supplier_code": "SUP-RED-3",
                         "stop_purchase": 1,
                         "height": "10.0",
                         "length": "10.0",
@@ -1208,7 +1340,6 @@ class SheinProductPayloadFactoryTests(TestCase):
         expected = {
             "category_id": "CAT-5",
             "product_type_id": "TYPE-5",
-            "supplier_code": parent.sku,
             "source_system": "openapi",
             "site_list": [{"main_site": "shein", "sub_site_list": ["shein-fr"]}],
             "skc_list": expected_skc,

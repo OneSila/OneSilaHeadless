@@ -143,7 +143,18 @@ SHEIN_PACKAGE_TYPE_OPTIONS = [
     {"value": "4", "label": _("Vacuum")},
 ]
 
+SHEIN_QUANTITY_UNIT_OPTIONS = [
+    {"value": "1", "label": _("Piece")},
+    {"value": "2", "label": _("Pair")},
+]
+
 SHEIN_INTERNAL_PROPERTY_DEFINITIONS = [
+    {
+        "code": "supplier_code",
+        "name": _("Supplier code"),
+        "type": Property.TYPES.TEXT,
+        "payload_field": "supplier_code",
+    },
     {
         "code": "reference_product_link",
         "name": _("Reference product link"),
@@ -162,6 +173,19 @@ SHEIN_INTERNAL_PROPERTY_DEFINITIONS = [
         "type": Property.TYPES.SELECT,
         "payload_field": "package_type",
         "options": SHEIN_PACKAGE_TYPE_OPTIONS,
+    },
+    {
+        "code": "quantity_info__unit",
+        "name": _("Quantity unit"),
+        "type": Property.TYPES.SELECT,
+        "payload_field": "quantity_unit",
+        "options": SHEIN_QUANTITY_UNIT_OPTIONS,
+    },
+    {
+        "code": "quantity_info__quantity",
+        "name": _("Quantity"),
+        "type": Property.TYPES.INT,
+        "payload_field": "quantity",
     },
     {
         "code": "height",

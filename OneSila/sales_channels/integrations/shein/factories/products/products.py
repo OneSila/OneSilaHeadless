@@ -85,6 +85,7 @@ class SheinProductBaseFactory(
         self.multi_language_name_list: list[dict[str, str]] = []
         self.multi_language_desc_list: list[dict[str, str]] = []
         self.skc_list: list[dict[str, Any]] = []
+        self.has_quantity_info = False
         super().__init__(
             sales_channel=sales_channel,
             local_instance=local_instance,
@@ -735,12 +736,63 @@ class SheinProductBaseFactory(
             "barcode_type": self.supplier_barcode_type,
         }
 
-    def _build_fill_configuration_info(self, *, package_type: str | None) -> dict[str, Any] | None:
-        if not package_type:
+    def _resolve_supplier_code(self, *, product=None, required: bool = False) -> str | None:
+        product = product or self.local_instance
+        value = self._get_internal_property_value(code="supplier_code", default=None, product=product)
+        if value in (None, "", []):
+            if required:
+                raise PreFlightCheckError(
+                    f"Shein supplier_code internal property is missing for product {product.sku}."
+                )
             return None
+        return str(value).strip()
+
+    def _build_quantity_info(self, *, product=None) -> dict[str, Any] | None:
+        product = product or self.local_instance
+        unit_value = self._get_internal_property_option_value(code="quantity_info__unit", product=product)
+        quantity_value = self._get_internal_property_value(
+            code="quantity_info__quantity",
+            default=None,
+            product=product,
+        )
+        if unit_value in (None, "", []) or quantity_value in (None, "", []):
+            return None
+        try:
+            quantity = int(quantity_value)
+        except (TypeError, ValueError):
+            return None
+        if quantity <= 0:
+            return None
+        try:
+            unit = int(unit_value)
+        except (TypeError, ValueError):
+            return None
+        if unit not in (1, 2):
+            return None
+        quantity_type = 1 if quantity == 1 else 2
         return {
-            "fill_configuration_tags": ["PACKAGE_TYPE_TO_SKU"],
+            "quantity_type": quantity_type,
+            "quantity_unit": unit,
+            "quantity": quantity,
         }
+
+    def _build_fill_configuration_info(
+        self,
+        *,
+        package_type: str | None,
+        filled_quantity_to_sku: bool,
+    ) -> dict[str, Any] | None:
+        if not package_type and not filled_quantity_to_sku:
+            return None
+        payload: dict[str, Any] = {}
+        tags: list[str] = []
+        if package_type:
+            tags.append("PACKAGE_TYPE_TO_SKU")
+        if tags:
+            payload["fill_configuration_tags"] = tags
+        if filled_quantity_to_sku:
+            payload["filled_quantity_to_sku"] = True
+        return payload
 
     def _coerce_dimension_value(self, *, value: Any) -> str:
         try:
@@ -966,15 +1018,21 @@ class SheinProductBaseFactory(
         height, length, width, weight = self._resolve_dimensions(product=product)
         supplier_barcode = self._build_supplier_barcode(product=product)
         package_type = self._get_internal_property_option_value(code="package_type", product=product)
+        supplier_code = self._resolve_supplier_code(product=product, required=True)
+        quantity_info = self._build_quantity_info(product=product)
+        if quantity_info:
+            self.has_quantity_info = True
 
         sku_entry: dict[str, Any] = {
             "mall_state": 1 if product.active else 2,
             "supplier_sku": product.sku,
+            "supplier_code": supplier_code,
             "stop_purchase": 1,
             "height": height,
             "length": length,
             "width": width,
             "weight": weight,
+            "quantity_info": quantity_info,
             "supplier_barcode": supplier_barcode,
             "package_type": package_type,
             "price_info_list": price_info_list or None,
@@ -997,11 +1055,12 @@ class SheinProductBaseFactory(
         include_skc_images = not getattr(self, "use_spu_pic", False)
 
         if not self.local_instance.is_configurable():
+            supplier_code = self._resolve_supplier_code(product=self.local_instance, required=True)
             skc_entry: dict[str, Any] = {
                 "shelf_way": "1",
                 "image_info": (self.image_info or None) if include_skc_images else None,
                 "sale_attribute": self.sale_attribute,
-                "supplier_code": self.local_instance.sku,
+                "supplier_code": supplier_code,
                 "sku_list": self._build_sku_list(assigns=assigns),
             }
 
@@ -1064,6 +1123,12 @@ class SheinProductBaseFactory(
         for data in grouped.values():
             sale_attribute = data["sale_attribute"]
             skc_variations: list = data["variations"]
+            primary_variation = skc_variations[0] if skc_variations else None
+            supplier_code = (
+                self._resolve_supplier_code(product=primary_variation, required=True)
+                if primary_variation is not None
+                else None
+            )
 
             sku_entries: list[dict[str, Any]] = []
             for variation in skc_variations:
@@ -1090,7 +1155,7 @@ class SheinProductBaseFactory(
                 "shelf_way": "1",
                 "image_info": (self.image_info or None) if include_skc_images else None,
                 "sale_attribute": sale_attribute,
-                "supplier_code": skc_variations[0].sku if skc_variations else self.local_instance.sku,
+                "supplier_code": supplier_code,
                 "sku_list": sku_entries,
             }
 
@@ -1142,12 +1207,20 @@ class SheinProductBaseFactory(
 
         self.site_list = self.build_site_list(product=self.local_instance) if self.is_create else []
         package_type = self._get_internal_property_option_value(code="package_type")
-        fill_configuration_info = self._build_fill_configuration_info(package_type=package_type)
+        fill_configuration_info = self._build_fill_configuration_info(
+            package_type=package_type,
+            filled_quantity_to_sku=self.has_quantity_info,
+        )
+        supplier_code = (
+            self._resolve_supplier_code(product=self.local_instance, required=False)
+            if not self.local_instance.is_configurable()
+            else None
+        )
 
         self.payload: dict[str, Any] = {
             "category_id": self.selected_category_id,
             "product_type_id": self.selected_product_type_id,
-            "supplier_code": self.local_instance.sku,
+            "supplier_code": supplier_code,
             "source_system": "openapi",
             "site_list": self.site_list or None,
             "multi_language_name_list": self.multi_language_name_list or None,

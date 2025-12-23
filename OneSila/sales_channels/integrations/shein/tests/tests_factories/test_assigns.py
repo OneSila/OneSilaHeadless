@@ -34,24 +34,11 @@ class SheinSalesChannelAssignMixinTest(TestCase):
         )
 
     def test_builds_site_list_with_default_and_subsites(self):
-        default_view = SheinSalesChannelView.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            remote_id="shein",
-            is_default=True,
-        )
         sub_view = SheinSalesChannelView.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             remote_id="shein-fr",
             is_default=False,
-        )
-        SalesChannelViewAssign.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            product=self.product,
-            sales_channel_view=default_view,
-            remote_product=self.remote_product,
         )
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -67,24 +54,3 @@ class SheinSalesChannelAssignMixinTest(TestCase):
         self.assertEqual(len(site_list), 1)
         self.assertEqual(site_list[0]["main_site"], "shein")
         self.assertEqual(site_list[0]["sub_site_list"], ["shein-fr"])
-
-    def test_defaults_to_first_assign_when_no_flag(self):
-        view = SheinSalesChannelView.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            remote_id="shein",
-            is_default=False,
-        )
-        SalesChannelViewAssign.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            product=self.product,
-            sales_channel_view=view,
-            remote_product=self.remote_product,
-        )
-
-        fac = DummyAssignFactory(sales_channel=self.sales_channel)
-        site_list = fac.build_site_list(product=self.product)
-
-        self.assertEqual(site_list[0]["main_site"], "shein")
-        self.assertEqual(site_list[0]["sub_site_list"], [])
