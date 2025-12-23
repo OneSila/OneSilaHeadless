@@ -902,6 +902,7 @@ It is intended for agents that generate tests, payloads, or integration code.
 - `size_attribute_list` is SPU-level; when SKUs exist, include `relate_sale_attribute_id` + `relate_sale_attribute_value_id` (omit those fields when there is no SKU-level sales attribute)
 - For **multi-select attributes**, send **one entry per selected value** (do not bundle multiple IDs in a single payload item)
 - `supplier_code` is mapped via the internal property `supplier_code` (TEXT) and must be set per SKC/SKU
+- When `support_sale_attribute_sort=true` on the category, send `sale_attribute_sort_list` ordered by `ProductPropertiesRuleItem.sort_order` and sorted attribute values (use `in_order_attribute_value_id_list` unless custom values are present).
 
 ---
 

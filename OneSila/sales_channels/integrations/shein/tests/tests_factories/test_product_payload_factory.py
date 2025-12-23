@@ -19,6 +19,7 @@ from sales_channels.integrations.shein.factories.products import (
     SheinProductUpdateFactory,
 )
 from sales_channels.integrations.shein.models import (
+    SheinCategory,
     SheinProductType,
     SheinProductTypeItem,
     SheinProperty,
@@ -832,6 +833,10 @@ class SheinProductPayloadFactoryTests(TestCase):
             remote_id="TYPE-2",
             category_id="CAT-2",
         )
+        SheinCategory.objects.create(
+            remote_id="CAT-2",
+            support_sale_attribute_sort=True,
+        )
         color_property = baker.make(
             Property,
             multi_tenant_company=self.multi_tenant_company,
@@ -953,6 +958,12 @@ class SheinProductPayloadFactoryTests(TestCase):
             "product_type_id": "TYPE-2",
             "source_system": "openapi",
             "site_list": [{"main_site": "shein", "sub_site_list": ["shein-fr"]}],
+            "sale_attribute_sort_list": [
+                {
+                    "attribute_id": "COLOR",
+                    "in_order_attribute_value_id_list": ["RED-1", "BLUE-1"],
+                }
+            ],
             "skc_list": expected_skc,
         }
         self.assertEqual(payload, expected, self._format_payload_debug(payload, expected))

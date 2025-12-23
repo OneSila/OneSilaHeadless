@@ -80,6 +80,7 @@ class SheinProductBaseFactory(
         self.image_info: dict[str, Any] = {}
         self.sale_attribute: Optional[dict[str, Any]] = None
         self.sale_attribute_list: list[dict[str, Any]] = []
+        self.sale_attribute_sort_list: list[dict[str, Any]] = []
         self.size_attribute_list: list[dict[str, Any]] = []
         self.product_attribute_list: list[dict[str, Any]] = []
         self.multi_language_name_list: list[dict[str, str]] = []
@@ -278,6 +279,18 @@ class SheinProductBaseFactory(
                 return bool(entry.get("is_true"))
 
         return False
+
+    def _supports_sale_attribute_sort(self) -> bool:
+        if not self.selected_category_id:
+            return False
+
+        categories = SheinCategory.objects.filter(remote_id=self.selected_category_id)
+        site_remote_id = getattr(self, "selected_site_remote_id", "")
+        if site_remote_id:
+            categories = categories.filter(site_remote_id=site_remote_id)
+
+        category = categories.only("support_sale_attribute_sort").first()
+        return bool(category and category.support_sale_attribute_sort)
 
     # ------------------------------------------------------------------
     # Payload builders
@@ -1001,6 +1014,104 @@ class SheinProductBaseFactory(
             )
         return primary, sku_level_items
 
+    def _build_sale_attribute_sort_list(self) -> list[dict[str, Any]]:
+        if not self._supports_sale_attribute_sort() or not self.local_instance.is_configurable():
+            return []
+
+        configurator_items = list(self._get_configurator_rule_items())
+        if not configurator_items:
+            return []
+
+        variations = list(self.local_instance.get_configurable_variations(active_only=True))
+        if not variations:
+            return []
+
+        property_ids = {item.property_id for item in configurator_items}
+        variation_properties = self._prefetch_variation_properties(
+            variations=variations,
+            property_ids=property_ids,
+        )
+
+        sorted_items = sorted(configurator_items, key=lambda item: getattr(item, "sort_order", 0))
+        sort_entries: list[dict[str, Any]] = []
+
+        for item in sorted_items:
+            seen: dict[Any, ProductProperty] = {}
+            for props in variation_properties.values():
+                product_property = props.get(item.property_id)
+                if product_property is None:
+                    continue
+                serialized = self._serialize_property_value(product_property=product_property)
+                if serialized is None:
+                    continue
+                if serialized not in seen:
+                    seen[serialized] = product_property
+
+            if not seen:
+                continue
+
+            def sort_key(pair: tuple[Any, ProductProperty]):
+                prop = pair[1]
+                prop_type = prop.property.type
+                if prop_type == Property.TYPES.SELECT:
+                    return prop.value_select_id or 0
+                if prop_type == Property.TYPES.MULTISELECT:
+                    return tuple(sorted(prop.value_multi_select.values_list("id", flat=True)))
+                value = prop.get_value()
+                return str(value) if value is not None else ""
+
+            payloads: list[dict[str, Any]] = []
+            for _, product_property in sorted(seen.items(), key=sort_key):
+                payload = self._build_sale_attribute_payload(product_property=product_property)
+                if payload:
+                    payloads.append(payload)
+
+            if not payloads:
+                continue
+
+            attribute_id = payloads[0].get("attribute_id")
+            if not attribute_id:
+                continue
+
+            has_custom = any(
+                payload.get("custom_attribute_value") or payload.get("attribute_extra_value")
+                for payload in payloads
+            )
+            if has_custom:
+                in_order_list: list[dict[str, Any]] = []
+                for payload in payloads:
+                    entry: dict[str, Any] = {}
+                    if payload.get("attribute_value_id") not in (None, "", []):
+                        entry["attribute_value_id"] = payload.get("attribute_value_id")
+                    if payload.get("custom_attribute_value") not in (None, "", []):
+                        entry["custom_attribute_value"] = payload.get("custom_attribute_value")
+                    if entry:
+                        in_order_list.append(entry)
+                if not in_order_list:
+                    continue
+                sort_entries.append(
+                    {
+                        "attribute_id": attribute_id,
+                        "in_order_attribute_value_list": in_order_list,
+                    }
+                )
+            else:
+                id_list = [
+                    payload.get("attribute_value_id")
+                    for payload in payloads
+                    if payload.get("attribute_value_id") not in (None, "", [])
+                ]
+                if not id_list:
+                    continue
+                sort_entries.append(
+                    {
+                        "attribute_id": attribute_id,
+                        "in_order_attribute_value_id_list": id_list,
+                    }
+                )
+
+        return sort_entries
+
     def _build_sku_list(
         self,
         *,
@@ -1204,6 +1315,7 @@ class SheinProductBaseFactory(
         self._build_translations()
         self._build_skc_list()
         self._attach_size_attribute_relations()
+        self.sale_attribute_sort_list = self._build_sale_attribute_sort_list()
 
         self.site_list = self.build_site_list(product=self.local_instance) if self.is_create else []
         package_type = self._get_internal_property_option_value(code="package_type")
@@ -1229,6 +1341,7 @@ class SheinProductBaseFactory(
             "image_info": (self.image_info or None) if getattr(self, "use_spu_pic", False) else None,
             "sale_attribute": self.sale_attribute,
             "sale_attribute_list": self.sale_attribute_list or None,
+            "sale_attribute_sort_list": self.sale_attribute_sort_list or None,
             "size_attribute_list": self.size_attribute_list or None,
             "product_attribute_list": self.product_attribute_list or None,
             "skc_list": self.skc_list or None,
