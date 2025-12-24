@@ -6,6 +6,7 @@ from sales_channels.integrations.shein.models import (
     SheinCategory,
     SheinInternalProperty,
     SheinInternalPropertyOption,
+    SheinProduct,
     SheinProductCategory,
     SheinProductIssue,
     SheinProductType,
@@ -80,11 +81,15 @@ class SheinCategoryOrder:
     name: auto
 
 
+@order(SheinProduct)
+class SheinProductOrder:
+    id: auto
+
+
 @order(SheinProductCategory)
 class SheinProductCategoryOrder:
     id: auto
     remote_id: auto
-    site_remote_id: auto
 
 
 @order(SheinProductIssue)

@@ -49,7 +49,8 @@ class SheinCategorySuggestionFactoryTests(TestCase):
         self.root = baker.make(
             SheinCategory,
             remote_id="100",
-            site_remote_id=self.view.remote_id,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
             name="Root",
             parent=None,
             parent_remote_id="",
@@ -58,7 +59,8 @@ class SheinCategorySuggestionFactoryTests(TestCase):
         self.child = baker.make(
             SheinCategory,
             remote_id="200",
-            site_remote_id=self.view.remote_id,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
             name="Child",
             parent=self.root,
             parent_remote_id=self.root.remote_id,
@@ -67,7 +69,8 @@ class SheinCategorySuggestionFactoryTests(TestCase):
         self.leaf = baker.make(
             SheinCategory,
             remote_id="300",
-            site_remote_id=self.view.remote_id,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
             name="Leaf",
             parent=self.child,
             parent_remote_id=self.child.remote_id,

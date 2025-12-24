@@ -62,7 +62,6 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         self.sales_channel_id = getattr(sales_channel, "pk", None)
         self.view = view
         self.view_id = getattr(view, "pk", None)
-        self.site_remote_id = self._normalize_identifier(getattr(view, "remote_id", None)) if view else ""
         self.language = language
         self.synced_categories: list[SheinCategory] = []
         self.synced_product_types: list[SheinProductType] = []
@@ -261,12 +260,12 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             "is_leaf": self._to_bool(node.get("last_category")),
             "product_type_remote_id": self._normalize_identifier(node.get("product_type_id")) or "",
             "raw_data": self._prepare_raw_payload(node=node),
-            "site_remote_id": self.site_remote_id or "",
         }
 
         category, _ = SheinCategory.objects.update_or_create(
             remote_id=remote_id,
-            site_remote_id=self.site_remote_id or "",
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
             defaults=defaults,
         )
 
@@ -1059,8 +1058,6 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
 
     def _build_request_payload(self) -> dict[str, Any]:
         payload: dict[str, Any] = {}
-        if self.site_remote_id:
-            payload["site_abbr"] = self.site_remote_id
         if self.language:
             payload["language"] = self.language
         return payload

@@ -18,9 +18,10 @@ from sales_channels.integrations.shein.models import (
     SheinCategory,
     SheinInternalProperty,
     SheinInternalPropertyOption,
+    SheinProduct,
     SheinProductCategory,
     SheinProductIssue,
-    SheinProductType,
+    SheinProductType as SheinProductTypeModel,
     SheinProductTypeItem,
     SheinProperty,
     SheinPropertySelectValue,
@@ -33,6 +34,7 @@ from sales_channels.integrations.shein.schema.types.filters import (
     SheinCategoryFilter,
     SheinInternalPropertyFilter,
     SheinInternalPropertyOptionFilter,
+    SheinProductFilter,
     SheinProductCategoryFilter,
     SheinProductIssueFilter,
     SheinProductTypeFilter,
@@ -48,6 +50,7 @@ from sales_channels.integrations.shein.schema.types.ordering import (
     SheinCategoryOrder,
     SheinInternalPropertyOptionOrder,
     SheinInternalPropertyOrder,
+    SheinProductOrder,
     SheinProductCategoryOrder,
     SheinProductIssueOrder,
     SheinProductTypeItemOrder,
@@ -82,9 +85,13 @@ class SheinSalesChannelMappingSyncPayload:
     pagination=True,
     fields="__all__",
 )
-class SheinCategoryType(relay.Node):
+class SheinCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
     """Expose public Shein category metadata for lookups."""
 
+    sales_channel: Annotated[
+        'SheinSalesChannelType',
+        lazy("sales_channels.integrations.shein.schema.types.types")
+    ]
     parent: Optional[Annotated[
         'SheinCategoryType',
         lazy("sales_channels.integrations.shein.schema.types.types")
@@ -133,6 +140,30 @@ class SheinProductIssueType(relay.Node, GetQuerysetMultiTenantMixin):
         "RemoteProductType",
         lazy("sales_channels.schema.types.types")
     ]
+
+
+@type(
+    SheinProduct,
+    filters=SheinProductFilter,
+    order=SheinProductOrder,
+    pagination=True,
+    fields="__all__",
+)
+class SheinProductType(relay.Node, GetQuerysetMultiTenantMixin):
+    """Expose Shein remote products."""
+
+    sales_channel: Annotated[
+        'SheinSalesChannelType',
+        lazy("sales_channels.integrations.shein.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]]
+    remote_parent_product: Optional[Annotated[
+        'RemoteProductType',
+        lazy("sales_channels.schema.types.types")
+    ]]
 
 
 @type(
@@ -306,13 +337,11 @@ class SuggestedSheinCategoryEntry:
 @strawberry_type
 class SuggestedSheinCategory:
     """Container for Shein category suggestion results."""
-
-    site_remote_id: str
     categories: List[SuggestedSheinCategoryEntry]
 
 
 @type(
-    SheinProductType,
+    SheinProductTypeModel,
     filters=SheinProductTypeFilter,
     order=SheinProductTypeOrder,
     pagination=True,

@@ -835,6 +835,8 @@ class SheinProductPayloadFactoryTests(TestCase):
         )
         SheinCategory.objects.create(
             remote_id="CAT-2",
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
             support_sale_attribute_sort=True,
         )
         color_property = baker.make(

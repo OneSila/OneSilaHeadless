@@ -232,7 +232,6 @@ class SheinSalesChannelMutation:
         ]
 
         return SuggestedSheinCategory(
-            site_remote_id=shein_view.remote_id or "",
             categories=categories,
         )
 

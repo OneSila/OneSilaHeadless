@@ -168,7 +168,6 @@ class SheinProductBaseFactory(
         self.rule = None
         self.selected_category_id = ""
         self.selected_product_type_id = ""
-        self.selected_site_remote_id = ""
         self.use_spu_pic = False
 
         mapping = (
@@ -178,7 +177,7 @@ class SheinProductBaseFactory(
                 product=self.local_instance,
             )
             .exclude(remote_id__in=(None, ""))
-            .only("remote_id", "product_type_remote_id", "site_remote_id")
+            .only("remote_id", "product_type_remote_id")
             .first()
         )
 
@@ -187,10 +186,11 @@ class SheinProductBaseFactory(
             self.selected_product_type_id = str(getattr(mapping, "product_type_remote_id", "") or "").strip()
 
             if self.selected_category_id and not self.selected_product_type_id:
-                site_remote_id = str(getattr(mapping, "site_remote_id", "") or "").strip()
                 category_qs = SheinCategory.objects.filter(remote_id=self.selected_category_id)
-                if site_remote_id:
-                    category_qs = category_qs.filter(site_remote_id=site_remote_id)
+                category_qs = category_qs.filter(sales_channel=self.sales_channel)
+                category_qs = category_qs.filter(
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
+                )
                 inferred = (
                     category_qs.exclude(product_type_remote_id__in=(None, ""))
                     .values_list("product_type_remote_id", flat=True)
@@ -233,20 +233,8 @@ class SheinProductBaseFactory(
                 "or ensure the product rule is mapped to a SheinProductType."
             )
 
-        self.selected_site_remote_id = self._resolve_site_remote_id()
         self.use_spu_pic = self._resolve_use_spu_pic()
 
-    def _resolve_site_remote_id(self) -> str:
-        value = (
-            SalesChannelViewAssign.objects.filter(
-                sales_channel=self.sales_channel,
-                product=self.local_instance,
-            )
-            .exclude(sales_channel_view__remote_id__in=(None, ""))
-            .values_list("sales_channel_view__remote_id", flat=True)
-            .first()
-        )
-        return str(value).strip() if value else ""
 
     @staticmethod
     def _is_blank_html(value: str) -> bool:
@@ -261,8 +249,10 @@ class SheinProductBaseFactory(
             return False
 
         categories = SheinCategory.objects.filter(remote_id=self.selected_category_id)
-        if self.selected_site_remote_id:
-            categories = categories.filter(site_remote_id=self.selected_site_remote_id)
+        categories = categories.filter(sales_channel=self.sales_channel)
+        categories = categories.filter(
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+        )
 
         category = categories.only("picture_config").first()
         if category is None:
@@ -285,9 +275,10 @@ class SheinProductBaseFactory(
             return False
 
         categories = SheinCategory.objects.filter(remote_id=self.selected_category_id)
-        site_remote_id = getattr(self, "selected_site_remote_id", "")
-        if site_remote_id:
-            categories = categories.filter(site_remote_id=site_remote_id)
+        categories = categories.filter(sales_channel=self.sales_channel)
+        categories = categories.filter(
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+        )
 
         category = categories.only("support_sale_attribute_sort").first()
         return bool(category and category.support_sale_attribute_sort)

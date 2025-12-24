@@ -273,7 +273,7 @@ class SheinCategoryTreeFactoryTests(TestCase):
 
         def fake_post(*, path: str, payload=None, **kwargs):  # type: ignore[no-untyped-def]
             if path == factory.category_tree_path:
-                self.assertEqual(payload, {"site_abbr": self.view.remote_id})
+                self.assertIsNone(payload)
                 tree_response = Mock()
                 tree_response.json.return_value = CATEGORY_TREE_PAYLOAD
                 return tree_response
@@ -307,7 +307,7 @@ class SheinCategoryTreeFactoryTests(TestCase):
         self.assertEqual(len(categories), SheinCategory.objects.count())
         self.assertEqual(SheinCategory.objects.count(), 4)
         self.assertEqual(
-            SheinCategory.objects.filter(site_remote_id=self.view.remote_id).count(),
+            SheinCategory.objects.filter(sales_channel=self.sales_channel).count(),
             4,
         )
         self.assertEqual(SheinProductType.objects.count(), 1)
@@ -318,7 +318,8 @@ class SheinCategoryTreeFactoryTests(TestCase):
         root_category = SheinCategory.objects.get(remote_id="2028")
         self.assertIsNone(root_category.parent)
         self.assertFalse(root_category.is_leaf)
-        self.assertEqual(root_category.site_remote_id, self.view.remote_id)
+        self.assertEqual(root_category.sales_channel, self.sales_channel)
+        self.assertEqual(root_category.multi_tenant_company, self.multi_tenant_company)
         self.assertNotIn("children", root_category.raw_data)
         self.assertEqual(root_category.default_language, PUBLISH_STANDARD_INFO["default_language"])
         self.assertEqual(root_category.currency, PUBLISH_STANDARD_INFO["currency"])
@@ -341,7 +342,8 @@ class SheinCategoryTreeFactoryTests(TestCase):
         leaf_category = SheinCategory.objects.get(remote_id="1727")
         self.assertTrue(leaf_category.is_leaf)
         self.assertEqual(leaf_category.parent_remote_id, "1767")
-        self.assertEqual(leaf_category.site_remote_id, self.view.remote_id)
+        self.assertEqual(leaf_category.sales_channel, self.sales_channel)
+        self.assertEqual(leaf_category.multi_tenant_company, self.multi_tenant_company)
         self.assertEqual(leaf_category.product_type_remote_id, "1080")
         self.assertEqual(leaf_category.default_language, PUBLISH_STANDARD_INFO["default_language"])
         self.assertEqual(leaf_category.currency, PUBLISH_STANDARD_INFO["currency"])

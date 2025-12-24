@@ -16,6 +16,7 @@ from sales_channels.integrations.shein.models import (
     SheinCategory,
     SheinInternalProperty,
     SheinInternalPropertyOption,
+    SheinProduct,
     SheinProductCategory,
     SheinProductIssue,
     SheinProductType,
@@ -183,10 +184,9 @@ class SheinInternalPropertyOptionFilter(SearchFilterMixin):
 @filter(SheinCategory)
 class SheinCategoryFilter(SearchFilterMixin):
     """Filter public Shein categories by the key attributes used in UIs."""
-
     id: auto
     remote_id: auto
-    site_remote_id: auto
+    sales_channel: Optional[SalesChannelFilter]
     parent_remote_id: auto
     product_type_remote_id: auto
     is_leaf: auto
@@ -194,15 +194,23 @@ class SheinCategoryFilter(SearchFilterMixin):
     parent: Optional['SheinCategoryFilter']
 
 
+@filter(SheinProduct)
+class SheinProductFilter(SearchFilterMixin):
+    """Filter Shein remote products."""
+
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: Optional[ProductFilter]
+    remote_parent_product: Optional[RemoteProductFilter]
+
+
 @filter(SheinProductCategory)
 class SheinProductCategoryFilter(SearchFilterMixin):
     """Filter product-to-category mappings for Shein listings."""
-
     id: auto
     product: Optional[ProductFilter]
     sales_channel: Optional[SalesChannelFilter]
     remote_id: auto
-    site_remote_id: auto
 
 
 @filter(SheinProductIssue)

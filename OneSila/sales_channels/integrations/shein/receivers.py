@@ -48,7 +48,6 @@ def shein__product_category__propagate_to_variations(sender, instance, **kwargs)
             sales_channel=instance.sales_channel,
             defaults={
                 "remote_id": instance.remote_id,
-                "site_remote_id": instance.site_remote_id,
             },
         )
 
