@@ -13,14 +13,14 @@ class SheinProductImportPayloadParser:
         self.values = SheinProductImportValueParser(sales_channel=sales_channel)
         self.attributes = SheinProductImportAttributeParser(sales_channel=sales_channel)
 
-    def parse_translations(self, *, **kwargs: Any):
+    def parse_translations(self, **kwargs: Any):
         return self.values.parse_translations(**kwargs)
 
-    def parse_images(self, *, **kwargs: Any):
+    def parse_images(self, **kwargs: Any):
         return self.values.parse_images(**kwargs)
 
-    def parse_prices(self, *, **kwargs: Any):
+    def parse_prices(self, **kwargs: Any):
         return self.values.parse_prices(**kwargs)
 
-    def parse_attributes(self, *, **kwargs: Any):
+    def parse_attributes(self, **kwargs: Any):
         return self.attributes.parse_attributes(**kwargs)

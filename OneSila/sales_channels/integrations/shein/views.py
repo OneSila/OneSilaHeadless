@@ -7,7 +7,8 @@ import logging
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 from django.conf import settings
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, QueryDict
+from django.http.multipartparser import MultiPartParser, MultiPartParserError
 from django.views.decorators.csrf import csrf_exempt
 
 from sales_channels.integrations.shein.models import SheinSalesChannel, SheinProduct
@@ -27,13 +28,6 @@ def _normalize_header(request, name: str) -> str | None:
     return text or None
 
 
-def _get_setting(name: str) -> str | None:
-    value = getattr(settings, name, None)
-    if not value:
-        return None
-    return str(value).strip()
-
-
 def _verify_shein_webhook_signature(*, sales_channel: SheinSalesChannel, request) -> bool:
     signature = _normalize_header(request, "x-lt-signature")
     timestamp = _normalize_header(request, "x-lt-timestamp")
@@ -45,7 +39,7 @@ def _verify_shein_webhook_signature(*, sales_channel: SheinSalesChannel, request
     if open_key_id != (sales_channel.open_key_id or ""):
         return False
 
-    expected_app_id = _get_setting("SHEIN_APP_ID")
+    expected_app_id = settings.SHEIN_APP_ID
     if not expected_app_id or app_id != expected_app_id:
         return False
 
@@ -61,7 +55,7 @@ def _verify_shein_webhook_signature(*, sales_channel: SheinSalesChannel, request
     if not random_key:
         return False
 
-    secret_key = _get_setting("SHEIN_APP_SECRET")
+    secret_key = settings.SHEIN_APP_SECRET
     if not secret_key:
         return False
 
@@ -82,44 +76,89 @@ def _get_sales_channel_from_request(request) -> SheinSalesChannel | None:
     return SheinSalesChannel.objects.filter(open_key_id=open_key_id).first()
 
 
-def _decrypt_event_data(*, event_data: str) -> dict | None:
-    secret_key = _get_setting("SHEIN_APP_SECRET")
-    if not secret_key:
+def _normalize_event_data(*, event_data: str | None) -> str | None:
+    if not event_data:
+        return None
+    normalized = str(event_data).strip()
+    if not normalized:
+        return None
+    normalized = normalized.replace(" ", "+")
+    normalized = "".join(normalized.split())
+    return normalized or None
+
+
+def _build_aes_bytes(*, value: str, length: int = 16) -> bytes:
+    raw = value.encode("utf-8")
+    if len(raw) >= length:
+        return raw[:length]
+    return raw.ljust(length, b"\0")
+
+
+def _decrypt_event_data(*, event_data: str, secret_key: str):
+    normalized = _normalize_event_data(event_data=event_data)
+    if not normalized:
         return None
 
     iv_seed = constants.DEFAULT_AES_IV
     if len(iv_seed.encode("utf-8")) < 16:
         return None
 
-    key_bytes = secret_key.encode("utf-8")[:16]
-    iv_bytes = iv_seed.encode("utf-8")[:16]
-    padded = event_data + "=" * (-len(event_data) % 4)
+    iv_bytes = _build_aes_bytes(value=iv_seed)
+    padded = normalized + "=" * (-len(normalized) % 4)
+
+    key_bytes = _build_aes_bytes(value=secret_key)
     try:
         decoded = base64.b64decode(padded)
         cipher = AES.new(key_bytes, AES.MODE_CBC, iv_bytes)
         decrypted = cipher.decrypt(decoded)
         plaintext = unpad(decrypted, AES.block_size).decode("utf-8")
         payload = json.loads(plaintext)
-    except Exception:
+
+        if isinstance(payload, str):
+            payload = json.loads(payload)
+
+    except Exception as e:  # noqa: BLE001 - surface a clean failure to the caller
         return None
 
-    return payload if isinstance(payload, dict) else None
+    if isinstance(payload, dict):
+        return payload
+
+    return None
 
 
-def _extract_webhook_payload(request) -> dict | None:
+def _extract_webhook_payload(*, request) -> dict | None:
     event_data = request.POST.get("eventData") if hasattr(request, "POST") else None
+    event_data = _normalize_event_data(event_data=event_data)
+
     if not event_data:
-        try:
-            body = json.loads(request.body or b"{}")
-        except ValueError:
-            body = None
-        if isinstance(body, dict):
-            event_data = body.get("eventData")
-            if not event_data:
-                return body
+        content_type = request.META.get("CONTENT_TYPE", "") or ""
+        if request.body and "application/json" in content_type:
+            try:
+                body = json.loads(request.body)
+            except ValueError:
+                body = None
+            if isinstance(body, dict):
+                event_data = _normalize_event_data(event_data=body.get("eventData"))
+                if not event_data:
+                    return body
+        elif request.body and "application/x-www-form-urlencoded" in content_type:
+            body = QueryDict(request.body.decode("utf-8"), encoding="utf-8")
+            event_data = _normalize_event_data(event_data=body.get("eventData"))
+        elif request.body and "multipart/form-data" in content_type:
+            try:
+                parser = MultiPartParser(request.META, request, request.upload_handlers)
+                data, _files = parser.parse()
+            except (MultiPartParserError, ValueError):
+                data = None
+            if data:
+                event_data = _normalize_event_data(event_data=data.get("eventData"))
 
     if event_data:
-        return _decrypt_event_data(event_data=str(event_data))
+        secret_key = settings.SHEIN_APP_SECRET
+        if not secret_key:
+            return None
+
+        return _decrypt_event_data(event_data=event_data, secret_key=secret_key)
 
     return None
 
@@ -133,7 +172,8 @@ def shein_product_document_audit_status_notice(request):
     if not _verify_shein_webhook_signature(sales_channel=sales_channel, request=request):
         return HttpResponse(status=401)
 
-    payload = _extract_webhook_payload(request)
+    sales_channel = None
+    payload = _extract_webhook_payload(request=request)
     if not isinstance(payload, dict):
         return HttpResponse(status=400)
 
