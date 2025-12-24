@@ -9,16 +9,14 @@ from integrations.tasks import add_task_to_queue
 def run_single_shein_product_task_flow(
     *,
     task_func,
-    view,
+    sales_channel,
     number_of_remote_requests=None,
     **kwargs,
 ) -> None:
-    """Queue a task for a specific Shein product assignment."""
-    sales_channel = view.sales_channel
+    """Queue a task for a specific Shein product."""
 
     task_kwargs = {
         "sales_channel_id": sales_channel.id,
-        "view_id": view.id,
         **kwargs,
     }
 
@@ -30,4 +28,3 @@ def run_single_shein_product_task_flow(
             number_of_remote_requests=number_of_remote_requests,
         )
     )
-

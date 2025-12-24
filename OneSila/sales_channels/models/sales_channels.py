@@ -234,10 +234,25 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Model representing the assignment of a product to a specific sales channel view.
     """
+    STATUS_CREATED = "CREATED"
+    STATUS_PENDING_CREATION = "PENDING_CREATION"
+    STATUS_CHOICES = (
+        (STATUS_CREATED, _("Created")),
+        (STATUS_PENDING_CREATION, _("Pending creation")),
+    )
+
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE, db_index=True)
     sales_channel_view = models.ForeignKey('SalesChannelView', on_delete=models.CASCADE, db_index=True)
     remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.SET_NULL, null=True,
                                        blank=True, help_text="The remote product associated with this assign.")
+    status = models.CharField(
+        max_length=32,
+        choices=STATUS_CHOICES,
+        default=STATUS_CREATED,
+        blank=True,
+        null=True,
+        help_text=_("Local assignment status for the view assignment."),
+    )
     needs_resync = models.BooleanField(default=False, help_text="Indicates if a resync is needed.")
 
     objects = SalesChannelViewAssignManager()
@@ -251,6 +266,39 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     def __str__(self):
         return f"{self.product} @ {self.sales_channel_view}"
+
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        previous_status = self.status
+        is_new = self.pk is None
+        self._set_pending_creation_status(is_new=is_new)
+
+        if self.remote_product_id:
+            self.status = self.STATUS_CREATED
+
+        if update_fields is not None and previous_status != self.status:
+            update_fields = set(update_fields)
+            update_fields.add("status")
+            kwargs["update_fields"] = list(update_fields)
+
+        return super().save(*args, **kwargs)
+
+    def _set_pending_creation_status(self, *, is_new: bool) -> None:
+        if not is_new or self.remote_product_id:
+            return
+
+        view = getattr(self, "sales_channel_view", None)
+        if view is None:
+            return
+
+        resolved_view = view.get_real_instance() if hasattr(view, "get_real_instance") else view
+        if resolved_view is None:
+            return
+
+        from sales_channels.integrations.shein.models import SheinSalesChannelView
+
+        if isinstance(resolved_view, SheinSalesChannelView):
+            self.status = self.STATUS_PENDING_CREATION
 
     @property
     def remote_url(self):

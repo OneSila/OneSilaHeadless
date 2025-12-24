@@ -63,7 +63,6 @@ class SheinProductBaseFactory(
         *,
         sales_channel,
         local_instance,
-        view=None,
         remote_instance=None,
         parent_local_instance=None,
         remote_parent_product=None,
@@ -72,7 +71,6 @@ class SheinProductBaseFactory(
         get_value_only: bool = False,
         skip_checks: bool = False,
     ) -> None:
-        self.view = view
         self.get_value_only = get_value_only
         self.skip_checks = skip_checks
         self.prices_data: dict[str, dict[str, Any]] = {}
@@ -228,9 +226,9 @@ class SheinProductBaseFactory(
                     self.selected_product_type_id = str(getattr(fallback, "remote_id", "") or "").strip()
 
         if not self.selected_category_id or not self.selected_product_type_id:
-            raise ValueError(
-                "Shein category/product type is missing. Set it via SheinProductCategory (category + product_type_id) "
-                "or ensure the product rule is mapped to a SheinProductType."
+            raise PreFlightCheckError(
+                "Missing Shein category or product type. Set the SheinProductCategory (category + product_type_id) "
+                "or map the product rule to a SheinProductType."
             )
 
         self.use_spu_pic = self._resolve_use_spu_pic()

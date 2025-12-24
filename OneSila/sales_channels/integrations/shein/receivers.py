@@ -63,13 +63,16 @@ def shein__product__manual_sync(
     if product is None:
         return
 
-    if view is None:
+    sales_channel = getattr(instance, "sales_channel", None)
+    if sales_channel is not None:
+        sales_channel = sales_channel.get_real_instance()
+    elif view is not None:
+        resolved_view = view.get_real_instance()
+        if resolved_view is None:
+            return
+        sales_channel = resolved_view.sales_channel.get_real_instance()
+    else:
         return
-
-    resolved_view = view.get_real_instance()
-    if resolved_view is None:
-        return
-    sales_channel = resolved_view.sales_channel.get_real_instance()
 
     from sales_channels.integrations.shein.flows.tasks_runner import (
         run_single_shein_product_task_flow,
@@ -83,7 +86,7 @@ def shein__product__manual_sync(
 
     run_single_shein_product_task_flow(
         task_func=resync_shein_product_db_task,
-        view=resolved_view,
+        sales_channel=sales_channel,
         number_of_remote_requests=count,
         product_id=product.id,
         remote_product_id=instance.id,
@@ -103,30 +106,4 @@ def shein__shein_product__manual_sync(
         instance=instance,
         view=view,
         **kwargs,
-    )
-
-@receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
-def shein__product__create_from_assign(sender, instance, view, **kwargs):
-    sales_channel = instance.sales_channel.get_real_instance()
-
-    from sales_channels.integrations.shein.flows.tasks_runner import (
-        run_single_shein_product_task_flow,
-    )
-    from sales_channels.integrations.shein.models import SheinSalesChannel
-    from sales_channels.integrations.shein.tasks import create_shein_product_db_task
-
-    if not isinstance(sales_channel, SheinSalesChannel) or not sales_channel.active:
-        return
-
-    resolved_view = view.get_real_instance()
-    if resolved_view is None:
-        return
-    product = instance.product
-    count = 1 + getattr(product, 'get_configurable_variations', lambda: [])().count()
-
-    run_single_shein_product_task_flow(
-        task_func=create_shein_product_db_task,
-        view=resolved_view,
-        number_of_remote_requests=count,
-        product_id=product.id,
     )

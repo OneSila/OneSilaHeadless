@@ -1,14 +1,19 @@
 """Tests covering the Shein mixin helpers."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import requests
 from django.test import override_settings
 from model_bakery import baker
 
 from core.tests import TestCase
+from sales_channels.integrations.shein.exceptions import SheinResponseException
 from sales_channels.integrations.shein.factories.mixins import SheinSignatureMixin
-from sales_channels.integrations.shein.models import SheinSalesChannel
+from sales_channels.integrations.shein.models import (
+    SheinRemoteLanguage,
+    SheinSalesChannel,
+    SheinSalesChannelView,
+)
 
 
 class _DummyFactory(SheinSignatureMixin):
@@ -230,3 +235,157 @@ class SheinSignatureMixinTests(TestCase):
 
         self.assertIs(result, response)
         response.raise_for_status.assert_not_called()
+
+    def test_get_all_products_paginates_and_includes_filters(self) -> None:
+        response_one = Mock()
+        response_one.json.return_value = {
+            "code": "0",
+            "msg": "OK",
+            "info": {
+                "data": [
+                    {"spuName": "M1"},
+                    {"spuName": "M2"},
+                ]
+            },
+        }
+        response_two = Mock()
+        response_two.json.return_value = {
+            "code": "0",
+            "msg": "OK",
+            "info": {
+                "data": [
+                    {"spuName": "M3"},
+                ]
+            },
+        }
+
+        with patch.object(
+            self.factory,
+            "shein_post",
+            side_effect=[response_one, response_two],
+        ) as post_mock:
+            results = list(
+                self.factory.get_all_products(
+                    page_size=2,
+                    insert_time_start="2024-11-15 20:00:00",
+                    insert_time_end="2024-11-15 19:00:00",
+                    update_time_start="2024-11-15 19:00:00",
+                    update_time_end="2024-11-15 19:00:00",
+                )
+            )
+
+        expected_payload_base = {
+            "pageSize": 2,
+            "insertTimeStart": "2024-11-15 20:00:00",
+            "insertTimeEnd": "2024-11-15 19:00:00",
+            "updateTimeStart": "2024-11-15 19:00:00",
+            "updateTimeEnd": "2024-11-15 19:00:00",
+        }
+
+        post_mock.assert_has_calls(
+            [
+                call(
+                    path="/open-api/openapi-business-backend/product/query",
+                    payload={**expected_payload_base, "pageNum": 1},
+                ),
+                call(
+                    path="/open-api/openapi-business-backend/product/query",
+                    payload={**expected_payload_base, "pageNum": 2},
+                ),
+            ]
+        )
+
+        self.assertEqual(
+            results,
+            [
+                {"spuName": "M1"},
+                {"spuName": "M2"},
+                {"spuName": "M3"},
+            ],
+        )
+
+    def test_get_all_products_raises_on_error_response(self) -> None:
+        response = Mock()
+        response.json.return_value = {"code": "1", "msg": "nope"}
+
+        with patch.object(self.factory, "shein_post", return_value=response):
+            with self.assertRaisesMessage(
+                ValueError,
+                "Failed to fetch Shein products: nope",
+            ):
+                list(self.factory.get_all_products())
+
+    def test_get_product_uses_view_languages_and_returns_info(self) -> None:
+        view = SheinSalesChannelView.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            name="Default View",
+            is_default=True,
+        )
+        SheinRemoteLanguage.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel_view=view,
+            local_instance="pt",
+            remote_code="pt",
+        )
+        SheinRemoteLanguage.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel_view=view,
+            local_instance=None,
+            remote_code="zh-cn",
+        )
+
+        response = Mock()
+        response.json.return_value = {
+            "code": "0",
+            "msg": "OK",
+            "info": {"spuName": "MM2404163183"},
+        }
+
+        with patch.object(self.factory, "shein_post", return_value=response) as post_mock:
+            info = self.factory.get_product(spu_name="MM2404163183")
+
+        post_mock.assert_called_once_with(
+            path="/open-api/goods/spu-info",
+            payload={
+                "languageList": ["pt-br", "zh-cn"],
+                "spuName": "MM2404163183",
+            },
+            add_language=False,
+            extra_headers={"language": "pt-br"},
+        )
+        self.assertEqual(info, {"spuName": "MM2404163183"})
+
+    def test_get_product_defaults_to_english_when_no_languages(self) -> None:
+        response = Mock()
+        response.json.return_value = {
+            "code": "0",
+            "msg": "OK",
+            "info": {"spuName": "MM2404163183"},
+        }
+
+        with patch.object(self.factory, "shein_post", return_value=response) as post_mock:
+            self.factory.get_product(spu_name="MM2404163183")
+
+        post_mock.assert_called_once_with(
+            path="/open-api/goods/spu-info",
+            payload={
+                "languageList": ["en"],
+                "spuName": "MM2404163183",
+            },
+            add_language=False,
+            extra_headers={"language": "en"},
+        )
+
+    def test_get_product_raises_on_error_response(self) -> None:
+        response = Mock()
+        response.json.return_value = {
+            "code": "0003",
+            "msg": "unable to obtain skc information according to spu",
+        }
+
+        with patch.object(self.factory, "shein_post", return_value=response):
+            with self.assertRaises(SheinResponseException):
+                self.factory.get_product(spu_name="MM2404163183")

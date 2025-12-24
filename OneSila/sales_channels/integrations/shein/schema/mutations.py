@@ -287,6 +287,67 @@ class SheinSalesChannelMutation:
         return remote_product_obj
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def create_shein_product(
+        self,
+        *,
+        product: ProductPartialInput,
+        sales_channel: SheinSalesChannelPartialInput,
+        info: Info,
+    ) -> bool:
+        """Create a Shein product for the assigned storefront view."""
+        from products.models import Product
+        from sales_channels.integrations.shein.models import SheinSalesChannel
+        from sales_channels.integrations.shein.flows.tasks_runner import (
+            run_single_shein_product_task_flow,
+        )
+        from sales_channels.integrations.shein.tasks import create_shein_product_db_task
+        from sales_channels.models import SalesChannelViewAssign
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        if product.id is None:
+            raise ValidationError(_("Product identifier is required."))
+        if sales_channel.id is None:
+            raise ValidationError(_("Sales channel identifier is required."))
+
+        try:
+            product_obj = Product.objects.get(
+                id=product.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            )
+        except Product.DoesNotExist as exc:
+            raise ValidationError(_("Product could not be found.")) from exc
+
+        try:
+            channel = SheinSalesChannel.objects.get(
+                id=sales_channel.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            )
+        except SheinSalesChannel.DoesNotExist as exc:
+            raise ValidationError(_("Shein sales channel could not be found.")) from exc
+
+        if not channel.active:
+            raise ValidationError(_("Shein sales channel is inactive."))
+
+        assign_exists = SalesChannelViewAssign.objects.filter(
+            sales_channel=channel,
+            product=product_obj,
+        ).exists()
+        if not assign_exists:
+            raise ValidationError(_("Product is not assigned to a Shein storefront view."))
+
+        count = 1 + getattr(product_obj, "get_configurable_variations", lambda: [])().count()
+
+        run_single_shein_product_task_flow(
+            task_func=create_shein_product_db_task,
+            sales_channel=channel,
+            number_of_remote_requests=count,
+            product_id=product_obj.id,
+        )
+
+        return True
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def force_update_shein_product(
         self,
         product: ProductPartialInput,
@@ -295,11 +356,12 @@ class SheinSalesChannelMutation:
     ) -> bool:
         """Force an update by running the create flow (publishOrEdit) again."""
         from products.models import Product
-        from sales_channels.integrations.shein.models import SheinSalesChannel, SheinSalesChannelView
+        from sales_channels.integrations.shein.models import SheinSalesChannel
         from sales_channels.integrations.shein.flows.tasks_runner import (
             run_single_shein_product_task_flow,
         )
         from sales_channels.integrations.shein.tasks import create_shein_product_db_task
+        from sales_channels.models import SalesChannelViewAssign
 
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
 
@@ -313,21 +375,18 @@ class SheinSalesChannelMutation:
             multi_tenant_company=multi_tenant_company,
         )
 
-        view_obj = (
-            SheinSalesChannelView.objects.filter(
-                sales_channel=channel,
-                is_default=True,
-            ).first()
-            or SheinSalesChannelView.objects.filter(sales_channel=channel).first()
-        )
-        if view_obj is None:
-            raise ValidationError(_("Shein sales channel has no storefront views. Pull marketplaces first."))
+        assign_exists = SalesChannelViewAssign.objects.filter(
+            sales_channel=channel,
+            product=product_obj,
+        ).exists()
+        if not assign_exists:
+            raise ValidationError(_("Product is not assigned to a Shein storefront view."))
 
         count = 1 + getattr(product_obj, "get_configurable_variations", lambda: [])().count()
 
         run_single_shein_product_task_flow(
             task_func=create_shein_product_db_task,
-            view=view_obj,
+            sales_channel=channel,
             number_of_remote_requests=count,
             product_id=product_obj.id,
         )

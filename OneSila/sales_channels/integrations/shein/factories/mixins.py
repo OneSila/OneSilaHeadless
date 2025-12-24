@@ -15,6 +15,7 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 from sales_channels.integrations.shein import constants
+from sales_channels.integrations.shein.exceptions import SheinResponseException
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,8 @@ class SheinSignatureMixin:
 
     signature_random_key_length = 5
     signature_random_charset = string.ascii_letters + string.digits
+    product_query_path = "/open-api/openapi-business-backend/product/query"
+    product_info_path = "/open-api/goods/spu-info"
 
     def get_shein_open_key_id(self) -> str:
         open_key_id = self.sales_channel.open_key_id
@@ -193,6 +196,173 @@ class SheinSignatureMixin:
                 raise ValueError(_("Shein request returned an HTTP error.")) from exc
 
         return response
+
+    def get_all_products(
+        self,
+        *,
+        page_size: int = 200,
+        page_num: int = 1,
+        insert_time_start: Optional[str] = None,
+        insert_time_end: Optional[str] = None,
+        update_time_start: Optional[str] = None,
+        update_time_end: Optional[str] = None,
+    ) -> Iterable[Dict[str, Any]]:
+        """Yield product records from the Shein product query endpoint."""
+
+        if not isinstance(page_size, int) or page_size <= 0:
+            raise ValueError(_("Shein page size must be a positive integer."))
+        if not isinstance(page_num, int) or page_num <= 0:
+            raise ValueError(_("Shein page number must be a positive integer."))
+
+        base_payload: Dict[str, Any] = {"pageSize": page_size}
+        if insert_time_start:
+            base_payload["insertTimeStart"] = insert_time_start
+        if insert_time_end:
+            base_payload["insertTimeEnd"] = insert_time_end
+        if update_time_start:
+            base_payload["updateTimeStart"] = update_time_start
+        if update_time_end:
+            base_payload["updateTimeEnd"] = update_time_end
+
+        current_page = page_num
+
+        while True:
+            payload = dict(base_payload, pageNum=current_page)
+            response = self.shein_post(path=self.product_query_path, payload=payload)
+
+            try:
+                body = response.json()
+            except ValueError as exc:  # pragma: no cover - defensive guard
+                logger.exception("Unable to decode Shein product list response")
+                raise ValueError(_("Shein product query returned invalid JSON.")) from exc
+
+            if body.get("code") != "0":
+                message = body.get("msg") or "Unknown error"
+                raise ValueError(
+                    _("Failed to fetch Shein products: %(message)s")
+                    % {"message": message}
+                )
+
+            info = body.get("info") or {}
+            data = info.get("data") or []
+            if not isinstance(data, list):  # pragma: no cover - defensive
+                data = []
+
+            if not data:
+                break
+
+            for record in data:
+                if isinstance(record, dict):
+                    yield record
+
+            if len(data) < page_size:
+                break
+
+            current_page += 1
+
+    def get_product(
+        self,
+        *,
+        spu_name: str,
+        language_list: Optional[Iterable[str]] = None,
+    ) -> Dict[str, Any]:
+        """Return the product info payload for the provided SPU."""
+
+        if not isinstance(spu_name, str) or not spu_name.strip():
+            raise ValueError(_("Shein spuName is required."))
+
+        languages = self._resolve_product_languages(language_list=language_list)
+        payload = {
+            "languageList": languages,
+            "spuName": spu_name.strip(),
+        }
+
+        response = self.shein_post(
+            path=self.product_info_path,
+            payload=payload,
+            add_language=False,
+        )
+
+        try:
+            body = response.json()
+        except ValueError as exc:  # pragma: no cover - defensive guard
+            logger.exception("Unable to decode Shein product info response")
+            raise ValueError(_("Shein product info returned invalid JSON.")) from exc
+
+        code = body.get("code")
+        if str(code) != "0":
+            message = body.get("msg") or "Unknown error"
+            raise SheinResponseException(
+                _("Failed to fetch Shein product: %(message)s (code %(code)s)")
+                % {"message": message, "code": code}
+            )
+
+        info = body.get("info") or {}
+        return info if isinstance(info, dict) else {}
+
+    def _resolve_product_languages(
+        self,
+        *,
+        language_list: Optional[Iterable[str]] = None,
+    ) -> list[str]:
+        languages: list[str] = []
+
+        def add_language(*, language_code: Optional[str]) -> None:
+            if not language_code or language_code in languages:
+                return
+            languages.append(language_code)
+
+        if language_list:
+            for candidate in language_list:
+                normalized = self._normalize_shein_language_code(language_code=candidate)
+                add_language(language_code=normalized)
+
+        from sales_channels.integrations.shein.models import SheinRemoteLanguage
+
+        remote_languages = (
+            SheinRemoteLanguage.objects.filter(sales_channel=self.sales_channel)
+            .select_related("sales_channel_view")
+            .order_by("-sales_channel_view__is_default", "sales_channel_view_id", "pk")
+        )
+
+        for remote_language in remote_languages:
+            normalized = self._normalize_shein_language_code(
+                language_code=remote_language.local_instance,
+            )
+            if not normalized:
+                normalized = self._normalize_shein_language_code(
+                    language_code=remote_language.remote_code,
+                )
+            add_language(language_code=normalized)
+
+            if len(languages) >= 5:
+                break
+
+        if not languages:
+            languages = [constants.DEFAULT_LANGUAGE]
+
+        return languages[:5]
+
+    def _normalize_shein_language_code(
+        self,
+        *,
+        language_code: Optional[str],
+    ) -> Optional[str]:
+        if not language_code:
+            return None
+
+        normalized = language_code.strip().lower()
+        if not normalized:
+            return None
+
+        mapped = constants.SHEIN_LANGUAGE_HEADER_MAP.get(normalized)
+        if mapped:
+            return mapped
+
+        if normalized in constants.SHEIN_LANGUAGE_HEADER_MAP.values():
+            return normalized
+
+        return None
 
     def _resolve_shein_language(self) -> str:
         company = getattr(self.sales_channel, "multi_tenant_company", None)
