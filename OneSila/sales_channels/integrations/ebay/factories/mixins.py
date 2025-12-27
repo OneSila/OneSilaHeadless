@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ast import literal_eval
 from collections.abc import Iterable, Iterator, Mapping
+import logging
 import time
 from typing import Any
 
@@ -22,8 +23,10 @@ from ebay_rest.api.sell_marketing.configuration import Configuration
 
 from ebay_rest.api.commerce_identity.api.user_api import UserApi
 
-from sales_channels.integrations.ebay.exceptions import EbayTemporarySystemError
 from sales_channels.integrations.ebay.models import EbaySalesChannel, EbaySalesChannelView
+
+
+logger = logging.getLogger(__name__)
 
 
 class GetEbayAPIMixin:
@@ -287,6 +290,7 @@ class GetEbayAPIMixin:
         record_key: str,
         records_key: str | None = None,
         oauth_max_retries: int = 3,
+        skip_failed_page: bool = False,
         **kwargs,
     ) -> Iterator[Any]:
         """Yield records from paginated eBay endpoints."""
@@ -305,6 +309,22 @@ class GetEbayAPIMixin:
                 oauth_max_retries=oauth_max_retries,
                 **request_kwargs,
             )
+
+            if response is None and skip_failed_page:
+                if limit is not None and limit > 0:
+                    logger.error(
+                        "Skipping eBay page after retryable errors (offset=%s, limit=%s)",
+                        offset,
+                        limit,
+                    )
+                    offset += limit
+                    continue
+                logger.error(
+                    "Skipping eBay page after retryable errors but no limit provided; stopping pagination.",
+                )
+                break
+            if response is None:
+                break
 
             is_iterator_response = isinstance(response, Iterator)
             response_items = response if is_iterator_response else (response,)
@@ -439,7 +459,9 @@ class GetEbayAPIMixin:
     def _is_retryable_api_exception(self, *, exc: ApiException) -> bool:
         if getattr(exc, "status", None) != 500:
             return False
-        return "25001" in self._extract_api_exception_error_ids(exc=exc)
+        if "25001" in self._extract_api_exception_error_ids(exc=exc):
+            return True
+        return "A system error has occurred" in str(exc)
 
     def _is_oauth_invalid_token_exception(self, *, exc: ApiException) -> bool:
         if getattr(exc, "status", None) != 401:
@@ -525,9 +547,13 @@ class GetEbayAPIMixin:
                     raise
 
                 if attempt >= max_attempts:
-                    raise EbayTemporarySystemError(
-                        f"eBay temporary system error after {attempt} attempts (status={getattr(exc, 'status', None)})"
-                    ) from exc
+                    logger.error(
+                        "eBay temporary system error after %s attempts (status=%s)",
+                        attempt,
+                        getattr(exc, "status", None),
+                        exc_info=exc,
+                    )
+                    return None
 
                 delay = base_delay_seconds * attempt
 
@@ -542,6 +568,7 @@ class GetEbayAPIMixin:
             limit=limit,
             record_key="record",
             records_key="inventory_items",
+            skip_failed_page=True,
         )
 
     def get_products_count(self) -> int:
