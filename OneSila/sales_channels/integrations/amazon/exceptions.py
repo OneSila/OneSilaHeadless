@@ -24,10 +24,20 @@ class AmazonProductValidationIssuesException(Exception):
         if not self.issues:
             return "Amazon product has validation issues."
 
-        first = self.issues[0] if isinstance(self.issues, list) and self.issues else None
-        if isinstance(first, dict):
-            code = first.get("code") or "unknown"
-            msg = first.get("message") or "validation error"
-            return f"Amazon product has validation issues ({len(self.issues)}). First: [{code}] {msg}"
+        if isinstance(self.issues, list):
+            details = []
+            for issue in self.issues:
+                if isinstance(issue, dict):
+                    code = issue.get("code") or "unknown"
+                    msg = issue.get("message") or "validation error"
+                    details.append(f"- [{code}] {msg}")
+                else:
+                    details.append(f"- {issue}")
 
-        return f"Amazon product has validation issues ({len(self.issues)})."
+            if details:
+                return "Amazon product has validation issues ({}).\n{}".format(
+                    len(self.issues),
+                    "\n".join(details),
+                )
+
+        return "Amazon product has validation issues ({}).".format(len(self.issues))

@@ -20,6 +20,7 @@ from core.exceptions import ValidationError
 from sentry_sdk.integrations.huey import HueyIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.strawberry import StrawberryIntegration
+from sales_channels.integrations.amazon.exceptions import AmazonProductValidationIssuesException
 
 SECRET_KEY = "FAKE-KEY-DONT-KEEP-THIS-YOU-SHOULD-SET-A-NEW-ONE"
 
@@ -516,6 +517,6 @@ SENTRY_CONFIG = {
     "environment": "test",
     "traces_sample_rate": 1.0,
     "profiles_sample_rate": 1.0,
-    "ignore_errors": [ValidationError],
+    "ignore_errors": [ValidationError, AmazonProductValidationIssuesException],
     "integrations": [DjangoIntegration(), HueyIntegration(), StrawberryIntegration(async_execution=True)],
 }
