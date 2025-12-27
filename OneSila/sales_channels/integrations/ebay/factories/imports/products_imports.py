@@ -249,6 +249,7 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
                     record_key="record",
                     records_key="offers",
                     sku=sku,
+                    skip_failed_page=True,
                 )
 
                 for offer in offers_iterator:

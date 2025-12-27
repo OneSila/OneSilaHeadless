@@ -374,6 +374,12 @@ class GetEbayAPIMixin:
                                 continue
                     except ApiException as exc:
                         if not self._is_oauth_invalid_token_exception(exc=exc):
+                            if skip_failed_page and self._is_retryable_api_exception(exc=exc):
+                                logger.error(
+                                    "Skipping eBay iterator results after retryable error.",
+                                    exc_info=exc,
+                                )
+                                return
                             raise
                         oauth_retries += 1
                         if oauth_retries >= oauth_max_retries:
