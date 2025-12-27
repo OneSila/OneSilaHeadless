@@ -372,9 +372,9 @@ class GetEbayAPIMixin:
                             increment = records_yielded if records_yielded is not None else len(records)
                             if increment <= 0:
                                 continue
-                    except ApiException as exc:
-                        if not self._is_oauth_invalid_token_exception(exc=exc):
-                            if skip_failed_page and self._is_retryable_api_exception(exc=exc):
+                    except (ApiException, EbayAPIError) as exc:
+                        if not self._is_oauth_invalid_token_error(exc=exc):
+                            if skip_failed_page and self._is_retryable_api_error(exc=exc):
                                 logger.error(
                                     "Skipping eBay iterator results after retryable error.",
                                     exc_info=exc,
@@ -430,8 +430,7 @@ class GetEbayAPIMixin:
                 break
 
     @staticmethod
-    def _extract_api_exception_error_ids(*, exc: ApiException) -> set[str]:
-        body = getattr(exc, "body", None)
+    def _extract_error_ids_from_body(*, body: Any) -> set[str]:
         if body is None:
             return set()
 
@@ -462,12 +461,32 @@ class GetEbayAPIMixin:
             if isinstance(error, dict) and error.get("errorId") is not None
         }
 
+    @staticmethod
+    def _extract_api_exception_error_ids(*, exc: ApiException) -> set[str]:
+        body = getattr(exc, "body", None)
+        return GetEbayAPIMixin._extract_error_ids_from_body(body=body)
+
     def _is_retryable_api_exception(self, *, exc: ApiException) -> bool:
         if getattr(exc, "status", None) != 500:
             return False
         if "25001" in self._extract_api_exception_error_ids(exc=exc):
             return True
         return "A system error has occurred" in str(exc)
+
+    def _is_retryable_api_error(self, *, exc: Exception) -> bool:
+        if isinstance(exc, ApiException):
+            return self._is_retryable_api_exception(exc=exc)
+        if isinstance(exc, EbayAPIError):
+            cause = getattr(exc, "__cause__", None)
+            if isinstance(cause, ApiException) and self._is_retryable_api_exception(exc=cause):
+                return True
+            detail = getattr(exc, "detail", None)
+            if detail is None:
+                return False
+            if "25001" in self._extract_error_ids_from_body(body=detail):
+                return True
+            return "A system error has occurred" in str(detail)
+        return False
 
     def _is_oauth_invalid_token_exception(self, *, exc: ApiException) -> bool:
         if getattr(exc, "status", None) != 401:
@@ -511,6 +530,23 @@ class GetEbayAPIMixin:
 
         return False
 
+    def _is_oauth_invalid_token_error(self, *, exc: Exception) -> bool:
+        if isinstance(exc, ApiException):
+            return self._is_oauth_invalid_token_exception(exc=exc)
+        if isinstance(exc, EbayAPIError):
+            cause = getattr(exc, "__cause__", None)
+            if isinstance(cause, ApiException) and self._is_oauth_invalid_token_exception(exc=cause):
+                return True
+            if getattr(exc, "number", None) == 99401:
+                return True
+            detail = getattr(exc, "detail", None)
+            if detail is None:
+                return False
+            if "1001" in self._extract_error_ids_from_body(body=detail):
+                return True
+            return "Invalid access token" in str(detail)
+        return False
+
     def _refresh_api_access_token(self, *, reason: str | None = None) -> None:
         api = getattr(self, "api", None)
         if api is None:
@@ -541,15 +577,15 @@ class GetEbayAPIMixin:
         while True:
             try:
                 return fetcher(**kwargs)
-            except ApiException as exc:
-                if self._is_oauth_invalid_token_exception(exc=exc):
+            except (ApiException, EbayAPIError) as exc:
+                if self._is_oauth_invalid_token_error(exc=exc):
                     if oauth_retries >= oauth_max_retries:
                         raise
                     self._refresh_api_access_token()
                     oauth_retries += 1
                     continue
 
-                if not self._is_retryable_api_exception(exc=exc):
+                if not self._is_retryable_api_error(exc=exc):
                     raise
 
                 if attempt >= max_attempts:
