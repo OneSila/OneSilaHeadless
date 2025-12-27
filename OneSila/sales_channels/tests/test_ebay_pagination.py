@@ -27,11 +27,29 @@ class _DummyEbayMixin(GetEbayAPIMixin):
         self.refresh_calls += 1
 
 
+class _DummyEbayMixinWithCallSequence(GetEbayAPIMixin):
+    """Dummy mixin that returns a predefined sequence of responses."""
+
+    def __init__(self, *, responses: list[Any]) -> None:
+        self.responses = list(responses)
+        self.calls: list[dict[str, Any]] = []
+
+    def _call_ebay_api(self, fetcher, *, oauth_max_retries: int = 3, **kwargs) -> Any:
+        self.calls.append(dict(kwargs))
+        return self.responses.pop(0) if self.responses else None
+
+
 def _invalid_token_exception(*, status: int = 401) -> ApiException:
     exc = ApiException(status=status, reason="Unauthorized")
     exc.body = (
         b'{"errors":[{"errorId":1001,"message":"Invalid access token","longMessage":"Invalid access token."}]}'
     )
+    return exc
+
+
+def _system_error_exception(*, status: int = 500) -> ApiException:
+    exc = ApiException(status=status, reason="A system error has occurred.")
+    exc.body = b'{"errors":[{"message":"A system error has occurred."}]}'
     return exc
 
 
@@ -151,3 +169,58 @@ def test_paginate_api_results_retries_invalid_token_from_iterator():
     assert results == records
     assert calls["count"] == 2
     assert mixin.refresh_calls == 1
+
+
+def test_paginate_api_results_skips_failed_page_and_advances_offset():
+    mixin = _DummyEbayMixinWithCallSequence(
+        responses=[
+            None,
+            {
+                "record": [{"id": 2}, {"id": 3}],
+                "total": {"records_available": 6, "records_yielded": 2},
+            },
+            {
+                "record": [{"id": 4}, {"id": 5}],
+                "total": {"records_available": 6, "records_yielded": 2},
+            },
+        ]
+    )
+
+    results = list(
+        mixin._paginate_api_results(
+            fetcher=lambda **kwargs: None,
+            limit=2,
+            record_key="record",
+            skip_failed_page=True,
+        )
+    )
+
+    assert results == [{"id": 2}, {"id": 3}, {"id": 4}, {"id": 5}]
+    assert [call.get("offset", 0) for call in mixin.calls] == [0, 2, 4]
+
+
+def test_is_retryable_api_exception_accepts_system_error_message():
+    mixin = _DummyEbayMixin()
+    exc = _system_error_exception()
+
+    assert mixin._is_retryable_api_exception(exc=exc) is True
+
+
+def test_call_ebay_api_logs_and_returns_none_after_retryable_exhausted(*, caplog):
+    mixin = _DummyEbayMixin()
+    calls = {"count": 0}
+
+    def fetcher(**kwargs):
+        calls["count"] += 1
+        raise _system_error_exception()
+
+    with caplog.at_level("ERROR"):
+        result = mixin._call_ebay_api(
+            fetcher=fetcher,
+            max_attempts=2,
+            base_delay_seconds=0.0,
+        )
+
+    assert result is None
+    assert calls["count"] == 2
+    assert any("eBay temporary system error after 2 attempts" in record.message for record in caplog.records)

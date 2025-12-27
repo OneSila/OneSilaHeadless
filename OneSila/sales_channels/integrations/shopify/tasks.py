@@ -417,6 +417,8 @@ def shopify_import_db_task(import_process, sales_channel):
 
 @periodic_task(crontab(minute=0, hour=2))
 def shopify_pull_remote_orders_db_task():
+    # @TODO: WE SKIP THIS FOR NOW
+    return
     from sales_channels.flows.puill_orders import pull_generic_orders_flow
     from .factories.orders import ShopifyOrderPullFactory
 
