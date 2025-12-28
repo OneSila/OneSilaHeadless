@@ -17,7 +17,7 @@ class SheinProductImportHelpers:
             return self._spu_index
 
         spu_names: list[str] = []
-        for record in self.get_all_products():
+        for record in self.get_all_products(skip_failed_page=True):
             if not isinstance(record, Mapping):
                 continue
             spu_name = self._extract_spu_name(payload=record)

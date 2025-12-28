@@ -15,6 +15,7 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 from sales_channels.integrations.shein import constants
+from sales_channels.integrations.shein.decorators import retry_shein_request
 from sales_channels.integrations.shein.exceptions import SheinResponseException
 
 logger = logging.getLogger(__name__)
@@ -105,6 +106,42 @@ class SheinSignatureMixin:
 
         return headers, effective_ts, effective_random
 
+    @retry_shein_request()
+    def _execute_post_request(
+        self,
+        *,
+        url: str,
+        payload: Dict[str, Any],
+        headers: Dict[str, str],
+        timeout: int,
+        verify: bool,
+    ) -> requests.Response:
+        return requests.post(
+            url,
+            json=payload,
+            headers=headers,
+            timeout=timeout,
+            verify=verify,
+        )
+
+    @retry_shein_request()
+    def _execute_get_request(
+        self,
+        *,
+        url: str,
+        payload: Dict[str, Any],
+        headers: Dict[str, str],
+        timeout: int,
+        verify: bool,
+    ) -> requests.Response:
+        return requests.get(
+            url,
+            params=payload,
+            headers=headers,
+            timeout=timeout,
+            verify=verify,
+        )
+
     def shein_post(
         self,
         *,
@@ -131,9 +168,9 @@ class SheinSignatureMixin:
         request_timeout = timeout if timeout is not None else constants.DEFAULT_TIMEOUT
 
         try:
-            response = requests.post(
-                url,
-                json=payload or {},
+            response = self._execute_post_request(
+                url=url,
+                payload=payload or {},
                 headers=headers,
                 timeout=request_timeout,
                 verify=self.sales_channel.verify_ssl,
@@ -177,9 +214,9 @@ class SheinSignatureMixin:
         request_timeout = timeout if timeout is not None else constants.DEFAULT_TIMEOUT
 
         try:
-            response = requests.get(
-                url,
-                params=payload or {},
+            response = self._execute_get_request(
+                url=url,
+                payload=payload or {},
                 headers=headers,
                 timeout=request_timeout,
                 verify=self.sales_channel.verify_ssl,
@@ -197,6 +234,14 @@ class SheinSignatureMixin:
 
         return response
 
+    @staticmethod
+    def _is_retryable_request_error(*, exc: Exception) -> bool:
+        cause = getattr(exc, "__cause__", None)
+        return isinstance(
+            cause,
+            (requests.exceptions.Timeout, requests.exceptions.ConnectionError),
+        )
+
     def get_all_products(
         self,
         *,
@@ -206,6 +251,8 @@ class SheinSignatureMixin:
         insert_time_end: Optional[str] = None,
         update_time_start: Optional[str] = None,
         update_time_end: Optional[str] = None,
+        skip_failed_page: bool = False,
+        max_failed_pages: Optional[int] = 3,
     ) -> Iterable[Dict[str, Any]]:
         """Yield product records from the Shein product query endpoint."""
 
@@ -225,10 +272,32 @@ class SheinSignatureMixin:
             base_payload["updateTimeEnd"] = update_time_end
 
         current_page = page_num
+        consecutive_failures = 0
 
         while True:
             payload = dict(base_payload, pageNum=current_page)
-            response = self.shein_post(path=self.product_query_path, payload=payload)
+            try:
+                response = self.shein_post(path=self.product_query_path, payload=payload)
+            except ValueError as exc:
+                if skip_failed_page and self._is_retryable_request_error(exc=exc):
+                    consecutive_failures += 1
+                    logger.warning(
+                        "Skipping Shein product page %s after request error (%s/%s).",
+                        current_page,
+                        consecutive_failures,
+                        max_failed_pages or "unlimited",
+                        exc_info=exc,
+                    )
+                    if max_failed_pages and consecutive_failures >= max_failed_pages:
+                        logger.error(
+                            "Stopping Shein product pagination after %s consecutive failures.",
+                            consecutive_failures,
+                        )
+                        break
+                    current_page += 1
+                    continue
+                raise
+            consecutive_failures = 0
 
             try:
                 body = response.json()

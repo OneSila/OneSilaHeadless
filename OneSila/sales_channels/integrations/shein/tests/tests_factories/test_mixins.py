@@ -144,6 +144,43 @@ class SheinSignatureMixinTests(TestCase):
         self.assertIs(result, response)
 
     @override_settings(DEBUG=False)
+    @patch("sales_channels.integrations.shein.decorators.time.sleep")
+    @patch("sales_channels.integrations.shein.factories.mixins.requests.post")
+    def test_shein_post_retries_on_timeout(self, post_mock: Mock, sleep_mock: Mock) -> None:
+        response = Mock()
+        response.raise_for_status = Mock()
+        post_mock.side_effect = [
+            requests.exceptions.ReadTimeout("slow"),
+            response,
+        ]
+
+        with patch.object(
+            self.factory,
+            "build_shein_headers",
+            return_value=(
+                {
+                    "Content-Type": "application/json;charset=UTF-8",
+                    "x-lt-openKeyId": "open-key",
+                    "x-lt-timestamp": "1700000000000",
+                    "x-lt-signature": "signed-value",
+                    "language": "fr",
+                },
+                1700000000000,
+                "abcde",
+            ),
+        ):
+            result = self.factory.shein_post(
+                path="/open-api/orders/sync",
+                payload={"foo": "bar"},
+                add_language=True,
+                timeout=20,
+            )
+
+        self.assertEqual(post_mock.call_count, 2)
+        sleep_mock.assert_called_once()
+        self.assertIs(result, response)
+
+    @override_settings(DEBUG=False)
     @patch("sales_channels.integrations.shein.factories.mixins.requests.get")
     def test_shein_get_executes_request_with_expected_arguments(self, get_mock: Mock) -> None:
         response = Mock()
@@ -303,6 +340,48 @@ class SheinSignatureMixinTests(TestCase):
                 {"spuName": "M3"},
             ],
         )
+
+    def test_get_all_products_skips_failed_page_on_timeout(self) -> None:
+        response = Mock()
+        response.json.return_value = {
+            "code": "0",
+            "msg": "OK",
+            "info": {
+                "data": [
+                    {"spuName": "M1"},
+                ]
+            },
+        }
+
+        timeout_error = ValueError("Shein request failed")
+        timeout_error.__cause__ = requests.exceptions.ReadTimeout("slow")
+
+        with patch.object(
+            self.factory,
+            "shein_post",
+            side_effect=[timeout_error, response],
+        ) as post_mock:
+            results = list(
+                self.factory.get_all_products(
+                    page_size=2,
+                    skip_failed_page=True,
+                    max_failed_pages=2,
+                )
+            )
+
+        post_mock.assert_has_calls(
+            [
+                call(
+                    path="/open-api/openapi-business-backend/product/query",
+                    payload={"pageSize": 2, "pageNum": 1},
+                ),
+                call(
+                    path="/open-api/openapi-business-backend/product/query",
+                    payload={"pageSize": 2, "pageNum": 2},
+                ),
+            ]
+        )
+        self.assertEqual(results, [{"spuName": "M1"}])
 
     def test_get_all_products_raises_on_error_response(self) -> None:
         response = Mock()
