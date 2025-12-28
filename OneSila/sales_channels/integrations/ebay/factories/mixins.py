@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from ast import literal_eval
 from collections.abc import Iterable, Iterator, Mapping
+import logging
+import time
 from typing import Any
 
 import requests
@@ -13,6 +15,7 @@ import json
 
 from ebay_rest import API
 from ebay_rest.error import Error as EbayAPIError
+from ebay_rest.api.sell_inventory.rest import ApiException
 from ebay_rest.api import commerce_identity
 from ebay_rest.reference import Reference
 from ebay_rest.api.sell_marketing.api_client import ApiClient
@@ -21,6 +24,9 @@ from ebay_rest.api.sell_marketing.configuration import Configuration
 from ebay_rest.api.commerce_identity.api.user_api import UserApi
 
 from sales_channels.integrations.ebay.models import EbaySalesChannel, EbaySalesChannelView
+
+
+logger = logging.getLogger(__name__)
 
 
 class GetEbayAPIMixin:
@@ -283,6 +289,8 @@ class GetEbayAPIMixin:
         limit: int | None,
         record_key: str,
         records_key: str | None = None,
+        oauth_max_retries: int = 3,
+        skip_failed_page: bool = False,
         **kwargs,
     ) -> Iterator[Any]:
         """Yield records from paginated eBay endpoints."""
@@ -296,7 +304,27 @@ class GetEbayAPIMixin:
             if offset:
                 request_kwargs["offset"] = offset
 
-            response = fetcher(**request_kwargs)
+            response = self._call_ebay_api(
+                fetcher=fetcher,
+                oauth_max_retries=oauth_max_retries,
+                **request_kwargs,
+            )
+
+            if response is None and skip_failed_page:
+                if limit is not None and limit > 0:
+                    logger.error(
+                        "Skipping eBay page after retryable errors (offset=%s, limit=%s)",
+                        offset,
+                        limit,
+                    )
+                    offset += limit
+                    continue
+                logger.error(
+                    "Skipping eBay page after retryable errors but no limit provided; stopping pagination.",
+                )
+                break
+            if response is None:
+                break
 
             is_iterator_response = isinstance(response, Iterator)
             response_items = response if is_iterator_response else (response,)
@@ -307,11 +335,68 @@ class GetEbayAPIMixin:
                 # number of records to yield overall. Re-fetch without the
                 # explicit limit so that we always process the complete result
                 # set and rely on the iterator to manage pagination.
+                iterator_kwargs = request_kwargs
                 if limit is not None and limit > 0 and "limit" in request_kwargs:
-                    response = fetcher(**dict(kwargs))
-                    response_items = response
-                else:
-                    response_items = response
+                    iterator_kwargs = dict(kwargs)
+                    response = self._call_ebay_api(
+                        fetcher=fetcher,
+                        oauth_max_retries=oauth_max_retries,
+                        **iterator_kwargs,
+                    )
+                response_items = response
+
+                oauth_retries = 0
+                records_emitted = 0
+
+                while True:
+                    skip_records = records_emitted
+                    skipped = 0
+                    try:
+                        for item in response_items:
+                            records, total_available, records_yielded = self._extract_paginated_records(
+                                item,
+                                record_key=record_key,
+                                records_key=records_key,
+                            )
+
+                            if not records:
+                                continue
+
+                            for record in records:
+                                if skipped < skip_records:
+                                    skipped += 1
+                                    continue
+                                records_emitted += 1
+                                yield record
+
+                            increment = records_yielded if records_yielded is not None else len(records)
+                            if increment <= 0:
+                                continue
+                    except (ApiException, EbayAPIError) as exc:
+                        if not self._is_oauth_invalid_token_error(exc=exc):
+                            if skip_failed_page and self._is_retryable_api_error(exc=exc):
+                                logger.error(
+                                    "Skipping eBay iterator results after retryable error.",
+                                    exc_info=exc,
+                                )
+                                return
+                            raise
+                        logger.warning(
+                            "Refreshing eBay access token after invalid token during iterator pagination.",
+                        )
+                        oauth_retries += 1
+                        if oauth_retries >= oauth_max_retries:
+                            raise
+                        self._refresh_api_access_token()
+                        response_items = self._call_ebay_api(
+                            fetcher=fetcher,
+                            oauth_max_retries=oauth_max_retries,
+                            **iterator_kwargs,
+                        )
+                        continue
+                    break
+
+                break
 
             yielded_any = False
 
@@ -347,6 +432,182 @@ class GetEbayAPIMixin:
             if not yielded_any:
                 break
 
+    @staticmethod
+    def _extract_error_ids_from_body(*, body: Any) -> set[str]:
+        if body is None:
+            return set()
+
+        if isinstance(body, (bytes, bytearray)):
+            try:
+                body = body.decode("utf-8")
+            except UnicodeDecodeError:
+                return set()
+
+        payload: dict[str, Any]
+        if isinstance(body, str):
+            try:
+                payload = json.loads(body)
+            except json.JSONDecodeError:
+                return set()
+        elif isinstance(body, dict):
+            payload = body
+        else:
+            return set()
+
+        errors = payload.get("errors")
+        if not isinstance(errors, list):
+            return set()
+
+        return {
+            str(error.get("errorId"))
+            for error in errors
+            if isinstance(error, dict) and error.get("errorId") is not None
+        }
+
+    @staticmethod
+    def _extract_api_exception_error_ids(*, exc: ApiException) -> set[str]:
+        body = getattr(exc, "body", None)
+        return GetEbayAPIMixin._extract_error_ids_from_body(body=body)
+
+    def _is_retryable_api_exception(self, *, exc: ApiException) -> bool:
+        if getattr(exc, "status", None) != 500:
+            return False
+        if "25001" in self._extract_api_exception_error_ids(exc=exc):
+            return True
+        return "A system error has occurred" in str(exc)
+
+    def _is_retryable_api_error(self, *, exc: Exception) -> bool:
+        if isinstance(exc, ApiException):
+            return self._is_retryable_api_exception(exc=exc)
+        if isinstance(exc, EbayAPIError):
+            cause = getattr(exc, "__cause__", None)
+            if isinstance(cause, ApiException) and self._is_retryable_api_exception(exc=cause):
+                return True
+            detail = getattr(exc, "detail", None)
+            if detail is None:
+                return False
+            if "25001" in self._extract_error_ids_from_body(body=detail):
+                return True
+            return "A system error has occurred" in str(detail)
+        return False
+
+    def _is_oauth_invalid_token_exception(self, *, exc: ApiException) -> bool:
+        if getattr(exc, "status", None) != 401:
+            return False
+
+        if "1001" in self._extract_api_exception_error_ids(exc=exc):
+            return True
+
+        body = getattr(exc, "body", None)
+        if body is None:
+            return False
+
+        if isinstance(body, (bytes, bytearray)):
+            try:
+                body = body.decode("utf-8")
+            except UnicodeDecodeError:
+                return False
+
+        payload: dict[str, Any] | None = None
+        if isinstance(body, str):
+            try:
+                payload = json.loads(body)
+            except json.JSONDecodeError:
+                return "Invalid access token" in body
+        elif isinstance(body, dict):
+            payload = body
+        else:
+            return False
+
+        errors = payload.get("errors") if isinstance(payload, dict) else None
+        if not isinstance(errors, list):
+            return False
+
+        for error in errors:
+            if not isinstance(error, dict):
+                continue
+            message = str(error.get("message") or "")
+            long_message = str(error.get("longMessage") or "")
+            if "Invalid access token" in message or "Invalid access token" in long_message:
+                return True
+
+        return False
+
+    def _is_oauth_invalid_token_error(self, *, exc: Exception) -> bool:
+        if isinstance(exc, ApiException):
+            return self._is_oauth_invalid_token_exception(exc=exc)
+        if isinstance(exc, EbayAPIError):
+            cause = getattr(exc, "__cause__", None)
+            if isinstance(cause, ApiException) and self._is_oauth_invalid_token_exception(exc=cause):
+                return True
+            if getattr(exc, "number", None) == 99401:
+                return True
+            detail = getattr(exc, "detail", None)
+            if detail is None:
+                return False
+            if "1001" in self._extract_error_ids_from_body(body=detail):
+                return True
+            return "Invalid access token" in str(detail)
+        return False
+
+    def _refresh_api_access_token(self, *, reason: str | None = None) -> None:
+        api = getattr(self, "api", None)
+        if api is None:
+            self.api = self.get_api()
+            return
+
+        user_token = getattr(api, "_user_token", None)
+        if user_token is None:
+            self.api = self.get_api()
+            return
+
+        user_token._refresh_user_token()
+
+    def _call_ebay_api(
+        self,
+        fetcher,
+        *,
+        max_attempts: int = 3,
+        oauth_max_retries: int = 3,
+        base_delay_seconds: float = 3.0,
+        **kwargs,
+    ) -> Any:
+        """Call an eBay REST SDK method with retry for temporary system errors and invalid tokens."""
+
+        attempt = 1
+        oauth_retries = 0
+
+        while True:
+            try:
+                return fetcher(**kwargs)
+            except (ApiException, EbayAPIError) as exc:
+                if self._is_oauth_invalid_token_error(exc=exc):
+                    if oauth_retries >= oauth_max_retries:
+                        raise
+                    logger.warning(
+                        "Refreshing eBay access token after invalid token response.",
+                    )
+                    self._refresh_api_access_token()
+                    oauth_retries += 1
+                    continue
+
+                if not self._is_retryable_api_error(exc=exc):
+                    raise
+
+                if attempt >= max_attempts:
+                    logger.error(
+                        "eBay temporary system error after %s attempts (status=%s)",
+                        attempt,
+                        getattr(exc, "status", None),
+                        exc_info=exc,
+                    )
+                    return None
+
+                delay = base_delay_seconds * attempt
+
+                time.sleep(delay)
+                attempt += 1
+
     def get_all_products(self, limit: int | None = None) -> Iterator[dict[str, Any]]:
         """Yield all inventory items for the configured sales channel."""
 
@@ -355,6 +616,7 @@ class GetEbayAPIMixin:
             limit=limit,
             record_key="record",
             records_key="inventory_items",
+            skip_failed_page=True,
         )
 
     def get_products_count(self) -> int:

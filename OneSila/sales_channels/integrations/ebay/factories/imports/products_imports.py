@@ -24,7 +24,7 @@ from imports_exports.helpers import append_broken_record, increment_processed_re
 from core.helpers import ensure_serializable
 from sales_channels.integrations.ebay.constants import EBAY_INTERNAL_PROPERTY_DEFAULTS
 from ebay_rest.error import Error as EbayAPIError
-
+from sales_channels.integrations.ebay.exceptions import EbayTemporarySystemError
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
 from sales_channels.integrations.ebay.helpers import get_is_product_variation
 from sales_channels.integrations.ebay.models import (
@@ -222,7 +222,6 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
 
         return description
 
-
     def get_total_instances(self) -> int:
         """Return the number of remote products that will be processed."""
 
@@ -239,15 +238,18 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
             if not sku:
                 continue
 
-            product = self.api.sell_inventory_get_inventory_item(sku=sku)
-
             try:
+                product = self._call_ebay_api(self.api.sell_inventory_get_inventory_item, sku=sku)
+                if not isinstance(product, dict):
+                    continue
+
                 offers_iterator = self._paginate_api_results(
                     self.api.sell_inventory_get_offers,
                     limit=None,
                     record_key="record",
                     records_key="offers",
                     sku=sku,
+                    skip_failed_page=True,
                 )
 
                 for offer in offers_iterator:
@@ -259,6 +261,9 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
                 if getattr(exc, "number", None) == 99404:
                     continue
                 raise
+            except EbayTemporarySystemError:
+                logger.warning("Skipping SKU %s due to temporary eBay system error", sku)
+                continue
 
     def get_product_rule(
         self,

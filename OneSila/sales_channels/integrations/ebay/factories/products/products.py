@@ -563,10 +563,10 @@ class EbayProductDeleteFactory(EbayProductBaseFactory):
             child_remotes: list[EbayProduct] = []
             if self._is_configurable_product():
                 child_remotes = self._collect_child_remote_products()
-                withdraw_result = self.withdraw_group()
                 offer_responses = self.delete_offers_for_remote_products(remote_products=child_remotes)
-                group_delete = self.delete_inventory_group()
                 inventory_responses = self.delete_inventory_for_remote_products(remote_products=child_remotes)
+                withdraw_result = self.withdraw_group()
+                group_delete = self.delete_inventory_group()
 
                 result = {
                     "withdraw": withdraw_result,
