@@ -101,9 +101,9 @@ class SheinCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
         lazy("sales_channels.integrations.shein.schema.types.types")
     ]]
 
-    @field(name="configuratorProperties")
-    def configurator_properties_field(self, info) -> JSON:
-        return self.configurator_properties
+    @field(name="properties")
+    def properties_field(self, info) -> JSON:
+        return self.properties
 
 
 @type(

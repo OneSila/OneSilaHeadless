@@ -90,6 +90,7 @@ class SheinPropertyFilter(
     """Filter Shein attribute definitions."""
 
     id: auto
+    remote_id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
     allows_unmapped_values: auto

@@ -155,11 +155,13 @@ class SheinCategory(models.Model):
         return default if isinstance(default, dict) else {}
 
     @property
-    def configurator_properties(self) -> list[dict[str, Any]]:
+    def properties(self) -> list[dict[str, Any]]:
         publish_standard = self.get_publish_standard(default={})
-        configurator_properties = publish_standard.get("configurator_properties")
-        if isinstance(configurator_properties, list):
-            return [entry for entry in configurator_properties if isinstance(entry, dict)]
+        properties = publish_standard.get("properties")
+        if not isinstance(properties, list):
+            properties = publish_standard.get("configurator_properties")
+        if isinstance(properties, list):
+            return [entry for entry in properties if isinstance(entry, dict)]
         return []
 
 

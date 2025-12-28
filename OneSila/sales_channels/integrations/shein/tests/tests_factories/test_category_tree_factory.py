@@ -337,7 +337,7 @@ class SheinCategoryTreeFactoryTests(TestCase):
         self.assertFalse(root_category.support_sale_attribute_sort)
         self.assertTrue(root_category.package_type_required)
         self.assertTrue(root_category.supplier_barcode_required)
-        self.assertEqual(root_category.configurator_properties, [])
+        self.assertEqual(root_category.properties, [])
 
         leaf_category = SheinCategory.objects.get(remote_id="1727")
         self.assertTrue(leaf_category.is_leaf)
@@ -361,7 +361,7 @@ class SheinCategoryTreeFactoryTests(TestCase):
         self.assertFalse(leaf_category.support_sale_attribute_sort)
         self.assertTrue(leaf_category.package_type_required)
         self.assertTrue(leaf_category.supplier_barcode_required)
-        self.assertEqual({entry.get("property_id") for entry in leaf_category.configurator_properties}, {"27", "87"})
+        self.assertEqual({entry.get("property_id") for entry in leaf_category.properties}, {"27", "87"})
 
         product_type = SheinProductType.objects.get(remote_id="1080")
         self.assertEqual(product_type.category_id, leaf_category.remote_id)

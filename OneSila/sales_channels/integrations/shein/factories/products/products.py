@@ -246,9 +246,9 @@ class SheinProductBaseFactory(
         if not self.selected_category_id:
             return False
 
-        categories = SheinCategory.objects.filter(remote_id=self.selected_category_id)
-        categories = categories.filter(sales_channel=self.sales_channel)
-        categories = categories.filter(
+        categories = SheinCategory.objects.filter(
+            remote_id=self.selected_category_id,
+            sales_channel=self.sales_channel,
             multi_tenant_company=self.sales_channel.multi_tenant_company,
         )
 

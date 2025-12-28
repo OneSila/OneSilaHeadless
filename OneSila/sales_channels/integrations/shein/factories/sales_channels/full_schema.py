@@ -57,12 +57,14 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         view: Optional[SheinSalesChannelView] = None,
         language: Optional[str] = None,
         import_process=None,
+        sync_product_type_attributes: bool = True,
     ) -> None:
         self.sales_channel = sales_channel
         self.sales_channel_id = getattr(sales_channel, "pk", None)
         self.view = view
         self.view_id = getattr(view, "pk", None)
         self.language = language
+        self.sync_product_type_attributes = sync_product_type_attributes
         self.synced_categories: list[SheinCategory] = []
         self.synced_product_types: list[SheinProductType] = []
         self._remote_language_cache: set[tuple[Optional[int], str]] = set()
@@ -312,7 +314,8 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             defaults=defaults,
         )
 
-        self._sync_product_type_attributes(product_type=product_type)
+        if self.sync_product_type_attributes:
+            self._sync_product_type_attributes(product_type=product_type)
         self._sync_category_configurator_properties(
             category=category,
             product_type=product_type,
@@ -408,7 +411,10 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
                 "picture_config_list": picture_config,
                 "package_type_required": package_type_required,
                 "supplier_barcode_required": supplier_barcode_required,
-                "configurator_properties": publish_standard.get("configurator_properties", []),
+                "properties": publish_standard.get(
+                    "properties",
+                    publish_standard.get("configurator_properties", []),
+                ),
             }
 
             if publish_standard != normalized_publish_standard:
@@ -467,7 +473,7 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
 
         next_publish_standard = {
             **publish_standard,
-            "configurator_properties": configurator_properties,
+            "properties": configurator_properties,
         }
         if publish_standard == next_publish_standard:
             return
