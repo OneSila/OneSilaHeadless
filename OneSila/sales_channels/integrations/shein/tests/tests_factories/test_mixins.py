@@ -433,7 +433,6 @@ class SheinSignatureMixinTests(TestCase):
                 "spuName": "MM2404163183",
             },
             add_language=False,
-            extra_headers={"language": "pt-br"},
         )
         self.assertEqual(info, {"spuName": "MM2404163183"})
 
@@ -455,7 +454,6 @@ class SheinSignatureMixinTests(TestCase):
                 "spuName": "MM2404163183",
             },
             add_language=False,
-            extra_headers={"language": "en"},
         )
 
     def test_get_product_raises_on_error_response(self) -> None:
