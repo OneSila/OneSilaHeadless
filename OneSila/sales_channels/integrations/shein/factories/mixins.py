@@ -27,6 +27,7 @@ class SheinSignatureMixin:
     signature_random_charset = string.ascii_letters + string.digits
     product_query_path = "/open-api/openapi-business-backend/product/query"
     product_info_path = "/open-api/goods/spu-info"
+    store_info_path = "/open-api/openapi-business-backend/query-store-info"
 
     def get_shein_open_key_id(self) -> str:
         open_key_id = self.sales_channel.open_key_id
@@ -299,6 +300,47 @@ class SheinSignatureMixin:
 
         info = body.get("info") or {}
         return info if isinstance(info, dict) else {}
+
+    def get_store_info(self) -> Dict[str, Any]:
+        """Return the store info payload with quota metadata."""
+
+        response = self.shein_post(
+            path=self.store_info_path,
+            payload={},
+            add_language=False,
+        )
+
+        try:
+            body = response.json()
+        except ValueError as exc:  # pragma: no cover - defensive guard
+            logger.exception("Unable to decode Shein store info response")
+            raise ValueError(_("Shein store info returned invalid JSON.")) from exc
+
+        if body.get("code") != "0":
+            message = body.get("msg") or "Unknown error"
+            raise ValueError(
+                _("Failed to fetch Shein store info: %(message)s")
+                % {"message": message}
+            )
+
+        info = body.get("info") or {}
+        return info if isinstance(info, dict) else {}
+
+    def get_total_product_count(self) -> Optional[int]:
+        """Return the total number of products for the Shein store."""
+
+        info = self.get_store_info()
+        quota = info.get("storeProductQuota") or {}
+        if not isinstance(quota, dict):
+            return None
+        used_quota = quota.get("usedQuota")
+        if used_quota is None:
+            return None
+        try:
+            total = int(used_quota)
+        except (TypeError, ValueError):
+            return None
+        return max(total, 0)
 
     def _resolve_product_languages(
         self,

@@ -389,3 +389,43 @@ class SheinSignatureMixinTests(TestCase):
         with patch.object(self.factory, "shein_post", return_value=response):
             with self.assertRaises(SheinResponseException):
                 self.factory.get_product(spu_name="MM2404163183")
+
+    def test_get_store_info_returns_payload(self) -> None:
+        response = Mock()
+        response.json.return_value = {
+            "code": "0",
+            "msg": "OK",
+            "info": {
+                "storeProductQuota": {"usedQuota": 12},
+                "storeInfo": {"supplierId": 123},
+            },
+        }
+
+        with patch.object(self.factory, "shein_post", return_value=response) as post_mock:
+            info = self.factory.get_store_info()
+
+        post_mock.assert_called_once_with(
+            path="/open-api/openapi-business-backend/query-store-info",
+            payload={},
+            add_language=False,
+        )
+        self.assertEqual(
+            info,
+            {
+                "storeProductQuota": {"usedQuota": 12},
+                "storeInfo": {"supplierId": 123},
+            },
+        )
+
+    def test_get_total_product_count_returns_used_quota(self) -> None:
+        response = Mock()
+        response.json.return_value = {
+            "code": "0",
+            "msg": "OK",
+            "info": {"storeProductQuota": {"usedQuota": "37"}},
+        }
+
+        with patch.object(self.factory, "shein_post", return_value=response):
+            total = self.factory.get_total_product_count()
+
+        self.assertEqual(total, 37)

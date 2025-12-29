@@ -83,6 +83,14 @@ class SheinProductsImportProcessor(
         return self
 
     def get_total_instances(self) -> int:
+        try:
+            total = self.get_total_product_count()
+        except Exception:
+            total = None
+
+        if total is not None:
+            return total
+
         return len(self._load_spu_index())
 
     def get_products_data(self) -> Iterator[dict[str, Any]]:
