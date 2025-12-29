@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
+from unittest.mock import PropertyMock, patch
 
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
@@ -10,9 +11,11 @@ from django.test import override_settings
 from core.tests import TestCase
 from model_bakery import baker
 
+from integrations.models import IntegrationLog
 from products.models import Product
 from sales_channels.integrations.shein import constants
 from sales_channels.integrations.shein.models import SheinSalesChannel, SheinProduct
+from sales_channels.models.logs import RemoteLog
 from sales_channels.models.products import RemoteProduct
 
 
@@ -66,8 +69,9 @@ class SheinWebhookTests(TestCase):
         version = "SPMP231215009184753"
         document_sn = "SPMPA420231215003106"
 
-        self.remote_product.remote_id = "h23121539315"
-        self.remote_product.save(update_fields=["remote_id"])
+        SheinProduct.objects.filter(pk=self.remote_product.pk).update(
+            remote_id="h23121539315",
+        )
 
         body = {
             "spu_name": "h23121539315",
@@ -99,3 +103,45 @@ class SheinWebhookTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.remote_product.refresh_from_db()
         self.assertEqual(self.remote_product.remote_id, "h23121539315")
+
+    @patch("sales_channels.models.products.RemoteProduct.errors", new_callable=PropertyMock)
+    def test_audit_webhook_marks_approval_rejected_on_failure(self, errors_mock) -> None:
+        errors_mock.return_value = IntegrationLog.objects.none()
+        body = {
+            "spu_name": "h23121539315",
+            "skc_name": "sh2312153931579766",
+            "sku_list": [{"sku_code": "I81ynllyzffh"}],
+            "document_sn": "SPMPA420231215003106",
+            "version": "SPMP231215009184753",
+            "audit_time": "2023-12-18 11:46:43",
+            "audit_state": 3,
+            "failed_reason": ["Missing brand authorization"],
+        }
+
+        timestamp = 1700000000000
+        random_key = "abc12"
+        signature = self._build_signature(path=self.webhook_path, timestamp=timestamp, random_key=random_key)
+        event_data = self._encrypt_event_data(body)
+
+        response = self.client.post(
+            self.webhook_path,
+            data={"eventData": event_data},
+            **{
+                "HTTP_X_LT_OPENKEYID": self.sales_channel.open_key_id,
+                "HTTP_X_LT_APPID": self.app_id,
+                "HTTP_X_LT_TIMESTAMP": str(timestamp),
+                "HTTP_X_LT_SIGNATURE": signature,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.remote_product.refresh_from_db()
+        self.assertEqual(self.remote_product.status, RemoteProduct.STATUS_APPROVAL_REJECTED)
+
+        log = RemoteLog.objects.filter(
+            remote_product=self.remote_product,
+            identifier="SheinProductAuditFailed",
+            user_error=True,
+        ).first()
+        self.assertIsNotNone(log)
+        self.assertIn("Missing brand authorization".lower(), (log.response or "").lower())

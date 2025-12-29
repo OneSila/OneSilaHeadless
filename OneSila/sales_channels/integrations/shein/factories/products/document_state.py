@@ -82,6 +82,50 @@ class SheinProductDocumentStateFactory(SheinSignatureMixin):
             entry["version"] = self.version
         return {"spuList": [entry]}
 
+    def _extract_failed_reason_messages(self, *, failures: list[dict[str, Any]]) -> list[str]:
+        messages: list[str] = []
+        for failure in failures:
+            failed_reason = failure.get("failedReason") or []
+            if isinstance(failed_reason, list):
+                for reason in failed_reason:
+                    text = str(reason).strip()
+                    if text:
+                        messages.append(text)
+            else:
+                text = str(failed_reason).strip()
+                if text:
+                    messages.append(text)
+
+        return list(dict.fromkeys(messages))
+
+    def _handle_review_failures(self, *, failures: list[dict[str, Any]]) -> None:
+        if not failures:
+            return
+
+        if not self.remote_product:
+            return
+
+        messages = self._extract_failed_reason_messages(failures=failures)
+        if not messages:
+            return
+
+        error_message = "Shein product review failed: {}".format("; ".join(messages))
+        self.remote_product.add_log(
+            action=IntegrationLog.ACTION_UPDATE,
+            response="",
+            payload={
+                "spu_name": self.spu_name,
+                "failure_count": len(messages),
+                "failed_reason": messages,
+            },
+            identifier="SheinProductDocumentState:review_failed",
+            remote_product=self.remote_product,
+            error_message=error_message,
+        )
+        self.remote_product.refresh_status(
+            override_status=self.remote_product.STATUS_APPROVAL_REJECTED,
+        )
+
     def fetch(self, *, payload: dict[str, Any]) -> dict[str, Any]:
         response = self.shein_post(path=self.query_document_state_path, payload=payload)
         response_data = response.json() if hasattr(response, "json") else {}
@@ -128,6 +172,7 @@ class SheinProductDocumentStateFactory(SheinSignatureMixin):
         self.failures = self._extract_failures(response_data=self.response_data)
         self.persist_issues()
         self.update_remote_product_status()
+        self._handle_review_failures(failures=self.failures)
         self.log()
         return self.response_data
 

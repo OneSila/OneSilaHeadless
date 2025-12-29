@@ -21,7 +21,7 @@ from sales_channels.integrations.shein.exceptions import (
     SheinPreValidationError,
     SheinResponseException,
 )
-from sales_channels.exceptions import PreFlightCheckError
+from sales_channels.exceptions import PreFlightCheckError, SkipSyncBecauseOfStatusException
 from sales_channels.integrations.shein.models import (
     SheinCategory,
     SheinInternalProperty,
@@ -161,6 +161,22 @@ class SheinProductBaseFactory(
             # If the check fails, proceed to allow iterative development.
             return True
         return True
+
+    def check_status(self, *, remote_product=None):
+        remote_product = remote_product or getattr(self, "remote_product", None)
+        if remote_product is None:
+            return
+
+        if getattr(remote_product, "status", None) != self.remote_model_class.STATUS_PENDING_APPROVAL:
+            return
+
+        if not getattr(remote_product, "spu_name", None):
+            return
+
+        message = (
+            "This product is pending approval on Shein, so updates are paused until the review completes."
+        )
+        raise SkipSyncBecauseOfStatusException(message)
 
     def set_rule(self):
         self.rule = None
@@ -1587,9 +1603,6 @@ class SheinProductCreateFactory(SheinProductBaseFactory, RemoteProductCreateFact
         if sku_code:
             setattr(self.remote_instance, "sku_code", sku_code)
             update_fields.add("sku_code")
-
-        print('------------------------------------------ REMOTE ID SETTED')
-        print(spu_name)
 
         if update_fields:
             self.remote_instance.save(update_fields=list(update_fields))

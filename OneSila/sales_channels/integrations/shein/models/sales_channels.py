@@ -8,7 +8,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core import models
 
-from sales_channels.exceptions import PreFlightCheckError
+from sales_channels.exceptions import PreFlightCheckError, SkipSyncBecauseOfStatusException
 from sales_channels.integrations.shein.exceptions import SheinPreValidationError, SheinResponseException
 from sales_channels.models.mixins import RemoteObjectMixin
 from sales_channels.models.sales_channels import (
@@ -87,7 +87,12 @@ class SheinSalesChannel(SalesChannel):
     class Meta:
         verbose_name = "Shein Sales Channel"
         verbose_name_plural = "Shein Sales Channels"
-        user_exceptions = (SheinResponseException, SheinPreValidationError, PreFlightCheckError)
+        user_exceptions = (
+            SheinResponseException,
+            SheinPreValidationError,
+            PreFlightCheckError,
+            SkipSyncBecauseOfStatusException,
+        )
 
     def __str__(self) -> str:
         return f"Shein Store: {self.hostname}"

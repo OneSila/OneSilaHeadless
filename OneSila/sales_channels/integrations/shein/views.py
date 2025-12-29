@@ -172,7 +172,6 @@ def shein_product_document_audit_status_notice(request):
     if not _verify_shein_webhook_signature(sales_channel=sales_channel, request=request):
         return HttpResponse(status=401)
 
-    sales_channel = None
     payload = _extract_webhook_payload(request=request)
     if not isinstance(payload, dict):
         return HttpResponse(status=400)
@@ -227,13 +226,29 @@ def shein_product_document_audit_status_notice(request):
     )
 
     if failed_reason:
-        remote_product.add_user_error(
+        if isinstance(failed_reason, list):
+            failed_reason_message = "; ".join(
+                str(reason).strip() for reason in failed_reason if str(reason).strip()
+            )
+        else:
+            failed_reason_message = str(failed_reason or "").strip()
+        if not failed_reason_message:
+            failed_reason_message = "Shein product review failed."
+
+        remote_product.add_log(
             action=IntegrationLog.ACTION_UPDATE,
-            response={"failed_reason": failed_reason, "audit_state": audit_state},
-            payload={"spu_name": spu_name},
-            error_traceback="",
+            response="",
+            payload={
+                "spu_name": spu_name,
+                "failed_reason": failed_reason,
+                "audit_state": audit_state,
+            },
             identifier="SheinProductAuditFailed",
             remote_product=remote_product,
+            error_message=failed_reason_message,
+        )
+        remote_product.refresh_status(
+            override_status=remote_product.STATUS_APPROVAL_REJECTED,
         )
 
     return JsonResponse({"ok": True})

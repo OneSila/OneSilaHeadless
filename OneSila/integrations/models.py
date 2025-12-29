@@ -360,7 +360,13 @@ class IntegrationObjectMixin(models.Model):
     def add_log(self, action, response, payload, identifier, remote_product=None, **kwargs):
         """
         Method to add a successful log entry.
+
+        Use error_message to surface a user-facing message without marking the log as failed.
         """
+        error_message = kwargs.pop("error_message", None)
+        if error_message:
+            response = error_message
+            kwargs.setdefault("user_error", True)
         self.create_log_entry(
             action=action,
             status=IntegrationLog.STATUS_SUCCESS,

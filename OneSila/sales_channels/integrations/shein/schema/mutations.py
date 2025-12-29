@@ -348,13 +348,15 @@ class SheinSalesChannelMutation:
         return True
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
-    def force_update_shein_product(
+    def update_shein_product(
         self,
+        *,
         product: ProductPartialInput,
         sales_channel: SheinSalesChannelPartialInput,
+        force_update: bool,
         info: Info,
     ) -> bool:
-        """Force an update by running the create flow (publishOrEdit) again."""
+        """Optionally force an update by running the create flow (publishOrEdit) again."""
         from products.models import Product
         from sales_channels.integrations.shein.models import SheinSalesChannel
         from sales_channels.integrations.shein.flows.tasks_runner import (
@@ -382,13 +384,14 @@ class SheinSalesChannelMutation:
         if not assign_exists:
             raise ValidationError(_("Product is not assigned to a Shein storefront view."))
 
-        count = 1 + getattr(product_obj, "get_configurable_variations", lambda: [])().count()
+        if force_update:
+            count = 1 + getattr(product_obj, "get_configurable_variations", lambda: [])().count()
 
-        run_single_shein_product_task_flow(
-            task_func=create_shein_product_db_task,
-            sales_channel=channel,
-            number_of_remote_requests=count,
-            product_id=product_obj.id,
-        )
+            run_single_shein_product_task_flow(
+                task_func=create_shein_product_db_task,
+                sales_channel=channel,
+                number_of_remote_requests=count,
+                product_id=product_obj.id,
+            )
 
         return True

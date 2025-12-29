@@ -308,6 +308,7 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
         from sales_channels.integrations.shopify.models import ShopifySalesChannel
         from sales_channels.integrations.magento2.models import MagentoSalesChannel
         from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
+        from sales_channels.integrations.shein.models import SheinSalesChannel
         from sales_channels.integrations.amazon.models import (
             AmazonExternalProductId,
             AmazonSalesChannel,
@@ -325,6 +326,8 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
             return f"{self.sales_channel_view.url}{self.product.url_key}.html"
         elif isinstance(sales_channel, WoocommerceSalesChannel):
             return f"{self.sales_channel_view.url}/products/{self.product.url_key}"
+        elif isinstance(sales_channel, SheinSalesChannel):
+            return None
         elif isinstance(sales_channel, AmazonSalesChannel):
             try:
                 asin = AmazonExternalProductId.objects.get(
@@ -378,9 +381,9 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
             if listing_id:
                 return f"{base_url.rstrip('/')}/itm/{listing_id}"
 
-            return base_url or None
+            return None
 
-        return f"{self.sales_channel_view.url}{self.product.url_key}.html"
+        return None
 
 
 class SalesChannelContentTemplate(models.Model):
