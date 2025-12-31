@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from core.tests import TestCase
 from model_bakery import baker
@@ -60,3 +60,29 @@ class SheinPendingApprovalSkipTests(TestCase):
 
     def test_skip_exception_is_registered_as_user_exception(self) -> None:
         self.assertIn(SkipSyncBecauseOfStatusException, self.sales_channel._meta.user_exceptions)
+
+    @patch.object(SheinProductUpdateFactory, "shein_post")
+    def test_update_blocks_when_edit_permission_denied(self, shein_post: MagicMock) -> None:
+        SheinProduct.objects.filter(pk=self.remote_product.pk).update(
+            status=RemoteProduct.STATUS_COMPLETED,
+        )
+        self.remote_product.refresh_from_db()
+
+        response = MagicMock()
+        response.json.return_value = {
+            "code": "0",
+            "msg": "OK",
+            "info": {"editable": False, "reason": "Review in progress."},
+        }
+        shein_post.return_value = response
+
+        factory = SheinProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+        )
+
+        with self.assertRaises(SkipSyncBecauseOfStatusException) as exc:
+            factory.check_status(remote_product=self.remote_product)
+
+        self.assertIn("Review in progress", str(exc.exception))

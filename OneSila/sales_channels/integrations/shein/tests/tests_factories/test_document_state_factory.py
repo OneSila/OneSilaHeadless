@@ -8,6 +8,9 @@ from products.models import Product
 from sales_channels.integrations.shein.factories.products.document_state import (
     SheinProductDocumentStateFactory,
 )
+from sales_channels.integrations.shein.factories.imports.product_refresh import (
+    SheinProductDetailRefreshFactory,
+)
 from sales_channels.integrations.shein.models import SheinSalesChannel, SheinProduct
 from sales_channels.models.logs import RemoteLog
 from sales_channels.models.products import RemoteProduct
@@ -76,3 +79,35 @@ class SheinDocumentStateFactoryTests(TestCase):
         ).first()
         self.assertIsNotNone(log)
         self.assertIn("brand issue", (log.response or "").lower())
+
+    @patch.object(SheinProductDetailRefreshFactory, "run")
+    @patch.object(SheinProductDocumentStateFactory, "fetch")
+    def test_approval_completion_refreshes_details(self, fetch_mock, refresh_mock) -> None:
+        fetch_mock.return_value = {
+            "info": {
+                "data": [
+                    {
+                        "spuName": "SPU-1",
+                        "version": "V2",
+                        "skcList": [
+                            {
+                                "skcName": "SKC-1",
+                                "documentState": 2,
+                                "documentSn": "DOC-2",
+                                "failedReason": [],
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+        self.remote_product.status = RemoteProduct.STATUS_PENDING_APPROVAL
+        self.remote_product.save(update_fields=["status"])
+
+        factory = SheinProductDocumentStateFactory(
+            sales_channel=self.sales_channel,
+            remote_product=self.remote_product,
+        )
+        factory.run()
+
+        refresh_mock.assert_called_once()

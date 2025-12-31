@@ -5,12 +5,17 @@ from typing import Any, Optional
 from django.db.utils import OperationalError, ProgrammingError
 from integrations.models import IntegrationLog
 from django.core.exceptions import ValidationError
+from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from sales_channels.integrations.shein.factories.mixins import SheinSignatureMixin
 from sales_channels.integrations.shein.models import SheinProductIssue
 from sales_channels.integrations.shein.helpers.document_state import (
     shein_aggregate_document_states_to_status,
 )
+from sales_channels.integrations.shein.factories.imports.product_refresh import (
+    SheinProductDetailRefreshFactory,
+)
+from sales_channels.models.products import RemoteProduct
 
 
 logger = logging.getLogger(__name__)
@@ -151,24 +156,36 @@ class SheinProductDocumentStateFactory(SheinSignatureMixin):
                 document_states.append(None)
 
         override = shein_aggregate_document_states_to_status(document_states=document_states)
-        if override:
-            self.remote_product.refresh_status(override_status=override)
+        if not override:
+            return
+
+        previous_status = self.remote_product.status
+        self.remote_product.refresh_status(override_status=override)
+
+        if (
+            previous_status == RemoteProduct.STATUS_PENDING_APPROVAL
+            and override == RemoteProduct.STATUS_COMPLETED
+        ):
+            SheinProductDetailRefreshFactory(
+                sales_channel=self.sales_channel,
+                remote_product=self.remote_product,
+            ).run()
 
     def log(self) -> None:
+        fetched_at = now().strftime("%Y-%m-%d %H:%M:%S")
         self.remote_product.add_log(
             action=IntegrationLog.ACTION_UPDATE,
             response=json.dumps(self.response_data, ensure_ascii=False),
             payload={"spu_name": self.spu_name, "version": self.version, "failure_count": len(self.failures)},
             identifier="SheinProductDocumentState",
             remote_product=self.remote_product,
+            error_message=f"Fetched issues at {fetched_at}",
         )
 
     def run(self) -> dict[str, Any]:
         self.validate()
         payload = self.build_payload()
         self.response_data = self.fetch(payload=payload)
-        print('----------------------- DATA')
-        print(self.response_data )
         self.failures = self._extract_failures(response_data=self.response_data)
         self.persist_issues()
         self.update_remote_product_status()

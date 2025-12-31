@@ -1,6 +1,9 @@
 from core.receivers import receiver
 from core.signals import post_create, post_update
-from sales_channels.integrations.shein.models import SheinSalesChannel
+from sales_channels.integrations.shein.models import SheinSalesChannel, SheinProperty
+from sales_channels.integrations.shein.factories.sync.rule_sync import (
+    SheinPropertyRuleItemSyncFactory,
+)
 from sales_channels.signals import (
     create_remote_product,
     manual_sync_remote_product,
@@ -107,3 +110,24 @@ def shein__shein_product__manual_sync(
         view=view,
         **kwargs,
     )
+
+
+@receiver(post_create, sender="shein.SheinProperty")
+@receiver(post_update, sender="shein.SheinProperty")
+def sales_channels__shein_property__sync_rule_item(
+    *,
+    sender,
+    instance: SheinProperty,
+    **kwargs,
+):
+    """Sync ProductPropertiesRuleItem when a Shein property is mapped locally."""
+    signal = kwargs.get("signal")
+    if signal == post_update and not instance.is_dirty_field(
+        "local_instance",
+        check_relationship=True,
+    ):
+        return
+    if signal == post_create and not instance.local_instance:
+        return
+
+    SheinPropertyRuleItemSyncFactory(shein_property=instance).run()

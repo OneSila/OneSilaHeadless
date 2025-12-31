@@ -483,8 +483,15 @@ class SheinProductPropertyUpdateFactory(
         )
         create_factory.run()
         self.remote_instance = create_factory.remote_instance
+        if self.get_value_only and not self.remote_value:
+            created_value = getattr(create_factory, "remote_value", None)
+            if created_value:
+                self.remote_value = created_value
+            elif self.remote_instance is not None:
+                self.remote_value = getattr(self.remote_instance, "remote_value", None)
 
     def get_remote_value(self):
+
         fallback_items: Sequence[SheinProductTypeItem] = ()
         remote_prop = getattr(self.remote_instance, "remote_property", None)
         if remote_prop and hasattr(remote_prop, "product_type_items"):

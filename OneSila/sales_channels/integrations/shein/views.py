@@ -14,7 +14,14 @@ from django.views.decorators.csrf import csrf_exempt
 from sales_channels.integrations.shein.models import SheinSalesChannel, SheinProduct
 from sales_channels.integrations.shein.models import SheinProductIssue
 from sales_channels.integrations.shein import constants
+from sales_channels.integrations.shein.helpers.document_state import (
+    shein_document_state_to_status,
+)
+from sales_channels.integrations.shein.factories.imports.product_refresh import (
+    SheinProductDetailRefreshFactory,
+)
 from integrations.models import IntegrationLog
+from sales_channels.models.products import RemoteProduct
 
 
 logger = logging.getLogger(__name__)
@@ -224,6 +231,18 @@ def shein_product_document_audit_status_notice(request):
         identifier="SheinProductAuditWebhook",
         remote_product=remote_product,
     )
+    previous_status = remote_product.status
+    status_override = shein_document_state_to_status(document_state=audit_state)
+    if status_override and not failed_reason:
+        remote_product.refresh_status(override_status=status_override)
+        if (
+            previous_status == RemoteProduct.STATUS_PENDING_APPROVAL
+            and status_override == RemoteProduct.STATUS_COMPLETED
+        ):
+            SheinProductDetailRefreshFactory(
+                sales_channel=sales_channel,
+                remote_product=remote_product,
+            ).run()
 
     if failed_reason:
         if isinstance(failed_reason, list):

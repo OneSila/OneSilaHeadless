@@ -82,6 +82,14 @@ class SheinProductsImportProcessor(
     def get_api(self):
         return self
 
+    def prepare_import_process(self):
+        self.sales_channel.active = False
+        self.sales_channel.is_importing = True
+        self.sales_channel.save()
+
+        self.import_process.skip_broken_records = True
+        self.import_process.save()
+
     def get_total_instances(self) -> int:
         try:
             total = self.get_total_product_count()
@@ -119,7 +127,6 @@ class SheinProductsImportProcessor(
 
         product_type_id = self._extract_product_type_id(payload=product_data)
         category_id = self._extract_category_id(payload=product_data)
-
         queryset = SheinProductType.objects.filter(
             sales_channel=self.sales_channel,
             multi_tenant_company=self.sales_channel.multi_tenant_company,
@@ -182,6 +189,33 @@ class SheinProductsImportProcessor(
         rule = self.get_product_rule(product_data=product_data)
         is_configurable = len(sku_entries) > 1
         primary_entry = sku_entries[0]
+        images_skc_payload = None
+        if is_configurable and self.sales_channel.sync_contents:
+            raw_spu_images = product_data.get("spuImageInfoList") or product_data.get("spu_image_info_list") or []
+            has_spu_images = False
+            if isinstance(raw_spu_images, list):
+                for entry in raw_spu_images:
+                    if isinstance(entry, Mapping):
+                        has_spu_images = True
+                        break
+            if not has_spu_images:
+                best_skc_payload = None
+                best_count = 0
+                for entry in sku_entries:
+                    skc_payload = entry.get("skc")
+                    if not isinstance(skc_payload, Mapping):
+                        continue
+                    raw_skc_images = skc_payload.get("skcImageInfoList") or skc_payload.get(
+                        "skc_image_info_list"
+                    ) or []
+                    if not isinstance(raw_skc_images, list):
+                        continue
+                    image_count = sum(1 for img in raw_skc_images if isinstance(img, Mapping))
+                    if image_count > best_count:
+                        best_count = image_count
+                        best_skc_payload = skc_payload
+                if best_skc_payload is not None and best_count:
+                    images_skc_payload = best_skc_payload
 
         parent_instance = self._process_single_product_entry(
             spu_payload=product_data,
@@ -191,10 +225,15 @@ class SheinProductsImportProcessor(
             is_variation=False,
             is_configurable=is_configurable,
             parent_sku=spu_name,
+            images_skc_payload=images_skc_payload,
         )
 
         if not is_configurable or parent_instance is None:
             return
+
+        parent_sku = spu_name
+        if parent_instance.instance is not None and parent_instance.instance.sku:
+            parent_sku = parent_instance.instance.sku
 
         for entry in sku_entries:
             self._process_single_product_entry(
@@ -204,9 +243,10 @@ class SheinProductsImportProcessor(
                 rule=rule,
                 is_variation=True,
                 is_configurable=False,
-                parent_sku=spu_name,
+                parent_sku=parent_sku,
                 parent_remote=parent_instance.remote_instance,
             )
+
 
     def _process_single_product_entry(
         self,
@@ -219,18 +259,21 @@ class SheinProductsImportProcessor(
         is_configurable: bool,
         parent_sku: str | None,
         parent_remote: SheinProduct | None = None,
+        images_skc_payload: Mapping[str, Any] | None = None,
     ) -> ImportProductInstance | None:
-        local_sku = self._resolve_local_sku(
-            sku_payload=sku_payload,
-            fallback_sku=parent_sku,
-        )
-        if not local_sku:
-            self._add_broken_record(
-                code=self.ERROR_INVALID_PRODUCT_DATA,
-                message="Unable to determine SKU for Shein product entry",
-                data={"spu_name": self._extract_spu_name(payload=spu_payload)},
+        local_sku = None
+        if not (is_configurable and not is_variation):
+            local_sku = self._resolve_local_sku(
+                sku_payload=sku_payload,
+                fallback_sku=parent_sku,
             )
-            return None
+            if not local_sku:
+                self._add_broken_record(
+                    code=self.ERROR_INVALID_PRODUCT_DATA,
+                    message="Unable to determine SKU for Shein product entry",
+                    data={"spu_name": self._extract_spu_name(payload=spu_payload)},
+                )
+                return None
 
         remote_product = self._get_remote_product(
             sku=local_sku,
@@ -248,6 +291,7 @@ class SheinProductsImportProcessor(
                 local_sku=local_sku,
                 is_variation=is_variation,
                 is_configurable=is_configurable,
+                images_skc_payload=images_skc_payload,
                 product_instance=product_instance,
                 parent_sku=parent_sku,
             )
@@ -277,10 +321,11 @@ class SheinProductsImportProcessor(
             sales_channel=self.sales_channel,
             mirror_model_map={"local_instance": "*"},
             mirror_model_defaults={
-                "remote_sku": local_sku,
                 "is_variation": is_variation,
             },
         )
+        if local_sku:
+            instance.mirror_model_defaults["remote_sku"] = local_sku
         instance.language = language
 
         try:
@@ -377,6 +422,7 @@ class SheinProductsAsyncImportProcessor(AsyncProductImportMixin, SheinProductsIm
             "updated_with": updated_with,
         }
 
+        sku = data.get("sku") if isinstance(data, dict) else None
         shein_product_import_item_task(**task_kwargs)
 
     def run(self) -> None:
@@ -389,7 +435,6 @@ class SheinProductsAsyncImportProcessor(AsyncProductImportMixin, SheinProductsIm
         self.import_process.processed_records = 0
         self.import_process.percentage = 0
         self.import_process.save(update_fields=["total_records", "processed_records", "percentage", "status"])
-
         self.total_import_instances_cnt = self.import_process.total_records
         self.set_threshold_chunk()
 
@@ -424,7 +469,6 @@ class SheinProductItemFactory(SheinProductsImportProcessor):
         self,
         *,
         product_data: dict[str, Any],
-        offer_data: dict[str, Any] | None,
         import_process,
         sales_channel,
         is_last: bool = False,
@@ -433,7 +477,6 @@ class SheinProductItemFactory(SheinProductsImportProcessor):
         super().__init__(import_process=import_process, sales_channel=sales_channel)
 
         self.product_data = product_data
-        self.offer_data = offer_data
         self.is_last = is_last
         self.updated_with = updated_with
 

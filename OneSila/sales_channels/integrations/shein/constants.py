@@ -208,7 +208,7 @@ SHEIN_INTERNAL_PROPERTY_DEFINITIONS = [
     {
         "code": "weight",
         "name": _("Package weight (g)"),
-        "type": Property.TYPES.INT,
+        "type": Property.TYPES.FLOAT,
         "payload_field": "weight",
     },
 ]

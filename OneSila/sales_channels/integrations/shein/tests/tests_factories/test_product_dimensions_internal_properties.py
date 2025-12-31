@@ -4,7 +4,12 @@ from model_bakery import baker
 from products.models import Product
 from properties.models import ProductProperty, ProductPropertyTextTranslation, Property
 from sales_channels.integrations.shein.factories.products import SheinProductCreateFactory
-from sales_channels.integrations.shein.models import SheinInternalProperty, SheinSalesChannel
+from sales_channels.integrations.shein.models import (
+    SheinInternalProperty,
+    SheinRemoteCurrency,
+    SheinSalesChannel,
+)
+from currencies.models import Currency
 from sales_channels.models import SalesChannelView, SalesChannelViewAssign
 from sales_channels.models.products import RemoteProduct
 
@@ -41,6 +46,17 @@ class SheinProductDimensionMappingTest(TestCase):
             product=self.product,
             sales_channel_view=self.view,
             remote_product=self.remote_product,
+        )
+        currency = Currency.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            iso_code="EUR",
+            name="Euro",
+        )
+        SheinRemoteCurrency.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=currency,
+            remote_code="EUR",
         )
 
     def _make_property(

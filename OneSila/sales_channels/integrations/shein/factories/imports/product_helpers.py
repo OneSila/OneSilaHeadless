@@ -214,7 +214,7 @@ class SheinProductImportHelpers:
     def _get_remote_product(
         self,
         *,
-        sku: str,
+        sku: str | None,
         spu_payload: Mapping[str, Any],
         sku_payload: Mapping[str, Any] | None,
         is_variation: bool,
@@ -224,14 +224,16 @@ class SheinProductImportHelpers:
             multi_tenant_company=self.multi_tenant_company,
         ).select_related("local_instance")
 
-        remote_product = base_qs.filter(remote_sku=sku).first()
-        if remote_product:
-            return remote_product
+        if sku:
+            remote_product = base_qs.filter(remote_sku=sku).first()
+            if remote_product:
+                return remote_product
 
         if is_variation:
             sku_code = self._extract_sku_code(payload=sku_payload)
             if sku_code:
                 return base_qs.filter(remote_id=sku_code).first()
+            return None
 
         spu_name = self._extract_spu_name(payload=spu_payload)
         if spu_name:

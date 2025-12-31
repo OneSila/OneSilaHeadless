@@ -50,7 +50,6 @@ def shein_product_import_item_task(
     channel = SheinSalesChannel.objects.get(id=sales_channel_id)
     factory = SheinProductItemFactory(
         product_data=data.get("product", {}),
-        offer_data=data.get("offer"),
         import_process=process,
         sales_channel=channel,
         is_last=is_last,
@@ -126,6 +125,49 @@ def create_shein_product_db_task(
         factory = SheinProductCreateFactory(
             sales_channel=SheinSalesChannel.objects.get(id=sales_channel_id),
             local_instance=Product.objects.get(id=product_id),
+        )
+        factory.run()
+
+    task.execute(actual_task)
+
+
+@remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
+@db_task()
+def update_shein_product_db_task(
+    task_queue_item_id,
+    *,
+    sales_channel_id: int,
+    product_id: int,
+    view_id: int | None = None,
+):
+    """Run the Shein product update factory."""
+    # view_id is kept for backward compatibility with queued tasks.
+    from products.models import Product
+    from sales_channels.integrations.shein.factories.products.products import (
+        SheinProductUpdateFactory,
+    )
+    from sales_channels.integrations.shein.models import SheinProduct, SheinSalesChannel
+
+    task = BaseRemoteTask(task_queue_item_id)
+
+    def actual_task() -> None:
+        sales_channel = SheinSalesChannel.objects.get(id=sales_channel_id)
+        product = Product.objects.get(id=product_id)
+        remote_product = (
+            SheinProduct.objects.filter(
+                sales_channel=sales_channel,
+                local_instance=product,
+                is_variation=False,
+            )
+            .order_by("id")
+            .first()
+        )
+        if remote_product is None:
+            raise ValueError("Shein remote product not found for update.")
+        factory = SheinProductUpdateFactory(
+            sales_channel=sales_channel,
+            local_instance=product,
+            remote_instance=remote_product,
         )
         factory.run()
 

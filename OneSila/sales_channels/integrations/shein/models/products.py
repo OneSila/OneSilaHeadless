@@ -83,6 +83,12 @@ class SheinImageProductAssociation(RemoteImageProductAssociation):
         blank=True,
         help_text="Shein image type used for transform-pic (1 main, 2 detail, 5 square, 6 color block, 7 detail page).",
     )
+    image_group_code = models.CharField(
+        max_length=128,
+        null=True,
+        blank=True,
+        help_text="Shein image_group_code associated with the image set.",
+    )
 
     class Meta:
         verbose_name = "Shein Image Product Association"

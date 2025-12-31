@@ -4,6 +4,7 @@ from unittest.mock import patch
 from core.tests import TestCase
 from model_bakery import baker
 
+from currencies.models import Currency
 from eancodes.models import EanCode
 from products.models import ConfigurableVariation, Product
 from properties.models import (
@@ -30,9 +31,10 @@ from sales_channels.integrations.shein.models import (
     SheinSalesChannel,
     SheinSalesChannelView,
 )
+from sales_channels.integrations.shein.models.sales_channels import SheinRemoteCurrency
 from sales_channels.integrations.shein.exceptions import SheinConfiguratorAttributesLimitError
 from sales_channels.models import SalesChannelViewAssign
-from sales_channels.models.products import RemoteProduct
+from sales_prices.models import SalesPrice
 
 
 class SheinProductPayloadFactoryTests(TestCase):
@@ -51,12 +53,13 @@ class SheinProductPayloadFactoryTests(TestCase):
             active=True,
             sku="SKU-1",
         )
-        self.remote_product = RemoteProduct.objects.create(
+        self.remote_product = SheinProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             local_instance=self.product,
             remote_id="SPU-1",
             remote_sku="SKU-1",
+            spu_name="SPU-1",
         )
         self.view = SheinSalesChannelView.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -70,6 +73,18 @@ class SheinProductPayloadFactoryTests(TestCase):
             product=self.product,
             sales_channel_view=self.view,
             remote_product=self.remote_product,
+        )
+        currency = Currency.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            iso_code="EUR",
+            name="Euro",
+            symbol="€",
+        )
+        SheinRemoteCurrency.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_code="EUR",
+            local_instance=currency,
         )
 
         self.product_type_property, _ = Property.objects.get_or_create(
@@ -383,7 +398,42 @@ class SheinProductPayloadFactoryTests(TestCase):
             payload = factory.build_payload()
 
         self.assertEqual(payload["spu_name"], "SPU-1")
+        self.assertEqual(payload["brand_code"], "")
         self.assertNotIn("site_list", payload)
+        self.assertNotIn("sale_attribute_list", payload)
+
+    def test_shein_update_without_spu_name_uses_create_payload(self) -> None:
+        remote_product = SheinProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_id="SPU-1",
+            remote_sku="SKU-1",
+        )
+        factory = SheinProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=remote_product,
+            get_value_only=True,
+            skip_checks=True,
+        )
+        factory.remote_rule = type("Rule", (), {"category_id": "1727", "remote_id": "1080"})()
+
+        def fake_property_payloads(self):
+            self.sale_attribute_list = [{"attribute_id": 1, "attribute_value_id": 2}]
+
+        with (
+            patch.object(SheinProductUpdateFactory, "_build_property_payloads", autospec=True, side_effect=fake_property_payloads),
+            patch.object(SheinProductUpdateFactory, "_build_prices"),
+            patch.object(SheinProductUpdateFactory, "_build_media"),
+            patch.object(SheinProductUpdateFactory, "_build_translations"),
+            patch.object(SheinProductUpdateFactory, "_build_skc_list"),
+        ):
+            payload = factory.build_payload()
+
+        self.assertNotIn("spu_name", payload)
+        self.assertIn("site_list", payload)
+        self.assertIn("sale_attribute_list", payload)
 
     def test_shein_configurable_payload_builds_skc_and_sku_lists_with_single_attribute(self) -> None:
         parent = baker.make(
@@ -904,11 +954,19 @@ class SheinProductPayloadFactoryTests(TestCase):
         factory.selected_product_type_id = shein_product_type.remote_id
         factory.rule = rule
 
-        with patch.object(
-            SheinProductCreateFactory,
-            "_build_media",
-            autospec=True,
-            side_effect=lambda self: setattr(self, "image_info", image_info),
+        with (
+            patch.object(
+                SheinProductCreateFactory,
+                "_build_media",
+                autospec=True,
+                side_effect=lambda self: setattr(self, "image_info", image_info),
+            ),
+            patch.object(
+                SheinProductCreateFactory,
+                "_build_image_info_for_product",
+                autospec=True,
+                return_value=image_info,
+            ),
         ):
             payload = factory.build_payload()
 
@@ -969,6 +1027,117 @@ class SheinProductPayloadFactoryTests(TestCase):
             "skc_list": expected_skc,
         }
         self.assertEqual(payload, expected, self._format_payload_debug(payload, expected))
+
+    def test_shein_configurable_payload_includes_sku_prices(self) -> None:
+        parent = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.CONFIGURABLE,
+            active=True,
+            sku="CONF-PRICE",
+        )
+        rule, shein_product_type = self._create_product_type_rule(
+            parent,
+            remote_id="TYPE-PRICE",
+            category_id="CAT-PRICE",
+        )
+        color_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        red = baker.make(PropertySelectValue, multi_tenant_company=self.multi_tenant_company, property=color_property)
+        blue = baker.make(PropertySelectValue, multi_tenant_company=self.multi_tenant_company, property=color_property)
+        ProductPropertiesRuleItem.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=rule,
+            property=color_property,
+            type=ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
+            sort_order=0,
+        )
+
+        shein_color, _ = self._link_shein_property(
+            property_obj=color_property,
+            shein_product_type=shein_product_type,
+            remote_id="COLOR",
+            is_main=True,
+        )
+        self._link_shein_value(shein_property=shein_color, local_value=red, remote_value="RED-1")
+        self._link_shein_value(shein_property=shein_color, local_value=blue, remote_value="BLUE-1")
+
+        red_variation = self._create_variation(
+            parent=parent,
+            sku="CONF-PRICE-RED",
+            color_property=color_property,
+            color_value=red,
+        )
+        blue_variation = self._create_variation(
+            parent=parent,
+            sku="CONF-PRICE-BLUE",
+            color_property=color_property,
+            color_value=blue,
+        )
+
+        currency = Currency.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            iso_code="USD",
+            name="US Dollar",
+            symbol="$",
+        )
+        SheinRemoteCurrency.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_code="USD",
+            local_instance=currency,
+            sales_channel_view=self.view,
+        )
+        SalesPrice.objects.update_or_create(
+            product=red_variation,
+            currency=currency,
+            multi_tenant_company=self.multi_tenant_company,
+            defaults={"price": 25},
+        )
+        SalesPrice.objects.update_or_create(
+            product=blue_variation,
+            currency=currency,
+            multi_tenant_company=self.multi_tenant_company,
+            defaults={"price": 30},
+        )
+
+        remote_product = SheinProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=parent,
+            remote_sku=parent.sku,
+        )
+        SalesChannelViewAssign.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=parent,
+            sales_channel_view=self.view,
+            remote_product=remote_product,
+        )
+
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=parent,
+            remote_instance=remote_product,
+            get_value_only=True,
+            skip_checks=True,
+        )
+        factory.remote_rule = type("Rule", (), {"category_id": shein_product_type.category_id, "remote_id": shein_product_type.remote_id})()
+        factory.selected_category_id = shein_product_type.category_id
+        factory.selected_product_type_id = shein_product_type.remote_id
+        factory.rule = rule
+
+        payload = factory.build_payload()
+
+        price_entries = [
+            sku.get("price_info_list")
+            for skc in payload.get("skc_list", [])
+            for sku in skc.get("sku_list", [])
+        ]
+        self.assertTrue(any(entry for entry in price_entries))
 
     def test_shein_configurable_payload_with_color_and_size(self) -> None:
         image_info = {
@@ -1080,11 +1249,19 @@ class SheinProductPayloadFactoryTests(TestCase):
         factory.selected_product_type_id = shein_product_type.remote_id
         factory.rule = rule
 
-        with patch.object(
-            SheinProductCreateFactory,
-            "_build_media",
-            autospec=True,
-            side_effect=lambda self: setattr(self, "image_info", image_info),
+        with (
+            patch.object(
+                SheinProductCreateFactory,
+                "_build_media",
+                autospec=True,
+                side_effect=lambda self: setattr(self, "image_info", image_info),
+            ),
+            patch.object(
+                SheinProductCreateFactory,
+                "_build_image_info_for_product",
+                autospec=True,
+                return_value=image_info,
+            ),
         ):
             payload = factory.build_payload()
 
@@ -1291,11 +1468,19 @@ class SheinProductPayloadFactoryTests(TestCase):
         factory.selected_product_type_id = shein_product_type.remote_id
         factory.rule = rule
 
-        with patch.object(
-            SheinProductCreateFactory,
-            "_build_media",
-            autospec=True,
-            side_effect=lambda self: setattr(self, "image_info", image_info),
+        with (
+            patch.object(
+                SheinProductCreateFactory,
+                "_build_media",
+                autospec=True,
+                side_effect=lambda self: setattr(self, "image_info", image_info),
+            ),
+            patch.object(
+                SheinProductCreateFactory,
+                "_build_image_info_for_product",
+                autospec=True,
+                return_value=image_info,
+            ),
         ):
             payload = factory.build_payload()
 

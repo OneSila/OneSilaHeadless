@@ -4,6 +4,7 @@ import json
 import re
 from typing import Any, Dict, Iterable, List, Optional
 
+from currencies.models import Currency
 from properties.models import ProductPropertiesRuleItem, ProductProperty, Property
 from sales_channels.factories.products.products import (
     RemoteProductCreateFactory,
@@ -70,9 +71,11 @@ class SheinProductBaseFactory(
         is_switched: bool = False,
         get_value_only: bool = False,
         skip_checks: bool = False,
+        skip_price_update: bool = False,
     ) -> None:
         self.get_value_only = get_value_only
         self.skip_checks = skip_checks
+        self.skip_price_update = skip_price_update
         self.prices_data: dict[str, dict[str, Any]] = {}
         self.price_info_list: list[dict[str, Any]] = []
         self.image_info: dict[str, Any] = {}
@@ -335,6 +338,14 @@ class SheinProductBaseFactory(
                 for language, value in desc_by_language.items()
             ]
 
+    def _use_create_payload(self) -> bool:
+        if getattr(self, "is_create", False):
+            return True
+        remote_instance = getattr(self, "remote_instance", None)
+        if remote_instance is None:
+            return True
+        return not bool(getattr(remote_instance, "spu_name", None))
+
     def _collect_product_properties(self) -> Iterable[ProductProperty]:
         configurator_items = (
             list(self._get_configurator_rule_items())
@@ -361,14 +372,18 @@ class SheinProductBaseFactory(
                     "Shein supports at most three sales attributes in total (one SKC-level, up to two SKU-level)."
                 )
 
-        rule_properties_ids = (
-            self.local_instance.get_required_and_optional_properties(
-                product_rule=self.rule,
-                sales_channel=self.sales_channel,
-            )
-            .exclude(type__in=(ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR, ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR))
-            .values_list("property_id", flat=True)
+        rule_properties_qs = self.local_instance.get_required_and_optional_properties(
+            product_rule=self.rule,
+            sales_channel=self.sales_channel,
         )
+        if self.local_instance.is_configurable():
+            rule_properties_qs = rule_properties_qs.exclude(
+                type__in=(
+                    ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
+                    ProductPropertiesRuleItem.OPTIONAL_IN_CONFIGURATOR,
+                )
+            )
+        rule_properties_ids = rule_properties_qs.values_list("property_id", flat=True)
 
         base_properties: list[ProductProperty] = []
         shared_properties: list[ProductProperty] = []
@@ -490,6 +505,7 @@ class SheinProductBaseFactory(
                 continue
 
             attribute_type = payload.get("attribute_type")
+            payload.pop("attribute_type", None)
 
             if attribute_type == SheinProductTypeItem.AttributeType.SALES:
                 cleaned_payload = {k: v for k, v in payload.items() if v not in (None, "", [], {})}
@@ -519,6 +535,7 @@ class SheinProductBaseFactory(
             remote_product=self.remote_instance,
             get_value_only=True,
             skip_checks=True,
+            include_all_prices=self._use_create_payload(),
             assigns=assigns,
         )
         price_factory.run()
@@ -526,15 +543,19 @@ class SheinProductBaseFactory(
         self.price_info_list = price_factory.value.get("price_info_list", []) if price_factory.value else []
 
     def _build_media(self):
+        self.image_info = self._build_image_info_for_product(product=self.local_instance)
+
+    def _build_image_info_for_product(self, *, product, remote_product=None) -> dict[str, Any]:
         media_factory = SheinMediaProductThroughUpdateFactory(
             sales_channel=self.sales_channel,
             local_instance=None,
-            remote_product=self.remote_instance,
+            remote_product=remote_product or self.remote_instance,
             get_value_only=True,
             skip_checks=True,
+            product_instance=product,
         )
         media_factory.run()
-        self.image_info = media_factory.value.get("image_info", {}) if media_factory.value else {}
+        return media_factory.value.get("image_info", {}) if media_factory.value else {}
 
     def _resolve_default_view_assign(self, *, assigns: Iterable[SalesChannelViewAssign]) -> Optional[SalesChannelViewAssign]:
         default_assign = next(
@@ -628,17 +649,19 @@ class SheinProductBaseFactory(
 
         return {k: v for k, v in currency_map.items() if k and v}
 
-    def _build_sku_price_info_list(self, *, assigns: list[SalesChannelViewAssign]) -> list[dict[str, Any]]:
-        if not self.price_info_list:
-            return []
-
+    def _build_sku_price_info_list(
+        self,
+        *,
+        assigns: list[SalesChannelViewAssign],
+        product=None,
+    ) -> list[dict[str, Any]]:
         currency_map = self._get_assign_currency_map(assigns=assigns)
         if assigns and not currency_map:
             raise PreFlightCheckError(
                 "Shein currency mapping is missing for assigned sub-sites. Pull Shein site list metadata first."
             )
 
-        price_by_currency = {entry.get("currency"): entry for entry in self.price_info_list if entry.get("currency")}
+        product = product or self.local_instance
 
         entries: list[dict[str, Any]] = []
         missing: list[str] = []
@@ -653,14 +676,24 @@ class SheinProductBaseFactory(
                 missing.append(sub_site_code)
                 continue
 
-            price = price_by_currency.get(currency_code)
-            if not price:
+            local_currency = Currency.objects.filter(
+                iso_code=currency_code,
+                multi_tenant_company=self.sales_channel.multi_tenant_company,
+            ).first()
+            if local_currency is None:
+                missing.append(sub_site_code)
                 continue
+            full_price, discount_price = product.get_price_for_sales_channel(
+                self.sales_channel,
+                currency=local_currency,
+            )
+            base_price = float(full_price) if full_price is not None else None
+            special_price = float(discount_price) if discount_price is not None else None
 
             entry = {
                 "currency": currency_code,
-                "base_price": price.get("base_price"),
-                "special_price": price.get("special_price"),
+                "base_price": base_price,
+                "special_price": special_price,
                 "sub_site": sub_site_code,
             }
             if entry["base_price"] is None:
@@ -758,11 +791,8 @@ class SheinProductBaseFactory(
         product = product or self.local_instance
         value = self._get_internal_property_value(code="supplier_code", default=None, product=product)
         if value in (None, "", []):
-            if required:
-                raise PreFlightCheckError(
-                    f"Shein supplier_code internal property is missing for product {product.sku}."
-                )
-            return None
+            fallback = getattr(product, "sku", None)
+            return str(fallback).strip() if fallback else None
         return str(value).strip()
 
     def _build_quantity_info(self, *, product=None) -> dict[str, Any] | None:
@@ -1123,13 +1153,20 @@ class SheinProductBaseFactory(
         assigns: list[SalesChannelViewAssign],
         product=None,
         sale_attributes: Optional[list[dict[str, Any]]] = None,
+        sku_code: Optional[str] = None,
     ) -> list[dict[str, Any]]:
         if sale_attributes and len(sale_attributes) > 2:
             raise SheinConfiguratorAttributesLimitError(
                 "Shein supports at most two SKU-level sales attributes per SKU."
             )
-        price_info_list = self._build_sku_price_info_list(assigns=assigns) if self.is_create else []
-        stock_info_list = self._build_stock_info_list(assigns=assigns) if self.is_create else []
+        use_create_payload = self._use_create_payload()
+        price_info_list = (
+            self._build_sku_price_info_list(assigns=assigns, product=product)
+            if use_create_payload
+            else []
+        )
+        stock_info_list = self._build_stock_info_list(assigns=assigns) if use_create_payload else []
+        sku_sale_attributes = sale_attributes if use_create_payload else None
         product = product or self.local_instance
         height, length, width, weight = self._resolve_dimensions(product=product)
         supplier_barcode = self._build_supplier_barcode(product=product)
@@ -1152,9 +1189,11 @@ class SheinProductBaseFactory(
             "supplier_barcode": supplier_barcode,
             "package_type": package_type,
             "price_info_list": price_info_list or None,
-            "sale_attribute_list": sale_attributes or None,
+            "sale_attribute_list": sku_sale_attributes or None,
             "stock_info_list": stock_info_list or None,
         }
+        if not use_create_payload and sku_code:
+            sku_entry["sku_code"] = sku_code
         return [{k: v for k, v in sku_entry.items() if v not in (None, "", [], {})}]
 
     def _build_skc_list(self):
@@ -1169,16 +1208,44 @@ class SheinProductBaseFactory(
             return
 
         include_skc_images = not getattr(self, "use_spu_pic", False)
+        remote_variations: dict[int, SheinProduct] = {}
+        remote_variations_by_sku: dict[str, SheinProduct] = {}
+        use_create_payload = self._use_create_payload()
+        if not use_create_payload and self.remote_instance and self.local_instance.is_configurable():
+            remote_variations_qs = (
+                self.remote_model_class.objects.filter(
+                    remote_parent_product=self.remote_instance,
+                    is_variation=True,
+                )
+                .only("local_instance_id", "skc_name", "sku_code", "remote_sku")
+            )
+            for remote_variation in remote_variations_qs:
+                if remote_variation.local_instance_id:
+                    remote_variations[remote_variation.local_instance_id] = remote_variation
+                if getattr(remote_variation, "remote_sku", None):
+                    remote_variations_by_sku[str(remote_variation.remote_sku)] = remote_variation
 
         if not self.local_instance.is_configurable():
             supplier_code = self._resolve_supplier_code(product=self.local_instance, required=True)
+            skc_name = (
+                getattr(self.remote_instance, "skc_name", None)
+                if (self.remote_instance and not use_create_payload)
+                else None
+            )
+            sku_code = (
+                getattr(self.remote_instance, "sku_code", None)
+                if (self.remote_instance and not use_create_payload)
+                else None
+            )
             skc_entry: dict[str, Any] = {
                 "shelf_way": "1",
                 "image_info": (self.image_info or None) if include_skc_images else None,
                 "sale_attribute": self.sale_attribute,
                 "supplier_code": supplier_code,
-                "sku_list": self._build_sku_list(assigns=assigns),
+                "sku_list": self._build_sku_list(assigns=assigns, sku_code=sku_code),
             }
+            if skc_name:
+                skc_entry["skc_name"] = skc_name
 
             suggested_price = self._build_suggested_retail_price(assigns=assigns)
             if suggested_price:
@@ -1247,7 +1314,9 @@ class SheinProductBaseFactory(
             )
 
             sku_entries: list[dict[str, Any]] = []
+            skc_name: Optional[str] = None
             for variation in skc_variations:
+                remote_variation = remote_variations.get(variation.id) or remote_variations_by_sku.get(variation.sku)
                 sku_sale_attributes: list[dict[str, Any]] = []
                 for sku_item in sku_level_items:
                     secondary_prop = variation_properties.get(variation.id, {}).get(sku_item.property_id)
@@ -1259,21 +1328,39 @@ class SheinProductBaseFactory(
                     if secondary_attr:
                         sku_sale_attributes.append(secondary_attr)
 
+                if skc_name is None and remote_variation is not None:
+                    skc_name = getattr(remote_variation, "skc_name", None)
+
                 sku_entries.extend(
                     self._build_sku_list(
                         assigns=assigns,
                         product=variation,
                         sale_attributes=sku_sale_attributes or None,
+                        sku_code=getattr(remote_variation, "sku_code", None) if remote_variation else None,
                     )
+                )
+
+            skc_image_info = {}
+            if include_skc_images and primary_variation is not None:
+                primary_remote = (
+                    remote_variations.get(primary_variation.id)
+                    or remote_variations_by_sku.get(primary_variation.sku)
+                    or self.remote_instance
+                )
+                skc_image_info = self._build_image_info_for_product(
+                    product=primary_variation,
+                    remote_product=primary_remote,
                 )
 
             skc_entry: dict[str, Any] = {
                 "shelf_way": "1",
-                "image_info": (self.image_info or None) if include_skc_images else None,
+                "image_info": (skc_image_info or None) if include_skc_images else None,
                 "sale_attribute": sale_attribute,
                 "supplier_code": supplier_code,
                 "sku_list": sku_entries,
             }
+            if skc_name:
+                skc_entry["skc_name"] = skc_name
 
             suggested_price = self._build_suggested_retail_price(assigns=assigns)
             if suggested_price:
@@ -1322,7 +1409,8 @@ class SheinProductBaseFactory(
         self._attach_size_attribute_relations()
         self.sale_attribute_sort_list = self._build_sale_attribute_sort_list()
 
-        self.site_list = self.build_site_list(product=self.local_instance) if self.is_create else []
+        use_create_payload = self._use_create_payload()
+        self.site_list = self.build_site_list(product=self.local_instance) if use_create_payload else []
         package_type = self._get_internal_property_option_value(code="package_type")
         fill_configuration_info = self._build_fill_configuration_info(
             package_type=package_type,
@@ -1334,9 +1422,24 @@ class SheinProductBaseFactory(
             else None
         )
 
+        brand_code = self._get_internal_property_option_value(code="brand_code")
+        if brand_code in (None, "", []) and not use_create_payload:
+            brand_code = ""
+
+        competing_product_link = self._get_internal_property_value(
+            code="reference_product_link",
+            default=None,
+        )
+        if competing_product_link in (None, "", []):
+            competing_product_link = None
+
+        sale_attribute_list = self.sale_attribute_list if use_create_payload else None
+
         self.payload: dict[str, Any] = {
             "category_id": self.selected_category_id,
             "product_type_id": self.selected_product_type_id,
+            "brand_code": brand_code,
+            "competing_product_link": competing_product_link,
             "supplier_code": supplier_code,
             "source_system": "openapi",
             "site_list": self.site_list or None,
@@ -1345,18 +1448,36 @@ class SheinProductBaseFactory(
             "is_spu_pic": True if getattr(self, "use_spu_pic", False) else None,
             "image_info": (self.image_info or None) if getattr(self, "use_spu_pic", False) else None,
             "sale_attribute": self.sale_attribute,
-            "sale_attribute_list": self.sale_attribute_list or None,
+            "sale_attribute_list": sale_attribute_list or None,
             "sale_attribute_sort_list": self.sale_attribute_sort_list or None,
             "size_attribute_list": self.size_attribute_list or None,
             "product_attribute_list": self.product_attribute_list or None,
             "skc_list": self.skc_list or None,
             "fill_configuration_info": fill_configuration_info,
         }
-        if not self.is_create:
+        if not use_create_payload:
             self.payload["spu_name"] = getattr(self.remote_instance, "remote_id", "") or ""
-
         # Clean None entries
         self.payload = {k: v for k, v in self.payload.items() if v not in (None, [], {})}
+
+        if not use_create_payload:
+            image_info = self.payload.get("image_info")
+            if isinstance(image_info, dict) and image_info.get("image_info_list"):
+                if not image_info.get("image_group_code"):
+                    raise PreFlightCheckError(
+                        "Shein image_group_code is required for editing images. "
+                        "Sync the product details to populate image group codes."
+                    )
+            for skc in self.payload.get("skc_list") or []:
+                if not isinstance(skc, dict):
+                    continue
+                skc_images = skc.get("image_info")
+                if isinstance(skc_images, dict) and skc_images.get("image_info_list"):
+                    if not skc_images.get("image_group_code"):
+                        raise PreFlightCheckError(
+                            "Shein image_group_code is required for editing SKC images. "
+                            "Sync the product details to populate image group codes."
+                        )
         return self.payload
 
     # ------------------------------------------------------------------
@@ -1367,22 +1488,15 @@ class SheinProductBaseFactory(
         if self.get_value_only:
             return self.value
 
-        if getattr(self, "is_create", False):
-            try:
-                print("[Shein] publishOrEdit payload:", json.dumps(self.value, ensure_ascii=False, sort_keys=True))
-            except Exception:
-                print("[Shein] publishOrEdit payload:", self.value)
-
         response = self.shein_post(
             path=self.publish_or_edit_path,
             payload=self.value,
         )
         response_data = response.json() if hasattr(response, "json") else {}
-        if getattr(self, "is_create", False):
-            try:
-                print("[Shein] publishOrEdit response:", json.dumps(response_data, ensure_ascii=False, sort_keys=True))
-            except Exception:
-                print("[Shein] publishOrEdit response:", response_data)
+
+        print('-------------------------------------------------------------------- RESPONSE DATA')
+        print(self.payload)
+        print(response_data)
 
         if isinstance(response_data, dict):
             code = response_data.get("code")
@@ -1423,6 +1537,9 @@ class SheinProductBaseFactory(
         self.set_remote_id(response_data)
         self._log_submission_tracking(response_data=response_data)
         self._update_or_create_remote_variations(response_data=response_data)
+        if not self.is_create and self.remote_instance:
+            self.remote_instance.status = self.remote_instance.STATUS_PENDING_APPROVAL
+            self.remote_instance.save(update_fields=["status"], skip_status_check=False)
         return response_data
 
     def _log_submission_tracking(self, *, response_data: Any) -> None:
@@ -1557,6 +1674,151 @@ class SheinProductUpdateFactory(SheinProductBaseFactory, RemoteProductUpdateFact
     """Resync an existing Shein product."""
 
     action_log = RemoteLog.ACTION_UPDATE
+    edit_permission_path = "/open-api/goods/product/check-edit-permission"
+
+    def check_status(self, *, remote_product=None):
+        super().check_status(remote_product=remote_product)
+        if self.skip_checks or self.get_value_only:
+            return
+
+        remote_product = remote_product or getattr(self, "remote_product", None)
+        if remote_product is None:
+            return
+
+        spu_name = (
+            getattr(remote_product, "spu_name", None)
+            or getattr(remote_product, "remote_id", None)
+        )
+        if not spu_name:
+            return
+
+        try:
+            response = self.shein_post(
+                path=self.edit_permission_path,
+                payload={"spuName": spu_name},
+            )
+            data = response.json() if hasattr(response, "json") else {}
+        except Exception:
+            return
+
+        info = data.get("info") if isinstance(data, dict) else {}
+        if not isinstance(info, dict):
+            return
+
+        if info.get("editable", True):
+            return
+
+        reason = str(info.get("reason") or "").strip()
+        message = (
+            reason
+            or "This product cannot be edited right now because it is still under review on Shein."
+        )
+        raise SkipSyncBecauseOfStatusException(message)
+
+    def post_action_process(self):
+        # @TODO: Basically this will never work because the update wil add the product to review and then we cannot do any
+        # updates not ven with price update endpoint
+        # price updates needs to be live in order to work not within the update product factory
+        return
+        self._update_prices()
+
+    def _resolve_price_assigns(self) -> list[SalesChannelViewAssign]:
+        assigns = list(
+            SalesChannelViewAssign.objects.filter(
+                sales_channel=self.sales_channel,
+                product=self.local_instance,
+            ).select_related("sales_channel_view")
+        )
+        if assigns:
+            return assigns
+
+        parent_product = getattr(self, "parent_local_instance", None)
+        if parent_product is None:
+            return []
+
+        return list(
+            SalesChannelViewAssign.objects.filter(
+                sales_channel=self.sales_channel,
+                product=parent_product,
+            ).select_related("sales_channel_view")
+        )
+
+    def _resolve_variation_price_targets(self) -> list[tuple[Any, SheinProduct]]:
+        variations = getattr(self, "variations", None)
+        if variations is None:
+            variations = self.local_instance.get_configurable_variations(active_only=True)
+        variation_ids = list(variations.values_list("id", flat=True))
+        if not variation_ids:
+            return []
+
+        remote_variations = list(
+            self.remote_model_class.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_parent_product=self.remote_instance,
+                is_variation=True,
+                local_instance_id__in=variation_ids,
+            ).select_related("local_instance")
+        )
+        remote_by_local_id = {remote.local_instance_id: remote for remote in remote_variations}
+
+        targets: list[tuple[Any, SheinProduct]] = []
+        for variation in variations:
+            remote_variation = remote_by_local_id.get(variation.id)
+            if remote_variation is None:
+                continue
+            targets.append((variation, remote_variation))
+
+        return targets
+
+    def _should_update_prices(self) -> bool:
+        if self.get_value_only or self.skip_checks:
+            return False
+        if self.skip_price_update:
+            return False
+        if not getattr(self.sales_channel, "sync_prices", False):
+            return False
+        if self.local_instance.is_configurable() and not getattr(self, "is_variation", False):
+            return True
+        if not getattr(self.remote_instance, "sku_code", None):
+            return False
+        return True
+
+    def _update_prices(self) -> None:
+        if not self._should_update_prices():
+            return
+
+        if self.local_instance.is_configurable() and not getattr(self, "is_variation", False):
+            price_assigns = self._resolve_price_assigns()
+            for variation, remote_variation in self._resolve_variation_price_targets():
+                if not getattr(remote_variation, "sku_code", None):
+                    continue
+                price_factory = SheinPriceUpdateFactory(
+                    sales_channel=self.sales_channel,
+                    local_instance=variation,
+                    remote_product=remote_variation,
+                    get_value_only=False,
+                    skip_checks=False,
+                    assigns=price_assigns or None,
+                    use_remote_prices=True,
+                )
+                price_factory.run()
+            return
+
+        assigns = self._resolve_price_assigns()
+        price_factory = SheinPriceUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.local_instance,
+            remote_product=self.remote_instance,
+            get_value_only=False,
+            skip_checks=False,
+            assigns=assigns or None,
+            use_remote_prices=True,
+        )
+        price_factory.run()
+
+    def update_multi_currency_prices(self):  # type: ignore[override]
+        """Update handled explicitly for edits; avoid duplicate runs from the base hook."""
+        return
 
     def update_remote(self):
         return self.perform_remote_action()

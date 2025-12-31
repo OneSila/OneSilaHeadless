@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from unittest.mock import Mock, patch
 
 from core.tests import TestCase
@@ -428,6 +429,50 @@ class SheinCategoryTreeFactoryTests(TestCase):
 
         import_process.refresh_from_db()
         self.assertEqual(import_process.percentage, 100)
+
+    def test_strips_openapi_prefix_from_property_names(self) -> None:
+        factory = SheinCategoryTreeSyncFactory(sales_channel=self.sales_channel, view=self.view)
+        payload = copy.deepcopy(ATTRIBUTE_TEMPLATE_RESPONSE)
+        payload["info"]["data"][0]["attribute_infos"][0]["attribute_name"] = "OPENAPI-Color"
+        payload["info"]["data"][0]["attribute_infos"][0]["attribute_name_en"] = "OPENAPI-Color EN"
+
+        def fake_post(*, path: str, payload=None, **kwargs):  # type: ignore[no-untyped-def]
+            if path == factory.category_tree_path:
+                tree_response = Mock()
+                tree_response.json.return_value = CATEGORY_TREE_PAYLOAD
+                return tree_response
+
+            if path == factory.publish_standard_path:
+                publish_response = Mock()
+                publish_response.json.return_value = {"info": PUBLISH_STANDARD_INFO}
+                return publish_response
+
+            if path == factory.attribute_template_path:
+                attribute_response = Mock()
+                attribute_response.json.return_value = payload
+                return attribute_response
+
+            if path == factory.custom_attribute_permission_path:
+                permission_response = Mock()
+                permission_response.json.return_value = CUSTOM_ATTRIBUTE_PERMISSION_RESPONSE
+                return permission_response
+
+            self.fail(f"Unexpected Shein API path invoked: {path}")
+
+        with patch.object(SheinCategoryTreeSyncFactory, "shein_post", side_effect=fake_post):
+            factory.run()
+
+        color_property = SheinProperty.objects.filter(
+            remote_id="27",
+            sales_channel=self.sales_channel,
+        ).first()
+        if color_property is None:
+            color_property = factory._sync_property_definition(
+                attribute=payload["info"]["data"][0]["attribute_infos"][0]
+            )
+        self.assertIsNotNone(color_property)
+        self.assertEqual(color_property.name, "Color")
+        self.assertEqual(color_property.name_en, "Color EN")
 
     def test_run_uses_provided_tree_without_remote_call(self) -> None:
         tree = CATEGORY_TREE_PAYLOAD["info"]["data"]

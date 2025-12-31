@@ -33,11 +33,13 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
         self,
         *args: Any,
         get_value_only: bool = False,
+        product_instance: Optional[Any] = None,
         **kwargs: Any,
     ) -> None:
         self.get_value_only = get_value_only
         self.value: Optional[Dict[str, Any]] = None
         self._transformed_cache: dict[str, str] = {}
+        self.product_instance = product_instance
         super().__init__(*args, **kwargs)
 
     def run(self):  # type: ignore[override]
@@ -50,7 +52,9 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
     # Helpers
     # ------------------------------------------------------------------
     def _collect_image_throughs(self) -> List[MediaProductThrough]:
-        product = self.remote_product.local_instance
+        product = self.product_instance or getattr(self.remote_product, "local_instance", None)
+        if product is None:
+            return []
         queryset = MediaProductThrough._base_manager.filter(
             product=product,
         )
@@ -132,12 +136,13 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
         self._transformed_cache[cache_key] = final_url
         return final_url
 
-    def _build_image_entries(self) -> List[Dict[str, Any]]:
+    def _build_image_entries(self) -> tuple[List[Dict[str, Any]], Optional[str]]:
         throughs = self._collect_image_throughs()
         if not throughs:
-            return []
+            return [], None
 
         main_through = next((t for t in throughs if getattr(t, "is_main_image", False)), None) or throughs[0]
+        image_group_code: Optional[str] = None
 
         def build_entry(*, through: MediaProductThrough, image_type: int, sort: int) -> Optional[Dict[str, Any]]:
             image_url = self._resolve_image_url(media=through.media, image_type=image_type)
@@ -150,6 +155,10 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
                 remote_product=self.remote_product,
                 local_instance=through,
             )
+
+            nonlocal image_group_code
+            if not image_group_code:
+                image_group_code = getattr(association, "image_group_code", None)
 
             cached_remote_url = str(getattr(association, "remote_url", "") or "").strip()
             cached_original_url = str(getattr(association, "original_url", "") or "").strip()
@@ -164,11 +173,14 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
                 association.remote_url = transformed_url
                 association.save(update_fields=["original_url", "image_type", "remote_url"])
 
-            return {
+            entry: Dict[str, Any] = {
                 "image_sort": sort,
                 "image_type": image_type,
                 "image_url": transformed_url,
             }
+            if getattr(association, "remote_id", None):
+                entry["image_item_id"] = association.remote_id
+            return entry
 
         entries: List[Dict[str, Any]] = []
 
@@ -176,27 +188,49 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
         if main_entry:
             entries.append(main_entry)
 
-        square_entry = build_entry(through=main_through, image_type=5, sort=2)
+        remaining_throughs = [through for through in throughs if through != main_through]
+        square_through = remaining_throughs[0] if remaining_throughs else main_through
+        square_entry = build_entry(through=square_through, image_type=5, sort=2)
         if square_entry:
             entries.append(square_entry)
 
+        product = self.product_instance or getattr(self.remote_product, "local_instance", None)
+        is_variation = False
+        if product is not None and hasattr(product, "configurables"):
+            is_variation = product.is_simple() and product.configurables.exists()
+
+        non_square_throughs = [through for through in remaining_throughs if through != square_through]
+        color_through = None
+        detail_throughs = list(non_square_throughs)
+
+        if is_variation:
+            if detail_throughs:
+                color_through = detail_throughs.pop()
+            elif remaining_throughs:
+                color_through = remaining_throughs[-1]
+            else:
+                color_through = main_through
+
         sort = 3
-        for through in throughs:
-            if through == main_through:
-                continue
+        for through in detail_throughs[:10]:
             detail_entry = build_entry(through=through, image_type=2, sort=sort)
             if detail_entry:
                 entries.append(detail_entry)
                 sort += 1
 
-        return entries
+        if color_through:
+            color_entry = build_entry(through=color_through, image_type=6, sort=sort)
+            if color_entry:
+                entries.append(color_entry)
+
+        return entries, image_group_code
 
     def _build_value(self) -> Dict[str, Any]:
-        return {
-            "image_info": {
-                "image_info_list": self._build_image_entries(),
-            }
-        }
+        image_entries, image_group_code = self._build_image_entries()
+        image_info: Dict[str, Any] = {"image_info_list": image_entries}
+        if image_group_code:
+            image_info["image_group_code"] = image_group_code
+        return {"image_info": image_info}
 
     def set_api(self) -> None:
         if self.get_value_only:

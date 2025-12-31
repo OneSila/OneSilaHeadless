@@ -76,10 +76,7 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         self._import_last_percentage = 0
 
     def _print_debug(self, message: str) -> None:
-        print(
-            f"[SheinSync channel={self.sales_channel_id} view={self.view_id or 'all'}] {message}",
-            flush=True,
-        )
+        return
 
     # ------------------------------------------------------------------
     # Public API
@@ -846,8 +843,8 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         raw_attribute = self._strip_attribute_values(attribute=attribute)
 
         defaults = {
-            "name": self._safe_string(attribute.get("attribute_name")) or "",
-            "name_en": self._safe_string(attribute.get("attribute_name_en")) or "",
+            "name": self._strip_openapi_prefix(self._safe_string(attribute.get("attribute_name"))),
+            "name_en": self._strip_openapi_prefix(self._safe_string(attribute.get("attribute_name_en"))),
             "value_mode": SheinProperty.ValueModes.from_remote(raw_value=attribute_mode),
             "value_limit": self._safe_positive_int(value=attribute.get("attribute_input_num")),
             "attribute_source": self._safe_int(value=attribute.get("attribute_source")),
@@ -1085,6 +1082,16 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             return None
         text = str(value).strip()
         return text or None
+
+    @staticmethod
+    def _strip_openapi_prefix(value: Optional[str]) -> str:
+        if not value:
+            return ""
+        text = value.strip()
+        prefix = "OPENAPI-"
+        if text.upper().startswith(prefix):
+            return text[len(prefix):].lstrip()
+        return text
 
     @staticmethod
     def _to_bool(value: Any) -> bool:

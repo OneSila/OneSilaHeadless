@@ -8,6 +8,7 @@ from typing import Any
 from django.core.exceptions import ValidationError
 
 from imports_exports.factories.products import ImportProductInstance
+from products.product_types import CONFIGURABLE
 from sales_channels.integrations.shein.models import (
     SheinProduct,
     SheinProductCategory,
@@ -35,6 +36,12 @@ class SheinProductImportMirrorMixin:
         updates: list[str] = []
 
         local_sku = import_instance.data.get("sku")
+        if not local_sku:
+            local_instance = getattr(import_instance, "instance", None)
+            if local_instance is None:
+                local_instance = getattr(remote_product, "local_instance", None)
+            if local_instance is not None and getattr(local_instance, "type", None) == CONFIGURABLE:
+                local_sku = getattr(local_instance, "sku", None)
         if local_sku and remote_product.remote_sku != local_sku:
             remote_product.remote_sku = local_sku
             updates.append("remote_sku")
@@ -72,8 +79,15 @@ class SheinProductImportMirrorMixin:
             remote_product.syncing_current_percentage = 100
             updates.append("syncing_current_percentage")
 
+        if remote_product.status != remote_product.STATUS_COMPLETED:
+            remote_product.status = remote_product.STATUS_COMPLETED
+            updates.append("status")
+
         if updates:
-            remote_product.save(update_fields=updates)
+            save_kwargs: dict[str, Any] = {"update_fields": updates}
+            if "status" in updates:
+                save_kwargs["skip_status_check"] = False
+            remote_product.save(**save_kwargs)
 
     def handle_attributes(self, *, import_instance: ImportProductInstance) -> None:
         if not hasattr(import_instance, "properties"):
@@ -158,6 +172,24 @@ class SheinProductImportMirrorMixin:
         if updated:
             remote_variation.save()
 
+        local_parent = remote_parent.local_instance
+        local_variation = remote_variation.local_instance
+        if local_parent is not None and local_variation is not None:
+            parent_categories = SheinProductCategory.objects.filter(
+                product=local_parent,
+                sales_channel=self.sales_channel,
+            )
+            for category in parent_categories:
+                SheinProductCategory.objects.get_or_create(
+                    product=local_variation,
+                    multi_tenant_company=self.multi_tenant_company,
+                    sales_channel=self.sales_channel,
+                    defaults={
+                        "remote_id": category.remote_id,
+                        "product_type_remote_id": category.product_type_remote_id,
+                    },
+                )
+
         parent_rule = None
         if remote_parent.local_instance is not None:
             parent_rule = remote_parent.local_instance.get_product_rule(
@@ -198,6 +230,8 @@ class SheinProductImportMirrorMixin:
             return
 
         for site_code in view_payloads:
+            payload = view_payloads.get(site_code) or {}
+            link = payload.get("link") if isinstance(payload, Mapping) else None
             view = (
                 SheinSalesChannelView.objects.filter(
                     sales_channel=self.sales_channel,
@@ -214,12 +248,21 @@ class SheinProductImportMirrorMixin:
                 sales_channel_view=view,
                 multi_tenant_company=self.import_process.multi_tenant_company,
                 sales_channel=self.sales_channel,
-                defaults={"remote_product": remote_product},
+                defaults={
+                    "remote_product": remote_product,
+                    "link": link,
+                },
             )
 
+            update_fields: list[str] = []
             if assign.remote_product_id != remote_product.id:
                 assign.remote_product = remote_product
-                assign.save(update_fields=["remote_product"])
+                update_fields.append("remote_product")
+            if link and assign.link != link:
+                assign.link = link
+                update_fields.append("link")
+            if update_fields:
+                assign.save(update_fields=update_fields)
 
         self._sync_product_category(
             product=local_product,

@@ -245,6 +245,12 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
     sales_channel_view = models.ForeignKey('SalesChannelView', on_delete=models.CASCADE, db_index=True)
     remote_product = models.ForeignKey('sales_channels.RemoteProduct', on_delete=models.SET_NULL, null=True,
                                        blank=True, help_text="The remote product associated with this assign.")
+    link = models.URLField(
+        max_length=2048,
+        null=True,
+        blank=True,
+        help_text="Remote product URL for this view assignment.",
+    )
     status = models.CharField(
         max_length=32,
         choices=STATUS_CHOICES,
@@ -327,7 +333,7 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
         elif isinstance(sales_channel, WoocommerceSalesChannel):
             return f"{self.sales_channel_view.url}/products/{self.product.url_key}"
         elif isinstance(sales_channel, SheinSalesChannel):
-            return None
+            return self.link or None
         elif isinstance(sales_channel, AmazonSalesChannel):
             try:
                 asin = AmazonExternalProductId.objects.get(

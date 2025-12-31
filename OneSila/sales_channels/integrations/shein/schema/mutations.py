@@ -300,7 +300,10 @@ class SheinSalesChannelMutation:
         from sales_channels.integrations.shein.flows.tasks_runner import (
             run_single_shein_product_task_flow,
         )
-        from sales_channels.integrations.shein.tasks import create_shein_product_db_task
+        from sales_channels.integrations.shein.tasks import (
+            create_shein_product_db_task,
+            update_shein_product_db_task,
+        )
         from sales_channels.models import SalesChannelViewAssign
 
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
@@ -362,7 +365,10 @@ class SheinSalesChannelMutation:
         from sales_channels.integrations.shein.flows.tasks_runner import (
             run_single_shein_product_task_flow,
         )
-        from sales_channels.integrations.shein.tasks import create_shein_product_db_task
+        from sales_channels.integrations.shein.tasks import (
+            create_shein_product_db_task,
+            update_shein_product_db_task,
+        )
         from sales_channels.models import SalesChannelViewAssign
 
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
@@ -384,14 +390,32 @@ class SheinSalesChannelMutation:
         if not assign_exists:
             raise ValidationError(_("Product is not assigned to a Shein storefront view."))
 
-        if force_update:
-            count = 1 + getattr(product_obj, "get_configurable_variations", lambda: [])().count()
+        assign = (
+            SalesChannelViewAssign.objects.filter(
+                sales_channel=channel,
+                product=product_obj,
+                remote_product__isnull=False,
+            )
+            .select_related("remote_product")
+            .first()
+        )
+        if assign is None:
+            raise ValidationError(_("Shein product has not been created yet."))
 
+        count = 1 + getattr(product_obj, "get_configurable_variations", lambda: [])().count()
+
+        if force_update:
             run_single_shein_product_task_flow(
                 task_func=create_shein_product_db_task,
                 sales_channel=channel,
                 number_of_remote_requests=count,
                 product_id=product_obj.id,
             )
-
+        else:
+            run_single_shein_product_task_flow(
+                task_func=update_shein_product_db_task,
+                sales_channel=channel,
+                number_of_remote_requests=count,
+                product_id=product_obj.id,
+            )
         return True

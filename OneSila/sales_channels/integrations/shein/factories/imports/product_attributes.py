@@ -52,32 +52,35 @@ class SheinProductImportAttributeParser:
 
         type_item_map = self._get_product_type_items(product_type_id=product_type_id)
 
-        if not is_variation:
-            attribute_records = spu_payload.get("productAttributeInfoList") or spu_payload.get("product_attribute_info_list") or []
-            for record in attribute_records:
-                self._ingest_attribute_record(
-                    record=record,
-                    type_item_map=type_item_map,
-                    attributes=attributes,
-                    mirror_map=mirror_map,
-                    language_code=language_code,
-                )
-
-            dimension_records = extract_dimension_records(
-                dimension_records=spu_payload.get("dimensionAttributeInfoList")
-                or spu_payload.get("dimension_attribute_info_list")
-                or [],
-                sale_attribute_map={},
-                apply_global_only=True,
+        attribute_records = (
+            spu_payload.get("productAttributeInfoList")
+            or spu_payload.get("product_attribute_info_list")
+            or []
+        )
+        for record in attribute_records:
+            self._ingest_attribute_record(
+                record=record,
+                type_item_map=type_item_map,
+                attributes=attributes,
+                mirror_map=mirror_map,
+                language_code=language_code,
             )
-            for record in dimension_records:
-                self._ingest_attribute_record(
-                    record=record,
-                    type_item_map=type_item_map,
-                    attributes=attributes,
-                    mirror_map=mirror_map,
-                    language_code=language_code,
-                )
+
+        dimension_records = extract_dimension_records(
+            dimension_records=spu_payload.get("dimensionAttributeInfoList")
+            or spu_payload.get("dimension_attribute_info_list")
+            or [],
+            sale_attribute_map={},
+            apply_global_only=True,
+        )
+        for record in dimension_records:
+            self._ingest_attribute_record(
+                record=record,
+                type_item_map=type_item_map,
+                attributes=attributes,
+                mirror_map=mirror_map,
+                language_code=language_code,
+            )
 
         sale_attribute_map = self._build_sale_attribute_map(
             skc_payload=skc_payload,

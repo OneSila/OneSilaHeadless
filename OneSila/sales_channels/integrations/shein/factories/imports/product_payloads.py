@@ -16,14 +16,14 @@ class SheinProductImportPayloadMixin:
         spu_payload: Mapping[str, Any],
         skc_payload: Mapping[str, Any] | None,
         sku_payload: Mapping[str, Any] | None,
-        local_sku: str,
+        local_sku: str | None,
         is_variation: bool,
         is_configurable: bool,
+        images_skc_payload: Mapping[str, Any] | None = None,
         product_instance: Any | None = None,
         parent_sku: str | None = None,
     ) -> tuple[dict[str, Any], str | None, SheinSalesChannelView | None]:
         structured: dict[str, Any] = {
-            "sku": local_sku,
             "type": CONFIGURABLE if is_configurable else SIMPLE,
             "active": self._resolve_active_status(
                 spu_payload=spu_payload,
@@ -32,6 +32,10 @@ class SheinProductImportPayloadMixin:
                 is_variation=is_variation,
             ),
         }
+        if is_variation or is_configurable:
+            structured["skip_rule_item_sync"] = True
+        if local_sku:
+            structured["sku"] = local_sku
 
         translations, language_code = self._payload_parser.parse_translations(
             spu_payload=spu_payload,
@@ -41,14 +45,28 @@ class SheinProductImportPayloadMixin:
             structured["translations"] = translations
             structured["name"] = translations[0]["name"]
         else:
-            structured["name"] = local_sku
+            fallback_name = local_sku or parent_sku or self._extract_spu_name(payload=spu_payload) or "Shein Product"
+            structured["name"] = fallback_name
 
         if self.sales_channel.sync_contents:
-            images, image_map = self._payload_parser.parse_images(skc_payload=skc_payload)
+            image_payload = skc_payload
+            if is_configurable and not is_variation:
+                image_payload = images_skc_payload or skc_payload
+                raw_spu_images = spu_payload.get("spuImageInfoList") or spu_payload.get("spu_image_info_list") or []
+                if isinstance(raw_spu_images, list):
+                    spu_images = [entry for entry in raw_spu_images if isinstance(entry, Mapping)]
+                else:
+                    spu_images = []
+                if spu_images:
+                    image_payload = {"skcImageInfoList": spu_images}
+
+            images, image_map, image_group_code = self._payload_parser.parse_images(skc_payload=image_payload)
             if images:
                 structured["images"] = images
                 if image_map:
                     structured["__image_index_to_remote_id"] = image_map
+                if image_group_code:
+                    structured["__image_group_code"] = image_group_code
 
         if not is_configurable and self.sales_channel.sync_prices:
             prices, sales_pricelist_items = self._payload_parser.parse_prices(
@@ -70,9 +88,9 @@ class SheinProductImportPayloadMixin:
             include_sku_fields=include_sku_fields,
             language_code=language_code,
         )
-        if attributes:
+        if attributes and (is_variation or not is_configurable):
             structured["properties"] = attributes
-        if mirror_map:
+        if mirror_map and (is_variation or not is_configurable):
             structured["__mirror_product_properties_map"] = mirror_map
 
         ean_code = self._extract_ean_code(sku_payload=sku_payload)

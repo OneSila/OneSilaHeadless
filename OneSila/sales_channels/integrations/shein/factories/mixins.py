@@ -178,14 +178,14 @@ class SheinSignatureMixin:
             )
         except requests.RequestException as exc:  # pragma: no cover - network errors are mocked in tests
             logger.exception("Shein POST request failed for path %s", path)
-            raise ValueError(_("Shein request failed: unable to reach remote service.")) from exc
+            raise ValueError("Shein request failed: unable to reach remote service.") from exc
 
         if raise_for_status:
             try:
                 response.raise_for_status()
             except requests.HTTPError as exc:  # pragma: no cover - raised via mocks
                 logger.exception("Shein POST request returned HTTP error for path %s", path)
-                raise ValueError(_("Shein request returned an HTTP error.")) from exc
+                raise ValueError("Shein request returned an HTTP error.") from exc
 
         return response
 
@@ -245,7 +245,6 @@ class SheinSignatureMixin:
 
     def get_all_products(
         self,
-        *,
         page_size: int = 200,
         page_num: int = 1,
         insert_time_start: Optional[str] = None,
@@ -254,6 +253,7 @@ class SheinSignatureMixin:
         update_time_end: Optional[str] = None,
         skip_failed_page: bool = False,
         max_failed_pages: Optional[int] = 3,
+        stop_after_page: Optional[int] = None,
     ) -> Iterable[Dict[str, Any]]:
         """Yield product records from the Shein product query endpoint."""
 
@@ -261,6 +261,13 @@ class SheinSignatureMixin:
             raise ValueError(_("Shein page size must be a positive integer."))
         if not isinstance(page_num, int) or page_num <= 0:
             raise ValueError(_("Shein page number must be a positive integer."))
+        if stop_after_page is not None and (
+            not isinstance(stop_after_page, int) or stop_after_page <= 0
+        ):
+            raise ValueError(_("Shein stop_after_page must be a positive integer."))
+
+        if stop_after_page is not None and page_num > stop_after_page:
+            return
 
         base_payload: Dict[str, Any] = {"pageSize": page_size}
         if insert_time_start:
@@ -326,6 +333,9 @@ class SheinSignatureMixin:
                     yield record
 
             if len(data) < page_size:
+                break
+
+            if stop_after_page is not None and current_page >= stop_after_page:
                 break
 
             current_page += 1
@@ -409,6 +419,7 @@ class SheinSignatureMixin:
             total = int(used_quota)
         except (TypeError, ValueError):
             return None
+
         return max(total, 0)
 
     def _resolve_product_languages(

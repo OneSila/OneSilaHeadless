@@ -26,6 +26,7 @@ These rules cover all integration apps under `sales_channels/integrations/`.
 - Factories should expose `.run()` orchestration, guard against missing prerequisites, and remain idempotent.
 - Write smoke scripts/tests that exercise at least one successful `.run()` call per critical factory.
 - When debugging, verify products are assigned to a `SalesChannelView`; missing assignments are a common silent failure.
+- Do not use keyword-only `*` in method signatures (e.g., `def method(self, *)`); it breaks our runtime environment.
 
 ## Testing & Credentials
 - Add fixtures or mocks so integration tests can run offline. Patch network calls at the module level (see root guidelines for `@patch(...)` usage).

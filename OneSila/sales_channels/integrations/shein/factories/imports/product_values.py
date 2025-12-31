@@ -97,13 +97,14 @@ class SheinProductImportValueParser:
         self,
         *,
         skc_payload: Mapping[str, Any] | None,
-    ) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    ) -> tuple[list[dict[str, Any]], dict[str, str], str | None]:
         if not isinstance(skc_payload, Mapping):
-            return [], {}
+            return [], {}, None
 
         images: list[dict[str, Any]] = []
         remote_id_map: dict[str, str] = {}
         seen_urls: set[str] = set()
+        image_group_code: str | None = None
 
         def append_entry(*, url: str | None, remote_id: Any | None, is_main: bool) -> None:
             if not url or url in seen_urls:
@@ -127,6 +128,12 @@ class SheinProductImportValueParser:
                 key=lambda entry: entry.get("sort") or entry.get("imageSort") or 0,
             )
             for entry in sorted_images:
+                if image_group_code is None:
+                    image_group_code = normalize_text(
+                        value=entry.get("groupCode")
+                        or entry.get("imageGroupCode")
+                        or entry.get("image_group_code")
+                    )
                 url = normalize_text(value=entry.get("imageUrl") or entry.get("image_url"))
                 image_type = normalize_text(value=entry.get("imageType") or entry.get("image_type")) or ""
                 is_main = image_type.upper() == "MAIN" or not images
@@ -141,6 +148,10 @@ class SheinProductImportValueParser:
             for group in site_detail_list:
                 if not isinstance(group, Mapping):
                     continue
+                if image_group_code is None:
+                    image_group_code = normalize_text(
+                        value=group.get("imageGroupCode") or group.get("image_group_code")
+                    )
                 info_list = group.get("imageInfoList") or group.get("image_info_list") or []
                 for entry in info_list:
                     if not isinstance(entry, Mapping):
@@ -152,7 +163,7 @@ class SheinProductImportValueParser:
                         is_main=False,
                     )
 
-        return images, remote_id_map
+        return images, remote_id_map, image_group_code
 
     def parse_prices(
         self,

@@ -7,11 +7,13 @@ from products.models import Product
 
 from sales_channels.integrations.shein.factories.prices import SheinPriceUpdateFactory
 from sales_channels.integrations.shein.models import (
+    SheinProduct,
     SheinSalesChannel,
     SheinSalesChannelView,
 )
+from sales_channels.exceptions import PreFlightCheckError
 from sales_channels.models import SalesChannelViewAssign
-from sales_channels.models.products import RemotePrice, RemoteProduct
+from sales_channels.models.products import RemotePrice
 
 
 class SheinPriceApiPayloadTest(TestCase):
@@ -36,12 +38,13 @@ class SheinPriceApiPayloadTest(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             type=Product.SIMPLE,
         )
-        self.remote_product = RemoteProduct.objects.create(
+        self.remote_product = SheinProduct.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
             local_instance=self.product,
             remote_sku="SKU-1",
             remote_id="REMOTE-SKU-1",
+            sku_code="SKU-CODE-1",
         )
         self.view = SheinSalesChannelView.objects.create(
             multi_tenant_company=self.multi_tenant_company,
@@ -88,10 +91,26 @@ class SheinPriceApiPayloadTest(TestCase):
         mock_post.assert_called_once()
         payload = mock_post.call_args[1]["payload"]["productPriceList"][0]
         self.assertEqual(payload["currencyCode"], "EUR")
-        self.assertEqual(payload["productCode"], "REMOTE-SKU-1")
+        self.assertEqual(payload["productCode"], "SKU-CODE-1")
         self.assertEqual(payload["site"], "shein-fr")
         self.assertEqual(payload["shopPrice"], 20)
         self.assertEqual(payload["specialPrice"], 10)
 
         remote_price = RemotePrice.objects.get(remote_product=self.remote_product)
         self.assertEqual(remote_price.price_data["EUR"]["price"], 20)
+
+    def test_raises_when_sku_code_missing(self):
+        SheinProduct.objects.filter(pk=self.remote_product.pk).update(sku_code=None)
+        self.remote_product.refresh_from_db()
+        self.product.get_price_for_sales_channel = lambda *args, **kwargs: (20, 10)
+
+        factory = SheinPriceUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_product=self.remote_product,
+            get_value_only=False,
+            skip_checks=True,
+        )
+
+        with self.assertRaises(PreFlightCheckError):
+            factory.run()
