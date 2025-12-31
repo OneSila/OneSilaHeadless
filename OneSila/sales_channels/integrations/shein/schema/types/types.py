@@ -10,6 +10,7 @@ from core.schema.core.types.types import (
     strawberry_type,
     type,
 )
+from strawberry.scalars import JSON
 from strawberry.relay import to_base64
 from imports_exports.schema.queries import ImportType
 
@@ -17,7 +18,10 @@ from sales_channels.integrations.shein.models import (
     SheinCategory,
     SheinInternalProperty,
     SheinInternalPropertyOption,
-    SheinProductType,
+    SheinProduct,
+    SheinProductCategory,
+    SheinProductIssue,
+    SheinProductType as SheinProductTypeModel,
     SheinProductTypeItem,
     SheinProperty,
     SheinPropertySelectValue,
@@ -30,6 +34,9 @@ from sales_channels.integrations.shein.schema.types.filters import (
     SheinCategoryFilter,
     SheinInternalPropertyFilter,
     SheinInternalPropertyOptionFilter,
+    SheinProductFilter,
+    SheinProductCategoryFilter,
+    SheinProductIssueFilter,
     SheinProductTypeFilter,
     SheinProductTypeItemFilter,
     SheinPropertyFilter,
@@ -43,6 +50,9 @@ from sales_channels.integrations.shein.schema.types.ordering import (
     SheinCategoryOrder,
     SheinInternalPropertyOptionOrder,
     SheinInternalPropertyOrder,
+    SheinProductOrder,
+    SheinProductCategoryOrder,
+    SheinProductIssueOrder,
     SheinProductTypeItemOrder,
     SheinProductTypeOrder,
     SheinPropertyOrder,
@@ -75,9 +85,13 @@ class SheinSalesChannelMappingSyncPayload:
     pagination=True,
     fields="__all__",
 )
-class SheinCategoryType(relay.Node):
+class SheinCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
     """Expose public Shein category metadata for lookups."""
 
+    sales_channel: Annotated[
+        'SheinSalesChannelType',
+        lazy("sales_channels.integrations.shein.schema.types.types")
+    ]
     parent: Optional[Annotated[
         'SheinCategoryType',
         lazy("sales_channels.integrations.shein.schema.types.types")
@@ -85,6 +99,70 @@ class SheinCategoryType(relay.Node):
     children: List[Annotated[
         'SheinCategoryType',
         lazy("sales_channels.integrations.shein.schema.types.types")
+    ]]
+
+    @field(name="properties")
+    def properties_field(self, info) -> JSON:
+        return self.properties
+
+
+@type(
+    SheinProductCategory,
+    filters=SheinProductCategoryFilter,
+    order=SheinProductCategoryOrder,
+    pagination=True,
+    fields="__all__",
+)
+class SheinProductCategoryType(relay.Node, GetQuerysetMultiTenantMixin):
+    """Expose the selected Shein category per product and sales channel."""
+
+    product: Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]
+    sales_channel: Annotated[
+        'SheinSalesChannelType',
+        lazy("sales_channels.integrations.shein.schema.types.types")
+    ]
+
+
+@type(
+    SheinProductIssue,
+    filters=SheinProductIssueFilter,
+    order=SheinProductIssueOrder,
+    pagination=True,
+    fields="__all__",
+)
+class SheinProductIssueType(relay.Node, GetQuerysetMultiTenantMixin):
+    """Expose Shein review/audit issues for remote products."""
+
+    remote_product: Annotated[
+        "RemoteProductType",
+        lazy("sales_channels.schema.types.types")
+    ]
+
+
+@type(
+    SheinProduct,
+    filters=SheinProductFilter,
+    order=SheinProductOrder,
+    pagination=True,
+    fields="__all__",
+)
+class SheinProductType(relay.Node, GetQuerysetMultiTenantMixin):
+    """Expose Shein remote products."""
+
+    sales_channel: Annotated[
+        'SheinSalesChannelType',
+        lazy("sales_channels.integrations.shein.schema.types.types")
+    ]
+    local_instance: Optional[Annotated[
+        'ProductType',
+        lazy("products.schema.types.types")
+    ]]
+    remote_parent_product: Optional[Annotated[
+        'RemoteProductType',
+        lazy("sales_channels.schema.types.types")
     ]]
 
 
@@ -259,13 +337,11 @@ class SuggestedSheinCategoryEntry:
 @strawberry_type
 class SuggestedSheinCategory:
     """Container for Shein category suggestion results."""
-
-    site_remote_id: str
     categories: List[SuggestedSheinCategoryEntry]
 
 
 @type(
-    SheinProductType,
+    SheinProductTypeModel,
     filters=SheinProductTypeFilter,
     order=SheinProductTypeOrder,
     pagination=True,

@@ -56,10 +56,7 @@ class SheinSchemaImportProcessor(ImportMixin):
             view_id,
             language,
         )
-        print(
-            f"[SheinImport] Starting schema import channel={channel_id} view={view_id} language={language}",
-            flush=True,
-        )
+
         factory = SheinCategoryTreeSyncFactory(
             sales_channel=self.sales_channel,
             view=self.view,
@@ -67,11 +64,7 @@ class SheinSchemaImportProcessor(ImportMixin):
             import_process=self.import_process,
         )
         factory.run()
-        print(
-            "[SheinImport] Completed schema import channel=%s view=%s categories=%s product_types=%s"
-            % (channel_id, view_id, len(factory.synced_categories), len(factory.synced_product_types)),
-            flush=True,
-        )
+
         logger.info(
             "Completed Shein schema import for channel=%s view=%s: %s categories, %s product types",
             channel_id,

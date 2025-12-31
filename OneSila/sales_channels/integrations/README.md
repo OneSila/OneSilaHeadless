@@ -189,7 +189,7 @@ Applicable: Marketplace ✅ | Direct storefront ✅
 
 ### Phase 10 – Testing, observability, and operations
 Applicable: Marketplace ✅ | Direct storefront ✅
-1. Add targeted tests for every new factory or mutation. Run them with `python manage.py test <path.to.test> --settings OneSila.settings.agent`.
+1. Add targeted tests for every new factory or mutation. Run them with `python manage.py test <path.to.test>`.
 2. Provide smoke scripts (`tests/helpers.py` or management commands) that call factory `.run()` with fixture data for manual QA.
 3. Instrument logging:
    - Use structured logging around API calls, including remote identifiers and request IDs.

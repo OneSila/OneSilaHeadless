@@ -1102,6 +1102,16 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
         except SkipSyncBecauseOfStatusException as skip:
             logger.debug(skip)
+            remote_instance = getattr(self, "remote_instance", None)
+            if remote_instance is not None and hasattr(remote_instance, "add_log"):
+                remote_instance.add_log(
+                    action=self.action_log,
+                    response="",
+                    payload={"reason": str(skip)},
+                    identifier=log_identifier,
+                    remote_product=getattr(self, "remote_product", None),
+                    error_message=str(skip),
+                )
             self.set_local_assigns()
             return
 
@@ -1160,6 +1170,16 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
 
         except SkipSyncBecauseOfStatusException as skip:
             logger.debug(skip)
+            remote_instance = getattr(self, "remote_instance", None)
+            if remote_instance is not None and hasattr(remote_instance, "add_log"):
+                remote_instance.add_log(
+                    action=self.action_log,
+                    response="",
+                    payload={"reason": str(skip)},
+                    identifier=log_identifier,
+                    remote_product=getattr(self, "remote_product", None),
+                    error_message=str(skip),
+                )
             return
 
         except SwitchedToCreateException as stc:

@@ -48,6 +48,7 @@ urlpatterns = [
     path('direct/integrations/shopify/', include('sales_channels.integrations.shopify.urls')),
     path('direct/integrations/amazon/', include('sales_channels.integrations.amazon.urls')),
     path('direct/integrations/ebay/', include('sales_channels.integrations.ebay.urls')),
+    path('direct/integrations/shein/', include('sales_channels.integrations.shein.urls')),
     path('integrations/', include('integrations.urls')),
     path('webhooks/test-receiver/', test_receiver),
     path('graphql/',

@@ -125,14 +125,15 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         # in amazon we can add in different vierws
         pass
 
-    def check_status(self):
+    def check_status(self, *, remote_product=None):
+        remote_product = remote_product or self.remote_product
         if (
-            getattr(self.remote_product, "status", None) == AmazonProduct.STATUS_PENDING_APPROVAL
+            getattr(remote_product, "status", None) == AmazonProduct.STATUS_PENDING_APPROVAL
             and not self.force_full_update
             and not self.force_validation_only
         ):
             raise SkipSyncBecauseOfStatusException(
-                f"Skipping Amazon sync for {self.remote_product} because status is {AmazonProduct.STATUS_PENDING_APPROVAL}."
+                "This listing is pending approval on Amazon, so updates are paused until the review completes."
             )
 
     def initialize_remote_product(self):

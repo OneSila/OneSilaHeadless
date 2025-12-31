@@ -2,6 +2,7 @@
 
 from .types import (
     SheinRedirectUrlType,
+    SheinProductIssueType,
     SheinRemoteCurrencyType,
     SheinSalesChannelType,
     SheinSalesChannelViewType,
@@ -9,6 +10,7 @@ from .types import (
 
 __all__ = [
     "SheinRedirectUrlType",
+    "SheinProductIssueType",
     "SheinRemoteCurrencyType",
     "SheinSalesChannelType",
     "SheinSalesChannelViewType",

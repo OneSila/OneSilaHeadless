@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from unittest.mock import Mock, patch
 
 from core.tests import TestCase
@@ -68,6 +69,8 @@ CATEGORY_TREE_PAYLOAD = {
 PUBLISH_STANDARD_INFO = {
     "default_language": "en",
     "currency": "GBP",
+    "support_sale_attribute_sort": False,
+    "fill_configuration_tags": ["PACKAGE_TYPE_TO_SKU"],
     "picture_config_list": [
         {"field_key": "spu_image_detail_show", "is_true": True},
         {"field_key": "skc_image_square_required", "is_true": False},
@@ -125,6 +128,18 @@ PUBLISH_STANDARD_INFO = {
             "module": "basic_info",
             "field_key": "sample_spec",
             "required": False,
+            "show": True,
+        },
+        {
+            "module": "supplier_info",
+            "field_key": "package_type",
+            "required": False,
+            "show": True,
+        },
+        {
+            "module": "supplier_info",
+            "field_key": "supplier_barcode",
+            "required": True,
             "show": True,
         },
     ],
@@ -259,7 +274,7 @@ class SheinCategoryTreeFactoryTests(TestCase):
 
         def fake_post(*, path: str, payload=None, **kwargs):  # type: ignore[no-untyped-def]
             if path == factory.category_tree_path:
-                self.assertEqual(payload, {"site_abbr": self.view.remote_id})
+                self.assertIsNone(payload)
                 tree_response = Mock()
                 tree_response.json.return_value = CATEGORY_TREE_PAYLOAD
                 return tree_response
@@ -293,7 +308,7 @@ class SheinCategoryTreeFactoryTests(TestCase):
         self.assertEqual(len(categories), SheinCategory.objects.count())
         self.assertEqual(SheinCategory.objects.count(), 4)
         self.assertEqual(
-            SheinCategory.objects.filter(site_remote_id=self.view.remote_id).count(),
+            SheinCategory.objects.filter(sales_channel=self.sales_channel).count(),
             4,
         )
         self.assertEqual(SheinProductType.objects.count(), 1)
@@ -304,7 +319,8 @@ class SheinCategoryTreeFactoryTests(TestCase):
         root_category = SheinCategory.objects.get(remote_id="2028")
         self.assertIsNone(root_category.parent)
         self.assertFalse(root_category.is_leaf)
-        self.assertEqual(root_category.site_remote_id, self.view.remote_id)
+        self.assertEqual(root_category.sales_channel, self.sales_channel)
+        self.assertEqual(root_category.multi_tenant_company, self.multi_tenant_company)
         self.assertNotIn("children", root_category.raw_data)
         self.assertEqual(root_category.default_language, PUBLISH_STANDARD_INFO["default_language"])
         self.assertEqual(root_category.currency, PUBLISH_STANDARD_INFO["currency"])
@@ -319,11 +335,16 @@ class SheinCategoryTreeFactoryTests(TestCase):
         self.assertFalse(root_category.quantity_info_required)
         self.assertFalse(root_category.sample_spec_required)
         self.assertEqual(root_category.picture_config, PUBLISH_STANDARD_INFO["picture_config_list"])
+        self.assertFalse(root_category.support_sale_attribute_sort)
+        self.assertTrue(root_category.package_type_required)
+        self.assertTrue(root_category.supplier_barcode_required)
+        self.assertEqual(root_category.properties, [])
 
         leaf_category = SheinCategory.objects.get(remote_id="1727")
         self.assertTrue(leaf_category.is_leaf)
         self.assertEqual(leaf_category.parent_remote_id, "1767")
-        self.assertEqual(leaf_category.site_remote_id, self.view.remote_id)
+        self.assertEqual(leaf_category.sales_channel, self.sales_channel)
+        self.assertEqual(leaf_category.multi_tenant_company, self.multi_tenant_company)
         self.assertEqual(leaf_category.product_type_remote_id, "1080")
         self.assertEqual(leaf_category.default_language, PUBLISH_STANDARD_INFO["default_language"])
         self.assertEqual(leaf_category.currency, PUBLISH_STANDARD_INFO["currency"])
@@ -338,6 +359,10 @@ class SheinCategoryTreeFactoryTests(TestCase):
         self.assertFalse(leaf_category.quantity_info_required)
         self.assertFalse(leaf_category.sample_spec_required)
         self.assertEqual(leaf_category.picture_config, PUBLISH_STANDARD_INFO["picture_config_list"])
+        self.assertFalse(leaf_category.support_sale_attribute_sort)
+        self.assertTrue(leaf_category.package_type_required)
+        self.assertTrue(leaf_category.supplier_barcode_required)
+        self.assertEqual({entry.get("property_id") for entry in leaf_category.properties}, {"27", "87"})
 
         product_type = SheinProductType.objects.get(remote_id="1080")
         self.assertEqual(product_type.category_id, leaf_category.remote_id)
@@ -404,6 +429,50 @@ class SheinCategoryTreeFactoryTests(TestCase):
 
         import_process.refresh_from_db()
         self.assertEqual(import_process.percentage, 100)
+
+    def test_strips_openapi_prefix_from_property_names(self) -> None:
+        factory = SheinCategoryTreeSyncFactory(sales_channel=self.sales_channel, view=self.view)
+        payload = copy.deepcopy(ATTRIBUTE_TEMPLATE_RESPONSE)
+        payload["info"]["data"][0]["attribute_infos"][0]["attribute_name"] = "OPENAPI-Color"
+        payload["info"]["data"][0]["attribute_infos"][0]["attribute_name_en"] = "OPENAPI-Color EN"
+
+        def fake_post(*, path: str, payload=None, **kwargs):  # type: ignore[no-untyped-def]
+            if path == factory.category_tree_path:
+                tree_response = Mock()
+                tree_response.json.return_value = CATEGORY_TREE_PAYLOAD
+                return tree_response
+
+            if path == factory.publish_standard_path:
+                publish_response = Mock()
+                publish_response.json.return_value = {"info": PUBLISH_STANDARD_INFO}
+                return publish_response
+
+            if path == factory.attribute_template_path:
+                attribute_response = Mock()
+                attribute_response.json.return_value = payload
+                return attribute_response
+
+            if path == factory.custom_attribute_permission_path:
+                permission_response = Mock()
+                permission_response.json.return_value = CUSTOM_ATTRIBUTE_PERMISSION_RESPONSE
+                return permission_response
+
+            self.fail(f"Unexpected Shein API path invoked: {path}")
+
+        with patch.object(SheinCategoryTreeSyncFactory, "shein_post", side_effect=fake_post):
+            factory.run()
+
+        color_property = SheinProperty.objects.filter(
+            remote_id="27",
+            sales_channel=self.sales_channel,
+        ).first()
+        if color_property is None:
+            color_property = factory._sync_property_definition(
+                attribute=payload["info"]["data"][0]["attribute_infos"][0]
+            )
+        self.assertIsNotNone(color_property)
+        self.assertEqual(color_property.name, "Color")
+        self.assertEqual(color_property.name_en, "Color EN")
 
     def test_run_uses_provided_tree_without_remote_call(self) -> None:
         tree = CATEGORY_TREE_PAYLOAD["info"]["data"]

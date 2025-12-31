@@ -29,7 +29,7 @@ class SheinInternalPropertiesFlow(SheinSignatureMixin):
     # ------------------------------------------------------------------
     def _ensure_internal_properties(self) -> None:
         for definition in constants.SHEIN_INTERNAL_PROPERTY_DEFINITIONS:
-            SheinInternalProperty.objects.update_or_create(
+            internal_property, _ = SheinInternalProperty.objects.update_or_create(
                 sales_channel=self.sales_channel,
                 code=definition['code'],
                 defaults={
@@ -40,6 +40,7 @@ class SheinInternalPropertiesFlow(SheinSignatureMixin):
                     'payload_field': definition.get('payload_field', '') or '',
                 },
             )
+            self._sync_static_options(internal_property=internal_property, definition=definition)
 
     def _sync_brand_options(self) -> None:
         try:
@@ -83,6 +84,53 @@ class SheinInternalPropertiesFlow(SheinSignatureMixin):
             active_values.add(option.value)
 
         # Soft disable options that disappeared remotely
+        if existing_options:
+            SheinInternalPropertyOption.objects.filter(
+                pk__in=[option.pk for option in existing_options.values()],
+            ).update(is_active=False)
+
+    def _sync_static_options(self, *, internal_property: SheinInternalProperty, definition: dict[str, Any]) -> None:
+        options = definition.get("options")
+        if not isinstance(options, list) or not options:
+            return
+
+        existing_options = {
+            option.value: option
+            for option in internal_property.options.all()
+        }
+
+        for sort_order, option_def in enumerate(options):
+            if not isinstance(option_def, dict):
+                continue
+
+            value = self._normalize_identifier(option_def.get("value"))
+            if not value:
+                continue
+
+            label = option_def.get("label")
+            label = str(label) if label is not None else value
+            description = option_def.get("description")
+            description = str(description) if description is not None else ""
+
+            option, _ = SheinInternalPropertyOption.objects.update_or_create(
+                internal_property=internal_property,
+                value=value,
+                defaults={
+                    'sales_channel': self.sales_channel,
+                    'multi_tenant_company': self.sales_channel.multi_tenant_company,
+                    'label': label,
+                    'description': description,
+                    'sort_order': sort_order,
+                    'is_active': True,
+                    'raw_data': {
+                        'value': value,
+                        'label': label,
+                        'description': description,
+                    },
+                },
+            )
+            existing_options.pop(option.value, None)
+
         if existing_options:
             SheinInternalPropertyOption.objects.filter(
                 pk__in=[option.pk for option in existing_options.values()],

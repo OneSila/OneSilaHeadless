@@ -15,6 +15,8 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 from sales_channels.integrations.shein import constants
+from sales_channels.integrations.shein.decorators import retry_shein_request
+from sales_channels.integrations.shein.exceptions import SheinResponseException
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,9 @@ class SheinSignatureMixin:
 
     signature_random_key_length = 5
     signature_random_charset = string.ascii_letters + string.digits
+    product_query_path = "/open-api/openapi-business-backend/product/query"
+    product_info_path = "/open-api/goods/spu-info"
+    store_info_path = "/open-api/openapi-business-backend/query-store-info"
 
     def get_shein_open_key_id(self) -> str:
         open_key_id = self.sales_channel.open_key_id
@@ -102,6 +107,42 @@ class SheinSignatureMixin:
 
         return headers, effective_ts, effective_random
 
+    @retry_shein_request()
+    def _execute_post_request(
+        self,
+        *,
+        url: str,
+        payload: Dict[str, Any],
+        headers: Dict[str, str],
+        timeout: int,
+        verify: bool,
+    ) -> requests.Response:
+        return requests.post(
+            url,
+            json=payload,
+            headers=headers,
+            timeout=timeout,
+            verify=verify,
+        )
+
+    @retry_shein_request()
+    def _execute_get_request(
+        self,
+        *,
+        url: str,
+        payload: Dict[str, Any],
+        headers: Dict[str, str],
+        timeout: int,
+        verify: bool,
+    ) -> requests.Response:
+        return requests.get(
+            url,
+            params=payload,
+            headers=headers,
+            timeout=timeout,
+            verify=verify,
+        )
+
     def shein_post(
         self,
         *,
@@ -128,25 +169,322 @@ class SheinSignatureMixin:
         request_timeout = timeout if timeout is not None else constants.DEFAULT_TIMEOUT
 
         try:
-            response = requests.post(
-                url,
-                json=payload or {},
+            response = self._execute_post_request(
+                url=url,
+                payload=payload or {},
                 headers=headers,
                 timeout=request_timeout,
                 verify=self.sales_channel.verify_ssl,
             )
         except requests.RequestException as exc:  # pragma: no cover - network errors are mocked in tests
             logger.exception("Shein POST request failed for path %s", path)
-            raise ValueError(_("Shein request failed: unable to reach remote service.")) from exc
+            raise ValueError("Shein request failed: unable to reach remote service.") from exc
 
         if raise_for_status:
             try:
                 response.raise_for_status()
             except requests.HTTPError as exc:  # pragma: no cover - raised via mocks
                 logger.exception("Shein POST request returned HTTP error for path %s", path)
+                raise ValueError("Shein request returned an HTTP error.") from exc
+
+        return response
+
+    def shein_get(
+        self,
+        *,
+        path: str,
+        payload: Optional[Dict[str, Any]] = None,
+        add_language: bool = True,
+        timeout: Optional[int] = None,
+        raise_for_status: bool = True,
+        timestamp: Optional[int] = None,
+        random_key: Optional[str] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
+    ) -> requests.Response:
+        """Execute a GET request against the Shein Open API."""
+
+        headers, _, _ = self.build_shein_headers(
+            path=path,
+            add_language=add_language,
+            timestamp=timestamp,
+            random_key=random_key,
+            extra_headers=extra_headers,
+        )
+
+        url = self._build_shein_url(path=path)
+        request_timeout = timeout if timeout is not None else constants.DEFAULT_TIMEOUT
+
+        try:
+            response = self._execute_get_request(
+                url=url,
+                payload=payload or {},
+                headers=headers,
+                timeout=request_timeout,
+                verify=self.sales_channel.verify_ssl,
+            )
+        except requests.RequestException as exc:  # pragma: no cover - network errors are mocked in tests
+            logger.exception("Shein GET request failed for path %s", path)
+            raise ValueError(_("Shein request failed: unable to reach remote service.")) from exc
+
+        if raise_for_status:
+            try:
+                response.raise_for_status()
+            except requests.HTTPError as exc:  # pragma: no cover - raised via mocks
+                logger.exception("Shein GET request returned HTTP error for path %s", path)
                 raise ValueError(_("Shein request returned an HTTP error.")) from exc
 
         return response
+
+    @staticmethod
+    def _is_retryable_request_error(*, exc: Exception) -> bool:
+        cause = getattr(exc, "__cause__", None)
+        return isinstance(
+            cause,
+            (requests.exceptions.Timeout, requests.exceptions.ConnectionError),
+        )
+
+    def get_all_products(
+        self,
+        page_size: int = 200,
+        page_num: int = 1,
+        insert_time_start: Optional[str] = None,
+        insert_time_end: Optional[str] = None,
+        update_time_start: Optional[str] = None,
+        update_time_end: Optional[str] = None,
+        skip_failed_page: bool = False,
+        max_failed_pages: Optional[int] = 3,
+        stop_after_page: Optional[int] = None,
+    ) -> Iterable[Dict[str, Any]]:
+        """Yield product records from the Shein product query endpoint."""
+
+        if not isinstance(page_size, int) or page_size <= 0:
+            raise ValueError(_("Shein page size must be a positive integer."))
+        if not isinstance(page_num, int) or page_num <= 0:
+            raise ValueError(_("Shein page number must be a positive integer."))
+        if stop_after_page is not None and (
+            not isinstance(stop_after_page, int) or stop_after_page <= 0
+        ):
+            raise ValueError(_("Shein stop_after_page must be a positive integer."))
+
+        if stop_after_page is not None and page_num > stop_after_page:
+            return
+
+        base_payload: Dict[str, Any] = {"pageSize": page_size}
+        if insert_time_start:
+            base_payload["insertTimeStart"] = insert_time_start
+        if insert_time_end:
+            base_payload["insertTimeEnd"] = insert_time_end
+        if update_time_start:
+            base_payload["updateTimeStart"] = update_time_start
+        if update_time_end:
+            base_payload["updateTimeEnd"] = update_time_end
+
+        current_page = page_num
+        consecutive_failures = 0
+
+        while True:
+            payload = dict(base_payload, pageNum=current_page)
+            try:
+                response = self.shein_post(path=self.product_query_path, payload=payload)
+            except ValueError as exc:
+                if skip_failed_page and self._is_retryable_request_error(exc=exc):
+                    consecutive_failures += 1
+                    logger.warning(
+                        "Skipping Shein product page %s after request error (%s/%s).",
+                        current_page,
+                        consecutive_failures,
+                        max_failed_pages or "unlimited",
+                        exc_info=exc,
+                    )
+                    if max_failed_pages and consecutive_failures >= max_failed_pages:
+                        logger.error(
+                            "Stopping Shein product pagination after %s consecutive failures.",
+                            consecutive_failures,
+                        )
+                        break
+                    current_page += 1
+                    continue
+                raise
+            consecutive_failures = 0
+
+            try:
+                body = response.json()
+            except ValueError as exc:  # pragma: no cover - defensive guard
+                logger.exception("Unable to decode Shein product list response")
+                raise ValueError(_("Shein product query returned invalid JSON.")) from exc
+
+            if body.get("code") != "0":
+                message = body.get("msg") or "Unknown error"
+                raise ValueError(
+                    _("Failed to fetch Shein products: %(message)s")
+                    % {"message": message}
+                )
+
+            info = body.get("info") or {}
+            data = info.get("data") or []
+            if not isinstance(data, list):  # pragma: no cover - defensive
+                data = []
+
+            if not data:
+                break
+
+            for record in data:
+                if isinstance(record, dict):
+                    yield record
+
+            if len(data) < page_size:
+                break
+
+            if stop_after_page is not None and current_page >= stop_after_page:
+                break
+
+            current_page += 1
+
+    def get_product(
+        self,
+        *,
+        spu_name: str,
+        language_list: Optional[Iterable[str]] = None,
+    ) -> Dict[str, Any]:
+        """Return the product info payload for the provided SPU."""
+
+        if not isinstance(spu_name, str) or not spu_name.strip():
+            raise ValueError(_("Shein spuName is required."))
+
+        languages = self._resolve_product_languages(language_list=language_list)
+        payload = {
+            "languageList": languages,
+            "spuName": spu_name.strip(),
+        }
+
+        response = self.shein_post(
+            path=self.product_info_path,
+            payload=payload,
+            add_language=False,
+        )
+
+        try:
+            body = response.json()
+        except ValueError as exc:  # pragma: no cover - defensive guard
+            logger.exception("Unable to decode Shein product info response")
+            raise ValueError(_("Shein product info returned invalid JSON.")) from exc
+
+        code = body.get("code")
+        if str(code) != "0":
+            message = body.get("msg") or "Unknown error"
+            raise SheinResponseException(
+                _("Failed to fetch Shein product: %(message)s (code %(code)s)")
+                % {"message": message, "code": code}
+            )
+
+        info = body.get("info") or {}
+        return info if isinstance(info, dict) else {}
+
+    def get_store_info(self) -> Dict[str, Any]:
+        """Return the store info payload with quota metadata."""
+
+        response = self.shein_post(
+            path=self.store_info_path,
+            payload={},
+            add_language=False,
+        )
+
+        try:
+            body = response.json()
+        except ValueError as exc:  # pragma: no cover - defensive guard
+            logger.exception("Unable to decode Shein store info response")
+            raise ValueError(_("Shein store info returned invalid JSON.")) from exc
+
+        if body.get("code") != "0":
+            message = body.get("msg") or "Unknown error"
+            raise ValueError(
+                _("Failed to fetch Shein store info: %(message)s")
+                % {"message": message}
+            )
+
+        info = body.get("info") or {}
+        return info if isinstance(info, dict) else {}
+
+    def get_total_product_count(self) -> Optional[int]:
+        """Return the total number of products for the Shein store."""
+
+        info = self.get_store_info()
+        quota = info.get("storeProductQuota") or {}
+        if not isinstance(quota, dict):
+            return None
+        used_quota = quota.get("usedQuota")
+        if used_quota is None:
+            return None
+        try:
+            total = int(used_quota)
+        except (TypeError, ValueError):
+            return None
+
+        return max(total, 0)
+
+    def _resolve_product_languages(
+        self,
+        *,
+        language_list: Optional[Iterable[str]] = None,
+    ) -> list[str]:
+        languages: list[str] = []
+
+        def add_language(*, language_code: Optional[str]) -> None:
+            if not language_code or language_code in languages:
+                return
+            languages.append(language_code)
+
+        if language_list:
+            for candidate in language_list:
+                normalized = self._normalize_shein_language_code(language_code=candidate)
+                add_language(language_code=normalized)
+
+        from sales_channels.integrations.shein.models import SheinRemoteLanguage
+
+        remote_languages = (
+            SheinRemoteLanguage.objects.filter(sales_channel=self.sales_channel)
+            .select_related("sales_channel_view")
+            .order_by("-sales_channel_view__is_default", "sales_channel_view_id", "pk")
+        )
+
+        for remote_language in remote_languages:
+            normalized = self._normalize_shein_language_code(
+                language_code=remote_language.local_instance,
+            )
+            if not normalized:
+                normalized = self._normalize_shein_language_code(
+                    language_code=remote_language.remote_code,
+                )
+            add_language(language_code=normalized)
+
+            if len(languages) >= 5:
+                break
+
+        if not languages:
+            languages = [constants.DEFAULT_LANGUAGE]
+
+        return languages[:5]
+
+    def _normalize_shein_language_code(
+        self,
+        *,
+        language_code: Optional[str],
+    ) -> Optional[str]:
+        if not language_code:
+            return None
+
+        normalized = language_code.strip().lower()
+        if not normalized:
+            return None
+
+        mapped = constants.SHEIN_LANGUAGE_HEADER_MAP.get(normalized)
+        if mapped:
+            return mapped
+
+        if normalized in constants.SHEIN_LANGUAGE_HEADER_MAP.values():
+            return normalized
+
+        return None
 
     def _resolve_shein_language(self) -> str:
         company = getattr(self.sales_channel, "multi_tenant_company", None)
