@@ -63,6 +63,23 @@ class AIBulkTranslationInput:
     values: Optional[List[PropertySelectValuePartialInput]] = None
 
 
+@strawberry_input
+class SalesChannelInstructionInput:
+    sales_channel: SalesChannelPartialInput
+    language: str
+    is_default: Optional[bool] = False
+
+
+@strawberry_input
+class AdvancedContentGeneratorInput:
+    products: List[ProductPartialInput]
+    sales_channels: List[SalesChannelInstructionInput]
+    override: Optional[bool] = False
+    preview: Optional[bool] = False
+    debug: Optional[bool] = False
+    additional_informations: Optional[str] = None
+
+
 @partial(Product, fields="__all__")
 class ProductAiBulletPointsInput(NodeInput):
     language_code: str

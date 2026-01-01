@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class OpenAIMixin:
     def __init__(self):
-        self.openai = openai.Client(api_key=settings.OPENAI_API_KEY)
+        self.openai = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
 
 
 class CreateTransactionMixin:
@@ -83,6 +83,11 @@ class CalculateCostMixin:
 
     # prices are USD per 1M tokens
     COSTS = {
+        "gpt-5-mini": {
+            "input": Decimal("0.25"),
+            "output": Decimal("2.00"),
+            "cached": Decimal("0.025"),
+        },
         "gpt-4o": {
             "input": Decimal("2.50"),
             "output": Decimal("10.00"),
@@ -118,6 +123,7 @@ class AskGPTMixin(OpenAIMixin):
     model = 'gpt-4o-mini'
     temperature = 0.7
     max_tokens = 2000
+    NO_TEMPERATURE_MODELS = ("gpt-5",)
 
     def ask_gpt(self):
         logger.debug(f"About to ask_gpt")
@@ -127,21 +133,29 @@ class AskGPTMixin(OpenAIMixin):
 
         image_inputs = [{"type": "input_image", "image_url": url} for url in self.images]
         start_time = time.time()
-        response = self.openai.responses.create(
-            model="gpt-4o-mini", # this model does not support images use gpt-4o or similar
-            instructions=self.system_prompt,
-            temperature=self.temperature,
-            max_output_tokens=self.max_tokens,
-            input=[
+        print('------------------------------------------------------')
+        print(self.system_prompt)
+        print(self.prompt)
+        payload = {
+            "model": self.model,  # this model does not support images use gpt-4o or similar
+            "instructions": self.system_prompt,
+            "max_output_tokens": self.max_tokens,
+            "input": [
                 {
                     "role": "user",
                     "content": [
                         {"type": "input_text", "text": self.prompt},
-                        *image_inputs
-                    ]
+                        *image_inputs,
+                    ],
                 }
-            ]
-        )
+            ],
+        }
+        if (
+            self.temperature is not None
+            and not str(self.model).startswith(self.NO_TEMPERATURE_MODELS)
+        ):
+            payload["temperature"] = self.temperature
+        response = self.openai.responses.create(**payload)
 
         end_time = time.time()
         self.result_time = end_time - start_time

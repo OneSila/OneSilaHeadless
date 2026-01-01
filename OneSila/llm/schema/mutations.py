@@ -4,12 +4,13 @@ import strawberry_django
 from strawberry import Info
 from core.schema.core.extensions import default_extensions
 from sales_channels.schema.types.input import SalesChannelPartialInput
-from .types.types import AiContent, AiTaskResponse, AiBulletPoints, BulletPoint
+from .types.types import AiContent, AiTaskResponse, AiBulletPoints, BulletPoint, AiBulkContentResponse
 from .types.input import (
     ProductAiContentInput,
     AITranslationInput,
     AIBulkTranslationInput,
     ProductAiBulletPointsInput,
+    AdvancedContentGeneratorInput,
 )
 from core.schema.core.mutations import type, create, update, delete, List
 from .types.types import BrandCustomPromptType, ChatGptProductFeedConfigType
@@ -22,6 +23,7 @@ from .types.input import (
 from core.schema.core.helpers import get_multi_tenant_company
 from products.models import Product
 from sales_channels.models import SalesChannel
+from django.core.exceptions import ValidationError
 
 
 @type(name="Mutation")
@@ -123,6 +125,76 @@ class LlmMutation:
         )
 
         return AiTaskResponse(success=True)
+
+    @strawberry_django.mutation(
+        handle_django_errors=True,
+        extensions=default_extensions,
+        name="advancedContentGenerator",
+    )
+    def advanced_content_generator(self, *, instance: AdvancedContentGeneratorInput, info: Info) -> AiBulkContentResponse:
+        from llm.tasks import llm__ai_generate__run_bulk_content_flow
+        from llm.flows.bulk_generate_content import BulkGenerateContentFlow
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        product_ids = [p.id.node_id for p in instance.products or []]
+        sales_channel_inputs = instance.sales_channels or []
+        sales_channel_languages: dict[str, list[str]] = {}
+        sales_channel_defaults: dict[str, str] = {}
+        for entry in sales_channel_inputs:
+            sales_channel_id = entry.sales_channel.id.node_id
+            language = entry.language
+            if not language:
+                raise ValidationError("Each sales channel instruction requires a language.")
+            sales_channel_languages.setdefault(sales_channel_id, [])
+            if language not in sales_channel_languages[sales_channel_id]:
+                sales_channel_languages[sales_channel_id].append(language)
+            if entry.is_default:
+                if sales_channel_id in sales_channel_defaults:
+                    raise ValidationError("Each sales channel requires only one default language.")
+                sales_channel_defaults[sales_channel_id] = language
+
+        if not product_ids or not sales_channel_languages:
+            raise ValidationError("Products and sales channels are required.")
+        missing_defaults = [
+            str(channel_id)
+            for channel_id in sales_channel_languages.keys()
+            if channel_id not in sales_channel_defaults
+        ]
+        if missing_defaults:
+            raise ValidationError("Each sales channel requires a default language.")
+
+        if instance.preview and len(product_ids) > 20:
+            raise ValidationError("Preview mode supports a maximum of 20 products.")
+
+        if instance.preview:
+            flow = BulkGenerateContentFlow(
+                multi_tenant_company=multi_tenant_company,
+                product_ids=product_ids,
+                sales_channel_languages=sales_channel_languages,
+                sales_channel_defaults=sales_channel_defaults,
+                override=instance.override or False,
+                preview=True,
+                additional_informations=instance.additional_informations,
+                debug=instance.debug or False,
+            )
+            preview_payload = flow.flow()
+            return AiBulkContentResponse(
+                success=True,
+                content=json.dumps(preview_payload),
+                points=str(flow.used_points),
+            )
+
+        llm__ai_generate__run_bulk_content_flow(
+            multi_tenant_company_id=multi_tenant_company.id,
+            product_ids=product_ids,
+            sales_channel_languages={str(key): value for key, value in sales_channel_languages.items()},
+            sales_channel_defaults={str(key): value for key, value in sales_channel_defaults.items()},
+            override=instance.override or False,
+            additional_informations=instance.additional_informations,
+            debug=instance.debug or False,
+        )
+
+        return AiBulkContentResponse(success=True)
 
     @strawberry_django.mutation(handle_django_errors=True, extensions=default_extensions)
     def detect_remote_valid_properties(self, instance: SalesChannelPartialInput, info: Info) -> AiContent:

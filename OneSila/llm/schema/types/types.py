@@ -22,6 +22,13 @@ class AiTaskResponse:
 
 
 @strawberry_type
+class AiBulkContentResponse:
+    success: bool
+    content: Optional[str] = None
+    points: Optional[str] = None
+
+
+@strawberry_type
 class BulletPoint:
     text: str
 

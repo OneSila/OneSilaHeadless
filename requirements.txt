@@ -29,7 +29,7 @@ faker-commerce
 sentry-sdk[django]
 tblib
 django-cleanup
-openai~=1.66.3
+openai~=2.13.0
 replicate
 pydantic
 gunicorn
