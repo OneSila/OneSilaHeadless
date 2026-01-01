@@ -141,7 +141,9 @@ class LlmMutation:
         sales_channel_languages: dict[str, list[str]] = {}
         sales_channel_defaults: dict[str, str] = {}
         for entry in sales_channel_inputs:
-            sales_channel_id = entry.sales_channel.id.node_id
+            sales_channel_id = "default"
+            if entry.sales_channel:
+                sales_channel_id = entry.sales_channel.id.node_id
             language = entry.language
             if not language:
                 raise ValidationError("Each sales channel instruction requires a language.")

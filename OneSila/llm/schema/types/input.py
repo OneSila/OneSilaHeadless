@@ -65,7 +65,7 @@ class AIBulkTranslationInput:
 
 @strawberry_input
 class SalesChannelInstructionInput:
-    sales_channel: SalesChannelPartialInput
+    sales_channel: Optional[SalesChannelPartialInput] = None
     language: str
     is_default: Optional[bool] = False
 

@@ -2,7 +2,7 @@ import json
 
 from core.tests import TestCase
 from integrations.constants import EBAY_INTEGRATION
-from llm.factories.bulk_content import BulkContentLLM, build_field_rules
+from llm.factories.bulk_content import BulkContentLLM, INTEGRATION_GUIDELINES, build_field_rules
 from products.models import SimpleProduct
 from sales_channels.integrations.ebay.models import EbaySalesChannel
 
@@ -26,17 +26,20 @@ class BulkContentLLMPromptTestCase(TestCase):
         self,
         *,
         additional_informations: str | None,
-        existing_content: dict[str, dict[str, str | None]] | None = None,
     ) -> BulkContentLLM:
+        channel = {
+            "integration_id": self.sales_channel.global_id,
+            "integration_fallback_id": str(self.sales_channel.id),
+            "integration_type": EBAY_INTEGRATION,
+            "languages": ["en"],
+            "default_language": "en",
+            "field_rules": build_field_rules(integration_type=EBAY_INTEGRATION),
+            "product_context": {},
+            "integration_guidelines": INTEGRATION_GUIDELINES.get(EBAY_INTEGRATION, []),
+        }
         return BulkContentLLM(
             product=self.product,
-            sales_channel=self.sales_channel,
-            integration_type=EBAY_INTEGRATION,
-            languages=["en"],
-            field_rules=build_field_rules(integration_type=EBAY_INTEGRATION),
-            product_context={},
-            existing_content=existing_content or {},
-            default_language="en",
+            channels=[channel],
             additional_informations=additional_informations,
             debug=False,
         )
@@ -54,19 +57,17 @@ class BulkContentLLMPromptTestCase(TestCase):
 
         self.assertNotIn("additional_informations", payload)
 
-    def test_existing_content_strips_url_key(self):
-        llm = self._build_llm(
-            additional_informations=None,
-            existing_content={"en": {"name": "Example", "urlKey": "example-url"}},
-        )
+    def test_prompt_excludes_existing_content(self):
+        llm = self._build_llm(additional_informations=None)
         payload = json.loads(llm.prompt)
 
-        self.assertNotIn("urlKey", payload["existing_content"]["en"])
+        self.assertNotIn("existing_content", payload["channels"][0])
 
     def test_system_prompt_excludes_url_key(self):
         llm = self._build_llm(additional_informations=None)
 
         self.assertNotIn("urlKey", llm.system_prompt)
+        self.assertNotIn("existing_content", llm.system_prompt)
         self.assertIn("len(value)", llm.system_prompt)
         self.assertNotIn("80%", llm.system_prompt)
 

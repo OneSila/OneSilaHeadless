@@ -7,6 +7,7 @@ from django.utils.text import slugify
 from integrations.constants import INTEGRATIONS_TYPES_MAP
 from llm.factories.bulk_content import (
     BulkContentLLM,
+    INTEGRATION_GUIDELINES,
     REQUIRED_BULLET_POINTS,
     build_field_rules,
     is_empty_value,
@@ -32,18 +33,27 @@ class BulkGenerateContentFlow:
     ):
         self.multi_tenant_company = multi_tenant_company
         self.product_ids = product_ids
-        self.sales_channel_languages = {
-            int(channel_id): list(dict.fromkeys(languages))
-            for channel_id, languages in sales_channel_languages.items()
-        }
-        self.sales_channel_defaults = {
-            int(channel_id): language for channel_id, language in sales_channel_defaults.items()
-        }
+        self.default_channel_languages: list[str] = []
+        self.default_channel_default: str | None = None
+        self.sales_channel_languages: dict[int, list[str]] = {}
+        for channel_id, languages in sales_channel_languages.items():
+            if channel_id is None or str(channel_id).lower() == "default":
+                self.default_channel_languages = list(dict.fromkeys(languages))
+                continue
+            self.sales_channel_languages[int(channel_id)] = list(dict.fromkeys(languages))
+        self.sales_channel_defaults: dict[int, str] = {}
+        for channel_id, language in sales_channel_defaults.items():
+            if channel_id is None or str(channel_id).lower() == "default":
+                self.default_channel_default = language
+                continue
+            self.sales_channel_defaults[int(channel_id)] = language
         self.override = override
         self.preview = preview
         self.additional_informations = additional_informations
         self.debug = debug
         self.default_language = multi_tenant_company.language
+        if self.default_channel_languages and not self.default_channel_default:
+            self.default_channel_default = self.default_language
         self.used_points = 0
         self.preview_payload: dict[str, dict[str, dict[str, Any]]] = {}
 
@@ -58,13 +68,15 @@ class BulkGenerateContentFlow:
                 multi_tenant_company=self.multi_tenant_company,
             )
         )
-        if not self.sales_channels:
+        if not self.sales_channels and not self.default_channel_languages:
             raise ValidationError("No valid sales channels provided.")
 
     def _load_products(self) -> None:
         languages = set()
         for language_list in self.sales_channel_languages.values():
             languages.update(language_list)
+        if self.default_channel_languages:
+            languages.update(self.default_channel_languages)
         languages.add(self.default_language)
 
         translation_qs = (
@@ -84,7 +96,7 @@ class BulkGenerateContentFlow:
 
     def _language_needs_generation(self, *, existing: dict[str, Any], field_rules: dict[str, Any]) -> bool:
         for field, enabled in field_rules["flags"].items():
-            if not enabled or field == "urlKey":
+            if not enabled:
                 continue
             if field == "bulletPoints":
                 bullet_points = existing.get("bulletPoints", []) if existing else []
@@ -207,14 +219,15 @@ class BulkGenerateContentFlow:
         self,
         *,
         product: Product,
-        sales_channel: SalesChannel,
+        sales_channel: SalesChannel | None,
         language: str,
         merged: dict[str, Any],
     ) -> None:
+        sales_channel_id = sales_channel.id if sales_channel else None
         translation = self.context_builder.select_translation(
             translations=self.context_builder.translations_by_product.get(product.id, []),
             language=language,
-            sales_channel_id=sales_channel.id,
+            sales_channel_id=sales_channel_id,
         )
 
         if not translation:
@@ -244,94 +257,169 @@ class BulkGenerateContentFlow:
                 override=self.override,
             )
 
-    def _process_product_sales_channel(
-        self,
-        *,
-        product: Product,
-        sales_channel: SalesChannel,
-        field_rules: dict[str, Any],
-        integration_type: str,
-    ) -> None:
+    def _process_product(self, *, product: Product) -> None:
         if not self.context_builder:
             raise ValidationError("Content context not initialized.")
 
-        translations = self.context_builder.translations_by_product.get(product.id, [])
-        languages = self.sales_channel_languages.get(sales_channel.id, [])
-        if not languages:
-            raise ValidationError("Languages missing for sales channel.")
-        existing_by_language = {
-            language: self.context_builder.build_existing_content(
-                translations=translations,
-                language=language,
-                sales_channel_id=sales_channel.id,
-            )
-            for language in languages
-        }
-        channel_default = self.sales_channel_defaults.get(sales_channel.id, self.default_language)
-        default_existing = self.context_builder.build_existing_content(
-            translations=translations,
-            language=channel_default,
-            sales_channel_id=sales_channel.id,
-        )
+        channel_states: list[dict[str, Any]] = []
+        channels_for_llm: list[dict[str, Any]] = []
 
-        if self.override:
-            languages_to_generate = list(languages)
-        else:
-            languages_to_generate = [
-                language
-                for language in languages
-                if self._language_needs_generation(
-                    existing=existing_by_language.get(language, {}),
-                    field_rules=field_rules,
+        for sales_channel in self.sales_channels:
+            integration_type = INTEGRATIONS_TYPES_MAP.get(type(sales_channel), "default")
+            field_rules = build_field_rules(integration_type=integration_type)
+            translations = self.context_builder.translations_by_product.get(product.id, [])
+            languages = self.sales_channel_languages.get(sales_channel.id, [])
+            if not languages:
+                raise ValidationError("Languages missing for sales channel.")
+
+            existing_by_language = {
+                language: self.context_builder.build_existing_content(
+                    translations=translations,
+                    language=language,
+                    sales_channel_id=sales_channel.id,
                 )
-            ]
+                for language in languages
+            }
+            channel_default = self.sales_channel_defaults.get(sales_channel.id, self.default_language)
 
-        generated_by_language: dict[str, dict[str, Any]] = {}
-        if languages_to_generate:
+            if self.override:
+                languages_to_generate = list(languages)
+            else:
+                languages_to_generate = [
+                    language
+                    for language in languages
+                    if self._language_needs_generation(
+                        existing=existing_by_language.get(language, {}),
+                        field_rules=field_rules,
+                    )
+                ]
+
+            integration_key = getattr(sales_channel, "global_id", None) or str(sales_channel.id)
+            channel_states.append(
+                {
+                    "sales_channel": sales_channel,
+                    "integration_key": integration_key,
+                    "field_rules": field_rules,
+                    "languages": languages,
+                    "existing_by_language": existing_by_language,
+                }
+            )
+
+            if languages_to_generate:
+                channels_for_llm.append(
+                    {
+                        "integration_id": integration_key,
+                        "integration_fallback_id": str(sales_channel.id),
+                        "integration_type": integration_type,
+                        "languages": languages_to_generate,
+                        "default_language": channel_default,
+                        "field_rules": field_rules,
+                        "product_context": self.context_builder.build_product_context(
+                            product=product,
+                            languages=languages,
+                            default_language=channel_default,
+                            sales_channel_id=sales_channel.id,
+                        ),
+                        "integration_guidelines": INTEGRATION_GUIDELINES.get(integration_type, []),
+                    }
+                )
+
+        if self.default_channel_languages:
+            integration_key = "default"
+            integration_type = "default"
+            field_rules = build_field_rules(integration_type=integration_type)
+            translations = self.context_builder.translations_by_product.get(product.id, [])
+            languages = list(self.default_channel_languages)
+            existing_by_language = {
+                language: self.context_builder.build_existing_content(
+                    translations=translations,
+                    language=language,
+                    sales_channel_id=None,
+                )
+                for language in languages
+            }
+            channel_default = self.default_channel_default or self.default_language
+
+            if self.override:
+                languages_to_generate = list(languages)
+            else:
+                languages_to_generate = [
+                    language
+                    for language in languages
+                    if self._language_needs_generation(
+                        existing=existing_by_language.get(language, {}),
+                        field_rules=field_rules,
+                    )
+                ]
+
+            channel_states.append(
+                {
+                    "sales_channel": None,
+                    "integration_key": integration_key,
+                    "field_rules": field_rules,
+                    "languages": languages,
+                    "existing_by_language": existing_by_language,
+                }
+            )
+
+            if languages_to_generate:
+                channels_for_llm.append(
+                    {
+                        "integration_id": integration_key,
+                        "integration_type": integration_type,
+                        "languages": languages_to_generate,
+                        "default_language": channel_default,
+                        "field_rules": field_rules,
+                        "product_context": self.context_builder.build_product_context(
+                            product=product,
+                            languages=languages,
+                            default_language=channel_default,
+                            sales_channel_id=None,
+                        ),
+                        "integration_guidelines": [],
+                    }
+                )
+
+        generated_by_channel: dict[str, dict[str, dict[str, Any]]] = {}
+        if channels_for_llm:
             llm_factory = BulkContentLLM(
                 product=product,
-                sales_channel=sales_channel,
-                integration_type=integration_type,
-                languages=languages_to_generate,
-                field_rules=field_rules,
-                product_context=self.context_builder.build_product_context(
-                    product=product,
-                    languages=languages,
-                    default_language=channel_default,
-                ),
-                existing_content={
-                    **existing_by_language,
-                    channel_default: default_existing,
-                },
-                default_language=channel_default,
+                channels=channels_for_llm,
                 additional_informations=self.additional_informations,
                 debug=self.debug,
             )
-            generated_by_language = llm_factory.generate_content()
+            generated_by_channel = llm_factory.generate_content()
             self.used_points += llm_factory.used_points
 
-        for language in languages:
-            existing = existing_by_language.get(language, {})
-            generated = generated_by_language.get(language, {})
-            merged = self._merge_language_content(
-                existing=existing,
-                generated=generated,
-                field_rules=field_rules,
-                override=self.override,
-            )
+        for channel_state in channel_states:
+            sales_channel = channel_state["sales_channel"]
+            field_rules = channel_state["field_rules"]
+            languages = channel_state["languages"]
+            existing_by_language = channel_state["existing_by_language"]
+            generated_by_language = generated_by_channel.get(channel_state["integration_key"], {})
 
-            if self.preview:
-                integration_key = getattr(sales_channel, "global_id", None) or str(sales_channel.id)
-                product_key = str(product.sku or product.id)
-                self.preview_payload.setdefault(integration_key, {}).setdefault(product_key, {})[language] = merged
-            else:
-                if merged:
-                    self._save_language_content(
-                        product=product,
-                        sales_channel=sales_channel,
-                        language=language,
-                        merged=merged,
-                    )
+            for language in languages:
+                existing = existing_by_language.get(language, {})
+                generated = generated_by_language.get(language, {})
+                merged = self._merge_language_content(
+                    existing=existing,
+                    generated=generated,
+                    field_rules=field_rules,
+                    override=self.override,
+                )
+
+                if self.preview:
+                    integration_key = channel_state["integration_key"]
+                    product_key = str(product.sku or product.id)
+                    self.preview_payload.setdefault(integration_key, {}).setdefault(product_key, {})[language] = merged
+                else:
+                    if merged:
+                        self._save_language_content(
+                            product=product,
+                            sales_channel=sales_channel,
+                            language=language,
+                            merged=merged,
+                        )
 
     def flow(self) -> dict[str, Any]:
         self._load_sales_channels()
@@ -344,15 +432,7 @@ class BulkGenerateContentFlow:
         self.context_builder.build()
 
         for product in self.products:
-            for sales_channel in self.sales_channels:
-                integration_type = INTEGRATIONS_TYPES_MAP.get(type(sales_channel), "default")
-                field_rules = build_field_rules(integration_type=integration_type)
-                self._process_product_sales_channel(
-                    product=product,
-                    sales_channel=sales_channel,
-                    field_rules=field_rules,
-                    integration_type=integration_type,
-                )
+            self._process_product(product=product)
 
         if self.preview:
             return [

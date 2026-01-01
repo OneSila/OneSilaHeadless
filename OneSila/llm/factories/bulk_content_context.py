@@ -174,7 +174,7 @@ class BulkContentContextBuilder:
         *,
         translations: list[ProductTranslation],
         language: str,
-        sales_channel_id: int,
+        sales_channel_id: int | None,
     ) -> dict[str, Any]:
         translation = self.select_translation(
             translations=translations,
@@ -202,13 +202,14 @@ class BulkContentContextBuilder:
         product: Product,
         languages: list[str],
         default_language: str | None = None,
+        sales_channel_id: int | None = None,
     ) -> dict[str, Any]:
         default_language = default_language or self.default_language
         translations = self.translations_by_product.get(product.id, [])
         default_translation = self.select_translation(
             translations=translations,
             language=default_language,
-            sales_channel_id=None,
+            sales_channel_id=sales_channel_id,
         )
 
         base_properties = self.property_map.get(product.id, {})

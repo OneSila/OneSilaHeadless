@@ -167,30 +167,28 @@ class BulkContentLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
         self,
         *,
         product,
-        sales_channel,
-        integration_type: str,
-        languages: list[str],
-        field_rules: dict[str, dict[str, Any]],
-        product_context: dict[str, Any],
-        existing_content: dict[str, dict[str, Any]],
-        default_language: str,
+        channels: list[dict[str, Any]],
         additional_informations: str | None = None,
         debug: bool = True,
     ):
         super().__init__()
         self.product = product
-        self.sales_channel = sales_channel
-        self.integration_key = getattr(sales_channel, "global_id", None) or str(sales_channel.id)
-        self.integration_type = integration_type
-        self.languages = languages
-        self.field_rules = field_rules
-        self.product_context = product_context
-        self.existing_content = existing_content
-        self.default_language = default_language
+        self.channels = channels
         self.product_sku = str(product.sku or product.id)
         self.debug = debug
         self.multi_tenant_company = product.multi_tenant_company
         self.additional_informations = normalize_optional_text(value=additional_informations)
+        self.channel_configs: dict[str, dict[str, Any]] = {}
+        self.integration_id_aliases: dict[str, str] = {}
+        for channel in channels:
+            integration_id = str(channel.get("integration_id"))
+            self.channel_configs[integration_id] = {
+                "languages": list(channel.get("languages", [])),
+                "field_rules": channel.get("field_rules", {}),
+            }
+            fallback_id = channel.get("integration_fallback_id")
+            if fallback_id and str(fallback_id) != integration_id:
+                self.integration_id_aliases[str(fallback_id)] = integration_id
         self.retry_errors: list[str] | None = None
         self.previous_output: str | None = None
         self.used_points = 0
@@ -198,12 +196,11 @@ class BulkContentLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
     @property
     def system_prompt(self) -> str:
         return build_bulk_content_system_prompt(
-            guidelines=INTEGRATION_GUIDELINES.get(self.integration_type, []),
             required_bullet_points=REQUIRED_BULLET_POINTS,
         )
 
-    def _prompt_rules(self) -> dict[str, dict[str, Any]]:
-        rules = deepcopy(self.field_rules)
+    def _prompt_rules(self, *, field_rules: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        rules = deepcopy(field_rules)
         rules["flags"] = {
             field: enabled for field, enabled in rules["flags"].items() if field in LLM_FIELDS
         }
@@ -212,28 +209,24 @@ class BulkContentLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
         }
         return rules
 
-    def _prompt_existing_content(self) -> dict[str, dict[str, Any]]:
-        sanitized: dict[str, dict[str, Any]] = {}
-        for language, payload in (self.existing_content or {}).items():
-            if not isinstance(payload, dict):
-                continue
-            cleaned = {field: value for field, value in payload.items() if field in LLM_FIELDS}
-            sanitized[language] = cleaned
-        return sanitized
+    def _prompt_channels(self) -> list[dict[str, Any]]:
+        cleaned_channels = []
+        for channel in self.channels:
+            cleaned = {
+                key: value
+                for key, value in channel.items()
+                if key not in {"integration_fallback_id", "existing_content"}
+            }
+            cleaned["field_rules"] = self._prompt_rules(field_rules=channel.get("field_rules", {}))
+            cleaned_channels.append(cleaned)
+        return cleaned_channels
 
     @property
     def prompt(self) -> str:
         payload = {
-            "integration_id": self.integration_key,
-            "integration_type": self.integration_type,
             "product_id": str(self.product.id),
             "product_sku": self.product_sku,
-            "languages": self.languages,
-            "default_language": self.default_language,
-            "field_rules": self._prompt_rules(),
-            "existing_content": self._prompt_existing_content(),
-            "product_context": self.product_context,
-            "integration_guidelines": INTEGRATION_GUIDELINES.get(self.integration_type, []),
+            "channels": self._prompt_channels(),
             "writing_brief": [
                 "Customer-facing storefront copy. Write about the product, not the listing.",
                 "Do not mention ordering, returns, customer service, inspections, or internal codes.",
@@ -355,45 +348,61 @@ class BulkContentLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
                 normalized[field] = normalize_text(value=value)
         return normalized
 
-    def _parse_response(self, *, text: str) -> dict[str, dict[str, Any]]:
+    def _parse_response(self, *, text: str) -> dict[str, dict[str, dict[str, Any]]]:
         data = self._clean_json_response(text=text)
         if not isinstance(data, dict):
             raise ValidationError("Invalid JSON response: expected an object.")
 
-        integration_key = self.integration_key
-        fallback_key = str(self.sales_channel.id)
-        if integration_key in data:
-            integration_payload = data[integration_key]
-        elif fallback_key in data:
-            integration_payload = data[fallback_key]
-        elif len(data) == 1:
-            integration_payload = next(iter(data.values()))
-        else:
+        expected_ids = set(self.channel_configs.keys())
+        recognized: dict[str, Any] = {}
+        for key, integration_payload in data.items():
+            if key in expected_ids:
+                recognized[key] = integration_payload
+                continue
+            if key in self.integration_id_aliases:
+                recognized[self.integration_id_aliases[key]] = integration_payload
+                continue
+            if len(expected_ids) == 1 and len(data) == 1:
+                recognized[next(iter(expected_ids))] = integration_payload
+
+        missing = expected_ids - set(recognized.keys())
+        if missing:
             raise ValidationError("Invalid JSON response: missing integration key.")
 
-        if not isinstance(integration_payload, dict):
-            raise ValidationError("Invalid JSON response: integration payload must be an object.")
+        normalized: dict[str, dict[str, dict[str, Any]]] = {}
+        for integration_id, integration_payload in recognized.items():
+            if not isinstance(integration_payload, dict):
+                raise ValidationError("Invalid JSON response: integration payload must be an object.")
 
-        if self.product_sku in integration_payload:
-            product_payload = integration_payload[self.product_sku]
-        elif len(integration_payload) == 1:
-            product_payload = next(iter(integration_payload.values()))
-        else:
-            raise ValidationError("Invalid JSON response: missing product sku key.")
+            if self.product_sku in integration_payload:
+                product_payload = integration_payload[self.product_sku]
+            elif len(integration_payload) == 1:
+                product_payload = next(iter(integration_payload.values()))
+            else:
+                raise ValidationError("Invalid JSON response: missing product sku key.")
 
-        if not isinstance(product_payload, dict):
-            raise ValidationError("Invalid JSON response: product payload must be an object.")
+            if not isinstance(product_payload, dict):
+                raise ValidationError("Invalid JSON response: product payload must be an object.")
 
-        normalized: dict[str, dict[str, Any]] = {}
-        for language in self.languages:
-            lang_payload = product_payload.get(language)
-            normalized[language] = self._normalize_language_payload(payload=lang_payload)
+            languages = self.channel_configs[integration_id]["languages"]
+            normalized[integration_id] = {}
+            for language in languages:
+                lang_payload = product_payload.get(language)
+                normalized[integration_id][language] = self._normalize_language_payload(payload=lang_payload)
+
         return normalized
 
-    def _validate_language_payload(self, *, language: str, payload: dict[str, Any]) -> list[str]:
+    def _validate_language_payload(
+        self,
+        *,
+        integration_id: str,
+        language: str,
+        payload: dict[str, Any],
+        field_rules: dict[str, Any],
+    ) -> list[str]:
         errors = []
-        flags = self.field_rules["flags"]
-        limits = self.field_rules["limits"]
+        flags = field_rules.get("flags", {})
+        limits = field_rules.get("limits", {})
 
         for field, enabled in flags.items():
             if not enabled:
@@ -402,44 +411,55 @@ class BulkContentLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
             if field == "bulletPoints":
                 points = payload.get(field, [])
                 if not points:
-                    errors.append(f"{language}.{field} is missing")
+                    errors.append(f"{integration_id}.{language}.{field} is missing")
                     continue
                 if len(points) != REQUIRED_BULLET_POINTS:
-                    errors.append(f"{language}.{field} must have {REQUIRED_BULLET_POINTS} items")
+                    errors.append(f"{integration_id}.{language}.{field} must have {REQUIRED_BULLET_POINTS} items")
                 max_len = _limit_value(value=limits.get(field, {}).get("max"))
                 for index, point in enumerate(points):
                     if is_empty_value(value=point):
-                        errors.append(f"{language}.{field}[{index}] is empty")
+                        errors.append(f"{integration_id}.{language}.{field}[{index}] is empty")
                         continue
                     if max_len and len(point) > max_len:
-                        errors.append(f"{language}.{field}[{index}] exceeds max length {max_len}")
+                        errors.append(f"{integration_id}.{language}.{field}[{index}] exceeds max length {max_len}")
                 continue
 
             value = payload.get(field, "")
             if is_empty_value(value=value):
-                errors.append(f"{language}.{field} is missing")
+                errors.append(f"{integration_id}.{language}.{field} is missing")
                 continue
             min_len = _limit_value(value=limits.get(field, {}).get("min"))
             max_len = _limit_value(value=limits.get(field, {}).get("max"))
             value_len = len(value)
             if min_len and value_len < min_len:
-                errors.append(f"{language}.{field} below min length {min_len}")
+                errors.append(f"{integration_id}.{language}.{field} below min length {min_len}")
             if max_len and value_len > max_len:
-                errors.append(f"{language}.{field} exceeds max length {max_len}")
+                errors.append(f"{integration_id}.{language}.{field} exceeds max length {max_len}")
 
         return errors
 
-    def _validate_response(self, *, payload: dict[str, dict[str, Any]]) -> list[str]:
+    def _validate_response(self, *, payload: dict[str, dict[str, dict[str, Any]]]) -> list[str]:
         errors = []
-        for language in self.languages:
-            lang_payload = payload.get(language)
-            if not isinstance(lang_payload, dict) or not lang_payload:
-                errors.append(f"{language} payload is missing or invalid")
-                continue
-            errors.extend(self._validate_language_payload(language=language, payload=lang_payload))
+        for integration_id, channel_payload in payload.items():
+            channel_config = self.channel_configs.get(integration_id, {})
+            languages = channel_config.get("languages", [])
+            field_rules = channel_config.get("field_rules", {})
+            for language in languages:
+                lang_payload = channel_payload.get(language)
+                if not isinstance(lang_payload, dict) or not lang_payload:
+                    errors.append(f"{integration_id}.{language} payload is missing or invalid")
+                    continue
+                errors.extend(
+                    self._validate_language_payload(
+                        integration_id=integration_id,
+                        language=language,
+                        payload=lang_payload,
+                        field_rules=field_rules,
+                    )
+                )
         return errors
 
-    def generate_content(self) -> dict[str, dict[str, Any]]:
+    def generate_content(self) -> dict[str, dict[str, dict[str, Any]]]:
 
         if self.debug:
             logger.info("BulkContentLLM prompt:\n%s", self.prompt)
