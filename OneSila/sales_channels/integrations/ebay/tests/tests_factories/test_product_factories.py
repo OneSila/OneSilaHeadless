@@ -10,7 +10,14 @@ from model_bakery import baker
 from currencies.models import Currency
 from ebay_rest.api.sell_inventory.rest import ApiException
 from products.models import ConfigurableVariation, Product, ProductTranslation
-from properties.models import ProductProperty, Property, ProductPropertyTextTranslation
+from properties.models import (
+    ProductProperty,
+    Property,
+    ProductPropertiesRuleItem,
+    ProductPropertyTextTranslation,
+    PropertySelectValue,
+    PropertySelectValueTranslation,
+)
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
 
@@ -23,7 +30,12 @@ from sales_channels.integrations.ebay.factories.products import (
     EbayProductUpdateFactory,
 )
 from sales_channels.integrations.ebay.models import EbayProductCategory
-from sales_channels.integrations.ebay.models.properties import EbayProductProperty, EbayInternalProperty
+from sales_channels.integrations.ebay.models.properties import (
+    EbayProductProperty,
+    EbayInternalProperty,
+    EbayProperty,
+    EbayPropertySelectValue,
+)
 from sales_channels.integrations.ebay.models.taxes import EbayCurrency
 from sales_channels.integrations.ebay.models.products import EbayProductOffer, EbayProduct
 from sales_channels.exceptions import PreFlightCheckError
@@ -815,6 +827,97 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
         mock_ean_run.assert_called()
         mock_content_run.assert_called_once()
 
+    def test_configurable_group_variation_values_use_mapped_select_values(self) -> None:
+        size_property = baker.make(
+            Property,
+            type=Property.TYPES.SELECT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        size_large = baker.make(
+            PropertySelectValue,
+            property=size_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        size_medium = baker.make(
+            PropertySelectValue,
+            property=size_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertySelectValueTranslation.objects.create(
+            propertyselectvalue=size_large,
+            language="en-us",
+            value="Large",
+        )
+        PropertySelectValueTranslation.objects.create(
+            propertyselectvalue=size_medium,
+            language="en-us",
+            value="Medium",
+        )
+
+        ProductPropertiesRuleItem.objects.create(
+            rule=self.product_rule,
+            property=size_property,
+            type=ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        remote_size = EbayProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            local_instance=size_property,
+            localized_name="Size",
+        )
+        EbayPropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            ebay_property=remote_size,
+            local_instance=size_large,
+            remote_id="L",
+            localized_value="L",
+        )
+        EbayPropertySelectValue.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            ebay_property=remote_size,
+            local_instance=size_medium,
+            remote_id="M",
+            localized_value="M",
+        )
+
+        ProductProperty.objects.update_or_create(
+            product=self.children[0],
+            property=size_property,
+            defaults={
+                "multi_tenant_company": self.multi_tenant_company,
+                "value_select": size_large,
+            },
+        )
+        ProductProperty.objects.update_or_create(
+            product=self.children[1],
+            property=size_property,
+            defaults={
+                "multi_tenant_company": self.multi_tenant_company,
+                "value_select": size_medium,
+            },
+        )
+
+        factory = EbayProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            view=self.view,
+            get_value_only=True,
+        )
+        factory._resolve_remote_product()
+        group_payload = factory._build_inventory_group_payload()
+
+        varies_by = group_payload.get("variesBy") or {}
+        specs = varies_by.get("specifications") or []
+        size_spec = next(spec for spec in specs if spec.get("name") == "Size")
+        self.assertCountEqual(size_spec.get("values", []), ["L", "M"])
+
     @patch(
         "sales_channels.integrations.ebay.factories.products.products.EbayEanCodeUpdateFactory.run",
         return_value="EAN",
@@ -944,3 +1047,56 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
             EbayProduct.objects.filter(pk=self.remote_product.pk).exists()
         )
         self.assertEqual(result["withdraw"], {"status": "WITHDRAWN"})
+
+    def test_configurable_delete_ignores_missing_group(self) -> None:
+        self._prime_remote_state()
+
+        error_body = json.dumps({
+            "errors": [
+                {
+                    "errorId": 25725,
+                    "message": "InventoryItemGroup not found or no offers found for the marketplace.",
+                }
+            ]
+        }).encode("utf-8")
+        api_exception = ApiException(status=400, reason="Bad Request")
+        api_exception.body = error_body
+
+        api_mock = MagicMock()
+        api_mock.sell_inventory_withdraw_offer_by_inventory_item_group.side_effect = api_exception
+        api_mock.sell_inventory_delete_offer.return_value = {}
+        api_mock.sell_inventory_delete_inventory_item_group.return_value = {
+            "status": "REMOVED"
+        }
+        api_mock.sell_inventory_delete_inventory_item.return_value = {}
+
+        with patch.object(EbayProductDeleteFactory, "get_api", return_value=api_mock):
+            factory = EbayProductDeleteFactory(
+                sales_channel=self.sales_channel,
+                local_instance=self.product,
+                view=self.view,
+            )
+            result = factory.run()
+
+        api_mock.sell_inventory_withdraw_offer_by_inventory_item_group.assert_called_once()
+        api_mock.sell_inventory_delete_inventory_item_group.assert_called_once()
+
+        for child in self.children:
+            self.assertFalse(
+                EbayProduct.objects.filter(
+                    local_instance=child,
+                    sales_channel=self.sales_channel,
+                ).exists()
+            )
+            self.assertFalse(
+                EbayProductOffer.objects.filter(
+                    sales_channel_view=self.view,
+                    remote_product__local_instance=child,
+                    remote_product__sales_channel=self.sales_channel,
+                ).exists()
+            )
+
+        self.assertFalse(
+            EbayProduct.objects.filter(pk=self.remote_product.pk).exists()
+        )
+        self.assertEqual(result["withdraw"], {"status": "NOT_FOUND"})

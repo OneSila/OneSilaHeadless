@@ -139,7 +139,6 @@ class LlmMutation:
         product_ids = [p.id.node_id for p in instance.products or []]
         sales_channel_inputs = instance.sales_channels or []
         sales_channel_languages: dict[str, list[str]] = {}
-        sales_channel_defaults: dict[str, str] = {}
         for entry in sales_channel_inputs:
             sales_channel_id = "default"
             if entry.sales_channel:
@@ -150,22 +149,11 @@ class LlmMutation:
             sales_channel_languages.setdefault(sales_channel_id, [])
             if language not in sales_channel_languages[sales_channel_id]:
                 sales_channel_languages[sales_channel_id].append(language)
-            if entry.is_default:
-                if sales_channel_id in sales_channel_defaults:
-                    raise ValidationError("Each sales channel requires only one default language.")
-                sales_channel_defaults[sales_channel_id] = language
 
         if not product_ids or not sales_channel_languages:
             raise ValidationError("Products and sales channels are required.")
-        missing_defaults = [
-            str(channel_id)
-            for channel_id in sales_channel_languages.keys()
-            if channel_id not in sales_channel_defaults
-        ]
-        if missing_defaults:
-            raise ValidationError("Each sales channel requires a default language.")
 
-        if instance.preview and len(product_ids) > 20:
+        if instance.preview and len(product_ids) > 5:
             raise ValidationError("Preview mode supports a maximum of 20 products.")
 
         if instance.preview:
@@ -173,7 +161,6 @@ class LlmMutation:
                 multi_tenant_company=multi_tenant_company,
                 product_ids=product_ids,
                 sales_channel_languages=sales_channel_languages,
-                sales_channel_defaults=sales_channel_defaults,
                 override=instance.override or False,
                 preview=True,
                 additional_informations=instance.additional_informations,
@@ -190,7 +177,6 @@ class LlmMutation:
             multi_tenant_company_id=multi_tenant_company.id,
             product_ids=product_ids,
             sales_channel_languages={str(key): value for key, value in sales_channel_languages.items()},
-            sales_channel_defaults={str(key): value for key, value in sales_channel_defaults.items()},
             override=instance.override or False,
             additional_informations=instance.additional_informations,
             debug=instance.debug or False,

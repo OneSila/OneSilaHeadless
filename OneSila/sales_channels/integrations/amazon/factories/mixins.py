@@ -628,6 +628,8 @@ class GetAmazonAPIMixin:
                 current_value = clean(current_value)
 
             if new_value is None:
+                if key == "child_parent_sku_relationship":
+                    continue
                 if key in current_attributes:
                     current_value = clean(current_value)
                     patches.append({"op": "delete", "path": path, "value": current_value})

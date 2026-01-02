@@ -52,7 +52,6 @@ class BulkContentGenerationFlowTestCase(TestCase):
                 multi_tenant_company=self.multi_tenant_company,
                 product_ids=[self.product.id],
                 sales_channel_languages={sales_channel.id: ["en"]},
-                sales_channel_defaults={sales_channel.id: "en"},
                 override=True,
                 preview=True,
             )
@@ -100,7 +99,6 @@ class BulkContentGenerationFlowTestCase(TestCase):
                 multi_tenant_company=self.multi_tenant_company,
                 product_ids=[self.product.id],
                 sales_channel_languages={sales_channel.id: ["en"]},
-                sales_channel_defaults={sales_channel.id: "en"},
                 override=False,
                 preview=False,
             )
@@ -127,7 +125,6 @@ class BulkContentGenerationFlowTestCase(TestCase):
                 multi_tenant_company=self.multi_tenant_company,
                 product_ids=[self.product.id],
                 sales_channel_languages={"default": ["en"]},
-                sales_channel_defaults={"default": "en"},
                 override=True,
                 preview=True,
             )
@@ -136,3 +133,25 @@ class BulkContentGenerationFlowTestCase(TestCase):
         content = payload[0]["default"][str(self.product.sku)]["en"]
         self.assertEqual(content["name"], "Generated Name")
         self.assertEqual(flow.used_points, 2)
+
+    def test_default_language_falls_back_to_first_sales_channel_language(self):
+        sales_channel = EbaySalesChannel.objects.create(
+            hostname="ebay-fallback",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        def _fake_generate(self, *, max_attempts: int = 2):
+            test_case.assertEqual(self.channels[0]["default_language"], "fr")
+            self.used_points = 1
+            return {sales_channel.global_id: {"fr": {"name": "Generated Name"}}}
+
+        test_case = self
+        with patch.object(BulkContentLLM, "generate_content", new=_fake_generate):
+            flow = BulkGenerateContentFlow(
+                multi_tenant_company=self.multi_tenant_company,
+                product_ids=[self.product.id],
+                sales_channel_languages={sales_channel.id: ["fr", "de"]},
+                override=True,
+                preview=True,
+            )
+            flow.flow()

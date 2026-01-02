@@ -25,7 +25,6 @@ class BulkGenerateContentFlow:
         multi_tenant_company,
         product_ids: list[int | str],
         sales_channel_languages: dict[int | str, list[str]],
-        sales_channel_defaults: dict[int | str, str],
         override: bool,
         preview: bool,
         additional_informations: str | None = None,
@@ -33,33 +32,40 @@ class BulkGenerateContentFlow:
     ):
         self.multi_tenant_company = multi_tenant_company
         self.product_ids = product_ids
+        self.default_language = multi_tenant_company.language
         self.default_channel_languages: list[str] = []
         self.default_channel_default: str | None = None
         self.sales_channel_languages: dict[int, list[str]] = {}
-        for channel_id, languages in sales_channel_languages.items():
-            if channel_id is None or str(channel_id).lower() == "default":
-                self.default_channel_languages = list(dict.fromkeys(languages))
-                continue
-            self.sales_channel_languages[int(channel_id)] = list(dict.fromkeys(languages))
         self.sales_channel_defaults: dict[int, str] = {}
-        for channel_id, language in sales_channel_defaults.items():
+        for channel_id, languages in sales_channel_languages.items():
+            normalized_languages = list(dict.fromkeys(languages))
             if channel_id is None or str(channel_id).lower() == "default":
-                self.default_channel_default = language
+                self.default_channel_languages = normalized_languages
                 continue
-            self.sales_channel_defaults[int(channel_id)] = language
+            channel_key = int(channel_id)
+            self.sales_channel_languages[channel_key] = normalized_languages
+            channel_default = self._select_default_language(languages=normalized_languages)
+            if channel_default:
+                self.sales_channel_defaults[channel_key] = channel_default
         self.override = override
         self.preview = preview
         self.additional_informations = additional_informations
         self.debug = debug
-        self.default_language = multi_tenant_company.language
-        if self.default_channel_languages and not self.default_channel_default:
-            self.default_channel_default = self.default_language
+        if self.default_channel_languages:
+            self.default_channel_default = self._select_default_language(languages=self.default_channel_languages)
         self.used_points = 0
         self.preview_payload: dict[str, dict[str, dict[str, Any]]] = {}
 
         self.sales_channels: list[SalesChannel] = []
         self.products: list[Product] = []
         self.context_builder: BulkContentContextBuilder | None = None
+
+    def _select_default_language(self, *, languages: list[str]) -> str | None:
+        if not languages:
+            return None
+        if self.default_language in languages:
+            return self.default_language
+        return languages[0]
 
     def _load_sales_channels(self) -> None:
         self.sales_channels = list(
@@ -280,7 +286,9 @@ class BulkGenerateContentFlow:
                 )
                 for language in languages
             }
-            channel_default = self.sales_channel_defaults.get(sales_channel.id, self.default_language)
+            channel_default = self.sales_channel_defaults.get(sales_channel.id)
+            if not channel_default:
+                channel_default = self._select_default_language(languages=languages)
 
             if self.override:
                 languages_to_generate = list(languages)
@@ -338,7 +346,7 @@ class BulkGenerateContentFlow:
                 )
                 for language in languages
             }
-            channel_default = self.default_channel_default or self.default_language
+            channel_default = self.default_channel_default or self._select_default_language(languages=languages)
 
             if self.override:
                 languages_to_generate = list(languages)
