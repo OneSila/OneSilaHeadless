@@ -5,6 +5,20 @@ from .sales_channels import SheinCategorySuggestionFactory
 from .sales_channels.oauth import GetSheinRedirectUrlFactory, ValidateSheinAuthFactory
 from .imports import SheinSchemaImportProcessor
 from .sync import SheinSalesChannelMappingSyncFactory
+from .prices import SheinPriceUpdateFactory
+from .properties import (
+    SheinProductPropertyCreateFactory,
+    SheinProductPropertyDeleteFactory,
+    SheinProductPropertyUpdateFactory,
+)
+from .products import (
+    SheinMediaProductThroughCreateFactory,
+    SheinMediaProductThroughUpdateFactory,
+    SheinMediaProductThroughDeleteFactory,
+    SheinProductCreateFactory,
+    SheinProductUpdateFactory,
+    SheinProductDeleteFactory,
+)
 
 __all__ = [
     "SheinSignatureMixin",
@@ -13,4 +27,14 @@ __all__ = [
     "ValidateSheinAuthFactory",
     "SheinSchemaImportProcessor",
     "SheinSalesChannelMappingSyncFactory",
+    "SheinProductPropertyCreateFactory",
+    "SheinProductPropertyUpdateFactory",
+    "SheinProductPropertyDeleteFactory",
+    "SheinPriceUpdateFactory",
+    "SheinMediaProductThroughCreateFactory",
+    "SheinMediaProductThroughUpdateFactory",
+    "SheinMediaProductThroughDeleteFactory",
+    "SheinProductCreateFactory",
+    "SheinProductUpdateFactory",
+    "SheinProductDeleteFactory",
 ]

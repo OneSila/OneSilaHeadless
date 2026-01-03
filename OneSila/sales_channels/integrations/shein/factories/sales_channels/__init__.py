@@ -5,6 +5,7 @@ from .full_schema import SheinCategoryTreeSyncFactory
 from .marketplaces import SheinMarketplacePullFactory
 from .oauth import GetSheinRedirectUrlFactory, ValidateSheinAuthFactory
 from .views import SheinSalesChannelViewPullFactory
+from .issues import FetchRemoteIssuesFactory
 
 __all__ = [
     "SheinCategorySuggestionFactory",
@@ -12,5 +13,6 @@ __all__ = [
     "GetSheinRedirectUrlFactory",
     "SheinMarketplacePullFactory",
     "SheinSalesChannelViewPullFactory",
+    "FetchRemoteIssuesFactory",
     "ValidateSheinAuthFactory",
 ]

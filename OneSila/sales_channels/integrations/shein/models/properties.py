@@ -213,7 +213,7 @@ class SheinPropertySelectValue(RemotePropertySelectValue):
     class Meta(RemotePropertySelectValue.Meta):
         verbose_name = "Shein Property Select Value"
         verbose_name_plural = "Shein Property Select Values"
-        search_terms = ["remote_id", "value", "value_en", "remote_property__name"]
+        search_terms = ["remote_id", "value", "value_en"]
 
     def __str__(self) -> str:
         label = self.value or self.value_en or self.remote_id or "Unknown"

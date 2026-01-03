@@ -164,6 +164,14 @@ class SalesChannelViewAssignQuerySet(PolymorphicQuerySet, MultiTenantQuerySet):
         from sales_channels.models.products import RemoteProduct
 
         normalized_status = (status or "").upper()
+        created_status = getattr(self.model, "STATUS_CREATED", None)
+        if created_status and normalized_status == created_status:
+            return self.filter(status=created_status)
+
+        pending_creation_status = getattr(self.model, "STATUS_PENDING_CREATION", None)
+        if pending_creation_status and normalized_status == pending_creation_status:
+            return self.filter(status=pending_creation_status)
+
         valid_statuses = {
             RemoteProduct.STATUS_COMPLETED,
             RemoteProduct.STATUS_FAILED,

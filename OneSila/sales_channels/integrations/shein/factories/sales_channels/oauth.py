@@ -200,7 +200,6 @@ class ValidateSheinAuthFactory:
 
     def _persist(self, payload: dict) -> None:
         update_fields = [
-            "remote_id",
             "state",
             "open_key_id",
             "secret_key_encrypted",
@@ -211,9 +210,6 @@ class ValidateSheinAuthFactory:
             "last_authorized_at",
         ]
 
-        remote_id = payload.get("supplierId") or payload.get("openKeyId")
-        if remote_id is not None:
-            self.sales_channel.remote_id = str(remote_id)
         self.sales_channel.state = payload.get("state") or self.sales_channel.state
         self.sales_channel.open_key_id = payload.get("openKeyId")
         self.sales_channel.secret_key_encrypted = payload.get("secretKey")

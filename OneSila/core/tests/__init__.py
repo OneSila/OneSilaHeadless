@@ -22,6 +22,16 @@ class TestCaseMixin:
         self.user.is_multi_tenant_company_owner = True
         self.user.save()
 
+    def _format_payload_debug(self, payload, expected) -> str:
+        from pprint import pformat
+
+        return (
+            "------------------------------------------------------ PAYLOAD\n"
+            f"{pformat(payload)}\n"
+            "------------------------------------------------------ EXPECTED PAYLOAD\n"
+            f"{pformat(expected)}"
+        )
+
 
 class TestCase(TestCaseMixin, DjangoTestCase):
     pass

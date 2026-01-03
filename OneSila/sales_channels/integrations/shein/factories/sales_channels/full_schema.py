@@ -57,13 +57,14 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         view: Optional[SheinSalesChannelView] = None,
         language: Optional[str] = None,
         import_process=None,
+        sync_product_type_attributes: bool = True,
     ) -> None:
         self.sales_channel = sales_channel
         self.sales_channel_id = getattr(sales_channel, "pk", None)
         self.view = view
         self.view_id = getattr(view, "pk", None)
-        self.site_remote_id = self._normalize_identifier(getattr(view, "remote_id", None)) if view else ""
         self.language = language
+        self.sync_product_type_attributes = sync_product_type_attributes
         self.synced_categories: list[SheinCategory] = []
         self.synced_product_types: list[SheinProductType] = []
         self._remote_language_cache: set[tuple[Optional[int], str]] = set()
@@ -75,10 +76,7 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         self._import_last_percentage = 0
 
     def _print_debug(self, message: str) -> None:
-        print(
-            f"[SheinSync channel={self.sales_channel_id} view={self.view_id or 'all'}] {message}",
-            flush=True,
-        )
+        return
 
     # ------------------------------------------------------------------
     # Public API
@@ -261,12 +259,12 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             "is_leaf": self._to_bool(node.get("last_category")),
             "product_type_remote_id": self._normalize_identifier(node.get("product_type_id")) or "",
             "raw_data": self._prepare_raw_payload(node=node),
-            "site_remote_id": self.site_remote_id or "",
         }
 
         category, _ = SheinCategory.objects.update_or_create(
             remote_id=remote_id,
-            site_remote_id=self.site_remote_id or "",
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
             defaults=defaults,
         )
 
@@ -313,7 +311,12 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             defaults=defaults,
         )
 
-        self._sync_product_type_attributes(product_type=product_type)
+        if self.sync_product_type_attributes:
+            self._sync_product_type_attributes(product_type=product_type)
+        self._sync_category_configurator_properties(
+            category=category,
+            product_type=product_type,
+        )
 
         return product_type
 
@@ -322,30 +325,39 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         if not info:
             return
 
-        fill_in_records = info.get("fill_in_standard_list")
+        fill_in_records = self._extract_fill_in_standard_records(value=info.get("fill_in_standard_list"))
         field_flags = {attr: False for attr in PUBLISH_FIELD_FLAG_MAP.values()}
         module_flags = {attr: False for attr in PUBLISH_MODULE_FLAG_MAP.values()}
 
-        if isinstance(fill_in_records, list):
-            for record in fill_in_records:
-                if not isinstance(record, dict):
-                    continue
+        for record in fill_in_records:
+            required_flag = self._to_bool(record.get("required"))
+            module_name = record.get("module")
+            field_key = record.get("field_key")
 
-                required_flag = self._to_bool(record.get("required"))
-                module_name = record.get("module")
-                field_key = record.get("field_key")
+            module_attr = PUBLISH_MODULE_FLAG_MAP.get(module_name)
+            if module_attr and required_flag:
+                module_flags[module_attr] = True
 
-                module_attr = PUBLISH_MODULE_FLAG_MAP.get(module_name)
-                if module_attr and required_flag:
-                    module_flags[module_attr] = True
-
-                field_attr = PUBLISH_FIELD_FLAG_MAP.get(field_key)
-                if field_attr is not None:
-                    field_flags[field_attr] = required_flag
+            field_attr = PUBLISH_FIELD_FLAG_MAP.get(field_key)
+            if field_attr is not None:
+                field_flags[field_attr] = required_flag
 
         default_language = self._safe_string(info.get("default_language")) or ""
         currency = self._safe_string(info.get("currency")) or ""
         picture_config = self._normalize_picture_config(info.get("picture_config_list"))
+        support_sale_attribute_sort = info.get("support_sale_attribute_sort")
+        if support_sale_attribute_sort is not None:
+            support_sale_attribute_sort = self._to_bool(support_sale_attribute_sort)
+
+        tags = self._normalize_fill_configuration_tags(value=info.get("fill_configuration_tags"))
+        package_type_required = self._field_required(
+            records=fill_in_records,
+            field_key="package_type",
+        ) or ("PACKAGE_TYPE_TO_SKU" in tags)
+        supplier_barcode_required = self._field_required(
+            records=fill_in_records,
+            field_key="supplier_barcode",
+        )
 
         if default_language:
             self._ensure_remote_language(language_code=default_language)
@@ -369,8 +381,162 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             category.picture_config = picture_config
             update_fields.append("picture_config")
 
+        if support_sale_attribute_sort != category.support_sale_attribute_sort:
+            category.support_sale_attribute_sort = support_sale_attribute_sort
+            update_fields.append("support_sale_attribute_sort")
+
+        if package_type_required != category.package_type_required:
+            category.package_type_required = package_type_required
+            update_fields.append("package_type_required")
+
+        if supplier_barcode_required != category.supplier_barcode_required:
+            category.supplier_barcode_required = supplier_barcode_required
+            update_fields.append("supplier_barcode_required")
+
+        raw_data = category.raw_data or {}
+        if isinstance(raw_data, dict):
+            publish_standard = raw_data.get("publish_standard")
+            if not isinstance(publish_standard, dict):
+                publish_standard = {}
+
+            normalized_publish_standard = {
+                "default_language": default_language or None,
+                "currency": currency or None,
+                "support_sale_attribute_sort": support_sale_attribute_sort,
+                "fill_configuration_tags": tags,
+                "fill_in_standard_list": fill_in_records,
+                "picture_config_list": picture_config,
+                "package_type_required": package_type_required,
+                "supplier_barcode_required": supplier_barcode_required,
+                "properties": publish_standard.get(
+                    "properties",
+                    publish_standard.get("configurator_properties", []),
+                ),
+            }
+
+            if publish_standard != normalized_publish_standard:
+                raw_data = {**raw_data, "publish_standard": normalized_publish_standard}
+                category.raw_data = raw_data
+                update_fields.append("raw_data")
+
         if update_fields:
             category.save(update_fields=update_fields)
+
+    def _sync_category_configurator_properties(
+        self,
+        *,
+        category: SheinCategory,
+        product_type: SheinProductType,
+    ) -> None:
+        items = (
+            SheinProductTypeItem.objects.filter(product_type=product_type)
+            .select_related("property")
+            .order_by("property__remote_id")
+        )
+
+        configurator_properties: list[dict[str, Any]] = []
+        for item in items:
+            property_obj = getattr(item, "property", None)
+            if not property_obj:
+                continue
+
+            configurator_properties.append(
+                {
+                    "product_type_id": product_type.remote_id,
+                    "product_type_item_id": item.remote_id,
+                    "property_id": property_obj.remote_id,
+                    "property_name": property_obj.name,
+                    "property_name_en": property_obj.name_en,
+                    "property_type": property_obj.type,
+                    "value_mode": property_obj.value_mode,
+                    "value_limit": property_obj.value_limit,
+                    "visibility": item.visibility,
+                    "attribute_type": item.attribute_type,
+                    "requirement": item.requirement,
+                    "is_main_attribute": item.is_main_attribute,
+                    "allows_unmapped_values": item.allows_unmapped_values,
+                    "remarks": item.remarks,
+                    "raw_data": item.raw_data,
+                }
+            )
+
+        raw_data = category.raw_data or {}
+        if not isinstance(raw_data, dict):
+            return
+
+        publish_standard = raw_data.get("publish_standard")
+        if not isinstance(publish_standard, dict):
+            publish_standard = {}
+
+        next_publish_standard = {
+            **publish_standard,
+            "properties": configurator_properties,
+        }
+        if publish_standard == next_publish_standard:
+            return
+
+        category.raw_data = {**raw_data, "publish_standard": next_publish_standard}
+        category.save(update_fields=["raw_data"])
+
+    @staticmethod
+    def _extract_fill_in_standard_records(*, value: Any) -> list[dict[str, Any]]:
+        if not isinstance(value, list):
+            return []
+
+        normalized_records: list[dict[str, Any]] = []
+        for record in value:
+            if not isinstance(record, dict):
+                continue
+            normalized_records.append(
+                {
+                    "module": record.get("module"),
+                    "field_key": record.get("field_key"),
+                    "required": SheinCategoryTreeSyncFactory._coerce_bool(value=record.get("required")),
+                    "show": SheinCategoryTreeSyncFactory._coerce_bool(value=record.get("show")),
+                }
+            )
+        return normalized_records
+
+    @staticmethod
+    def _normalize_fill_configuration_tags(*, value: Any) -> list[str]:
+        if value is None:
+            return []
+
+        tags: list[str] = []
+        if isinstance(value, str):
+            parts = [part.strip() for part in value.split(",")]
+            tags = [part for part in parts if part]
+        elif isinstance(value, (list, tuple, set)):
+            for entry in value:
+                if entry is None:
+                    continue
+                text = str(entry).strip()
+                if text:
+                    tags.append(text)
+
+        unique: list[str] = []
+        for tag in tags:
+            if tag not in unique:
+                unique.append(tag)
+        return unique
+
+    @staticmethod
+    def _field_required(*, records: list[dict[str, Any]], field_key: str) -> bool:
+        for record in records:
+            if record.get("field_key") == field_key and SheinCategoryTreeSyncFactory._coerce_bool(value=record.get("required")):
+                return True
+        return False
+
+    @staticmethod
+    def _coerce_bool(*, value: Any) -> bool:
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return False
+        if isinstance(value, (int, float)):
+            return value != 0
+        text = str(value).strip().lower()
+        return text in {"1", "true", "yes", "y", "on"}
 
     def _ensure_remote_language(
         self,
@@ -677,8 +843,8 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         raw_attribute = self._strip_attribute_values(attribute=attribute)
 
         defaults = {
-            "name": self._safe_string(attribute.get("attribute_name")) or "",
-            "name_en": self._safe_string(attribute.get("attribute_name_en")) or "",
+            "name": self._strip_openapi_prefix(self._safe_string(attribute.get("attribute_name"))),
+            "name_en": self._strip_openapi_prefix(self._safe_string(attribute.get("attribute_name_en"))),
             "value_mode": SheinProperty.ValueModes.from_remote(raw_value=attribute_mode),
             "value_limit": self._safe_positive_int(value=attribute.get("attribute_input_num")),
             "attribute_source": self._safe_int(value=attribute.get("attribute_source")),
@@ -895,8 +1061,6 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
 
     def _build_request_payload(self) -> dict[str, Any]:
         payload: dict[str, Any] = {}
-        if self.site_remote_id:
-            payload["site_abbr"] = self.site_remote_id
         if self.language:
             payload["language"] = self.language
         return payload
@@ -918,6 +1082,16 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             return None
         text = str(value).strip()
         return text or None
+
+    @staticmethod
+    def _strip_openapi_prefix(value: Optional[str]) -> str:
+        if not value:
+            return ""
+        text = value.strip()
+        prefix = "OPENAPI-"
+        if text.upper().startswith(prefix):
+            return text[len(prefix):].lstrip()
+        return text
 
     @staticmethod
     def _to_bool(value: Any) -> bool:

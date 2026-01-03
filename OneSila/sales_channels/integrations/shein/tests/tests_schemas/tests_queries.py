@@ -329,10 +329,15 @@ class SheinInternalPropertyOptionQueryTest(TransactionTestCaseMixin, Transaction
 class SheinCategoryQueryTest(TransactionTestCaseMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
+        self.sales_channel = baker.make(
+            SheinSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
         self.root = baker.make(
             SheinCategory,
             remote_id="root-cat",
-            site_remote_id="roe",
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
             is_leaf=False,
             parent=None,
             parent_remote_id="",
@@ -340,7 +345,8 @@ class SheinCategoryQueryTest(TransactionTestCaseMixin, TransactionTestCase):
         self.leaf = baker.make(
             SheinCategory,
             remote_id="leaf-cat",
-            site_remote_id="roe",
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
             parent=self.root,
             parent_remote_id=self.root.remote_id,
             is_leaf=True,
@@ -349,7 +355,7 @@ class SheinCategoryQueryTest(TransactionTestCaseMixin, TransactionTestCase):
     def test_filter_by_site_and_leaf_flag(self):
         resp = self.strawberry_test_client(
             query=SHEIN_CATEGORY_FILTER_BY_SITE_AND_LEAF,
-            variables={"siteRemoteId": self.root.site_remote_id},
+            variables={"salesChannel": self.to_global_id(self.sales_channel)},
         )
         self.assertTrue(resp.errors is None)
         edges = resp.data["sheinCategories"]["edges"]

@@ -16,6 +16,9 @@ from sales_channels.integrations.shein.models import (
     SheinCategory,
     SheinInternalProperty,
     SheinInternalPropertyOption,
+    SheinProduct,
+    SheinProductCategory,
+    SheinProductIssue,
     SheinProductType,
     SheinProductTypeItem,
     SheinProperty,
@@ -27,13 +30,14 @@ from sales_channels.integrations.shein.models import (
 )
 from sales_channels.schema.types.filter_mixins import GeneralMappedLocallyFilterMixin, GeneralMappedRemotelyFilterMixin, \
     DependentMappedLocallyFilterMixin, DependentUsedInProductsFilterMixin, GeneralUsedInProductsFilterMixin
-from sales_channels.schema.types.filters import SalesChannelFilter
+from sales_channels.schema.types.filters import SalesChannelFilter, RemoteProductFilter
 from properties.schema.types.filters import (
     ProductPropertiesRuleFilter,
     ProductPropertiesRuleItemFilter,
     PropertyFilter,
     PropertySelectValueFilter,
 )
+from products.schema.types.filters import ProductFilter
 
 
 @filter(SheinSalesChannel)
@@ -86,6 +90,7 @@ class SheinPropertyFilter(
     """Filter Shein attribute definitions."""
 
     id: auto
+    remote_id: auto
     sales_channel: Optional[SalesChannelFilter]
     local_instance: Optional[PropertyFilter]
     allows_unmapped_values: auto
@@ -180,12 +185,45 @@ class SheinInternalPropertyOptionFilter(SearchFilterMixin):
 @filter(SheinCategory)
 class SheinCategoryFilter(SearchFilterMixin):
     """Filter public Shein categories by the key attributes used in UIs."""
-
     id: auto
     remote_id: auto
-    site_remote_id: auto
+    sales_channel: Optional[SalesChannelFilter]
     parent_remote_id: auto
     product_type_remote_id: auto
     is_leaf: auto
     reference_info_required: auto
     parent: Optional['SheinCategoryFilter']
+
+
+@filter(SheinProduct)
+class SheinProductFilter(SearchFilterMixin):
+    """Filter Shein remote products."""
+
+    id: auto
+    sales_channel: Optional[SalesChannelFilter]
+    local_instance: Optional[ProductFilter]
+    remote_parent_product: Optional[RemoteProductFilter]
+
+
+@filter(SheinProductCategory)
+class SheinProductCategoryFilter(SearchFilterMixin):
+    """Filter product-to-category mappings for Shein listings."""
+    id: auto
+    product: Optional[ProductFilter]
+    sales_channel: Optional[SalesChannelFilter]
+    remote_id: auto
+
+
+@filter(SheinProductIssue)
+class SheinProductIssueFilter(SearchFilterMixin):
+    """Filter Shein review/audit issues."""
+
+    id: auto
+    remote_product: Optional[RemoteProductFilter]
+    version: auto
+    document_sn: auto
+    spu_name: auto
+    skc_name: auto
+    audit_state: auto
+    document_state: auto
+    is_active: auto

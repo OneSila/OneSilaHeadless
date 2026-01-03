@@ -185,6 +185,7 @@ class SalesChannelImportMixin(ImportMixin):
 
         if hasattr(import_instance, 'images'):
             remote_id_map = import_instance.data.get('__image_index_to_remote_id', {})
+            image_group_code = import_instance.data.get('__image_group_code')
 
             for index, image_ass in enumerate(import_instance.images_associations_instances):
                 image_association, _ = RemoteImageProductAssociationClass.objects.get_or_create(
@@ -195,9 +196,19 @@ class SalesChannelImportMixin(ImportMixin):
                 )
 
                 remote_id = remote_id_map.get(str(index))
+                updated_fields: list[str] = []
                 if remote_id and not image_association.remote_id:
                     image_association.remote_id = remote_id
-                    image_association.save()
+                    updated_fields.append("remote_id")
+                if (
+                    image_group_code
+                    and hasattr(image_association, "image_group_code")
+                    and not getattr(image_association, "image_group_code", None)
+                ):
+                    image_association.image_group_code = image_group_code
+                    updated_fields.append("image_group_code")
+                if updated_fields:
+                    image_association.save(update_fields=updated_fields)
 
     def handle_prices(self, import_instance: ImportProductInstance):
         RemotePriceClass = self.get_remote_model_class('remote_price_class')

@@ -8,6 +8,8 @@ from integrations.constants import (
     SHOPIFY_INTEGRATION,
     AMAZON_INTEGRATION,
     WOOCOMMERCE_INTEGRATION,
+    EBAY_INTEGRATION,
+    SHEIN_INTEGRATION,
 )
 
 from products.schema.types.input import ProductPartialInput
@@ -32,6 +34,8 @@ class SalesChannelIntegrationType(Enum):
     SHOPIFY = SHOPIFY_INTEGRATION
     AMAZON = AMAZON_INTEGRATION
     WOOCOMMERCE = WOOCOMMERCE_INTEGRATION
+    EBAY = EBAY_INTEGRATION
+    SHEIN = SHEIN_INTEGRATION
 
 
 @partial(Product, fields="__all__")
@@ -61,6 +65,22 @@ class AIBulkTranslationInput:
     products: Optional[List[ProductPartialInput]] = None
     properties: Optional[List[PropertyPartialInput]] = None
     values: Optional[List[PropertySelectValuePartialInput]] = None
+
+
+@strawberry_input
+class SalesChannelInstructionInput:
+    sales_channel: Optional[SalesChannelPartialInput] = None
+    language: str
+
+
+@strawberry_input
+class AdvancedContentGeneratorInput:
+    products: List[ProductPartialInput]
+    sales_channels: List[SalesChannelInstructionInput]
+    override: Optional[bool] = False
+    preview: Optional[bool] = False
+    debug: Optional[bool] = False
+    additional_informations: Optional[str] = None
 
 
 @partial(Product, fields="__all__")

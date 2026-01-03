@@ -6,6 +6,9 @@ from sales_channels.integrations.shein.schema.types.types import (
     SheinCategoryType,
     SheinInternalPropertyOptionType,
     SheinInternalPropertyType,
+    SheinProductCategoryType,
+    SheinProductType,
+    SheinProductIssueType,
     SheinProductTypeItemType,
     SheinProductTypeType,
     SheinPropertySelectValueType,
@@ -51,9 +54,16 @@ class SheinSalesChannelsQuery:
     ] = connection()
 
     shein_import_process: SheinSalesChannelImportType = node()
-    shein_import_processes: DjangoListConnection[
-        SheinSalesChannelImportType
-    ] = connection()
+    shein_import_processes: DjangoListConnection[SheinSalesChannelImportType] = connection()
 
     shein_category: SheinCategoryType = node()
     shein_categories: DjangoListConnection[SheinCategoryType] = connection()
+
+    shein_product_category: SheinProductCategoryType = node()
+    shein_product_categories: DjangoListConnection[SheinProductCategoryType] = connection()
+
+    shein_product: SheinProductType = node()
+    shein_products: DjangoListConnection[SheinProductType] = connection()
+
+    shein_product_issue: SheinProductIssueType = node()
+    shein_product_issues: DjangoListConnection[SheinProductIssueType] = connection()

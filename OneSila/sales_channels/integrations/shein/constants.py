@@ -135,7 +135,26 @@ SHEIN_LANGUAGE_CATALOG: list[dict[str, str]] = [
 # Internal property definitions
 # ---------------------------------------------------------------------------
 
+SHEIN_PACKAGE_TYPE_OPTIONS = [
+    {"value": "0", "label": _("Clear packaging")},
+    {"value": "1", "label": _("Soft packaging + soft item")},
+    {"value": "2", "label": _("Soft packaging + hard item")},
+    {"value": "3", "label": _("Hard packaging")},
+    {"value": "4", "label": _("Vacuum")},
+]
+
+SHEIN_QUANTITY_UNIT_OPTIONS = [
+    {"value": "1", "label": _("Piece")},
+    {"value": "2", "label": _("Pair")},
+]
+
 SHEIN_INTERNAL_PROPERTY_DEFINITIONS = [
+    {
+        "code": "supplier_code",
+        "name": _("Supplier code"),
+        "type": Property.TYPES.TEXT,
+        "payload_field": "supplier_code",
+    },
     {
         "code": "reference_product_link",
         "name": _("Reference product link"),
@@ -143,52 +162,53 @@ SHEIN_INTERNAL_PROPERTY_DEFINITIONS = [
         "payload_field": "competing_product_link",
     },
     {
-        "code": "sample_spec",
-        "name": _("Sample information"),
-        "type": Property.TYPES.TEXT,
-        "payload_field": "sample_info",
-    },
-    {
-        "code": "proof_of_stock",
-        "name": _("Proof of stock"),
-        "type": Property.TYPES.TEXT,
-        "payload_field": "proof_of_stock_list",
-    },
-    {
-        "code": "shelf_require",
-        "name": _("Mandatory shelf requirement"),
-        "type": Property.TYPES.TEXT,
-        "payload_field": "shelf_require",
-    },
-    {
         "code": "brand_code",
         "name": _("Brand"),
         "type": Property.TYPES.SELECT,
         "payload_field": "brand_code",
-        "options_source": "brand_list",
     },
     {
-        "code": "skc_title",
-        "name": _("SKC title"),
-        "type": Property.TYPES.TEXT,
-        "payload_field": "skc_title",
+        "code": "package_type",
+        "name": _("Package type"),
+        "type": Property.TYPES.SELECT,
+        "payload_field": "package_type",
+        "options": SHEIN_PACKAGE_TYPE_OPTIONS,
     },
     {
-        "code": "minimum_stock_quantity",
-        "name": _("Minimum stock quantity"),
+        "code": "quantity_info__unit",
+        "name": _("Quantity unit"),
+        "type": Property.TYPES.SELECT,
+        "payload_field": "quantity_unit",
+        "options": SHEIN_QUANTITY_UNIT_OPTIONS,
+    },
+    {
+        "code": "quantity_info__quantity",
+        "name": _("Quantity"),
         "type": Property.TYPES.INT,
-        "payload_field": "minimum_stock_quantity",
+        "payload_field": "quantity",
     },
     {
-        "code": "product_detail_picture",
-        "name": _("Product detail picture"),
-        "type": Property.TYPES.TEXT,
-        "payload_field": "site_detail_image_info_list",
+        "code": "height",
+        "name": _("Package height (cm)"),
+        "type": Property.TYPES.FLOAT,
+        "payload_field": "height",
     },
     {
-        "code": "quantity_info",
-        "name": _("Quantity info"),
-        "type": Property.TYPES.BOOLEAN,
-        "payload_field": "quantity_info",
+        "code": "length",
+        "name": _("Package length (cm)"),
+        "type": Property.TYPES.FLOAT,
+        "payload_field": "length",
+    },
+    {
+        "code": "width",
+        "name": _("Package width (cm)"),
+        "type": Property.TYPES.FLOAT,
+        "payload_field": "width",
+    },
+    {
+        "code": "weight",
+        "name": _("Package weight (g)"),
+        "type": Property.TYPES.FLOAT,
+        "payload_field": "weight",
     },
 ]

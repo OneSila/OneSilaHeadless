@@ -120,9 +120,11 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
         self.set_field_if_exists('bundle_variations')
         self.set_field_if_exists('alias_variations')
         self.set_field_if_exists('configurator_select_values')
+        self.set_field_if_exists('skip_rule_item_sync')
 
         # used to help remote imports
         self.set_field_if_exists('__image_index_to_remote_id')
+        self.set_field_if_exists('__image_group_code')
         self.set_field_if_exists('__mirror_product_properties_map')
         self.set_field_if_exists('__variation_sku_to_id_map')
 
@@ -242,6 +244,10 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
 
         if self.rule and self.update_current_rule:
             self.update_product_rule()
+
+        if getattr(self, "skip_rule_item_sync", False) and self.rule:
+            self.rule_instance = self.rule
+            return
 
         if not self.rule and not hasattr(self, 'product_type'):
             return

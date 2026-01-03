@@ -35,7 +35,6 @@ class SheinCategorySuggestionFactory(SheinSignatureMixin):
         self.query = (query or "").strip()
         self.explicit_image_url = (image_url or "").strip()
         self.image = image
-        self.site_remote_id = self._resolve_site_remote_id()
         self.categories: List[Dict[str, Any]] = []
         self._raw_payload: Dict[str, Any] = {}
         self._normalized_payload: Dict[str, Any] = {}
@@ -201,17 +200,13 @@ class SheinCategorySuggestionFactory(SheinSignatureMixin):
             return SheinSalesChannel.objects.filter(pk=pk).first()
         return None
 
-    def _resolve_site_remote_id(self) -> str:
-        remote_id = getattr(self.view, "remote_id", None)
-        return str(remote_id).strip() if remote_id else ""
-
     def _get_category(self, remote_id: str) -> Optional[SheinCategory]:
         if remote_id in self._category_cache:
             return self._category_cache[remote_id]
-        queryset = SheinCategory.objects.select_related("parent").filter(
-            remote_id=remote_id,
-            site_remote_id=self.site_remote_id or "",
-        )
+        queryset = SheinCategory.objects.select_related("parent").filter(remote_id=remote_id)
+        if self.sales_channel is not None:
+            queryset = queryset.filter(sales_channel=self.sales_channel)
+            queryset = queryset.filter(multi_tenant_company=self.sales_channel.multi_tenant_company)
         category = queryset.first()
         self._category_cache[remote_id] = category
         return category

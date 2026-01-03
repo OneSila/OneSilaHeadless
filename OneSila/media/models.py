@@ -68,6 +68,16 @@ class Media(models.Model):
         id='mediapp:image:imagewebspec')
     onesila_thumbnail = ImageSpecField(source='image',
         id='mediapp:image:onesilathumbnail')
+    shein_main_image = ImageSpecField(source='image',
+        id='mediapp:image:sheinmain')
+    shein_detail_image = ImageSpecField(source='image',
+        id='mediapp:image:sheindetail')
+    shein_square_image = ImageSpecField(source='image',
+        id='mediapp:image:sheinsquare')
+    shein_color_block_image = ImageSpecField(source='image',
+        id='mediapp:image:sheincolorblock')
+    shein_detail_page_image = ImageSpecField(source='image',
+        id='mediapp:image:sheindetailpage')
     image_hash = models.CharField(_('image hash'), max_length=100, blank=True, null=True)
     # File Fields
     file = models.FileField(

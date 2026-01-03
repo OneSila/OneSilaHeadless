@@ -695,6 +695,17 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         }
         self.assertIn(expected, patches)
 
+    def test_build_patches_skips_child_parent_relationship_delete(self):
+        mixin = GetAmazonAPIMixin()
+        current = {
+            "child_parent_sku_relationship": [
+                {"child_relationship_type": "variation", "marketplace_id": "GB"}
+            ]
+        }
+        new = {"child_parent_sku_relationship": None}
+        patches = mixin._build_patches(current, new)
+        self.assertEqual(patches, [])
+
     def test_build_patches_keeps_non_all_audiences(self):
         mixin = GetAmazonAPIMixin()
         current = {

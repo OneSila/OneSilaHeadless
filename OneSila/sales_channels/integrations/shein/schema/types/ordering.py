@@ -6,6 +6,9 @@ from sales_channels.integrations.shein.models import (
     SheinCategory,
     SheinInternalProperty,
     SheinInternalPropertyOption,
+    SheinProduct,
+    SheinProductCategory,
+    SheinProductIssue,
     SheinProductType,
     SheinProductTypeItem,
     SheinProperty,
@@ -76,3 +79,26 @@ class SheinInternalPropertyOptionOrder:
 class SheinCategoryOrder:
     id: auto
     name: auto
+
+
+@order(SheinProduct)
+class SheinProductOrder:
+    id: auto
+
+
+@order(SheinProductCategory)
+class SheinProductCategoryOrder:
+    id: auto
+    remote_id: auto
+
+
+@order(SheinProductIssue)
+class SheinProductIssueOrder:
+    id: auto
+    spu_name: auto
+    skc_name: auto
+    version: auto
+    document_sn: auto
+    document_state: auto
+    audit_state: auto
+    is_active: auto

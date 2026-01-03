@@ -381,6 +381,9 @@ class GetEbayAPIMixin:
                                 )
                                 return
                             raise
+                        logger.warning(
+                            "Refreshing eBay access token after invalid token during iterator pagination.",
+                        )
                         oauth_retries += 1
                         if oauth_retries >= oauth_max_retries:
                             raise
@@ -581,6 +584,9 @@ class GetEbayAPIMixin:
                 if self._is_oauth_invalid_token_error(exc=exc):
                     if oauth_retries >= oauth_max_retries:
                         raise
+                    logger.warning(
+                        "Refreshing eBay access token after invalid token response.",
+                    )
                     self._refresh_api_access_token()
                     oauth_retries += 1
                     continue

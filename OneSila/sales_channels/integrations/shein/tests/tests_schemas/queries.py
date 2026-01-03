@@ -118,10 +118,10 @@ query ($salesChannel: GlobalID!, $mappedLocally: Boolean!) {
 """
 
 SHEIN_CATEGORY_FILTER_BY_SITE_AND_LEAF = """
-query ($siteRemoteId: String!) {
+query ($salesChannel: GlobalID!) {
   sheinCategories(
     filters: {
-      siteRemoteId: {exact: $siteRemoteId}
+      salesChannel: {id: {exact: $salesChannel}}
       isLeaf: {exact: true}
     }
   ) {
@@ -129,7 +129,6 @@ query ($siteRemoteId: String!) {
       node {
         id
         remoteId
-        siteRemoteId
         parentRemoteId
         isLeaf
       }

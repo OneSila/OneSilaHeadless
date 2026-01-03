@@ -33,3 +33,29 @@ def llm__ai_translate__run_bulk_ai_translation_flow(
         override_translation=override_translation,
     )
     flow.run()
+
+
+@db_task()
+def llm__ai_generate__run_bulk_content_flow(
+    *,
+    multi_tenant_company_id: int,
+    product_ids: list[int | str],
+    sales_channel_languages: dict[str, list[str]],
+    override: bool,
+    additional_informations: str | None = None,
+    debug: bool = False,
+):
+    from core.models import MultiTenantCompany
+    from llm.flows.bulk_generate_content import BulkGenerateContentFlow
+
+    multi_tenant_company = MultiTenantCompany.objects.get(id=multi_tenant_company_id)
+    flow = BulkGenerateContentFlow(
+        multi_tenant_company=multi_tenant_company,
+        product_ids=product_ids,
+        sales_channel_languages=sales_channel_languages,
+        override=override,
+        preview=False,
+        additional_informations=additional_informations,
+        debug=debug,
+    )
+    flow.flow()

@@ -80,3 +80,45 @@ class ImageWebSpec(ImageSpec):
 
 register.generator('mediapp:image:imagewebspec', ImageWebSpec)
 register.generator('mediapp:image:onesilathumbnail', OneSilaThumbnail)
+
+
+class SheinMainImageSpec(ImageSpec):
+    processors = [ResizeToFill(1340, 1785)]
+    format = 'JPEG'
+    options = {'quality': 85}
+    maximum_size = 3_000_000
+
+
+class SheinDetailImageSpec(ImageSpec):
+    processors = [ResizeToFill(1340, 1785)]
+    format = 'JPEG'
+    options = {'quality': 85}
+    maximum_size = 3_000_000
+
+
+class SheinSquareImageSpec(ImageSpec):
+    processors = [ResizeToFill(900, 900)]
+    format = 'JPEG'
+    options = {'quality': 85}
+    maximum_size = 3_000_000
+
+
+class SheinColorBlockImageSpec(ImageSpec):
+    processors = [ResizeToFill(80, 80)]
+    format = 'JPEG'
+    options = {'quality': 85}
+    maximum_size = 3_000_000
+
+
+class SheinDetailPageImageSpec(ImageSpec):
+    processors = [ResizeToFill(900, 1200)]
+    format = 'JPEG'
+    options = {'quality': 85}
+    maximum_size = 3_000_000
+
+
+register.generator('mediapp:image:sheinmain', SheinMainImageSpec)
+register.generator('mediapp:image:sheindetail', SheinDetailImageSpec)
+register.generator('mediapp:image:sheinsquare', SheinSquareImageSpec)
+register.generator('mediapp:image:sheincolorblock', SheinColorBlockImageSpec)
+register.generator('mediapp:image:sheindetailpage', SheinDetailPageImageSpec)

@@ -10,6 +10,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonSalesChannelView,
 )
+from sales_channels.exceptions import SkipSyncBecauseOfStatusException
 
 from ..helpers import DisableWooCommerceSignalsMixin
 
@@ -95,3 +96,4 @@ class AmazonValidationIssuesExceptionTest(DisableWooCommerceSignalsMixin, TestCa
 
     def test_exception_is_registered_as_user_exception(self):
         self.assertIn(AmazonProductValidationIssuesException, self.sales_channel._meta.user_exceptions)
+        self.assertIn(SkipSyncBecauseOfStatusException, self.sales_channel._meta.user_exceptions)

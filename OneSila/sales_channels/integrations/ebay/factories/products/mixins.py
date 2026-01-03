@@ -387,43 +387,6 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             "specifications": specs,
         }
 
-    def _format_variation_value(
-        self,
-        *,
-        property_obj: Property,
-        product_property: ProductProperty,
-        language_code: str | None,
-    ) -> str | None:
-        if property_obj.type == Property.TYPES.SELECT:
-            select_value = getattr(product_property, "value_select", None)
-            if select_value is None:
-                return None
-            if language_code:
-                translated = select_value.value_by_language_code(language=language_code)
-                if translated not in (None, ""):
-                    return str(translated)
-            return str(select_value.value or "") or None
-
-        if property_obj.type == Property.TYPES.MULTISELECT:
-            values: list[str] = []
-            for select_value in product_property.value_multi_select.all():
-                if language_code:
-                    translated = select_value.value_by_language_code(language=language_code)
-                    if translated not in (None, ""):
-                        values.append(str(translated))
-                        continue
-                raw_value = select_value.value
-                if raw_value not in (None, ""):
-                    values.append(str(raw_value))
-            if not values:
-                return None
-            return ", ".join(sorted(values))
-
-        raw_value = product_property.get_value()
-        if isinstance(raw_value, str):
-            raw_value = raw_value.strip()
-        return str(raw_value) if raw_value not in (None, "") else None
-
     def _collect_variation_aspect_values(
         self,
         *,
@@ -464,12 +427,12 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
                 if remote_property is None:
                     continue
 
-                formatted_value = self._format_variation_value(
-                    property_obj=property_obj,
+                remote_values = self._render_property_value(
                     product_property=product_property,
+                    remote_property=remote_property,
                     language_code=language_code,
                 )
-                if formatted_value in (None, ""):
+                if remote_values in (None, ""):
                     continue
 
                 aspect_name = (
@@ -480,7 +443,17 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
                 if not aspect_name:
                     continue
 
-                collected_values.setdefault(aspect_name, set()).add(formatted_value)
+                if isinstance(remote_values, (list, tuple, set)):
+                    normalized_values = [
+                        str(value) for value in remote_values if value not in (None, "")
+                    ]
+                else:
+                    normalized_values = [str(remote_values)]
+
+                if not normalized_values:
+                    continue
+
+                collected_values.setdefault(aspect_name, set()).update(normalized_values)
 
         return collected_values
 
@@ -2052,6 +2025,36 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
                 content_type="application/json",
             )
         except (EbayApiError, ApiException) as exc:
+            error_ids: set[str] = set()
+            if isinstance(exc, ApiException):
+                error_ids = self._extract_api_exception_error_ids(exc=exc)
+            else:
+                cause = getattr(exc, "__cause__", None)
+                if isinstance(cause, ApiException):
+                    error_ids = self._extract_api_exception_error_ids(exc=cause)
+                else:
+                    error_ids = self._extract_error_ids_from_body(
+                        body=getattr(exc, "detail", None)
+                    )
+
+            if "25725" in error_ids:
+                offer_record = self._ensure_offer_record()
+                if offer_record:
+                    fields: list[str] = []
+                    if offer_record.successfully_created:
+                        offer_record.successfully_created = False
+                        fields.append("successfully_created")
+                    if offer_record.listing_id:
+                        offer_record.listing_id = None
+                        fields.append("listing_id")
+                    if offer_record.listing_status:
+                        offer_record.listing_status = None
+                        fields.append("listing_status")
+                    if fields:
+                        self._update_offer_fields(offer=offer_record, fields=fields)
+
+                return {"status": "NOT_FOUND"}
+
             message = _extract_ebay_api_error_message(exc=exc)
             raise EbayResponseException(message) from exc
 
