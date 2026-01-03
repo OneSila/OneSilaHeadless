@@ -40,6 +40,7 @@ class ImportMixin:
         self.set_threshold_chunk()
 
     def set_threshold_chunk(self):
+        self.total_import_instances_cnt = max(1, self.total_import_instances_cnt)
         self._threshold_chunk = max(1, math.floor(self.total_import_instances_cnt * 0.01))
 
     def update_percentage(self, to_add=1):

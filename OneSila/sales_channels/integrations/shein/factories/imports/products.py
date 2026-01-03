@@ -96,7 +96,7 @@ class SheinProductsImportProcessor(
         except Exception:
             total = None
 
-        if total is not None:
+        if total is not None and total != 0:
             return total
 
         return len(self._load_spu_index())
