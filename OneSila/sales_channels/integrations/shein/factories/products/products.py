@@ -5,6 +5,7 @@ import re
 from typing import Any, Dict, Iterable, List, Optional
 
 from currencies.models import Currency
+from products.models import ProductTranslation
 from properties.models import ProductPropertiesRuleItem, ProductProperty, Property
 from sales_channels.factories.products.products import (
     RemoteProductCreateFactory,
@@ -304,6 +305,20 @@ class SheinProductBaseFactory(
     # Payload builders
     # ------------------------------------------------------------------
     def _get_default_language(self) -> str:
+        category_id = getattr(self, "selected_category_id", None)
+        if category_id:
+            category = (
+                SheinCategory.objects.filter(
+                    remote_id=category_id,
+                    sales_channel=self.sales_channel,
+                    multi_tenant_company=self.sales_channel.multi_tenant_company,
+                )
+                .only("default_language")
+                .first()
+            )
+            if category and category.default_language:
+                return category.default_language
+
         company = getattr(self.sales_channel, "multi_tenant_company", None)
         return getattr(company, "language", None) or TranslationFieldsMixin.LANGUAGES[0][0]
 
@@ -313,15 +328,61 @@ class SheinProductBaseFactory(
             return
 
         default_language = self._get_default_language()
+        from sales_channels.integrations.shein.models import SheinRemoteLanguage
+
+        remote_language_qs = (
+            SheinRemoteLanguage.objects.filter(
+                sales_channel=self.sales_channel,
+                local_instance__isnull=False,
+            )
+            .exclude(local_instance="")
+            .order_by("id")
+        )
+        allowed_languages: list[str] = []
+        for entry in remote_language_qs:
+            language = entry.local_instance
+            if language and language not in allowed_languages:
+                allowed_languages.append(language)
+        if not allowed_languages:
+            allowed_languages = [default_language]
 
         name_by_language: dict[str, str] = {}
         desc_by_language: dict[str, str] = {}
+        sales_channel_id = self.sales_channel.id
+        channel_translations: dict[str, ProductTranslation] = {}
+        default_translations: dict[str, ProductTranslation] = {}
 
         for translation in translations:
             language = translation.language or default_language
-            if translation.name and language not in name_by_language:
-                name_by_language[language] = translation.name
-            description = translation.description or translation.short_description
+            if not language:
+                continue
+            translation_sales_channel_id = getattr(translation, "sales_channel_id", None)
+            if translation_sales_channel_id == sales_channel_id:
+                channel_translations[language] = translation
+            elif translation_sales_channel_id is None:
+                default_translations[language] = translation
+
+        for language in allowed_languages:
+            selected = channel_translations.get(language) or default_translations.get(language)
+            if selected is None:
+                continue
+
+            fallback = default_translations.get(language)
+            name = selected.name
+            if not name and fallback is not None and fallback is not selected:
+                name = fallback.name
+            if name:
+                name_by_language[language] = name
+
+            description = selected.description or selected.short_description
+            if fallback is not None and fallback is not selected:
+                fallback_desc = fallback.description or fallback.short_description
+                if not description or (
+                    self._is_blank_html(description)
+                    and fallback_desc
+                    and not self._is_blank_html(fallback_desc)
+                ):
+                    description = fallback_desc
             if description:
                 existing = desc_by_language.get(language)
                 if existing is None or (self._is_blank_html(existing) and not self._is_blank_html(description)):

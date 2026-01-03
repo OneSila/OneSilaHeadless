@@ -17,7 +17,7 @@ class SheinSalesChannelViewPullFactory(SheinSiteListMixin, PullRemoteInstanceMix
 
     remote_model_class = SheinSalesChannelView
     field_mapping = {
-        "remote_id": "site_abbr",
+        "remote_id": "remote_id",
         "name": "site_name",
         "site_status": "site_status",
         "store_type": "store_type",
@@ -52,7 +52,6 @@ class SheinSalesChannelViewPullFactory(SheinSiteListMixin, PullRemoteInstanceMix
         default_remote_id: str | None = None
 
         for marketplace in records:
-            marketplace_remote_id = marketplace.get("main_site")
             for sub_site in marketplace.get("sub_site_list", []):
                 site_abbr = sub_site.get("site_abbr")
                 if not site_abbr:
@@ -70,13 +69,14 @@ class SheinSalesChannelViewPullFactory(SheinSiteListMixin, PullRemoteInstanceMix
 
                 remote_instances.append(
                     {
+                        "remote_id": site_abbr,
                         "site_abbr": site_abbr,
                         "site_name": sub_site.get("site_name"),
                         "site_status": sub_site.get("site_status"),
                         "store_type": sub_site.get("store_type"),
                         "domain": domain,
                         "url": url,
-                        "marketplace_remote_id": marketplace_remote_id,
+                        "marketplace_remote_id": site_abbr,
                         "marketplace_is_default": marketplace.get("is_default"),
                         "currency": sub_site.get("currency"),
                         "symbol_left": sub_site.get("symbol_left"),

@@ -16,7 +16,6 @@ from sales_channels.integrations.shein.models import (
     SheinPropertySelectValue,
     SheinRemoteLanguage,
     SheinSalesChannel,
-    SheinSalesChannelView,
 )
 
 
@@ -54,15 +53,12 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         self,
         *,
         sales_channel: SheinSalesChannel,
-        view: Optional[SheinSalesChannelView] = None,
         language: Optional[str] = None,
         import_process=None,
         sync_product_type_attributes: bool = True,
     ) -> None:
         self.sales_channel = sales_channel
         self.sales_channel_id = getattr(sales_channel, "pk", None)
-        self.view = view
-        self.view_id = getattr(view, "pk", None)
         self.language = language
         self.sync_product_type_attributes = sync_product_type_attributes
         self.synced_categories: list[SheinCategory] = []
@@ -85,9 +81,8 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         """Fetch the remote tree (when not provided) and persist all nodes."""
 
         logger.info(
-            "Shein schema sync starting for channel=%s view=%s language=%s",
+            "Shein schema sync starting for channel=%s language=%s",
             self.sales_channel_id,
-            self.view_id or "all",
             self.language or "auto",
         )
         self._print_debug(
@@ -100,18 +95,16 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
 
         if not normalized_nodes:
             logger.info(
-                "Shein schema sync aborted for channel=%s view=%s: no nodes returned",
+                "Shein schema sync aborted for channel=%s: no nodes returned",
                 self.sales_channel_id,
-                self.view_id or "all",
             )
             self._print_debug("No nodes returned from remote tree; aborting run.")
             return []
 
         logger.info(
-            "Shein schema sync will process %s nodes for channel=%s view=%s",
+            "Shein schema sync will process %s nodes for channel=%s",
             len(normalized_nodes),
             self.sales_channel_id,
-            self.view_id or "all",
         )
         self._print_debug(f"Processing {len(normalized_nodes)} nodes from remote tree.")
         self._prepare_import_progress(nodes=normalized_nodes)
@@ -120,9 +113,8 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             self._sync_node(node=node, parent=None)
 
         logger.info(
-            "Shein schema sync finished for channel=%s view=%s: %s categories, %s product types",
+            "Shein schema sync finished for channel=%s: %s categories, %s product types",
             self.sales_channel_id,
-            self.view_id or "all",
             len(self.synced_categories),
             len(self.synced_product_types),
         )
@@ -136,9 +128,8 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
 
         payload = self._build_request_payload()
         logger.info(
-            "Requesting Shein category tree for channel=%s view=%s payload=%s",
+            "Requesting Shein category tree for channel=%s payload=%s",
             self.sales_channel_id,
-            self.view_id or "all",
             payload,
         )
         self._print_debug(f"Requesting category tree with payload={payload}")
@@ -174,10 +165,9 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
 
         normalized = [record for record in records if isinstance(record, dict)]
         logger.info(
-            "Fetched %s remote Shein category nodes for channel=%s view=%s",
+            "Fetched %s remote Shein category nodes for channel=%s",
             len(normalized),
             self.sales_channel_id,
-            self.view_id or "all",
         )
         self._print_debug(f"Received {len(normalized)} nodes from category tree response.")
         return normalized
@@ -543,15 +533,11 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         *,
         language_code: str,
     ) -> None:
-        view = self.view
-        if view is None:
-            return
-
         normalized_code = language_code.strip().lower()
         if not normalized_code:
             return
 
-        cache_key = (getattr(view, "pk", None), normalized_code)
+        cache_key = (self.sales_channel_id, normalized_code)
         if cache_key in self._remote_language_cache:
             return
 
@@ -560,7 +546,6 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         SheinRemoteLanguage.objects.update_or_create(
             multi_tenant_company=self.sales_channel.multi_tenant_company,
             sales_channel=self.sales_channel,
-            sales_channel_view=view,
             remote_code=normalized_code,
             defaults={
                 "local_instance": local_code,
@@ -1036,11 +1021,6 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
         return None
 
     def _get_view_domain(self) -> Optional[str]:
-        if self.view and self.view.url:
-            domain = self._normalise_domain(value=self.view.url)
-            if domain:
-                return domain
-
         return self._normalise_domain(value=getattr(self.sales_channel, "hostname", None))
 
     @staticmethod

@@ -45,7 +45,6 @@ class SheinSchemaImportProcessorTest(TestCase):
 
         mock_factory.assert_called_once_with(
             sales_channel=self.sales_channel,
-            view=None,
             language=None,
             import_process=self.import_process,
         )

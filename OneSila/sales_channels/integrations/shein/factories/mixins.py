@@ -443,8 +443,7 @@ class SheinSignatureMixin:
 
         remote_languages = (
             SheinRemoteLanguage.objects.filter(sales_channel=self.sales_channel)
-            .select_related("sales_channel_view")
-            .order_by("-sales_channel_view__is_default", "sales_channel_view_id", "pk")
+            .order_by("pk")
         )
 
         for remote_language in remote_languages:

@@ -10,7 +10,6 @@ from sales_channels.integrations.shein.models import (
     SheinPropertySelectValue,
     SheinRemoteLanguage,
     SheinSalesChannel,
-    SheinSalesChannelView,
 )
 
 
@@ -22,16 +21,9 @@ class SheinPerfectMatchSelectValueMappingFactoryTest(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             remote_id="SHEIN",
         )
-        self.view = SheinSalesChannelView.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            remote_id="SITE",
-            is_default=True,
-        )
         SheinRemoteLanguage.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
-            sales_channel_view=self.view,
             local_instance="en",
             remote_code="en_US",
             remote_id="LANG",
@@ -134,4 +126,3 @@ class SheinPerfectMatchSelectValueMappingFactoryTest(TestCase):
 
         remote_select_value.refresh_from_db()
         self.assertIsNone(remote_select_value.local_instance)
-

@@ -20,7 +20,6 @@ from sales_channels.integrations.shein.models import (
     SheinPropertySelectValue,
     SheinRemoteLanguage,
     SheinSalesChannel,
-    SheinSalesChannelView,
 )
 from sales_channels.integrations.shein.models.imports import SheinSalesChannelImport
 
@@ -262,15 +261,9 @@ class SheinCategoryTreeFactoryTests(TestCase):
             open_key_id="open-key",
             secret_key="secret-key",
         )
-        self.view = baker.make(
-            SheinSalesChannelView,
-            sales_channel=self.sales_channel,
-            remote_id="shein-fr",
-            is_default=True,
-        )
 
     def test_run_creates_categories_and_product_types(self) -> None:
-        factory = SheinCategoryTreeSyncFactory(sales_channel=self.sales_channel, view=self.view)
+        factory = SheinCategoryTreeSyncFactory(sales_channel=self.sales_channel)
 
         def fake_post(*, path: str, payload=None, **kwargs):  # type: ignore[no-untyped-def]
             if path == factory.category_tree_path:
@@ -401,7 +394,7 @@ class SheinCategoryTreeFactoryTests(TestCase):
         self.assertFalse(size_item.is_main_attribute)
         self.assertTrue(size_item.allows_unmapped_values)
 
-        remote_languages = self.view.remote_languages.all()
+        remote_languages = SheinRemoteLanguage.objects.filter(sales_channel=self.sales_channel)
         self.assertEqual(remote_languages.count(), 1)
         remote_language = remote_languages.first()
         self.assertIsNotNone(remote_language)
@@ -419,7 +412,6 @@ class SheinCategoryTreeFactoryTests(TestCase):
         )
         factory = SheinCategoryTreeSyncFactory(
             sales_channel=self.sales_channel,
-            view=self.view,
             import_process=import_process,
         )
         nodes = CATEGORY_TREE_PAYLOAD["info"]["data"]
@@ -431,7 +423,7 @@ class SheinCategoryTreeFactoryTests(TestCase):
         self.assertEqual(import_process.percentage, 100)
 
     def test_strips_openapi_prefix_from_property_names(self) -> None:
-        factory = SheinCategoryTreeSyncFactory(sales_channel=self.sales_channel, view=self.view)
+        factory = SheinCategoryTreeSyncFactory(sales_channel=self.sales_channel)
         payload = copy.deepcopy(ATTRIBUTE_TEMPLATE_RESPONSE)
         payload["info"]["data"][0]["attribute_infos"][0]["attribute_name"] = "OPENAPI-Color"
         payload["info"]["data"][0]["attribute_infos"][0]["attribute_name_en"] = "OPENAPI-Color EN"
@@ -476,7 +468,7 @@ class SheinCategoryTreeFactoryTests(TestCase):
 
     def test_run_uses_provided_tree_without_remote_call(self) -> None:
         tree = CATEGORY_TREE_PAYLOAD["info"]["data"]
-        factory = SheinCategoryTreeSyncFactory(sales_channel=self.sales_channel, view=self.view)
+        factory = SheinCategoryTreeSyncFactory(sales_channel=self.sales_channel)
 
         with patch.object(
             SheinCategoryTreeSyncFactory,
