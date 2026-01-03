@@ -23,11 +23,9 @@ class SheinSchemaImportProcessor(ImportMixin):
         import_process,
         sales_channel: SheinSalesChannel,
         language: Optional[str] = None,
-        view=None,
     ) -> None:
         super().__init__(import_process, language)
         self.sales_channel = sales_channel
-        self.view = view
         self.initial_active = bool(getattr(sales_channel, "active", True))
         self.initial_is_importing = bool(getattr(sales_channel, "is_importing", False))
         self.import_process = self.import_process.get_real_instance()
@@ -47,28 +45,24 @@ class SheinSchemaImportProcessor(ImportMixin):
 
     def import_rules_process(self) -> None:
         channel_id = getattr(self.sales_channel, "pk", None)
-        view_id = getattr(self.view, "pk", None) or "all"
         language = self.language or "auto"
 
         logger.info(
-            "Starting Shein schema import for channel=%s view=%s language=%s",
+            "Starting Shein schema import for channel=%s language=%s",
             channel_id,
-            view_id,
             language,
         )
 
         factory = SheinCategoryTreeSyncFactory(
             sales_channel=self.sales_channel,
-            view=self.view,
             language=self.language,
             import_process=self.import_process,
         )
         factory.run()
 
         logger.info(
-            "Completed Shein schema import for channel=%s view=%s: %s categories, %s product types",
+            "Completed Shein schema import for channel=%s: %s categories, %s product types",
             channel_id,
-            view_id,
             len(factory.synced_categories),
             len(factory.synced_product_types),
         )

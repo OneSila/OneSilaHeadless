@@ -6,7 +6,7 @@ from model_bakery import baker
 
 from currencies.models import Currency
 from eancodes.models import EanCode
-from products.models import ConfigurableVariation, Product
+from products.models import ConfigurableVariation, Product, ProductTranslation
 from properties.models import (
     ProductPropertiesRule,
     ProductPropertiesRuleItem,
@@ -28,6 +28,7 @@ from sales_channels.integrations.shein.models import (
     SheinProduct,
     SheinInternalProperty,
     SheinInternalPropertyOption,
+    SheinRemoteLanguage,
     SheinSalesChannel,
     SheinSalesChannelView,
 )
@@ -220,6 +221,128 @@ class SheinProductPayloadFactoryTests(TestCase):
             variation=variation,
         )
         return variation
+
+    def test_build_translations_prefers_sales_channel_and_filters_languages(self) -> None:
+        SheinRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance="en",
+            remote_code="en",
+        )
+        SheinRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance="fr",
+            remote_code="fr",
+        )
+        category = SheinCategory.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="CAT-DEFAULT",
+            default_language="fr",
+            name="Category",
+            raw_data={},
+        )
+
+        ProductTranslation.objects.create(
+            product=self.product,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            language="en",
+            name="Channel EN",
+            description="Channel EN desc",
+        )
+        ProductTranslation.objects.create(
+            product=self.product,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=None,
+            language="en",
+            name="Default EN",
+            description="Default EN desc",
+        )
+        ProductTranslation.objects.create(
+            product=self.product,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=None,
+            language="fr",
+            name="Default FR",
+            description="Default FR desc",
+        )
+        ProductTranslation.objects.create(
+            product=self.product,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            language="es",
+            name="Ignored ES",
+            description="Ignored ES desc",
+        )
+
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            get_value_only=True,
+        )
+        factory.selected_category_id = category.remote_id
+        self.assertEqual(factory._get_default_language(), "fr")
+        factory._build_translations()
+
+        self.assertCountEqual(
+            factory.multi_language_name_list,
+            [
+                {"language": "en", "name": "Channel EN"},
+                {"language": "fr", "name": "Default FR"},
+            ],
+        )
+        self.assertCountEqual(
+            factory.multi_language_desc_list,
+            [
+                {"language": "en", "name": "Channel EN desc"},
+                {"language": "fr", "name": "Default FR desc"},
+            ],
+        )
+
+    def test_build_translations_falls_back_when_channel_description_blank(self) -> None:
+        SheinRemoteLanguage.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance="en",
+            remote_code="en",
+        )
+
+        ProductTranslation.objects.create(
+            product=self.product,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            language="en",
+            name="Channel EN",
+            description="<p><br></p>",
+        )
+        ProductTranslation.objects.create(
+            product=self.product,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=None,
+            language="en",
+            name="Default EN",
+            description="Default EN desc",
+        )
+
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            get_value_only=True,
+        )
+        factory._build_translations()
+
+        self.assertCountEqual(
+            factory.multi_language_name_list,
+            [{"language": "en", "name": "Channel EN"}],
+        )
+        self.assertCountEqual(
+            factory.multi_language_desc_list,
+            [{"language": "en", "name": "Default EN desc"}],
+        )
 
     def test_shein_build_sku_list_includes_supplier_barcode_and_package_type(self) -> None:
         self._assign_supplier_code(product=self.product, value="SUP-1")

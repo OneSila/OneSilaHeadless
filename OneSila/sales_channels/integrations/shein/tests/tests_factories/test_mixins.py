@@ -12,7 +12,6 @@ from sales_channels.integrations.shein.factories.mixins import SheinSignatureMix
 from sales_channels.integrations.shein.models import (
     SheinRemoteLanguage,
     SheinSalesChannel,
-    SheinSalesChannelView,
 )
 
 
@@ -395,23 +394,15 @@ class SheinSignatureMixinTests(TestCase):
                 list(self.factory.get_all_products())
 
     def test_get_product_uses_view_languages_and_returns_info(self) -> None:
-        view = SheinSalesChannelView.objects.create(
-            sales_channel=self.sales_channel,
-            multi_tenant_company=self.multi_tenant_company,
-            name="Default View",
-            is_default=True,
-        )
         SheinRemoteLanguage.objects.create(
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
-            sales_channel_view=view,
             local_instance="pt",
             remote_code="pt",
         )
         SheinRemoteLanguage.objects.create(
             sales_channel=self.sales_channel,
             multi_tenant_company=self.multi_tenant_company,
-            sales_channel_view=view,
             local_instance=None,
             remote_code="zh-cn",
         )

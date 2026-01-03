@@ -27,15 +27,14 @@ class SheinPerfectMatchSelectValueMappingFactory(BasePerfectMatchSelectValueMapp
                 sales_channel=self.sales_channel,
                 local_instance__isnull=False,
             )
-            .select_related("sales_channel_view")
-            .order_by("-sales_channel_view__is_default", "id")
+            .order_by("id")
         )
 
     def get_local_language_code(self, *, remote_language):
         return remote_language.local_instance
 
     def get_remote_scope_for_language(self, *, remote_language):
-        return remote_language.sales_channel_view
+        return self.sales_channel
 
     def get_candidates_queryset(self, *, remote_scope):
         return (
@@ -61,4 +60,3 @@ class SheinPerfectMatchSelectValueMappingFactory(BasePerfectMatchSelectValueMapp
             cleaned = value_en.strip()
             if cleaned:
                 yield cleaned
-

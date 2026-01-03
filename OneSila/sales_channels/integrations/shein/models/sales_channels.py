@@ -214,11 +214,3 @@ class SheinRemoteLanguage(RemoteLanguage):
         blank=True,
         help_text="Display name for the remote language.",
     )
-    sales_channel_view = models.ForeignKey(
-        SheinSalesChannelView,
-        on_delete=models.SET_NULL,
-        related_name='remote_languages',
-        null=True,
-        blank=True,
-        help_text="Storefront associated with this language, if known.",
-    )
