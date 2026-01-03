@@ -847,11 +847,13 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
             propertyselectvalue=size_large,
             language="en-us",
             value="Large",
+            multi_tenant_company=self.multi_tenant_company,
         )
         PropertySelectValueTranslation.objects.create(
             propertyselectvalue=size_medium,
             language="en-us",
             value="Medium",
+            multi_tenant_company=self.multi_tenant_company,
         )
 
         ProductPropertiesRuleItem.objects.create(

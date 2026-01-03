@@ -31,10 +31,12 @@ class BulkContentContextBuilderTestCase(TestCase):
         ConfigurableVariation.objects.create(
             parent=self.parent,
             variation=self.variation_red,
+            multi_tenant_company=self.multi_tenant_company,
         )
         ConfigurableVariation.objects.create(
             parent=self.parent,
             variation=self.variation_blue,
+            multi_tenant_company=self.multi_tenant_company,
         )
 
         self.color_property = Property.objects.create(
@@ -110,6 +112,7 @@ class BulkContentContextBuilderTestCase(TestCase):
             ConfigurableVariation.objects.create(
                 parent=self.parent,
                 variation=variation,
+                multi_tenant_company=self.multi_tenant_company,
             )
 
         builder = BulkContentContextBuilder(
