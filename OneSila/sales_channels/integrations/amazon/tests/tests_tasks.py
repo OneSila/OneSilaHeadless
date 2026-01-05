@@ -1,7 +1,9 @@
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from core.tests import TestCase
+from django.utils import timezone
 from imports_exports.factories.imports import AsyncProductImportMixin
 from imports_exports.models import Import
 from model_bakery import baker
@@ -10,11 +12,13 @@ from sales_channels.integrations.amazon.factories.imports.products_imports impor
     AmazonProductItemFactory,
 )
 from sales_channels.integrations.amazon.helpers import serialize_listing_item
+from sales_channels.integrations.amazon.models import AmazonProduct, AmazonSalesChannelView
 from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonSalesChannel,
 )
 from sales_channels.integrations.amazon.models.properties import AmazonProperty
 from sales_channels.integrations.amazon.tasks import (
+    refresh_amazon_product_issues_cronjob,
     run_amazon_sales_channel_mapping_sync,
 )
 from unittest.mock import PropertyMock, patch
@@ -98,3 +102,45 @@ class AmazonMappingSyncTaskTest(TestCase):
         self.assertEqual(summary["select_values"], 0)
         self.assertEqual(summary["default_units"], 0)
         self.assertEqual(target_property.local_instance, self.local_property)
+
+
+class AmazonProductIssuesCronjobTest(TestCase):
+    @patch("sales_channels.integrations.amazon.factories.sales_channels.issues.FetchRemoteIssuesFactory")
+    def test_refresh_includes_pending_approval_products(self, factory_class):
+        sales_channel = AmazonSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="store.example.com",
+        )
+        view = AmazonSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            remote_id="US",
+        )
+        now = timezone.now()
+        recent_product = AmazonProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            last_sync_at=now,
+            created_marketplaces=[view.remote_id],
+        )
+        pending_product = AmazonProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            status=AmazonProduct.STATUS_PENDING_APPROVAL,
+            last_sync_at=now - timedelta(days=1),
+            created_marketplaces=[view.remote_id],
+        )
+        old_product = AmazonProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=sales_channel,
+            last_sync_at=now - timedelta(days=1),
+            created_marketplaces=[view.remote_id],
+        )
+
+        refresh_amazon_product_issues_cronjob()
+
+        called_products = {
+            call.kwargs["remote_product"]
+            for call in factory_class.call_args_list
+        }
+        self.assertEqual(called_products, {recent_product, pending_product})

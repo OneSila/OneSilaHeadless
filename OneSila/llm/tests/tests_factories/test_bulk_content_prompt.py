@@ -26,7 +26,9 @@ class BulkContentLLMPromptTestCase(TestCase):
         self,
         *,
         additional_informations: str | None,
+        product_context: dict | None = None,
     ) -> BulkContentLLM:
+        product_context = product_context or {}
         channel = {
             "integration_id": self.sales_channel.global_id,
             "integration_fallback_id": str(self.sales_channel.id),
@@ -34,7 +36,7 @@ class BulkContentLLMPromptTestCase(TestCase):
             "languages": ["en"],
             "default_language": "en",
             "field_rules": build_field_rules(integration_type=EBAY_INTEGRATION),
-            "product_context": {},
+            "product_context": product_context,
             "integration_guidelines": INTEGRATION_GUIDELINES.get(EBAY_INTEGRATION, []),
         }
         return BulkContentLLM(
@@ -71,9 +73,27 @@ class BulkContentLLMPromptTestCase(TestCase):
         self.assertIn("len(value)", llm.system_prompt)
         self.assertNotIn("80%", llm.system_prompt)
 
+    def test_system_prompt_enforces_language_output(self):
+        llm = self._build_llm(additional_informations=None)
+
+        self.assertIn("never output English for non-English codes", llm.system_prompt)
+
     def test_prompt_includes_writing_brief(self):
         llm = self._build_llm(additional_informations=None)
         payload = json.loads(llm.prompt)
 
         self.assertIn("writing_brief", payload)
         self.assertTrue(payload["writing_brief"])
+
+    def test_images_from_product_context(self):
+        llm = self._build_llm(
+            additional_informations=None,
+            product_context={
+                "media": {
+                    "images": ["https://example.com/image.jpg"],
+                    "documents": [],
+                }
+            },
+        )
+
+        self.assertEqual(llm.images, ["https://example.com/image.jpg"])

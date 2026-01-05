@@ -5,6 +5,7 @@ from django.core.files import File
 from django.core.files.base import ContentFile
 from django.conf import settings
 from pathlib import Path
+from unittest.mock import patch
 
 from .helpers import CreateImageMixin
 
@@ -55,6 +56,26 @@ class MediaTestCase(CreateImageMixin, TestCase):
         image2 = Image.objects.create(image=image_file_duplicate, multi_tenant_company=self.multi_tenant_company)
 
         self.assertEqual(image1.id, image2.id)
+
+    def test_image_get_or_create_handles_duplicate_insert(self):
+        image_file = self.get_image_file('red.png')
+        existing = Image.objects.create(
+            image=image_file,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        duplicate_file = self.get_image_file('red.png')
+        with patch(
+            "media.managers.ImageManager.get",
+            side_effect=[Image.DoesNotExist, existing],
+        ):
+            instance, created = Image.objects.get_or_create(
+                image=duplicate_file,
+                multi_tenant_company=self.multi_tenant_company,
+            )
+
+        self.assertEqual(instance.id, existing.id)
+        self.assertFalse(created)
 
     def test_image_upload_path(self):
         image = self.create_image(fname='red.png', multi_tenant_company=self.multi_tenant_company)

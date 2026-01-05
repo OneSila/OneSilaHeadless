@@ -28,7 +28,7 @@ class BulkGenerateContentFlow:
         override: bool,
         preview: bool,
         additional_informations: str | None = None,
-        debug: bool = False,
+        debug: bool = True,
     ):
         self.multi_tenant_company = multi_tenant_company
         self.product_ids = product_ids
@@ -171,16 +171,6 @@ class BulkGenerateContentFlow:
                 override=override,
             )
 
-        if field_rules["flags"].get("urlKey", False):
-            url_key_limit = field_rules["limits"].get("urlKey", {}).get("max")
-            max_len = url_key_limit if url_key_limit and url_key_limit > 0 else None
-            name_value = merged.get("name") or existing.get("name") or ""
-            url_key = self._build_url_key(name=name_value, max_len=max_len)
-            if override or is_empty_value(value=existing.get("urlKey")):
-                merged["urlKey"] = url_key
-            else:
-                merged["urlKey"] = existing.get("urlKey")
-
         return merged
 
     def _apply_bullet_points(
@@ -197,6 +187,7 @@ class BulkGenerateContentFlow:
                 [
                     ProductTranslationBulletPoint(
                         product_translation=translation,
+                        multi_tenant_company=translation.multi_tenant_company,
                         text=point,
                         sort_order=index,
                     )
@@ -214,6 +205,7 @@ class BulkGenerateContentFlow:
             [
                 ProductTranslationBulletPoint(
                     product_translation=translation,
+                    multi_tenant_company=translation.multi_tenant_company,
                     text=point,
                     sort_order=start_index + index,
                 )
@@ -241,6 +233,7 @@ class BulkGenerateContentFlow:
                 product=product,
                 language=language,
                 sales_channel=sales_channel,
+                multi_tenant_company=product.multi_tenant_company,
                 name=merged.get("name") or product.sku or "",
             )
 
@@ -249,7 +242,6 @@ class BulkGenerateContentFlow:
             "subtitle": "subtitle",
             "shortDescription": "short_description",
             "description": "description",
-            "urlKey": "url_key",
         }.items():
             if field in merged:
                 setattr(translation, attr, merged.get(field))

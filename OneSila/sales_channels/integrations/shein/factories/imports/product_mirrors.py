@@ -180,15 +180,33 @@ class SheinProductImportMirrorMixin:
                 sales_channel=self.sales_channel,
             )
             for category in parent_categories:
-                SheinProductCategory.objects.get_or_create(
-                    product=local_variation,
-                    multi_tenant_company=self.multi_tenant_company,
-                    sales_channel=self.sales_channel,
-                    defaults={
-                        "remote_id": category.remote_id,
-                        "product_type_remote_id": category.product_type_remote_id,
-                    },
-                )
+                try:
+                    SheinProductCategory.objects.get_or_create(
+                        product=local_variation,
+                        multi_tenant_company=self.multi_tenant_company,
+                        sales_channel=self.sales_channel,
+                        defaults={
+                            "remote_id": category.remote_id,
+                            "product_type_remote_id": category.product_type_remote_id,
+                        },
+                    )
+                except ValidationError as exc:
+                    existing = SheinProductCategory.objects.filter(
+                        product=local_variation,
+                        sales_channel=self.sales_channel,
+                    ).first()
+                    if existing is not None:
+                        continue
+                    self._add_broken_record(
+                        code=self.ERROR_INVALID_CATEGORY_ASSIGNMENT,
+                        message="Invalid Shein category returned by payload",
+                        data={
+                            "category_id": category.remote_id,
+                            "sku": getattr(local_variation, "sku", None),
+                        },
+                        context={"product_id": getattr(local_variation, "id", None)},
+                        exc=exc,
+                    )
 
         parent_rule = None
         if remote_parent.local_instance is not None:

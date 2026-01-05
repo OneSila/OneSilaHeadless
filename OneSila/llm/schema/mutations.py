@@ -164,7 +164,6 @@ class LlmMutation:
                 override=instance.override or False,
                 preview=True,
                 additional_informations=instance.additional_informations,
-                debug=instance.debug or False,
             )
             preview_payload = flow.flow()
             return AiBulkContentResponse(
@@ -179,7 +178,6 @@ class LlmMutation:
             sales_channel_languages={str(key): value for key, value in sales_channel_languages.items()},
             override=instance.override or False,
             additional_informations=instance.additional_informations,
-            debug=instance.debug or False,
         )
 
         return AiBulkContentResponse(success=True)

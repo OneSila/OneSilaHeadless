@@ -133,9 +133,7 @@ class AskGPTMixin(OpenAIMixin):
 
         image_inputs = [{"type": "input_image", "image_url": url} for url in self.images]
         start_time = time.time()
-        print('------------------------------------------------------')
-        print(self.system_prompt)
-        print(self.prompt)
+
         payload = {
             "model": self.model,  # this model does not support images use gpt-4o or similar
             "instructions": self.system_prompt,

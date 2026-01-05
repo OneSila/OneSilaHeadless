@@ -29,6 +29,7 @@ Non-negotiable constraints:
 - The <product_sku> key must match the provided product_sku.
 - Only include languages listed in the input.
 - Use language codes exactly as provided (no normalization or shortening).
+- Every <language> block must be written in that language; never output English for non-English codes.
 - Use only these field keys when enabled: name, subtitle, shortDescription, description, bulletPoints.
 - name/subtitle/bulletPoints must be plain text. description/shortDescription may use basic HTML (<p>, <b>, <ol>, <li data-list="bullet">).
 - All min/max limits apply to the final field string as returned in JSON, measured by Python len(value).

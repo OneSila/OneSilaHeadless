@@ -134,6 +134,7 @@ class SheinProductDocumentStateFactory(SheinSignatureMixin):
     def fetch(self, *, payload: dict[str, Any]) -> dict[str, Any]:
         response = self.shein_post(path=self.query_document_state_path, payload=payload)
         response_data = response.json() if hasattr(response, "json") else {}
+        logger.debug("Shein document state response: %s", response_data)
         return response_data if isinstance(response_data, dict) else {"response": response_data}
 
     def persist_issues(self) -> None:
