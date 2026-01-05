@@ -314,13 +314,15 @@ class SheinProductsImportProcessor(
             instance=product_instance,
             update_current_rule=False,
         )
+        mirror_defaults = {"is_variation": is_variation}
+        if is_variation and parent_remote is not None:
+            mirror_defaults["remote_parent_product"] = parent_remote
+
         instance.prepare_mirror_model_class(
             mirror_model_class=SheinProduct,
             sales_channel=self.sales_channel,
             mirror_model_map={"local_instance": "*"},
-            mirror_model_defaults={
-                "is_variation": is_variation,
-            },
+            mirror_model_defaults=mirror_defaults,
         )
         if local_sku:
             instance.mirror_model_defaults["remote_sku"] = local_sku
