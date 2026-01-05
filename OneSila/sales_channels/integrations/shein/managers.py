@@ -19,10 +19,10 @@ class SheinPropertyQuerySet(
     mapped_field = "remote_id"
 
     def used_in_products(self, value: bool = True):
-        from sales_channels.models.properties import RemoteProductProperty
+        from sales_channels.integrations.shein.models import SheinProductProperty
 
         return super().used_in_products(
-            remote_product_property_model=RemoteProductProperty,
+            remote_product_property_model=SheinProductProperty,
             used=value,
         )
 
@@ -53,19 +53,19 @@ class SheinPropertySelectValueQuerySet(
         return self.annotate_mapping().filter(shein_property_mapped_locally=value)
 
     def used_in_products(self, value: bool = True):
-        from sales_channels.models.properties import RemoteProductProperty
+        from sales_channels.integrations.shein.models import SheinProductProperty
 
         return super().used_in_products_by_remote_property(
-            remote_product_property_model=RemoteProductProperty,
+            remote_product_property_model=SheinProductProperty,
             related_remote_property_field="remote_property",
             used=value,
         )
 
     def filter_shein_property_used_in_products(self, value: bool = True):
-        from sales_channels.models.properties import RemoteProductProperty
+        from sales_channels.integrations.shein.models import SheinProductProperty
 
         return super().remote_property_used_in_products(
-            remote_product_property_model=RemoteProductProperty,
+            remote_product_property_model=SheinProductProperty,
             related_remote_property_field="remote_property",
             used=value,
         )

@@ -7,13 +7,13 @@ from products.models import Product
 
 from sales_channels.integrations.shein.factories.prices import SheinPriceUpdateFactory
 from sales_channels.integrations.shein.models import (
+    SheinPrice,
     SheinProduct,
     SheinSalesChannel,
     SheinSalesChannelView,
 )
 from sales_channels.exceptions import PreFlightCheckError
 from sales_channels.models import SalesChannelViewAssign
-from sales_channels.models.products import RemotePrice
 
 
 class SheinPriceApiPayloadTest(TestCase):
@@ -96,7 +96,7 @@ class SheinPriceApiPayloadTest(TestCase):
         self.assertEqual(payload["shopPrice"], 20)
         self.assertEqual(payload["specialPrice"], 10)
 
-        remote_price = RemotePrice.objects.get(remote_product=self.remote_product)
+        remote_price = SheinPrice.objects.get(remote_product=self.remote_product)
         self.assertEqual(remote_price.price_data["EUR"]["price"], 20)
 
     def test_raises_when_sku_code_missing(self):

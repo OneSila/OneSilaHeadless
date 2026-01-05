@@ -10,7 +10,6 @@ from sales_channels.integrations.shein.models import (
     SheinRemoteCurrency,
     SheinSalesChannel,
 )
-from sales_channels.models.products import RemotePrice
 from products.models import Product
 
 

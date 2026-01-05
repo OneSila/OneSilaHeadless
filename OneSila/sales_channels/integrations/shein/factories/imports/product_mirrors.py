@@ -12,11 +12,11 @@ from products.product_types import CONFIGURABLE
 from sales_channels.integrations.shein.models import (
     SheinProduct,
     SheinProductCategory,
+    SheinProductProperty,
     SheinSalesChannelView,
 )
 from sales_channels.models import SalesChannelViewAssign
 from sales_channels.models.products import RemoteProductConfigurator
-from sales_channels.models.properties import RemoteProductProperty
 
 
 class SheinProductImportMirrorMixin:
@@ -115,7 +115,7 @@ class SheinProductImportMirrorMixin:
             if remote_property is None:
                 continue
 
-            remote_entry, _ = RemoteProductProperty.objects.get_or_create(
+            remote_entry, _ = SheinProductProperty.objects.get_or_create(
                 multi_tenant_company=self.import_process.multi_tenant_company,
                 sales_channel=self.sales_channel,
                 remote_product=remote_product,

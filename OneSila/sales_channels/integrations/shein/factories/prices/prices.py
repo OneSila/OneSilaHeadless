@@ -5,9 +5,9 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional
 
 from sales_channels.factories.prices.prices import RemotePriceUpdateFactory
 from sales_channels.integrations.shein.factories.mixins import SheinSignatureMixin
-from sales_channels.models import SalesChannelViewAssign
+from sales_channels.integrations.shein.models import SheinPrice
 from sales_channels.integrations.shein.models.sales_channels import SheinRemoteCurrency
-from sales_channels.models.products import RemotePrice
+from sales_channels.models import SalesChannelViewAssign
 from sales_channels.exceptions import PreFlightCheckError
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class SheinPriceUpdateFactory(SheinSignatureMixin, RemotePriceUpdateFactory):
     """Compute Shein price payloads with optional value-only mode."""
 
-    remote_model_class = RemotePrice
+    remote_model_class = SheinPrice
 
     def __init__(
         self,

@@ -3,9 +3,13 @@ from model_bakery import baker
 
 from products.models import Product
 from properties.models import ProductProperty, Property
-from sales_channels.integrations.shein.models import SheinProperty, SheinPropertySelectValue, SheinSalesChannel
+from sales_channels.integrations.shein.models import (
+    SheinProductProperty,
+    SheinProperty,
+    SheinPropertySelectValue,
+    SheinSalesChannel,
+)
 from sales_channels.models.products import RemoteProduct
-from sales_channels.models.properties import RemoteProductProperty
 
 
 class SheinUsedInProductsQuerySetTest(TestCase):
@@ -55,9 +59,9 @@ class SheinUsedInProductsQuerySetTest(TestCase):
             property=self.property,
             multi_tenant_company=self.multi_tenant_company,
         )
-        RemoteProductProperty.objects.bulk_create(
+        SheinProductProperty.objects.bulk_create(
             [
-                RemoteProductProperty(
+                SheinProductProperty(
                     multi_tenant_company=self.multi_tenant_company,
                     sales_channel=self.sales_channel,
                     local_instance=product_property,
@@ -80,9 +84,9 @@ class SheinUsedInProductsQuerySetTest(TestCase):
             property=self.property,
             multi_tenant_company=self.multi_tenant_company,
         )
-        RemoteProductProperty.objects.bulk_create(
+        SheinProductProperty.objects.bulk_create(
             [
-                RemoteProductProperty(
+                SheinProductProperty(
                     multi_tenant_company=self.multi_tenant_company,
                     sales_channel=self.sales_channel,
                     local_instance=product_property,

@@ -268,7 +268,7 @@ class SheinProductImportTests(TestCase):
             product_type_remote_id="2147503175",
             is_leaf=True,
         )
-        local_parent = baker.make(Product, multi_tenant_company=self.multi_tenant_company)
+        local_parent = baker.make(Product, multi_tenant_company=self.multi_tenant_company, type=Product.CONFIGURABLE)
         local_variation = baker.make(Product, multi_tenant_company=self.multi_tenant_company)
         remote_parent = baker.make(
             SheinProduct,

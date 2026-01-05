@@ -32,9 +32,9 @@ from sales_channels.integrations.shein.models import (
     SheinImageProductAssociation,
     SheinProduct,
     SheinProductContent,
+    SheinPrice,
     SheinProductType,
 )
-from sales_channels.models.products import RemotePrice
 
 
 class SheinProductsImportProcessor(
@@ -59,7 +59,7 @@ class SheinProductsImportProcessor(
     remote_ean_code_class = SheinEanCode
     remote_product_content_class = SheinProductContent
     remote_imageproductassociation_class = SheinImageProductAssociation
-    remote_price_class = RemotePrice
+    remote_price_class = SheinPrice
 
     def __init__(
         self,

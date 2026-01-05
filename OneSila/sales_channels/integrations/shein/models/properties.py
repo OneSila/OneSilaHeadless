@@ -17,6 +17,7 @@ from sales_channels.integrations.shein.managers import SheinPropertyManager, She
 from sales_channels.models.mixins import RemoteObjectMixin
 from sales_channels.models.properties import (
     RemoteProperty,
+    RemoteProductProperty,
     RemotePropertySelectValue,
 )
 
@@ -431,6 +432,12 @@ class SheinProductTypeItem(RemoteObjectMixin, models.Model):
 
     def __str__(self) -> str:
         return f"{self.product_type} :: {self.property}"
+
+
+class SheinProductProperty(RemoteProductProperty):
+    """Shein product property model."""
+
+    pass
 
 
 class SheinInternalProperty(RemoteObjectMixin, models.Model):
