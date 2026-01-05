@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -42,6 +43,8 @@ from sales_channels.integrations.shein.models import (
     SheinInternalPropertyOption,
     SheinSalesChannelView,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SheinProductBaseFactory(
@@ -1555,9 +1558,11 @@ class SheinProductBaseFactory(
         )
         response_data = response.json() if hasattr(response, "json") else {}
 
-        print('-------------------------------------------------------------------- RESPONSE DATA')
-        print(self.payload)
-        print(response_data)
+        logger.info(
+            "Shein publish/edit response data: payload=%s response=%s",
+            self.payload,
+            response_data,
+        )
 
         if isinstance(response_data, dict):
             code = response_data.get("code")

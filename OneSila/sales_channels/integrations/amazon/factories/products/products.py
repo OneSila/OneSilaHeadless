@@ -1,3 +1,4 @@
+import inspect
 import json
 from typing import Dict
 
@@ -103,6 +104,18 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         self.external_product_id = self._get_external_product_id()
         self.ean_for_payload = self._get_ean_for_payload()
         self.recommended_browse_node_id = self._get_recommended_browse_node_id()
+
+    def get_identifiers(self, *, fixing_caller: str = "run"):
+        frame = inspect.currentframe()
+        caller = frame.f_back.f_code.co_name
+        class_name = AmazonProductBaseFactory.__name__
+
+        fixing_class = getattr(self, "fixing_identifier_class", None)
+        fixing_identifier = None
+        if fixing_caller and fixing_class:
+            fixing_identifier = f"{fixing_class.__name__}:{fixing_caller}"
+
+        return f"{class_name}:{caller}", fixing_identifier
 
     # ------------------------------------------------------------
     # Preflight & initialization helpers

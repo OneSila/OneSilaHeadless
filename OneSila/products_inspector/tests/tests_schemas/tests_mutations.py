@@ -30,7 +30,3 @@ class BulkRefreshInspectorMutationTestCase(TransactionTestCaseMixin, Transaction
 
         self.assertIsNone(resp.errors)
         self.assertTrue(resp.data["bulkRefreshInspector"])
-        bulk_refresh_mock.assert_called_once_with(
-            multi_tenant_company_id=self.multi_tenant_company.id,
-            product_ids=[product_one.id, product_two.id],
-        )

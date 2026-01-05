@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+import json
 from typing import Any, Dict, List, Optional
 
 from django.db import IntegrityError
@@ -31,6 +33,7 @@ from sales_channels.integrations.ebay.factories.prices import EbayPriceUpdateFac
 from sales_channels.integrations.ebay.models.products import EbayProduct
 from sales_channels.integrations.ebay.models.properties import (
     EbayProductProperty,
+    EbayInternalProperty,
     EbayProperty,
 )
 
@@ -80,6 +83,18 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
 
         # Ensure create/update factories share the same fixing identifier for log retries.
         type(self).fixing_identifier_class = EbayProductBaseFactory
+
+    def get_identifiers(self, *, fixing_caller: str = "run"):
+        frame = inspect.currentframe()
+        caller = frame.f_back.f_code.co_name
+        class_name = EbayProductBaseFactory.__name__
+
+        fixing_class = getattr(self, "fixing_identifier_class", None)
+        fixing_identifier = None
+        if fixing_caller and fixing_class:
+            fixing_identifier = f"{fixing_class.__name__}:{fixing_caller}"
+
+        return f"{class_name}:{caller}", fixing_identifier
 
     # ------------------------------------------------------------------
     # Base utilities
@@ -284,12 +299,47 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
 
         if self.get_value_only:
             values: Dict[str, str] = {}
+            language_code = self._get_language_code()
+            internal_properties = {
+                internal.local_instance_id: internal
+                for internal in (
+                    EbayInternalProperty.objects.filter(
+                        sales_channel=self.sales_channel,
+                        local_instance__isnull=False,
+                    )
+                    .select_related("local_instance")
+                    .prefetch_related("options__local_instance")
+                )
+            }
             for product_property in product_properties:
                 remote_property = EbayProperty.objects.filter(
                     sales_channel=self.sales_channel,
                     marketplace=self.view,
                     local_instance=product_property.property,
                 ).first()
+                if remote_property is None:
+                    internal_property = internal_properties.get(product_property.property_id)
+                    if internal_property is None:
+                        continue
+                    value = self._render_basic_property_value(
+                        product_property=product_property,
+                        language_code=language_code,
+                    )
+                    value = self._normalize_internal_property_value(
+                        internal_property=internal_property,
+                        product_property=product_property,
+                        value=value,
+                    )
+                    if value in (None, "", []):
+                        continue
+                    if isinstance(value, (dict, list)):
+                        values[str(product_property.property_id)] = json.dumps(
+                            value,
+                            sort_keys=True,
+                        )
+                    else:
+                        values[str(product_property.property_id)] = str(value)
+                    continue
                 values[str(product_property.property_id)] = self._prepare_property_remote_value(
                     product_property=product_property,
                     remote_property=remote_property,
@@ -302,6 +352,8 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
                 marketplace=self.view,
                 local_instance=product_property.property,
             ).first()
+            if remote_property is None:
+                continue
 
             defaults: Dict[str, Any] = {
                 "multi_tenant_company": self.sales_channel.multi_tenant_company,

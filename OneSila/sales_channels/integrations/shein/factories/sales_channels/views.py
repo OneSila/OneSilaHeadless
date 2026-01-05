@@ -26,7 +26,15 @@ class SheinSalesChannelViewPullFactory(SheinSiteListMixin, PullRemoteInstanceMix
         "merchant_location_key": "merchant_location_key",
         "merchant_location_choices": "merchant_location_choices",
     }
-    update_field_mapping = field_mapping
+    update_field_mapping = {
+        "remote_id": "remote_id",
+        "site_status": "site_status",
+        "store_type": "store_type",
+        "url": "url",
+        "is_default": "is_default",
+        "merchant_location_key": "merchant_location_key",
+        "merchant_location_choices": "merchant_location_choices",
+    }
     get_or_create_fields = ["remote_id"]
 
     allow_create = True

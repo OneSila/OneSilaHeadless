@@ -144,6 +144,18 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
     # ------------------------------------------------------------------
     # Tests
     # ------------------------------------------------------------------
+    def test_identifiers_use_base_factory(self) -> None:
+        create_factory = self._build_create_factory()
+        update_factory = self._build_update_factory()
+
+        create_identifier, create_fixing = create_factory.get_identifiers()
+        update_identifier, update_fixing = update_factory.get_identifiers()
+
+        self.assertTrue(create_identifier.startswith("EbayProductBaseFactory:"))
+        self.assertTrue(update_identifier.startswith("EbayProductBaseFactory:"))
+        self.assertEqual(create_fixing, "EbayProductBaseFactory:run")
+        self.assertEqual(update_fixing, "EbayProductBaseFactory:run")
+
     @patch(
         "sales_channels.integrations.ebay.factories.products.products.EbayProductContentUpdateFactory.run"
     )
@@ -397,6 +409,7 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         self.assertEqual(result["ean"], "EAN-VALUE")
         self.assertIn("listingDescription", result["content"])
         property_map = result["properties"]
+
         self.assertEqual(property_map[str(self.brand_property.id)], "Acme")
         self.assertEqual(property_map[str(self.weight_property.id)], "2.5")
         offer = EbayProductOffer.objects.get(

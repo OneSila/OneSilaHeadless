@@ -44,7 +44,6 @@ from ebay_rest.api.sell_inventory.rest import ApiException
 from ebay_rest.error import Error as EbayApiError
 
 from sales_channels.integrations.ebay.exceptions import (
-    EbayPropertyMappingMissingError,
     EbayResponseException,
 )
 from sales_channels.integrations.ebay.models.taxes import EbayCurrency
@@ -861,9 +860,10 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             or getattr(self.view, "remote_id", None)
             or "this marketplace"
         )
-        raise EbayPropertyMappingMissingError(
-            f"Property '{property_label}' is not mapped to an eBay aspect for {view_label}. "
-            "Import and map eBay aspects before syncing."
+        logger.warning(
+            "Skipping property '%s' because it is not mapped to an eBay aspect for %s.",
+            property_label,
+            view_label,
         )
 
     def _select_value_label(
@@ -1119,8 +1119,6 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
 
     def _prepare_property_remote_value(self, *, product_property: ProductProperty, remote_property: EbayProperty | None) -> str:
         language_code = self._get_language_code()
-        if remote_property is None:
-            self._raise_missing_remote_property(product_property=product_property)
 
         value = self._render_property_value(
             product_property=product_property,
@@ -2289,6 +2287,10 @@ class EbayProductPropertyValueMixin(EbayInventoryItemPushMixin):
     """Shared helpers for eBay product property factories."""
 
     remote_model_class = EbayProductProperty
+
+    def get_select_values(self):
+        """Skip generic select value preflight; eBay handles mappings in value rendering."""
+        pass
 
     def _compute_remote_value(self, *, remote_property: EbayProperty | None) -> str:
         return self._prepare_property_remote_value(

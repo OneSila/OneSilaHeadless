@@ -32,6 +32,8 @@ class CreateTransactionMixin:
         return self.transaction
 
     def _create_ai_generate_process(self):
+        if not hasattr(self, "result_time"):
+            self.result_time = 0
         self.ai_process = AiGenerateProcess.objects.create(
             product=self.product,
             transaction=self.transaction,
