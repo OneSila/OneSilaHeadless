@@ -1,7 +1,7 @@
 """Shein integration product models."""
 
 from core import models
-from sales_channels.models.products import RemoteProduct
+from sales_channels.models.products import RemoteEanCode, RemoteProduct, RemoteProductContent
 from sales_channels.models import RemoteImageProductAssociation
 
 
@@ -63,6 +63,16 @@ class SheinProduct(RemoteProduct):
             return self.STATUS_PENDING_APPROVAL
 
         return self.STATUS_COMPLETED
+
+
+class SheinProductContent(RemoteProductContent):
+    """Shein product content model."""
+    pass
+
+
+class SheinEanCode(RemoteEanCode):
+    """Shein EAN code model."""
+    pass
 
 
 class SheinImageProductAssociation(RemoteImageProductAssociation):

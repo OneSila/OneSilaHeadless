@@ -91,3 +91,25 @@ class SheinSiteListCurrencySyncTest(TestCase):
         )
         self.assertIsNone(pln_remote.local_instance)
         self.assertEqual(pln_remote.symbol_right, "zł")
+
+    def test_pull_keeps_existing_view_name(self):
+        SheinSalesChannelView.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="shein-fr",
+            name="Custom FR",
+            site_status=0,
+        )
+
+        factory = SheinSalesChannelViewPullFactory(sales_channel=self.sales_channel)
+
+        with patch.object(
+            factory,
+            "fetch_site_records",
+            return_value=SITE_LIST_RESPONSE,
+        ):
+            factory.run()
+
+        fr_view = SheinSalesChannelView.objects.get(sales_channel=self.sales_channel, remote_id="shein-fr")
+        self.assertEqual(fr_view.name, "Custom FR")
+        self.assertEqual(fr_view.site_status, 1)

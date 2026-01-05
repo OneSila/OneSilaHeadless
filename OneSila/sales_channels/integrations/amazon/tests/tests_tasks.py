@@ -1,7 +1,9 @@
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from core.tests import TestCase
+from django.utils import timezone
 from imports_exports.factories.imports import AsyncProductImportMixin
 from imports_exports.models import Import
 from model_bakery import baker
@@ -10,11 +12,13 @@ from sales_channels.integrations.amazon.factories.imports.products_imports impor
     AmazonProductItemFactory,
 )
 from sales_channels.integrations.amazon.helpers import serialize_listing_item
+from sales_channels.integrations.amazon.models import AmazonProduct, AmazonSalesChannelView
 from sales_channels.integrations.amazon.models.sales_channels import (
     AmazonSalesChannel,
 )
 from sales_channels.integrations.amazon.models.properties import AmazonProperty
 from sales_channels.integrations.amazon.tasks import (
+    refresh_amazon_product_issues_cronjob,
     run_amazon_sales_channel_mapping_sync,
 )
 from unittest.mock import PropertyMock, patch

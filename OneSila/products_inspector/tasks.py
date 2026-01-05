@@ -49,3 +49,20 @@ def trigger_rule_dependent_inspector_blocks_delete_task(rule):
     can run it on post_delete signal.
     """
     trigger_product_inspectors_for_rule_flow(rule)
+
+
+@run_task_after_commit
+@db_task(priority=0)
+def products_inspector__tasks__bulk_refresh_inspector(
+    *,
+    multi_tenant_company_id: int,
+    product_ids: list[int | str],
+) -> None:
+    from core.models import MultiTenantCompany
+    from products_inspector.flows.inspector import bulk_refresh_inspector_flow
+
+    multi_tenant_company = MultiTenantCompany.objects.get(id=multi_tenant_company_id)
+    bulk_refresh_inspector_flow(
+        multi_tenant_company=multi_tenant_company,
+        product_ids=product_ids,
+    )

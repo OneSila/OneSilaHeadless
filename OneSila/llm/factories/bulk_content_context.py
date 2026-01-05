@@ -161,12 +161,16 @@ class BulkContentContextBuilder:
         language: str,
         sales_channel_id: int | None,
     ) -> ProductTranslation | None:
-        for translation in translations:
-            if translation.language == language and translation.sales_channel_id == sales_channel_id:
-                return translation
-        for translation in translations:
-            if translation.language == language and translation.sales_channel_id is None:
-                return translation
+
+        if sales_channel_id is None:
+            for translation in translations:
+                if translation.language == language and translation.sales_channel_id is None:
+                    return translation
+        else:
+            for translation in translations:
+                if translation.language == language and translation.sales_channel_id == sales_channel_id:
+                    return translation
+
         return None
 
     def build_existing_content(

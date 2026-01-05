@@ -229,12 +229,15 @@ def resync_amazon_product_db_task(
 def refresh_amazon_product_issues_cronjob():
     """Fetch latest listing issues for Amazon products synced in the last 15 minutes."""
     from datetime import timedelta
+    from django.db.models import Q
     from django.utils import timezone
     from .models import AmazonProduct, AmazonSalesChannelView
     from .factories.sales_channels.issues import FetchRemoteIssuesFactory
 
     cutoff = timezone.now() - timedelta(minutes=15)
-    products = AmazonProduct.objects.filter(last_sync_at__gte=cutoff)
+    products = AmazonProduct.objects.filter(
+        Q(last_sync_at__gte=cutoff) | Q(status=AmazonProduct.STATUS_PENDING_APPROVAL)
+    )
     for product in products.iterator():
         marketplaces = product.created_marketplaces or []
         views = AmazonSalesChannelView.objects.filter(

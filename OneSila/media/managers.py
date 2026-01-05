@@ -94,10 +94,11 @@ class MediaManager(MultiTenantManager):
             # Save the image file using our file content.
             instance.image.save(image_name, ContentFile(content), save=False)
             try:
-                instance.save()
+                with transaction.atomic():
+                    instance.save()
                 return instance
             except IntegrityError:
-                # Another process created the same image concurrently
+                # Another process created the same image concurrently.
                 return self.get(image_hash=image_hash, multi_tenant_company=multi_tenant_company)
 
     @transaction.atomic
@@ -125,10 +126,11 @@ class MediaManager(MultiTenantManager):
             instance = self.model(**kwargs)
             instance.image.save(image_name, ContentFile(content), save=False)
             try:
-                instance.save()
+                with transaction.atomic():
+                    instance.save()
                 created = True
             except IntegrityError:
-                # Another process inserted the image in parallel
+                # Another process inserted the image in parallel.
                 instance = self.get(image_hash=image_hash, multi_tenant_company=multi_tenant_company)
                 created = False
             return instance, created

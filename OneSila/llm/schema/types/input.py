@@ -79,7 +79,6 @@ class AdvancedContentGeneratorInput:
     sales_channels: List[SalesChannelInstructionInput]
     override: Optional[bool] = False
     preview: Optional[bool] = False
-    debug: Optional[bool] = False
     additional_informations: Optional[str] = None
 
 

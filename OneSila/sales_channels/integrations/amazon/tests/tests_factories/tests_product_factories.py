@@ -630,6 +630,28 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         self.assertIsInstance(body, dict)
         self.assertEqual(body.get("requirements"), "LISTING")
 
+    def test_identifiers_use_base_factory(self):
+        create_factory = AmazonProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+        update_factory = AmazonProductUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+
+        create_identifier, create_fixing = create_factory.get_identifiers()
+        update_identifier, update_fixing = update_factory.get_identifiers()
+
+        self.assertTrue(create_identifier.startswith("AmazonProductBaseFactory:"))
+        self.assertTrue(update_identifier.startswith("AmazonProductBaseFactory:"))
+        self.assertEqual(create_fixing, "AmazonProductBaseFactory:run")
+        self.assertEqual(update_fixing, "AmazonProductBaseFactory:run")
+
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_update_product_factory_builds_correct_body(self, mock_listings, mock_get_client):

@@ -25,3 +25,22 @@ def resync_inspector_flow(inspector, run_async=True):
         # Run the resync synchronously (in the main thread)
         factory = ResyncInspectorFactory(inspector)
         factory.run()
+
+
+def bulk_refresh_inspector_flow(*, multi_tenant_company, product_ids: list[int | str]) -> None:
+    """
+    Refresh inspectors for the provided product ids.
+    """
+    from products_inspector.models import Inspector
+
+    if not product_ids:
+        return
+
+    unique_product_ids = list(dict.fromkeys(product_ids))
+    inspectors = Inspector.objects.select_related("product").filter(
+        product_id__in=unique_product_ids,
+        product__multi_tenant_company=multi_tenant_company,
+    )
+
+    for inspector in inspectors.iterator():
+        inspector.inspect_product(run_async=False)

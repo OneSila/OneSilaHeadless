@@ -254,3 +254,66 @@ class SheinProductImportTests(TestCase):
             assign.link,
             "https://us.shein.com/Product-Name-New-Eu-p-54645646511380-cat-4913127300.html",
         )
+
+    def test_handle_variations_ignores_duplicate_category_assignment(self) -> None:
+        class DummyImportInstance:
+            def __init__(self, *, remote_instance):
+                self.remote_instance = remote_instance
+
+        category = baker.make(
+            SheinCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="20039882",
+            product_type_remote_id="2147503175",
+            is_leaf=True,
+        )
+        local_parent = baker.make(Product, multi_tenant_company=self.multi_tenant_company)
+        local_variation = baker.make(Product, multi_tenant_company=self.multi_tenant_company)
+        remote_parent = baker.make(
+            SheinProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=local_parent,
+        )
+        remote_variation = baker.make(
+            SheinProduct,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=local_variation,
+        )
+        baker.make(
+            SheinProductCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=local_parent,
+            remote_id=category.remote_id,
+            product_type_remote_id=category.product_type_remote_id,
+        )
+        other_company = baker.make(type(self.multi_tenant_company))
+        baker.make(
+            SheinProductCategory,
+            multi_tenant_company=other_company,
+            sales_channel=self.sales_channel,
+            product=local_variation,
+            remote_id=category.remote_id,
+            product_type_remote_id=category.product_type_remote_id,
+        )
+
+        processor = SheinProductsImportProcessor(
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+        )
+        processor.handle_variations(
+            import_instance=DummyImportInstance(remote_instance=remote_variation),
+            parent_sku="parent-sku",
+            parent_remote=remote_parent,
+        )
+
+        self.assertEqual(
+            SheinProductCategory.objects.filter(
+                sales_channel=self.sales_channel,
+                product=local_variation,
+            ).count(),
+            1,
+        )

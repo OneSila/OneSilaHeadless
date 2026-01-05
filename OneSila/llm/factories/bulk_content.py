@@ -1,5 +1,4 @@
 import json
-import re
 import logging
 from copy import deepcopy
 from typing import Any
@@ -13,6 +12,13 @@ from integrations.constants import (
     SHEIN_INTEGRATION,
     SHOPIFY_INTEGRATION,
     WOOCOMMERCE_INTEGRATION,
+)
+from llm.factories.bulk_content_json import (
+    close_unterminated_json,
+    escape_control_chars,
+    extract_json_block,
+    remove_trailing_commas,
+    strip_code_fences,
 )
 from llm.factories.bulk_content_prompt import build_bulk_content_system_prompt
 from llm.factories.mixins import AskGPTMixin, CalculateCostMixin, CreateTransactionMixin
@@ -161,7 +167,7 @@ def _limit_value(*, value: int | None) -> int | None:
 class BulkContentLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
     model = "gpt-5-mini"
     temperature = 0.4
-    max_tokens = 8000
+    max_tokens = 16000
 
     def __init__(
         self,
@@ -192,6 +198,19 @@ class BulkContentLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
         self.retry_errors: list[str] | None = None
         self.previous_output: str | None = None
         self.used_points = 0
+        self.images = self._collect_prompt_images(channels=channels)
+
+    def _collect_prompt_images(self, *, channels: list[dict[str, Any]]) -> list[str]:
+        images: list[str] = []
+        seen: set[str] = set()
+        for channel in channels:
+            media = channel.get("product_context", {}).get("media", {})
+            for url in media.get("images", []) or []:
+                if not url or url in seen:
+                    continue
+                images.append(url)
+                seen.add(url)
+        return images
 
     @property
     def system_prompt(self) -> str:
@@ -241,97 +260,22 @@ class BulkContentLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
 
         return json.dumps(payload, ensure_ascii=True, indent=2)
 
-    def _strip_code_fences(self, *, text: str) -> str:
-        clean = text.strip()
-        if clean.startswith("```"):
-            clean = clean.split("```", 1)[1].strip()
-            if clean.startswith("json"):
-                clean = clean[len("json"):].strip()
-            if "```" in clean:
-                clean = clean.split("```")[0].strip()
-        return clean
-
-    def _extract_json_block(self, *, text: str) -> str | None:
-        start_idx = None
-        stack = []
-        in_string = False
-        escape = False
-
-        for idx, char in enumerate(text):
-            if in_string:
-                if escape:
-                    escape = False
-                elif char == "\\":
-                    escape = True
-                elif char == "\"":
-                    in_string = False
-                continue
-
-            if char == "\"":
-                in_string = True
-                continue
-
-            if char in ("{", "["):
-                if start_idx is None:
-                    start_idx = idx
-                stack.append(char)
-                continue
-
-            if char in ("}", "]") and stack:
-                opening = stack.pop()
-                if (opening == "{" and char != "}") or (opening == "[" and char != "]"):
-                    return None
-                if not stack and start_idx is not None:
-                    return text[start_idx:idx + 1]
-
-        return None
-
-    def _escape_control_chars(self, *, text: str) -> str:
-        escaped = []
-        in_string = False
-        escape = False
-
-        for char in text:
-            if in_string:
-                if escape:
-                    escape = False
-                    escaped.append(char)
-                    continue
-                if char == "\\":
-                    escape = True
-                    escaped.append(char)
-                    continue
-                if char == "\"":
-                    in_string = False
-                    escaped.append(char)
-                    continue
-                if char == "\n":
-                    escaped.append("\\n")
-                    continue
-                if char == "\r":
-                    escaped.append("\\r")
-                    continue
-                if char == "\t":
-                    escaped.append("\\t")
-                    continue
-                escaped.append(char)
-                continue
-
-            if char == "\"":
-                in_string = True
-            escaped.append(char)
-
-        return "".join(escaped)
-
-    def _remove_trailing_commas(self, *, text: str) -> str:
-        return re.sub(r",\s*([}\]])", r"\1", text)
-
     def _clean_json_response(self, *, text: str) -> dict[str, Any]:
-        clean = self._strip_code_fences(text=text)
-        candidate = self._extract_json_block(text=clean) or clean
-        candidate = self._escape_control_chars(text=candidate)
-        candidate = self._remove_trailing_commas(text=candidate)
-        return json.loads(candidate)
+        clean = strip_code_fences(text=text)
+        candidate = extract_json_block(text=clean) or clean
+        candidate = escape_control_chars(text=candidate)
+        candidate = remove_trailing_commas(text=candidate)
+        candidate = candidate.replace("\\'", "'")
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError as exc:
+            repaired = close_unterminated_json(text=candidate)
+            if repaired:
+                try:
+                    return json.loads(repaired)
+                except json.JSONDecodeError:
+                    pass
+            raise ValidationError("Invalid JSON response: could not parse.") from exc
 
     def _normalize_language_payload(self, *, payload: Any) -> dict[str, Any]:
         if not isinstance(payload, dict):
@@ -460,18 +404,15 @@ class BulkContentLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
         return errors
 
     def generate_content(self) -> dict[str, dict[str, dict[str, Any]]]:
-
         if self.debug:
             logger.info("BulkContentLLM prompt:\n%s", self.prompt)
-            print(f"BulkContentLLM prompt:\n{self.prompt}")
+
         self.response = self.ask_gpt()
         self.calculate_cost(self.response)
         self.text_response = self.get_text_response(self.response)
-        print('----------------------------------------------------- RESPONMSE ???')
-        print(self.text_response)
         if self.debug:
             logger.info("BulkContentLLM response:\n%s", self.text_response)
-            print(f"BulkContentLLM response:\n{self.text_response}")
+
         self._create_transaction()
         self._create_ai_generate_process()
         self.used_points += self.ai_process.transaction.points
@@ -479,5 +420,6 @@ class BulkContentLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
         parsed = self._parse_response(text=self.text_response)
         errors = self._validate_response(payload=parsed)
         if errors:
-            raise ValidationError("; ".join(errors))
+            self.retry_errors = errors
+            logger.warning("BulkContentLLM validation errors: %s", "; ".join(errors))
         return parsed

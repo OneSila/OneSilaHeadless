@@ -1,21 +1,21 @@
-from huey.contrib.djhuey import db_task
+from huey import crontab
+from huey.contrib.djhuey import db_task, db_periodic_task
 
 from core.huey import CRUCIAL_PRIORITY
 from integrations.factories.remote_task import BaseRemoteTask
 from sales_channels.decorators import remote_task
+from sales_channels.integrations.shein.factories.imports.products import (
+    SheinProductsAsyncImportProcessor,
+)
+from sales_channels.integrations.shein.factories.imports.schema_imports import (
+    SheinSchemaImportProcessor,
+)
 from sales_channels.integrations.shein.models.imports import SheinSalesChannelImport
 
 
 @db_task()
 def shein_import_db_task(import_process, sales_channel):
     """Dispatch the Shein import processor."""
-    from sales_channels.integrations.shein.factories.imports.schema_imports import (
-        SheinSchemaImportProcessor,
-    )
-    from sales_channels.integrations.shein.factories.imports.products import (
-        SheinProductsAsyncImportProcessor,
-    )
-
     import_type = getattr(import_process, "type", SheinSalesChannelImport.TYPE_SCHEMA)
     if import_type == SheinSalesChannelImport.TYPE_SCHEMA:
         factory = SheinSchemaImportProcessor(
@@ -204,3 +204,21 @@ def resync_shein_product_db_task(
         factory.run()
 
     task.execute(actual_task)
+
+
+@db_periodic_task(crontab(hour="0", minute="0"))
+def shein__tasks__refresh_product_issues__cronjob() -> None:
+    """Fetch latest review issues for pending Shein products once per day."""
+    from sales_channels.integrations.shein.factories.sales_channels.issues import (
+        FetchRemoteIssuesFactory,
+    )
+    from sales_channels.integrations.shein.models import SheinProduct
+
+    products = SheinProduct.objects.select_related("sales_channel").filter(
+        status=SheinProduct.STATUS_PENDING_APPROVAL
+    )
+    for product in products.iterator():
+        FetchRemoteIssuesFactory(
+            remote_product=product,
+            sales_channel=product.sales_channel,
+        ).run()

@@ -109,6 +109,43 @@ class BulkContentGenerationFlowTestCase(TestCase):
         self.assertEqual(translation.name, "Amazon Name")
         self.assertEqual(bullet_points, ["Point A", "Point B", "Point C", "Point D", "Point E"])
 
+    def test_override_creates_sales_channel_translation_when_global_exists(self):
+        sales_channel = AmazonSalesChannel.objects.create(
+            hostname="amazon-override",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        integration_id = sales_channel.global_id
+
+        def _fake_generate(self, *, max_attempts: int = 2):
+            return {
+                integration_id: {
+                    "en": {
+                        "name": "Amazon Generated Name",
+                        "description": "<p>Amazon generated description</p>",
+                        "bulletPoints": ["Point A", "Point B", "Point C", "Point D", "Point E"],
+                    }
+                }
+            }
+
+        with patch.object(BulkContentLLM, "generate_content", new=_fake_generate):
+            flow = BulkGenerateContentFlow(
+                multi_tenant_company=self.multi_tenant_company,
+                product_ids=[self.product.id],
+                sales_channel_languages={sales_channel.id: ["en"]},
+                override=True,
+                preview=False,
+            )
+            flow.flow()
+
+        translation = ProductTranslation.objects.filter(
+            product=self.product,
+            language="en",
+            sales_channel=sales_channel,
+        ).first()
+
+        self.assertIsNotNone(translation)
+        self.assertEqual(translation.name, "Amazon Generated Name")
+
     def test_preview_bulk_generation_supports_default_channel(self):
         def _fake_generate(self, *, max_attempts: int = 2):
             self.used_points = 2
