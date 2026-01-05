@@ -11,10 +11,10 @@ from sales_channels.factories.properties.properties import (
     RemoteProductPropertyDeleteFactory,
     RemoteProductPropertyUpdateFactory,
 )
-from sales_channels.models.properties import RemoteProductProperty
 from sales_channels.integrations.shein.factories.mixins import SheinSignatureMixin
 
 from sales_channels.integrations.shein.models import (
+    SheinProductProperty,
     SheinProductTypeItem,
     SheinProperty,
     SheinPropertySelectValue,
@@ -381,7 +381,7 @@ class SheinProductPropertyCreateFactory(
 ):
     """Compute Shein attribute payloads for new product property mirrors."""
 
-    remote_model_class = RemoteProductProperty
+    remote_model_class = SheinProductProperty
 
     def __init__(
         self,
@@ -433,7 +433,7 @@ class SheinProductPropertyUpdateFactory(
 ):
     """Update Shein attribute payload mirrors."""
 
-    remote_model_class = RemoteProductProperty
+    remote_model_class = SheinProductProperty
     create_factory_class = SheinProductPropertyCreateFactory
 
     def __init__(
@@ -513,7 +513,7 @@ class SheinProductPropertyUpdateFactory(
 class SheinProductPropertyDeleteFactory(RemoteProductPropertyDeleteFactory):
     """Delete the local mirror for a Shein product property without remote API calls."""
 
-    remote_model_class = RemoteProductProperty
+    remote_model_class = SheinProductProperty
 
     def delete_remote(self):
         return True

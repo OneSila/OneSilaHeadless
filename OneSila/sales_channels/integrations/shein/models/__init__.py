@@ -6,6 +6,7 @@ from .properties import (
     SheinProductTypeItem,
     SheinProperty,
     SheinPropertySelectValue,
+    SheinProductProperty,
     SheinInternalProperty,
     SheinInternalPropertyOption
 )
@@ -17,6 +18,7 @@ from .sales_channels import (
     SheinSalesChannelView,
 )
 
+from .prices import SheinPrice
 from .imports import SheinSalesChannelImport
 from .issues import SheinProductIssue
 from .products import (
@@ -33,12 +35,14 @@ __all__ = [
     "SheinProductTypeItem",
     "SheinProperty",
     "SheinPropertySelectValue",
+    "SheinProductProperty",
     "SheinInternalProperty",
     "SheinInternalPropertyOption",
     "SheinRemoteCurrency",
     "SheinRemoteLanguage",
     "SheinSalesChannel",
     "SheinSalesChannelView",
+    "SheinPrice",
     "SheinSalesChannelImport",
     "SheinProductIssue",
     "SheinProduct",

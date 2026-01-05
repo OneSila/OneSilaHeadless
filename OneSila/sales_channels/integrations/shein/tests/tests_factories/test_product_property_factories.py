@@ -6,12 +6,12 @@ from model_bakery import baker
 
 from products.models import Product
 from properties.models import ProductProperty, Property, PropertySelectValue
-from sales_channels.models.properties import RemoteProductProperty
 from sales_channels.exceptions import RemotePropertyValueNotMapped
 from sales_channels.integrations.shein.factories.properties.properties import (
     SheinProductPropertyCreateFactory,
 )
 from sales_channels.integrations.shein.models import (
+    SheinProductProperty,
     SheinProductType,
     SheinProductTypeItem,
     SheinProperty,
@@ -117,7 +117,7 @@ class SheinProductPropertyFactoryTest(TestCase):
         )
         factory.run()
 
-        remote_instance = RemoteProductProperty.objects.get(
+        remote_instance = SheinProductProperty.objects.get(
             local_instance=product_property,
             remote_product=self.remote_product,
         )
@@ -175,7 +175,7 @@ class SheinProductPropertyFactoryTest(TestCase):
         )
         factory.run()
 
-        remote_instance = RemoteProductProperty.objects.get(
+        remote_instance = SheinProductProperty.objects.get(
             local_instance=product_property,
             remote_product=self.remote_product,
         )
@@ -216,7 +216,7 @@ class SheinProductPropertyFactoryTest(TestCase):
         )
         factory.run()
 
-        remote_instance = RemoteProductProperty.objects.get(
+        remote_instance = SheinProductProperty.objects.get(
             local_instance=product_property,
             remote_product=self.remote_product,
         )
