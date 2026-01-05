@@ -159,14 +159,14 @@ class SalesChannelImportMixin(ImportMixin):
             mirror_property_select_value.save()
 
     def handle_ean_code(self, import_instance: ImportProductInstance):
-        EanCodeClass = self.get_remote_model_class('remote_ean_code_class')
-        instance, _ = EanCodeClass.objects.get_or_create(
-            multi_tenant_company=self.import_process.multi_tenant_company,
-            sales_channel=self.sales_channel,
-            remote_product=import_instance.remote_instance,
-        )
-
         if hasattr(import_instance, 'ean_code'):
+            EanCodeClass = self.get_remote_model_class('remote_ean_code_class')
+            instance, _ = EanCodeClass.objects.get_or_create(
+                multi_tenant_company=self.import_process.multi_tenant_company,
+                sales_channel=self.sales_channel,
+                remote_product=import_instance.remote_instance,
+            )
+
             if instance.ean_code != import_instance.ean_code:
                 instance.ean_code = import_instance.ean_code
                 instance.save()

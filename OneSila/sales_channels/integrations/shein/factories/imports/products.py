@@ -28,15 +28,13 @@ from sales_channels.integrations.shein.factories.imports.product_payloads import
 )
 from sales_channels.integrations.shein.factories.mixins import SheinSignatureMixin
 from sales_channels.integrations.shein.models import (
+    SheinEanCode,
     SheinImageProductAssociation,
     SheinProduct,
+    SheinProductContent,
     SheinProductType,
 )
-from sales_channels.models.products import (
-    RemoteEanCode,
-    RemotePrice,
-    RemoteProductContent,
-)
+from sales_channels.models.products import RemotePrice
 
 
 class SheinProductsImportProcessor(
@@ -58,8 +56,8 @@ class SheinProductsImportProcessor(
     ERROR_INVALID_PRODUCT_DATA = "INVALID_PRODUCT_DATA"
     ERROR_INVALID_CATEGORY_ASSIGNMENT = "INVALID_CATEGORY_ASSIGNMENT"
 
-    remote_ean_code_class = RemoteEanCode
-    remote_product_content_class = RemoteProductContent
+    remote_ean_code_class = SheinEanCode
+    remote_product_content_class = SheinProductContent
     remote_imageproductassociation_class = SheinImageProductAssociation
     remote_price_class = RemotePrice
 

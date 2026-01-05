@@ -19,7 +19,12 @@ from .sales_channels import (
 
 from .imports import SheinSalesChannelImport
 from .issues import SheinProductIssue
-from .products import SheinImageProductAssociation, SheinProduct
+from .products import (
+    SheinEanCode,
+    SheinImageProductAssociation,
+    SheinProduct,
+    SheinProductContent,
+)
 
 __all__ = [
     "SheinCategory",
@@ -37,5 +42,7 @@ __all__ = [
     "SheinSalesChannelImport",
     "SheinProductIssue",
     "SheinProduct",
+    "SheinProductContent",
+    "SheinEanCode",
     "SheinImageProductAssociation",
 ]
