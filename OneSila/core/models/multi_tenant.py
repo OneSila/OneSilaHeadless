@@ -246,7 +246,7 @@ class DashboardSection(TimeStampMixin, MultiTenantAwareMixin):
         related_name="dashboard_sections",
     )
     title = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
+    description = models.TextField(blank=True, null=True)
     sort_order = models.PositiveIntegerField(default=10)
 
     class Meta:
