@@ -22,7 +22,6 @@ from ..types.input import SalesChannelImportInput, SalesChannelImportPartialInpu
     SalesChannelContentTemplateInput, SalesChannelContentTemplatePartialInput, \
     SalesChannelGptFeedPartialInput, \
     RemoteLanguagePartialInput, RemoteCurrencyPartialInput, ImportPropertyInput
-from .validators import validate_sku_conflicts, validate_amazon_assignment, validate_ebay_assignment
 from core.helpers import get_languages
 from products.models import Product
 from sales_channels.content_templates import (
@@ -73,12 +72,10 @@ class SalesChannelsMutation:
 
     create_sales_channel_view_assign: SalesChannelViewAssignType = create(
         SalesChannelViewAssignInput,
-        validators=[validate_sku_conflicts, validate_amazon_assignment, validate_ebay_assignment],
     )
     resync_sales_channel_view_assign: SalesChannelViewAssignType = resync_sales_channel_assign()
     create_sales_channel_view_assigns: List[SalesChannelViewAssignType] = create(
         SalesChannelViewAssignInput,
-        validators=[validate_sku_conflicts, validate_amazon_assignment, validate_ebay_assignment],
     )
     update_sales_channel_view_assign: SalesChannelViewAssignType = update(SalesChannelViewAssignPartialInput)
     delete_sales_channel_view_assign: SalesChannelViewAssignType = delete()

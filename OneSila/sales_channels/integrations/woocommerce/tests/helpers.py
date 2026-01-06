@@ -12,6 +12,38 @@ logger = logging.getLogger(__name__)
 
 class CreateTestProductMixin:
     def assign_product_to_sales_channel(self, product):
+        from products_inspector.models import Inspector
+
+        try:
+            inspector = product.inspector
+        except Inspector.DoesNotExist:
+            inspector = Inspector.objects.create(
+                product=product,
+                has_missing_information=False,
+                has_missing_optional_information=False,
+            )
+        else:
+            inspector.has_missing_information = False
+            inspector.has_missing_optional_information = False
+            inspector.save(update_fields=["has_missing_information", "has_missing_optional_information"])
+
+        if getattr(product, "is_configurable", None) and product.is_configurable():
+            for variation in product.get_configurable_variations(active_only=True):
+                try:
+                    variation_inspector = variation.inspector
+                except Inspector.DoesNotExist:
+                    variation_inspector = Inspector.objects.create(
+                        product=variation,
+                        has_missing_information=False,
+                        has_missing_optional_information=False,
+                    )
+                else:
+                    variation_inspector.has_missing_information = False
+                    variation_inspector.has_missing_optional_information = False
+                    variation_inspector.save(
+                        update_fields=["has_missing_information", "has_missing_optional_information"]
+                    )
+
         self.sales_channel_view = SalesChannelView.objects.get(
             # multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
@@ -100,6 +132,21 @@ class CreateTestProductMixin:
 
         if not created:
             return product
+
+        from products_inspector.models import Inspector
+
+        try:
+            inspector = product.inspector
+        except Inspector.DoesNotExist:
+            inspector = Inspector.objects.create(
+                product=product,
+                has_missing_information=False,
+                has_missing_optional_information=False,
+            )
+        else:
+            inspector.has_missing_information = False
+            inspector.has_missing_optional_information = False
+            inspector.save(update_fields=["has_missing_information", "has_missing_optional_information"])
 
         ProductTranslation.objects.create(
             multi_tenant_company=self.multi_tenant_company,

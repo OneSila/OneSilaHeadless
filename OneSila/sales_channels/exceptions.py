@@ -30,6 +30,11 @@ class VariationAlreadyExistsOnWebsite(Exception):
     pass
 
 
+class InspectorMissingInformationError(Exception):
+    """Raised when a product inspector indicates missing required information."""
+    pass
+
+
 class ConfiguratorPropertyNotFilterable(Exception):
     """Raised when a property without filter support is used in configurator workflows."""
     pass

@@ -1,5 +1,9 @@
 from django.utils.translation import gettext_lazy as _
 from core import models
+from sales_channels.exceptions import (
+    InspectorMissingInformationError,
+    VariationAlreadyExistsOnWebsite,
+)
 from sales_channels.models.sales_channels import SalesChannel, SalesChannelView, RemoteLanguage
 import uuid
 
@@ -67,6 +71,10 @@ class ShopifySalesChannel(SalesChannel):
     class Meta:
         verbose_name = 'Shopify Sales Channel'
         verbose_name_plural = 'Shopify Sales Channels'
+        user_exceptions = (
+            InspectorMissingInformationError,
+            VariationAlreadyExistsOnWebsite,
+        )
 
     def __str__(self):
         return f"Shopify Store: {self.hostname}"

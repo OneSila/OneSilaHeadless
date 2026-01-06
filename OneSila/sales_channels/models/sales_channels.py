@@ -279,9 +279,6 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
         is_new = self.pk is None
         self._set_pending_creation_status(is_new=is_new)
 
-        if self.remote_product_id:
-            self.status = self.STATUS_CREATED
-
         if update_fields is not None and previous_status != self.status:
             update_fields = set(update_fields)
             update_fields.add("status")

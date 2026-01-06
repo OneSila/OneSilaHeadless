@@ -168,6 +168,20 @@ class EbayProductPushFactoryTestBase(TestCaseEbayMixin):
             type="SIMPLE",
             multi_tenant_company=self.multi_tenant_company,
         )
+        from products_inspector.models import Inspector
+
+        try:
+            inspector = self.product.inspector
+        except Inspector.DoesNotExist:
+            inspector = Inspector.objects.create(
+                product=self.product,
+                has_missing_information=False,
+                has_missing_optional_information=False,
+            )
+        else:
+            inspector.has_missing_information = False
+            inspector.has_missing_optional_information = False
+            inspector.save(update_fields=["has_missing_information", "has_missing_optional_information"])
         ProductTranslation.objects.create(
             product=self.product,
             sales_channel=self.sales_channel,

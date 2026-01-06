@@ -3,7 +3,10 @@ from sales_channels.models.sales_channels import (
     SalesChannelView,
     RemoteLanguage
 )
-from sales_channels.exceptions import VariationAlreadyExistsOnWebsite
+from sales_channels.exceptions import (
+    InspectorMissingInformationError,
+    VariationAlreadyExistsOnWebsite,
+)
 
 from core import models
 from django.utils.translation import gettext_lazy as _
@@ -36,7 +39,10 @@ class MagentoSalesChannel(SalesChannel):
     class Meta:
         verbose_name = 'Magento Sales Channel'
         verbose_name_plural = 'Magento Sales Channels'
-        user_exceptions = (VariationAlreadyExistsOnWebsite,)
+        user_exceptions = (
+            InspectorMissingInformationError,
+            VariationAlreadyExistsOnWebsite,
+        )
 
     def __str__(self):
         return f"Magento Sales Channel: {self.hostname}"

@@ -55,6 +55,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+AMAZON_MIN_TITLE_LENGTH = 150
+AMAZON_MIN_DESCRIPTION_LENGTH = 1000
+
 
 class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     remote_model_class = AmazonProduct
@@ -123,20 +126,165 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     def preflight_check(self):
         if not super().preflight_check():
             return False
-        if self.is_create:
-            if (
-                not self._get_gtin_exemption()
-                and not self.external_product_id
-                and not self.ean_for_payload
-                and not self.local_instance.is_configurable()
-            ):
-                raise ValueError("Amazon listings require external product id or EAN on create")
         return True
 
     def sanity_check(self):
         # allow variations to be added separately from the configurable product
         # in amazon we can add in different vierws
         pass
+
+    def validate(self):
+        if getattr(self, "skip_checks", False):
+            return
+
+        super().validate()
+
+        from sales_channels.integrations.amazon.exceptions import (
+            AmazonDescriptionTooShortError,
+            AmazonMissingBrowseNodeError,
+            AmazonMissingIdentifierError,
+            AmazonMissingVariationIdentifierError,
+            AmazonMissingVariationThemeError,
+            AmazonTitleTooShortError,
+        )
+        from sales_channels.integrations.amazon.models import (
+            AmazonExternalProductId,
+            AmazonGtinExemption,
+            AmazonProductBrowseNode,
+            AmazonVariationTheme,
+        )
+        from sales_channels.models.sales_channels import SalesChannelViewAssign
+
+        product = self.local_instance
+        view = self.view
+        sales_channel = self.sales_channel
+
+        views = [view]
+        default_view = self._get_default_view()
+        if default_view and default_view != view:
+            views.append(default_view)
+
+        has_gtin_exemption = AmazonGtinExemption.objects.filter(
+            product=product,
+            view__in=views,
+            value=True,
+        ).exists()
+
+        has_external_id = (
+            AmazonExternalProductId.objects.filter(
+                product=product,
+                view__in=views,
+            )
+            .exclude(value__isnull=True)
+            .exclude(value__exact="")
+            .exists()
+        )
+
+        remote_language_code = None
+        remote_languages = getattr(view, "remote_languages", None)
+        if remote_languages is not None:
+            remote_language = remote_languages.exclude(local_instance__isnull=True).first()
+            if remote_language:
+                remote_language_code = remote_language.local_instance
+
+        if not remote_language_code:
+            remote_language_code = getattr(sales_channel.multi_tenant_company, "language", None)
+
+        localized_title = product._get_translated_value(
+            field_name="name",
+            language=remote_language_code,
+            related_name="translations",
+            sales_channel=sales_channel,
+        )
+        localized_description = product._get_translated_value(
+            field_name="description",
+            language=remote_language_code,
+            related_name="translations",
+            sales_channel=sales_channel,
+        )
+
+        title_length = len((localized_title or "").strip())
+        description_length = len((localized_description or "").strip())
+
+        if title_length < AMAZON_MIN_TITLE_LENGTH:
+            raise AmazonTitleTooShortError(
+                "Amazon titles must have at least {} characters for the selected marketplace. Current length: {}.".format(
+                    AMAZON_MIN_TITLE_LENGTH, title_length
+                )
+            )
+
+        if description_length < AMAZON_MIN_DESCRIPTION_LENGTH:
+            raise AmazonDescriptionTooShortError(
+                "Amazon descriptions must have at least {} characters for the selected marketplace. Current length: {}.".format(
+                    AMAZON_MIN_DESCRIPTION_LENGTH, description_length
+                )
+            )
+
+        has_ean_code = bool(product.ean_code)
+        is_configurable = product.is_configurable()
+        has_required_identifier = any((has_gtin_exemption, has_external_id, has_ean_code))
+
+        if not is_configurable and not has_required_identifier:
+            raise AmazonMissingIdentifierError(
+                "Amazon listings require a GTIN exemption, external product id, EAN code, or configurable product."
+            )
+
+        if is_configurable:
+            variations = product.get_configurable_variations(active_only=True)
+            missing_variation_skus = []
+
+            for variation in variations:
+                variation_has_gtin_exemption = AmazonGtinExemption.objects.filter(
+                    product=variation,
+                    view__in=views,
+                    value=True,
+                ).exists()
+
+                variation_has_external_id = (
+                    AmazonExternalProductId.objects.filter(
+                        product=variation,
+                        view__in=views,
+                    )
+                    .exclude(value__isnull=True)
+                    .exclude(value__exact="")
+                    .exists()
+                )
+
+                variation_has_ean_code = bool(variation.ean_code)
+
+                if not any((variation_has_gtin_exemption, variation_has_external_id, variation_has_ean_code)):
+                    missing_variation_skus.append(variation.sku or str(variation.pk))
+
+            if missing_variation_skus:
+                skus = ", ".join(missing_variation_skus)
+                raise AmazonMissingVariationIdentifierError(
+                    "Amazon configurable products require each variation to have a GTIN exemption, external product id, or EAN code. Missing for SKU(s): {}.".format(
+                        skus
+                    )
+                )
+
+        exists = SalesChannelViewAssign.objects.filter(
+            product=product,
+            sales_channel_view__sales_channel=sales_channel,
+        ).exists()
+
+        if not exists and not self.is_variation:
+            if not AmazonProductBrowseNode.objects.filter(
+                product=product,
+                sales_channel=sales_channel,
+                view__in=views,
+            ).exists():
+                raise AmazonMissingBrowseNodeError(
+                    "Amazon products require a browse node for the first assignment."
+                )
+
+            if product.is_configurable() and not AmazonVariationTheme.objects.filter(
+                product=product,
+                view__in=views,
+            ).exists():
+                raise AmazonMissingVariationThemeError(
+                    "Amazon configurable products require a variation theme for the first assignment."
+                )
 
     def check_status(self, *, remote_product=None):
         remote_product = remote_product or self.remote_product

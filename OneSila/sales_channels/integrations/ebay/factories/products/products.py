@@ -24,6 +24,11 @@ from sales_channels.integrations.ebay.factories.products.images import (
 from sales_channels.integrations.ebay.factories.products.mixins import (
     EbayInventoryItemPushMixin,
 )
+from sales_channels.integrations.ebay.exceptions import (
+    EbayMissingListingPoliciesError,
+    EbayMissingProductMappingError,
+    EbayMissingVariationMappingsError,
+)
 from sales_channels.integrations.ebay.factories.products.properties import (
     EbayProductPropertyCreateFactory,
     EbayProductPropertyDeleteFactory,
@@ -101,6 +106,76 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
     # ------------------------------------------------------------------
     def preflight_check(self) -> bool:
         return self.view is not None and super().preflight_check()
+
+    def validate(self) -> None:
+        if getattr(self, "skip_checks", False):
+            return
+
+        super().validate()
+
+        from sales_channels.integrations.ebay.models import (
+            EbayProductCategory,
+            EbayProductType,
+        )
+
+        view = self.view
+        product = self.local_instance
+
+        fulfillment_id = getattr(view, "fulfillment_policy_id", None)
+        payment_id = getattr(view, "payment_policy_id", None)
+        return_id = getattr(view, "return_policy_id", None)
+
+        missing = []
+        if not fulfillment_id:
+            missing.append("fulfillment policy")
+        if not payment_id:
+            missing.append("payment policy")
+        if not return_id:
+            missing.append("return policy")
+
+        if missing:
+            raise EbayMissingListingPoliciesError(
+                "Missing eBay listing policies ({}). Please configure the marketplace policies before pushing products.".format(
+                    ", ".join(missing)
+                )
+            )
+
+        product_rule = product.get_product_rule(sales_channel=self.sales_channel)
+        has_type_mapping = False
+        if product_rule:
+            has_type_mapping = EbayProductType.objects.filter(
+                local_instance=product_rule,
+                marketplace=view,
+            ).exists()
+
+        def has_required_ebay_mapping(target):
+            if has_type_mapping:
+                return True
+
+            return EbayProductCategory.objects.filter(
+                product=target,
+                view=view,
+            ).exists()
+
+        if product.is_configurable():
+            variations = product.get_configurable_variations(active_only=True)
+            missing_skus = [
+                variation.sku or str(variation.pk)
+                for variation in variations
+                if not has_required_ebay_mapping(variation)
+            ]
+
+            if missing_skus:
+                raise EbayMissingVariationMappingsError(
+                    "eBay configurable products require each variation to have either a mapped product type or a category assigned. Missing for SKU(s): {}.".format(
+                        ", ".join(missing_skus)
+                    )
+                )
+        else:
+            if not has_required_ebay_mapping(product):
+                raise EbayMissingProductMappingError(
+                    "eBay products require either a mapped product type (EbayProductType) or a category (EbayProductCategory) before listing."
+                )
 
     def set_api(self) -> None:
         if self.get_value_only:
@@ -495,6 +570,7 @@ class EbayProductCreateFactory(EbayProductBaseFactory):
             self._build_listing_policies()
             self._resolve_remote_product()
             self.set_remote_product_for_logging()
+            self.validate()
             self.sanity_check()
             self.precalculate_progress_step_increment(3)
             self.update_progress()
@@ -548,6 +624,7 @@ class EbayProductUpdateFactory(EbayProductBaseFactory):
             self._build_listing_policies()
             self._resolve_remote_product()
             self.set_remote_product_for_logging()
+            self.validate()
             self.sanity_check()
             self.precalculate_progress_step_increment(3)
             self.update_progress()
@@ -708,6 +785,7 @@ class EbayProductVariationAddFactory(EbayProductBaseFactory):
         parent_remote = self._resolve_parent_remote_product()
         self._resolve_remote_product()
         self.set_api()
+        self.validate()
 
         inventory_result = self.send_inventory_payload()
 

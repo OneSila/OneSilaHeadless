@@ -21,7 +21,10 @@ from properties.models import (
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
 
-from sales_channels.integrations.ebay.exceptions import EbayResponseException
+from sales_channels.integrations.ebay.exceptions import (
+    EbayMissingListingPoliciesError,
+    EbayResponseException,
+)
 from sales_channels.integrations.ebay.factories.products import (
     EbayProductCreateFactory,
     EbayProductDeleteFactory,
@@ -38,7 +41,6 @@ from sales_channels.integrations.ebay.models.properties import (
 )
 from sales_channels.integrations.ebay.models.taxes import EbayCurrency
 from sales_channels.integrations.ebay.models.products import EbayProductOffer, EbayProduct
-from sales_channels.exceptions import PreFlightCheckError
 
 from .mixins import EbayProductPushFactoryTestBase
 
@@ -250,7 +252,7 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         self.view.refresh_from_db()
 
         factory = self._build_create_factory()
-        with self.assertRaises(PreFlightCheckError):
+        with self.assertRaises(EbayMissingListingPoliciesError):
             factory.run()
 
     def test_create_flow_errors_when_price_missing_for_view_currency(self) -> None:
@@ -659,6 +661,20 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
             type=Product.SIMPLE,
             multi_tenant_company=self.multi_tenant_company,
         )
+        from products_inspector.models import Inspector
+
+        try:
+            inspector = child.inspector
+        except Inspector.DoesNotExist:
+            inspector = Inspector.objects.create(
+                product=child,
+                has_missing_information=False,
+                has_missing_optional_information=False,
+            )
+        else:
+            inspector.has_missing_information = False
+            inspector.has_missing_optional_information = False
+            inspector.save(update_fields=["has_missing_information", "has_missing_optional_information"])
         self._assign_product_type(child)
         ProductTranslation.objects.create(
             product=child,

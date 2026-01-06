@@ -9,6 +9,7 @@ from sales_channels.models.products import RemoteImageProductAssociation
 from django.utils.translation import gettext_lazy as _
 from sales_channels.exceptions import (
     ConfiguratorPropertyNotFilterable,
+    InspectorMissingInformationError,
     VariationAlreadyExistsOnWebsite,
 )
 
@@ -46,6 +47,7 @@ class WoocommerceSalesChannel(SalesChannel):
         user_exceptions = (
             VariationAlreadyExistsOnWebsite,
             ConfiguratorPropertyNotFilterable,
+            InspectorMissingInformationError,
         )
 
 
