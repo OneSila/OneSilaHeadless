@@ -480,7 +480,7 @@ class ProductFeedPayloadFactory:
             sorted_images = sorted(images, key=lambda item: (not item.is_main_image, item.sort_order, item.id))
             primary = sorted_images[0]
             thumbnail = primary.media.onesila_thumbnail_url()
-            additional = [img.media.image_web_url for img in sorted_images[1:] if img.media.image_web_url]
+            additional = [img.media.image_url() for img in sorted_images[1:] if img.media.image_url()]
 
         video_url = None
         if videos:
