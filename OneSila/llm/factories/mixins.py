@@ -253,7 +253,7 @@ class ContentLLMMixin(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
         )
 
         self.images = [
-            item.media.image_web_url
+            item.media.image_url()
             for item in images_queryset.filter(media__type=Media.IMAGE)
         ]
 

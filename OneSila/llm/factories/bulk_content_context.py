@@ -147,8 +147,8 @@ class BulkContentContextBuilder:
 
         media_map: dict[int, dict[str, list[str]]] = defaultdict(lambda: {"images": [], "documents": []})
         for item in media_qs:
-            if item.media.type == Media.IMAGE and item.media.image_web_url:
-                media_map[item.product_id]["images"].append(item.media.image_web_url)
+            if item.media.type == Media.IMAGE and item.media.image_url():
+                media_map[item.product_id]["images"].append(item.media.image_url())
             elif item.media.type == Media.FILE and item.media.file_url():
                 media_map[item.product_id]["documents"].append(item.media.file_url())
 

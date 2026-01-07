@@ -29,7 +29,7 @@ class UpdateRatesTestCase(TestCase):
             inherits_from=currency_base,
             follow_official_rate=False,
             exchange_rate=fake_rate,
-            **currencies['BG'])
+            **currencies['RO'])
 
         update_rate_flow()
         currency_not_follow = Currency.objects.get(id=currency_not_follow.id)
