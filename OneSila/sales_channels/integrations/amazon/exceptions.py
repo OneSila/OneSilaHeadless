@@ -41,3 +41,33 @@ class AmazonProductValidationIssuesException(Exception):
                 )
 
         return "Amazon product has validation issues ({}).".format(len(self.issues))
+
+
+class AmazonTitleTooShortError(Exception):
+    """Raised when Amazon listing titles are below the required length."""
+    pass
+
+
+class AmazonDescriptionTooShortError(Exception):
+    """Raised when Amazon listing descriptions are below the required length."""
+    pass
+
+
+class AmazonMissingIdentifierError(Exception):
+    """Raised when an Amazon listing lacks a required product identifier."""
+    pass
+
+
+class AmazonMissingVariationIdentifierError(Exception):
+    """Raised when Amazon variations lack required identifiers."""
+    pass
+
+
+class AmazonMissingBrowseNodeError(Exception):
+    """Raised when Amazon browse node mappings are missing for first assignment."""
+    pass
+
+
+class AmazonMissingVariationThemeError(Exception):
+    """Raised when Amazon variation theme mappings are missing for first assignment."""
+    pass

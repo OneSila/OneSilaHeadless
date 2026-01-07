@@ -103,7 +103,7 @@ REQUIRED_BULLET_POINTS = 5
 LLM_FIELDS = ("name", "subtitle", "shortDescription", "description", "bulletPoints")
 
 
-def build_field_rules(*, integration_type: str) -> dict[str, dict[str, Any]]:
+def build_field_rules(*, integration_type: str, sales_channel: Any | None = None) -> dict[str, dict[str, Any]]:
     rules = {
         "flags": deepcopy(BASE_FIELD_FLAGS),
         "limits": deepcopy(BASE_FIELD_LIMITS),
@@ -116,6 +116,14 @@ def build_field_rules(*, integration_type: str) -> dict[str, dict[str, Any]]:
     for field_name, limit_overrides in overrides.get("limits", {}).items():
         base_limit = rules["limits"].setdefault(field_name, {"min": 0, "max": 0})
         base_limit.update(limit_overrides)
+
+    if integration_type == AMAZON_INTEGRATION and sales_channel is not None:
+        min_name_length = getattr(sales_channel, "min_name_length", None)
+        min_description_length = getattr(sales_channel, "min_description_length", None)
+        if min_name_length:
+            rules["limits"].setdefault("name", {"min": 0, "max": 0})["min"] = min_name_length
+        if min_description_length:
+            rules["limits"].setdefault("description", {"min": 0, "max": 0})["min"] = min_description_length
 
     return rules
 

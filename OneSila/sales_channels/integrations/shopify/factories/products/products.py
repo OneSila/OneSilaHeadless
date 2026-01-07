@@ -406,11 +406,13 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
         try:
             self.initialize_remote_product()
             self.set_remote_product_for_logging()
-
+            self.check_status()
             if self.local_type == Product.CONFIGURABLE:
                 self.get_variations()
 
             self.set_local_assigns()
+
+            self.validate()
             self.set_rule()
             self.build_payload()
             self.set_product_properties()

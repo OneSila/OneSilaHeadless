@@ -1,8 +1,16 @@
 from django.utils.translation import gettext_lazy as _
 from core import models
-from sales_channels.exceptions import PreFlightCheckError, RemotePropertyValueNotMapped
+from sales_channels.exceptions import (
+    InspectorMissingInformationError,
+    PreFlightCheckError,
+    RemotePropertyValueNotMapped,
+    VariationAlreadyExistsOnWebsite,
+)
 from sales_channels.integrations.ebay.constants import  WEIGHT_UNIT_CHOICES, LENGTH_UNIT_CHOICES
 from sales_channels.integrations.ebay.exceptions import (
+    EbayMissingListingPoliciesError,
+    EbayMissingProductMappingError,
+    EbayMissingVariationMappingsError,
     EbayPropertyMappingMissingError,
     EbayResponseException,
 )
@@ -77,6 +85,11 @@ class EbaySalesChannel(SalesChannel):
             PreFlightCheckError,
             RemotePropertyValueNotMapped,
             EbayPropertyMappingMissingError,
+            InspectorMissingInformationError,
+            VariationAlreadyExistsOnWebsite,
+            EbayMissingListingPoliciesError,
+            EbayMissingProductMappingError,
+            EbayMissingVariationMappingsError,
         )
 
     def __str__(self):

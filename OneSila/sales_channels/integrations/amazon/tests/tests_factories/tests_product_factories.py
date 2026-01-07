@@ -15,6 +15,7 @@ from sales_channels.integrations.amazon.factories.properties.mixins import (
     AmazonProductPropertyBaseMixin,
 )
 from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
+from sales_channels.integrations.amazon.exceptions import AmazonMissingIdentifierError
 
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
@@ -76,8 +77,16 @@ from integrations.models import IntegrationLog
 
 
 class AmazonProductTestMixin:
+    def _pad_text(self, text, target_length):
+        return text + ("X" * max(0, target_length - len(text)))
+
     def setup_product(self):
         """Create common data used by Amazon product factory tests."""
+        self.product_title = self._pad_text("Chair name", 150)
+        self.product_description = self._pad_text("Chair description", 1000)
+        self.product_title_fr = self._pad_text("Chair name fr", 150)
+        self.product_description_fr = self._pad_text("Chair description fr", 1000)
+
         self.sales_channel = AmazonSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             remote_id="SELLER123",
@@ -102,6 +111,20 @@ class AmazonProductTestMixin:
             type="SIMPLE",
             multi_tenant_company=self.multi_tenant_company,
         )
+        from products_inspector.models import Inspector
+
+        try:
+            inspector = self.product.inspector
+        except Inspector.DoesNotExist:
+            inspector = Inspector.objects.create(
+                product=self.product,
+                has_missing_information=False,
+                has_missing_optional_information=False,
+            )
+        else:
+            inspector.has_missing_information = False
+            inspector.has_missing_optional_information = False
+            inspector.save(update_fields=["has_missing_information", "has_missing_optional_information"])
         self.product_type_property = Property.objects.filter(
             is_product_type=True,
             multi_tenant_company=self.multi_tenant_company,
@@ -182,8 +205,8 @@ class AmazonProductTestMixin:
             product=self.product,
             sales_channel=self.sales_channel,
             language=self.multi_tenant_company.language,
-            name="Chair name",
-            description="Chair description",
+            name=self.product_title,
+            description=self.product_description,
             multi_tenant_company=self.multi_tenant_company,
         )
         ProductTranslationBulletPoint.objects.create(
@@ -883,14 +906,14 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             ],
             "item_name": [
                 {
-                    "value": "Chair name",
+                    "value": self.product_title,
                     "language_tag": "en",
                     "marketplace_id": "GB",
                 }
             ],
             "product_description": [
                 {
-                    "value": "Chair description",
+                    "value": self.product_description,
                     "language_tag": "en",
                     "marketplace_id": "GB",
                 }
@@ -994,7 +1017,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
                 "op": "replace",
                 "path": "/attributes/item_name",
                 "value": [{
-                    "value": "Chair name",
+                    "value": self.product_title,
                     "language_tag": "en",
                     "marketplace_id": "GB",
                 }],
@@ -1114,8 +1137,8 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             product=self.product,
             sales_channel=self.sales_channel,
             language="fr",
-            name="Chair name fr",
-            description="Chair description fr",
+            name=self.product_title_fr,
+            description=self.product_description_fr,
             multi_tenant_company=self.multi_tenant_company,
         )
         ProductTranslationBulletPoint.objects.create(
@@ -1203,14 +1226,14 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             ],
             "item_name": [
                 {
-                    "value": "Chair name fr",
+                    "value": self.product_title_fr,
                     "language_tag": "fr",
                     "marketplace_id": "FR",
                 }
             ],
             "product_description": [
                 {
-                    "value": "Chair description fr",
+                    "value": self.product_description_fr,
                     "language_tag": "fr",
                     "marketplace_id": "FR",
                 }
@@ -1644,10 +1667,10 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             view=self.view,
         )
 
-        with self.assertRaises(ValueError) as ctx:
+        with self.assertRaises(AmazonMissingIdentifierError) as ctx:
             fac.run()
 
-        self.assertIn("external product id or EAN", str(ctx.exception))
+        self.assertIn("GTIN exemption", str(ctx.exception))
         mock_listings.return_value.put_listings_item.assert_not_called()
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
@@ -1873,13 +1896,18 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         self, mock_listings, mock_get_images, mock_get_client
     ):
         """This test checks that product content is pulled from sales channel translations if available."""
+        global_name = self._pad_text("Global Name", 150)
+        global_description = self._pad_text("Global Description", 1000)
+        channel_name = self._pad_text("Channel Name", 150)
+        channel_description = self._pad_text("Channel Description", 1000)
+
         baker.make(
             ProductTranslation,
             product=self.product,
             sales_channel=None,
             language=self.multi_tenant_company.language,
-            name="Global Name",
-            description="Global Description",
+            name=global_name,
+            description=global_description,
             multi_tenant_company=self.multi_tenant_company,
         )
 
@@ -1888,8 +1916,8 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             sales_channel=self.sales_channel,
             language=self.multi_tenant_company.language,
         )
-        translation.name = "Channel Name"
-        translation.description = "Channel Description"
+        translation.name = channel_name
+        translation.description = channel_description
         translation.save()
 
         mock_instance = mock_listings.return_value
@@ -1910,7 +1938,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         self.assertEqual(
             attrs.get("item_name"),
             [{
-                "value": "Channel Name",
+                "value": channel_name,
                 "language_tag": "en",
                 "marketplace_id": "GB",
             }],
@@ -1918,7 +1946,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         self.assertEqual(
             attrs.get("product_description"),
             [{
-                "value": "Channel Description",
+                "value": channel_description,
                 "language_tag": "en",
                 "marketplace_id": "GB",
             }],
@@ -1929,14 +1957,18 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_translation_fallbacks_to_global_if_not_in_channel(self, mock_listings, mock_get_images, mock_get_client):
         """This test ensures fallback to global translation when channel-specific translation is missing."""
+        global_name = self._pad_text("Global Name", 150)
+        global_description = self._pad_text("Global Description", 1000)
+        channel_name = self._pad_text("Channel Name", 150)
+
         ProductTranslation.objects.filter(product=self.product).delete()
         baker.make(
             ProductTranslation,
             product=self.product,
             sales_channel=None,
             language=self.multi_tenant_company.language,
-            name="Global Name",
-            description="Global Description",
+            name=global_name,
+            description=global_description,
             multi_tenant_company=self.multi_tenant_company,
         )
 
@@ -1945,7 +1977,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             product=self.product,
             sales_channel=self.sales_channel,
             language=self.multi_tenant_company.language,
-            name="Channel Name",
+            name=channel_name,
             description=None,
             multi_tenant_company=self.multi_tenant_company,
         )
@@ -1967,7 +1999,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         self.assertEqual(
             attrs.get("item_name"),
             [{
-                "value": "Channel Name",
+                "value": channel_name,
                 "language_tag": "en",
                 "marketplace_id": "GB",
             }],
@@ -1975,7 +2007,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         self.assertEqual(
             attrs.get("product_description"),
             [{
-                "value": "Global Description",
+                "value": global_description,
                 "language_tag": "en",
                 "marketplace_id": "GB",
             }],
@@ -2447,6 +2479,20 @@ class AmazonConfigurablePropertySelectionTest(DisableWooCommerceSignalsMixin, Tr
             type=Product.SIMPLE,
             multi_tenant_company=self.multi_tenant_company,
         )
+        from products_inspector.models import Inspector
+
+        try:
+            inspector = variation.inspector
+        except Inspector.DoesNotExist:
+            inspector = Inspector.objects.create(
+                product=variation,
+                has_missing_information=False,
+                has_missing_optional_information=False,
+            )
+        else:
+            inspector.has_missing_information = False
+            inspector.has_missing_optional_information = False
+            inspector.save(update_fields=["has_missing_information", "has_missing_optional_information"])
         ProductProperty.objects.create(
             product=variation,
             property=self.product_type_property,
@@ -2481,6 +2527,12 @@ class AmazonConfigurablePropertySelectionTest(DisableWooCommerceSignalsMixin, Tr
             multi_tenant_company=self.multi_tenant_company,
             parent=self.parent,
             variation=variation,
+        )
+        AmazonExternalProductId.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=variation,
+            view=self.view,
+            value="ASIN{}".format(sku),
         )
         return variation
 
@@ -2594,6 +2646,20 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
             type="SIMPLE",
             multi_tenant_company=self.multi_tenant_company,
         )
+        from products_inspector.models import Inspector
+
+        try:
+            inspector = self.child.inspector
+        except Inspector.DoesNotExist:
+            inspector = Inspector.objects.create(
+                product=self.child,
+                has_missing_information=False,
+                has_missing_optional_information=False,
+            )
+        else:
+            inspector.has_missing_information = False
+            inspector.has_missing_optional_information = False
+            inspector.save(update_fields=["has_missing_information", "has_missing_optional_information"])
         ProductProperty.objects.create(
             product=self.child,
             property=self.product_type_property,
@@ -2606,6 +2672,14 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
             product=self.child,
             view=self.view,
             value="ASINCHILD",
+        )
+        ProductTranslation.objects.create(
+            product=self.child,
+            sales_channel=self.sales_channel,
+            language=self.multi_tenant_company.language,
+            name=self.product_title,
+            description=self.product_description,
+            multi_tenant_company=self.multi_tenant_company,
         )
 
         self.child_remote = AmazonProduct.objects.create(
@@ -2712,10 +2786,32 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
             type="SIMPLE",
             multi_tenant_company=self.multi_tenant_company,
         )
+        from products_inspector.models import Inspector
+
+        try:
+            inspector = simple.inspector
+        except Inspector.DoesNotExist:
+            inspector = Inspector.objects.create(
+                product=simple,
+                has_missing_information=False,
+                has_missing_optional_information=False,
+            )
+        else:
+            inspector.has_missing_information = False
+            inspector.has_missing_optional_information = False
+            inspector.save(update_fields=["has_missing_information", "has_missing_optional_information"])
         ProductProperty.objects.create(
             product=simple,
             property=self.product_type_property,
             value_select=self.product_type_value,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductTranslation.objects.create(
+            product=simple,
+            sales_channel=self.sales_channel,
+            language=self.multi_tenant_company.language,
+            name=self.product_title,
+            description=self.product_description,
             multi_tenant_company=self.multi_tenant_company,
         )
         AmazonExternalProductId.objects.create(
@@ -2729,6 +2825,13 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
             sales_channel=self.sales_channel,
             local_instance=simple,
             remote_sku="SIMPLE",
+        )
+        SalesChannelViewAssign.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=simple,
+            sales_channel_view=self.view,
+            sales_channel=self.sales_channel,
+            remote_product=simple_remote,
         )
 
         mock_instance = mock_listings.return_value

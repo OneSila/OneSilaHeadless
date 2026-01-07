@@ -95,6 +95,8 @@ class IntegrationInstanceOperationMixin:
         payload = clean_json_data(payload)
 
         remote_instance = getattr(self, "remote_instance", None)
+        print('-------------------------------------------------- REMOTE INSTANCE')
+        print(remote_instance)
         if remote_instance is None:
             logger.warning(
                 "Skipping error log for %s because remote_instance is missing: %s",
@@ -104,6 +106,8 @@ class IntegrationInstanceOperationMixin:
             return
 
         if hasattr(self.integration._meta, 'user_exceptions') and isinstance(exception, self.integration._meta.user_exceptions):
+            print('------------------------------------------------------------ ADD USER ERROR!')
+            print(getattr(self, 'remote_product', None))
             remote_instance.add_user_error(
                 action=action,
                 response=error_message,
@@ -114,6 +118,7 @@ class IntegrationInstanceOperationMixin:
                 fixing_identifier=fixing_identifier
             )
         else:
+            print('--------------------------------------------------- NO USER ERROR?')
             remote_instance.add_admin_error(
                 action=action,
                 response=error_message,

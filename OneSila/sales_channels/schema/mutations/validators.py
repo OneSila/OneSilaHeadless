@@ -6,9 +6,6 @@ from sales_channels.exceptions import VariationAlreadyExistsOnWebsite
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.shopify.models import ShopifySalesChannel
 
-AMAZON_MIN_TITLE_LENGTH = 150
-AMAZON_MIN_DESCRIPTION_LENGTH = 1000
-
 
 def validate_sku_conflicts(data, info):
     product = data['product'].pk
@@ -120,23 +117,26 @@ def validate_amazon_assignment(data, info):
         title_length = len((localized_title or '').strip())
         description_length = len((localized_description or '').strip())
 
-        if title_length < AMAZON_MIN_TITLE_LENGTH:
+        min_name_length = getattr(sales_channel, "min_name_length", 0)
+        min_description_length = getattr(sales_channel, "min_description_length", 0)
+
+        if min_name_length and title_length < min_name_length:
             raise ValidationError(
                 {
                     '__all__': _(
                         'Amazon titles must have at least %(minimum)d characters for the selected marketplace. Current length: %(length)d.'
                     )
-                    % {'minimum': AMAZON_MIN_TITLE_LENGTH, 'length': title_length}
+                    % {'minimum': min_name_length, 'length': title_length}
                 }
             )
 
-        if description_length < AMAZON_MIN_DESCRIPTION_LENGTH:
+        if min_description_length and description_length < min_description_length:
             raise ValidationError(
                 {
                     '__all__': _(
                         'Amazon descriptions must have at least %(minimum)d characters for the selected marketplace. Current length: %(length)d.'
                     )
-                    % {'minimum': AMAZON_MIN_DESCRIPTION_LENGTH, 'length': description_length}
+                    % {'minimum': min_description_length, 'length': description_length}
                 }
             )
 

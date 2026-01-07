@@ -264,7 +264,7 @@ class BulkGenerateContentFlow:
 
         for sales_channel in self.sales_channels:
             integration_type = INTEGRATIONS_TYPES_MAP.get(type(sales_channel), "default")
-            field_rules = build_field_rules(integration_type=integration_type)
+            field_rules = build_field_rules(integration_type=integration_type, sales_channel=sales_channel)
             translations = self.context_builder.translations_by_product.get(product.id, [])
             languages = self.sales_channel_languages.get(sales_channel.id, [])
             if not languages:
