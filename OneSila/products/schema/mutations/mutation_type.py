@@ -16,6 +16,7 @@ from ..types.types import (
     BundleVariationType,
     ProductTranslationBulletPointType,
     ProductVariationsTaskResponse,
+    ProductTranslationImportTaskResponse,
 )
 from ..types.input import (
     ProductInput,
@@ -36,6 +37,7 @@ from ..types.input import (
     ProductTranslationBulletPointPartialInput,
     ProductPropertiesRulePartialInput,
     PropertySelectValuePartialInput,
+    ProductTranslationBulkImportInput,
 )
 from core.schema.core.mutations import create, update, delete, type, List
 
@@ -132,6 +134,67 @@ class ProductsMutation:
         )
 
         return ProductVariationsTaskResponse(success=True)
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def import_product_translations(
+        self,
+        *,
+        info: Info,
+        instance: ProductTranslationBulkImportInput,
+    ) -> ProductTranslationImportTaskResponse:
+        from django.core.exceptions import ValidationError
+        from sales_channels.models import SalesChannel
+        from products.tasks import products__tasks__import_product_translations
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        source_channel = None
+        target_channel = None
+
+        if instance.channel_source:
+            source_channel = SalesChannel.objects.filter(
+                id=instance.channel_source.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            ).first()
+            if not source_channel:
+                raise ValidationError("Invalid source sales channel.")
+
+        if instance.channel_target:
+            target_channel = SalesChannel.objects.filter(
+                id=instance.channel_target.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            ).first()
+            if not target_channel:
+                raise ValidationError("Invalid target sales channel.")
+
+        if source_channel is None and target_channel is None:
+            raise ValidationError("Source and target channels cannot be the same.")
+
+        if source_channel and target_channel and source_channel.id == target_channel.id:
+            raise ValidationError("Source and target channels cannot be the same.")
+
+        if not instance.all_languages and not instance.language:
+            raise ValidationError("Language is required when allLanguages is false.")
+
+        product_ids = [p.id.node_id for p in instance.products or []]
+        products = Product.objects.filter(id__in=product_ids, multi_tenant_company=multi_tenant_company)
+        if not products.exists():
+            raise ValidationError("No products found.")
+
+        fields = [field.value for field in instance.fields]
+
+        products__tasks__import_product_translations(
+            multi_tenant_company_id=multi_tenant_company.id,
+            product_ids=list(products.values_list("id", flat=True)),
+            source_channel_id=source_channel.id if source_channel else None,
+            target_channel_id=target_channel.id if target_channel else None,
+            language=instance.language,
+            override=instance.override or False,
+            all_languages=instance.all_languages or False,
+            fields=fields,
+        )
+
+        return ProductTranslationImportTaskResponse(success=True)
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def duplicate_product(

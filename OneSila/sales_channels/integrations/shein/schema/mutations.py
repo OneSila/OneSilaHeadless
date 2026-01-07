@@ -16,6 +16,7 @@ from sales_channels.integrations.shein.factories.sales_channels import (
     SheinCategorySuggestionFactory,
     FetchRemoteIssuesFactory,
 )
+from sales_channels.integrations.shein.models import SheinSalesChannel
 from sales_channels.integrations.shein.schema.types.input import (
     SheinInternalPropertyOptionPartialInput,
     SheinInternalPropertyPartialInput,
@@ -48,7 +49,8 @@ from sales_channels.integrations.shein.schema.types.types import (
     SuggestedSheinCategory,
     SuggestedSheinCategoryEntry,
 )
-from sales_channels.schema.types.input import SalesChannelViewPartialInput
+from sales_channels.models import SalesChannelViewAssign
+from sales_channels.schema.types.input import SalesChannelViewPartialInput, SalesChannelViewAssignPartialInput
 from sales_channels.schema.types.input import RemoteProductPartialInput
 from sales_channels.schema.types.types import RemoteProductType
 from products.schema.types.input import ProductPartialInput
@@ -347,6 +349,72 @@ class SheinSalesChannelMutation:
             number_of_remote_requests=count,
             product_id=product_obj.id,
         )
+
+        return True
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def bulk_create_shein_product_from_assigns(
+            self,
+            *,
+            assigns: List[SalesChannelViewAssignPartialInput],
+            info: Info,
+    ) -> bool:
+        """
+        Bulk create Shein products based on SalesChannelViewAssign ids.
+        Only uses assigns that are PENDING_CREATION and belong to the tenant.
+        Raises if none eligible.
+        """
+        from sales_channels.models import SalesChannelViewAssign
+        from sales_channels.integrations.shein.flows.tasks_runner import (
+            run_single_shein_product_task_flow,
+        )
+        from sales_channels.integrations.shein.tasks import create_shein_product_db_task
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        assign_ids = [a.id.node_id for a in assigns if getattr(a, "id", None)]
+        if not assign_ids:
+            raise ValidationError(_("No assignments were provided."))
+
+        qs = (
+            SalesChannelViewAssign.objects
+            .filter(
+                id__in=assign_ids,
+                multi_tenant_company=multi_tenant_company,
+                status=SalesChannelViewAssign.STATUS_PENDING_CREATION,
+                sales_channel__active=True,
+            )
+            .select_related("product", "sales_channel")
+        )
+
+        if not qs.exists():
+            raise ValidationError(_("No eligible assignments. We can only create Pending Creation assignments."))
+
+        seen_product_ids: set[int] = set()
+        triggered = False
+        for assign in qs.iterator():
+
+            channel = assign.sales_channel
+            if not isinstance(channel, SheinSalesChannel):
+                continue
+
+            product_obj = assign.product
+            if product_obj.id in seen_product_ids:
+                continue
+
+            seen_product_ids.add(product_obj.id)
+            count = 1 + getattr(product_obj, "get_configurable_variations", lambda: [])().count()
+
+            run_single_shein_product_task_flow(
+                task_func=create_shein_product_db_task,
+                sales_channel=channel,
+                number_of_remote_requests=count,
+                product_id=product_obj.id,
+            )
+            triggered = True
+
+        if not triggered:
+            raise ValidationError(_("No eligible assignments. We can only create Pending Creation assignments."))
 
         return True
 

@@ -369,12 +369,9 @@ class SyncProgressMixin:
 
     def finalize_progress(self):
 
-        print('------------------------------------ WUT 1')
         if self.remote_instance is None:
-            print('------------------------------------ WUT 2')
             return
 
-        print('------------------------------------ WUT 3')
         self.remote_instance.set_new_sync_percentage(100)
 
 

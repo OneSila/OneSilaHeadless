@@ -79,7 +79,7 @@ class SalesChannelsMutation:
     )
     update_sales_channel_view_assign: SalesChannelViewAssignType = update(SalesChannelViewAssignPartialInput)
     delete_sales_channel_view_assign: SalesChannelViewAssignType = delete()
-    delete_sales_channel_view_assigns: List[SalesChannelViewAssignType] = delete()
+    delete_sales_channel_view_assigns: List[SalesChannelViewAssignType] = delete(is_bulk=True)
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def resync_sales_channel_gpt_feed(

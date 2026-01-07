@@ -1183,7 +1183,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             self.run_sync_flow()
 
         except Exception as e:
-            print('---------------------------------------------------------------------------- SET AS FAILED!!!')
             self.log_error(e, self.action_log, log_identifier, self.payload, fixing_identifier)
             raise
 
