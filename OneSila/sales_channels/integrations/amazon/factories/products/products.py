@@ -55,10 +55,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-AMAZON_MIN_TITLE_LENGTH = 150
-AMAZON_MIN_DESCRIPTION_LENGTH = 1000
-
-
 class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     remote_model_class = AmazonProduct
     remote_image_assign_create_factory = AmazonMediaProductThroughCreateFactory
@@ -206,17 +202,20 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         title_length = len((localized_title or "").strip())
         description_length = len((localized_description or "").strip())
 
-        if title_length < AMAZON_MIN_TITLE_LENGTH:
+        min_name_length = getattr(sales_channel, "min_name_length", 0)
+        min_description_length = getattr(sales_channel, "min_description_length", 0)
+
+        if min_name_length and title_length < min_name_length:
             raise AmazonTitleTooShortError(
                 "Amazon titles must have at least {} characters for the selected marketplace. Current length: {}.".format(
-                    AMAZON_MIN_TITLE_LENGTH, title_length
+                    min_name_length, title_length
                 )
             )
 
-        if description_length < AMAZON_MIN_DESCRIPTION_LENGTH:
+        if min_description_length and description_length < min_description_length:
             raise AmazonDescriptionTooShortError(
                 "Amazon descriptions must have at least {} characters for the selected marketplace. Current length: {}.".format(
-                    AMAZON_MIN_DESCRIPTION_LENGTH, description_length
+                    min_description_length, description_length
                 )
             )
 

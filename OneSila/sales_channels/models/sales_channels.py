@@ -30,6 +30,14 @@ class SalesChannel(Integration, models.Model):
         blank=True,
         help_text="Initial stock quantity to send when creating remote products.",
     )
+    min_name_length = models.PositiveIntegerField(
+        default=150,
+        help_text=_("Minimum product name length enforced by this sales channel."),
+    )
+    min_description_length = models.PositiveIntegerField(
+        default=1000,
+        help_text=_("Minimum product description length enforced by this sales channel."),
+    )
 
     gpt_enable = models.BooleanField(default=False, help_text=_("Enable GPT-generated product feed configuration."))
     gpt_enable_checkout = models.BooleanField(default=False, help_text=_("Allow GPT-generated content to power checkout experiences."))
