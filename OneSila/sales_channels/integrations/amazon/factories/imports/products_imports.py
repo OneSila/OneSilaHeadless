@@ -16,6 +16,7 @@ from properties.models import Property, ProductProperty
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.decorators import throttle_safe
 from spapi import CatalogApi
+from media.models import Image
 from sales_channels.integrations.amazon.helpers import (
     infer_product_type,
     extract_description_and_bullets,
@@ -233,6 +234,18 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
                     "is_main_image": index == 0,
                 })
                 index += 1
+
+        for value in attrs.get("swatch_product_image_locator", []):
+            url = value.get("media_location")
+            if not url:
+                continue
+            images.append({
+                "image_url": url,
+                "sort_order": index,
+                "is_main_image": False,
+                "type": Image.COLOR_SHOT,
+            })
+            index += 1
 
         if index == 0:
             summaries = product.get("summaries") or []

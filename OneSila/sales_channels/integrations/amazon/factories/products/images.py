@@ -1,6 +1,6 @@
 import json
 
-from media.models import Media, MediaProductThrough
+from media.models import MediaProductThrough
 from sales_channels.factories.products.images import (
     RemoteMediaProductThroughCreateFactory,
     RemoteMediaProductThroughUpdateFactory,
@@ -36,28 +36,30 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+    def _get_media_url(self, *, through: MediaProductThrough) -> str | None:
+        assoc = AmazonImageProductAssociation.objects.filter(
+            remote_product=self.remote_product,
+            local_instance=through,
+        ).first()
+
+        if assoc and assoc.imported_url:
+            return assoc.imported_url
+        if through.media and through.media.image_web_url:
+            return through.media.image_web_url
+        return None
+
     def _get_images(self):
         product = self.remote_product.local_instance
-        throughs = (
-            MediaProductThrough.objects.get_product_images(
-                product=product,
-                sales_channel=self.sales_channel,
-            )
-            .filter(media__type=Media.IMAGE)
-            .order_by("sort_order")
+        throughs = MediaProductThrough.objects.get_product_images(
+            product=product,
+            sales_channel=self.sales_channel,
         )
 
         urls = []
         for t in throughs:
-            assoc = AmazonImageProductAssociation.objects.filter(
-                remote_product=self.remote_product,
-                local_instance=t,
-            ).first()
-
-            if assoc and assoc.imported_url:
-                urls.append(assoc.imported_url)
-            elif t.media.image_web_url:
-                urls.append(t.media.image_web_url)
+            url = self._get_media_url(through=t)
+            if url:
+                urls.append(url)
 
         return urls
 
@@ -65,6 +67,16 @@ class AmazonMediaProductThroughBase(GetAmazonAPIMixin):
         urls = self._get_images()
         attrs = {}
         marketplace_id = self.view.remote_id if self.view else None
+        swatch_through = MediaProductThrough.objects.get_product_color_image(
+            product=self.remote_product.local_instance,
+            sales_channel=self.sales_channel,
+        )
+        if swatch_through:
+            swatch_url = self._get_media_url(through=swatch_through)
+            if swatch_url:
+                attrs["swatch_product_image_locator"] = [
+                    {"marketplace_id": marketplace_id, "media_location": swatch_url}
+                ]
         # for idx, key in enumerate(self.OFFER_KEYS):
         #     attrs[key] = (
         #         [{"marketplace_id": marketplace_id, "media_location": urls[idx]}]

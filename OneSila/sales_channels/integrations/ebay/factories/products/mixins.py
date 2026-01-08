@@ -14,7 +14,7 @@ from django.db.models import Q
 from django.template import TemplateSyntaxError
 
 from currencies.models import Currency
-from media.models import Media, MediaProductThrough
+from media.models import MediaProductThrough
 from products.models import ProductTranslation
 from properties.models import ProductProperty, Property, PropertySelectValue
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
@@ -690,13 +690,9 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         return (rendered or fallback_description), True
 
     def _collect_image_urls(self, *, product) -> List[str]:
-        throughs = (
-            MediaProductThrough.objects.get_product_images(
-                product=product,
-                sales_channel=self.sales_channel,
-            )
-            .filter(media__type=Media.IMAGE)
-            .order_by("sort_order")
+        throughs = MediaProductThrough.objects.get_product_images(
+            product=product,
+            sales_channel=self.sales_channel,
         )
 
         urls: List[str] = []

@@ -33,10 +33,12 @@ class Media(models.Model):
     '''
     MOOD_SHOT = 'MOOD'
     PACK_SHOT = 'PACK'
+    COLOR_SHOT = 'COLOR'
 
     IMAGE_TYPE_CHOICES = (
         (MOOD_SHOT, _('Mood Shot')),
         (PACK_SHOT, _('Pack Shot')),
+        (COLOR_SHOT, _('Color Image')),
     )
 
     IMAGE = 'IMAGE'
@@ -228,9 +230,9 @@ class MediaProductThrough(models.Model):
             )
 
             # Check if there's no image marked as the main image for this product
-            if not channel_images.filter(media__type=Media.IMAGE, is_main_image=True).exists():
+            if not channel_images.filter(is_main_image=True).exists():
                 # Set the first image by sort order as the main image if none are set
-                first_image = channel_images.filter(media__type=Media.IMAGE).order_by('sort_order').first()
+                first_image = channel_images.order_by('sort_order').first()
                 if first_image and first_image.pk == self.pk:
                     self.is_main_image = True
                     self.save()
@@ -241,10 +243,7 @@ class MediaProductThrough(models.Model):
             # If this image is marked as the main image, ensure no other image for this product is marked as main
             if self.is_main_image:
                 # Get all other instances marked as main image for the same product
-                other_main_images = channel_images.filter(
-                    media__type=Media.IMAGE,
-                    is_main_image=True,
-                ).exclude(pk=self.pk)
+                other_main_images = channel_images.filter(is_main_image=True).exclude(pk=self.pk)
 
                 # Iterate through each instance and set is_main_image to False, saving individually to trigger post_save
                 for other in other_main_images:

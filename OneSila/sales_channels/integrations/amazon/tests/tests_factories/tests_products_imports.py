@@ -4,6 +4,7 @@ from core.tests import TestCase
 from imports_exports.models import Import
 from imports_exports.factories.products import ImportProductInstance
 from model_bakery import baker
+from media.models import Image
 from properties.models import (
     ProductProperty,
     ProductPropertiesRule,
@@ -210,6 +211,38 @@ class AmazonProductsImportProcessorImagesTest(TestCase):
                     "image_url": "https://example.com/3.jpg",
                     "sort_order": 2,
                     "is_main_image": False,
+                },
+            ],
+        )
+
+    def test_swatch_image_imports_as_color_type(self):
+        product_data = {
+            "attributes": {
+                "main_product_image_locator": [
+                    {"media_location": "https://example.com/main.jpg"}
+                ],
+                "swatch_product_image_locator": [
+                    {"media_location": "https://example.com/swatch.jpg"}
+                ],
+            }
+        }
+        with patch.object(AmazonProductsImportProcessor, "get_api", return_value=None):
+            processor = AmazonProductsImportProcessor(self.import_process, self.sales_channel)
+            images = processor._parse_images(product_data)
+
+        self.assertEqual(
+            images,
+            [
+                {
+                    "image_url": "https://example.com/main.jpg",
+                    "sort_order": 0,
+                    "is_main_image": True,
+                },
+                {
+                    "image_url": "https://example.com/swatch.jpg",
+                    "sort_order": 1,
+                    "is_main_image": False,
+                    "type": Image.COLOR_SHOT,
                 },
             ],
         )

@@ -6,6 +6,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from currencies.models import Currency
+from media.models import Image
 from sales_channels.integrations.shein import constants
 from sales_channels.integrations.shein.models import SheinRemoteLanguage
 from sales_channels.models import SalesChannelIntegrationPricelist
@@ -106,17 +107,24 @@ class SheinProductImportValueParser:
         seen_urls: set[str] = set()
         image_group_code: str | None = None
 
-        def append_entry(*, url: str | None, remote_id: Any | None, is_main: bool) -> None:
+        def append_entry(
+            *,
+            url: str | None,
+            remote_id: Any | None,
+            is_main: bool,
+            image_type: str | None = None,
+        ) -> None:
             if not url or url in seen_urls:
                 return
             sort_order = len(images)
-            images.append(
-                {
-                    "image_url": url,
-                    "sort_order": sort_order,
-                    "is_main_image": is_main,
-                }
-            )
+            payload: dict[str, Any] = {
+                "image_url": url,
+                "sort_order": sort_order,
+                "is_main_image": is_main,
+            }
+            if image_type is not None:
+                payload["type"] = image_type
+            images.append(payload)
             if remote_id is not None:
                 remote_id_map[str(sort_order)] = str(remote_id)
             seen_urls.add(url)
@@ -136,11 +144,18 @@ class SheinProductImportValueParser:
                     )
                 url = normalize_text(value=entry.get("imageUrl") or entry.get("image_url"))
                 image_type = normalize_text(value=entry.get("imageType") or entry.get("image_type")) or ""
-                is_main = image_type.upper() == "MAIN" or not images
+                image_type_value = image_type.strip().upper()
+                image_type_override = (
+                    Image.COLOR_SHOT
+                    if image_type_value in {"COLOR", "COLOUR"}
+                    else None
+                )
+                is_main = image_type_value == "MAIN" or not images
                 append_entry(
                     url=url,
                     remote_id=entry.get("imageItemId") or entry.get("image_item_id"),
                     is_main=is_main,
+                    image_type=image_type_override,
                 )
 
         site_detail_list = skc_payload.get("siteDetailImageInfoList") or skc_payload.get("site_detail_image_info_list") or []

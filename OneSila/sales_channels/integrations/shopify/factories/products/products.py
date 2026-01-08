@@ -330,7 +330,7 @@ class ShopifyProductSyncFactory(GetShopifyApiMixin, RemoteProductSyncFactory):
 
     def get_medias(self):
         return (
-            MediaProductThrough.objects.get_product_images(
+            MediaProductThrough.objects.get_product_media(
                 product=self.local_instance,
                 sales_channel=self.sales_channel,
             )

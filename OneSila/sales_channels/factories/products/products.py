@@ -1,6 +1,6 @@
 from integrations.models import IntegrationLog
 from types import SimpleNamespace
-from media.models import MediaProductThrough, Media
+from media.models import MediaProductThrough
 from products.models import Product
 from properties.models import ProductProperty
 from django.template import TemplateSyntaxError
@@ -833,13 +833,9 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.finalize_content_translations()
 
     def get_medias(self):
-        medias = (
-            MediaProductThrough.objects.get_product_images(
-                product=self.local_instance,
-                sales_channel=self.sales_channel,
-            )
-            .filter(media__type=Media.IMAGE)
-            .order_by('-is_main_image', 'sort_order')
+        medias = MediaProductThrough.objects.get_product_images(
+            product=self.local_instance,
+            sales_channel=self.sales_channel,
         )
 
         self._content_template_media_assignments = medias

@@ -1,4 +1,6 @@
-from media.models import Media, Image
+from media.models import Media, Image, MediaProductThrough
+from products.models import Product
+from sales_channels.models import SalesChannel
 from core.tests import TestCase
 from model_bakery import baker
 from django.core.files import File
@@ -146,6 +148,116 @@ class MediaTestCase(CreateImageMixin, TestCase):
 
         # # Clean up by deleting the second media instance
         # media2.delete()
+
+
+class MediaProductThroughManagerTestCase(TestCase):
+    def test_get_product_images_excludes_color_type(self):
+        product = baker.make(Product, multi_tenant_company=self.multi_tenant_company)
+        image_media = baker.make(
+            Media,
+            type=Media.IMAGE,
+            image_type=Media.PACK_SHOT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        color_media = baker.make(
+            Media,
+            type=Media.IMAGE,
+            image_type=Media.COLOR_SHOT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        image_through = MediaProductThrough.objects.create(
+            product=product,
+            media=image_media,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        MediaProductThrough.objects.create(
+            product=product,
+            media=color_media,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        images_queryset = MediaProductThrough.objects.get_product_images(
+            product=product,
+            sales_channel=None,
+        )
+
+        self.assertTrue(images_queryset.filter(pk=image_through.pk).exists())
+        self.assertFalse(images_queryset.filter(media=color_media).exists())
+
+    def test_get_product_color_image_fallback(self):
+        product = baker.make(Product, multi_tenant_company=self.multi_tenant_company)
+        default_media_one = baker.make(
+            Media,
+            type=Media.IMAGE,
+            image_type=Media.COLOR_SHOT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        default_media_two = baker.make(
+            Media,
+            type=Media.IMAGE,
+            image_type=Media.COLOR_SHOT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        channel_media = baker.make(
+            Media,
+            type=Media.IMAGE,
+            image_type=Media.COLOR_SHOT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        default_through_one = MediaProductThrough.objects.create(
+            product=product,
+            media=default_media_one,
+            sort_order=1,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        MediaProductThrough.objects.create(
+            product=product,
+            media=default_media_two,
+            sort_order=2,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        sales_channel = baker.make(
+            SalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="https://channel.test",
+        )
+        channel_through = MediaProductThrough.objects.create(
+            product=product,
+            media=channel_media,
+            sort_order=1,
+            sales_channel=sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        other_channel = baker.make(
+            SalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="https://other.test",
+        )
+
+        self.assertEqual(
+            MediaProductThrough.objects.get_product_color_image(
+                product=product,
+                sales_channel=sales_channel,
+            ),
+            channel_through,
+        )
+        self.assertEqual(
+            MediaProductThrough.objects.get_product_color_image(
+                product=product,
+                sales_channel=other_channel,
+            ),
+            default_through_one,
+        )
+        self.assertEqual(
+            MediaProductThrough.objects.get_product_color_image(
+                product=product,
+                sales_channel=None,
+            ),
+            default_through_one,
+        )
 
 
 class ImageCleanupTestCase(CreateImageMixin, TestCase):
