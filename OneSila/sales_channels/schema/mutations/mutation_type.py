@@ -70,13 +70,9 @@ class SalesChannelsMutation:
     delete_sales_channel_content_template: SalesChannelContentTemplateType = delete()
     delete_sales_channel_content_templates: List[SalesChannelContentTemplateType] = delete()
 
-    create_sales_channel_view_assign: SalesChannelViewAssignType = create(
-        SalesChannelViewAssignInput,
-    )
+    create_sales_channel_view_assign: SalesChannelViewAssignType = create(SalesChannelViewAssignInput)
     resync_sales_channel_view_assign: SalesChannelViewAssignType = resync_sales_channel_assign()
-    create_sales_channel_view_assigns: List[SalesChannelViewAssignType] = create(
-        SalesChannelViewAssignInput,
-    )
+    create_sales_channel_view_assigns: List[SalesChannelViewAssignType] = create(List[SalesChannelViewAssignInput])
     update_sales_channel_view_assign: SalesChannelViewAssignType = update(SalesChannelViewAssignPartialInput)
     delete_sales_channel_view_assign: SalesChannelViewAssignType = delete()
     delete_sales_channel_view_assigns: List[SalesChannelViewAssignType] = delete(is_bulk=True)

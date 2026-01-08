@@ -12,6 +12,7 @@ from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -93,6 +94,7 @@ class ValidateSheinAuthFactory:
     def run(self) -> SheinSalesChannel:
         self._validate_inputs()
         response_payload = self._call_token_endpoint()
+        self._ensure_unique_open_key(open_key_id=response_payload.get("openKeyId"))
         self.decrypted_secret = self._decrypt_secret(response_payload["secretKey"])
         self._persist(response_payload)
         self._dispatch_refresh()
@@ -197,6 +199,31 @@ class ValidateSheinAuthFactory:
     def _get_company_language(self) -> Optional[str]:
         company = getattr(self.sales_channel, "multi_tenant_company", None)
         return getattr(company, "language", None) if company else None
+
+    def _ensure_unique_open_key(self, *, open_key_id: Optional[str]) -> None:
+        if not open_key_id:
+            return
+        company = getattr(self.sales_channel, "multi_tenant_company", None)
+        if not company:
+            return
+        existing = (
+            SheinSalesChannel.objects.filter(
+                multi_tenant_company=company,
+                open_key_id=open_key_id,
+            )
+            .exclude(pk=self.sales_channel.pk)
+            .only("hostname")
+            .first()
+        )
+        if existing:
+            raise ValidationError(
+                {
+                    "__all__": _(
+                        "The Shein app is already connected to %(hostname)s."
+                    )
+                    % {"hostname": existing.hostname}
+                }
+            )
 
     def _persist(self, payload: dict) -> None:
         update_fields = [

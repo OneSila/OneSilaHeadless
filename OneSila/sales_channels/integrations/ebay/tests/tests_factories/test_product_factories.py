@@ -1131,3 +1131,33 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
             EbayProduct.objects.filter(pk=self.remote_product.pk).exists()
         )
         self.assertEqual(result["withdraw"], {"status": "NOT_FOUND"})
+
+    def test_configurable_delete_collects_child_errors(self) -> None:
+        self._prime_remote_state()
+
+        api_mock = MagicMock()
+        api_mock.sell_inventory_withdraw_offer_by_inventory_item_group.return_value = {
+            "status": "WITHDRAWN"
+        }
+        api_mock.sell_inventory_delete_inventory_item_group.return_value = {
+            "status": "REMOVED"
+        }
+        api_mock.sell_inventory_delete_inventory_item.return_value = {}
+
+        offer_error = EbayResponseException("Offer delete failed")
+
+        with patch.object(EbayProductDeleteFactory, "get_api", return_value=api_mock):
+            with patch.object(EbayProductDeleteFactory, "delete_offer", side_effect=[offer_error, {}]):
+                with patch(
+                    "sales_channels.integrations.ebay.factories.products.products.logger"
+                ) as logger_mock:
+                    factory = EbayProductDeleteFactory(
+                        sales_channel=self.sales_channel,
+                        local_instance=self.product,
+                        view=self.view,
+                    )
+                    result = factory.run()
+
+        self.assertEqual(result["children"]["offers"][0]["error"], "Offer delete failed")
+        self.assertEqual(result["children"]["offers"][1], {})
+        logger_mock.error.assert_called_once()

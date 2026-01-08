@@ -312,14 +312,32 @@ class SheinProductPropertyValueMixin(SheinSignatureMixin):
     ) -> dict[str, Any]:
         shein_property = product_type_item.property
         if shein_property is None:
-            raise PreFlightCheckError("Shein property is required to build attribute payload.")
+            product_type = product_type_item.product_type
+            product_type_label = (
+                product_type.name
+                or product_type.remote_id
+                or "Unknown product type"
+            )
+            raise PreFlightCheckError(
+                f"Shein property is required to build attribute payload for '{product_type_label}'."
+            )
 
+        shein_property_label = (
+            shein_property.name
+            or shein_property.name_en
+            or shein_property.remote_id
+            or "Unknown property"
+        )
         attribute_id = self._normalize_identifier(value=shein_property.remote_id)
         if attribute_id is None:
-            raise PreFlightCheckError("Shein property is missing a remote_id mapping.")
+            raise PreFlightCheckError(
+                f"Shein property '{shein_property_label}' is missing a remote_id mapping."
+            )
 
         if shein_property.local_instance and shein_property.local_instance != product_property.property:
-            raise PreFlightCheckError("Mapped Shein property does not match the product property being synced.")
+            raise PreFlightCheckError(
+                f"Mapped Shein property '{shein_property_label}' does not match the product property being synced."
+            )
 
         language_code = self._normalize_language()
         allow_custom_values = bool(

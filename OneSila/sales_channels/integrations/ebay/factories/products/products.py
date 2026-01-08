@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import logging
 from typing import Any, Dict, List, Optional
 
 from django.db import IntegrityError
@@ -28,6 +29,7 @@ from sales_channels.integrations.ebay.exceptions import (
     EbayMissingListingPoliciesError,
     EbayMissingProductMappingError,
     EbayMissingVariationMappingsError,
+    EbayResponseException,
 )
 from sales_channels.integrations.ebay.factories.products.properties import (
     EbayProductPropertyCreateFactory,
@@ -41,6 +43,9 @@ from sales_channels.integrations.ebay.models.properties import (
     EbayInternalProperty,
     EbayProperty,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactory):
@@ -675,6 +680,59 @@ class EbayProductDeleteFactory(EbayProductBaseFactory):
                 continue
             type(target).objects.filter(pk=target.pk).delete()
 
+    def _collect_delete_errors(self, *, payload: Any) -> List[str]:
+        if payload is None:
+            return []
+
+        if isinstance(payload, list):
+            messages: List[str] = []
+            for item in payload:
+                messages.extend(self._collect_delete_errors(payload=item))
+            return messages
+
+        if isinstance(payload, dict):
+            messages = self._extract_delete_errors_from_dict(payload=payload)
+            for value in payload.values():
+                messages.extend(self._collect_delete_errors(payload=value))
+            return messages
+
+        return []
+
+    def _extract_delete_errors_from_dict(self, *, payload: Dict[str, Any]) -> List[str]:
+        messages: List[str] = []
+        error_message = payload.get("error")
+        if error_message:
+            messages.append(
+                self._format_delete_error_message(
+                    payload=payload,
+                    message=str(error_message),
+                )
+            )
+
+        api_errors = payload.get("errors")
+        if isinstance(api_errors, list):
+            for error in api_errors:
+                if isinstance(error, dict):
+                    message = error.get("message")
+                    if message:
+                        messages.append(str(message))
+                elif error:
+                    messages.append(str(error))
+
+        return messages
+
+    def _format_delete_error_message(self, *, payload: Dict[str, Any], message: str) -> str:
+        details: List[str] = []
+        sku = payload.get("sku")
+        if sku:
+            details.append(f"sku={sku}")
+        remote_product_id = payload.get("remote_product_id")
+        if remote_product_id:
+            details.append(f"remote_product_id={remote_product_id}")
+        if details:
+            return f"{message} ({', '.join(details)})"
+        return message
+
     def run(self) -> Optional[Dict[str, Any]]:
         if not self.preflight_check():
             return None
@@ -724,6 +782,11 @@ class EbayProductDeleteFactory(EbayProductBaseFactory):
             self.update_progress()
             self.final_process()
             self.log_action(self.action_log, result or {}, self.payload, log_identifier)
+
+            delete_errors = self._collect_delete_errors(payload=result or {})
+            if delete_errors:
+                message = "Delete failed:\n" + "\n".join(delete_errors)
+                logger.error(message)
 
             if remote_product is not None:
                 self._delete_remote_records(

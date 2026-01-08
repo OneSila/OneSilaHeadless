@@ -157,7 +157,7 @@ class SheinSalesChannelMutation:
                 state=instance.state,
                 multi_tenant_company=multi_tenant_company,
             )
-        except SheinSalesChannel.DoesNotExist as exc:  # pragma: no cover - guard path
+        except SheinSalesChannel.DoesNotExist as exc:
             raise ValueError(
                 _("Could not find Shein integration for the provided state.")
             ) from exc
