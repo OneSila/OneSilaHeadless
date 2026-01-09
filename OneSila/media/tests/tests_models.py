@@ -153,7 +153,7 @@ class MediaTestCase(CreateImageMixin, TestCase):
 
 class MediaProductThroughManagerTestCase(TestCase):
     def test_get_product_images_excludes_color_type(self):
-        product = baker.make(Product, multi_tenant_company=self.multi_tenant_company)
+        product = baker.make(Product, type="SIMPLE", multi_tenant_company=self.multi_tenant_company)
         image_media = baker.make(
             Media,
             type=Media.IMAGE,
