@@ -180,6 +180,12 @@ class SalesChannelViewAssignStatusFilterTestCase(TestCase):
             [self.assign_failed],
         )
 
+    def test_filter_by_status_created_excludes_failed(self):
+        queryset = SalesChannelViewAssign.objects.filter_by_status(
+            status=SalesChannelViewAssign.STATUS_CREATED,
+        ).order_by("id")
+        self.assertNotIn(self.assign_failed, list(queryset))
+
     def test_filter_by_status_unknown_returns_empty(self):
         queryset = SalesChannelViewAssign.objects.filter_by_status(status="UNKNOWN")
         self.assertEqual(queryset.count(), 0)

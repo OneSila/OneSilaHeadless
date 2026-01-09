@@ -90,6 +90,8 @@ class AmazonProductTestMixin:
         self.sales_channel = AmazonSalesChannel.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             remote_id="SELLER123",
+            min_description_length=0,
+            min_name_length=0
         )
         self.view = AmazonSalesChannelView.objects.create(
             multi_tenant_company=self.multi_tenant_company,
