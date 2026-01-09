@@ -18,6 +18,7 @@ from properties.models import (
     PropertySelectValue,
     PropertySelectValueTranslation,
 )
+from sales_channels.exceptions import PreFlightCheckError
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
 
@@ -252,11 +253,15 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
         self.view.refresh_from_db()
 
         factory = self._build_create_factory()
-        with self.assertRaises(EbayMissingListingPoliciesError):
+        with self.assertRaises(PreFlightCheckError):
             factory.run()
 
     def test_create_flow_errors_when_price_missing_for_view_currency(self) -> None:
         SalesPrice.objects.filter(product=self.product, currency=self.currency).delete()
+
+        # don't care about inspector in this test and we don't wanna get InspectorMissingInformationError
+        inspector = self.product.inspector
+        inspector.delete()
 
         factory = self._build_create_factory(get_value_only=True)
 

@@ -99,6 +99,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         super().__init__(*args, **kwargs)
         self.attributes: Dict = {}
         self.image_attributes: Dict = {}
+        self.content = None
         self.prices_data = {}
         self.external_product_id = self._get_external_product_id()
         self.ean_for_payload = self._get_ean_for_payload()
@@ -128,6 +129,83 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         # allow variations to be added separately from the configurable product
         # in amazon we can add in different vierws
         pass
+
+    def set_local_assigns(self):
+        super().set_local_assigns()
+        self._set_content()
+
+    def _set_content(self, *, force: bool = False) -> None:
+        if self.content is not None and not force:
+            return
+
+        lang = (
+            self.view.remote_languages.first().local_instance
+            if self.view.remote_languages.exists()
+            else self.sales_channel.multi_tenant_company.language
+        )
+
+        channel_translation = ProductTranslation.objects.filter(
+            product=self.local_instance,
+            language=lang,
+            sales_channel=self.sales_channel,
+        ).first()
+
+        default_translation = ProductTranslation.objects.filter(
+            product=self.local_instance,
+            language=lang,
+            sales_channel=None,
+        ).first()
+
+        item_name = None
+        product_description = None
+
+        if channel_translation:
+            item_name = channel_translation.name or None
+            product_description = channel_translation.description or None
+
+        if not item_name and default_translation:
+            item_name = default_translation.name
+
+        if not product_description and default_translation:
+            product_description = default_translation.description
+
+        bullet_points = []
+        if channel_translation:
+            bullet_points = list(
+                ProductTranslationBulletPoint.objects.filter(
+                    product_translation=channel_translation
+                )
+                .order_by("sort_order")
+                .values_list("text", flat=True)
+            )
+
+        attrs = {}
+        language_tag = self.view.language_tag if self.view else None
+        marketplace_id = self.view.remote_id if self.view else None
+        if item_name:
+            attrs["item_name"] = [{
+                "value": item_name,
+                "language_tag": language_tag,
+                "marketplace_id": marketplace_id,
+            }]
+        if is_safe_content(product_description):
+            attrs["product_description"] = [{
+                "value": product_description,
+                "language_tag": language_tag,
+                "marketplace_id": marketplace_id,
+            }]
+
+        if bullet_points:
+            attrs["bullet_point"] = [
+                {
+                    "value": bp,
+                    "language_tag": language_tag,
+                    "marketplace_id": marketplace_id,
+                }
+                for bp in bullet_points
+            ]
+
+        self.content = {k: v for k, v in attrs.items() if v not in (None, "")}
 
     def validate(self):
         if getattr(self, "skip_checks", False):
@@ -176,28 +254,17 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             .exists()
         )
 
-        remote_language_code = None
-        remote_languages = getattr(view, "remote_languages", None)
-        if remote_languages is not None:
-            remote_language = remote_languages.exclude(local_instance__isnull=True).first()
-            if remote_language:
-                remote_language_code = remote_language.local_instance
+        content = self.content or {}
+        localized_title = None
+        localized_description = None
 
-        if not remote_language_code:
-            remote_language_code = getattr(sales_channel.multi_tenant_company, "language", None)
+        content_title = content.get("item_name", [])
+        if content_title:
+            localized_title = content_title[0].get("value")
 
-        localized_title = product._get_translated_value(
-            field_name="name",
-            language=remote_language_code,
-            related_name="translations",
-            sales_channel=sales_channel,
-        )
-        localized_description = product._get_translated_value(
-            field_name="description",
-            language=remote_language_code,
-            related_name="translations",
-            sales_channel=sales_channel,
-        )
+        content_description = content.get("product_description", [])
+        if content_description:
+            localized_description = content_description[0].get("value")
 
         title_length = len((localized_title or "").strip())
         description_length = len((localized_description or "").strip())
@@ -533,74 +600,8 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         return attrs
 
     def build_content_attributes(self) -> Dict:
-        lang = (
-            self.view.remote_languages.first().local_instance
-            if self.view.remote_languages.exists()
-            else self.sales_channel.multi_tenant_company.language
-        )
-
-        channel_translation = ProductTranslation.objects.filter(
-            product=self.local_instance,
-            language=lang,
-            sales_channel=self.sales_channel,
-        ).first()
-
-        default_translation = ProductTranslation.objects.filter(
-            product=self.local_instance,
-            language=lang,
-            sales_channel=None,
-        ).first()
-
-        item_name = None
-        product_description = None
-
-        if channel_translation:
-            item_name = channel_translation.name or None
-            product_description = channel_translation.description or None
-
-        if not item_name and default_translation:
-            item_name = default_translation.name
-
-        if not product_description and default_translation:
-            product_description = default_translation.description
-
-        bullet_points = []
-        if channel_translation:
-            bullet_points = list(
-                ProductTranslationBulletPoint.objects.filter(
-                    product_translation=channel_translation
-                )
-                .order_by("sort_order")
-                .values_list("text", flat=True)
-            )
-
-        attrs = {}
-        language_tag = self.view.language_tag if self.view else None
-        marketplace_id = self.view.remote_id if self.view else None
-        if item_name:
-            attrs["item_name"] = [{
-                "value": item_name,
-                "language_tag": language_tag,
-                "marketplace_id": marketplace_id,
-            }]
-        if is_safe_content(product_description):
-            attrs["product_description"] = [{
-                "value": product_description,
-                "language_tag": language_tag,
-                "marketplace_id": marketplace_id,
-            }]
-
-        if bullet_points:
-            attrs["bullet_point"] = [
-                {
-                    "value": bp,
-                    "language_tag": language_tag,
-                    "marketplace_id": marketplace_id,
-                }
-                for bp in bullet_points
-            ]
-
-        return {k: v for k, v in attrs.items() if v not in (None, "")}
+        self._set_content()
+        return self.content or {}
 
     def build_price_attributes(self) -> Dict:
         attrs: Dict = {}
@@ -642,7 +643,8 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         # gather image attributes before building payload so they are sent with the product
         self.assign_images()
         self.attributes.update(self.build_basic_attributes())
-        self.attributes.update(self.build_content_attributes())
+        self._set_content()
+        self.attributes.update(self.content or {})
         self.attributes.update(self.build_price_attributes())
         self.attributes.update(self.image_attributes)
 

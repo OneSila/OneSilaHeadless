@@ -213,6 +213,7 @@ class EbayProductPropertyUpdateFactoryTest(EbayProductPushFactoryTestBase):
             multi_tenant_company=self.multi_tenant_company,
         )
         PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
             property=local_property,
             language=self.multi_tenant_company.language,
             name="Material",

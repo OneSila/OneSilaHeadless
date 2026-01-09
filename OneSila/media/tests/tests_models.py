@@ -1,5 +1,6 @@
 from media.models import Media, Image, MediaProductThrough
 from products.models import Product
+from sales_channels.integrations.shein.models import SheinSalesChannel
 from sales_channels.models import SalesChannel
 from core.tests import TestCase
 from model_bakery import baker
@@ -219,7 +220,7 @@ class MediaProductThroughManagerTestCase(TestCase):
         )
 
         sales_channel = baker.make(
-            SalesChannel,
+            SheinSalesChannel,
             multi_tenant_company=self.multi_tenant_company,
             hostname="https://channel.test",
         )
@@ -232,7 +233,7 @@ class MediaProductThroughManagerTestCase(TestCase):
         )
 
         other_channel = baker.make(
-            SalesChannel,
+            SheinSalesChannel,
             multi_tenant_company=self.multi_tenant_company,
             hostname="https://other.test",
         )

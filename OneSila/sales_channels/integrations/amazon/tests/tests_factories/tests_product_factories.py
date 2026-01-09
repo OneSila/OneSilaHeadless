@@ -2096,6 +2096,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         }
 
         SalesPrice.objects.filter(product=self.product).delete()
+        self.product.inspector.delete()
         fac = AmazonProductCreateFactory(
             sales_channel=self.sales_channel,
             local_instance=self.product,
@@ -2698,6 +2699,8 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
         mock_instance = mock_listings.return_value
         mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
+        self.product.inspector.delete()
+        self.child.inspector.delete()
         fac = AmazonProductCreateFactory(
             sales_channel=self.sales_channel,
             local_instance=self.product,
@@ -2748,6 +2751,8 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
     def test_child_payload_has_variation_attributes(self, mock_listings, mock_get_images, mock_get_client):
         mock_instance = mock_listings.return_value
         mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
+        self.product.inspector.delete()
+        self.child.inspector.delete()
 
         fac = AmazonProductCreateFactory(
             sales_channel=self.sales_channel,
@@ -2800,6 +2805,7 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
             inspector.has_missing_information = False
             inspector.has_missing_optional_information = False
             inspector.save(update_fields=["has_missing_information", "has_missing_optional_information"])
+
         ProductProperty.objects.create(
             product=simple,
             property=self.product_type_property,
@@ -2836,7 +2842,7 @@ class AmazonConfigurableProductFlowTest(DisableWooCommerceSignalsMixin, Transact
 
         mock_instance = mock_listings.return_value
         mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
-
+        inspector.delete()
         fac = AmazonProductCreateFactory(
             sales_channel=self.sales_channel,
             local_instance=simple,

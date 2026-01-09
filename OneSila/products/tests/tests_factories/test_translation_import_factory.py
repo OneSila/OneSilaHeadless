@@ -49,8 +49,8 @@ class ProductTranslationImportFactoryTestCase(TestCase):
 
     def test_import_all_languages_overwrites_bullet_points(self):
         product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        source_channel = baker.make(SalesChannel, multi_tenant_company=self.multi_tenant_company)
-        target_channel = baker.make(SalesChannel, multi_tenant_company=self.multi_tenant_company)
+        source_channel = baker.make(AmazonSalesChannel, multi_tenant_company=self.multi_tenant_company)
+        target_channel = baker.make(AmazonSalesChannel, multi_tenant_company=self.multi_tenant_company)
 
         source_en = ProductTranslation.objects.create(
             product=product,
@@ -132,8 +132,8 @@ class ProductTranslationImportFactoryTestCase(TestCase):
 
     def test_import_bullet_points_fills_to_five_when_not_overriding(self):
         product = SimpleProduct.objects.create(multi_tenant_company=self.multi_tenant_company)
-        source_channel = baker.make(SalesChannel, multi_tenant_company=self.multi_tenant_company)
-        target_channel = baker.make(SalesChannel, multi_tenant_company=self.multi_tenant_company)
+        source_channel = baker.make(AmazonSalesChannel, multi_tenant_company=self.multi_tenant_company)
+        target_channel = baker.make(AmazonSalesChannel, multi_tenant_company=self.multi_tenant_company)
 
         source_translation = ProductTranslation.objects.create(
             product=product,
