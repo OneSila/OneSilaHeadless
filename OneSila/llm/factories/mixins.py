@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 
 from billing.models import AiPointTransaction
 from llm.models import AiGenerateProcess, AiTranslationProcess, AiImportProcess
-from media.models import MediaProductThrough, Media
+from media.models import MediaProductThrough
 from products.models import ProductTranslation
 from properties.helpers import get_product_properties_dict
 
@@ -252,10 +252,7 @@ class ContentLLMMixin(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
             sales_channel=None,
         )
 
-        self.images = [
-            item.media.image_url()
-            for item in images_queryset.filter(media__type=Media.IMAGE)
-        ]
+        self.images = [item.media.image_url() for item in images_queryset]
 
     def _set_documents(self):
 
@@ -263,15 +260,12 @@ class ContentLLMMixin(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
             self.documents = []
             return
 
-        documents_queryset = MediaProductThrough.objects.get_product_images(
+        documents_queryset = MediaProductThrough.objects.get_product_documents(
             product=self.product,
             sales_channel=None,
         )
 
-        self.documents = [
-            item.media.file_url()
-            for item in documents_queryset.filter(media__type=Media.FILE)
-        ]
+        self.documents = [item.media.file_url() for item in documents_queryset]
 
     def _set_is_configurable(self):
         self.is_configurable = self.product.is_configurable()

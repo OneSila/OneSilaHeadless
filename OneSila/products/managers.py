@@ -21,20 +21,39 @@ class ProductQuerySet(MultiTenantQuerySet):
         from .models import ProductTranslation
 
         language_field = language_code if language_code is not None else OuterRef('multi_tenant_company__language')
-        name_in_language = ProductTranslation.objects.filter(
-            product=OuterRef('pk'),
-            language=language_field,
-        ).values('name')[:1]
+        # 1) default language AND global translation (no sales_channel)
+        name_in_default_language_global = (
+            ProductTranslation.objects.filter(
+                product=OuterRef("pk"),
+                language=language_field,
+                sales_channel=None,
+            )
+            .values("name")[:1]
+        )
 
-        any_name = ProductTranslation.objects.filter(
-            product=OuterRef('pk'),
-        ).values('name')[:1]
+        # 2) default language AND any translation (including sales_channel-specific)
+        name_in_default_language_any = (
+            ProductTranslation.objects.filter(
+                product=OuterRef("pk"),
+                language=language_field,
+            )
+            .values("name")[:1]
+        )
+
+        # 3) any translation at all (any language, any channel)
+        any_name = (
+            ProductTranslation.objects.filter(
+                product=OuterRef("pk"),
+            )
+            .values("name")[:1]
+        )
 
         return self.annotate(
             translated_name=Coalesce(
-                Subquery(name_in_language, output_field=CharField()),
+                Subquery(name_in_default_language_global, output_field=CharField()),
+                Subquery(name_in_default_language_any, output_field=CharField()),
                 Subquery(any_name, output_field=CharField()),
-                Value('No Name Set'),
+                Value("No Name Set"),
             )
         )
 

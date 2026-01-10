@@ -55,16 +55,12 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
         product = self.product_instance or getattr(self.remote_product, "local_instance", None)
         if product is None:
             return []
-        queryset = MediaProductThrough._base_manager.filter(
-            product=product,
+        return list(
+            MediaProductThrough.objects.get_product_images(
+                product=product,
+                sales_channel=self.sales_channel,
+            )
         )
-        if self.sales_channel:
-            channel_qs = queryset.filter(sales_channel=self.sales_channel)
-            queryset = channel_qs if channel_qs.exists() else queryset.filter(sales_channel__isnull=True)
-        else:
-            queryset = queryset.filter(sales_channel__isnull=True)
-
-        return list(queryset.filter(media__type=Media.IMAGE).order_by("sort_order"))
 
     def _resolve_image_url(self, *, media: Media, image_type: int) -> Optional[str]:
         if getattr(settings, "TESTING", False):
@@ -200,16 +196,15 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
             is_variation = product.is_simple() and product.configurables.exists()
 
         non_square_throughs = [through for through in remaining_throughs if through != square_through]
-        color_through = None
         detail_throughs = list(non_square_throughs)
 
         if is_variation:
-            if detail_throughs:
-                color_through = detail_throughs.pop()
-            elif remaining_throughs:
-                color_through = remaining_throughs[-1]
-            else:
-                color_through = main_through
+            color_through = MediaProductThrough.objects.get_product_color_image(
+                product=product,
+                sales_channel=self.sales_channel,
+            )
+        else:
+            color_through = None
 
         sort = 3
         for through in detail_throughs[:10]:

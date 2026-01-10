@@ -4,6 +4,12 @@ from core.exceptions import ValidationError
 from sales_channels.integrations.amazon.exceptions import (
     AmazonProductValidationIssuesException,
     AmazonResponseException,
+    AmazonDescriptionTooShortError,
+    AmazonMissingBrowseNodeError,
+    AmazonMissingIdentifierError,
+    AmazonMissingVariationIdentifierError,
+    AmazonMissingVariationThemeError,
+    AmazonTitleTooShortError,
 )
 from sales_channels.models.sales_channels import (
     SalesChannel,
@@ -12,7 +18,12 @@ from sales_channels.models.sales_channels import (
 )
 from django.db.models import Q
 import uuid
-from sales_channels.exceptions import RemotePropertyValueNotMapped, SkipSyncBecauseOfStatusException
+from sales_channels.exceptions import (
+    InspectorMissingInformationError,
+    RemotePropertyValueNotMapped,
+    SkipSyncBecauseOfStatusException,
+    VariationAlreadyExistsOnWebsite,
+)
 
 
 class AmazonSalesChannel(SalesChannel):
@@ -113,10 +124,18 @@ class AmazonSalesChannel(SalesChannel):
         verbose_name = 'Amazon Sales Channel'
         verbose_name_plural = 'Amazon Sales Channels'
         user_exceptions = (
+            InspectorMissingInformationError,
             RemotePropertyValueNotMapped,
             AmazonResponseException,
             AmazonProductValidationIssuesException,
             SkipSyncBecauseOfStatusException,
+            VariationAlreadyExistsOnWebsite,
+            AmazonTitleTooShortError,
+            AmazonDescriptionTooShortError,
+            AmazonMissingIdentifierError,
+            AmazonMissingVariationIdentifierError,
+            AmazonMissingBrowseNodeError,
+            AmazonMissingVariationThemeError,
         )
 
     def __str__(self):

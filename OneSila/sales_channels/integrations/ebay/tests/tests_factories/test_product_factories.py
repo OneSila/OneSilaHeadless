@@ -18,10 +18,14 @@ from properties.models import (
     PropertySelectValue,
     PropertySelectValueTranslation,
 )
+from sales_channels.exceptions import PreFlightCheckError
 from sales_prices.models import SalesPrice
 from taxes.models import VatRate
 
-from sales_channels.integrations.ebay.exceptions import EbayResponseException
+from sales_channels.integrations.ebay.exceptions import (
+    EbayMissingListingPoliciesError,
+    EbayResponseException,
+)
 from sales_channels.integrations.ebay.factories.products import (
     EbayProductCreateFactory,
     EbayProductDeleteFactory,
@@ -38,7 +42,6 @@ from sales_channels.integrations.ebay.models.properties import (
 )
 from sales_channels.integrations.ebay.models.taxes import EbayCurrency
 from sales_channels.integrations.ebay.models.products import EbayProductOffer, EbayProduct
-from sales_channels.exceptions import PreFlightCheckError
 
 from .mixins import EbayProductPushFactoryTestBase
 
@@ -255,6 +258,10 @@ class EbaySimpleProductFactoryTest(EbayProductPushFactoryTestBase):
 
     def test_create_flow_errors_when_price_missing_for_view_currency(self) -> None:
         SalesPrice.objects.filter(product=self.product, currency=self.currency).delete()
+
+        # don't care about inspector in this test and we don't wanna get InspectorMissingInformationError
+        inspector = self.product.inspector
+        inspector.delete()
 
         factory = self._build_create_factory(get_value_only=True)
 
@@ -659,6 +666,20 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
             type=Product.SIMPLE,
             multi_tenant_company=self.multi_tenant_company,
         )
+        from products_inspector.models import Inspector
+
+        try:
+            inspector = child.inspector
+        except Inspector.DoesNotExist:
+            inspector = Inspector.objects.create(
+                product=child,
+                has_missing_information=False,
+                has_missing_optional_information=False,
+            )
+        else:
+            inspector.has_missing_information = False
+            inspector.has_missing_optional_information = False
+            inspector.save(update_fields=["has_missing_information", "has_missing_optional_information"])
         self._assign_product_type(child)
         ProductTranslation.objects.create(
             product=child,
@@ -1115,3 +1136,33 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
             EbayProduct.objects.filter(pk=self.remote_product.pk).exists()
         )
         self.assertEqual(result["withdraw"], {"status": "NOT_FOUND"})
+
+    def test_configurable_delete_collects_child_errors(self) -> None:
+        self._prime_remote_state()
+
+        api_mock = MagicMock()
+        api_mock.sell_inventory_withdraw_offer_by_inventory_item_group.return_value = {
+            "status": "WITHDRAWN"
+        }
+        api_mock.sell_inventory_delete_inventory_item_group.return_value = {
+            "status": "REMOVED"
+        }
+        api_mock.sell_inventory_delete_inventory_item.return_value = {}
+
+        offer_error = EbayResponseException("Offer delete failed")
+
+        with patch.object(EbayProductDeleteFactory, "get_api", return_value=api_mock):
+            with patch.object(EbayProductDeleteFactory, "delete_offer", side_effect=[offer_error, {}]):
+                with patch(
+                    "sales_channels.integrations.ebay.factories.products.products.logger"
+                ) as logger_mock:
+                    factory = EbayProductDeleteFactory(
+                        sales_channel=self.sales_channel,
+                        local_instance=self.product,
+                        view=self.view,
+                    )
+                    result = factory.run()
+
+        self.assertEqual(result["children"]["offers"][0]["error"], "Offer delete failed")
+        self.assertEqual(result["children"]["offers"][1], {})
+        logger_mock.error.assert_called_once()

@@ -11,7 +11,7 @@ class MediaQuerySet(MultiTenantQuerySet):
 
 
 class MediaProductThroughQuerySet(MultiTenantQuerySet):
-    def get_product_images(self, *, product, sales_channel=None):
+    def get_product_media(self, *, product, sales_channel=None):
         base_queryset = self.filter(product=product)
 
         if sales_channel is None:
@@ -24,13 +24,63 @@ class MediaProductThroughQuerySet(MultiTenantQuerySet):
 
         return base_queryset.filter(sales_channel__isnull=True)
 
+    def get_product_images(self, *, product, sales_channel=None):
+        from media.models import Media
+
+        return (
+            self.get_product_media(product=product, sales_channel=sales_channel)
+            .filter(media__type=Media.IMAGE)
+            .exclude(media__image_type=Media.COLOR_SHOT)
+            .order_by("-is_main_image", "sort_order")
+        )
+
+    def get_product_color_image(self, *, product, sales_channel=None):
+        from media.models import Media
+
+        return (
+            self.get_product_media(product=product, sales_channel=sales_channel)
+            .filter(media__type=Media.IMAGE, media__image_type=Media.COLOR_SHOT)
+            .order_by("sort_order", "id")
+            .first()
+        )
+
+    def get_product_documents(self, *, product, sales_channel=None):
+        from media.models import Media
+
+        return (
+            self.get_product_media(product=product, sales_channel=sales_channel)
+            .filter(media__type=Media.FILE)
+            .order_by("sort_order")
+        )
+
+    def get_product_videos(self, *, product, sales_channel=None):
+        from media.models import Media
+
+        return (
+            self.get_product_media(product=product, sales_channel=sales_channel)
+            .filter(media__type=Media.VIDEO)
+            .order_by("sort_order")
+        )
+
 
 class MediaProductThroughManager(MultiTenantManager):
     def get_queryset(self):
         return MediaProductThroughQuerySet(self.model, using=self._db)
 
+    def get_product_media(self, *, product, sales_channel=None):
+        return self.get_queryset().get_product_media(product=product, sales_channel=sales_channel)
+
     def get_product_images(self, *, product, sales_channel=None):
         return self.get_queryset().get_product_images(product=product, sales_channel=sales_channel)
+
+    def get_product_color_image(self, *, product, sales_channel=None):
+        return self.get_queryset().get_product_color_image(product=product, sales_channel=sales_channel)
+
+    def get_product_documents(self, *, product, sales_channel=None):
+        return self.get_queryset().get_product_documents(product=product, sales_channel=sales_channel)
+
+    def get_product_videos(self, *, product, sales_channel=None):
+        return self.get_queryset().get_product_videos(product=product, sales_channel=sales_channel)
 
 
 class MediaManager(MultiTenantManager):

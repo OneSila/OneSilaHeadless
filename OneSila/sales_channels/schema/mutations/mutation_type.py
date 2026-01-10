@@ -22,7 +22,6 @@ from ..types.input import SalesChannelImportInput, SalesChannelImportPartialInpu
     SalesChannelContentTemplateInput, SalesChannelContentTemplatePartialInput, \
     SalesChannelGptFeedPartialInput, \
     RemoteLanguagePartialInput, RemoteCurrencyPartialInput, ImportPropertyInput
-from .validators import validate_sku_conflicts, validate_amazon_assignment, validate_ebay_assignment
 from core.helpers import get_languages
 from products.models import Product
 from sales_channels.content_templates import (
@@ -71,18 +70,12 @@ class SalesChannelsMutation:
     delete_sales_channel_content_template: SalesChannelContentTemplateType = delete()
     delete_sales_channel_content_templates: List[SalesChannelContentTemplateType] = delete()
 
-    create_sales_channel_view_assign: SalesChannelViewAssignType = create(
-        SalesChannelViewAssignInput,
-        validators=[validate_sku_conflicts, validate_amazon_assignment, validate_ebay_assignment],
-    )
+    create_sales_channel_view_assign: SalesChannelViewAssignType = create(SalesChannelViewAssignInput)
     resync_sales_channel_view_assign: SalesChannelViewAssignType = resync_sales_channel_assign()
-    create_sales_channel_view_assigns: List[SalesChannelViewAssignType] = create(
-        SalesChannelViewAssignInput,
-        validators=[validate_sku_conflicts, validate_amazon_assignment, validate_ebay_assignment],
-    )
+    create_sales_channel_view_assigns: List[SalesChannelViewAssignType] = create(List[SalesChannelViewAssignInput])
     update_sales_channel_view_assign: SalesChannelViewAssignType = update(SalesChannelViewAssignPartialInput)
     delete_sales_channel_view_assign: SalesChannelViewAssignType = delete()
-    delete_sales_channel_view_assigns: List[SalesChannelViewAssignType] = delete()
+    delete_sales_channel_view_assigns: List[SalesChannelViewAssignType] = delete(is_bulk=True)
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def resync_sales_channel_gpt_feed(

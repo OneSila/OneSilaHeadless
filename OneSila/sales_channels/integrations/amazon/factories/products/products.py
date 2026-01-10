@@ -55,7 +55,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     remote_model_class = AmazonProduct
     remote_image_assign_create_factory = AmazonMediaProductThroughCreateFactory
@@ -100,6 +99,7 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         super().__init__(*args, **kwargs)
         self.attributes: Dict = {}
         self.image_attributes: Dict = {}
+        self.content = None
         self.prices_data = {}
         self.external_product_id = self._get_external_product_id()
         self.ean_for_payload = self._get_ean_for_payload()
@@ -123,20 +123,234 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
     def preflight_check(self):
         if not super().preflight_check():
             return False
-        if self.is_create:
-            if (
-                not self._get_gtin_exemption()
-                and not self.external_product_id
-                and not self.ean_for_payload
-                and not self.local_instance.is_configurable()
-            ):
-                raise ValueError("Amazon listings require external product id or EAN on create")
         return True
 
     def sanity_check(self):
         # allow variations to be added separately from the configurable product
         # in amazon we can add in different vierws
         pass
+
+    def set_local_assigns(self):
+        super().set_local_assigns()
+        self._set_content()
+
+    def _set_content(self, *, force: bool = False) -> None:
+        if self.content is not None and not force:
+            return
+
+        lang = (
+            self.view.remote_languages.first().local_instance
+            if self.view.remote_languages.exists()
+            else self.sales_channel.multi_tenant_company.language
+        )
+
+        channel_translation = ProductTranslation.objects.filter(
+            product=self.local_instance,
+            language=lang,
+            sales_channel=self.sales_channel,
+        ).first()
+
+        default_translation = ProductTranslation.objects.filter(
+            product=self.local_instance,
+            language=lang,
+            sales_channel=None,
+        ).first()
+
+        item_name = None
+        product_description = None
+
+        if channel_translation:
+            item_name = channel_translation.name or None
+            product_description = channel_translation.description or None
+
+        if not item_name and default_translation:
+            item_name = default_translation.name
+
+        if not product_description and default_translation:
+            product_description = default_translation.description
+
+        bullet_points = []
+        if channel_translation:
+            bullet_points = list(
+                ProductTranslationBulletPoint.objects.filter(
+                    product_translation=channel_translation
+                )
+                .order_by("sort_order")
+                .values_list("text", flat=True)
+            )
+
+        attrs = {}
+        language_tag = self.view.language_tag if self.view else None
+        marketplace_id = self.view.remote_id if self.view else None
+        if item_name:
+            attrs["item_name"] = [{
+                "value": item_name,
+                "language_tag": language_tag,
+                "marketplace_id": marketplace_id,
+            }]
+        if is_safe_content(product_description):
+            attrs["product_description"] = [{
+                "value": product_description,
+                "language_tag": language_tag,
+                "marketplace_id": marketplace_id,
+            }]
+
+        if bullet_points:
+            attrs["bullet_point"] = [
+                {
+                    "value": bp,
+                    "language_tag": language_tag,
+                    "marketplace_id": marketplace_id,
+                }
+                for bp in bullet_points
+            ]
+
+        self.content = {k: v for k, v in attrs.items() if v not in (None, "")}
+
+    def validate(self):
+        if getattr(self, "skip_checks", False):
+            return
+
+        super().validate()
+
+        from sales_channels.integrations.amazon.exceptions import (
+            AmazonDescriptionTooShortError,
+            AmazonMissingBrowseNodeError,
+            AmazonMissingIdentifierError,
+            AmazonMissingVariationIdentifierError,
+            AmazonMissingVariationThemeError,
+            AmazonTitleTooShortError,
+        )
+        from sales_channels.integrations.amazon.models import (
+            AmazonExternalProductId,
+            AmazonGtinExemption,
+            AmazonProductBrowseNode,
+            AmazonVariationTheme,
+        )
+        from sales_channels.models.sales_channels import SalesChannelViewAssign
+
+        product = self.local_instance
+        view = self.view
+        sales_channel = self.sales_channel
+
+        views = [view]
+        default_view = self._get_default_view()
+        if default_view and default_view != view:
+            views.append(default_view)
+
+        has_gtin_exemption = AmazonGtinExemption.objects.filter(
+            product=product,
+            view__in=views,
+            value=True,
+        ).exists()
+
+        has_external_id = (
+            AmazonExternalProductId.objects.filter(
+                product=product,
+                view__in=views,
+            )
+            .exclude(value__isnull=True)
+            .exclude(value__exact="")
+            .exists()
+        )
+
+        content = self.content or {}
+        localized_title = None
+        localized_description = None
+
+        content_title = content.get("item_name", [])
+        if content_title:
+            localized_title = content_title[0].get("value")
+
+        content_description = content.get("product_description", [])
+        if content_description:
+            localized_description = content_description[0].get("value")
+
+        title_length = len((localized_title or "").strip())
+        description_length = len((localized_description or "").strip())
+
+        min_name_length = getattr(sales_channel, "min_name_length", 0)
+        min_description_length = getattr(sales_channel, "min_description_length", 0)
+
+        if min_name_length and title_length < min_name_length:
+            raise AmazonTitleTooShortError(
+                "Amazon titles must have at least {} characters for the selected marketplace. Current length: {}.".format(
+                    min_name_length, title_length
+                )
+            )
+
+        if min_description_length and description_length < min_description_length:
+            raise AmazonDescriptionTooShortError(
+                "Amazon descriptions must have at least {} characters for the selected marketplace. Current length: {}.".format(
+                    min_description_length, description_length
+                )
+            )
+
+        has_ean_code = bool(product.ean_code)
+        is_configurable = product.is_configurable()
+        has_required_identifier = any((has_gtin_exemption, has_external_id, has_ean_code))
+
+        if not is_configurable and not has_required_identifier:
+            raise AmazonMissingIdentifierError(
+                "Amazon listings require a GTIN exemption, external product id, EAN code, or configurable product."
+            )
+
+        if is_configurable:
+            variations = product.get_configurable_variations(active_only=True)
+            missing_variation_skus = []
+
+            for variation in variations:
+                variation_has_gtin_exemption = AmazonGtinExemption.objects.filter(
+                    product=variation,
+                    view__in=views,
+                    value=True,
+                ).exists()
+
+                variation_has_external_id = (
+                    AmazonExternalProductId.objects.filter(
+                        product=variation,
+                        view__in=views,
+                    )
+                    .exclude(value__isnull=True)
+                    .exclude(value__exact="")
+                    .exists()
+                )
+
+                variation_has_ean_code = bool(variation.ean_code)
+
+                if not any((variation_has_gtin_exemption, variation_has_external_id, variation_has_ean_code)):
+                    missing_variation_skus.append(variation.sku or str(variation.pk))
+
+            if missing_variation_skus:
+                skus = ", ".join(missing_variation_skus)
+                raise AmazonMissingVariationIdentifierError(
+                    "Amazon configurable products require each variation to have a GTIN exemption, external product id, or EAN code. Missing for SKU(s): {}.".format(
+                        skus
+                    )
+                )
+
+        exists = SalesChannelViewAssign.objects.filter(
+            product=product,
+            sales_channel_view__sales_channel=sales_channel,
+        ).exists()
+
+        if not exists and not self.is_variation:
+            if not AmazonProductBrowseNode.objects.filter(
+                product=product,
+                sales_channel=sales_channel,
+                view__in=views,
+            ).exists():
+                raise AmazonMissingBrowseNodeError(
+                    "Amazon products require a browse node for the first assignment."
+                )
+
+            if product.is_configurable() and not AmazonVariationTheme.objects.filter(
+                product=product,
+                view__in=views,
+            ).exists():
+                raise AmazonMissingVariationThemeError(
+                    "Amazon configurable products require a variation theme for the first assignment."
+                )
 
     def check_status(self, *, remote_product=None):
         remote_product = remote_product or self.remote_product
@@ -386,74 +600,8 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         return attrs
 
     def build_content_attributes(self) -> Dict:
-        lang = (
-            self.view.remote_languages.first().local_instance
-            if self.view.remote_languages.exists()
-            else self.sales_channel.multi_tenant_company.language
-        )
-
-        channel_translation = ProductTranslation.objects.filter(
-            product=self.local_instance,
-            language=lang,
-            sales_channel=self.sales_channel,
-        ).first()
-
-        default_translation = ProductTranslation.objects.filter(
-            product=self.local_instance,
-            language=lang,
-            sales_channel=None,
-        ).first()
-
-        item_name = None
-        product_description = None
-
-        if channel_translation:
-            item_name = channel_translation.name or None
-            product_description = channel_translation.description or None
-
-        if not item_name and default_translation:
-            item_name = default_translation.name
-
-        if not product_description and default_translation:
-            product_description = default_translation.description
-
-        bullet_points = []
-        if channel_translation:
-            bullet_points = list(
-                ProductTranslationBulletPoint.objects.filter(
-                    product_translation=channel_translation
-                )
-                .order_by("sort_order")
-                .values_list("text", flat=True)
-            )
-
-        attrs = {}
-        language_tag = self.view.language_tag if self.view else None
-        marketplace_id = self.view.remote_id if self.view else None
-        if item_name:
-            attrs["item_name"] = [{
-                "value": item_name,
-                "language_tag": language_tag,
-                "marketplace_id": marketplace_id,
-            }]
-        if is_safe_content(product_description):
-            attrs["product_description"] = [{
-                "value": product_description,
-                "language_tag": language_tag,
-                "marketplace_id": marketplace_id,
-            }]
-
-        if bullet_points:
-            attrs["bullet_point"] = [
-                {
-                    "value": bp,
-                    "language_tag": language_tag,
-                    "marketplace_id": marketplace_id,
-                }
-                for bp in bullet_points
-            ]
-
-        return {k: v for k, v in attrs.items() if v not in (None, "")}
+        self._set_content()
+        return self.content or {}
 
     def build_price_attributes(self) -> Dict:
         attrs: Dict = {}
@@ -495,7 +643,8 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
         # gather image attributes before building payload so they are sent with the product
         self.assign_images()
         self.attributes.update(self.build_basic_attributes())
-        self.attributes.update(self.build_content_attributes())
+        self._set_content()
+        self.attributes.update(self.content or {})
         self.attributes.update(self.build_price_attributes())
         self.attributes.update(self.image_attributes)
 

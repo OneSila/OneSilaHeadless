@@ -11,7 +11,7 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
 from currencies.models import Currency
-from media.models import Media, MediaProductThrough
+from media.models import MediaProductThrough
 from products.models import Product
 from properties.models import ProductProperty, PropertySelectValue
 from sales_channels.models.sales_channels import SalesChannel, SalesChannelContentTemplate
@@ -81,8 +81,6 @@ class ContentTemplateDataBuilder:
                 product=self.product,
                 sales_channel=self.sales_channel,
             )
-            .filter(media__type=Media.IMAGE)
-            .order_by("-is_main_image", "sort_order")
         )
 
     @cached_property

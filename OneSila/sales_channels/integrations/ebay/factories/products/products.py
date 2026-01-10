@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import logging
 from typing import Any, Dict, List, Optional
 
 from django.db import IntegrityError
@@ -24,6 +25,12 @@ from sales_channels.integrations.ebay.factories.products.images import (
 from sales_channels.integrations.ebay.factories.products.mixins import (
     EbayInventoryItemPushMixin,
 )
+from sales_channels.integrations.ebay.exceptions import (
+    EbayMissingListingPoliciesError,
+    EbayMissingProductMappingError,
+    EbayMissingVariationMappingsError,
+    EbayResponseException,
+)
 from sales_channels.integrations.ebay.factories.products.properties import (
     EbayProductPropertyCreateFactory,
     EbayProductPropertyDeleteFactory,
@@ -36,6 +43,9 @@ from sales_channels.integrations.ebay.models.properties import (
     EbayInternalProperty,
     EbayProperty,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactory):
@@ -101,6 +111,76 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
     # ------------------------------------------------------------------
     def preflight_check(self) -> bool:
         return self.view is not None and super().preflight_check()
+
+    def validate(self) -> None:
+        if getattr(self, "skip_checks", False):
+            return
+
+        super().validate()
+
+        from sales_channels.integrations.ebay.models import (
+            EbayProductCategory,
+            EbayProductType,
+        )
+
+        view = self.view
+        product = self.local_instance
+
+        fulfillment_id = getattr(view, "fulfillment_policy_id", None)
+        payment_id = getattr(view, "payment_policy_id", None)
+        return_id = getattr(view, "return_policy_id", None)
+
+        missing = []
+        if not fulfillment_id:
+            missing.append("fulfillment policy")
+        if not payment_id:
+            missing.append("payment policy")
+        if not return_id:
+            missing.append("return policy")
+
+        if missing:
+            raise EbayMissingListingPoliciesError(
+                "Missing eBay listing policies ({}). Please configure the marketplace policies before pushing products.".format(
+                    ", ".join(missing)
+                )
+            )
+
+        product_rule = product.get_product_rule(sales_channel=self.sales_channel)
+        has_type_mapping = False
+        if product_rule:
+            has_type_mapping = EbayProductType.objects.filter(
+                local_instance=product_rule,
+                marketplace=view,
+            ).exists()
+
+        def has_required_ebay_mapping(target):
+            if has_type_mapping:
+                return True
+
+            return EbayProductCategory.objects.filter(
+                product=target,
+                view=view,
+            ).exists()
+
+        if product.is_configurable():
+            variations = product.get_configurable_variations(active_only=True)
+            missing_skus = [
+                variation.sku or str(variation.pk)
+                for variation in variations
+                if not has_required_ebay_mapping(variation)
+            ]
+
+            if missing_skus:
+                raise EbayMissingVariationMappingsError(
+                    "eBay configurable products require each variation to have either a mapped product type or a category assigned. Missing for SKU(s): {}.".format(
+                        ", ".join(missing_skus)
+                    )
+                )
+        else:
+            if not has_required_ebay_mapping(product):
+                raise EbayMissingProductMappingError(
+                    "eBay products require either a mapped product type (EbayProductType) or a category (EbayProductCategory) before listing."
+                )
 
     def set_api(self) -> None:
         if self.get_value_only:
@@ -495,6 +575,7 @@ class EbayProductCreateFactory(EbayProductBaseFactory):
             self._build_listing_policies()
             self._resolve_remote_product()
             self.set_remote_product_for_logging()
+            self.validate()
             self.sanity_check()
             self.precalculate_progress_step_increment(3)
             self.update_progress()
@@ -548,6 +629,7 @@ class EbayProductUpdateFactory(EbayProductBaseFactory):
             self._build_listing_policies()
             self._resolve_remote_product()
             self.set_remote_product_for_logging()
+            self.validate()
             self.sanity_check()
             self.precalculate_progress_step_increment(3)
             self.update_progress()
@@ -598,6 +680,59 @@ class EbayProductDeleteFactory(EbayProductBaseFactory):
                 continue
             type(target).objects.filter(pk=target.pk).delete()
 
+    def _collect_delete_errors(self, *, payload: Any) -> List[str]:
+        if payload is None:
+            return []
+
+        if isinstance(payload, list):
+            messages: List[str] = []
+            for item in payload:
+                messages.extend(self._collect_delete_errors(payload=item))
+            return messages
+
+        if isinstance(payload, dict):
+            messages = self._extract_delete_errors_from_dict(payload=payload)
+            for value in payload.values():
+                messages.extend(self._collect_delete_errors(payload=value))
+            return messages
+
+        return []
+
+    def _extract_delete_errors_from_dict(self, *, payload: Dict[str, Any]) -> List[str]:
+        messages: List[str] = []
+        error_message = payload.get("error")
+        if error_message:
+            messages.append(
+                self._format_delete_error_message(
+                    payload=payload,
+                    message=str(error_message),
+                )
+            )
+
+        api_errors = payload.get("errors")
+        if isinstance(api_errors, list):
+            for error in api_errors:
+                if isinstance(error, dict):
+                    message = error.get("message")
+                    if message:
+                        messages.append(str(message))
+                elif error:
+                    messages.append(str(error))
+
+        return messages
+
+    def _format_delete_error_message(self, *, payload: Dict[str, Any], message: str) -> str:
+        details: List[str] = []
+        sku = payload.get("sku")
+        if sku:
+            details.append(f"sku={sku}")
+        remote_product_id = payload.get("remote_product_id")
+        if remote_product_id:
+            details.append(f"remote_product_id={remote_product_id}")
+        if details:
+            return f"{message} ({', '.join(details)})"
+        return message
+
     def run(self) -> Optional[Dict[str, Any]]:
         if not self.preflight_check():
             return None
@@ -647,6 +782,11 @@ class EbayProductDeleteFactory(EbayProductBaseFactory):
             self.update_progress()
             self.final_process()
             self.log_action(self.action_log, result or {}, self.payload, log_identifier)
+
+            delete_errors = self._collect_delete_errors(payload=result or {})
+            if delete_errors:
+                message = "Delete failed:\n" + "\n".join(delete_errors)
+                logger.error(message)
 
             if remote_product is not None:
                 self._delete_remote_records(
@@ -708,6 +848,7 @@ class EbayProductVariationAddFactory(EbayProductBaseFactory):
         parent_remote = self._resolve_parent_remote_product()
         self._resolve_remote_product()
         self.set_api()
+        self.validate()
 
         inventory_result = self.send_inventory_payload()
 

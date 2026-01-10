@@ -3,8 +3,12 @@
 from core.tests import TestCase
 from model_bakery import baker
 
+from media.models import Image
 from products.models import ConfigurableVariation, Product
 from properties.models import ProductProperty, Property, PropertySelectValue
+from sales_channels.integrations.shein.factories.imports.product_values import (
+    SheinProductImportValueParser,
+)
 from sales_channels.integrations.shein.factories.imports.products import (
     SheinProductsImportProcessor,
 )
@@ -317,3 +321,41 @@ class SheinProductImportTests(TestCase):
             ).count(),
             1,
         )
+
+
+class SheinProductImportValueParserTests(TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.sales_channel = baker.make(
+            SheinSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+    def test_parse_images_sets_color_type(self) -> None:
+        parser = SheinProductImportValueParser(sales_channel=self.sales_channel)
+        payload = {
+            "skcImageInfoList": [
+                {"imageUrl": "https://images.test/main.jpg", "imageType": "MAIN", "imageItemId": 1},
+                {"imageUrl": "https://images.test/color.jpg", "imageType": "COLOR", "imageItemId": 2},
+            ]
+        }
+
+        images, remote_id_map, _ = parser.parse_images(skc_payload=payload)
+
+        self.assertEqual(len(images), 2)
+        self.assertNotIn("type", images[0])
+        self.assertEqual(images[1].get("type"), Image.COLOR_SHOT)
+        self.assertEqual(remote_id_map, {"0": "1", "1": "2"})
+
+    def test_parse_images_sets_colour_type(self) -> None:
+        parser = SheinProductImportValueParser(sales_channel=self.sales_channel)
+        payload = {
+            "skcImageInfoList": [
+                {"imageUrl": "https://images.test/colour.jpg", "imageType": "COLOUR", "imageItemId": 1},
+            ]
+        }
+
+        images, _, _ = parser.parse_images(skc_payload=payload)
+
+        self.assertEqual(len(images), 1)
+        self.assertEqual(images[0].get("type"), Image.COLOR_SHOT)

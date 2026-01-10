@@ -3,7 +3,7 @@ from sales_channels.integrations.woocommerce.models import WoocommerceRemoteLang
 from sales_channels.integrations.woocommerce.constants import EAN_CODE_WOOCOMMERCE_FIELD_NAME
 from sales_channels.exceptions import ConfiguratorPropertyNotFilterable
 from django.conf import settings
-from media.models import Media, MediaProductThrough
+from media.models import MediaProductThrough
 from sales_channels.integrations.woocommerce.models import WoocommerceGlobalAttribute, \
     WoocommerceCurrency
 from sales_channels.integrations.woocommerce.constants import API_ATTRIBUTE_PREFIX
@@ -671,7 +671,6 @@ class WooCommercePayloadMixin(WooCommerceProductAttributeMixin, WoocommerceSales
                 product=product,
                 sales_channel=sales_channel,
             )
-            .filter(media__type=Media.IMAGE)
             .select_related("media")
         )
         payload = [{"src": self.get_image_url(i.media)} for i in image_throughs]

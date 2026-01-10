@@ -216,7 +216,7 @@ class ProductFeedPayloadFactory:
         media_map: Dict[int, List[MediaProductThrough]] = {}
         for product in relevant_products.values():
             throughs = (
-                MediaProductThrough.objects.get_product_images(
+                MediaProductThrough.objects.get_product_media(
                     product=product,
                     sales_channel=self.sales_channel,
                 )

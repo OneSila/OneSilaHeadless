@@ -201,3 +201,8 @@ class ProductTranslationBulletPointType(relay.Node, GetQuerysetMultiTenantMixin)
 @strawberry_type
 class ProductVariationsTaskResponse:
     success: bool
+
+
+@strawberry_type
+class ProductTranslationImportTaskResponse:
+    success: bool

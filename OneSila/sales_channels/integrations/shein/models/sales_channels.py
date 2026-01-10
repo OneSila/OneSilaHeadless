@@ -8,7 +8,12 @@ from django.utils.translation import gettext_lazy as _
 
 from core import models
 
-from sales_channels.exceptions import PreFlightCheckError, SkipSyncBecauseOfStatusException
+from sales_channels.exceptions import (
+    InspectorMissingInformationError,
+    PreFlightCheckError,
+    SkipSyncBecauseOfStatusException,
+    VariationAlreadyExistsOnWebsite,
+)
 from sales_channels.integrations.shein.exceptions import SheinPreValidationError, SheinResponseException
 from sales_channels.models.mixins import RemoteObjectMixin
 from sales_channels.models.sales_channels import (
@@ -92,6 +97,8 @@ class SheinSalesChannel(SalesChannel):
             SheinPreValidationError,
             PreFlightCheckError,
             SkipSyncBecauseOfStatusException,
+            InspectorMissingInformationError,
+            VariationAlreadyExistsOnWebsite,
         )
 
     def __str__(self) -> str:

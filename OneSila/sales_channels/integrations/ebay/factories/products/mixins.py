@@ -14,7 +14,7 @@ from django.db.models import Q
 from django.template import TemplateSyntaxError
 
 from currencies.models import Currency
-from media.models import Media, MediaProductThrough
+from media.models import MediaProductThrough
 from products.models import ProductTranslation
 from properties.models import ProductProperty, Property, PropertySelectValue
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
@@ -44,6 +44,7 @@ from ebay_rest.api.sell_inventory.rest import ApiException
 from ebay_rest.error import Error as EbayApiError
 
 from sales_channels.integrations.ebay.exceptions import (
+    EbayPropertyMappingMissingError,
     EbayResponseException,
 )
 from sales_channels.integrations.ebay.models.taxes import EbayCurrency
@@ -690,13 +691,9 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         return (rendered or fallback_description), True
 
     def _collect_image_urls(self, *, product) -> List[str]:
-        throughs = (
-            MediaProductThrough.objects.get_product_images(
-                product=product,
-                sales_channel=self.sales_channel,
-            )
-            .filter(media__type=Media.IMAGE)
-            .order_by("sort_order")
+        throughs = MediaProductThrough.objects.get_product_images(
+            product=product,
+            sales_channel=self.sales_channel,
         )
 
         urls: List[str] = []
@@ -1118,6 +1115,11 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         current[parts[-1]] = value
 
     def _prepare_property_remote_value(self, *, product_property: ProductProperty, remote_property: EbayProperty | None) -> str:
+        if remote_property is None:
+            property_name = product_property.property.name
+            raise EbayPropertyMappingMissingError(
+                f"Missing eBay mapping for property: {property_name}"
+            )
         language_code = self._get_language_code()
 
         value = self._render_property_value(
@@ -2271,16 +2273,43 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
     def delete_offers_for_remote_products(self, *, remote_products: Sequence[Any]) -> List[Any]:
         results: List[Any] = []
         for remote_product in list(remote_products):
-            with self._use_remote_product(remote_product):
-                results.append(self.delete_offer())
+            try:
+                with self._use_remote_product(remote_product):
+                    results.append(self.delete_offer())
+            except Exception as exc:
+                results.append(
+                    self._build_delete_error_result(
+                        exc=exc,
+                        remote_product=remote_product,
+                    )
+                )
         return results
 
     def delete_inventory_for_remote_products(self, *, remote_products: Sequence[Any]) -> List[Any]:
         results: List[Any] = []
         for remote_product in list(remote_products):
-            with self._use_remote_product(remote_product):
-                results.append(self.delete_inventory())
+            try:
+                with self._use_remote_product(remote_product):
+                    results.append(self.delete_inventory())
+            except Exception as exc:
+                results.append(
+                    self._build_delete_error_result(
+                        exc=exc,
+                        remote_product=remote_product,
+                    )
+                )
         return results
+
+    def _build_delete_error_result(self, *, exc: Exception, remote_product: Any) -> Dict[str, Any]:
+        product = getattr(remote_product, "local_instance", None)
+        sku = None
+        if product is not None:
+            sku = self._get_sku(product=product)
+        return {
+            "error": str(exc),
+            "sku": sku,
+            "remote_product_id": getattr(remote_product, "pk", None),
+        }
 
 
 class EbayProductPropertyValueMixin(EbayInventoryItemPushMixin):

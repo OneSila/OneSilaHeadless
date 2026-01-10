@@ -9,6 +9,7 @@ from properties.models import (
     Property,
     PropertySelectValue,
     PropertySelectValueTranslation,
+    PropertyTranslation,
 )
 from sales_channels.exceptions import RemotePropertyValueNotMapped
 from sales_channels.integrations.ebay.exceptions import EbayPropertyMappingMissingError
@@ -204,3 +205,53 @@ class EbayProductPropertyUpdateFactoryTest(EbayProductPushFactoryTestBase):
 
         with self.assertRaises(RemotePropertyValueNotMapped):
             factory.run()
+
+    def test_missing_remote_property_raises_mapping_error(self) -> None:
+        local_property = baker.make(
+            Property,
+            type=Property.TYPES.TEXT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        PropertyTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            property=local_property,
+            language=self.multi_tenant_company.language,
+            name="Material",
+        )
+        product_property = ProductProperty.objects.create(
+            product=self.product,
+            property=local_property,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        EbayProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            local_instance=local_property,
+            localized_name="Material",
+            allows_unmapped_values=True,
+        )
+        remote_property_instance = EbayProductProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=product_property,
+            remote_product=self.remote_product,
+            remote_property=None,
+            remote_value="",
+        )
+
+        factory = EbayProductPropertyUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=product_property,
+            remote_product=self.remote_product,
+            view=self.view,
+            get_value_only=True,
+            remote_instance=remote_property_instance,
+        )
+        factory.log_action = MagicMock()
+        factory.log_error = MagicMock()
+
+        with self.assertRaises(EbayPropertyMappingMissingError) as exc_info:
+            factory.run()
+
+        self.assertIn("Material", str(exc_info.exception))

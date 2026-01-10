@@ -1,6 +1,6 @@
 from integrations.models import IntegrationLog
 from types import SimpleNamespace
-from media.models import MediaProductThrough, Media
+from media.models import MediaProductThrough
 from products.models import Product
 from properties.models import ProductProperty
 from django.template import TemplateSyntaxError
@@ -9,6 +9,8 @@ from sales_channels.exceptions import (
     SwitchedToCreateException,
     ConfigurationMissingError,
     SkipSyncBecauseOfStatusException,
+    InspectorMissingInformationError,
+    VariationAlreadyExistsOnWebsite,
 )
 from sales_channels.factories.mixins import IntegrationInstanceOperationMixin, RemoteInstanceDeleteFactory, \
     EanCodeValueMixin, SyncProgressMixin
@@ -96,6 +98,55 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
     def sanity_check(self):
         """Run pre-sync validations."""
         return True
+
+    def validate(self):
+        if getattr(self, "skip_checks", False):
+            return
+
+        from products_inspector.models import Inspector
+
+        if Inspector.objects.filter(product=self.local_instance, has_missing_information=True).exists():
+            sku = self.local_instance.sku or str(self.local_instance.pk)
+            raise InspectorMissingInformationError(
+                f"Product {sku} has inspector missing required information."
+            )
+
+        if self.sales_channel_allow_duplicate_sku:
+            return
+
+        if self.local_instance.is_configurable():
+            variations = self.local_instance.get_configurable_variations(active_only=True)
+            variation_ids = [variation.id for variation in variations]
+            conflicted_ids = SalesChannelViewAssign.objects.filter(
+                product_id__in=variation_ids,
+                sales_channel=self.sales_channel,
+                remote_product__isnull=False,
+            ).values_list("product_id", flat=True)
+
+            if conflicted_ids:
+                sku_map = {variation.id: variation.sku for variation in variations}
+                conflicted_skus = [sku_map[product_id] for product_id in conflicted_ids]
+                skus = ", ".join(conflicted_skus)
+                raise VariationAlreadyExistsOnWebsite(
+                    "Variations with SKU(s) {} already exist on this sales channel. "
+                    "Remove them before syncing as a configurable product.".format(skus)
+                )
+        elif not self.is_variation:
+            parents = list(self.local_instance.configurables.all())
+            parent_ids = [parent.id for parent in parents]
+            conflicted_parent_ids = SalesChannelViewAssign.objects.filter(
+                product_id__in=parent_ids,
+                sales_channel=self.sales_channel,
+            ).values_list("product_id", flat=True)
+
+            if conflicted_parent_ids:
+                sku_map = {parent.id: parent.sku for parent in parents}
+                conflicted_skus = [sku_map[product_id] for product_id in conflicted_parent_ids]
+                skus = ", ".join(conflicted_skus)
+                raise VariationAlreadyExistsOnWebsite(
+                    "Parent product(s) with SKU(s) {} already exist on this sales channel. "
+                    "Remove them before syncing this variation independently.".format(skus)
+                )
 
     def add_field_in_payload(self, field_name, value):
         """
@@ -782,13 +833,9 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.finalize_content_translations()
 
     def get_medias(self):
-        medias = (
-            MediaProductThrough.objects.get_product_images(
-                product=self.local_instance,
-                sales_channel=self.sales_channel,
-            )
-            .filter(media__type=Media.IMAGE)
-            .order_by('-is_main_image', 'sort_order')
+        medias = MediaProductThrough.objects.get_product_images(
+            product=self.local_instance,
+            sales_channel=self.sales_channel,
         )
 
         self._content_template_media_assignments = medias
@@ -1064,6 +1111,8 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
             self.precalculate_progress_step_increment(4)
             self.set_local_assigns()
+            self.validate() # it's important to set_local_assign first so we see the errors in the frontend
+
             self.set_rule()  # we put this here since if is not present we will stop the process
             self.set_product_properties()
             self.build_payload()
@@ -1153,6 +1202,7 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
             self.initialize_remote_product()
             self.set_remote_product_for_logging()
             self.check_status()
+            self.validate()
             self.sanity_check()
             self.precalculate_progress_step_increment(2)
             self.set_rule()
