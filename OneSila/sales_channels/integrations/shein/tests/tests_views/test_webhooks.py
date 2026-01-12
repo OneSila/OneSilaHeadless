@@ -49,7 +49,7 @@ class SheinWebhookTests(TestCase):
             remote_sku=self.product.sku,
             spu_name="h23121539315"
         )
-        self.webhook_path = "/direct/integrations/shein/product_document_audit_status_notice"
+        self.webhook_path = "/direct/integrations/shein/webhooks"
 
     def _build_signature(self, *, path: str, timestamp: int, random_key: str) -> str:
         value = f"{self.app_id}&{timestamp}&{path}"
