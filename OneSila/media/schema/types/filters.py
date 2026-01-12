@@ -12,7 +12,7 @@ from sales_channels.schema.types.filters import SalesChannelFilter
 class MediaFilter(SearchFilterMixin):
     id: auto
     type: auto
-
+    image_type: auto
 
 @filter(Image)
 class ImageFilter(SearchFilterMixin):
