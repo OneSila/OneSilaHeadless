@@ -140,26 +140,6 @@ class EbaySalesChannelMutation:
         )
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
-    def map_ebay_perfect_match_select_values(
-        self,
-        sales_channel: EbaySalesChannelPartialInput,
-        info: Info,
-    ) -> bool:
-        from sales_channels.integrations.ebay.models import EbaySalesChannel
-        from sales_channels.integrations.ebay.tasks import (
-            ebay_map_perfect_match_select_values_db_task,
-        )
-
-        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-        channel = EbaySalesChannel.objects.get(
-            id=sales_channel.id.node_id,
-            multi_tenant_company=multi_tenant_company,
-        )
-
-        ebay_map_perfect_match_select_values_db_task(sales_channel_id=channel.id)
-        return True
-
-    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def create_ebay_product_types_from_local_rules(
         self,
         instance: EbaySalesChannelPartialInput,

@@ -1,5 +1,6 @@
 from typing import Optional, Annotated
 
+from django.core.exceptions import ValidationError
 from django.template import TemplateSyntaxError
 from strawberry import Info, lazy
 import strawberry_django
@@ -229,3 +230,83 @@ class SalesChannelsMutation:
             available_variables=available_variables,
             errors=[],
         )
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def map_sales_channel_perfect_match_select_values(
+        self,
+        info: Info,
+        *,
+        sales_channel: SalesChannelPartialInput,
+    ) -> bool:
+        from sales_channels.integrations.amazon.models import AmazonSalesChannel
+        from sales_channels.integrations.amazon.tasks import amazon_map_perfect_match_select_values_db_task
+        from sales_channels.integrations.ebay.models import EbaySalesChannel
+        from sales_channels.integrations.ebay.tasks import ebay_map_perfect_match_select_values_db_task
+        from sales_channels.integrations.shein.models import SheinSalesChannel
+        from sales_channels.integrations.shein.tasks import shein_map_perfect_match_select_values_db_task
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        try:
+            channel = SalesChannel.objects.get(
+                id=sales_channel.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            )
+        except SalesChannel.DoesNotExist as exc:
+            raise PermissionError("Invalid company") from exc
+
+        resolved_channel = channel.get_real_instance()
+
+        if isinstance(resolved_channel, AmazonSalesChannel):
+            amazon_map_perfect_match_select_values_db_task(sales_channel_id=resolved_channel.id)
+            return True
+
+        if isinstance(resolved_channel, EbaySalesChannel):
+            ebay_map_perfect_match_select_values_db_task(sales_channel_id=resolved_channel.id)
+            return True
+
+        if isinstance(resolved_channel, SheinSalesChannel):
+            shein_map_perfect_match_select_values_db_task(sales_channel_id=resolved_channel.id)
+            return True
+
+        raise ValidationError("Unsupported sales channel integration.")
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def map_sales_channel_perfect_match_properties(
+        self,
+        info: Info,
+        *,
+        sales_channel: SalesChannelPartialInput,
+    ) -> bool:
+        from sales_channels.integrations.amazon.models import AmazonSalesChannel
+        from sales_channels.integrations.amazon.tasks import amazon_map_perfect_match_properties_db_task
+        from sales_channels.integrations.ebay.models import EbaySalesChannel
+        from sales_channels.integrations.ebay.tasks import ebay_map_perfect_match_properties_db_task
+        from sales_channels.integrations.shein.models import SheinSalesChannel
+        from sales_channels.integrations.shein.tasks import shein_map_perfect_match_properties_db_task
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        try:
+            channel = SalesChannel.objects.get(
+                id=sales_channel.id.node_id,
+                multi_tenant_company=multi_tenant_company,
+            )
+        except SalesChannel.DoesNotExist as exc:
+            raise PermissionError("Invalid company") from exc
+
+        resolved_channel = channel.get_real_instance()
+
+        if isinstance(resolved_channel, AmazonSalesChannel):
+            amazon_map_perfect_match_properties_db_task(sales_channel_id=resolved_channel.id)
+            return True
+
+        if isinstance(resolved_channel, EbaySalesChannel):
+            ebay_map_perfect_match_properties_db_task(sales_channel_id=resolved_channel.id)
+            return True
+
+        if isinstance(resolved_channel, SheinSalesChannel):
+            shein_map_perfect_match_properties_db_task(sales_channel_id=resolved_channel.id)
+            return True
+
+        raise ValidationError("Unsupported sales channel integration.")

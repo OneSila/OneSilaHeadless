@@ -7,7 +7,7 @@ app_name = "shein"
 
 urlpatterns = [
     path(
-        "product_document_audit_status_notice",
+        "webhooks",
         views.shein_product_document_audit_status_notice,
         name="product_document_audit_status_notice",
     ),

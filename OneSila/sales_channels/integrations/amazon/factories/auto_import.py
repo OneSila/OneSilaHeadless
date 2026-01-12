@@ -1,9 +1,11 @@
 from properties.models import ProductProperty, Property
-from sales_channels.factories.properties.select_value_perfect_match import (
+from sales_channels.factories.properties.perfect_match_mapping import (
+    BasePerfectMatchPropertyMappingFactory,
     BasePerfectMatchSelectValueMappingFactory,
 )
 from sales_channels.integrations.amazon.models import (
     AmazonProductProperty,
+    AmazonProperty,
     AmazonPropertySelectValue,
     AmazonRemoteLanguage,
 )
@@ -122,4 +124,38 @@ class AmazonPerfectMatchSelectValueMappingFactory(BasePerfectMatchSelectValueMap
             )
             .annotate(local_property_id=models.F("amazon_property__local_instance_id"))
             .only("id", "remote_name", "translated_remote_name", "local_instance_id", "amazon_property_id")
+        )
+
+
+class AmazonPerfectMatchPropertyMappingFactory(BasePerfectMatchPropertyMappingFactory):
+    """
+    Maps unmapped AmazonProperty rows to local Property instances by searching perfect matches
+    against PropertyTranslation.name for each marketplace language.
+    """
+
+    def get_remote_languages_in_order(self):
+        return (
+            AmazonRemoteLanguage.objects.filter(
+                sales_channel=self.sales_channel,
+                sales_channel_view__isnull=False,
+                local_instance__isnull=False,
+            )
+            .select_related("sales_channel_view")
+            .order_by("-sales_channel_view__is_default", "id")
+        )
+
+    def get_local_language_code(self, *, remote_language):
+        return remote_language.local_instance
+
+    def get_remote_scope_for_language(self, *, remote_language):
+        return remote_language.sales_channel_view
+
+    def get_candidates_queryset(self, *, remote_scope):
+        return (
+            AmazonProperty.objects.filter(
+                sales_channel=self.sales_channel,
+                local_instance__isnull=True,
+            )
+            .exclude(Q(name__isnull=True) | Q(name=""))
+            .only("id", "name", "local_instance_id", "type")
         )

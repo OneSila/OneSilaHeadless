@@ -121,6 +121,17 @@ def ebay_map_perfect_match_select_values_db_task(*, sales_channel_id: int):
     EbayPerfectMatchSelectValueMappingFactory(sales_channel=sales_channel).run()
 
 
+@db_task()
+def ebay_map_perfect_match_properties_db_task(*, sales_channel_id: int):
+    from sales_channels.integrations.ebay.factories.auto_import import (
+        EbayPerfectMatchPropertyMappingFactory,
+    )
+    from sales_channels.integrations.ebay.models import EbaySalesChannel
+
+    sales_channel = EbaySalesChannel.objects.get(id=sales_channel_id)
+    EbayPerfectMatchPropertyMappingFactory(sales_channel=sales_channel).run()
+
+
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=2)
 @db_task()
 def ebay_product_type_rule_sync_task(*, product_type_id: int) -> None:

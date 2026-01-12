@@ -59,6 +59,19 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
         return queryset, condition
 
     @custom_filter
+    def value_select_ids(self, queryset: QuerySet, value: list[str], prefix: str) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        select_ids = [from_base64(item)[1] for item in value if item not in (None, UNSET)]
+        if not select_ids:
+            return queryset, Q()
+
+        condition = Q(productproperty__value_select_id__in=select_ids)
+
+        return queryset, condition
+
+    @custom_filter
     def amazon_products_with_issues_for_sales_channel(
         self,
         queryset: QuerySet,

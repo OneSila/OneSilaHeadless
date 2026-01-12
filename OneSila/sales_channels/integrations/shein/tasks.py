@@ -102,6 +102,17 @@ def shein_map_perfect_match_select_values_db_task(*, sales_channel_id: int):
     SheinPerfectMatchSelectValueMappingFactory(sales_channel=sales_channel).run()
 
 
+@db_task()
+def shein_map_perfect_match_properties_db_task(*, sales_channel_id: int):
+    from sales_channels.integrations.shein.factories.auto_import import (
+        SheinPerfectMatchPropertyMappingFactory,
+    )
+    from sales_channels.integrations.shein.models import SheinSalesChannel
+
+    sales_channel = SheinSalesChannel.objects.get(id=sales_channel_id)
+    SheinPerfectMatchPropertyMappingFactory(sales_channel=sales_channel).run()
+
+
 @remote_task(priority=CRUCIAL_PRIORITY, number_of_remote_requests=1)
 @db_task()
 def create_shein_product_db_task(
