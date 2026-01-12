@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
@@ -7,6 +8,8 @@ from django.db import models
 from django.db.models import QuerySet
 
 from properties.models import PropertySelectValueTranslation, PropertyTranslation
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -25,9 +28,16 @@ class BasePerfectMatchSelectValueMappingFactory:
 
     def __init__(self, *, sales_channel: Any):
         self.sales_channel = sales_channel
+        self.errors: List[str] = []
 
     def run(self) -> Dict[str, int]:
-        return self._map_all_languages()
+        stats = self._map_all_languages()
+        if self.errors:
+            logger.error(
+                "Perfect match select value mapping errors:\n%s",
+                "\n".join(self.errors),
+            )
+        return stats
 
     def _map_all_languages(self) -> Dict[str, int]:
         stats = {
@@ -149,9 +159,23 @@ class BasePerfectMatchSelectValueMappingFactory:
             if select_value_id_to_property_id.get(local_select_value_id) != candidate.local_property_id:
                 continue
 
-            candidate.remote_instance.local_instance_id = local_select_value_id
-            candidate.remote_instance.save(update_fields=["local_instance"])
-            mapped += 1
+            try:
+                candidate.remote_instance.local_instance_id = local_select_value_id
+                candidate.remote_instance.save(update_fields=["local_instance"])
+                mapped += 1
+            except Exception as exc:
+                self.errors.append(
+                    (
+                        "select_value_id=%s property_id=%s remote_model=%s remote_id=%s error=%r"
+                        % (
+                            local_select_value_id,
+                            candidate.local_property_id,
+                            candidate.remote_instance.__class__.__name__,
+                            candidate.remote_instance.pk,
+                            exc,
+                        )
+                    )
+                )
 
         return mapped
 
@@ -254,9 +278,16 @@ class BasePerfectMatchPropertyMappingFactory:
 
     def __init__(self, *, sales_channel: Any):
         self.sales_channel = sales_channel
+        self.errors: List[str] = []
 
     def run(self) -> Dict[str, int]:
-        return self._map_all_languages()
+        stats = self._map_all_languages()
+        if self.errors:
+            logger.error(
+                "Perfect match property mapping errors:\n%s",
+                "\n".join(self.errors),
+            )
+        return stats
 
     def _map_all_languages(self) -> Dict[str, int]:
         stats = {
@@ -373,9 +404,23 @@ class BasePerfectMatchPropertyMappingFactory:
             if not local_property_id:
                 continue
 
-            candidate.remote_instance.local_instance_id = local_property_id
-            candidate.remote_instance.save(update_fields=["local_instance"])
-            mapped += 1
+            try:
+                candidate.remote_instance.local_instance_id = local_property_id
+                candidate.remote_instance.save(update_fields=["local_instance"])
+                mapped += 1
+            except Exception as exc:
+                self.errors.append(
+                    (
+                        "local_property_id=%s property_type=%s remote_model=%s remote_id=%s error=%r"
+                        % (
+                            local_property_id,
+                            property_type,
+                            candidate.remote_instance.__class__.__name__,
+                            candidate.remote_instance.pk,
+                            exc,
+                        )
+                    )
+                )
 
         return mapped
 
