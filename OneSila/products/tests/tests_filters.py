@@ -90,20 +90,24 @@ class ProductFilterSalesChannelViewTestCase(TransactionTestCaseMixin, Transactio
 class ProductFilterValueSelectIdsTestCase(TransactionTestCaseMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
-        self.property = Property.objects.create(
+        self.color_property = Property.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             type=Property.TYPES.SELECT,
         )
-        self.value1 = PropertySelectValue.objects.create(
-            property=self.property,
+        self.size_property = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        self.color_red = PropertySelectValue.objects.create(
+            property=self.color_property,
             multi_tenant_company=self.multi_tenant_company,
         )
-        self.value2 = PropertySelectValue.objects.create(
-            property=self.property,
+        self.color_blue = PropertySelectValue.objects.create(
+            property=self.color_property,
             multi_tenant_company=self.multi_tenant_company,
         )
-        self.value3 = PropertySelectValue.objects.create(
-            property=self.property,
+        self.size_small = PropertySelectValue.objects.create(
+            property=self.size_property,
             multi_tenant_company=self.multi_tenant_company,
         )
 
@@ -113,20 +117,26 @@ class ProductFilterValueSelectIdsTestCase(TransactionTestCaseMixin, TransactionT
 
         ProductProperty.objects.create(
             product=self.p1,
-            property=self.property,
-            value_select=self.value1,
+            property=self.color_property,
+            value_select=self.color_red,
             multi_tenant_company=self.multi_tenant_company,
         )
         ProductProperty.objects.create(
             product=self.p2,
-            property=self.property,
-            value_select=self.value2,
+            property=self.color_property,
+            value_select=self.color_red,
             multi_tenant_company=self.multi_tenant_company,
         )
         ProductProperty.objects.create(
             product=self.p3,
-            property=self.property,
-            value_select=self.value3,
+            property=self.size_property,
+            value_select=self.size_small,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=self.p1,
+            property=self.size_property,
+            value_select=self.size_small,
             multi_tenant_company=self.multi_tenant_company,
         )
 
@@ -145,12 +155,12 @@ class ProductFilterValueSelectIdsTestCase(TransactionTestCaseMixin, TransactionT
 
     def test_value_select_ids_filters_multiple(self):
         ids = self._query_ids(
-            [self.to_global_id(self.value1), self.to_global_id(self.value2)],
+            [self.to_global_id(self.color_red), self.to_global_id(self.size_small)],
         )
-        self.assertSetEqual(ids, {self.p1.id, self.p2.id})
+        self.assertSetEqual(ids, {self.p1.id})
 
-    def test_value_select_ids_filters_subset(self):
+    def test_value_select_ids_filters_no_match(self):
         ids = self._query_ids(
-            [self.to_global_id(self.value1), self.to_global_id(self.value3)],
+            [self.to_global_id(self.color_blue), self.to_global_id(self.size_small)],
         )
-        self.assertSetEqual(ids, {self.p1.id, self.p3.id})
+        self.assertSetEqual(ids, set())

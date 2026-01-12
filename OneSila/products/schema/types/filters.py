@@ -67,9 +67,10 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
         if not select_ids:
             return queryset, Q()
 
-        condition = Q(productproperty__value_select_id__in=select_ids)
+        for select_id in set(select_ids):
+            queryset = queryset.filter(productproperty__value_select_id=select_id)
 
-        return queryset, condition
+        return queryset, Q()
 
     @custom_filter
     def amazon_products_with_issues_for_sales_channel(
