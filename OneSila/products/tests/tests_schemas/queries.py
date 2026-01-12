@@ -49,3 +49,11 @@ query Products($view: String!) {
   }
 }
 """
+
+PRODUCTS_WITH_VALUE_SELECT_IDS_QUERY = """
+query Products($ids: [String!]!) {
+  products(filters: {valueSelectIds: $ids}) {
+    edges { node { id } }
+  }
+}
+"""

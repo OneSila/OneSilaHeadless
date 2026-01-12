@@ -186,7 +186,7 @@ class MediaProductThroughManagerTestCase(TestCase):
         self.assertFalse(images_queryset.filter(media=color_media).exists())
 
     def test_get_product_color_image_fallback(self):
-        product = baker.make(Product, multi_tenant_company=self.multi_tenant_company)
+        product = baker.make(Product,type="SIMPLE", multi_tenant_company=self.multi_tenant_company)
         default_media_one = baker.make(
             Media,
             type=Media.IMAGE,

@@ -132,6 +132,18 @@ def amazon_map_perfect_match_select_values_db_task(*, sales_channel_id: int):
     sales_channel = AmazonSalesChannel.objects.get(id=sales_channel_id)
     AmazonPerfectMatchSelectValueMappingFactory(sales_channel=sales_channel).run()
 
+
+@db_task()
+def amazon_map_perfect_match_properties_db_task(*, sales_channel_id: int):
+    from sales_channels.integrations.amazon.factories.auto_import import (
+        AmazonPerfectMatchPropertyMappingFactory,
+    )
+    from sales_channels.integrations.amazon.models import AmazonSalesChannel
+
+    sales_channel = AmazonSalesChannel.objects.get(id=sales_channel_id)
+    AmazonPerfectMatchPropertyMappingFactory(sales_channel=sales_channel).run()
+
+
 def run_amazon_sales_channel_mapping_sync(
     *,
     source_sales_channel_id: int,
