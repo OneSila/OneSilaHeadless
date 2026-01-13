@@ -257,6 +257,7 @@ class BulkContentLLM(AskGPTMixin, CalculateCostMixin, CreateTransactionMixin):
             "writing_brief": [
                 "Customer-facing storefront copy. Write about the product, not the listing.",
                 "Do not mention ordering, returns, customer service, inspections, or internal codes.",
+                "Use product_context as source material for cohesive, human-sounding marketing copy; blend facts into full sentences and paragraphs, not staccato clauses.",
                 "Do not use em dashes or hyphens; use commas or plain sentences.",
                 "Avoid meta phrases like \"this description\" or \"this listing\".",
                 "Do not dump property labels; integrate facts naturally.",
