@@ -160,6 +160,7 @@ class RemoteLanguageOrder:
 @order(SalesChannelViewAssign)
 class SalesChannelViewAssignOrder:
     id: auto
+    created_at: auto
 
 
 @order(SalesChannelContentTemplate)

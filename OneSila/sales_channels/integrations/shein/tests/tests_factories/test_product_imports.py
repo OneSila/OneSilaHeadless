@@ -1,8 +1,14 @@
 """Tests for Shein product import behavior."""
 
+import functools
+from tempfile import NamedTemporaryFile
+from unittest.mock import patch
+
 from core.tests import TestCase
 from model_bakery import baker
 
+from imports_exports.models import Import
+from media.tests.helpers import CreateImageMixin
 from media.models import Image
 from products.models import ConfigurableVariation, Product
 from properties.models import ProductProperty, Property, PropertySelectValue
@@ -10,6 +16,7 @@ from sales_channels.integrations.shein.factories.imports.product_values import (
     SheinProductImportValueParser,
 )
 from sales_channels.integrations.shein.factories.imports.products import (
+    SheinProductItemFactory,
     SheinProductsImportProcessor,
 )
 from sales_channels.integrations.shein.models import (
@@ -359,3 +366,66 @@ class SheinProductImportValueParserTests(TestCase):
 
         self.assertEqual(len(images), 1)
         self.assertEqual(images[0].get("type"), Image.COLOR_SHOT)
+
+
+class SheinProductItemFactoryImageTypeTests(CreateImageMixin, TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.sales_channel = baker.make(
+            SheinSalesChannel,
+            multi_tenant_company=self.multi_tenant_company,
+            sync_contents=True,
+            sync_ean_codes=False,
+            sync_prices=False,
+        )
+        self.import_process = Import.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+    @patch("imports_exports.factories.media.ImportImageInstance.download_image_from_url")
+    def test_import_updates_existing_image_to_color_shot(self, mock_download) -> None:
+        image_file = self.get_image_file(fname="red.png")
+        image_bytes = image_file.read()
+        image_file.seek(0)
+        image, _ = Image.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            image=image_file,
+            image_type=Image.PACK_SHOT,
+        )
+        image_url = "https://images.test/known.png"
+
+        def build_temp_file(*, content: bytes) -> NamedTemporaryFile:
+            temp_file = NamedTemporaryFile(delete=True)
+            temp_file.write(content)
+            temp_file.flush()
+            temp_file.seek(0)
+            return temp_file
+
+        mock_download.side_effect = functools.partial(build_temp_file, content=image_bytes)
+
+        data = {
+            "product": {
+                "spuName": "spu-test-color",
+                "skcInfoList": [
+                    {
+                        "skcName": "skc-test-color",
+                        "shelfStatusInfoList": [{"siteAbbr": "shein-us", "shelfStatus": 1}],
+                        "skcImageInfoList": [
+                            {"imageUrl": image_url, "imageType": "COLOR", "imageItemId": 1},
+                        ],
+                        "skuInfoList": [{"skuCode": "I01test", "supplierSku": "SKU-TEST-1"}],
+                    }
+                ],
+            }
+        }
+
+        factory = SheinProductItemFactory(
+            product_data=data.get("product", {}),
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+            is_last=True,
+        )
+        factory.run()
+
+        image.refresh_from_db()
+        self.assertEqual(image.image_type, Image.COLOR_SHOT)
