@@ -31,3 +31,8 @@ These rules cover all integration apps under `sales_channels/integrations/`.
 ## Testing & Credentials
 - Add fixtures or mocks so integration tests can run offline. Patch network calls at the module level (see root guidelines for `@patch(...)` usage).
 - Store API credentials in environment variables—never hardcode secrets.
+
+## Marketplace Sync Signals
+- Follow `sales_channels/integrations/marketplace_sync_signals.md` for signal model shape, guard logic, and dedupe rules.
+- Do not create signals when `remote_product.successfully_created` is False; only explicit/manual syncs may bypass this.
+- Use integration-specific mapping checks for properties (mapping, category usage, select value mapping).
