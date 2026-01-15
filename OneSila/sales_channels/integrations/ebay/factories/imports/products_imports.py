@@ -1700,6 +1700,10 @@ class EbayProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesCh
             instance=product_instance,
             update_current_rule=False,
         )
+        if structured.get("type") == CONFIGURABLE:
+            instance.update_only = False
+        else:
+            instance.update_only = self.import_process.update_only
 
         instance.prepare_mirror_model_class(
             mirror_model_class=EbayProduct,

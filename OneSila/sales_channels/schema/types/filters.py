@@ -26,6 +26,7 @@ from sales_channels.models import (
     RemoteProduct,
     RemoteProductContent,
     RemoteProductProperty,
+    SyncRequest,
     RemoteProperty,
     RemotePropertySelectValue,
     RemoteVat,
@@ -101,6 +102,22 @@ class RemoteOrderFilter(SearchFilterMixin):
 @filter(RemoteProduct)
 class RemoteProductFilter(SearchFilterMixin):
     id: auto
+
+    @custom_filter
+    def has_sync_requests(
+        self,
+        queryset: QuerySet,
+        value: bool,
+        prefix: str,
+    ):
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        pending = SyncRequest.STATUS_PENDING
+        if value:
+            return queryset.filter(sync_requests__status=pending).distinct(), Q()
+
+        return queryset.exclude(sync_requests__status=pending).distinct(), Q()
 
 
 @filter(RemoteProductContent)

@@ -11,8 +11,7 @@ from sales_channels.flows.default import (
 )
 from sales_channels.integrations.magento2.models import MagentoProperty, MagentoSalesChannel
 from sales_channels.helpers import rebind_magento_attribute_sets_for_rule
-from sales_channels.signals import create_remote_property, update_remote_property, delete_remote_property, \
-    create_remote_property_select_value, \
+from sales_channels.signals import update_remote_property, delete_remote_property, \
     update_remote_property_select_value, delete_remote_property_select_value, refresh_website_pull_models, \
     sales_channel_created, create_remote_product, \
     create_remote_product_property, update_remote_product_property, delete_remote_product_property, \
@@ -25,13 +24,7 @@ from sales_channels.signals import create_remote_property, update_remote_propert
     create_remote_vat_rate
 
 
-@receiver(create_remote_property, sender='properties.Property')
-def sales_channels__magento__property__create(sender, instance, **kwargs):
-    from .tasks import create_magento_property_db_task
-    language = kwargs.get('language', None)
-
-    task_kwargs = {'property_id': instance.id, 'language': language}
-    run_generic_sales_channel_task_flow(create_magento_property_db_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
+# Magento properties are created only when needed by product/property sync.
 
 
 @receiver(update_remote_property, sender='properties.Property')
@@ -54,13 +47,7 @@ def sales_channels__magento__property__delete(sender, instance, **kwargs):
         remote_class=MagentoProperty)
 
 
-@receiver(create_remote_property_select_value, sender='properties.PropertySelectValue')
-def sales_channels__magento__property_select_value__create(sender, instance, **kwargs):
-    from .tasks import create_magento_property_select_value_task
-    language = kwargs.get('language', None)
-
-    task_kwargs = {'property_select_value_id': instance.id, 'language': language}
-    run_generic_sales_channel_task_flow(create_magento_property_select_value_task, multi_tenant_company=instance.multi_tenant_company, **task_kwargs)
+# Magento select values are created only when needed by product/property sync.
 
 
 @receiver(update_remote_property_select_value, sender='properties.PropertySelectValue')

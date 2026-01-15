@@ -719,6 +719,10 @@ class ShopifyImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
             import_process=self.import_process,
             instance=instance
         )
+        if structured_data.get("type") == Product.CONFIGURABLE:
+            import_instance.update_only = False
+        else:
+            import_instance.update_only = self.import_process.update_only
 
         import_instance.prepare_mirror_model_class(
             mirror_model_class=ShopifyProduct,

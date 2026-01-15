@@ -316,6 +316,10 @@ class RemoteProductType(relay.Node, GetQuerysetMultiTenantMixin):
     def has_errors(self, info) -> bool | None:
         return self.has_errors
 
+    @field()
+    def has_sync_requests(self, info) -> bool:
+        return self.has_sync_requests
+
 
 @type(SalesChannelViewAssign, filters=SalesChannelViewAssignFilter, order=SalesChannelViewAssignOrder, pagination=True, fields='__all__')
 class SalesChannelViewAssignType(relay.Node, GetQuerysetMultiTenantMixin):

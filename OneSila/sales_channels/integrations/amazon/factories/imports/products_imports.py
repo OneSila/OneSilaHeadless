@@ -1007,8 +1007,10 @@ class AmazonProductsImportProcessor(TemporaryDisableInspectorSignalsMixin, Impor
             update_current_rule=True
         )
 
-        if structured.get("type") != CONFIGURABLE:
-            instance.update_only = True
+        if structured.get("type") == CONFIGURABLE:
+            instance.update_only = False
+        else:
+            instance.update_only = self.import_process.update_only
 
         instance.prepare_mirror_model_class(
             mirror_model_class=AmazonProduct,

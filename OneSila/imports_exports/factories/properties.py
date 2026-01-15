@@ -69,11 +69,16 @@ class ProductPropertiesRuleItemImport(ImportOperationMixin):
                 current_val_ids = list(getattr(self.instance, key).values_list('id', flat=True))
                 new_val_ids = list(val.values_list('id', flat=True))
 
+                if getattr(self.import_instance, "override_only", False) and current_val_ids:
+                    continue
+
                 if set(current_val_ids) != set(new_val_ids):
                     getattr(self.instance, key).set(val)
                     logger.debug(f"Updated many-to-many field '{key}': {current_val_ids} -> {new_val_ids}")
             else:
                 current_val = getattr(self.instance, key, None)
+                if self._should_skip_override(value=current_val):
+                    continue
                 if current_val != val:
                     setattr(self.instance, key, val)
                     to_save = True
@@ -802,6 +807,9 @@ class ImportProductPropertyInstance(AbstractImportInstance, GetSelectValueMixin)
                 language=language,
             )
 
-            if getattr(translation_obj, value_field) != value:
+            current_val = getattr(translation_obj, value_field)
+            if self.override_only and current_val not in (None, ""):
+                continue
+            if current_val != value:
                 setattr(translation_obj, value_field, value)
                 translation_obj.save()

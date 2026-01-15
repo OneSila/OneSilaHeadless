@@ -30,6 +30,7 @@ from .products import (
     RemoteCategory,
     RemoteImageProductAssociation,
     RemoteEanCode,
+    SyncRequest,
 )
 
 # Property related models
@@ -44,7 +45,7 @@ from .orders import RemoteOrder, RemoteCustomer
 
 # Logging models
 from .logs import RemoteLog
-from .products import RemoteProduct, RemoteImage, RemoteProductContent, RemotePrice, RemoteInventory, RemoteCategory, RemoteImageProductAssociation
+from .products import RemoteProduct, RemoteImage, RemoteProductContent, RemotePrice, RemoteInventory, RemoteCategory, RemoteImageProductAssociation, SyncRequest
 from .properties import RemoteProperty, RemotePropertySelectValue, RemoteProductProperty
 from .sales_channels import (
     SalesChannel,

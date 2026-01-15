@@ -948,6 +948,10 @@ class MagentoImportProcessor(TemporaryDisableInspectorSignalsMixin, SalesChannel
                         import_process=self.import_process,
                         rule=rule,
                     )
+                    if structured_data.get("type") == Product.CONFIGURABLE:
+                        product_import_instance.update_only = False
+                    else:
+                        product_import_instance.update_only = self.import_process.update_only
 
                     # This is creating the remote_id and is actually
                     # your "import_instance".

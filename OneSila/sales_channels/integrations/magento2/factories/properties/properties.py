@@ -67,6 +67,7 @@ class MagentoPropertyCreateFactory(GetMagentoAPIMixin, MagentoEntityNotFoundGene
 
 class MagentoPropertyUpdateFactory(GetMagentoAPIMixin, RemotePropertyUpdateFactory, MagentoTranslationMixin):
     remote_model_class = MagentoProperty
+    create_if_not_exists = False
     create_factory_class = MagentoPropertyCreateFactory
     field_mapping = {
         'add_to_filters': 'is_filterable',
@@ -163,6 +164,7 @@ class MagentoPropertySelectValueCreateFactory(GetMagentoAPIMixin, MagentoEntityN
 
 class MagentoPropertySelectValueUpdateFactory(GetMagentoAPIMixin, MagentoTranslationMixin, RemotePropertySelectValueUpdateFactory):
     remote_model_class = MagentoPropertySelectValue
+    create_if_not_exists = False
     create_factory_class = MagentoPropertySelectValueCreateFactory
 
     field_mapping = {

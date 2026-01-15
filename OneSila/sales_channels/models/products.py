@@ -1,4 +1,4 @@
-from django.db.models import UniqueConstraint, Q
+from django.db.models import UniqueConstraint, Q, Index
 from django.db.utils import NotSupportedError
 from model_bakery.recipe import related
 
@@ -113,6 +113,15 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
 
         return IntegrationLog.objects.filter(id__in=error_ids)
 
+    @property
+    def has_sync_requests(self) -> bool:
+        from sales_channels.models.products import SyncRequest
+
+        if not self.pk:
+            return False
+
+        return self.sync_requests.filter(status=SyncRequest.STATUS_PENDING).exists()
+
     def __str__(self):
         local_name = self.local_instance.name if self.local_instance else "N/A"
         remote_sku = self.remote_sku if self.remote_sku else "N/A"
@@ -189,6 +198,92 @@ class RemoteInventory(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     def __str__(self):
         return f"Inventory for {self.remote_product} - Quantity: {self.quantity}"
+
+
+class SyncRequest(models.Model):
+    """Deduplicated sync request for marketplace operations."""
+
+    STATUS_PENDING = "pending"
+    STATUS_DONE = "done"
+    STATUS_FAILED = "failed"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, _("Pending")),
+        (STATUS_DONE, _("Done")),
+        (STATUS_FAILED, _("Failed")),
+    ]
+
+    TYPE_PRODUCT = "product"
+    TYPE_PROPERTY = "property"
+    TYPE_CONTENT = "content"
+    TYPE_PRICE = "price"
+    TYPE_IMAGES = "images"
+
+    TYPE_CHOICES = [
+        (TYPE_PRODUCT, _("Product")),
+        (TYPE_PROPERTY, _("Property")),
+        (TYPE_CONTENT, _("Content")),
+        (TYPE_PRICE, _("Price")),
+        (TYPE_IMAGES, _("Images")),
+    ]
+
+    remote_product = models.ForeignKey(
+        "sales_channels.RemoteProduct",
+        on_delete=models.CASCADE,
+        related_name="sync_requests",
+        help_text="Remote product that needs sync.",
+    )
+    sales_channel = models.ForeignKey(
+        "sales_channels.SalesChannel",
+        on_delete=models.CASCADE,
+        related_name="sync_requests",
+        help_text="Sales channel associated with the sync request.",
+    )
+    sales_channel_view = models.ForeignKey(
+        "sales_channels.SalesChannelView",
+        on_delete=models.CASCADE,
+        related_name="sync_requests",
+        null=True,
+        blank=True,
+        help_text="Marketplace view to sync (nullable for viewless changes).",
+    )
+    sync_type = models.CharField(
+        max_length=16,
+        choices=TYPE_CHOICES,
+        help_text="What kind of sync is required.",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        help_text="Current state of the sync request.",
+    )
+    reason = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Short reason for the sync request.",
+    )
+
+    class Meta:
+        verbose_name = _("Sync Request")
+        verbose_name_plural = _("Sync Requests")
+        indexes = [
+            Index(fields=["status"]),
+            Index(fields=["remote_product", "status"]),
+            Index(fields=["sales_channel", "status"]),
+        ]
+        constraints = [
+            UniqueConstraint(
+                fields=["remote_product", "sales_channel", "sales_channel_view", "sync_type"],
+                name="uniq_sync_request",
+                nulls_distinct=False,
+            ),
+        ]
+
+    def __str__(self) -> str:
+        view = self.sales_channel_view_id or "global"
+        return f"SyncRequest {self.sync_type} for {self.remote_product_id} @ {view}"
 
 
 class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):

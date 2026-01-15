@@ -157,6 +157,21 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
         self.alias_variations_instances = Product.objects.none()
         self.sales_pricelist_item_instances = SalesPriceListItem.objects.none()
 
+    def _skip_when_override(self, *, has_value):
+        return self.override_only and has_value
+
+    def _is_empty_value(self, *, value):
+        if value is None:
+            return True
+        if isinstance(value, str) and value == "":
+            return True
+        return False
+
+    def _should_skip_override(self, *, value):
+        if not self.override_only:
+            return False
+        return not self._is_empty_value(value=value)
+
     @property
     def local_class(self):
         return Product
@@ -203,6 +218,13 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
     def update_ean_code(self):
 
         if not hasattr(self, 'ean_code') or not self.ean_code:
+            return
+        if self._skip_when_override(
+            has_value=EanCode.objects.filter(
+                multi_tenant_company=self.multi_tenant_company,
+                product=self.instance,
+            ).exists()
+        ):
             return
 
         # Try to find by product first (for update case)
@@ -338,6 +360,16 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
 
     def update_product_rule(self):
 
+        if self._skip_when_override(
+            has_value=ProductProperty.objects.filter(
+                multi_tenant_company=self.multi_tenant_company,
+                product=self.instance,
+                property__is_product_type=True,
+                value_select__isnull=False,
+            ).exists()
+        ):
+            return
+
         if self.rule and self.instance and self.rule != self.instance.get_product_rule(
             sales_channel=self.sales_channel,
         ):
@@ -402,6 +434,8 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
         images_instances_ids = []
         images_instances_associations_ids = []
         product_has_images = self.instance.mediaproductthrough_set.exists()
+        if self._skip_when_override(has_value=product_has_images):
+            return
 
         for image in self.images:
 
@@ -694,7 +728,10 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
 
             updated = False
             for field, value in defaults.items():
-                if getattr(translation_obj, field) != value:
+                current_val = getattr(translation_obj, field)
+                if self._should_skip_override(value=current_val):
+                    continue
+                if current_val != value:
                     setattr(translation_obj, field, value)
                     updated = True
 
@@ -710,14 +747,17 @@ class ImportProductInstance(AbstractImportInstance, AddLogTimeentry):
 
             bullet_points = translation.get('bullet_points')
             if bullet_points is not None:
-                translation_obj.bullet_points.all().delete()
-                for index, text in enumerate(bullet_points):
-                    ProductTranslationBulletPoint.objects.create(
-                        multi_tenant_company=translation_obj.multi_tenant_company,
-                        product_translation=translation_obj,
-                        text=text,
-                        sort_order=index,
-                    )
+                if not self._skip_when_override(
+                    has_value=translation_obj.bullet_points.exists()
+                ):
+                    translation_obj.bullet_points.all().delete()
+                    for index, text in enumerate(bullet_points):
+                        ProductTranslationBulletPoint.objects.create(
+                            multi_tenant_company=translation_obj.multi_tenant_company,
+                            product_translation=translation_obj,
+                            text=text,
+                            sort_order=index,
+                        )
 
             translation_instance_ids.append(translation_obj.id)
 
@@ -820,14 +860,15 @@ class ImportProductTranslationInstance(AbstractImportInstance):
         self.instance = fac.instance
 
         if hasattr(self, 'bullet_points') and self.bullet_points is not None:
-            self.instance.bullet_points.all().delete()
-            for index, text in enumerate(self.bullet_points):
-                ProductTranslationBulletPoint.objects.create(
-                    multi_tenant_company=self.instance.multi_tenant_company,
-                    product_translation=self.instance,
-                    text=text,
-                    sort_order=index,
-                )
+            if not (self.override_only and self.instance.bullet_points.exists()):
+                self.instance.bullet_points.all().delete()
+                for index, text in enumerate(self.bullet_points):
+                    ProductTranslationBulletPoint.objects.create(
+                        multi_tenant_company=self.instance.multi_tenant_company,
+                        product_translation=self.instance,
+                        text=text,
+                        sort_order=index,
+                    )
 
         if self.sales_channel is not None:
             exists_default = ProductTranslation.objects.filter(
