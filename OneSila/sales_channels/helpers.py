@@ -416,6 +416,7 @@ def mark_remote_products_for_feed_updates(*, product_ids: Iterable[int]) -> None
 
 
 def run_generic_sales_channel_factory(sales_channel_id, factory_class, local_instance_id=None, local_instance_class=None, factory_kwargs=None, sales_channel_class=MagentoSalesChannel):
+    # Tasks only carry primitive IDs, so resolve those IDs into model instances here before instantiating factories.
     sales_channel = sales_channel_class.objects.get(id=sales_channel_id)
 
     local_instance = None
@@ -450,6 +451,7 @@ def run_remote_product_dependent_sales_channel_factory(
     :param remote_product_id: ID of the remote product (optional).
     :param factory_kwargs: Additional keyword arguments for the factory (optional).
     """
+    # Tasks only carry primitive IDs; resolve remote_product and local_instance here to satisfy factory expectations.
     sales_channel = sales_channel_class.objects.get(id=sales_channel_id)
 
     # Retrieve the remote product if remote_product_id is provided

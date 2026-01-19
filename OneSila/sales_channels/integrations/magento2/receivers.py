@@ -96,10 +96,15 @@ def sales_channels__magento__attribute_set__create(sender, instance, **kwargs):
         return
 
     from .tasks import create_magento_attribute_set_task
+    from sales_channels.integrations.magento2.factories.task_queue import MagentoChannelAddTask
 
-    task_kwargs = {'rule_id': instance.id}
-    run_generic_sales_channel_task_flow(create_magento_attribute_set_task, multi_tenant_company=instance.multi_tenant_company,
-                                        number_of_remote_requests=instance.items.all().count() + 1, **task_kwargs)
+    task_runner = MagentoChannelAddTask(
+        task_func=create_magento_attribute_set_task,
+        multi_tenant_company=instance.multi_tenant_company,
+        number_of_remote_requests=instance.items.all().count() + 1,
+    )
+    task_runner.set_extra_task_kwargs(rule_id=instance.id)
+    task_runner.run()
 
 
 @receiver(product_properties_rule_updated, sender='properties.ProductPropertiesRule')
@@ -365,13 +370,15 @@ def sales_channels__magento__product__sync(sender, instance, **kwargs):
 @receiver(sales_view_assign_updated, sender='products.Product')
 def sales_channels__magento__assign__update(sender, instance, **kwargs):
     from .tasks import update_magento_sales_view_assign_db_task
+    from sales_channels.integrations.magento2.factories.task_queue import MagentoSingleChannelAddTask
     sales_channel = kwargs.get('sales_channel')
 
-    task_kwargs = {'product_id': instance.id}
-    run_generic_sales_channel_task_flow(update_magento_sales_view_assign_db_task,
-                                  multi_tenant_company=instance.multi_tenant_company,
-                                  sales_channels_filter_kwargs={'id': sales_channel.id},
-                                  **task_kwargs)
+    task_runner = MagentoSingleChannelAddTask(
+        task_func=update_magento_sales_view_assign_db_task,
+        sales_channel=sales_channel,
+    )
+    task_runner.set_extra_task_kwargs(product_id=instance.id)
+    task_runner.run()
 
 
 @receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')

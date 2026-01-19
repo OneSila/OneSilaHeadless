@@ -11,6 +11,25 @@ reuse the same guard logic to avoid unnecessary updates.
 - Dedupe signals for the same target product and view.
 - Upgrade to a product/full sync when multiple change types stack up.
 
+## Task Queue Factories (New Flow)
+We are replacing the old `run_*_task_flow` helpers with a unified AddTask factory
+stack that centralizes guard checks and queue creation.
+
+Key points:
+- All enqueue calls go through a single `send_to_queue` method.
+- `live = True` means enqueue immediately.
+- `live = False` means create a `SyncRequest` with the task payload instead.
+- Guard checks run before enqueue or SyncRequest creation.
+- SyncRequest stores `task_func_path`, `task_kwargs`, and `number_of_remote_requests`
+  so it can be enqueued later (stage 2) without reconstructing context.
+- The same guard classes are reused for both live and async integrations.
+
+This allows us to:
+- keep the queue clean (no tasks created when guards fail),
+- dedupe sync requests consistently,
+- switch any integration from async to live by flipping `live = True`,
+- and add protection logic once, in one place.
+
 ## Model Shape (Conceptual)
 - `remote_product`: required, points to the product being synced.
 - `view`: nullable; `AmazonSalesChannelView` for Amazon, null for channels that do

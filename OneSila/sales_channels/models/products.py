@@ -264,6 +264,22 @@ class SyncRequest(models.Model):
         blank=True,
         help_text="Short reason for the sync request.",
     )
+    task_func_path = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Python import path for the task function.",
+    )
+    task_kwargs = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Serialized task kwargs for enqueueing the sync request.",
+    )
+    number_of_remote_requests = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Optional number of remote requests for queue accounting.",
+    )
 
     class Meta:
         verbose_name = _("Sync Request")
@@ -284,6 +300,31 @@ class SyncRequest(models.Model):
     def __str__(self) -> str:
         view = self.sales_channel_view_id or "global"
         return f"SyncRequest {self.sync_type} for {self.remote_product_id} @ {view}"
+
+    def enqueue(self, *, mark_done: bool = True):
+        if not self.task_func_path:
+            raise ValueError("SyncRequest is missing task_func_path.")
+
+        from integrations.tasks import add_task_to_queue
+        from django.db import transaction
+
+        task_kwargs = self.task_kwargs or {}
+        integration_id = self.sales_channel_id
+        task_func_path = self.task_func_path
+        number_of_remote_requests = self.number_of_remote_requests
+
+        transaction.on_commit(
+            lambda lb_task_kwargs=task_kwargs, integration_id=integration_id: add_task_to_queue(
+                integration_id=integration_id,
+                task_func_path=task_func_path,
+                task_kwargs=lb_task_kwargs,
+                number_of_remote_requests=number_of_remote_requests,
+            )
+        )
+
+        if mark_done and self.status != self.STATUS_DONE:
+            self.status = self.STATUS_DONE
+            self.save(update_fields=["status"])
 
 
 class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
