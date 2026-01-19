@@ -259,8 +259,24 @@ class SheinProductsImportProcessor(
         parent_remote: SheinProduct | None = None,
         images_skc_payload: Mapping[str, Any] | None = None,
     ) -> ImportProductInstance | None:
+        spu_name = self._extract_spu_name(payload=spu_payload)
+        skc_name = self._extract_skc_name(payload=skc_payload)
+        sku_code = self._extract_sku_code(payload=sku_payload)
+        if is_configurable and not is_variation:
+            skc_name = None
+            sku_code = None
+
         local_sku = None
-        if not (is_configurable and not is_variation):
+        if is_configurable and not is_variation:
+            local_sku = spu_name
+            if not local_sku:
+                self._add_broken_record(
+                    code=self.ERROR_INVALID_PRODUCT_DATA,
+                    message="Unable to determine SKU for Shein product entry",
+                    data={"spu_name": spu_name},
+                )
+                return None
+        else:
             local_sku = self._resolve_local_sku(
                 sku_payload=sku_payload,
                 fallback_sku=parent_sku,
@@ -269,14 +285,14 @@ class SheinProductsImportProcessor(
                 self._add_broken_record(
                     code=self.ERROR_INVALID_PRODUCT_DATA,
                     message="Unable to determine SKU for Shein product entry",
-                    data={"spu_name": self._extract_spu_name(payload=spu_payload)},
+                    data={"spu_name": spu_name},
                 )
                 return None
 
         remote_product = self._get_remote_product(
             sku=local_sku,
-            spu_payload=spu_payload,
-            sku_payload=sku_payload,
+            spu_name=spu_name,
+            sku_code=sku_code,
             is_variation=is_variation,
         )
         product_instance = remote_product.local_instance if remote_product and remote_product.local_instance else None
@@ -314,7 +330,12 @@ class SheinProductsImportProcessor(
             instance=product_instance,
             update_current_rule=False,
         )
-        mirror_defaults = {"is_variation": is_variation}
+        mirror_defaults = {
+            "is_variation": is_variation,
+            "spu_name": spu_name,
+            "skc_name": skc_name,
+            "sku_code": sku_code,
+        }
         if is_variation and parent_remote is not None:
             mirror_defaults["remote_parent_product"] = parent_remote
 
@@ -364,9 +385,9 @@ class SheinProductsImportProcessor(
 
         self.update_remote_product(
             import_instance=instance,
-            spu_payload=spu_payload,
-            skc_payload=skc_payload,
-            sku_payload=sku_payload,
+            spu_name=spu_name,
+            skc_name=skc_name,
+            sku_code=sku_code,
             is_variation=is_variation,
         )
 

@@ -215,8 +215,8 @@ class SheinProductImportHelpers:
         self,
         *,
         sku: str | None,
-        spu_payload: Mapping[str, Any],
-        sku_payload: Mapping[str, Any] | None,
+        spu_name: str | None,
+        sku_code: str | None,
         is_variation: bool,
     ) -> SheinProduct | None:
         base_qs = SheinProduct.objects.filter(
@@ -230,13 +230,11 @@ class SheinProductImportHelpers:
                 return remote_product
 
         if is_variation:
-            sku_code = self._extract_sku_code(payload=sku_payload)
             if sku_code:
-                return base_qs.filter(remote_id=sku_code).first()
+                return base_qs.filter(sku_code=sku_code).first()
             return None
 
-        spu_name = self._extract_spu_name(payload=spu_payload)
         if spu_name:
-            return base_qs.filter(remote_id=spu_name).first()
+            return base_qs.filter(spu_name=spu_name).first()
 
         return None
