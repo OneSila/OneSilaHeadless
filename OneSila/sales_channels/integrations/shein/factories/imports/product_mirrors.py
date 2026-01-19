@@ -24,9 +24,9 @@ class SheinProductImportMirrorMixin:
         self,
         *,
         import_instance: ImportProductInstance,
-        spu_payload: Mapping[str, Any],
-        skc_payload: Mapping[str, Any] | None,
-        sku_payload: Mapping[str, Any] | None,
+        spu_name: str | None,
+        skc_name: str | None,
+        sku_code: str | None,
         is_variation: bool,
     ) -> None:
         remote_product = getattr(import_instance, "remote_instance", None)
@@ -46,21 +46,18 @@ class SheinProductImportMirrorMixin:
             remote_product.remote_sku = local_sku
             updates.append("remote_sku")
 
-        spu_name = self._extract_spu_name(payload=spu_payload)
-        skc_name = self._extract_skc_name(payload=skc_payload)
-        sku_code = self._extract_sku_code(payload=sku_payload)
-
         if spu_name and getattr(remote_product, "spu_name", None) != spu_name:
             setattr(remote_product, "spu_name", spu_name)
             updates.append("spu_name")
 
-        if skc_name and getattr(remote_product, "skc_name", None) != skc_name:
-            setattr(remote_product, "skc_name", skc_name)
-            updates.append("skc_name")
+        if is_variation:
+            if skc_name and getattr(remote_product, "skc_name", None) != skc_name:
+                setattr(remote_product, "skc_name", skc_name)
+                updates.append("skc_name")
 
-        if sku_code and getattr(remote_product, "sku_code", None) != sku_code:
-            setattr(remote_product, "sku_code", sku_code)
-            updates.append("sku_code")
+            if sku_code and getattr(remote_product, "sku_code", None) != sku_code:
+                setattr(remote_product, "sku_code", sku_code)
+                updates.append("sku_code")
 
         desired_remote_id = sku_code if is_variation else spu_name
         if desired_remote_id and remote_product.remote_id != desired_remote_id:
