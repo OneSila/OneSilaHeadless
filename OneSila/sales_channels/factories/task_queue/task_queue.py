@@ -246,6 +246,12 @@ class ProductScopedAddTask(ChannelScopedAddTask):
         self.product = product
         super().__init__(multi_tenant_company=product.multi_tenant_company, **kwargs)
 
+    def build_task_kwargs(self, *, target: TaskTarget) -> dict[str, Any]:
+        task_kwargs = super().build_task_kwargs(target=target)
+        if target.remote_product:
+            task_kwargs["remote_product_id"] = target.remote_product.id
+        return task_kwargs
+
     def get_targets(self, *, sales_channel) -> Iterable[TaskTarget]:
         from sales_channels.models import RemoteProduct
 
@@ -318,6 +324,12 @@ class ProductFullSyncAddTask(ProductScopedAddTask):
 class DeleteScopedAddTask(ChannelScopedAddTask):
     require_remote_class = True
 
+    def build_task_kwargs(self, *, target: TaskTarget) -> dict[str, Any]:
+        task_kwargs = super().build_task_kwargs(target=target)
+        if target.remote_instance:
+            task_kwargs["remote_instance"] = target.remote_instance.id
+        return task_kwargs
+
     def __init__(
         self,
         *,
@@ -360,6 +372,14 @@ class ProductDeleteScopedAddTask(ProductScopedAddTask):
     def __init__(self, *, local_instance_id, **kwargs):
         self.local_instance_id = local_instance_id
         super().__init__(**kwargs)
+
+    def build_task_kwargs(self, *, target: TaskTarget) -> dict[str, Any]:
+        task_kwargs = super().build_task_kwargs(target=target)
+        if target.remote_product:
+            task_kwargs["remote_product_id"] = target.remote_product.id
+        if target.remote_instance:
+            task_kwargs["remote_instance_id"] = target.remote_instance.id
+        return task_kwargs
 
     def get_targets(self, *, sales_channel) -> Iterable[TaskTarget]:
         from sales_channels.models import RemoteProduct
