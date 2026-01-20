@@ -96,7 +96,7 @@ class MagentoAddToTaskReceiverTests(
             multi_tenant_company=self.multi_tenant_company,
         )
 
-    def test_assign_update_queues_task(self, *, _unused=None):
+    def test_magento_assign_update_queues_task(self, *, _unused=None):
         product = Product.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sku="MAG-ASSIGN-1",
@@ -132,7 +132,7 @@ class MagentoAddToTaskReceiverTests(
         )
         self.assertEqual(task.task_kwargs.get("product_id"), product.id)
 
-    def test_attribute_set_create_queues_task(self, *, _unused=None):
+    def test_magento_attribute_set_create_queues_task(self, *, _unused=None):
         select_value = PropertySelectValue.objects.create(
             property=self.product_type_property,
             multi_tenant_company=self.multi_tenant_company,
@@ -173,7 +173,7 @@ class MagentoAddToTaskReceiverTests(
         )
         self.assertEqual(task.task_kwargs.get("rule_id"), rule.id)
 
-    def test_attribute_set_delete_queues_task(self, *, _unused=None):
+    def test_magento_attribute_set_delete_queues_task(self, *, _unused=None):
         select_value = PropertySelectValue.objects.create(
             property=self.product_type_property,
             multi_tenant_company=self.multi_tenant_company,
@@ -216,7 +216,7 @@ class MagentoAddToTaskReceiverTests(
         )
         self.assertEqual(task.task_kwargs.get("remote_instance"), attribute_set.id)
 
-    def test_attribute_set_rename_queues_task(self, *, _unused=None):
+    def test_magento_attribute_set_rename_queues_task(self, *, _unused=None):
         select_value = PropertySelectValue.objects.create(
             property=self.product_type_property,
             multi_tenant_company=self.multi_tenant_company,
@@ -258,7 +258,7 @@ class MagentoAddToTaskReceiverTests(
         self.assertEqual(task.task_kwargs.get("rule_id"), rule.id)
         self.assertTrue(task.task_kwargs.get("update_name_only"))
 
-    def test_attribute_set_update_queues_task(self, *, _unused=None):
+    def test_magento_attribute_set_update_queues_task(self, *, _unused=None):
         select_value = PropertySelectValue.objects.create(
             property=self.product_type_property,
             multi_tenant_company=self.multi_tenant_company,
@@ -299,7 +299,7 @@ class MagentoAddToTaskReceiverTests(
         )
         self.assertEqual(task.task_kwargs.get("rule_id"), rule.id)
 
-    def test_image_delete_queues_task(self, *, _unused=None):
+    def test_magento_image_delete_queues_task(self, *, _unused=None):
         image = Media.objects.create(
             type=Media.IMAGE,
             multi_tenant_company=self.multi_tenant_company,
@@ -335,7 +335,7 @@ class MagentoAddToTaskReceiverTests(
         )
         self.assertEqual(task.task_kwargs.get("image_id"), image.id)
 
-    def test_property_update_queues_task(self, *, _unused=None):
+    def test_magento_property_update_queues_task(self, *, _unused=None):
         initial_count = IntegrationTaskQueue.objects.filter(
             integration_id=self.sales_channel.id,
         ).count()
@@ -368,7 +368,7 @@ class MagentoAddToTaskReceiverTests(
         self.assertEqual(task.task_kwargs.get("property_id"), self.product_type_property.id)
         self.assertEqual(task.task_kwargs.get("language"), "en")
 
-    def test_property_select_value_update_queues_task(self, *, _unused=None):
+    def test_magento_property_select_value_update_queues_task(self, *, _unused=None):
         select_value = PropertySelectValue.objects.create(
             property=self.product_type_property,
             multi_tenant_company=self.multi_tenant_company,
@@ -406,7 +406,7 @@ class MagentoAddToTaskReceiverTests(
         self.assertEqual(task.task_kwargs.get("property_select_value_id"), select_value.id)
         self.assertEqual(task.task_kwargs.get("language"), "en")
 
-    def test_product_variation_add_queues_task(self, *, _unused=None):
+    def test_magento_product_variation_add_queues_task(self, *, _unused=None):
         parent_product = Product.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sku="MAG-PARENT-1",
@@ -450,7 +450,7 @@ class MagentoAddToTaskReceiverTests(
         self.assertEqual(task.task_kwargs.get("parent_product_id"), parent_product.id)
         self.assertEqual(task.task_kwargs.get("variation_product_id"), variation_product.id)
 
-    def test_product_variation_remove_queues_task(self, *, _unused=None):
+    def test_magento_product_variation_remove_queues_task(self, *, _unused=None):
         parent_product = Product.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sku="MAG-PARENT-2",
@@ -494,7 +494,7 @@ class MagentoAddToTaskReceiverTests(
         self.assertEqual(task.task_kwargs.get("parent_product_id"), parent_product.id)
         self.assertEqual(task.task_kwargs.get("variation_product_id"), variation_product.id)
 
-    def test_product_create_queues_task(self, *, _unused=None):
+    def test_magento_product_create_queues_task(self, *, _unused=None):
         product = Product.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sku="MAG-CREATE-1",
@@ -544,7 +544,7 @@ class MagentoAddToTaskReceiverTests(
         )
         self.assertEqual(task.task_kwargs.get("product_id"), product.id)
 
-    def test_vat_rate_create_queues_task(self, *, _unused=None):
+    def test_magento_vat_rate_create_queues_task(self, *, _unused=None):
         vat_rate = VatRate.objects.create(
             name="VAT 21",
             rate=21,
@@ -581,7 +581,7 @@ class MagentoAddToTaskReceiverTests(
         )
         self.assertEqual(task.task_kwargs.get("vat_rate_id"), vat_rate.id)
 
-    def test_vat_rate_update_queues_task(self, *, _unused=None):
+    def test_magento_vat_rate_update_queues_task(self, *, _unused=None):
         vat_rate = VatRate.objects.create(
             name="VAT 10",
             rate=10,
@@ -646,7 +646,7 @@ class MagentoProductScopedAddReceiverTests(
         )
         return product, remote_product
 
-    def test_media_product_through_create_queues_task(self, *, _unused=None):
+    def test_magento_media_product_through_create_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-IMG-1")
         image = Media.objects.create(
             type=Media.IMAGE,
@@ -696,7 +696,7 @@ class MagentoProductScopedAddReceiverTests(
             remote_product.id,
         )
 
-    def test_media_product_through_update_queues_task(self, *, _unused=None):
+    def test_magento_media_product_through_update_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-IMG-2")
         image = Media.objects.create(
             type=Media.IMAGE,
@@ -746,7 +746,7 @@ class MagentoProductScopedAddReceiverTests(
             remote_product.id,
         )
 
-    def test_media_product_through_delete_queues_task(self, *, _unused=None):
+    def test_magento_media_product_through_delete_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-IMG-3")
         image = Media.objects.create(
             type=Media.IMAGE,
@@ -796,7 +796,7 @@ class MagentoProductScopedAddReceiverTests(
         self.assertEqual(task.task_kwargs.get("remote_product_id"), remote_product.id)
         self.assertEqual(task.task_kwargs.get("remote_instance_id"), remote_association.id)
 
-    def test_price_update_queues_task(self, *, _unused=None):
+    def test_magento_price_update_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-PRICE-1")
         currency = Currency.objects.create(
             iso_code="USD",
@@ -838,7 +838,7 @@ class MagentoProductScopedAddReceiverTests(
         self.assertEqual(task.task_kwargs.get("remote_product_id"), remote_product.id)
         self.assertEqual(task.task_kwargs.get("currency_id"), currency.id)
 
-    def test_product_update_queues_task(self, *, _unused=None):
+    def test_magento_product_update_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-UPD-1")
 
         initial_count = IntegrationTaskQueue.objects.filter(
@@ -872,7 +872,7 @@ class MagentoProductScopedAddReceiverTests(
         self.assertEqual(task.task_kwargs.get("product_id"), product.id)
         self.assertEqual(task.task_kwargs.get("remote_product_id"), remote_product.id)
 
-    def test_product_content_update_queues_task(self, *, _unused=None):
+    def test_magento_product_content_update_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-CONT-1")
 
         initial_count = IntegrationTaskQueue.objects.filter(
@@ -908,7 +908,7 @@ class MagentoProductScopedAddReceiverTests(
         self.assertEqual(task.task_kwargs.get("remote_product_id"), remote_product.id)
         self.assertEqual(task.task_kwargs.get("language"), "en")
 
-    def test_product_eancode_update_queues_task(self, *, _unused=None):
+    def test_magento_product_eancode_update_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-EAN-1")
 
         initial_count = IntegrationTaskQueue.objects.filter(
@@ -942,7 +942,7 @@ class MagentoProductScopedAddReceiverTests(
         self.assertEqual(task.task_kwargs.get("product_id"), product.id)
         self.assertEqual(task.task_kwargs.get("remote_product_id"), remote_product.id)
 
-    def test_product_property_create_queues_task(self, *, _unused=None):
+    def test_magento_product_property_create_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-PROP-1")
         property_instance = Property.objects.create(
             type=Property.TYPES.INT,
@@ -988,7 +988,7 @@ class MagentoProductScopedAddReceiverTests(
         self.assertEqual(task.task_kwargs.get("remote_product_id"), remote_product.id)
         self.assertEqual(task.task_kwargs.get("language"), "en")
 
-    def test_product_property_update_queues_task(self, *, _unused=None):
+    def test_magento_product_property_update_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-PROP-2")
         property_instance = Property.objects.create(
             type=Property.TYPES.INT,
@@ -1034,7 +1034,7 @@ class MagentoProductScopedAddReceiverTests(
         self.assertEqual(task.task_kwargs.get("remote_product_id"), remote_product.id)
         self.assertEqual(task.task_kwargs.get("language"), "en")
 
-    def test_product_property_delete_queues_task(self, *, _unused=None):
+    def test_magento_product_property_delete_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-PROP-3")
         property_instance = Property.objects.create(
             type=Property.TYPES.INT,
@@ -1084,7 +1084,7 @@ class MagentoProductScopedAddReceiverTests(
         self.assertEqual(task.task_kwargs.get("remote_product_id"), remote_product.id)
         self.assertEqual(task.task_kwargs.get("remote_instance_id"), remote_property.id)
 
-    def test_product_sync_from_product_queues_task(self, *, _unused=None):
+    def test_magento_product_sync_from_product_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-SYNC-1")
 
         initial_count = IntegrationTaskQueue.objects.filter(
@@ -1118,7 +1118,7 @@ class MagentoProductScopedAddReceiverTests(
         self.assertEqual(task.task_kwargs.get("product_id"), product.id)
         self.assertEqual(task.task_kwargs.get("remote_product_id"), remote_product.id)
 
-    def test_product_sync_from_remote_queues_task(self, *, _unused=None):
+    def test_magento_product_sync_from_remote_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-SYNC-2")
 
         initial_count = IntegrationTaskQueue.objects.filter(
@@ -1152,7 +1152,7 @@ class MagentoProductScopedAddReceiverTests(
         self.assertEqual(task.task_kwargs.get("product_id"), product.id)
         self.assertEqual(task.task_kwargs.get("remote_product_id"), remote_product.id)
 
-    def test_product_delete_from_assign_queues_task(self, *, _unused=None):
+    def test_magento_product_delete_from_assign_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-DEL-ASSIGN-1")
         view = MagentoSalesChannelView.objects.create(
             sales_channel=self.sales_channel,
@@ -1198,7 +1198,7 @@ class MagentoProductScopedAddReceiverTests(
         )
         self.assertEqual(task.task_kwargs.get("remote_instance"), remote_product.id)
 
-    def test_product_delete_from_product_queues_task(self, *, _unused=None):
+    def test_magento_product_delete_from_product_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-DEL-PROD-1")
 
         initial_count = IntegrationTaskQueue.objects.filter(
@@ -1231,7 +1231,7 @@ class MagentoProductScopedAddReceiverTests(
         )
         self.assertEqual(task.task_kwargs.get("remote_instance"), remote_product.id)
 
-    def test_property_delete_queues_task(self, *, _unused=None):
+    def test_magento_property_delete_queues_task(self, *, _unused=None):
         property_instance = Property.objects.create(
             type=Property.TYPES.INT,
             multi_tenant_company=self.multi_tenant_company,
@@ -1272,7 +1272,7 @@ class MagentoProductScopedAddReceiverTests(
         )
         self.assertEqual(task.task_kwargs.get("remote_instance"), remote_property.id)
 
-    def test_property_select_value_delete_queues_task(self, *, _unused=None):
+    def test_magento_property_select_value_delete_queues_task(self, *, _unused=None):
         property_instance = Property.objects.create(
             type=Property.TYPES.SELECT,
             multi_tenant_company=self.multi_tenant_company,

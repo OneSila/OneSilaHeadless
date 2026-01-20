@@ -203,7 +203,8 @@ class ChannelScopedAddTask(AddTaskBase):
     require_sales_channel_class = True
 
     def __init__(self, *, multi_tenant_company, **kwargs):
-        super().__init__(multi_tenant_company=multi_tenant_company, **kwargs)
+        kwargs.setdefault("multi_tenant_company", multi_tenant_company)
+        super().__init__(**kwargs)
 
     def get_sales_channels_filter_kwargs(self):
         filter_kwargs = super().get_sales_channels_filter_kwargs()
@@ -216,7 +217,8 @@ class ChannelScopedAddTask(AddTaskBase):
 class RuleScopedAddTask(ChannelScopedAddTask):
     def __init__(self, *, rule, **kwargs):
         self.rule = rule
-        super().__init__(multi_tenant_company=rule.multi_tenant_company, **kwargs)
+        kwargs.setdefault("multi_tenant_company", rule.multi_tenant_company)
+        super().__init__(**kwargs)
 
     def get_sales_channels(self) -> Iterable[Any]:
         from properties.models import ProductPropertiesRule
@@ -244,7 +246,8 @@ class RuleScopedAddTask(ChannelScopedAddTask):
 class ProductScopedAddTask(ChannelScopedAddTask):
     def __init__(self, *, product, **kwargs):
         self.product = product
-        super().__init__(multi_tenant_company=product.multi_tenant_company, **kwargs)
+        kwargs.setdefault("multi_tenant_company", product.multi_tenant_company)
+        super().__init__(**kwargs)
 
     def build_task_kwargs(self, *, target: TaskTarget) -> dict[str, Any]:
         task_kwargs = super().build_task_kwargs(target=target)
@@ -446,7 +449,8 @@ class SingleViewAddTask(AddTaskBase):
     def __init__(self, *, view, **kwargs):
         self.view = view
         self.sales_channel = view.sales_channel
-        super().__init__(multi_tenant_company=self.sales_channel.multi_tenant_company, **kwargs)
+        kwargs.setdefault("multi_tenant_company", self.sales_channel.multi_tenant_company)
+        super().__init__(**kwargs)
 
     def get_sales_channels(self) -> Iterable[Any]:
         return [self.sales_channel]
@@ -470,7 +474,8 @@ class SingleViewAddTask(AddTaskBase):
 class SingleChannelAddTask(AddTaskBase):
     def __init__(self, *, sales_channel, **kwargs):
         self.sales_channel = sales_channel
-        super().__init__(multi_tenant_company=self.sales_channel.multi_tenant_company, **kwargs)
+        kwargs.setdefault("multi_tenant_company", self.sales_channel.multi_tenant_company)
+        super().__init__(**kwargs)
 
     def get_sales_channels(self) -> Iterable[Any]:
         return [self.sales_channel]

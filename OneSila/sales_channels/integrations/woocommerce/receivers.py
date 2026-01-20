@@ -26,14 +26,7 @@ from sales_channels.signals import (
     delete_remote_image, refresh_website_pull_models, sales_channel_created,
 )
 
-from sales_channels.flows.default import (
-    run_generic_sales_channel_task_flow,
-    run_product_specific_sales_channel_task_flow,
-    run_delete_product_specific_generic_sales_channel_task_flow, run_delete_generic_sales_channel_task_flow,
-)
-
-from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel, WoocommerceProductProperty, \
-    WoocommerceMediaThroughProduct, WoocommerceProduct
+from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
 
 import logging
 logger = logging.getLogger(__name__)
@@ -44,8 +37,8 @@ logger = logging.getLogger(__name__)
 #
 @receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
 def woocommerce__product__create_from_assign(sender, instance, **kwargs):
-    from sales_channels.integrations.woocommerce.flows.products import create_woocommerce_product_flow
     from products.product_types import CONFIGURABLE
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceSingleChannelAddTask
 
     product = instance.product
     sales_channel = instance.sales_channel
@@ -58,14 +51,13 @@ def woocommerce__product__create_from_assign(sender, instance, **kwargs):
     else:
         number_of_remote_requests = 1
 
-    run_generic_sales_channel_task_flow(
+    task_runner = WooCommerceSingleChannelAddTask(
         task_func=create_woocommerce_product_db_task,
-        multi_tenant_company=product.multi_tenant_company,
-        sales_channels_filter_kwargs={'id': sales_channel.id},
+        sales_channel=sales_channel,
         number_of_remote_requests=number_of_remote_requests,
-        sales_channel_class=WoocommerceSalesChannel,
-        product_id=product.id,
     )
+    task_runner.set_extra_task_kwargs(product_id=product.id)
+    task_runner.run()
 
 
 #
@@ -73,13 +65,14 @@ def woocommerce__product__create_from_assign(sender, instance, **kwargs):
 #
 @receiver(update_remote_product, sender='products.Product')
 def woocommerce__product__update(sender, instance, **kwargs):
-    run_product_specific_sales_channel_task_flow(
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceProductUpdateAddTask
+
+    task_runner = WooCommerceProductUpdateAddTask(
         task_func=update_woocommerce_product_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
         product=instance,
-        sales_channel_class=WoocommerceSalesChannel,
-        product_id=instance.id,
     )
+    task_runner.set_extra_task_kwargs(product_id=instance.id)
+    task_runner.run()
 
 
 #
@@ -87,19 +80,18 @@ def woocommerce__product__update(sender, instance, **kwargs):
 #
 @receiver(delete_remote_product, sender='sales_channels.SalesChannelViewAssign')
 def woocommerce__product__delete_from_assign(sender, instance, **kwargs):
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceProductDeleteFromAssignAddTask
 
     product = instance.product
     sales_channel = instance.sales_channel
 
-    run_delete_generic_sales_channel_task_flow(
+    task_runner = WooCommerceProductDeleteFromAssignAddTask(
         task_func=delete_woocommerce_product_db_task,
         local_instance_id=product.id,
-        remote_class=WoocommerceProduct,
-        multi_tenant_company=product.multi_tenant_company,
-        sales_channels_filter_kwargs={'id': sales_channel.id},
+        sales_channel=sales_channel,
         is_variation=kwargs.get('is_variation', False),
-        sales_channel_class=WoocommerceSalesChannel
     )
+    task_runner.run()
 
 
 #
@@ -107,15 +99,15 @@ def woocommerce__product__delete_from_assign(sender, instance, **kwargs):
 #
 @receiver(delete_remote_product, sender='products.Product')
 def woocommerce__product__delete_from_product(sender, instance, **kwargs):
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceProductDeleteAddTask
 
-    run_delete_generic_sales_channel_task_flow(
+    task_runner = WooCommerceProductDeleteAddTask(
         task_func=delete_woocommerce_product_db_task,
         local_instance_id=instance.id,
-        remote_class=WoocommerceProduct,
         multi_tenant_company=instance.multi_tenant_company,
         is_multiple=True,
-        sales_channel_class=WoocommerceSalesChannel,
     )
+    task_runner.run()
 
 
 #
@@ -127,14 +119,15 @@ def woocommerce__product__sync_from_local(sender, instance, **kwargs):
     # number of calls = 1 + variations
     count = 1 + (instance.get_configurable_variations().count()
                  if hasattr(instance, 'get_configurable_variations') else 0)
-    run_product_specific_sales_channel_task_flow(
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceProductFullSyncAddTask
+
+    task_runner = WooCommerceProductFullSyncAddTask(
         task_func=sync_woocommerce_product_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
         product=instance,
         number_of_remote_requests=count,
-        sales_channel_class=WoocommerceSalesChannel,
-        product_id=instance.id,
     )
+    task_runner.set_extra_task_kwargs(product_id=instance.id)
+    task_runner.run()
 
 
 @receiver(sync_remote_product, sender='woocommerce.WoocommerceProduct')
@@ -142,15 +135,16 @@ def woocommerce__product__sync_from_local(sender, instance, **kwargs):
 def woocommerce__product__sync_from_remote(sender, instance, **kwargs):
     product = instance.local_instance
     count = 1 + (getattr(product, 'get_configurable_variations', lambda: [])().count())
-    run_generic_sales_channel_task_flow(
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceRemoteProductFullSyncAddTask
+
+    task_runner = WooCommerceRemoteProductFullSyncAddTask(
         task_func=sync_woocommerce_product_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
-        sales_channels_filter_kwargs={'id': instance.sales_channel.id},
+        product=product,
+        sales_channel=instance.sales_channel,
         number_of_remote_requests=count,
-        sales_channel_class=WoocommerceSalesChannel,
-        product_id=product.id,
-        remote_product_id=instance.id,
     )
+    task_runner.set_extra_task_kwargs(product_id=product.id)
+    task_runner.run()
 
 
 #
@@ -158,36 +152,38 @@ def woocommerce__product__sync_from_remote(sender, instance, **kwargs):
 #
 @receiver(create_remote_product_property, sender='properties.ProductProperty')
 def woocommerce__product_property__create(sender, instance, **kwargs):
-    run_product_specific_sales_channel_task_flow(
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceProductPropertyAddTask
+
+    task_runner = WooCommerceProductPropertyAddTask(
         task_func=create_woocommerce_product_property_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
         product=instance.product,
-        sales_channel_class=WoocommerceSalesChannel,
-        product_property_id=instance.id,
     )
+    task_runner.set_extra_task_kwargs(product_property_id=instance.id)
+    task_runner.run()
 
 
 @receiver(update_remote_product_property, sender='properties.ProductProperty')
 def woocommerce__product_property__update(sender, instance, **kwargs):
-    run_product_specific_sales_channel_task_flow(
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceProductPropertyAddTask
+
+    task_runner = WooCommerceProductPropertyAddTask(
         task_func=update_woocommerce_product_property_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
         product=instance.product,
-        sales_channel_class=WoocommerceSalesChannel,
-        product_property_id=instance.id,
     )
+    task_runner.set_extra_task_kwargs(product_property_id=instance.id)
+    task_runner.run()
 
 
 @receiver(delete_remote_product_property, sender='properties.ProductProperty')
 def woocommerce__product_property__delete(sender, instance, **kwargs):
-    run_delete_product_specific_generic_sales_channel_task_flow(
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceProductPropertyDeleteAddTask
+
+    task_runner = WooCommerceProductPropertyDeleteAddTask(
         task_func=delete_woocommerce_product_property_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
-        remote_class=WoocommerceProductProperty,
-        local_instance_id=instance.id,
         product=instance.product,
-        sales_channel_class=WoocommerceSalesChannel,
+        local_instance_id=instance.id,
     )
+    task_runner.run()
 
 
 #
@@ -197,14 +193,17 @@ def woocommerce__product_property__delete(sender, instance, **kwargs):
 def woocommerce__price__update(sender, instance, **kwargs):
     currency = kwargs.get('currency')
 
-    task_kwargs = {'product_id': instance.id, 'currency_id': currency.id}
-    run_product_specific_sales_channel_task_flow(
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceProductPriceAddTask
+
+    task_runner = WooCommerceProductPriceAddTask(
         task_func=update_woocommerce_price_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
         product=instance,
-        sales_channel_class=WoocommerceSalesChannel,
-        **task_kwargs
     )
+    task_runner.set_extra_task_kwargs(
+        product_id=instance.id,
+        currency_id=currency.id,
+    )
+    task_runner.run()
 
 
 #
@@ -214,14 +213,17 @@ def woocommerce__price__update(sender, instance, **kwargs):
 def woocommerce__content__update(sender, instance, **kwargs):
     language = kwargs.get('language', None)
 
-    task_kwargs = {'product_id': instance.id, 'language': language}
-    run_product_specific_sales_channel_task_flow(
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceProductContentAddTask
+
+    task_runner = WooCommerceProductContentAddTask(
         task_func=update_woocommerce_product_content_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
         product=instance,
-        sales_channel_class=WoocommerceSalesChannel,
-        **task_kwargs
     )
+    task_runner.set_extra_task_kwargs(
+        product_id=instance.id,
+        language=language,
+    )
+    task_runner.run()
 
 
 #
@@ -229,15 +231,14 @@ def woocommerce__content__update(sender, instance, **kwargs):
 #
 @receiver(update_remote_product_eancode, sender='products.Product')
 def woocommerce__ean_code__update(sender, instance, **kwargs):
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceProductEanCodeAddTask
 
-    task_kwargs = {'product_id': instance.id}
-    run_product_specific_sales_channel_task_flow(
+    task_runner = WooCommerceProductEanCodeAddTask(
         task_func=update_woocommerce_product_eancode_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
         product=instance,
-        sales_channel_class=WoocommerceSalesChannel,
-        **task_kwargs
     )
+    task_runner.set_extra_task_kwargs(product_id=instance.id)
+    task_runner.run()
 
 
 #
@@ -245,24 +246,32 @@ def woocommerce__ean_code__update(sender, instance, **kwargs):
 #
 @receiver(add_remote_product_variation, sender='products.ConfigurableVariation')
 def woocommerce__variation__add(sender, parent_product, variation_product, **kwargs):
-    run_generic_sales_channel_task_flow(
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceChannelAddTask
+
+    task_runner = WooCommerceChannelAddTask(
         task_func=add_woocommerce_product_variation_db_task,
         multi_tenant_company=parent_product.multi_tenant_company,
-        sales_channel_class=WoocommerceSalesChannel,
+    )
+    task_runner.set_extra_task_kwargs(
         parent_product_id=parent_product.id,
         variation_product_id=variation_product.id,
     )
+    task_runner.run()
 
 
 @receiver(remove_remote_product_variation, sender='products.ConfigurableVariation')
 def woocommerce__variation__remove(sender, parent_product, variation_product, **kwargs):
-    run_generic_sales_channel_task_flow(
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceChannelAddTask
+
+    task_runner = WooCommerceChannelAddTask(
         task_func=remove_woocommerce_product_variation_db_task,
         multi_tenant_company=parent_product.multi_tenant_company,
-        sales_channel_class=WoocommerceSalesChannel,
+    )
+    task_runner.set_extra_task_kwargs(
         parent_product_id=parent_product.id,
         variation_product_id=variation_product.id,
     )
+    task_runner.run()
 
 
 #
@@ -270,39 +279,41 @@ def woocommerce__variation__remove(sender, parent_product, variation_product, **
 #
 @receiver(create_remote_image_association, sender='media.MediaProductThrough')
 def woocommerce__image_assoc__create(sender, instance, **kwargs):
-    run_product_specific_sales_channel_task_flow(
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceProductImagesAddTask
+
+    task_runner = WooCommerceProductImagesAddTask(
         task_func=create_woocommerce_image_association_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
         product=instance.product,
-        sales_channel_class=WoocommerceSalesChannel,
         sales_channels_filter_kwargs={'id': instance.sales_channel_id} if instance.sales_channel_id else None,
-        media_product_through_id=instance.id,
     )
+    task_runner.set_extra_task_kwargs(media_product_through_id=instance.id)
+    task_runner.run()
 
 
 @receiver(update_remote_image_association, sender='media.MediaProductThrough')
 def woocommerce__image_assoc__update(sender, instance, **kwargs):
-    run_product_specific_sales_channel_task_flow(
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceProductImagesAddTask
+
+    task_runner = WooCommerceProductImagesAddTask(
         task_func=update_woocommerce_image_association_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
         product=instance.product,
-        sales_channel_class=WoocommerceSalesChannel,
         sales_channels_filter_kwargs={'id': instance.sales_channel_id} if instance.sales_channel_id else None,
-        media_product_through_id=instance.id,
     )
+    task_runner.set_extra_task_kwargs(media_product_through_id=instance.id)
+    task_runner.run()
 
 
 @receiver(delete_remote_image_association, sender='media.MediaProductThrough')
 def woocommerce__image_assoc__delete(sender, instance, **kwargs):
-    run_delete_product_specific_generic_sales_channel_task_flow(
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceImageAssociationDeleteAddTask
+
+    task_runner = WooCommerceImageAssociationDeleteAddTask(
         task_func=delete_woocommerce_image_association_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
-        remote_class=WoocommerceMediaThroughProduct,
-        local_instance_id=instance.id,
         product=instance.product,
-        sales_channel_class=WoocommerceSalesChannel,
+        local_instance_id=instance.id,
         sales_channels_filter_kwargs={'id': instance.sales_channel_id} if instance.sales_channel_id else None,
     )
+    task_runner.run()
 
 
 #
@@ -310,12 +321,14 @@ def woocommerce__image_assoc__delete(sender, instance, **kwargs):
 #
 @receiver(delete_remote_image, sender='media.Media')
 def woocommerce__image__delete(sender, instance, **kwargs):
-    run_generic_sales_channel_task_flow(
+    from sales_channels.integrations.woocommerce.factories.task_queue import WooCommerceChannelAddTask
+
+    task_runner = WooCommerceChannelAddTask(
         task_func=delete_woocommerce_image_db_task,
         multi_tenant_company=instance.multi_tenant_company,
-        sales_channel_class=WoocommerceSalesChannel,
-        image_id=instance.id,
     )
+    task_runner.set_extra_task_kwargs(image_id=instance.id)
+    task_runner.run()
 
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
