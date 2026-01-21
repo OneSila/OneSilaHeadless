@@ -46,10 +46,6 @@ from sales_channels.integrations.ebay.tasks import (
     delete_ebay_assign_offers_db_task,
     delete_ebay_product_db_task,
 )
-from sales_channels.integrations.ebay.flows.tasks_runner import (
-    run_product_ebay_sales_channel_task_flow,
-    run_single_ebay_product_task_flow,
-)
 from sales_channels.models import SalesChannelViewAssign
 from sales_channels.helpers import rebind_ebay_product_type_to_rule
 
@@ -80,12 +76,17 @@ def _queue_delete_product_task(*, product, sales_channel, view) -> bool:
         return False
 
     remote_requests = _get_remote_request_count(product)
-    run_single_ebay_product_task_flow(
+    from sales_channels.integrations.ebay.factories.task_queue import EbaySingleViewAddTask
+
+    task_runner = EbaySingleViewAddTask(
         task_func=delete_ebay_product_db_task,
         view=view,
         number_of_remote_requests=remote_requests,
+    )
+    task_runner.set_extra_task_kwargs(
         product_id=product.id,
     )
+    task_runner.run()
     return True
 
 
@@ -94,14 +95,17 @@ def ebay__product__update(sender, instance, **kwargs):
     from sales_channels.integrations.ebay.tasks_receiver_audit import (
         ebay__product__update_db_task,
     )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductUpdateAddTask
 
-    run_product_ebay_sales_channel_task_flow(
+    task_runner = EbayProductUpdateAddTask(
         task_func=ebay__product__update_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
         product=instance,
         number_of_remote_requests=0,
+    )
+    task_runner.set_extra_task_kwargs(
         context={"payload_keys": sorted(kwargs.keys())},
     )
+    task_runner.run()
 
 
 @receiver(create_remote_product_property, sender='properties.ProductProperty')
@@ -109,20 +113,23 @@ def ebay__product_property__create(sender, instance, **kwargs):
     from sales_channels.integrations.ebay.tasks_receiver_audit import (
         ebay__product_property__create_db_task,
     )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductPropertyAddTask
 
     product = instance.product
     property_obj = getattr(instance, "property", None)
-    run_product_ebay_sales_channel_task_flow(
+    task_runner = EbayProductPropertyAddTask(
         task_func=ebay__product_property__create_db_task,
-        multi_tenant_company=product.multi_tenant_company,
         product=product,
         number_of_remote_requests=0,
+    )
+    task_runner.set_extra_task_kwargs(
         context={
             "product_property_id": instance.id,
             "property_id": getattr(property_obj, "id", None),
             "property_code": getattr(property_obj, "code", None),
         },
     )
+    task_runner.run()
 
 
 @receiver(update_remote_product_property, sender='properties.ProductProperty')
@@ -130,14 +137,16 @@ def ebay__product_property__update(sender, instance, **kwargs):
     from sales_channels.integrations.ebay.tasks_receiver_audit import (
         ebay__product_property__update_db_task,
     )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductPropertyAddTask
 
     product = instance.product
     property_obj = getattr(instance, "property", None)
-    run_product_ebay_sales_channel_task_flow(
+    task_runner = EbayProductPropertyAddTask(
         task_func=ebay__product_property__update_db_task,
-        multi_tenant_company=product.multi_tenant_company,
         product=product,
         number_of_remote_requests=0,
+    )
+    task_runner.set_extra_task_kwargs(
         context={
             "product_property_id": instance.id,
             "property_id": getattr(property_obj, "id", None),
@@ -145,6 +154,7 @@ def ebay__product_property__update(sender, instance, **kwargs):
             "payload_keys": sorted(kwargs.keys()),
         },
     )
+    task_runner.run()
 
 
 @receiver(delete_remote_product_property, sender='properties.ProductProperty')
@@ -152,20 +162,23 @@ def ebay__product_property__delete(sender, instance, **kwargs):
     from sales_channels.integrations.ebay.tasks_receiver_audit import (
         ebay__product_property__delete_db_task,
     )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductPropertyAddTask
 
     product = instance.product
     property_obj = getattr(instance, "property", None)
-    run_product_ebay_sales_channel_task_flow(
+    task_runner = EbayProductPropertyAddTask(
         task_func=ebay__product_property__delete_db_task,
-        multi_tenant_company=product.multi_tenant_company,
         product=product,
         number_of_remote_requests=0,
+    )
+    task_runner.set_extra_task_kwargs(
         context={
             "product_property_id": instance.id,
             "property_id": getattr(property_obj, "id", None),
             "property_code": getattr(property_obj, "code", None),
         },
     )
+    task_runner.run()
 
 
 @receiver(update_remote_price, sender='products.Product')
@@ -173,19 +186,22 @@ def ebay__price__update(sender, instance, **kwargs):
     from sales_channels.integrations.ebay.tasks_receiver_audit import (
         ebay__price__update_db_task,
     )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductPriceAddTask
 
     currency = kwargs.get("currency")
-    run_product_ebay_sales_channel_task_flow(
+    task_runner = EbayProductPriceAddTask(
         task_func=ebay__price__update_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
         product=instance,
         number_of_remote_requests=0,
+    )
+    task_runner.set_extra_task_kwargs(
         context={
             "currency_id": getattr(currency, "id", None),
             "currency_code": getattr(currency, "code", None),
             "currency_iso_code": getattr(currency, "iso_code", None),
         },
     )
+    task_runner.run()
 
 
 @receiver(update_remote_product_content, sender='products.Product')
@@ -193,19 +209,22 @@ def ebay__content__update(sender, instance, **kwargs):
     from sales_channels.integrations.ebay.tasks_receiver_audit import (
         ebay__content__update_db_task,
     )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductContentAddTask
 
     language = kwargs.get("language")
-    run_product_ebay_sales_channel_task_flow(
+    task_runner = EbayProductContentAddTask(
         task_func=ebay__content__update_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
         product=instance,
         number_of_remote_requests=0,
+    )
+    task_runner.set_extra_task_kwargs(
         context={
             "language_id": getattr(language, "id", None),
             "language_code": getattr(language, "code", None),
             "language_iso_code": getattr(language, "iso_code", None),
         },
     )
+    task_runner.run()
 
 
 @receiver(update_remote_product_eancode, sender='products.Product')
@@ -213,14 +232,15 @@ def ebay__ean_code__update(sender, instance, **kwargs):
     from sales_channels.integrations.ebay.tasks_receiver_audit import (
         ebay__ean_code__update_db_task,
     )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductEanCodeAddTask
 
-    run_product_ebay_sales_channel_task_flow(
+    task_runner = EbayProductEanCodeAddTask(
         task_func=ebay__ean_code__update_db_task,
-        multi_tenant_company=instance.multi_tenant_company,
         product=instance,
         number_of_remote_requests=0,
-        context=None,
     )
+    task_runner.set_extra_task_kwargs(context=None)
+    task_runner.run()
 
 
 @receiver(add_remote_product_variation, sender='products.ConfigurableVariation')
@@ -228,17 +248,20 @@ def ebay__variation__add(sender, parent_product, variation_product, **kwargs):
     from sales_channels.integrations.ebay.tasks_receiver_audit import (
         ebay__variation__add_db_task,
     )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductUpdateAddTask
 
-    run_product_ebay_sales_channel_task_flow(
+    task_runner = EbayProductUpdateAddTask(
         task_func=ebay__variation__add_db_task,
-        multi_tenant_company=parent_product.multi_tenant_company,
         product=parent_product,
         number_of_remote_requests=0,
+    )
+    task_runner.set_extra_task_kwargs(
         context={
             "parent_product_id": getattr(parent_product, "id", None),
             "variation_product_id": getattr(variation_product, "id", None),
         },
     )
+    task_runner.run()
 
 
 @receiver(remove_remote_product_variation, sender='products.ConfigurableVariation')
@@ -246,17 +269,20 @@ def ebay__variation__remove(sender, parent_product, variation_product, **kwargs)
     from sales_channels.integrations.ebay.tasks_receiver_audit import (
         ebay__variation__remove_db_task,
     )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductUpdateAddTask
 
-    run_product_ebay_sales_channel_task_flow(
+    task_runner = EbayProductUpdateAddTask(
         task_func=ebay__variation__remove_db_task,
-        multi_tenant_company=parent_product.multi_tenant_company,
         product=parent_product,
         number_of_remote_requests=0,
+    )
+    task_runner.set_extra_task_kwargs(
         context={
             "parent_product_id": getattr(parent_product, "id", None),
             "variation_product_id": getattr(variation_product, "id", None),
         },
     )
+    task_runner.run()
 
 
 @receiver(create_remote_image_association, sender='media.MediaProductThrough')
@@ -264,20 +290,23 @@ def ebay__image_assoc__create(sender, instance, **kwargs):
     from sales_channels.integrations.ebay.tasks_receiver_audit import (
         ebay__image_assoc__create_db_task,
     )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductImagesAddTask
 
     product = instance.product
     media = getattr(instance, "media", None)
-    run_product_ebay_sales_channel_task_flow(
+    task_runner = EbayProductImagesAddTask(
         task_func=ebay__image_assoc__create_db_task,
-        multi_tenant_company=product.multi_tenant_company,
         product=product,
         number_of_remote_requests=0,
+    )
+    task_runner.set_extra_task_kwargs(
         context={
             "media_product_through_id": instance.id,
             "media_id": getattr(media, "id", None),
             "media_type": getattr(media, "type", None),
         },
     )
+    task_runner.run()
 
 
 @receiver(update_remote_image_association, sender='media.MediaProductThrough')
@@ -285,14 +314,16 @@ def ebay__image_assoc__update(sender, instance, **kwargs):
     from sales_channels.integrations.ebay.tasks_receiver_audit import (
         ebay__image_assoc__update_db_task,
     )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductImagesAddTask
 
     product = instance.product
     media = getattr(instance, "media", None)
-    run_product_ebay_sales_channel_task_flow(
+    task_runner = EbayProductImagesAddTask(
         task_func=ebay__image_assoc__update_db_task,
-        multi_tenant_company=product.multi_tenant_company,
         product=product,
         number_of_remote_requests=0,
+    )
+    task_runner.set_extra_task_kwargs(
         context={
             "media_product_through_id": instance.id,
             "media_id": getattr(media, "id", None),
@@ -300,6 +331,7 @@ def ebay__image_assoc__update(sender, instance, **kwargs):
             "payload_keys": sorted(kwargs.keys()),
         },
     )
+    task_runner.run()
 
 
 @receiver(delete_remote_image_association, sender='media.MediaProductThrough')
@@ -307,20 +339,23 @@ def ebay__image_assoc__delete(sender, instance, **kwargs):
     from sales_channels.integrations.ebay.tasks_receiver_audit import (
         ebay__image_assoc__delete_db_task,
     )
+    from sales_channels.integrations.ebay.factories.task_queue import EbayProductImagesAddTask
 
     product = instance.product
     media = getattr(instance, "media", None)
-    run_product_ebay_sales_channel_task_flow(
+    task_runner = EbayProductImagesAddTask(
         task_func=ebay__image_assoc__delete_db_task,
-        multi_tenant_company=product.multi_tenant_company,
         product=product,
         number_of_remote_requests=0,
+    )
+    task_runner.set_extra_task_kwargs(
         context={
             "media_product_through_id": instance.id,
             "media_id": getattr(media, "id", None),
             "media_type": getattr(media, "type", None),
         },
     )
+    task_runner.run()
 
 
 @receiver(delete_remote_image, sender='media.Media')
@@ -334,16 +369,20 @@ def ebay__image__delete(sender, instance, **kwargs):
     products = Product.objects.filter(id__in=product_ids).only("id", "multi_tenant_company_id")
 
     for product in products.iterator():
-        run_product_ebay_sales_channel_task_flow(
+        from sales_channels.integrations.ebay.factories.task_queue import EbayProductImagesAddTask
+
+        task_runner = EbayProductImagesAddTask(
             task_func=ebay__image__delete_db_task,
-            multi_tenant_company=product.multi_tenant_company,
             product=product,
             number_of_remote_requests=0,
+        )
+        task_runner.set_extra_task_kwargs(
             context={
                 "image_id": instance.id,
                 "product_id": product.id,
             },
         )
+        task_runner.run()
 
 @receiver(refresh_website_pull_models, sender='sales_channels.SalesChannel')
 @receiver(refresh_website_pull_models, sender='ebay.EbaySalesChannel')
@@ -518,13 +557,18 @@ def ebay__product__manual_sync(
 
     count = 1 + getattr(product, 'get_configurable_variations', lambda: [])().count()
 
-    run_single_ebay_product_task_flow(
+    from sales_channels.integrations.ebay.factories.task_queue import EbaySingleViewAddTask
+
+    task_runner = EbaySingleViewAddTask(
         task_func=resync_ebay_product_db_task,
         view=resolved_view,
         number_of_remote_requests=count,
+    )
+    task_runner.set_extra_task_kwargs(
         product_id=product.id,
         remote_product_id=instance.id,
     )
+    task_runner.run()
 
 
 @receiver(create_remote_product, sender='sales_channels.SalesChannelViewAssign')
@@ -538,12 +582,18 @@ def ebay__product__create_from_assign(sender, instance, view, **kwargs):
     product = instance.product
     count = 1 + getattr(product, 'get_configurable_variations', lambda: [])().count()
 
-    run_single_ebay_product_task_flow(
+    from sales_channels.integrations.ebay.factories.task_queue import EbaySingleViewAddTask
+
+    print('---------------------------------- ???')
+    task_runner = EbaySingleViewAddTask(
         task_func=create_ebay_product_db_task,
         view=resolved_view,
         number_of_remote_requests=count,
+    )
+    task_runner.set_extra_task_kwargs(
         product_id=product.id,
     )
+    task_runner.run()
 
 
 @receiver(sales_view_assign_updated, sender='products.Product')
@@ -563,12 +613,17 @@ def ebay__assign__update(sender, instance, sales_channel, view, **kwargs):
     is_delete = kwargs.get('is_delete', False)
     task_func = delete_ebay_assign_offers_db_task if is_delete else update_ebay_assign_offers_db_task
 
-    run_single_ebay_product_task_flow(
+    from sales_channels.integrations.ebay.factories.task_queue import EbaySingleViewAddTask
+
+    task_runner = EbaySingleViewAddTask(
         task_func=task_func,
         view=resolved_view,
         number_of_remote_requests=count,
+    )
+    task_runner.set_extra_task_kwargs(
         product_id=instance.id,
     )
+    task_runner.run()
 
 
 @receiver(delete_remote_product, sender='sales_channels.SalesChannelViewAssign')
