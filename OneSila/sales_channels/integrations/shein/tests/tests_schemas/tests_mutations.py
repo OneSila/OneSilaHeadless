@@ -72,8 +72,8 @@ class SheinProductMutationTest(TransactionTestCaseMixin, TransactionTestCase):
         self.assign.save(update_fields=["status"])
         self.assign.refresh_from_db()
 
-    @patch("sales_channels.integrations.shein.flows.tasks_runner.run_single_shein_product_task_flow")
-    def test_update_shein_product_force_update_runs_create_task(self, run_flow):
+    @patch("sales_channels.integrations.shein.factories.task_queue.SheinSingleChannelAddTask")
+    def test_update_shein_product_force_update_runs_create_task(self, task_runner_cls):
         resp = self.strawberry_test_client(
             query=UPDATE_SHEIN_PRODUCT_MUTATION,
             variables={
@@ -84,15 +84,18 @@ class SheinProductMutationTest(TransactionTestCaseMixin, TransactionTestCase):
         )
 
         self.assertTrue(resp.errors is None)
-        run_flow.assert_called_once()
-        _, kwargs = run_flow.call_args
-        self.assertEqual(kwargs["task_func"], create_shein_product_db_task)
-        self.assertEqual(kwargs["sales_channel"], self.sales_channel)
-        self.assertEqual(kwargs["product_id"], self.product.id)
-        self.assertEqual(kwargs["number_of_remote_requests"], 1)
+        task_runner_cls.assert_called_once_with(
+            task_func=create_shein_product_db_task,
+            sales_channel=self.sales_channel,
+            number_of_remote_requests=1,
+        )
+        task_runner_cls.return_value.set_extra_task_kwargs.assert_called_once_with(
+            product_id=self.product.id,
+        )
+        task_runner_cls.return_value.run.assert_called_once()
 
-    @patch("sales_channels.integrations.shein.flows.tasks_runner.run_single_shein_product_task_flow")
-    def test_bulk_update_shein_product_force_update_runs_create_task(self, run_flow):
+    @patch("sales_channels.integrations.shein.factories.task_queue.SheinSingleChannelAddTask")
+    def test_bulk_update_shein_product_force_update_runs_create_task(self, task_runner_cls):
         resp = self.strawberry_test_client(
             query=BULK_UPDATE_SHEIN_PRODUCT_MUTATION,
             variables={
@@ -102,15 +105,18 @@ class SheinProductMutationTest(TransactionTestCaseMixin, TransactionTestCase):
         )
 
         self.assertTrue(resp.errors is None)
-        run_flow.assert_called_once()
-        _, kwargs = run_flow.call_args
-        self.assertEqual(kwargs["task_func"], create_shein_product_db_task)
-        self.assertEqual(kwargs["sales_channel"], self.sales_channel)
-        self.assertEqual(kwargs["product_id"], self.product.id)
-        self.assertEqual(kwargs["number_of_remote_requests"], 1)
+        task_runner_cls.assert_called_once_with(
+            task_func=create_shein_product_db_task,
+            sales_channel=self.sales_channel,
+            number_of_remote_requests=1,
+        )
+        task_runner_cls.return_value.set_extra_task_kwargs.assert_called_once_with(
+            product_id=self.product.id,
+        )
+        task_runner_cls.return_value.run.assert_called_once()
 
-    @patch("sales_channels.integrations.shein.flows.tasks_runner.run_single_shein_product_task_flow")
-    def test_bulk_update_shein_product_runs_update_task(self, run_flow):
+    @patch("sales_channels.integrations.shein.factories.task_queue.SheinSingleChannelAddTask")
+    def test_bulk_update_shein_product_runs_update_task(self, task_runner_cls):
         resp = self.strawberry_test_client(
             query=BULK_UPDATE_SHEIN_PRODUCT_MUTATION,
             variables={
@@ -120,9 +126,12 @@ class SheinProductMutationTest(TransactionTestCaseMixin, TransactionTestCase):
         )
 
         self.assertTrue(resp.errors is None)
-        run_flow.assert_called_once()
-        _, kwargs = run_flow.call_args
-        self.assertEqual(kwargs["task_func"], update_shein_product_db_task)
-        self.assertEqual(kwargs["sales_channel"], self.sales_channel)
-        self.assertEqual(kwargs["product_id"], self.product.id)
-        self.assertEqual(kwargs["number_of_remote_requests"], 1)
+        task_runner_cls.assert_called_once_with(
+            task_func=update_shein_product_db_task,
+            sales_channel=self.sales_channel,
+            number_of_remote_requests=1,
+        )
+        task_runner_cls.return_value.set_extra_task_kwargs.assert_called_once_with(
+            product_id=self.product.id,
+        )
+        task_runner_cls.return_value.run.assert_called_once()

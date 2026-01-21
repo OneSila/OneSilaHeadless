@@ -584,7 +584,6 @@ def ebay__product__create_from_assign(sender, instance, view, **kwargs):
 
     from sales_channels.integrations.ebay.factories.task_queue import EbaySingleViewAddTask
 
-    print('---------------------------------- ???')
     task_runner = EbaySingleViewAddTask(
         task_func=create_ebay_product_db_task,
         view=resolved_view,
