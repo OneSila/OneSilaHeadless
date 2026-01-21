@@ -7,7 +7,6 @@ from sales_channels.factories.task_queue import (
     AddTaskConfigError,
     ChannelScopedAddTask,
     DeleteScopedAddTask,
-    MarketplaceAddTask,
     ProductDeleteScopedAddTask,
     ViewScopedAddTask,
 )
@@ -33,11 +32,12 @@ class TaskQueueConfigTests(SimpleTestCase):
             )
 
     def test_missing_sync_type_when_not_live_raises(self, *, _unused=None):
-        class DummyMarketplaceTask(MarketplaceAddTask):
+        class DummyNonLiveTask(AddTaskBase):
+            live = False
             pass
 
         with self.assertRaises(AddTaskConfigError):
-            DummyMarketplaceTask(task_func=lambda: None, multi_tenant_company=object())
+            DummyNonLiveTask(task_func=lambda: None, multi_tenant_company=object())
 
     def test_missing_remote_class_raises(self, *, _unused=None):
         class DummyDeleteTask(DeleteScopedAddTask):

@@ -247,9 +247,8 @@ class ResyncSalesChannelAssignsMutationTestCase(TransactionTestCaseMixin, Transa
             syncing_current_percentage=100,
         )
 
-    @patch("sales_channels.integrations.amazon.receivers.run_single_amazon_product_task_flow")
     @patch("sales_channels.signals.manual_sync_remote_product.send")
-    def test_resync_sales_channel_view_assigns_triggers_signal(self, send_mock, _run_flow):
+    def test_resync_sales_channel_view_assigns_triggers_signal(self, send_mock):
         assign = SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,

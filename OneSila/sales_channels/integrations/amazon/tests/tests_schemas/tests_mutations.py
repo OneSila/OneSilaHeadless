@@ -57,9 +57,8 @@ class AmazonProductMutationTest(TransactionTestCaseMixin, TransactionTestCase):
             syncing_current_percentage=100,
         )
 
-    @patch("sales_channels.integrations.amazon.receivers.run_single_amazon_product_task_flow")
     @patch("sales_channels.signals.manual_sync_remote_product.send")
-    def test_bulk_resync_amazon_product_from_assigns_sends_signal(self, send_mock, _run_flow):
+    def test_bulk_resync_amazon_product_from_assigns_sends_signal(self, send_mock):
         assign = SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
@@ -85,9 +84,8 @@ class AmazonProductMutationTest(TransactionTestCaseMixin, TransactionTestCase):
         self.assertFalse(kwargs["force_validation_only"])
         self.assertTrue(kwargs["force_full_update"])
 
-    @patch("sales_channels.integrations.amazon.receivers.run_single_amazon_product_task_flow")
     @patch("sales_channels.integrations.amazon.factories.sales_channels.issues.FetchRemoteIssuesFactory")
-    def test_bulk_refresh_amazon_latest_issues_from_assigns_runs_factory(self, factory_mock, _run_flow):
+    def test_bulk_refresh_amazon_latest_issues_from_assigns_runs_factory(self, factory_mock):
         assign = SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,

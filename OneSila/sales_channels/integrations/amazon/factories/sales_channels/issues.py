@@ -1,7 +1,6 @@
 from core.helpers import ensure_serializable
 from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixin
 from sales_channels.integrations.amazon.models import AmazonProduct, AmazonProductIssue
-from sales_channels.integrations.amazon.flows.tasks_runner import run_single_amazon_product_task_flow
 from sales_channels.integrations.amazon.tasks import resync_amazon_product_db_task
 
 
@@ -114,15 +113,20 @@ class FetchRemoteIssuesFactory(GetAmazonAPIMixin):
 
         count = 1 + (getattr(self.remote_product.local_instance, "get_configurable_variations", lambda: [])().count())
         for view in AmazonSalesChannelView.objects.filter(id__in=missing_view_ids).select_related("sales_channel"):
-            run_single_amazon_product_task_flow(
+            from sales_channels.integrations.amazon.factories.task_queue import AmazonSingleViewAddTask
+
+            task_runner = AmazonSingleViewAddTask(
                 task_func=resync_amazon_product_db_task,
                 view=view,
                 number_of_remote_requests=count,
+            )
+            task_runner.set_extra_task_kwargs(
                 product_id=self.remote_product.local_instance_id,
                 remote_product_id=self.remote_product.id,
                 force_validation_only=False,
                 force_full_update=True,
             )
+            task_runner.run()
 
 
 class FetchRemoteValidationIssueFactory:

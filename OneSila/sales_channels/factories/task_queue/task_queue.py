@@ -101,6 +101,17 @@ class AddTaskBase:
         yield TaskTarget(sales_channel=sales_channel)
 
     def guard(self, *, target: TaskTarget) -> GuardResult:
+        resolved_channel = getattr(target.sales_channel, "get_real_instance", None)
+        if resolved_channel:
+            sales_channel = resolved_channel()
+        else:
+            sales_channel = target.sales_channel
+
+        if self.sales_channel_class and not isinstance(sales_channel, self.sales_channel_class):
+            return GuardResult(allowed=False, reason="sales_channel_type_mismatch")
+        if hasattr(sales_channel, "active") and not sales_channel.active:
+            return GuardResult(allowed=False, reason="sales_channel_inactive")
+
         return GuardResult(allowed=True)
 
     def build_task_kwargs(self, *, target: TaskTarget) -> dict[str, Any]:
@@ -465,7 +476,6 @@ class SingleViewAddTask(AddTaskBase):
         view_id = target.sales_channel_view.id
         return {
             "sales_channel_id": target.sales_channel.id,
-            "sales_channel_view_id": view_id,
             "view_id": view_id,
             **self.extra_task_kwargs,
         }
@@ -482,11 +492,3 @@ class SingleChannelAddTask(AddTaskBase):
 
     def get_targets(self, *, sales_channel) -> Iterable[TaskTarget]:
         yield TaskTarget(sales_channel=sales_channel)
-
-
-class MarketplaceAddTask(AddTaskBase):
-    live = False
-
-
-class MarketplaceViewScopedAddTask(MarketplaceAddTask, ViewScopedAddTask):
-    view_assign_model = None
