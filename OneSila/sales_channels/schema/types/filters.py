@@ -196,6 +196,7 @@ class SalesChannelViewAssignFilter(SearchFilterMixin):
     sales_channel: Optional[SalesChannelFilter]
     sales_channel_view: Optional[SalesChannelViewFilter]
     product: Optional[ProductFilter]
+    remote_product: Optional[RemoteProductFilter]
 
     @custom_filter
     def status(
@@ -208,6 +209,22 @@ class SalesChannelViewAssignFilter(SearchFilterMixin):
             return queryset, Q()
 
         return queryset.filter_by_status(status=str(value)), Q()
+
+    @custom_filter
+    def has_sync_requests(
+        self,
+        queryset: QuerySet,
+        value: bool,
+        prefix: str,
+    ):
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        pending = SyncRequest.STATUS_PENDING
+        if value:
+            return queryset.filter(remote_product__sync_requests__status=pending).distinct(), Q()
+
+        return queryset.exclude(remote_product__sync_requests__status=pending).distinct(), Q()
 
 
 @filter(SalesChannelContentTemplate)

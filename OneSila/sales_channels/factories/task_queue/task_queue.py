@@ -152,19 +152,20 @@ class AddTaskBase:
         task_func_path = get_import_path(self.task_func)
         task_kwargs = self.build_task_kwargs(target=target)
 
-        sync_request, created = SyncRequest.objects.get_or_create(
+        sync_request = SyncRequest.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             remote_product=target.remote_product,
             sales_channel=target.sales_channel,
             sales_channel_view_id=sales_channel_view_id,
             sync_type=sync_type,
-            defaults={
-                "reason": guard_result.reason or self.reason,
-                "task_func_path": task_func_path,
-                "task_kwargs": task_kwargs,
-                "number_of_remote_requests": self.number_of_remote_requests,
-            },
+            reason=guard_result.reason or self.reason,
+            task_func_path=task_func_path,
+            task_kwargs=task_kwargs,
+            number_of_remote_requests=self.number_of_remote_requests
         )
+        created = True
+
+        # @TODO: Refactor this!
         if not created:
             update_fields = []
             updated_reason = guard_result.reason or self.reason

@@ -289,13 +289,13 @@ class SyncRequest(models.Model):
             Index(fields=["remote_product", "status"]),
             Index(fields=["sales_channel", "status"]),
         ]
-        constraints = [
-            UniqueConstraint(
-                fields=["remote_product", "sales_channel", "sales_channel_view", "sync_type"],
-                name="uniq_sync_request",
-                nulls_distinct=False,
-            ),
-        ]
+        # constraints = [
+        #     UniqueConstraint(
+        #         fields=["remote_product", "sales_channel", "sales_channel_view", "sync_type"],
+        #         name="uniq_sync_request",
+        #         nulls_distinct=False,
+        #     ),
+        # ]
 
     def __str__(self) -> str:
         view = self.sales_channel_view_id or "global"
