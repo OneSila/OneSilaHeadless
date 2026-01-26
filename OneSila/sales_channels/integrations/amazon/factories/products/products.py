@@ -17,7 +17,10 @@ from sales_channels.factories.products.products import (
     RemoteProductUpdateFactory,
     RemoteProductDeleteFactory,
 )
-from sales_channels.integrations.amazon.exceptions import AmazonUnsupportedPropertyForProductType
+from sales_channels.integrations.amazon.exceptions import (
+    AmazonProductTypeNotMappedError,
+    AmazonUnsupportedPropertyForProductType,
+)
 from sales_channels.integrations.amazon.factories.mixins import (
     GetAmazonAPIMixin,
 )
@@ -633,10 +636,15 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
 
     def set_rule(self):
         super().set_rule()
-        self.remote_rule = AmazonProductType.objects.get(
-            local_instance=self.rule,
-            sales_channel=self.sales_channel,
-        )
+        try:
+            self.remote_rule = AmazonProductType.objects.get(
+                local_instance=self.rule,
+                sales_channel=self.sales_channel,
+            )
+        except AmazonProductType.DoesNotExist as exc:
+            raise AmazonProductTypeNotMappedError(
+                "Amazon product type mapping is missing for this product type. Please map an Amazon product type before syncing."
+            ) from exc
 
     def build_payload(self):
         super().build_payload()

@@ -132,7 +132,7 @@ class RemoteProductPropertyFilter(SearchFilterMixin):
 
 @filter(RemoteProperty)
 class RemotePropertyFilter(SearchFilterMixin):
-    pass
+    local_instance: Optional[lazy['PropertyFilter', "properties.schema.types.filters"]]
 
 
 @filter(RemotePropertySelectValue)

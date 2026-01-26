@@ -203,6 +203,80 @@ class PropertySelectValueQuerySetTest(TestCase):
         self.assertNotIn(select_used, qs_unused)
         self.assertNotIn(multi_used, qs_unused)
 
+    def test_with_usage_count_counts_select_and_multi(self):
+        prop_select = Property.objects.create(
+            type=Property.TYPES.SELECT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        prop_multi = Property.objects.create(
+            type=Property.TYPES.MULTISELECT,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        select_used = PropertySelectValue.objects.create(
+            property=prop_select,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        select_unused = PropertySelectValue.objects.create(
+            property=prop_select,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        multi_used = PropertySelectValue.objects.create(
+            property=prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        multi_unused = PropertySelectValue.objects.create(
+            property=prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        product_one = Product.objects.create(
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product_two = Product.objects.create(
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ProductProperty.objects.create(
+            product=product_one,
+            property=prop_select,
+            value_select=select_used,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=product_two,
+            property=prop_select,
+            value_select=select_used,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        pp_multi_one = ProductProperty.objects.create(
+            product=product_one,
+            property=prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        pp_multi_two = ProductProperty.objects.create(
+            product=product_two,
+            property=prop_multi,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        pp_multi_one.value_multi_select.add(multi_used)
+        pp_multi_two.value_multi_select.add(multi_used)
+
+        qs = PropertySelectValue.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+        ).with_usage_count(
+            multi_tenant_company_id=self.multi_tenant_company.id,
+        )
+        usage_by_id = {value.id: value.usage_count for value in qs}
+
+        self.assertEqual(usage_by_id[select_used.id], 2)
+        self.assertEqual(usage_by_id[select_unused.id], 0)
+        self.assertEqual(usage_by_id[multi_used.id], 2)
+        self.assertEqual(usage_by_id[multi_unused.id], 0)
+
     def test_merge_updates_product_property_value_select(self):
         prop_select = Property.objects.create(
             type=Property.TYPES.SELECT,

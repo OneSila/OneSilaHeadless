@@ -15,7 +15,10 @@ from sales_channels.integrations.amazon.factories.properties.mixins import (
     AmazonProductPropertyBaseMixin,
 )
 from sales_channels.integrations.amazon.tests.helpers import DisableWooCommerceSignalsMixin
-from sales_channels.integrations.amazon.exceptions import AmazonMissingIdentifierError
+from sales_channels.integrations.amazon.exceptions import (
+    AmazonMissingIdentifierError,
+    AmazonProductTypeNotMappedError,
+)
 
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.integrations.amazon.models.sales_channels import (
@@ -628,6 +631,24 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     def setUp(self):
         super().setUp()
         self.setup_product()
+
+    def test_missing_product_type_mapping_raises_user_error(self):
+        AmazonProductType.objects.filter(
+            local_instance=self.rule,
+            sales_channel=self.sales_channel,
+        ).delete()
+
+        fac = AmazonProductSyncFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            view=self.view,
+        )
+
+        with self.assertRaises(AmazonProductTypeNotMappedError) as ctx:
+            fac.set_rule()
+
+        self.assertIn("product type mapping is missing", str(ctx.exception))
 
     @patch("sales_channels.integrations.amazon.factories.mixins.GetAmazonAPIMixin._get_client", return_value=None)
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")

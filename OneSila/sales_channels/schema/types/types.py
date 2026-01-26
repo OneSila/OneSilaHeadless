@@ -118,6 +118,15 @@ class SalesChannelContentTemplateCheckType:
     errors: List[FormattedIssueType]
 
 
+@strawberry_type
+class RemotePropertySelectValueMirrorType:
+    value: Optional[str]
+    translated_value: Optional[str]
+    marketplace: Optional[Annotated['SalesChannelViewType', lazy("sales_channels.schema.types.types")]]
+    proxy_id: str
+    remote_property: Annotated['RemotePropertyType', lazy("sales_channels.schema.types.types")]
+
+
 @type(SalesChannelGptFeed, fields='__all__')
 class SalesChannelGptFeedType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: Annotated['SalesChannelType', lazy("sales_channels.schema.types.types")]
@@ -147,6 +156,43 @@ class SalesChannelType(relay.Node, GetQuerysetMultiTenantMixin):
     @field()
     def type(self, info) -> str:
         return INTEGRATIONS_TYPES_MAP.get(self.__class__, MAGENTO_INTEGRATION)
+
+    @field()
+    def proxy_id(self, info) -> str:
+        from sales_channels.integrations.magento2.models import MagentoSalesChannel
+        from sales_channels.integrations.magento2.schema.types.types import MagentoSalesChannelType
+        from sales_channels.integrations.shopify.models import ShopifySalesChannel
+        from sales_channels.integrations.shopify.schema.types.types import ShopifySalesChannelType
+        from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel
+        from sales_channels.integrations.woocommerce.schema.types.types import WoocommerceSalesChannelType
+        from sales_channels.integrations.amazon.models import AmazonSalesChannel
+        from sales_channels.integrations.amazon.schema.types.types import AmazonSalesChannelType
+        from webhooks.models import WebhookIntegration
+        from webhooks.schema.types.types import WebhookIntegrationType
+        from sales_channels.integrations.ebay.models import EbaySalesChannel
+        from sales_channels.integrations.ebay.schema.types.types import EbaySalesChannelType
+        from sales_channels.integrations.shein.models import SheinSalesChannel
+        from sales_channels.integrations.shein.schema.types.types import SheinSalesChannelType
+
+
+        if isinstance(self, MagentoSalesChannel):
+            graphql_type = MagentoSalesChannelType
+        elif isinstance(self, ShopifySalesChannel):
+            graphql_type = ShopifySalesChannelType
+        elif isinstance(self, WoocommerceSalesChannel):
+            graphql_type = WoocommerceSalesChannelType
+        elif isinstance(self, AmazonSalesChannel):
+            graphql_type = AmazonSalesChannelType
+        elif isinstance(self, SheinSalesChannel):
+            graphql_type = SheinSalesChannelType
+        elif isinstance(self, WebhookIntegration):
+            graphql_type = WebhookIntegrationType
+        elif isinstance(self, EbaySalesChannel):
+            graphql_type = EbaySalesChannelType
+        else:
+            raise NotImplementedError(f"Integration type {self.__class__} not implemented")
+
+        return to_base64(graphql_type, self.pk)
 
 @type(ImportCurrency, filters=ImportCurrencyFilter, order=ImportCurrencyOrder, pagination=True, fields='__all__')
 class ImportCurrencyType(relay.Node, GetQuerysetMultiTenantMixin):
@@ -245,6 +291,97 @@ class RemoteProductPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
 @type(RemoteProperty, filters=RemotePropertyFilter, order=RemotePropertyOrder, pagination=True, fields='__all__')
 class RemotePropertyType(relay.Node, GetQuerysetMultiTenantMixin):
     sales_channel: SalesChannelType
+
+    @field()
+    def remote_name(self, info) -> Optional[str]:
+        from sales_channels.integrations.shein.models.properties import SheinProperty
+        from sales_channels.integrations.ebay.models.properties import EbayProperty
+        from sales_channels.integrations.amazon.models.properties import AmazonProperty
+        from sales_channels.integrations.magento2.models.properties import MagentoProperty
+        from sales_channels.integrations.woocommerce.models import WoocommerceGlobalAttribute
+
+        instance = self.get_real_instance() if hasattr(self, "get_real_instance") else self
+
+        if isinstance(instance, SheinProperty):
+            return instance.name
+        if isinstance(instance, EbayProperty):
+            return instance.localized_name
+        if isinstance(instance, AmazonProperty):
+            return instance.name
+        if isinstance(instance, (MagentoProperty, WoocommerceGlobalAttribute)):
+            local_instance = getattr(instance, "local_instance", None)
+            return local_instance.name if local_instance else "Unknown"
+        return "Unknown"
+
+    @field()
+    def translated_remote_name(self, info) -> Optional[str]:
+        from sales_channels.integrations.shein.models.properties import SheinProperty
+        from sales_channels.integrations.ebay.models.properties import EbayProperty
+        from sales_channels.integrations.amazon.models.properties import AmazonProperty
+        from sales_channels.integrations.magento2.models.properties import MagentoProperty
+        from sales_channels.integrations.woocommerce.models import WoocommerceGlobalAttribute
+
+        instance = self.get_real_instance() if hasattr(self, "get_real_instance") else self
+
+        if isinstance(instance, SheinProperty):
+            return instance.name_en
+        if isinstance(instance, EbayProperty):
+            return instance.translated_name
+        if isinstance(instance, AmazonProperty):
+            return instance.name
+        if isinstance(instance, (MagentoProperty, WoocommerceGlobalAttribute)):
+            local_instance = getattr(instance, "local_instance", None)
+            return local_instance.name if local_instance else "Unknown"
+        return None
+
+    @field()
+    def marketplace(self, info) -> Optional['SalesChannelViewType']:
+        from sales_channels.integrations.ebay.models.properties import EbayProperty
+
+        instance = self.get_real_instance() if hasattr(self, "get_real_instance") else self
+
+        if isinstance(instance, EbayProperty):
+            return instance.marketplace
+        return None
+
+    @field()
+    def allows_unmapped_values(self, info) -> bool:
+        from sales_channels.integrations.shein.models.properties import SheinProperty
+        from sales_channels.integrations.ebay.models.properties import EbayProperty
+        from sales_channels.integrations.amazon.models.properties import AmazonProperty
+        from sales_channels.integrations.magento2.models.properties import MagentoProperty
+        from sales_channels.integrations.woocommerce.models import WoocommerceGlobalAttribute
+
+        instance = self.get_real_instance() if hasattr(self, "get_real_instance") else self
+
+        if isinstance(instance, (SheinProperty, EbayProperty, AmazonProperty)):
+            return instance.allows_unmapped_values
+        if isinstance(instance, (MagentoProperty, WoocommerceGlobalAttribute)):
+            return True
+        return True
+
+    @field()
+    def proxy_id(self, info) -> str:
+        from sales_channels.integrations.shein.models.properties import SheinProperty
+        from sales_channels.integrations.ebay.models.properties import EbayProperty
+        from sales_channels.integrations.amazon.models.properties import AmazonProperty
+        from sales_channels.integrations.magento2.models.properties import MagentoProperty
+        from sales_channels.integrations.woocommerce.models import WoocommerceGlobalAttribute
+        from sales_channels.integrations.shein.schema.types.types import SheinPropertyType
+        from sales_channels.integrations.ebay.schema.types.types import EbayPropertyType
+        from sales_channels.integrations.amazon.schema.types.types import AmazonPropertyType
+
+        instance = self.get_real_instance() if hasattr(self, "get_real_instance") else self
+
+        if isinstance(instance, SheinProperty):
+            return to_base64(SheinPropertyType, self.pk)
+        if isinstance(instance, EbayProperty):
+            return to_base64(EbayPropertyType, self.pk)
+        if isinstance(instance, AmazonProperty):
+            return to_base64(AmazonPropertyType, self.pk)
+        if isinstance(instance, (MagentoProperty, WoocommerceGlobalAttribute)):
+            return to_base64(RemotePropertyType, self.pk)
+        return to_base64(RemotePropertyType, self.pk)
 
 
 @type(RemotePropertySelectValue, filters=RemotePropertySelectValueFilter, order=RemotePropertySelectValueOrder, pagination=True, fields='__all__')

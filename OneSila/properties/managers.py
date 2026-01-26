@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Subquery, OuterRef, Value, CharField, Exists, Min
+from django.db.models import Subquery, OuterRef, Value, CharField, Exists, Min, Count, IntegerField, ExpressionWrapper
 from django.db.models.functions import Coalesce
 from django.utils.text import slugify
 from django.conf import settings
@@ -214,6 +214,45 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
         exists_expr = exists_expr | Exists(usage_multi_qs)
 
         return self.annotate(has_usage=exists_expr)
+
+    def with_usage_count(self, *, multi_tenant_company_id: int):
+        from .models import ProductProperty
+
+        select_usage_qs = ProductProperty._base_manager.filter(
+            multi_tenant_company_id=multi_tenant_company_id,
+            value_select_id=OuterRef("pk"),
+        ).values("value_select_id").annotate(
+            usage_count=Count("id"),
+        ).values("usage_count")[:1]
+
+        m2m_field = ProductProperty._meta.get_field("value_multi_select")
+        through = m2m_field.remote_field.through
+        src_fk_name = m2m_field.m2m_field_name()
+        tgt_fk_name = m2m_field.m2m_reverse_field_name()
+
+        multi_usage_qs = through._base_manager.filter(
+            **{
+                f"{src_fk_name}__multi_tenant_company_id": multi_tenant_company_id,
+                f"{tgt_fk_name}_id": OuterRef("pk"),
+            }
+        ).values(tgt_fk_name).annotate(
+            usage_count=Count("id"),
+        ).values("usage_count")[:1]
+
+        select_count = Coalesce(
+            Subquery(select_usage_qs, output_field=IntegerField()),
+            Value(0),
+            output_field=IntegerField(),
+        )
+        multi_count = Coalesce(
+            Subquery(multi_usage_qs, output_field=IntegerField()),
+            Value(0),
+            output_field=IntegerField(),
+        )
+
+        return self.annotate(
+            usage_count=ExpressionWrapper(select_count + multi_count, output_field=IntegerField()),
+        )
 
     def used_in_products(self, *, multi_tenant_company_id: int, used: bool):
         return (
