@@ -1,5 +1,6 @@
 from products.models import Product
-from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
+from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin, RemoteProductSyncRequestMixin
+from sales_channels.models import SyncRequest
 from core.exceptions import SanityCheckError
 
 import logging
@@ -94,9 +95,10 @@ class ToUpdateCurrenciesMixin:
         return super().run()
 
 
-class RemotePriceUpdateFactory(ToUpdateCurrenciesMixin, ProductAssignmentMixin, RemoteInstanceUpdateFactory):
+class RemotePriceUpdateFactory(RemoteProductSyncRequestMixin, ToUpdateCurrenciesMixin, ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = Product
     local_product_map = 'local_instance'
+    sync_request_type = SyncRequest.TYPE_PRICE
 
     def __init__(self, sales_channel, local_instance, remote_product, api=None, currency=None, skip_checks=False):
         super().__init__(sales_channel, local_instance, api=api, remote_product=remote_product)

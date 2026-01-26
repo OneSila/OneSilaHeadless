@@ -1,14 +1,16 @@
 from products.models import Product
-from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin
+from sales_channels.factories.mixins import RemoteInstanceUpdateFactory, ProductAssignmentMixin, RemoteProductSyncRequestMixin
+from sales_channels.models import SyncRequest
 
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class RemoteProductContentUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
+class RemoteProductContentUpdateFactory(RemoteProductSyncRequestMixin, ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = Product
     local_product_map = 'local_instance'
+    sync_request_type = SyncRequest.TYPE_CONTENT
 
     def __init__(self, sales_channel, local_instance, remote_product, api=None, skip_checks=False, remote_instance=None, language=None):
         super().__init__(sales_channel, local_instance, api=api, remote_product=remote_product)

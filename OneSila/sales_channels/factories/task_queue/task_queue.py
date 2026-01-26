@@ -148,6 +148,11 @@ class AddTaskBase:
 
         sales_channel_view = target.sales_channel_view
         sales_channel_view_id = getattr(sales_channel_view, "id", sales_channel_view)
+        escalation_remote_product = (
+            target.remote_product.remote_parent_product
+            if target.remote_product and target.remote_product.remote_parent_product
+            else target.remote_product
+        )
 
         task_func_path = get_import_path(self.task_func)
         task_kwargs = self.build_task_kwargs(target=target)
@@ -155,6 +160,7 @@ class AddTaskBase:
         sync_request = SyncRequest.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             remote_product=target.remote_product,
+            escalation_remote_product=escalation_remote_product,
             sales_channel=target.sales_channel,
             sales_channel_view_id=sales_channel_view_id,
             sync_type=sync_type,
@@ -267,6 +273,18 @@ class ProductScopedAddTask(ChannelScopedAddTask):
             task_kwargs["remote_product_id"] = target.remote_product.id
         return task_kwargs
 
+    def guard(self, *, target: TaskTarget) -> GuardResult:
+        guard_result = super().guard(target=target)
+        if not guard_result.allowed:
+            return guard_result
+        remote_product = target.remote_product
+        if remote_product is not None and not remote_product.successfully_created:
+            return GuardResult(
+                allowed=False,
+                reason="remote_product_not_successfully_created",
+            )
+        return guard_result
+
     def get_targets(self, *, sales_channel) -> Iterable[TaskTarget]:
         from sales_channels.models import RemoteProduct
 
@@ -292,48 +310,66 @@ class ProductPriceAddTask(ProductScopedAddTask):
     sync_type = "price"
 
     def guard(self, *, target: TaskTarget) -> GuardResult:
+        guard_result = super().guard(target=target)
+        if not guard_result.allowed:
+            return guard_result
         # TODO: add price-specific guards.
-        return GuardResult(allowed=True)
+        return guard_result
 
 
 class ProductContentAddTask(ProductScopedAddTask):
     sync_type = "content"
 
     def guard(self, *, target: TaskTarget) -> GuardResult:
+        guard_result = super().guard(target=target)
+        if not guard_result.allowed:
+            return guard_result
         # TODO: add content-specific guards.
-        return GuardResult(allowed=True)
+        return guard_result
 
 
 class ProductEanCodeAddTask(ProductScopedAddTask):
     sync_type = "product"
 
     def guard(self, *, target: TaskTarget) -> GuardResult:
+        guard_result = super().guard(target=target)
+        if not guard_result.allowed:
+            return guard_result
         # TODO: add EAN-code-specific guards.
-        return GuardResult(allowed=True)
+        return guard_result
 
 
 class ProductImagesAddTask(ProductScopedAddTask):
     sync_type = "images"
 
     def guard(self, *, target: TaskTarget) -> GuardResult:
+        guard_result = super().guard(target=target)
+        if not guard_result.allowed:
+            return guard_result
         # TODO: add image-specific guards.
-        return GuardResult(allowed=True)
+        return guard_result
 
 
 class ProductUpdateAddTask(ProductScopedAddTask):
     sync_type = "product"
 
     def guard(self, *, target: TaskTarget) -> GuardResult:
+        guard_result = super().guard(target=target)
+        if not guard_result.allowed:
+            return guard_result
         # TODO: add product-update guards.
-        return GuardResult(allowed=True)
+        return guard_result
 
 
 class ProductFullSyncAddTask(ProductScopedAddTask):
     sync_type = "product"
 
     def guard(self, *, target: TaskTarget) -> GuardResult:
+        guard_result = super().guard(target=target)
+        if not guard_result.allowed:
+            return guard_result
         # TODO: add full-sync guards.
-        return GuardResult(allowed=True)
+        return guard_result
 
 
 class DeleteScopedAddTask(ChannelScopedAddTask):

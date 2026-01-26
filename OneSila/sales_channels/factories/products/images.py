@@ -1,5 +1,6 @@
 from media.models import MediaProductThrough, Media
-from sales_channels.factories.mixins import RemoteInstanceCreateFactory, ProductAssignmentMixin, RemoteInstanceUpdateFactory, RemoteInstanceDeleteFactory
+from sales_channels.factories.mixins import RemoteInstanceCreateFactory, ProductAssignmentMixin, RemoteInstanceUpdateFactory, RemoteInstanceDeleteFactory, RemoteProductSyncRequestMixin
+from sales_channels.models import SyncRequest
 from integrations.signals import remote_instance_post_create
 
 
@@ -35,9 +36,11 @@ class RemoteImageDeleteFactory(RemoteInstanceDeleteFactory):
                 delete_factory.run()
 
 
-class RemoteMediaProductThroughCreateFactory(ProductAssignmentMixin, RemoteInstanceCreateFactory):
+class RemoteMediaProductThroughCreateFactory(RemoteProductSyncRequestMixin, ProductAssignmentMixin, RemoteInstanceCreateFactory):
     local_model_class = MediaProductThrough
     has_remote_media_instance = False
+    sync_request_type = SyncRequest.TYPE_IMAGES
+    sync_request_task_kwargs_key = "local_instance_id"
 
     def __init__(self, sales_channel, local_instance, remote_product, api=None, skip_checks=False):
         super().__init__(sales_channel, local_instance, api=api)
@@ -165,8 +168,10 @@ class RemoteMediaProductThroughCreateFactory(ProductAssignmentMixin, RemoteInsta
         super().run()
 
 
-class RemoteMediaProductThroughUpdateFactory(ProductAssignmentMixin, RemoteInstanceUpdateFactory):
+class RemoteMediaProductThroughUpdateFactory(RemoteProductSyncRequestMixin, ProductAssignmentMixin, RemoteInstanceUpdateFactory):
     local_model_class = MediaProductThrough
+    sync_request_type = SyncRequest.TYPE_IMAGES
+    sync_request_task_kwargs_key = "local_instance_id"
 
     def __init__(self, sales_channel, local_instance, remote_product, api=None, skip_checks=False, remote_instance=None):
         super().__init__(sales_channel, local_instance, api=api, remote_instance=remote_instance, remote_product=remote_product)
@@ -192,8 +197,10 @@ class RemoteMediaProductThroughUpdateFactory(ProductAssignmentMixin, RemoteInsta
         return True
 
 
-class RemoteMediaProductThroughDeleteFactory(ProductAssignmentMixin, RemoteInstanceDeleteFactory):
+class RemoteMediaProductThroughDeleteFactory(RemoteProductSyncRequestMixin, ProductAssignmentMixin, RemoteInstanceDeleteFactory):
     local_model_class = MediaProductThrough
+    sync_request_type = SyncRequest.TYPE_IMAGES
+    sync_request_task_kwargs_key = "local_instance_id"
 
     def __init__(self, sales_channel, remote_product, local_instance=None, api=None, skip_checks=False, remote_instance=None):
         super().__init__(sales_channel, local_instance, api=api, remote_instance=remote_instance, remote_product=remote_product)

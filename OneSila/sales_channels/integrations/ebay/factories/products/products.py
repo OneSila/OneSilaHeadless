@@ -564,6 +564,7 @@ class EbayProductCreateFactory(EbayProductBaseFactory):
         super().__init__(enable_price_update=enable_price_update, **kwargs)
 
     def run(self) -> Optional[Dict[str, Any]]:
+        run_succeeded = None
         if not self.preflight_check():
             return None
 
@@ -604,13 +605,19 @@ class EbayProductCreateFactory(EbayProductBaseFactory):
             self.update_progress()
             self.final_process()
             self.log_action(self.action_log, result or {}, self.payload, log_identifier)
+            run_succeeded = True
             return result
 
         except Exception as exc:
+            run_succeeded = False
             self.log_error(exc, self.action_log, log_identifier, self.payload, fixing_identifier)
             raise
 
         finally:
+            if run_succeeded is False:
+                self._set_successfully_created(value=False)
+            elif run_succeeded is True:
+                self._set_successfully_created(value=True)
             self.finalize_progress()
 
 
@@ -618,6 +625,7 @@ class EbayProductUpdateFactory(EbayProductBaseFactory):
     """Refresh inventory and offer data for an existing listing."""
 
     def run(self) -> Optional[Dict[str, Any]]:
+        run_succeeded = None
         if not self.preflight_check():
             return None
 
@@ -658,13 +666,19 @@ class EbayProductUpdateFactory(EbayProductBaseFactory):
             self.update_progress()
             self.final_process()
             self.log_action(self.action_log, result or {}, self.payload, log_identifier)
+            run_succeeded = True
             return result
 
         except Exception as exc:
+            run_succeeded = False
             self.log_error(exc, self.action_log, log_identifier, self.payload, fixing_identifier)
             raise
 
         finally:
+            if run_succeeded is False:
+                self._set_successfully_created(value=False)
+            elif run_succeeded is True:
+                self._set_successfully_created(value=True)
             self.finalize_progress()
 
 

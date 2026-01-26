@@ -192,6 +192,12 @@ class IntegrationInstanceOperationMixin:
         """
         pass
 
+    def clean_sync_requests(self, *, success: bool):
+        """
+        Hook for cleaning SyncRequest rows after a remote operation completes.
+        """
+        pass
+
 
 class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
     local_model_class = None  # The Sila Model
@@ -437,6 +443,7 @@ class IntegrationInstanceCreateFactory(IntegrationInstanceOperationMixin):
         finally:
             self.remote_instance.successfully_created = self.successfully_created
             self.remote_instance.save()
+            self.clean_sync_requests(success=self.successfully_created)
 
             logger.debug(f"Finished create process with success status: {self.successfully_created}")
 
@@ -662,6 +669,7 @@ class IntegrationInstanceUpdateFactory(IntegrationInstanceOperationMixin):
         finally:
             logger.debug(f"Finished update process with success status: {self.successfully_updated}")
             self.remote_instance.save()
+            self.clean_sync_requests(success=self.successfully_updated)
 
     def run(self):
 
@@ -776,6 +784,7 @@ class IntegrationInstanceDeleteFactory(IntegrationInstanceOperationMixin):
         """
         log_identifier, _ = self.get_identifiers()
         remote_instance_pre_delete.send(sender=self.remote_instance.__class__, instance=self.remote_instance)
+        success = True
 
         try:
             logger.debug(f"Deleting remote instance with payload: {self.payload}")
@@ -787,10 +796,12 @@ class IntegrationInstanceDeleteFactory(IntegrationInstanceOperationMixin):
             self.log_action(IntegrationLog.ACTION_DELETE, response_data, self.payload, log_identifier)
 
         except Exception as e:
+            success = False
             self.log_error(e, IntegrationLog.ACTION_DELETE, log_identifier, self.payload)
             raise
 
         finally:
+            self.clean_sync_requests(success=success)
             # Send post-delete signal
             remote_instance_post_delete.send(sender=self.remote_instance.__class__, instance=self.remote_instance)
 

@@ -120,7 +120,11 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
         if not self.pk:
             return False
 
-        return self.sync_requests.filter(status=SyncRequest.STATUS_PENDING).exists()
+        pending = SyncRequest.STATUS_PENDING
+        return (
+            self.sync_requests.filter(status=pending).exists()
+            or self.escalation_sync_requests.filter(status=pending).exists()
+        )
 
     def __str__(self):
         local_name = self.local_instance.name if self.local_instance else "N/A"
@@ -233,6 +237,14 @@ class SyncRequest(models.Model):
         related_name="sync_requests",
         help_text="Remote product that needs sync.",
     )
+    escalation_remote_product = models.ForeignKey(
+        "sales_channels.RemoteProduct",
+        on_delete=models.CASCADE,
+        related_name="escalation_sync_requests",
+        null=True,
+        blank=True,
+        help_text="Remote product that should be refreshed to clear this sync request.",
+    )
     sales_channel = models.ForeignKey(
         "sales_channels.SalesChannel",
         on_delete=models.CASCADE,
@@ -307,6 +319,9 @@ class SyncRequest(models.Model):
 
         from integrations.tasks import add_task_to_queue
         from django.db import transaction
+        self.refresh_from_db(fields=["status"])
+        if self.status != self.STATUS_PENDING:
+            return
 
         task_kwargs = self.task_kwargs or {}
         integration_id = self.sales_channel_id
@@ -319,6 +334,7 @@ class SyncRequest(models.Model):
                 task_func_path=task_func_path,
                 task_kwargs=lb_task_kwargs,
                 number_of_remote_requests=number_of_remote_requests,
+                sync_request_id=self.id,
             )
         )
 

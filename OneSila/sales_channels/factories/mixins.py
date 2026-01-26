@@ -127,6 +127,53 @@ class RemotePropertyEnsureMixin:
                 self.remote_select_values.append(remote_select_value.remote_id)
 
 
+class RemoteProductSyncRequestMixin:
+    sync_request_type = None
+    sync_request_include_escalation = False
+    sync_request_include_parent = False
+    sync_request_task_kwargs_key = None
+
+    def clean_sync_requests(self, *, success: bool):
+        from django.db.models import Q
+        from sales_channels.models import SyncRequest
+
+        if self.sync_request_type is None:
+            raise ValueError("sync_request_type must be set on the sync request mixin.")
+
+        remote_product = getattr(self, "remote_product", None)
+        if remote_product is None:
+            return
+
+        status = SyncRequest.STATUS_DONE if success else SyncRequest.STATUS_FAILED
+        targets = [remote_product]
+        if self.sync_request_include_parent:
+            parent = getattr(remote_product, "remote_parent_product", None)
+            if parent:
+                targets.append(parent)
+
+        task_kwargs_key = self.sync_request_task_kwargs_key
+        local_instance_id = getattr(self.local_instance, "id", None)
+        if task_kwargs_key and local_instance_id is None:
+            raise ValueError("sync_request_task_kwargs_key requires a local_instance with an id.")
+
+        query = SyncRequest.objects.filter(
+            Q(status=SyncRequest.STATUS_PENDING, sync_type=self.sync_request_type),
+            Q(remote_product__in=targets),
+        )
+        if self.sync_request_include_escalation:
+            query = query | SyncRequest.objects.filter(
+                Q(status=SyncRequest.STATUS_PENDING, sync_type=self.sync_request_type),
+                Q(escalation_remote_product__in=targets),
+            )
+
+        if task_kwargs_key:
+            query = query.filter(
+                **{f"task_kwargs__{task_kwargs_key}": local_instance_id},
+            )
+
+        query.update(status=status)
+
+
 class PullRemoteInstanceMixin(IntegrationInstanceOperationMixin):
     remote_model_class = None  # The Mirror Model (e.g., RemoteOrder)
     field_mapping = {}  # Mapping of remote fields to local fields
@@ -407,4 +454,3 @@ class LocalCurrencyMappingMixin:
         if currency and not remote_instance_mirror.local_instance:
             remote_instance_mirror.local_instance = currency
             remote_instance_mirror.save(update_fields=['local_instance'])
-

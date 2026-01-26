@@ -62,6 +62,7 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             sales_channel=self.sales_channel,
             sales_channel_view=None,
             sync_type=sync_type,
+            task_func_path=get_import_path(task_func),
         )
 
         self.assertEqual(sync_request.status, SyncRequest.STATUS_PENDING)
@@ -115,6 +116,23 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             task_func=shein__product__update_db_task,
         )
 
+    def test_shein_update_skips_when_not_successfully_created(self):
+        self.remote_product.successfully_created = False
+        self.remote_product.save(update_fields=["successfully_created"])
+
+        update_remote_product.send(
+            sender=self.product.__class__,
+            instance=self.product,
+        )
+
+        self.assertFalse(
+            SyncRequest.objects.filter(
+                remote_product=self.remote_product,
+                sales_channel=self.sales_channel,
+                sync_type=SyncRequest.TYPE_PRODUCT,
+            ).exists()
+        )
+
     def test_shein_product_property_create_creates_sync_request(self):
         property_instance = Property.objects.create(
             type=Property.TYPES.INT,
@@ -126,10 +144,8 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             value_int=5,
             multi_tenant_company=self.multi_tenant_company,
         )
-        create_remote_product_property.send(
-            sender=product_property.__class__,
-            instance=product_property,
-        )
+
+        # no need to send the signal because is automatically sent
 
         self._assert_sync_request(
             sync_type=SyncRequest.TYPE_PROPERTY,
@@ -221,10 +237,7 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             media=image,
             multi_tenant_company=self.multi_tenant_company,
         )
-        create_remote_image_association.send(
-            sender=association.__class__,
-            instance=association,
-        )
+        # no need to send the signal because is automatically sent
 
         self._assert_sync_request(
             sync_type=SyncRequest.TYPE_IMAGES,
@@ -241,11 +254,7 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             media=image,
             multi_tenant_company=self.multi_tenant_company,
         )
-        update_remote_image_association.send(
-            sender=association.__class__,
-            instance=association,
-            extra_payload_key=True,
-        )
+        # no need to send the signal because is automatically sent
 
         self._assert_sync_request(
             sync_type=SyncRequest.TYPE_IMAGES,
@@ -292,6 +301,7 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             remote_product=self.remote_product,
             sales_channel=self.sales_channel,
             sales_channel_view=None,
+            task_func_path=get_import_path(shein__image__delete_db_task),
             sync_type=SyncRequest.TYPE_IMAGES,
         )
         self.assertEqual(sync_request.task_func_path, get_import_path(shein__image__delete_db_task))
@@ -309,6 +319,6 @@ class SheinMarketplaceSyncRequestTests(TestCase):
         )
 
         self._assert_sync_request(
-            sync_type=SyncRequest.TYPE_EAN_CODE,
+            sync_type=SyncRequest.TYPE_PRODUCT,
             task_func=shein__ean_code__update_db_task,
         )

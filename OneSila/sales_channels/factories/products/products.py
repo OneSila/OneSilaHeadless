@@ -4,6 +4,7 @@ from media.models import MediaProductThrough
 from products.models import Product
 from properties.models import ProductProperty
 from django.template import TemplateSyntaxError
+from django.db.models import Q
 from sales_channels.exceptions import (
     SwitchedToSyncException,
     SwitchedToCreateException,
@@ -83,6 +84,24 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.is_switched = is_switched
         self._content_template_media_assignments = None
         self._content_template_cache = {}
+        self.successfully_created = True
+
+    def _set_successfully_created(self, *, value: bool) -> None:
+        remote_instance = getattr(self, "remote_instance", None)
+        if remote_instance is None:
+            return
+        remote_instance.successfully_created = value
+        remote_instance.save(update_fields=["successfully_created"])
+
+        from sales_channels.models import SyncRequest
+
+        status = SyncRequest.STATUS_DONE if value else SyncRequest.STATUS_FAILED
+        SyncRequest.objects.filter(
+            Q(status=SyncRequest.STATUS_PENDING),
+            Q(remote_product=remote_instance)
+            | Q(remote_product__remote_parent_product=remote_instance)
+            | Q(escalation_remote_product=remote_instance),
+        ).update(status=status)
 
     def set_local_assigns(self):
         to_assign = SalesChannelViewAssign.objects.filter(product=self.local_instance, sales_channel=self.sales_channel, remote_product__isnull=True)
@@ -1090,6 +1109,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         raise NotImplementedError("Subclasses must implement update_multi_currency_prices method.")
 
     def run(self):
+        run_succeeded = None
 
         if not self.preflight_check():
             logger.debug(f"Preflight check failed for {self.sales_channel}.")
@@ -1101,6 +1121,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
         self.set_type()
         try:
             self.initialize_remote_product()
+            self.successfully_created = getattr(self.remote_instance, "successfully_created", True)
             self.set_remote_product_for_logging()
             self.check_status()
 
@@ -1148,6 +1169,7 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
 
             self.final_process()
             self.log_action(self.action_log, {}, self.payload, log_identifier)
+            run_succeeded = True
 
         except SkipSyncBecauseOfStatusException as skip:
             logger.debug(skip)
@@ -1169,20 +1191,35 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             if self.is_switched:
                 raise stc
             self.is_switched = True
-            self.run_create_flow()
+            try:
+                self.run_create_flow()
+                run_succeeded = True
+            except Exception:
+                run_succeeded = False
+                raise
 
         except SwitchedToSyncException as sts:
             logger.debug(sts)
             if self.is_switched:
                 raise sts
             self.is_switched = True
-            self.run_sync_flow()
+            try:
+                self.run_sync_flow()
+                run_succeeded = True
+            except Exception:
+                run_succeeded = False
+                raise
 
         except Exception as e:
+            run_succeeded = False
             self.log_error(e, self.action_log, log_identifier, self.payload, fixing_identifier)
             raise
 
         finally:
+            if run_succeeded is False:
+                self._set_successfully_created(value=False)
+            elif run_succeeded is True:
+                self._set_successfully_created(value=True)
             self.finalize_progress()
 
 
@@ -1190,6 +1227,7 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
 
     # this will be the same with the Sync but the run will be slightly changed to perform only the product related changes
     def run(self):
+        run_succeeded = None
         if not self.preflight_check():
             logger.debug(f"Preflight check failed for {self.sales_channel}.")
             return
@@ -1200,6 +1238,7 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
         self.set_type()
         try:
             self.initialize_remote_product()
+            self.successfully_created = getattr(self.remote_instance, "successfully_created", True)
             self.set_remote_product_for_logging()
             self.check_status()
             self.validate()
@@ -1217,6 +1256,7 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
             self.assign_saleschannels()
             self.final_process()
             self.log_action(self.action_log, {}, self.payload, log_identifier)
+            run_succeeded = True
 
         except SkipSyncBecauseOfStatusException as skip:
             logger.debug(skip)
@@ -1237,13 +1277,23 @@ class RemoteProductUpdateFactory(RemoteProductSyncFactory, SyncProgressMixin):
             if self.is_switched:
                 raise stc
             self.is_switched = True
-            self.run_create_flow()
+            try:
+                self.run_create_flow()
+                run_succeeded = True
+            except Exception:
+                run_succeeded = False
+                raise
 
         except Exception as e:
+            run_succeeded = False
             self.log_error(e, self.action_log, log_identifier, self.payload)
             raise
 
         finally:
+            if run_succeeded is False:
+                self._set_successfully_created(value=False)
+            elif run_succeeded is True:
+                self._set_successfully_created(value=True)
             self.finalize_progress()
 
 

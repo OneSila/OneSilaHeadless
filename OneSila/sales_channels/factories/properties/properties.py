@@ -1,5 +1,13 @@
 from properties.models import Property, PropertySelectValue, ProductProperty
-from ..mixins import RemoteInstanceCreateFactory, RemoteInstanceDeleteFactory, RemoteInstanceUpdateFactory, RemotePropertyEnsureMixin, ProductAssignmentMixin
+from sales_channels.models import SyncRequest
+from ..mixins import (
+    RemoteInstanceCreateFactory,
+    RemoteInstanceDeleteFactory,
+    RemoteInstanceUpdateFactory,
+    RemotePropertyEnsureMixin,
+    ProductAssignmentMixin,
+    RemoteProductSyncRequestMixin,
+)
 
 
 class RemotePropertyCreateFactory(RemoteInstanceCreateFactory):
@@ -50,10 +58,17 @@ class RemotePropertySelectValueDeleteFactory(RemoteInstanceDeleteFactory):
     local_model_class = PropertySelectValue
 
 
-class RemoteProductPropertyCreateFactory(ProductAssignmentMixin, RemotePropertyEnsureMixin, RemoteInstanceCreateFactory):
+class RemoteProductPropertyCreateFactory(
+    RemoteProductSyncRequestMixin,
+    ProductAssignmentMixin,
+    RemotePropertyEnsureMixin,
+    RemoteInstanceCreateFactory,
+):
     local_model_class = ProductProperty
     remote_property_factory = None
     remote_property_select_value_factory = None
+    sync_request_type = SyncRequest.TYPE_PROPERTY
+    sync_request_task_kwargs_key = "local_instance_id"
 
     def __init__(self, sales_channel, local_instance, remote_product, api=None, skip_checks=False, get_value_only=False, language=None):
         super().__init__(sales_channel, local_instance, api=api)
@@ -99,10 +114,16 @@ class RemoteProductPropertyCreateFactory(ProductAssignmentMixin, RemotePropertyE
         self.remote_instance_data['remote_property'] = self.remote_property
         return self.remote_instance_data
 
-
-class RemoteProductPropertyUpdateFactory(RemotePropertyEnsureMixin, ProductAssignmentMixin, RemoteInstanceUpdateFactory):
+class RemoteProductPropertyUpdateFactory(
+    RemoteProductSyncRequestMixin,
+    RemotePropertyEnsureMixin,
+    ProductAssignmentMixin,
+    RemoteInstanceUpdateFactory,
+):
     local_model_class = ProductProperty
     create_if_not_exists = True
+    sync_request_type = SyncRequest.TYPE_PROPERTY
+    sync_request_task_kwargs_key = "local_instance_id"
 
     def __init__(self, sales_channel, local_instance, remote_product, api=None, get_value_only=False, remote_instance=None, skip_checks=False, language=None):
         super().__init__(sales_channel, local_instance, api=api, remote_instance=remote_instance, remote_product=remote_product)
@@ -145,9 +166,10 @@ class RemoteProductPropertyUpdateFactory(RemotePropertyEnsureMixin, ProductAssig
     def post_update_process(self):
         self.remote_instance.remote_value = str(self.remote_value)
 
-
-class RemoteProductPropertyDeleteFactory(RemoteInstanceDeleteFactory):
+class RemoteProductPropertyDeleteFactory(RemoteProductSyncRequestMixin, RemoteInstanceDeleteFactory):
     local_model_class = ProductProperty
+    sync_request_type = SyncRequest.TYPE_PROPERTY
+    sync_request_task_kwargs_key = "local_instance_id"
 
     def __init__(self, sales_channel, local_instance, remote_product, api=None, remote_instance=None):
         super().__init__(sales_channel, local_instance, api=api, remote_instance=remote_instance, remote_product=remote_product)
