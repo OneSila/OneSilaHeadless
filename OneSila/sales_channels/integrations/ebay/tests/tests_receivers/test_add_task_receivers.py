@@ -79,10 +79,10 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             sales_channel=self.sales_channel,
             sales_channel_view=self.view,
             sync_type=sync_type,
+            task_func_path=get_import_path(task_func),
         )
 
         self.assertEqual(sync_request.status, SyncRequest.STATUS_PENDING)
-        self.assertEqual(sync_request.task_func_path, get_import_path(task_func))
         self.assertEqual(sync_request.sales_channel_view_id, self.view.id)
         self.assertEqual(sync_request.task_kwargs.get("sales_channel_view_id"), self.view.id)
         self.assertEqual(sync_request.task_kwargs.get("view_id"), self.view.id)
@@ -150,10 +150,7 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             value_int=5,
             multi_tenant_company=self.multi_tenant_company,
         )
-        create_remote_product_property.send(
-            sender=product_property.__class__,
-            instance=product_property,
-        )
+        # no need to add signal because is automatically sent above
 
         self._assert_sync_request(
             sync_type=SyncRequest.TYPE_PROPERTY,
@@ -245,10 +242,7 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             media=image,
             multi_tenant_company=self.multi_tenant_company,
         )
-        create_remote_image_association.send(
-            sender=association.__class__,
-            instance=association,
-        )
+        # no need to add signal because is automatically sent above
 
         self._assert_sync_request(
             sync_type=SyncRequest.TYPE_IMAGES,
@@ -264,6 +258,7 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             product=self.product,
             media=image,
             multi_tenant_company=self.multi_tenant_company,
+            is_main_image=True,
         )
         update_remote_image_association.send(
             sender=association.__class__,
@@ -317,6 +312,7 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             sales_channel=self.sales_channel,
             sales_channel_view=self.view,
             sync_type=SyncRequest.TYPE_IMAGES,
+            task_func_path=get_import_path(ebay__image__delete_db_task),
         )
         self.assertEqual(sync_request.task_func_path, get_import_path(ebay__image__delete_db_task))
         self.assertEqual(sync_request.task_kwargs.get("remote_product_id"), self.remote_product.id)

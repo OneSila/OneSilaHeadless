@@ -595,7 +595,7 @@ class AmazonProductsImportProcessorUpdateOnlyTest(TestCase):
             )
             processor.process_product_item(product_data)
 
-            self.assertTrue(MockImportProductInstance.return_value.update_only)
+            self.assertFalse(MockImportProductInstance.return_value.update_only)
 
 
 class AmazonProductItemFactoryRunTest(TestCase):

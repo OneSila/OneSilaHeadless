@@ -496,6 +496,8 @@ def _get_remote_language_code(view):
 @receiver(post_update, sender='ebay.EbayProperty')
 def sales_channels__ebay_property__translate(sender, instance: EbayProperty, **kwargs):
     signal = kwargs.get('signal')
+    if signal == post_create and instance.translated_name:
+        return
     if signal == post_update and not instance.is_dirty_field('localized_name'):
         return
 
@@ -517,6 +519,9 @@ def sales_channels__ebay_property__translate(sender, instance: EbayProperty, **k
 
 @receiver(post_create, sender='ebay.EbayPropertySelectValue')
 def sales_channels__ebay_property_select_value__translate(sender, instance: EbayPropertySelectValue, **kwargs):
+    if instance.translated_value:
+        return
+
     remote_lang = _get_remote_language_code(instance.marketplace)
     company_lang = instance.sales_channel.multi_tenant_company.language
     remote_name = instance.localized_value or instance.remote_id

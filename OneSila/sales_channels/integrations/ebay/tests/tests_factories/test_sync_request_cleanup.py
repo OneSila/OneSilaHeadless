@@ -29,6 +29,7 @@ from sales_channels.integrations.ebay.models import (
     EbayProperty,
     EbayProductProperty,
     EbayMediaThroughProduct,
+    EbayCurrency,
 )
 from sales_channels.integrations.ebay.tests.tests_factories.mixins import (
     TestCaseEbayMixin,
@@ -54,6 +55,13 @@ class EbaySyncRequestCleanupTests(TestCaseEbayMixin):
             EbayProduct,
             sales_channel=self.sales_channel,
             local_instance=self.product,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.remote_currency = EbayCurrency.objects.create(
+            sales_channel=self.sales_channel,
+            sales_channel_view=self.view,
+            local_instance=self.currency,
+            remote_code=self.currency.iso_code,
             multi_tenant_company=self.multi_tenant_company,
         )
         SalesChannelViewAssign.objects.create(
@@ -144,32 +152,34 @@ class EbaySyncRequestCleanupTests(TestCaseEbayMixin):
             remote_instance=self.remote_product,
             view=self.view,
         )
-        patch_methods = [
-            "set_type",
-            "initialize_remote_product",
-            "check_status",
-            "validate",
-            "sanity_check",
-            "precalculate_progress_step_increment",
-            "set_rule",
-            "build_payload",
-            "customize_payload",
-            "pre_action_process",
-            "update_progress",
-            "perform_remote_action",
-            "set_discount",
-            "post_action_process",
-            "assign_saleschannels",
-            "final_process",
-            "log_action",
-        ]
-        patches = [patch.object(factory, name, return_value=None) for name in patch_methods]
-        for patcher in patches:
-            patcher.start()
-            self.addCleanup(patcher.stop)
-        factory.initialize_remote_product.side_effect = lambda: setattr(factory, "remote_instance", self.remote_product)
-        with patch.object(factory, "preflight_check", return_value=True):
-            factory.run()
+        with patch.object(factory, "_build_listing_policies", return_value=None):
+            patch_methods = [
+                "set_type",
+                "initialize_remote_product",
+                "check_status",
+                "validate",
+                "sanity_check",
+                "precalculate_progress_step_increment",
+                "set_rule",
+                "build_payload",
+                "customize_payload",
+                "pre_action_process",
+                "update_progress",
+                "perform_remote_action",
+                "set_discount",
+                "post_action_process",
+                "assign_saleschannels",
+                "final_process",
+                "log_action",
+            ]
+            patches = [patch.object(factory, name, return_value=None) for name in patch_methods]
+            patches.append(patch.object(factory, "_run_offer_sequence", return_value={}))
+            for patcher in patches:
+                patcher.start()
+                self.addCleanup(patcher.stop)
+            factory.initialize_remote_product.side_effect = lambda: setattr(factory, "remote_instance", self.remote_product)
+            with patch.object(factory, "preflight_check", return_value=True):
+                factory.run()
 
         sync_request.refresh_from_db()
         self.assertEqual(sync_request.status, SyncRequest.STATUS_DONE)
@@ -220,7 +230,6 @@ class EbaySyncRequestCleanupTests(TestCaseEbayMixin):
             remote_product=self.remote_product,
             remote_instance=remote_product_property,
             view=self.view,
-            remote_property=remote_property,
         )
         with patch.object(factory, "delete_remote", return_value=SimpleNamespace()), patch.object(
             factory, "serialize_response", return_value={}

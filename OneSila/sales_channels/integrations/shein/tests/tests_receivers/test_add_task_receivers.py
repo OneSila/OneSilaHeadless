@@ -253,9 +253,13 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             product=self.product,
             media=image,
             multi_tenant_company=self.multi_tenant_company,
+            is_main_image=True
         )
-        # no need to send the signal because is automatically sent
-
+        update_remote_image_association.send(
+            sender=association.__class__,
+            instance=association,
+            extra_payload_key=True,
+        )
         self._assert_sync_request(
             sync_type=SyncRequest.TYPE_IMAGES,
             task_func=shein__image_assoc__update_db_task,

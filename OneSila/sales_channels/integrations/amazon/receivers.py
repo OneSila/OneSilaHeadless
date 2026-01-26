@@ -127,6 +127,9 @@ def sales_channels__amazon_property__unmap_select_values(sender, instance: Amazo
 @receiver(post_create, sender='amazon.AmazonPropertySelectValue')
 def sales_channels__amazon_property_select_value__translate(sender, instance: AmazonPropertySelectValue, **kwargs):
     """Translate remote select value names into the company language."""
+    if instance.translated_remote_name:
+        return
+
     remote_language_obj = instance.marketplace.remote_languages.first()
     remote_lang = remote_language_obj.local_instance if remote_language_obj else None
     company_lang = instance.sales_channel.multi_tenant_company.language

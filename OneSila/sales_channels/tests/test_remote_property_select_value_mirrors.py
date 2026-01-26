@@ -17,9 +17,14 @@ from sales_channels.integrations.shein.models.properties import SheinProperty, S
 from sales_channels.integrations.shein.schema.types.types import SheinPropertySelectValueType
 from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel, WoocommerceGlobalAttribute, WoocommerceGlobalAttributeValue
 from sales_channels.schema.types.types import RemotePropertySelectValueType
+from sales_channels.tests.helpers import DisableMagentoAndWooConnectionsMixin
 
 
-class RemotePropertySelectValueMirrorsQueryTest(TransactionTestCaseMixin, TransactionTestCase):
+class RemotePropertySelectValueMirrorsQueryTest(
+    DisableMagentoAndWooConnectionsMixin,
+    TransactionTestCaseMixin,
+    TransactionTestCase,
+):
     def setUp(self):
         super().setUp()
         self.local_property = baker.make(

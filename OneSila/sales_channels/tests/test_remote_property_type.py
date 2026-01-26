@@ -18,9 +18,14 @@ from sales_channels.integrations.shein.schema.types.types import SheinPropertyTy
 from sales_channels.integrations.woocommerce.models import WoocommerceSalesChannel, WoocommerceGlobalAttribute
 from sales_channels.models.properties import RemoteProperty
 from sales_channels.schema.types.types import RemotePropertyType
+from sales_channels.tests.helpers import DisableMagentoAndWooConnectionsMixin
 
 
-class RemotePropertyTypeResolverTest(TransactionTestCaseMixin, TransactionTestCase):
+class RemotePropertyTypeResolverTest(
+    DisableMagentoAndWooConnectionsMixin,
+    TransactionTestCaseMixin,
+    TransactionTestCase,
+):
     def setUp(self):
         super().setUp()
         self.amazon_channel = baker.make(
@@ -110,92 +115,139 @@ class RemotePropertyTypeResolverTest(TransactionTestCaseMixin, TransactionTestCa
             sales_channel=self.magento_channel,
         )
 
+        query = """
+            query {
+              remoteProperties {
+                edges {
+                  node {
+                    remoteName
+                    translatedRemoteName
+                    marketplace { id }
+                    allowsUnmappedValues
+                    proxyId
+                  }
+                }
+              }
+            }
+        """
+        resp = self.strawberry_test_client(query=query)
+        self.assertTrue(resp.errors is None)
+
+        results = {
+            item["node"]["proxyId"]: item["node"]
+            for item in resp.data["remoteProperties"]["edges"]
+        }
+
         self.assertEqual(
-            RemotePropertyType.remote_name(shein_property, None),
+            results[to_base64(SheinPropertyType, shein_property.pk)]["remoteName"],
             "Shein Name",
         )
         self.assertEqual(
-            RemotePropertyType.translated_remote_name(shein_property, None),
+            results[to_base64(SheinPropertyType, shein_property.pk)]["translatedRemoteName"],
             "Shein EN",
         )
-        self.assertIsNone(RemotePropertyType.marketplace(shein_property, None))
-        self.assertTrue(RemotePropertyType.allows_unmapped_values(shein_property, None))
+        self.assertIsNone(
+            results[to_base64(SheinPropertyType, shein_property.pk)]["marketplace"],
+        )
+        self.assertTrue(
+            results[to_base64(SheinPropertyType, shein_property.pk)]["allowsUnmappedValues"],
+        )
         self.assertEqual(
-            RemotePropertyType.proxy_id(shein_property, None),
+            results[to_base64(SheinPropertyType, shein_property.pk)]["proxyId"],
             to_base64(SheinPropertyType, shein_property.pk),
         )
 
         self.assertEqual(
-            RemotePropertyType.remote_name(ebay_property, None),
+            results[to_base64(EbayPropertyType, ebay_property.pk)]["remoteName"],
             "Ebay Name",
         )
         self.assertEqual(
-            RemotePropertyType.translated_remote_name(ebay_property, None),
+            results[to_base64(EbayPropertyType, ebay_property.pk)]["translatedRemoteName"],
             "Ebay Translated",
         )
         self.assertEqual(
-            RemotePropertyType.marketplace(ebay_property, None),
-            ebay_marketplace,
+            results[to_base64(EbayPropertyType, ebay_property.pk)]["marketplace"]["id"],
+            to_base64("SalesChannelViewType", ebay_marketplace.pk),
         )
-        self.assertFalse(RemotePropertyType.allows_unmapped_values(ebay_property, None))
+        self.assertFalse(
+            results[to_base64(EbayPropertyType, ebay_property.pk)]["allowsUnmappedValues"],
+        )
         self.assertEqual(
-            RemotePropertyType.proxy_id(ebay_property, None),
+            results[to_base64(EbayPropertyType, ebay_property.pk)]["proxyId"],
             to_base64(EbayPropertyType, ebay_property.pk),
         )
 
         self.assertEqual(
-            RemotePropertyType.remote_name(amazon_property, None),
+            results[to_base64(AmazonPropertyType, amazon_property.pk)]["remoteName"],
             "Amazon Name",
         )
         self.assertEqual(
-            RemotePropertyType.translated_remote_name(amazon_property, None),
+            results[to_base64(AmazonPropertyType, amazon_property.pk)]["translatedRemoteName"],
             "Amazon Name",
         )
-        self.assertIsNone(RemotePropertyType.marketplace(amazon_property, None))
-        self.assertTrue(RemotePropertyType.allows_unmapped_values(amazon_property, None))
+        self.assertIsNone(
+            results[to_base64(AmazonPropertyType, amazon_property.pk)]["marketplace"],
+        )
+        self.assertTrue(
+            results[to_base64(AmazonPropertyType, amazon_property.pk)]["allowsUnmappedValues"],
+        )
         self.assertEqual(
-            RemotePropertyType.proxy_id(amazon_property, None),
+            results[to_base64(AmazonPropertyType, amazon_property.pk)]["proxyId"],
             to_base64(AmazonPropertyType, amazon_property.pk),
         )
 
         self.assertEqual(
-            RemotePropertyType.remote_name(magento_property, None),
+            results[to_base64(RemotePropertyType, magento_property.pk)]["remoteName"],
             "Local Name",
         )
         self.assertEqual(
-            RemotePropertyType.translated_remote_name(magento_property, None),
+            results[to_base64(RemotePropertyType, magento_property.pk)]["translatedRemoteName"],
             "Local Name",
         )
-        self.assertIsNone(RemotePropertyType.marketplace(magento_property, None))
-        self.assertTrue(RemotePropertyType.allows_unmapped_values(magento_property, None))
+        self.assertIsNone(
+            results[to_base64(RemotePropertyType, magento_property.pk)]["marketplace"],
+        )
+        self.assertTrue(
+            results[to_base64(RemotePropertyType, magento_property.pk)]["allowsUnmappedValues"],
+        )
         self.assertEqual(
-            RemotePropertyType.proxy_id(magento_property, None),
+            results[to_base64(RemotePropertyType, magento_property.pk)]["proxyId"],
             to_base64(RemotePropertyType, magento_property.pk),
         )
 
         self.assertEqual(
-            RemotePropertyType.remote_name(woo_property, None),
+            results[to_base64(RemotePropertyType, woo_property.pk)]["remoteName"],
             "Local Name",
         )
         self.assertEqual(
-            RemotePropertyType.translated_remote_name(woo_property, None),
+            results[to_base64(RemotePropertyType, woo_property.pk)]["translatedRemoteName"],
             "Local Name",
         )
-        self.assertIsNone(RemotePropertyType.marketplace(woo_property, None))
-        self.assertTrue(RemotePropertyType.allows_unmapped_values(woo_property, None))
+        self.assertIsNone(
+            results[to_base64(RemotePropertyType, woo_property.pk)]["marketplace"],
+        )
+        self.assertTrue(
+            results[to_base64(RemotePropertyType, woo_property.pk)]["allowsUnmappedValues"],
+        )
         self.assertEqual(
-            RemotePropertyType.proxy_id(woo_property, None),
+            results[to_base64(RemotePropertyType, woo_property.pk)]["proxyId"],
             to_base64(RemotePropertyType, woo_property.pk),
         )
 
         self.assertEqual(
-            RemotePropertyType.remote_name(base_property, None),
+            results[to_base64(RemotePropertyType, base_property.pk)]["remoteName"],
             "Unknown",
         )
-        self.assertIsNone(RemotePropertyType.translated_remote_name(base_property, None))
-        self.assertIsNone(RemotePropertyType.marketplace(base_property, None))
-        self.assertTrue(RemotePropertyType.allows_unmapped_values(base_property, None))
+        self.assertIsNone(
+            results[to_base64(RemotePropertyType, base_property.pk)]["translatedRemoteName"],
+        )
+        self.assertIsNone(
+            results[to_base64(RemotePropertyType, base_property.pk)]["marketplace"],
+        )
+        self.assertTrue(
+            results[to_base64(RemotePropertyType, base_property.pk)]["allowsUnmappedValues"],
+        )
         self.assertEqual(
-            RemotePropertyType.proxy_id(base_property, None),
+            results[to_base64(RemotePropertyType, base_property.pk)]["proxyId"],
             to_base64(RemotePropertyType, base_property.pk),
         )
