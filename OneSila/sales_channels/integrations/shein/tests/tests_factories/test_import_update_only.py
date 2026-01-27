@@ -75,7 +75,7 @@ class SheinImportUpdateOnlyTests(TransactionTestCase):
         self.assertTrue(instance.update_only)
 
     @patch("sales_channels.integrations.shein.factories.imports.products.ImportProductInstance")
-    def test_configurable_product_overrides_update_only(self, mock_import_instance, *, _unused=None):
+    def test_shein_configurable_product_overrides_update_only(self, mock_import_instance, *, _unused=None):
         processor = SheinProductsImportProcessor(
             import_process=self.import_process,
             sales_channel=self.sales_channel,
@@ -97,7 +97,7 @@ class SheinImportUpdateOnlyTests(TransactionTestCase):
         mock_import_instance.return_value = instance
 
         processor._process_single_product_entry(
-            spu_payload={},
+            spu_payload={"spuName": "SKU1"},
             skc_payload={},
             sku_payload={},
             rule=None,
