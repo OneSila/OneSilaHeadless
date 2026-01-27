@@ -38,6 +38,7 @@ class AddTaskBase:
     sales_channel_class = None
     sync_type = None
     reason = None
+    product_task_fallback = None
     require_sales_channel_class = False
     require_remote_class = False
     require_view_assign_model = False
@@ -120,6 +121,49 @@ class AddTaskBase:
             **self.extra_task_kwargs,
         }
 
+    def build_product_task_kwargs(self, *, target: TaskTarget) -> dict[str, Any]:
+        task_kwargs = {
+            "sales_channel_id": target.sales_channel.id,
+        }
+        view_id = getattr(target.sales_channel_view, "id", target.sales_channel_view)
+        if view_id:
+            task_kwargs["view_id"] = view_id
+        if target.remote_product:
+            task_kwargs["remote_product_id"] = target.remote_product.id
+            local_instance_id = getattr(target.remote_product, "local_instance_id", None)
+            if local_instance_id:
+                task_kwargs["product_id"] = local_instance_id
+        return task_kwargs
+
+    def _create_sync_request_record(
+        self,
+        *,
+        remote_product,
+        sales_channel,
+        sales_channel_view_id,
+        sync_type,
+        reason,
+        task_func_path,
+        task_kwargs,
+        status,
+        skipped_for=None,
+    ):
+        from sales_channels.models import SyncRequest
+
+        return SyncRequest.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            remote_product=remote_product,
+            sales_channel=sales_channel,
+            sales_channel_view_id=sales_channel_view_id,
+            sync_type=sync_type,
+            reason=reason,
+            task_func_path=task_func_path,
+            task_kwargs=task_kwargs,
+            number_of_remote_requests=self.number_of_remote_requests,
+            status=status,
+            skipped_for=skipped_for,
+        )
+
     def get_integration_id(self, *, target: TaskTarget) -> int:
         return target.sales_channel.id
 
@@ -136,6 +180,185 @@ class AddTaskBase:
             )
         )
 
+    def _get_pending_requests_for_remote(
+        self,
+        *,
+        remote_product,
+        sales_channel,
+        sales_channel_view_id,
+    ):
+        from sales_channels.models import SyncRequest
+
+        return SyncRequest.objects.filter(
+            status=SyncRequest.STATUS_PENDING,
+            sales_channel=sales_channel,
+            sales_channel_view_id=sales_channel_view_id,
+            remote_product=remote_product,
+        )
+
+    def _get_pending_product_request(
+        self,
+        *,
+        remote_product,
+        sales_channel,
+        sales_channel_view_id,
+    ):
+        from sales_channels.models import SyncRequest
+
+        return (
+            self._get_pending_requests_for_remote(
+                remote_product=remote_product,
+                sales_channel=sales_channel,
+                sales_channel_view_id=sales_channel_view_id,
+            )
+            .filter(sync_type=SyncRequest.TYPE_PRODUCT)
+            .first()
+        )
+
+    def _get_remote_product_siblings(self, *, remote_product):
+        from sales_channels.models import RemoteProduct
+
+        parent = getattr(remote_product, "remote_parent_product", None)
+        if not parent:
+            return RemoteProduct.objects.none()
+
+        return RemoteProduct.objects.filter(
+            remote_parent_product=parent,
+            sales_channel=remote_product.sales_channel,
+        )
+
+    def _get_pending_product_requests_for_siblings(
+        self,
+        *,
+        siblings,
+        sales_channel,
+        sales_channel_view_id,
+    ):
+        from sales_channels.models import SyncRequest
+
+        sibling_ids = siblings.values_list("id", flat=True)
+        return SyncRequest.objects.filter(
+            status=SyncRequest.STATUS_PENDING,
+            sales_channel=sales_channel,
+            sales_channel_view_id=sales_channel_view_id,
+            sync_type=SyncRequest.TYPE_PRODUCT,
+            remote_product_id__in=sibling_ids,
+        )
+
+    def _create_product_request(
+        self,
+        *,
+        remote_product,
+        sales_channel,
+        sales_channel_view_id,
+        reason,
+    ):
+        from sales_channels.models import SyncRequest
+
+        if self.product_task_fallback is None:
+            raise AddTaskConfigError("product_task_fallback must be configured to upgrade to product sync.")
+
+        product_target = TaskTarget(
+            sales_channel=sales_channel,
+            remote_product=remote_product,
+            sales_channel_view=sales_channel_view_id,
+        )
+        return self._create_sync_request_record(
+            remote_product=remote_product,
+            sales_channel=sales_channel,
+            sales_channel_view_id=sales_channel_view_id,
+            sync_type=SyncRequest.TYPE_PRODUCT,
+            reason=reason,
+            task_func_path=get_import_path(self.product_task_fallback),
+            task_kwargs=self.build_product_task_kwargs(target=product_target),
+            status=SyncRequest.STATUS_PENDING,
+        )
+
+    def _mark_requests_skipped(self, *, queryset, skipped_for):
+        from sales_channels.models import SyncRequest
+
+        if not queryset.exists():
+            return
+
+        queryset.update(
+            status=SyncRequest.STATUS_SKIPPED,
+            skipped_for=skipped_for,
+        )
+
+    def _create_skipped_request(
+        self,
+        *,
+        remote_product,
+        sales_channel,
+        sales_channel_view_id,
+        sync_type,
+        reason,
+        task_func_path,
+        task_kwargs,
+        skipped_for,
+    ):
+        from sales_channels.models import SyncRequest
+
+        self._create_sync_request_record(
+            remote_product=remote_product,
+            sales_channel=sales_channel,
+            sales_channel_view_id=sales_channel_view_id,
+            sync_type=sync_type,
+            reason=reason,
+            task_func_path=task_func_path,
+            task_kwargs=task_kwargs,
+            status=SyncRequest.STATUS_SKIPPED,
+            skipped_for=skipped_for,
+        )
+
+    def _escalate_product_to_parent_if_needed(
+        self,
+        *,
+        product_request,
+        base_remote_product,
+        sales_channel,
+        sales_channel_view_id,
+        reason,
+    ):
+        from sales_channels.models import SyncRequest
+
+        if not getattr(base_remote_product, "is_variation", False):
+            return product_request
+
+        parent = getattr(base_remote_product, "remote_parent_product", None)
+        if parent is None:
+            return product_request
+
+        siblings = self._get_remote_product_siblings(remote_product=base_remote_product)
+        if not siblings.exclude(id=base_remote_product.id).exists():
+            # Example: variation has no siblings, so no parent escalation is needed.
+            return product_request
+
+        sibling_pending = self._get_pending_product_requests_for_siblings(
+            siblings=siblings,
+            sales_channel=sales_channel,
+            sales_channel_view_id=sales_channel_view_id,
+        )
+
+        # Example: a parent product request already exists, so all sibling product requests
+        # should be skipped to that parent request.
+        parent_request = self._get_pending_product_request(
+            remote_product=parent,
+            sales_channel=sales_channel,
+            sales_channel_view_id=sales_channel_view_id,
+        )
+        if not parent_request:
+            # Example: no parent product request exists, create one and skip sibling product requests to it.
+            parent_request = self._create_product_request(
+                remote_product=parent,
+                sales_channel=sales_channel,
+                sales_channel_view_id=sales_channel_view_id,
+                reason=reason,
+            )
+
+        self._mark_requests_skipped(queryset=sibling_pending, skipped_for=parent_request)
+        return parent_request
+
     def create_sync_request(self, *, target: TaskTarget, guard_result: GuardResult):
         from sales_channels.models import SyncRequest
 
@@ -148,48 +371,97 @@ class AddTaskBase:
 
         sales_channel_view = target.sales_channel_view
         sales_channel_view_id = getattr(sales_channel_view, "id", sales_channel_view)
-        escalation_remote_product = (
-            target.remote_product.remote_parent_product
-            if target.remote_product and target.remote_product.remote_parent_product
-            else target.remote_product
-        )
-
+        base_remote_product = target.remote_product
+        sales_channel = target.sales_channel
+        sync_request_reason = guard_result.reason or self.reason
         task_func_path = get_import_path(self.task_func)
         task_kwargs = self.build_task_kwargs(target=target)
 
-        sync_request = SyncRequest.objects.create(
-            multi_tenant_company=self.multi_tenant_company,
-            remote_product=target.remote_product,
-            escalation_remote_product=escalation_remote_product,
-            sales_channel=target.sales_channel,
+        # Step 1: Same-remote-product dedupe → upgrade to product (no updates, only new rows).
+        # 1. Look at pending sync requests for the same remote_product + view.
+        # 2. If there are any non-product pending:
+        #    - If there is already a pending product request:
+        #      - Create the new request as skipped, pointing skipped_for to the existing product request.
+        #      - Mark the existing non-product pending requests as skipped (also pointing to that product request).
+        #      - Stop (no further escalation needed at this level).
+        #    - If there is no pending product:
+        #      - Create a new product pending request (product fallback task/kwargs).
+        #      - Mark all existing non-product pending as skipped, pointing skipped_for to the new product request.
+        #      - The current incoming request is represented by that product request, but we still
+        #        create the current one as skipped for transparency.
+        # 3. If there are no non-product pending:
+        #    - Create the request as-is (non-product), and proceed to step 2 only if it’s product.
+        pending_same = self._get_pending_requests_for_remote(
+            remote_product=base_remote_product,
+            sales_channel=sales_channel,
             sales_channel_view_id=sales_channel_view_id,
-            sync_type=sync_type,
-            reason=guard_result.reason or self.reason,
-            task_func_path=task_func_path,
-            task_kwargs=task_kwargs,
-            number_of_remote_requests=self.number_of_remote_requests
         )
-        created = True
+        pending_non_product = pending_same.exclude(sync_type=SyncRequest.TYPE_PRODUCT)
+        existing_product = pending_same.filter(sync_type=SyncRequest.TYPE_PRODUCT).first()
 
-        # @TODO: Refactor this!
-        if not created:
-            update_fields = []
-            updated_reason = guard_result.reason or self.reason
-            if updated_reason and sync_request.reason != updated_reason:
-                sync_request.reason = updated_reason
-                update_fields.append("reason")
-            if task_func_path and sync_request.task_func_path != task_func_path:
-                sync_request.task_func_path = task_func_path
-                update_fields.append("task_func_path")
-            if sync_request.task_kwargs != task_kwargs:
-                sync_request.task_kwargs = task_kwargs
-                update_fields.append("task_kwargs")
-            if sync_request.number_of_remote_requests != self.number_of_remote_requests:
-                sync_request.number_of_remote_requests = self.number_of_remote_requests
-                update_fields.append("number_of_remote_requests")
+        product_request = None
 
-            if update_fields:
-                sync_request.save(update_fields=update_fields)
+        if pending_non_product.exists():
+            # Example: existing pending "property"/"content" for this remote product.
+            # Upgrade to a single pending "product" request, and mark the others (including current)
+            # as skipped_for that product request.
+            if not existing_product:
+                existing_product = self._create_product_request(
+                    remote_product=base_remote_product,
+                    sales_channel=sales_channel,
+                    sales_channel_view_id=sales_channel_view_id,
+                    reason=sync_request_reason,
+                )
+            product_request = existing_product
+            self._create_skipped_request(
+                remote_product=base_remote_product,
+                sales_channel=sales_channel,
+                sales_channel_view_id=sales_channel_view_id,
+                sync_type=sync_type,
+                reason=sync_request_reason,
+                task_func_path=task_func_path,
+                task_kwargs=task_kwargs,
+                skipped_for=product_request,
+            )
+            self._mark_requests_skipped(queryset=pending_non_product, skipped_for=product_request)
+        else:
+            if sync_type == SyncRequest.TYPE_PRODUCT:
+                # Example: incoming is already "product" and there are no other non-product pending.
+                # Reuse the existing product request or create a new pending one.
+                if not existing_product:
+                    existing_product = self._create_product_request(
+                        remote_product=base_remote_product,
+                        sales_channel=sales_channel,
+                        sales_channel_view_id=sales_channel_view_id,
+                        reason=sync_request_reason,
+                    )
+                product_request = existing_product
+            else:
+                # Example: incoming is "price" and there are no other pending requests.
+                # Create a pending non-product request and stop (no sibling escalation).
+                self._create_sync_request_record(
+                    remote_product=base_remote_product,
+                    sales_channel=sales_channel,
+                    sales_channel_view_id=sales_channel_view_id,
+                    sync_type=sync_type,
+                    reason=sync_request_reason,
+                    task_func_path=task_func_path,
+                    task_kwargs=task_kwargs,
+                    status=SyncRequest.STATUS_PENDING,
+                )
+                return
+
+        if product_request is None:
+            return
+
+        # Sibling escalation (only for product requests).
+        self._escalate_product_to_parent_if_needed(
+            product_request=product_request,
+            base_remote_product=base_remote_product,
+            sales_channel=sales_channel,
+            sales_channel_view_id=sales_channel_view_id,
+            reason=sync_request_reason,
+        )
 
     def log_guard_blocked(self, *, target: TaskTarget, guard_result: GuardResult):
         logger.debug(
@@ -302,6 +574,13 @@ class ProductPropertyAddTask(ProductScopedAddTask):
     sync_type = "property"
 
     def guard(self, *, target: TaskTarget) -> GuardResult:
+        # Guard intent (property):
+        # - extra check for internal information to skip
+        # - Only meaningful for products where the property is actually used on the channel.
+        # - For marketplaces: must pass integration-specific mapping checks
+        #   (property mapped, used in category, select/multi-select value mapped).
+        # - For variations: if the property change should escalate to parent, do it in create_sync_request.
+        # - Skip when no effective change would happen (e.g., property not relevant to the channel/rule).
         # TODO: add property-specific guards.
         return GuardResult(allowed=True)
 
@@ -313,6 +592,10 @@ class ProductPriceAddTask(ProductScopedAddTask):
         guard_result = super().guard(target=target)
         if not guard_result.allowed:
             return guard_result
+        # Guard intent (price):
+        # - Compute effective channel price (currency, discount, rounding).
+        # - Compare against last known remote price payload/hash; if unchanged, skip.
+        # - For configurable products, pricing changes usually belong to variations only.
         # TODO: add price-specific guards.
         return guard_result
 
@@ -324,6 +607,10 @@ class ProductContentAddTask(ProductScopedAddTask):
         guard_result = super().guard(target=target)
         if not guard_result.allowed:
             return guard_result
+        # Guard intent (content):
+        # - Resolve effective content for the channel view (language + overrides).
+        # - If default content is overridden by channel-specific content, ignore default changes.
+        # - Compare against last known remote content payload/hash; if unchanged, skip.
         # TODO: add content-specific guards.
         return guard_result
 
@@ -335,6 +622,9 @@ class ProductEanCodeAddTask(ProductScopedAddTask):
         guard_result = super().guard(target=target)
         if not guard_result.allowed:
             return guard_result
+        # Guard intent (EAN):
+        # - Only allow when the channel supports EAN updates.
+        # - Skip if the effective value matches the remote value.
         # TODO: add EAN-code-specific guards.
         return guard_result
 
@@ -346,6 +636,10 @@ class ProductImagesAddTask(ProductScopedAddTask):
         guard_result = super().guard(target=target)
         if not guard_result.allowed:
             return guard_result
+        # Guard intent (images):
+        # - Respect channel-specific overrides; default image changes should not affect
+        #   channels with their own image sets.
+        # - Compare effective image set/hash before/after; if unchanged, skip.
         # TODO: add image-specific guards.
         return guard_result
 
@@ -357,6 +651,9 @@ class ProductUpdateAddTask(ProductScopedAddTask):
         guard_result = super().guard(target=target)
         if not guard_result.allowed:
             return guard_result
+        # Guard intent (product update):
+        # - Use for identity/availability changes (active, SKU, identifiers).
+        # - Skip if changes do not impact the channel’s effective payload.
         # TODO: add product-update guards.
         return guard_result
 
@@ -368,6 +665,9 @@ class ProductFullSyncAddTask(ProductScopedAddTask):
         guard_result = super().guard(target=target)
         if not guard_result.allowed:
             return guard_result
+        # Guard intent (full sync):
+        # - Use as fallback when multiple changes require a full resync.
+        # - Skip when remote product is not ready or no effective changes are present.
         # TODO: add full-sync guards.
         return guard_result
 

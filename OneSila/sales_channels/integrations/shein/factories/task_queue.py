@@ -9,6 +9,7 @@ from sales_channels.factories.task_queue import (
     SingleChannelAddTask,
 )
 from sales_channels.integrations.shein.models import SheinSalesChannel
+from sales_channels.integrations.shein.tasks import resync_shein_product_db_task
 
 
 class SheinChannelAddTask(ChannelScopedAddTask):
@@ -21,6 +22,7 @@ class SheinSingleChannelAddTask(SingleChannelAddTask, SheinChannelAddTask):
 
 class SheinNonLiveChannelAddTask(SheinChannelAddTask):
     live = False
+    product_task_fallback = resync_shein_product_db_task
 
 
 class SheinProductContentAddTask(ProductContentAddTask, SheinNonLiveChannelAddTask):

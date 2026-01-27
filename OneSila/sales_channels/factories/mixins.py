@@ -129,7 +129,6 @@ class RemotePropertyEnsureMixin:
 
 class RemoteProductSyncRequestMixin:
     sync_request_type = None
-    sync_request_include_escalation = False
     sync_request_include_parent = False
     sync_request_task_kwargs_key = None
 
@@ -160,12 +159,6 @@ class RemoteProductSyncRequestMixin:
             Q(status=SyncRequest.STATUS_PENDING, sync_type=self.sync_request_type),
             Q(remote_product__in=targets),
         )
-        if self.sync_request_include_escalation:
-            query = query | SyncRequest.objects.filter(
-                Q(status=SyncRequest.STATUS_PENDING, sync_type=self.sync_request_type),
-                Q(escalation_remote_product__in=targets),
-            )
-
         if task_kwargs_key:
             query = query.filter(
                 **{f"task_kwargs__{task_kwargs_key}": local_instance_id},

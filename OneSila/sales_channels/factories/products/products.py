@@ -100,7 +100,6 @@ class RemoteProductSyncFactory(IntegrationInstanceOperationMixin, EanCodeValueMi
             Q(status=SyncRequest.STATUS_PENDING),
             Q(remote_product=remote_instance)
             | Q(remote_product__remote_parent_product=remote_instance)
-            | Q(escalation_remote_product=remote_instance),
         ).update(status=status)
 
     def set_local_assigns(self):

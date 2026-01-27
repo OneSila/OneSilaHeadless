@@ -163,7 +163,7 @@ class SyncRequestAdmin(ModelAdmin):
         "sales_channel_view",
     )
     search_fields = ("task_func_path", "reason")
-    raw_id_fields = ("remote_product",)
+    raw_id_fields = ("remote_product", "skipped_for")
     list_select_related = ("sales_channel", "sales_channel_view")
     readonly_fields = ("enqueue_button",)
     fieldsets = (
@@ -172,6 +172,7 @@ class SyncRequestAdmin(ModelAdmin):
             {
                 "fields": (
                     "remote_product",
+                    "skipped_for",
                     "sales_channel",
                     "sales_channel_view",
                     "sync_type",

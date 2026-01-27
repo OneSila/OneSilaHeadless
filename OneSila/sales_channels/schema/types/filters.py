@@ -114,17 +114,11 @@ class RemoteProductFilter(SearchFilterMixin):
             return queryset, Q()
 
         pending = SyncRequest.STATUS_PENDING
+        pending_filter = Q(sync_requests__status=pending) | Q(sync_requests__skipped_for__status=pending)
         if value:
-            return (
-                queryset.filter(
-                    Q(sync_requests__status=pending) | Q(escalation_sync_requests__status=pending)
-                ).distinct(),
-                Q(),
-            )
+            return queryset.filter(pending_filter).distinct(), Q()
 
-        return queryset.exclude(
-            Q(sync_requests__status=pending) | Q(escalation_sync_requests__status=pending)
-        ).distinct(), Q()
+        return queryset.exclude(pending_filter).distinct(), Q()
 
 
 @filter(RemoteProductContent)
@@ -228,16 +222,14 @@ class SalesChannelViewAssignFilter(SearchFilterMixin):
             return queryset, Q()
 
         pending = SyncRequest.STATUS_PENDING
-        if value:
-            return queryset.filter(
-                Q(remote_product__sync_requests__status=pending)
-                | Q(remote_product__escalation_sync_requests__status=pending)
-            ).distinct(), Q()
-
-        return queryset.exclude(
+        pending_filter = (
             Q(remote_product__sync_requests__status=pending)
-            | Q(remote_product__escalation_sync_requests__status=pending)
-        ).distinct(), Q()
+            | Q(remote_product__sync_requests__skipped_for__status=pending)
+        )
+        if value:
+            return queryset.filter(pending_filter).distinct(), Q()
+
+        return queryset.exclude(pending_filter).distinct(), Q()
 
 
 @filter(SalesChannelContentTemplate)

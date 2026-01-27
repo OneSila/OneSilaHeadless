@@ -10,6 +10,7 @@ from sales_channels.factories.task_queue import (
     ViewScopedAddTask,
 )
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
+from sales_channels.integrations.amazon.tasks import resync_amazon_product_db_task
 from sales_channels.models import SalesChannelViewAssign
 
 
@@ -31,6 +32,7 @@ class AmazonMarketplaceViewAddTask(ViewScopedAddTask, AmazonChannelAddTask):
 
 class AmazonNonLiveMarketplaceViewAddTask(AmazonMarketplaceViewAddTask):
     live = False
+    product_task_fallback = resync_amazon_product_db_task
 
 
 class AmazonSingleViewAddTask(SingleViewAddTask, AmazonChannelAddTask):

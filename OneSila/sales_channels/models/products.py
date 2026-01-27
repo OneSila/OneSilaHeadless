@@ -121,10 +121,9 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
             return False
 
         pending = SyncRequest.STATUS_PENDING
-        return (
-            self.sync_requests.filter(status=pending).exists()
-            or self.escalation_sync_requests.filter(status=pending).exists()
-        )
+        return self.sync_requests.filter(
+            Q(status=pending) | Q(skipped_for__status=pending)
+        ).exists()
 
     def __str__(self):
         local_name = self.local_instance.name if self.local_instance else "N/A"
@@ -210,11 +209,13 @@ class SyncRequest(models.Model):
     STATUS_PENDING = "pending"
     STATUS_DONE = "done"
     STATUS_FAILED = "failed"
+    STATUS_SKIPPED = "skipped"
 
     STATUS_CHOICES = [
         (STATUS_PENDING, _("Pending")),
         (STATUS_DONE, _("Done")),
         (STATUS_FAILED, _("Failed")),
+        (STATUS_SKIPPED, _("Skipped")),
     ]
 
     TYPE_PRODUCT = "product"
@@ -236,14 +237,6 @@ class SyncRequest(models.Model):
         on_delete=models.CASCADE,
         related_name="sync_requests",
         help_text="Remote product that needs sync.",
-    )
-    escalation_remote_product = models.ForeignKey(
-        "sales_channels.RemoteProduct",
-        on_delete=models.CASCADE,
-        related_name="escalation_sync_requests",
-        null=True,
-        blank=True,
-        help_text="Remote product that should be refreshed to clear this sync request.",
     )
     sales_channel = models.ForeignKey(
         "sales_channels.SalesChannel",
@@ -269,6 +262,14 @@ class SyncRequest(models.Model):
         choices=STATUS_CHOICES,
         default=STATUS_PENDING,
         help_text="Current state of the sync request.",
+    )
+    skipped_for = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        related_name="skipped_requests",
+        null=True,
+        blank=True,
+        help_text="Request that superseded this sync request.",
     )
     reason = models.CharField(
         max_length=255,

@@ -10,6 +10,7 @@ from sales_channels.factories.task_queue import (
     ViewScopedAddTask,
 )
 from sales_channels.integrations.ebay.models import EbaySalesChannel
+from sales_channels.integrations.ebay.tasks import resync_ebay_product_db_task
 from sales_channels.models import SalesChannelViewAssign
 
 
@@ -31,6 +32,7 @@ class EbayMarketplaceViewAddTask(ViewScopedAddTask, EbayChannelAddTask):
 
 class EbayNonLiveMarketplaceViewAddTask(EbayMarketplaceViewAddTask):
     live = False
+    product_task_fallback = resync_ebay_product_db_task
 
 
 class EbaySingleViewAddTask(SingleViewAddTask, EbayChannelAddTask):
