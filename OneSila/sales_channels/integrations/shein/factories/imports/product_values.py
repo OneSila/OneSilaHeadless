@@ -147,7 +147,7 @@ class SheinProductImportValueParser:
                 image_type_value = image_type.strip().upper()
                 image_type_override = (
                     Image.COLOR_SHOT
-                    if image_type_value in {"COLOR", "COLOUR"}
+                    if image_type_value in {"COLOR", "COLOUR", "PIECE"}
                     else None
                 )
                 is_main = image_type_value == "MAIN" or not images

@@ -112,7 +112,17 @@ class SheinProductImportTests(TestCase):
         ).first()
         self.assertIsNotNone(parent)
         parent_sku = parent.sku if parent else None
+        self.assertEqual(parent_sku, "a250611520068")
         self.assertNotIn(parent_sku, {"ppp0001", "PPPP0002"})
+
+        remote_parent = SheinProduct.objects.filter(
+            sales_channel=self.sales_channel,
+            local_instance=parent,
+        ).first()
+        self.assertIsNotNone(remote_parent)
+        self.assertEqual(remote_parent.spu_name, "a250611520068")
+        self.assertIsNone(remote_parent.skc_name)
+        self.assertIsNone(remote_parent.sku_code)
 
         variations = Product.objects.filter(
             multi_tenant_company=self.multi_tenant_company,
@@ -139,6 +149,149 @@ class SheinProductImportTests(TestCase):
             ).values_list("remote_sku", flat=True)
         )
         self.assertSetEqual(remote_skus, {"ppp0001", "PPPP0002"})
+
+    def test_configurable_reimport_reuses_parent_and_adds_variation(self) -> None:
+        baker.make(
+            SheinCategory,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="20039882",
+            product_type_remote_id="2147503175",
+            is_leaf=True,
+        )
+        payload = {
+            "spuName": "a250611520068",
+            "categoryId": 20039882,
+            "productTypeId": 2147503175,
+            "skcInfoList": [
+                {
+                    "attributeId": 2147484187,
+                    "attributeValueId": 2147488295,
+                    "skcName": "sa25061152006814133",
+                    "shelfStatusInfoList": [
+                        {
+                            "siteAbbr": "shein-us",
+                            "shelfStatus": 0,
+                        }
+                    ],
+                    "skuInfoList": [
+                        {
+                            "skuCode": "I04hto929j3h",
+                            "supplierSku": "ppp0001",
+                        }
+                    ],
+                },
+                {
+                    "attributeId": 2147484187,
+                    "attributeValueId": 2147488294,
+                    "skcName": "sa25061152006824283",
+                    "shelfStatusInfoList": [
+                        {
+                            "siteAbbr": "shein-us",
+                            "shelfStatus": 0,
+                        }
+                    ],
+                    "skuInfoList": [
+                        {
+                            "skuCode": "I04hto92an8k",
+                            "supplierSku": "PPPP0002",
+                        }
+                    ],
+                },
+            ],
+        }
+        payload_with_extra = {
+            "spuName": "a250611520068",
+            "categoryId": 20039882,
+            "productTypeId": 2147503175,
+            "skcInfoList": [
+                *payload["skcInfoList"],
+                {
+                    "attributeId": 2147484187,
+                    "attributeValueId": 2147488296,
+                    "skcName": "sa25061152006899999",
+                    "shelfStatusInfoList": [
+                        {
+                            "siteAbbr": "shein-us",
+                            "shelfStatus": 0,
+                        }
+                    ],
+                    "skuInfoList": [
+                        {
+                            "skuCode": "I04hto92new1",
+                            "supplierSku": "PPPP0003",
+                        }
+                    ],
+                },
+            ],
+        }
+
+        processor = SheinProductsImportProcessor(
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+        )
+        base_count = Product.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.CONFIGURABLE,
+        ).count()
+
+        processor.process_product_item(product_data=payload)
+
+        parent = Product.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.CONFIGURABLE,
+            sku="a250611520068",
+        ).first()
+        self.assertIsNotNone(parent)
+
+        self.assertEqual(
+            Product.objects.filter(
+                multi_tenant_company=self.multi_tenant_company,
+                type=Product.CONFIGURABLE,
+            ).count(),
+            base_count + 1,
+        )
+        variation_skus = set(
+            ConfigurableVariation.objects.filter(parent=parent).values_list(
+                "variation__sku",
+                flat=True,
+            )
+        )
+        self.assertSetEqual(variation_skus, {"ppp0001", "PPPP0002"})
+
+        processor.process_product_item(product_data=payload)
+
+        self.assertEqual(
+            Product.objects.filter(
+                multi_tenant_company=self.multi_tenant_company,
+                type=Product.CONFIGURABLE,
+            ).count(),
+            base_count + 1,
+        )
+        variation_skus = set(
+            ConfigurableVariation.objects.filter(parent=parent).values_list(
+                "variation__sku",
+                flat=True,
+            )
+        )
+        self.assertSetEqual(variation_skus, {"ppp0001", "PPPP0002"})
+
+        processor.process_product_item(product_data=payload_with_extra)
+
+        self.assertEqual(
+            Product.objects.filter(
+                multi_tenant_company=self.multi_tenant_company,
+                type=Product.CONFIGURABLE,
+            ).count(),
+            base_count + 1,
+        )
+        variation_skus = set(
+            ConfigurableVariation.objects.filter(parent=parent).values_list(
+                "variation__sku",
+                flat=True,
+            )
+        )
+        self.assertSetEqual(variation_skus, {"ppp0001", "PPPP0002", "PPPP0003"})
 
     def test_configurable_import_copies_spu_attributes_to_variations(self) -> None:
         local_property = baker.make(
@@ -367,6 +520,19 @@ class SheinProductImportValueParserTests(TestCase):
         self.assertEqual(len(images), 1)
         self.assertEqual(images[0].get("type"), Image.COLOR_SHOT)
 
+    def test_parse_images_sets_piece_type(self) -> None:
+        parser = SheinProductImportValueParser(sales_channel=self.sales_channel)
+        payload = {
+            "skcImageInfoList": [
+                {"imageUrl": "https://images.test/piece.jpg", "imageType": "PIECE", "imageItemId": 1},
+            ]
+        }
+
+        images, _, _ = parser.parse_images(skc_payload=payload)
+
+        self.assertEqual(len(images), 1)
+        self.assertEqual(images[0].get("type"), Image.COLOR_SHOT)
+
 
 class SheinProductItemFactoryImageTypeTests(CreateImageMixin, TestCase):
     def setUp(self) -> None:
@@ -394,7 +560,7 @@ class SheinProductItemFactoryImageTypeTests(CreateImageMixin, TestCase):
         )
         image_url = "https://images.test/known.png"
 
-        def build_temp_file(*, content: bytes) -> NamedTemporaryFile:
+        def build_temp_file(content: bytes) -> NamedTemporaryFile:
             temp_file = NamedTemporaryFile(delete=True)
             temp_file.write(content)
             temp_file.flush()
@@ -412,6 +578,54 @@ class SheinProductItemFactoryImageTypeTests(CreateImageMixin, TestCase):
                         "shelfStatusInfoList": [{"siteAbbr": "shein-us", "shelfStatus": 1}],
                         "skcImageInfoList": [
                             {"imageUrl": image_url, "imageType": "COLOR", "imageItemId": 1},
+                        ],
+                        "skuInfoList": [{"skuCode": "I01test", "supplierSku": "SKU-TEST-1"}],
+                    }
+                ],
+            }
+        }
+
+        factory = SheinProductItemFactory(
+            product_data=data.get("product", {}),
+            import_process=self.import_process,
+            sales_channel=self.sales_channel,
+            is_last=True,
+        )
+        factory.run()
+
+        image.refresh_from_db()
+        self.assertEqual(image.image_type, Image.COLOR_SHOT)
+
+    @patch("imports_exports.factories.media.ImportImageInstance.download_image_from_url")
+    def test_import_updates_existing_image_to_color_shot_for_piece(self, mock_download) -> None:
+        image_file = self.get_image_file(fname="red.png")
+        image_bytes = image_file.read()
+        image_file.seek(0)
+        image, _ = Image.objects.get_or_create(
+            multi_tenant_company=self.multi_tenant_company,
+            image=image_file,
+            image_type=Image.PACK_SHOT,
+        )
+        image_url = "https://images.test/known.png"
+
+        def build_temp_file(*, content: bytes) -> NamedTemporaryFile:
+            temp_file = NamedTemporaryFile(delete=True)
+            temp_file.write(content)
+            temp_file.flush()
+            temp_file.seek(0)
+            return temp_file
+
+        mock_download.side_effect = functools.partial(build_temp_file, content=image_bytes)
+
+        data = {
+            "product": {
+                "spuName": "spu-test-color",
+                "skcInfoList": [
+                    {
+                        "skcName": "skc-test-color",
+                        "shelfStatusInfoList": [{"siteAbbr": "shein-us", "shelfStatus": 1}],
+                        "skcImageInfoList": [
+                            {"imageUrl": image_url, "imageType": "PIECE", "imageItemId": 1},
                         ],
                         "skuInfoList": [{"skuCode": "I01test", "supplierSku": "SKU-TEST-1"}],
                     }

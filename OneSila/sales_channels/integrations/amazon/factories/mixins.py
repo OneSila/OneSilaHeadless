@@ -539,6 +539,8 @@ class GetAmazonAPIMixin:
                 raise AmazonResponseException(_extract_api_error_message(exc=exc)) from exc
             raise
 
+        logger.info("create_product response:\n%s", pprint.pformat(response))
+
         if getattr(self, "remote_product", None):
             self.remote_product.last_sync_at = timezone.now()
             self.remote_product.save(update_fields=["last_sync_at"])
@@ -554,8 +556,6 @@ class GetAmazonAPIMixin:
             submission_id=submission_id,
             processing_status=processing_status,
         )
-
-        logger.info("create_product response:\n%s", pprint.pformat(response))
 
         return response
 
@@ -698,6 +698,8 @@ class GetAmazonAPIMixin:
                 raise AmazonResponseException(_extract_api_error_message(exc=exc)) from exc
             raise
 
+        logger.info("update_product response:\n%s", pprint.pformat(response))
+
         if getattr(self, "remote_product", None):
             self.remote_product.last_sync_at = timezone.now()
             self.remote_product.save(update_fields=["last_sync_at"])
@@ -712,8 +714,6 @@ class GetAmazonAPIMixin:
             submission_id=submission_id,
             processing_status=processing_status,
         )
-
-        logger.info("update_product response:\n%s", pprint.pformat(response))
 
         return response
 

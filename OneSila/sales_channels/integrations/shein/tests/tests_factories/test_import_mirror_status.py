@@ -61,9 +61,9 @@ class SheinImportMirrorStatusTests(TestCase):
         mirror = _MirrorHarness(import_process=None, sales_channel=self.sales_channel)
         mirror.update_remote_product(
             import_instance=import_instance,
-            spu_payload={"spu_name": "SPU-1"},
-            skc_payload=None,
-            sku_payload=None,
+            spu_name="SPU-1",
+            skc_name=None,
+            sku_code=None,
             is_variation=False,
         )
 

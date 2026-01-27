@@ -151,7 +151,7 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
             if isinstance(node, dict):
                 cleaned = {k: _clean(v) for k, v in node.items()}
                 cleaned = {k: v for k, v in cleaned.items() if v not in (None, "", [], {})}
-                if "unit" in cleaned and "value" not in cleaned:
+                if "unit" in cleaned and not any("value" in k for k in cleaned.keys()):
                     cleaned.pop("unit")
                 if not cleaned:
                     return None
