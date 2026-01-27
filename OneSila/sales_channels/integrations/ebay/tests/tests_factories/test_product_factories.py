@@ -923,6 +923,13 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
             localized_value="M",
         )
 
+        category = self.ensure_ebay_leaf_category(
+            remote_id=str(self.category_id),
+            view=self.view,
+        )
+        category.configurator_properties = ["Size"]
+        category.save(update_fields=["configurator_properties"])
+
         ProductProperty.objects.update_or_create(
             product=self.children[0],
             property=size_property,
