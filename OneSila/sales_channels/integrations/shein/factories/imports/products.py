@@ -12,6 +12,7 @@ from core.mixins import TemporaryDisableInspectorSignalsMixin
 from imports_exports.factories.imports import AsyncProductImportMixin
 from imports_exports.factories.products import ImportProductInstance
 from imports_exports.helpers import increment_processed_records
+from products.product_types import CONFIGURABLE
 from sales_channels.factories.imports import SalesChannelImportMixin
 from sales_channels.integrations.amazon.helpers import serialize_listing_item
 from sales_channels.integrations.shein.factories.imports.product_parsers import (
@@ -330,6 +331,12 @@ class SheinProductsImportProcessor(
             instance=product_instance,
             update_current_rule=False,
         )
+
+        if structured.get("type") == CONFIGURABLE:
+            instance.update_only = False
+        else:
+            instance.update_only = self.import_process.update_only
+
         mirror_defaults = {
             "is_variation": is_variation,
             "spu_name": spu_name,
