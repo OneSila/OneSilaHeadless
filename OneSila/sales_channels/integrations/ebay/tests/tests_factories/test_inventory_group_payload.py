@@ -76,6 +76,32 @@ class EbayInventoryGroupPayloadTest(EbayProductPushFactoryTestBase):
             return_value=values,
         )
 
+    def test_collect_variation_dimensions_filters_to_category_configurator_properties(self):
+        category = self.ensure_ebay_leaf_category(remote_id=self.category_id, view=self.view)
+        category.configurator_properties = ["Size"]
+        category.save(update_fields=["configurator_properties"])
+
+        api = MagicMock()
+        factory = EbayMediaProductThroughCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.media_through,
+            remote_product=self.remote_product,
+            view=self.view,
+            get_value_only=False,
+        )
+        factory.api = api
+
+        with patch(
+            "sales_channels.integrations.ebay.factories.products.mixins.EbayInventoryItemPayloadMixin._collect_variation_aspect_values",
+            return_value={
+                "Size": {"S/M", "M/L"},
+                "Style": {"Classic", "Modern"},
+            },
+        ):
+            dimensions = factory._collect_variation_dimensions(product=self.product)
+
+        self.assertEqual(dimensions, [("Size", "M/L"), ("Size", "S/M")])
+
     @patch(
         "sales_channels.integrations.ebay.factories.products.mixins.EbayInventoryItemPayloadMixin._collect_image_urls",
         return_value=["https://cdn.example.com/img.jpg"],

@@ -28,7 +28,7 @@ from sales_channels.content_templates import (
     render_sales_channel_content_template,
 )
 
-from sales_channels.integrations.ebay.models import EbayProductCategory
+from sales_channels.integrations.ebay.models import EbayCategory, EbayProductCategory
 from sales_channels.integrations.ebay.models.products import (
     EbayMediaThroughProduct,
     EbayProductOffer,
@@ -391,6 +391,29 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             "specifications": specs,
         }
 
+    def _get_category_configurator_property_names(self, *, product) -> set[str] | None:
+        if getattr(self, "_category_configurator_properties_loaded", False):
+            return getattr(self, "_category_configurator_properties_cache", None)
+
+        category_id = self._get_category_id()
+        view = getattr(self, "view", None)
+        tree_id = getattr(view, "default_category_tree_id", None)
+
+        allowed_names: set[str] | None = None
+        if category_id:
+            queryset = EbayCategory.objects.filter(remote_id=str(category_id).strip())
+            if tree_id:
+                queryset = queryset.filter(marketplace_default_tree_id=str(tree_id))
+
+            category = queryset.only("configurator_properties").first()
+            if category is not None and isinstance(category.configurator_properties, list):
+                normalized = {str(name).strip() for name in category.configurator_properties if str(name).strip()}
+                allowed_names = normalized
+
+        self._category_configurator_properties_loaded = True
+        self._category_configurator_properties_cache = allowed_names
+        return allowed_names
+
     def _collect_variation_aspect_values(
         self,
         *,
@@ -467,6 +490,17 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             product=product,
             child_products=child_products,
         )
+
+        if not collected_values:
+            return []
+
+        allowed_aspects = self._get_category_configurator_property_names(product=product)
+        if allowed_aspects is not None:
+            collected_values = {
+                aspect_name: values
+                for aspect_name, values in collected_values.items()
+                if aspect_name in allowed_aspects
+            }
 
         if not collected_values:
             return []
