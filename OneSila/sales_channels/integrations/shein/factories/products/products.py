@@ -489,6 +489,7 @@ class SheinProductBaseFactory(
         *,
         variations: list,
         property_ids: set[int],
+        relevant_only: bool = False,
     ) -> dict[int, dict[int, ProductProperty]]:
         if not variations or not property_ids:
             return {}
@@ -501,6 +502,8 @@ class SheinProductBaseFactory(
         )
         mapped: dict[int, dict[int, ProductProperty]] = {}
         for product_property in props:
+            if relevant_only and not self._resolve_type_item_for_property(product_property=product_property):
+                continue
             mapped.setdefault(product_property.product_id, {})[product_property.property_id] = product_property
         return mapped
 
@@ -1139,6 +1142,7 @@ class SheinProductBaseFactory(
         variation_properties = self._prefetch_variation_properties(
             variations=variations,
             property_ids=property_ids,
+            relevant_only=True,
         )
 
         sorted_items = sorted(configurator_items, key=lambda item: getattr(item, "sort_order", 0))
@@ -1342,6 +1346,7 @@ class SheinProductBaseFactory(
         variation_properties = self._prefetch_variation_properties(
             variations=variations,
             property_ids=property_ids,
+            relevant_only=True,
         )
         varying_map = self._collect_configurator_values(
             variation_properties=variation_properties,
