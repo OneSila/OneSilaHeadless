@@ -413,6 +413,11 @@ class SheinProductTypeItem(RemoteObjectMixin, models.Model):
         blank=True,
         help_text="Scenario tags (important/compliance/etc.) associated with the attribute.",
     )
+    approved_value_ids = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Allowed attribute_value_id list scoped to this product type.",
+    )
     raw_data = models.JSONField(
         default=dict,
         blank=True,
@@ -432,6 +437,7 @@ class SheinProductTypeItem(RemoteObjectMixin, models.Model):
 
     def __str__(self) -> str:
         return f"{self.product_type} :: {self.property}"
+
 
 
 class SheinProductProperty(RemoteProductProperty):

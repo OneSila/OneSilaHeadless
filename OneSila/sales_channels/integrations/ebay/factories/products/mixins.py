@@ -495,7 +495,7 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             return []
 
         allowed_aspects = self._get_category_configurator_property_names(product=product)
-        if allowed_aspects is not None:
+        if allowed_aspects:
             collected_values = {
                 aspect_name: values
                 for aspect_name, values in collected_values.items()

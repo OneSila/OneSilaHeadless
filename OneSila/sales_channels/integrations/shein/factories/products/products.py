@@ -583,6 +583,36 @@ class SheinProductBaseFactory(
             except (TypeError, ValueError):
                 continue
 
+            approved_value_ids = {str(value) for value in (type_item.approved_value_ids or []) if value not in (None, "")}
+            attribute_value_id = payload.get("attribute_value_id")
+            if approved_value_ids and attribute_value_id not in (None, "", []):
+                if isinstance(attribute_value_id, (list, tuple, set)):
+                    invalid_values = [
+                        str(value)
+                        for value in attribute_value_id
+                        if str(value) not in approved_value_ids
+                    ]
+                    if invalid_values:
+                        details = describe_local_instance(local_instance=product_property)
+                        raise PreFlightCheckError(
+                            "Shein value(s) {} for {} are not approved for category {} (allowed: {}).".format(
+                                ", ".join(invalid_values),
+                                details,
+                                type_item.product_type.category_id,
+                                ", ".join(sorted(approved_value_ids)),
+                            )
+                        )
+                elif str(attribute_value_id) not in approved_value_ids:
+                    details = describe_local_instance(local_instance=product_property)
+                    raise PreFlightCheckError(
+                        "Shein value {} for {} is not approved for category {} (allowed: {}).".format(
+                            attribute_value_id,
+                            details,
+                            type_item.product_type.category_id,
+                            ", ".join(sorted(approved_value_ids)),
+                        )
+                    )
+
             attribute_type = payload.get("attribute_type")
             payload.pop("attribute_type", None)
 
@@ -1751,6 +1781,7 @@ class SheinProductBaseFactory(
 class SheinProductUpdateFactory(SheinProductBaseFactory, RemoteProductUpdateFactory):
     """Resync an existing Shein product."""
 
+    fixing_identifier_class = SheinProductBaseFactory
     action_log = RemoteLog.ACTION_UPDATE
     edit_permission_path = "/open-api/goods/product/check-edit-permission"
 
@@ -1905,6 +1936,7 @@ class SheinProductUpdateFactory(SheinProductBaseFactory, RemoteProductUpdateFact
 class SheinProductCreateFactory(SheinProductBaseFactory, RemoteProductCreateFactory):
     """Create a Shein product or fall back to sync."""
 
+    fixing_identifier_class = SheinProductBaseFactory
     action_log = RemoteLog.ACTION_CREATE
     sync_product_factory = SheinProductUpdateFactory
 
