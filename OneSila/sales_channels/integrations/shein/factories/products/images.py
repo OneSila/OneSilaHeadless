@@ -40,13 +40,26 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
         self.value: Optional[Dict[str, Any]] = None
         self._transformed_cache: dict[str, str] = {}
         self.product_instance = product_instance
+        remote_product = kwargs.get("remote_product")
+        if remote_product is not None:
+            self._remote_instance_additional_filters = {"remote_product": remote_product}
         super().__init__(*args, **kwargs)
+        if remote_product is not None:
+            if not hasattr(self, "_remote_instance_additional_filters"):
+                self._remote_instance_additional_filters = {}
+            self._remote_instance_additional_filters.setdefault("remote_product", remote_product)
 
     def run(self):  # type: ignore[override]
         if self.get_value_only:
             self.value = self._build_value()
             return self.value
         return super().run()
+
+    def get_remote_instance(self):
+        if self.get_value_only:
+            self.remote_instance = None
+            return
+        return super().get_remote_instance()
 
     # ------------------------------------------------------------------
     # Helpers

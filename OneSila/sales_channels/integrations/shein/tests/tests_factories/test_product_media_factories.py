@@ -10,8 +10,7 @@ from sales_channels.integrations.shein.factories.products import (
     SheinMediaProductThroughUpdateFactory,
     SheinMediaProductThroughDeleteFactory,
 )
-from sales_channels.integrations.shein.models import SheinSalesChannel
-from sales_channels.models.products import RemoteImageProductAssociation, RemoteProduct
+from sales_channels.integrations.shein.models import SheinImageProductAssociation, SheinProduct, SheinSalesChannel
 
 # @TODO: Come to fix this later
 # class SheinMediaProductThroughFactoryTest(TestCase):
@@ -141,3 +140,100 @@ from sales_channels.models.products import RemoteImageProductAssociation, Remote
 #         factory.run()
 #
 #         self.assertIn("image_info", factory.value)
+
+
+class SheinMediaProductThroughUpdateFactoryValueOnlyTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.has_errors_patcher = patch(
+            "integrations.models.IntegrationObjectMixin.has_errors",
+            new_callable=PropertyMock,
+            return_value=False,
+        )
+        self.has_errors_patcher.start()
+        self.addCleanup(self.has_errors_patcher.stop)
+
+        self.sales_channel = SheinSalesChannel.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            hostname="shein.test",
+            remote_id="SC-1",
+        )
+        self.product = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.SIMPLE,
+        )
+        self.remote_product = SheinProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_sku="SKU-1",
+        )
+
+    def test_get_value_only_skips_remote_instance_lookup(self):
+        SheinImageProductAssociation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=None,
+            remote_product=self.remote_product,
+        )
+        SheinImageProductAssociation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=None,
+            remote_product=self.remote_product,
+        )
+
+        try:
+            SheinMediaProductThroughUpdateFactory(
+                sales_channel=self.sales_channel,
+                local_instance=None,
+                remote_product=self.remote_product,
+                get_value_only=True,
+                skip_checks=True,
+                product_instance=self.product,
+            )
+        except SheinImageProductAssociation.MultipleObjectsReturned as exc:
+            self.fail(f"get_value_only should skip remote instance lookup: {exc}")
+
+    def test_remote_instance_lookup_filters_by_remote_product(self):
+        media = baker.make(
+            Media,
+            type=Media.IMAGE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        through = MediaProductThrough.objects.create(
+            product=self.product,
+            media=media,
+            sort_order=0,
+            is_main_image=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        sibling_remote_product = SheinProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_sku="SKU-2",
+            remote_parent_product=self.remote_product,
+        )
+        target_assoc = SheinImageProductAssociation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=through,
+            remote_product=self.remote_product,
+        )
+        SheinImageProductAssociation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=through,
+            remote_product=sibling_remote_product,
+        )
+
+        factory = SheinMediaProductThroughUpdateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=through,
+            remote_product=self.remote_product,
+            skip_checks=True,
+        )
+
+        self.assertEqual(factory.remote_instance, target_assoc)
