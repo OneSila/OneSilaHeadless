@@ -43,6 +43,7 @@ from sales_channels.integrations.shein.models import (
     SheinInternalPropertyOption,
     SheinSalesChannelView,
 )
+from sales_channels.integrations.shein.helpers.local_instances import describe_local_instance
 
 logger = logging.getLogger(__name__)
 
@@ -1000,7 +1001,10 @@ class SheinProductBaseFactory(
     def _build_sale_attribute_payload(self, *, product_property: ProductProperty) -> dict[str, Any]:
         type_item = self._resolve_type_item_for_property(product_property=product_property)
         if not type_item:
-            raise PreFlightCheckError("Shein product type item mapping is missing for a configurator property.")
+            details = describe_local_instance(local_instance=product_property)
+            raise PreFlightCheckError(
+                f"Shein product type item mapping is missing for a configurator property{details}."
+            )
 
         factory = SheinProductPropertyUpdateFactory(
             sales_channel=self.sales_channel,
@@ -1012,12 +1016,18 @@ class SheinProductBaseFactory(
         )
         remote_value = factory.get_remote_value()
         if not remote_value:
-            raise PreFlightCheckError("Unable to render Shein sale attribute payload for a configurator property.")
+            details = describe_local_instance(local_instance=product_property)
+            raise PreFlightCheckError(
+                f"Unable to render Shein sale attribute payload for a configurator property{details}."
+            )
 
         try:
             raw_payload = json.loads(remote_value)
         except (TypeError, ValueError):
-            raise PreFlightCheckError("Invalid Shein sale attribute payload for configurator property.")
+            details = describe_local_instance(local_instance=product_property)
+            raise PreFlightCheckError(
+                f"Invalid Shein sale attribute payload for configurator property{details}."
+            )
         return self._clean_sale_attribute_payload(payload=raw_payload)
 
     def _find_sample_property_for_id(
