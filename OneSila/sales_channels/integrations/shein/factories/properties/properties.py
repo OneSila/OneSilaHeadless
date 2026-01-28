@@ -4,7 +4,7 @@ import json
 from datetime import date, datetime
 from typing import Any, Iterable, Optional, Sequence
 
-from properties.models import ProductProperty, Property
+from properties.models import ProductProperty, Property, PropertySelectValue
 from sales_channels.exceptions import PreFlightCheckError, RemotePropertyValueNotMapped
 from sales_channels.factories.properties.properties import (
     RemoteProductPropertyCreateFactory,
@@ -26,19 +26,58 @@ def _describe_local_instance(*, local_instance: Any) -> str:
     if local_instance is None:
         return ""
 
-    class_name = local_instance.__class__.__name__
-    pk = getattr(local_instance, "pk", None) or getattr(local_instance, "id", None)
-    identifier = f"{class_name}#{pk}" if pk is not None else class_name
+    if isinstance(local_instance, Property):
+        name = getattr(local_instance, "name", None)
+        internal_name = getattr(local_instance, "internal_name", None)
+        prop_type = getattr(local_instance, "type", None)
+        parts = [part for part in (name, internal_name, prop_type) if part]
+        if parts:
+            return f" (Property: {' | '.join(parts)})"
+        return " (Property)"
 
-    product = getattr(local_instance, "product", None)
-    sku = getattr(product, "sku", None) if product is not None else None
-    sku_label = f" product={sku}" if sku else ""
+    if isinstance(local_instance, PropertySelectValue):
+        prop = getattr(local_instance, "property", None)
+        prop_name = getattr(prop, "name", None) if prop is not None else None
+        value = None
+        try:
+            value = local_instance.value
+        except Exception:  # pragma: no cover - defensive fallback
+            value = None
+        parts = [part for part in (prop_name, value) if part not in (None, "")]
+        if parts:
+            return f" (Property value: {' | '.join(str(part) for part in parts)})"
+        return " (Property value)"
 
-    prop = getattr(local_instance, "property", None)
-    prop_name = getattr(prop, "name", None) if prop is not None else None
-    prop_label = f" property={prop_name}" if prop_name else ""
+    if isinstance(local_instance, ProductProperty):
+        product = getattr(local_instance, "product", None)
+        sku = getattr(product, "sku", None) if product is not None else None
+        product_name = getattr(product, "name", None) if product is not None else None
+        prop = getattr(local_instance, "property", None)
+        prop_name = getattr(prop, "name", None) if prop is not None else None
+        prop_type = getattr(prop, "type", None) if prop is not None else None
+        value = None
+        if prop_type == Property.TYPES.SELECT:
+            selected = getattr(local_instance, "value_select", None)
+            if selected is not None:
+                try:
+                    value = selected.value
+                except Exception:  # pragma: no cover - defensive fallback
+                    value = None
+        elif prop_type == Property.TYPES.MULTISELECT:
+            selected = getattr(local_instance, "value_multi_select", None)
+            if selected is not None:
+                try:
+                    value = [item.value for item in selected.all()]
+                except Exception:  # pragma: no cover - defensive fallback
+                    value = None
+        if value is None:
+            value = local_instance.get_serialised_value()
+        parts = [part for part in (sku, product_name, prop_name, value) if part not in (None, "", [], {})]
+        if parts:
+            return f" (Product property: {' | '.join(str(part) for part in parts)})"
+        return " (Product property)"
 
-    return f" (local_instance={identifier}{sku_label}{prop_label})"
+    return ""
 
 
 class SheinRemotePropertyEnsureFactory:

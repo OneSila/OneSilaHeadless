@@ -374,7 +374,7 @@ class SheinSalesChannelMutation:
         triggered = False
         for assign in qs.iterator():
 
-            channel = assign.sales_channel
+            channel = assign.sales_channel.get_real_instance()
             if not isinstance(channel, SheinSalesChannel):
                 continue
 
