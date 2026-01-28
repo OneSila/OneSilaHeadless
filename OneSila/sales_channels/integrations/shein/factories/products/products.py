@@ -1085,38 +1085,30 @@ class SheinProductBaseFactory(
 
         items = sorted(configurator_items, key=lambda item: getattr(item, "sort_order", 0))
 
-        def is_varying(item: ProductPropertiesRuleItem) -> bool:
-            return len(varying_map.get(item.property_id, set())) > 1
+        def is_varying(item: ProductPropertiesRuleItem, vary_by=1) -> bool:
+            return len(varying_map.get(item.property_id, set())) > vary_by
 
-        primary = next(
-            (
-                item
-                for item in items
-                if self._is_main_sales_attribute(
-                    property_id=item.property_id,
-                    variation_properties=variation_properties,
-                )
-                and is_varying(item)
-            ),
-            None,
-        )
-        if primary is None:
-            primary = next((item for item in items if is_varying(item)), None)
-        if primary is None:
-            primary = next(
-                (
-                    item
-                    for item in items
-                    if self._is_main_sales_attribute(
-                        property_id=item.property_id,
-                        variation_properties=variation_properties,
-                    )
-                ),
-                None,
+        # Primary must be a "main" sales attribute that has at least one value present.
+        # If any "main" attribute has multiple values across variations, pick that one as primary.
+        # If no main attribute varies, pick the first main attribute that has at least one value.
+        primary_candidates = [
+            item
+            for item in items
+            if self._is_main_sales_attribute(
+                property_id=item.property_id,
+                variation_properties=variation_properties,
             )
+            and is_varying(item, vary_by=0)
+        ]
+        if not primary_candidates:
+            raise PreFlightCheckError(
+                "Shein requires at least one main sales attribute with values."
+            )
+        primary = next((item for item in primary_candidates if is_varying(item)), None)
         if primary is None:
-            primary = items[0]
+            primary = primary_candidates[0]
 
+        # SKU-level attributes are the remaining varying attributes, excluding the primary.
         sku_level_items = [
             item for item in items if item.property_id != primary.property_id and is_varying(item)
         ]
@@ -1361,16 +1353,6 @@ class SheinProductBaseFactory(
         if primary_item is None:
             self.skc_list = []
             return
-        varying_ids = [
-            pid
-            for pid, values in varying_map.items()
-            if len(values) > 1 and pid != primary_item.property_id
-        ]
-        if len(varying_ids) > 3:
-            raise SheinConfiguratorAttributesLimitError(
-                "Shein supports at most three sales attributes in total (one SKC-level, up to two SKU-level)."
-            )
-
         grouped: dict[str, dict[str, Any]] = {}
         for variation in variations:
             primary_prop = variation_properties.get(variation.id, {}).get(primary_item.property_id)
