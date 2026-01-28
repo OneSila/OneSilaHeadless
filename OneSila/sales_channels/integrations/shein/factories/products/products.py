@@ -64,6 +64,17 @@ class SheinProductBaseFactory(
     supplier_barcode_type = "EAN"
     _EAN_DIGITS_RE = re.compile(r"\D+")
 
+    def process_content_translation(
+        self,
+        *,
+        short_description,
+        description,
+        url_key,
+        remote_language,
+    ) -> None:
+        # Shein payloads are handled via _build_translations; no per-translation persistence needed.
+        return
+
     def __init__(
         self,
         *,
