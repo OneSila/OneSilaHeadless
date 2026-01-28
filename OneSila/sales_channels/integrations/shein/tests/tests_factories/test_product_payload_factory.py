@@ -34,6 +34,7 @@ from sales_channels.integrations.shein.models import (
 )
 from sales_channels.integrations.shein.models.sales_channels import SheinRemoteCurrency
 from sales_channels.integrations.shein.exceptions import SheinConfiguratorAttributesLimitError
+from sales_channels.exceptions import PreFlightCheckError
 from sales_channels.models import SalesChannelViewAssign
 from sales_prices.models import SalesPrice
 
@@ -1689,6 +1690,17 @@ class SheinProductPayloadFactoryTests(TestCase):
         val_d1 = baker.make(PropertySelectValue, multi_tenant_company=self.multi_tenant_company, property=prop_d)
         val_d2 = baker.make(PropertySelectValue, multi_tenant_company=self.multi_tenant_company, property=prop_d)
 
+        shein_product_type = SheinProductType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="TYPE-4",
+            category_id="CAT-4",
+        )
+        self._link_shein_property(property_obj=prop_a, shein_product_type=shein_product_type, remote_id="ATTR-A", is_main=True)
+        self._link_shein_property(property_obj=prop_b, shein_product_type=shein_product_type, remote_id="ATTR-B", is_main=False)
+        self._link_shein_property(property_obj=prop_c, shein_product_type=shein_product_type, remote_id="ATTR-C", is_main=False)
+        self._link_shein_property(property_obj=prop_d, shein_product_type=shein_product_type, remote_id="ATTR-D", is_main=False)
+
         variation_one = self._create_variation(
             parent=parent,
             sku="CONF-A1",
@@ -1762,3 +1774,102 @@ class SheinProductPayloadFactoryTests(TestCase):
         ):
             with self.assertRaises(SheinConfiguratorAttributesLimitError):
                 factory.build_payload()
+
+    def test_shein_primary_attribute_allows_main_with_single_value(self) -> None:
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            get_value_only=True,
+            skip_checks=True,
+        )
+        main_id = 1600
+        varying_id = 1775
+        configurator_items = [
+            SimpleNamespace(property_id=main_id, sort_order=0),
+            SimpleNamespace(property_id=varying_id, sort_order=1),
+        ]
+        varying_map = {
+            main_id: {("select", 1)},
+            varying_id: {("select", 2), ("select", 3)},
+        }
+
+        with patch.object(
+            factory,
+            "_is_main_sales_attribute",
+            side_effect=lambda *, property_id, variation_properties: property_id == main_id,
+        ):
+            primary, sku_level_items = factory._resolve_primary_and_sku_attributes(
+                configurator_items=configurator_items,
+                variation_properties={},
+                varying_map=varying_map,
+            )
+
+        self.assertEqual(primary.property_id, main_id)
+        self.assertEqual([item.property_id for item in sku_level_items], [varying_id])
+
+    def test_shein_primary_attribute_picks_main_varying(self) -> None:
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            get_value_only=True,
+            skip_checks=True,
+        )
+        main_single_id = 1600
+        main_varying_id = 1601
+        varying_id = 1775
+        configurator_items = [
+            SimpleNamespace(property_id=main_single_id, sort_order=0),
+            SimpleNamespace(property_id=main_varying_id, sort_order=1),
+            SimpleNamespace(property_id=varying_id, sort_order=2),
+        ]
+        varying_map = {
+            main_single_id: {("select", 1)},
+            main_varying_id: {("select", 10), ("select", 11), ("select", 12), ("select", 13)},
+            varying_id: {("select", 20), ("select", 21)},
+        }
+
+        with patch.object(
+            factory,
+            "_is_main_sales_attribute",
+            side_effect=lambda *, property_id, variation_properties: property_id in {main_single_id, main_varying_id},
+        ):
+            primary, sku_level_items = factory._resolve_primary_and_sku_attributes(
+                configurator_items=configurator_items,
+                variation_properties={},
+                varying_map=varying_map,
+            )
+
+        self.assertEqual(primary.property_id, main_varying_id)
+        self.assertEqual([item.property_id for item in sku_level_items], [varying_id])
+
+    def test_shein_primary_attribute_requires_main_with_values(self) -> None:
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            get_value_only=True,
+            skip_checks=True,
+        )
+        main_id = 1600
+        varying_id = 1775
+        configurator_items = [
+            SimpleNamespace(property_id=main_id, sort_order=0),
+        ]
+        varying_map = {
+            main_id: set(),
+            varying_id: {("select", 20), ("select", 21)},
+        }
+
+        with patch.object(
+            factory,
+            "_is_main_sales_attribute",
+            side_effect=lambda *, property_id, variation_properties: property_id == main_id,
+        ):
+            with self.assertRaises(PreFlightCheckError):
+                factory._resolve_primary_and_sku_attributes(
+                    configurator_items=configurator_items,
+                    variation_properties={},
+                    varying_map=varying_map,
+                )

@@ -386,6 +386,7 @@ class SheinCategoryTreeFactoryTests(TestCase):
         self.assertTrue(color_item.is_main_attribute)
         self.assertIn(SheinProductTypeItem.RemarkTags.IMPORTANT, color_item.remarks)
         self.assertTrue(color_item.allows_unmapped_values)
+        self.assertEqual(color_item.approved_value_ids, ["78", "103"])
 
         size_item = product_type_items.get(property=size_property)
         self.assertEqual(size_item.visibility, SheinProductTypeItem.Visibility.HIDDEN)
@@ -393,6 +394,7 @@ class SheinCategoryTreeFactoryTests(TestCase):
         self.assertEqual(size_item.requirement, SheinProductTypeItem.Requirement.OPTIONAL)
         self.assertFalse(size_item.is_main_attribute)
         self.assertTrue(size_item.allows_unmapped_values)
+        self.assertEqual(size_item.approved_value_ids, ["474"])
 
         remote_languages = SheinRemoteLanguage.objects.filter(sales_channel=self.sales_channel)
         self.assertEqual(remote_languages.count(), 1)

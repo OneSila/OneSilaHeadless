@@ -64,6 +64,17 @@ class SheinProductBaseFactory(
     supplier_barcode_type = "EAN"
     _EAN_DIGITS_RE = re.compile(r"\D+")
 
+    def process_content_translation(
+        self,
+        *,
+        short_description,
+        description,
+        url_key,
+        remote_language,
+    ) -> None:
+        # Shein payloads are handled via _build_translations; no per-translation persistence needed.
+        return
+
     def __init__(
         self,
         *,
@@ -571,6 +582,36 @@ class SheinProductBaseFactory(
                 payload = json.loads(factory.remote_value)
             except (TypeError, ValueError):
                 continue
+
+            approved_value_ids = {str(value) for value in (type_item.approved_value_ids or []) if value not in (None, "")}
+            attribute_value_id = payload.get("attribute_value_id")
+            if approved_value_ids and attribute_value_id not in (None, "", []):
+                if isinstance(attribute_value_id, (list, tuple, set)):
+                    invalid_values = [
+                        str(value)
+                        for value in attribute_value_id
+                        if str(value) not in approved_value_ids
+                    ]
+                    if invalid_values:
+                        details = describe_local_instance(local_instance=product_property)
+                        raise PreFlightCheckError(
+                            "Shein value(s) {} for {} are not approved for category {} (allowed: {}).".format(
+                                ", ".join(invalid_values),
+                                details,
+                                type_item.product_type.category_id,
+                                ", ".join(sorted(approved_value_ids)),
+                            )
+                        )
+                elif str(attribute_value_id) not in approved_value_ids:
+                    details = describe_local_instance(local_instance=product_property)
+                    raise PreFlightCheckError(
+                        "Shein value {} for {} is not approved for category {} (allowed: {}).".format(
+                            attribute_value_id,
+                            details,
+                            type_item.product_type.category_id,
+                            ", ".join(sorted(approved_value_ids)),
+                        )
+                    )
 
             attribute_type = payload.get("attribute_type")
             payload.pop("attribute_type", None)
@@ -1085,38 +1126,30 @@ class SheinProductBaseFactory(
 
         items = sorted(configurator_items, key=lambda item: getattr(item, "sort_order", 0))
 
-        def is_varying(item: ProductPropertiesRuleItem) -> bool:
-            return len(varying_map.get(item.property_id, set())) > 1
+        def is_varying(item: ProductPropertiesRuleItem, vary_by=1) -> bool:
+            return len(varying_map.get(item.property_id, set())) > vary_by
 
-        primary = next(
-            (
-                item
-                for item in items
-                if self._is_main_sales_attribute(
-                    property_id=item.property_id,
-                    variation_properties=variation_properties,
-                )
-                and is_varying(item)
-            ),
-            None,
-        )
-        if primary is None:
-            primary = next((item for item in items if is_varying(item)), None)
-        if primary is None:
-            primary = next(
-                (
-                    item
-                    for item in items
-                    if self._is_main_sales_attribute(
-                        property_id=item.property_id,
-                        variation_properties=variation_properties,
-                    )
-                ),
-                None,
+        # Primary must be a "main" sales attribute that has at least one value present.
+        # If any "main" attribute has multiple values across variations, pick that one as primary.
+        # If no main attribute varies, pick the first main attribute that has at least one value.
+        primary_candidates = [
+            item
+            for item in items
+            if self._is_main_sales_attribute(
+                property_id=item.property_id,
+                variation_properties=variation_properties,
             )
+            and is_varying(item, vary_by=0)
+        ]
+        if not primary_candidates:
+            raise PreFlightCheckError(
+                "Shein requires at least one main sales attribute with values."
+            )
+        primary = next((item for item in primary_candidates if is_varying(item)), None)
         if primary is None:
-            primary = items[0]
+            primary = primary_candidates[0]
 
+        # SKU-level attributes are the remaining varying attributes, excluding the primary.
         sku_level_items = [
             item for item in items if item.property_id != primary.property_id and is_varying(item)
         ]
@@ -1352,11 +1385,6 @@ class SheinProductBaseFactory(
             variation_properties=variation_properties,
             property_ids=property_ids,
         )
-        varying_ids = [pid for pid, values in varying_map.items() if len(values) > 1]
-        if len(varying_ids) > 3:
-            raise SheinConfiguratorAttributesLimitError(
-                "Shein supports at most three sales attributes in total (one SKC-level, up to two SKU-level)."
-            )
         primary_item, sku_level_items = self._resolve_primary_and_sku_attributes(
             configurator_items=configurator_items,
             variation_properties=variation_properties,
@@ -1366,7 +1394,6 @@ class SheinProductBaseFactory(
         if primary_item is None:
             self.skc_list = []
             return
-
         grouped: dict[str, dict[str, Any]] = {}
         for variation in variations:
             primary_prop = variation_properties.get(variation.id, {}).get(primary_item.property_id)
@@ -1754,6 +1781,7 @@ class SheinProductBaseFactory(
 class SheinProductUpdateFactory(SheinProductBaseFactory, RemoteProductUpdateFactory):
     """Resync an existing Shein product."""
 
+    fixing_identifier_class = SheinProductBaseFactory
     action_log = RemoteLog.ACTION_UPDATE
     edit_permission_path = "/open-api/goods/product/check-edit-permission"
 
@@ -1908,6 +1936,7 @@ class SheinProductUpdateFactory(SheinProductBaseFactory, RemoteProductUpdateFact
 class SheinProductCreateFactory(SheinProductBaseFactory, RemoteProductCreateFactory):
     """Create a Shein product or fall back to sync."""
 
+    fixing_identifier_class = SheinProductBaseFactory
     action_log = RemoteLog.ACTION_CREATE
     sync_product_factory = SheinProductUpdateFactory
 

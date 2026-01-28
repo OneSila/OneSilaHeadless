@@ -840,16 +840,19 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             "attribute_doc": self._safe_string(attribute.get("attribute_doc")) or "",
             "attribute_doc_images": self._ensure_list(value=attribute.get("attribute_doc_image_list")),
             "allows_unmapped_values": SheinProperty.allows_custom_values(attribute_mode=attribute_mode),
-            "type": SheinProperty.determine_property_type(attribute_mode=attribute_mode),
             "raw_data": raw_attribute,
         }
 
-        property_obj, _ = SheinProperty.objects.update_or_create(
+        property_obj, created = SheinProperty.objects.update_or_create(
             multi_tenant_company=self.sales_channel.multi_tenant_company,
             sales_channel=self.sales_channel,
             remote_id=remote_id,
             defaults=defaults,
         )
+
+        if created:
+            property_obj.type = SheinProperty.determine_property_type(attribute_mode=attribute_mode)
+            property_obj.save(update_fields=["type"])
 
         return property_obj
 
@@ -912,6 +915,13 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             False,
         )
 
+        approved_value_ids = [
+            str(self._normalize_identifier(record.get("attribute_value_id")))
+            for record in attribute.get("attribute_value_info_list") or []
+            if isinstance(record, dict) and self._normalize_identifier(record.get("attribute_value_id"))
+        ]
+        raw_data = self._strip_attribute_values(attribute=attribute)
+
         SheinProductTypeItem.objects.update_or_create(
             multi_tenant_company=self.sales_channel.multi_tenant_company,
             product_type=product_type,
@@ -931,7 +941,8 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
                 "is_main_attribute": self._to_bool(attribute.get("attribute_label")),
                 "allows_unmapped_values": allows_custom_values,
                 "remarks": remarks,
-                "raw_data": self._strip_attribute_values(attribute=attribute),
+                "approved_value_ids": approved_value_ids,
+                "raw_data": raw_data,
             },
         )
 
