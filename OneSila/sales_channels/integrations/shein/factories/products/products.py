@@ -1352,11 +1352,6 @@ class SheinProductBaseFactory(
             variation_properties=variation_properties,
             property_ids=property_ids,
         )
-        varying_ids = [pid for pid, values in varying_map.items() if len(values) > 1]
-        if len(varying_ids) > 3:
-            raise SheinConfiguratorAttributesLimitError(
-                "Shein supports at most three sales attributes in total (one SKC-level, up to two SKU-level)."
-            )
         primary_item, sku_level_items = self._resolve_primary_and_sku_attributes(
             configurator_items=configurator_items,
             variation_properties=variation_properties,
@@ -1366,6 +1361,15 @@ class SheinProductBaseFactory(
         if primary_item is None:
             self.skc_list = []
             return
+        varying_ids = [
+            pid
+            for pid, values in varying_map.items()
+            if len(values) > 1 and pid != primary_item.property_id
+        ]
+        if len(varying_ids) > 3:
+            raise SheinConfiguratorAttributesLimitError(
+                "Shein supports at most three sales attributes in total (one SKC-level, up to two SKU-level)."
+            )
 
         grouped: dict[str, dict[str, Any]] = {}
         for variation in variations:
