@@ -14,6 +14,9 @@ from sales_channels.integrations.shein.factories.imports.product_helpers import 
 from sales_channels.integrations.shein.factories.imports.product_parsers import (
     SheinProductImportPayloadParser,
 )
+from sales_channels.integrations.shein.factories.products.shelf import (
+    SheinProductShelfUpdateFactory,
+)
 from sales_channels.integrations.shein.models import (
     SheinProduct,
     SheinSalesChannelView,
@@ -132,6 +135,13 @@ class SheinProductDetailRefreshFactory(SheinSignatureMixin, SheinProductImportHe
             if updated_fields:
                 association.save(update_fields=updated_fields)
 
+    def publish_product(self) -> None:
+        SheinProductShelfUpdateFactory(
+            sales_channel=self.sales_channel,
+            remote_product=self.remote_product,
+            shelf_state=1,
+        ).run()
+
     def run(self) -> dict[str, Any] | None:
         spu_name = self._resolve_spu_name()
         if not spu_name:
@@ -140,6 +150,8 @@ class SheinProductDetailRefreshFactory(SheinSignatureMixin, SheinProductImportHe
                 getattr(self.remote_product, "pk", None),
             )
             return None
+
+        self.publish_product()
 
         try:
             payload = self.get_product(spu_name=spu_name)
