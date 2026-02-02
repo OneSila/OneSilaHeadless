@@ -83,6 +83,17 @@ class AmazonProductTestMixin:
     def _pad_text(self, text, target_length):
         return text + ("X" * max(0, target_length - len(text)))
 
+    def force_product_create(self):
+        # to force create route and avoid no ean code or gtin exception error
+        AmazonExternalProductId.objects.filter(type=AmazonExternalProductId.TYPE_ASIN).delete()
+        AmazonGtinExemption.objects.create(
+            product=self.product,
+            view=self.view,
+            value=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+
     def setup_product(self):
         """Create common data used by Amazon product factory tests."""
         self.product_title = self._pad_text("Chair name", 150)
@@ -1213,6 +1224,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
             product=self.product,
             view=fr_view,
             value="ASIN123",
+            created_asin="ASIN123",
         )
 
         mock_instance = mock_listings.return_value
@@ -1423,6 +1435,7 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
         mock_instance = mock_listings.return_value
         mock_instance.put_listings_item.return_value = self.get_put_and_patch_item_listing_mock_response()
 
+        self.force_product_create()
         # TEXT property
         text_prop = baker.make(
             Property,
@@ -2041,6 +2054,8 @@ class AmazonProductFactoriesTest(DisableWooCommerceSignalsMixin, TransactionTest
     @patch("sales_channels.integrations.amazon.factories.mixins.ListingsApi")
     def test_price_sync_enabled_includes_price_fields(self, mock_listings, mock_get_images, mock_get_client):
         """Ensure price attributes are included when price sync is on."""
+
+        self.force_product_create()
         self.sales_channel.sync_prices = True
         self.sales_channel.save()
 
@@ -3060,7 +3075,6 @@ class AmazonProductOwnerFlagTest(DisableWooCommerceSignalsMixin, TransactionTest
             ean_code="1234567890123",
         )
 
-        self.remote_product.product_owner = False
         self.remote_product.created_marketplaces = ["DE"]
         self.remote_product.save(update_fields=["product_owner", "created_marketplaces"])
 
