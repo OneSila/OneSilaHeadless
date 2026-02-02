@@ -32,7 +32,7 @@ class AmazonProduct(RemoteProduct):
     )
 
     product_owner = models.BooleanField(
-        default=False,
+        default=True,
         help_text="Indicates if this listing was created by us and we can manage listing level data.",
     )
 

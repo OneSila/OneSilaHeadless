@@ -591,6 +591,12 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             attrs["supplier_declared_has_product_identifier_exemption"] = [
                 {"value": True, "marketplace_id": self.view.remote_id}
             ]
+            external_identifier = attrs.get("externally_assigned_product_identifier")
+            if external_identifier:
+                identifier_type = external_identifier[0].get("type")
+                if identifier_type == "ean":
+                    # If GTIN exemption is claimed, drop EAN to avoid Amazon matching it to an existing ASIN.
+                    attrs.pop("externally_assigned_product_identifier", None)
 
         browse_node_id = self.recommended_browse_node_id
         if browse_node_id:
@@ -679,6 +685,11 @@ class AmazonProductBaseFactory(GetAmazonAPIMixin, RemoteProductSyncFactory):
             )
         except Exception as e:
             if not self.is_create:
+                created_marketplaces = self.remote_instance.created_marketplaces or []
+                if self.view.remote_id in created_marketplaces:
+                    created_marketplaces.remove(self.view.remote_id)
+                    self.remote_instance.created_marketplaces = created_marketplaces
+                    self.remote_instance.save(update_fields=["created_marketplaces"])
                 raise SwitchedToCreateException(
                     f"Product with sku {sku} was not found. Initial error: {str(e)}"
                 )
@@ -1022,16 +1033,16 @@ class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFa
 
     def set_remote_product_for_logging(self):
         super().set_remote_product_for_logging()
-        created_marketplaces = self.remote_instance.created_marketplaces or []
-        first_assign = self.view.remote_id not in created_marketplaces
         external_id = getattr(self, "external_product_id", None)
         has_asin = bool(
             external_id
             and getattr(external_id, "type", None) == external_id.TYPE_ASIN
+            and getattr(external_id, "value", None)
         )
+        created_asin = getattr(external_id, "created_asin", None)
 
-        if first_assign and not has_asin and not self.remote_instance.product_owner:
-            self.remote_instance.product_owner = True
+        if has_asin and not created_asin and self.remote_instance.product_owner:
+            self.remote_instance.product_owner = False
             self.remote_instance.save(update_fields=["product_owner"])
 
     def perform_remote_action(self):
