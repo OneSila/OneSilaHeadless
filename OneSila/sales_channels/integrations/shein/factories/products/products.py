@@ -88,10 +88,12 @@ class SheinProductBaseFactory(
         get_value_only: bool = False,
         skip_checks: bool = False,
         skip_price_update: bool = False,
+        skip_property_values_category_validation: bool = False,
     ) -> None:
         self.get_value_only = get_value_only
         self.skip_checks = skip_checks
         self.skip_price_update = skip_price_update
+        self.skip_property_values_category_validation = skip_property_values_category_validation
         self.prices_data: dict[str, dict[str, Any]] = {}
         self.price_info_list: list[dict[str, Any]] = []
         self.image_info: dict[str, Any] = {}
@@ -560,6 +562,31 @@ class SheinProductBaseFactory(
             .first()
         )
 
+    def _get_approved_value_labels(
+        self,
+        *,
+        type_item: SheinProductTypeItem,
+        approved_value_ids: set[str],
+    ) -> list[str]:
+        if not approved_value_ids:
+            return []
+        from sales_channels.integrations.shein.models import SheinPropertySelectValue
+
+        values = (
+            SheinPropertySelectValue.objects.filter(
+                remote_property=type_item.property,
+                remote_id__in=approved_value_ids,
+            )
+            .values_list("remote_id", "value", "value_en")
+        )
+        label_by_id = {}
+        for remote_id, value, value_en in values:
+            label = value or value_en or str(remote_id)
+            label_by_id[str(remote_id)] = label
+
+        labels = {label_by_id.get(str(value), str(value)) for value in approved_value_ids}
+        return sorted(labels)
+
     def _build_property_payloads(self):
         for product_property in self._collect_product_properties():
             type_item = self._resolve_type_item_for_property(product_property=product_property)
@@ -585,7 +612,16 @@ class SheinProductBaseFactory(
 
             approved_value_ids = {str(value) for value in (type_item.approved_value_ids or []) if value not in (None, "")}
             attribute_value_id = payload.get("attribute_value_id")
-            if approved_value_ids and attribute_value_id not in (None, "", []):
+            if (
+                approved_value_ids
+                and attribute_value_id not in (None, "", [])
+                and not self.skip_property_values_category_validation
+            ):
+                approved_value_labels = self._get_approved_value_labels(
+                    type_item=type_item,
+                    approved_value_ids=approved_value_ids,
+                )
+                allowed_values = ", ".join(approved_value_labels or sorted(approved_value_ids))
                 if isinstance(attribute_value_id, (list, tuple, set)):
                     invalid_values = [
                         str(value)
@@ -599,7 +635,7 @@ class SheinProductBaseFactory(
                                 ", ".join(invalid_values),
                                 details,
                                 type_item.product_type.category_id,
-                                ", ".join(sorted(approved_value_ids)),
+                                allowed_values,
                             )
                         )
                 elif str(attribute_value_id) not in approved_value_ids:
@@ -609,7 +645,7 @@ class SheinProductBaseFactory(
                             attribute_value_id,
                             details,
                             type_item.product_type.category_id,
-                            ", ".join(sorted(approved_value_ids)),
+                            allowed_values,
                         )
                     )
 
