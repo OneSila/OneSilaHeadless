@@ -11,10 +11,15 @@ from core import models
 from sales_channels.exceptions import (
     InspectorMissingInformationError,
     PreFlightCheckError,
+    RemotePropertyValueNotMapped,
     SkipSyncBecauseOfStatusException,
     VariationAlreadyExistsOnWebsite,
 )
-from sales_channels.integrations.shein.exceptions import SheinPreValidationError, SheinResponseException
+from sales_channels.integrations.shein.exceptions import (
+    SheinConfiguratorAttributesLimitError,
+    SheinPreValidationError,
+    SheinResponseException,
+)
 from sales_channels.models.mixins import RemoteObjectMixin
 from sales_channels.models.sales_channels import (
     RemoteLanguage,
@@ -95,7 +100,9 @@ class SheinSalesChannel(SalesChannel):
         user_exceptions = (
             SheinResponseException,
             SheinPreValidationError,
+            SheinConfiguratorAttributesLimitError,
             PreFlightCheckError,
+            RemotePropertyValueNotMapped,
             SkipSyncBecauseOfStatusException,
             InspectorMissingInformationError,
             VariationAlreadyExistsOnWebsite,

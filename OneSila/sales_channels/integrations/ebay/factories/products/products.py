@@ -179,7 +179,7 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
         else:
             if not has_required_ebay_mapping(product):
                 raise EbayMissingProductMappingError(
-                    "eBay products require either a mapped product type (EbayProductType) or a category (EbayProductCategory) before listing."
+                    "Before listing on eBay, assign either a mapped product type or a category to this product."
                 )
 
     def set_api(self) -> None:

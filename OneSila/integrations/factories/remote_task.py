@@ -1,8 +1,61 @@
 import logging
 import traceback
 from integrations.models import IntegrationTaskQueue
+from sales_channels.exceptions import (
+    ConfiguratorPropertyNotFilterable,
+    InspectorMissingInformationError,
+    PreFlightCheckError,
+    RemotePropertyValueNotMapped,
+    SkipSyncBecauseOfStatusException,
+    VariationAlreadyExistsOnWebsite,
+)
+from sales_channels.integrations.amazon.exceptions import (
+    AmazonDescriptionTooShortError,
+    AmazonMissingBrowseNodeError,
+    AmazonMissingIdentifierError,
+    AmazonMissingVariationIdentifierError,
+    AmazonMissingVariationThemeError,
+    AmazonProductValidationIssuesException,
+    AmazonTitleTooShortError,
+)
+from sales_channels.integrations.ebay.exceptions import (
+    EbayMissingListingPoliciesError,
+    EbayMissingProductMappingError,
+    EbayMissingVariationMappingsError,
+    EbayPropertyMappingMissingError,
+)
+from sales_channels.integrations.shein.exceptions import (
+    SheinConfiguratorAttributesLimitError,
+    SheinPreValidationError,
+)
 
 logger = logging.getLogger(__name__)
+
+NON_RETRYABLE_EXCEPTIONS = (
+    InspectorMissingInformationError,
+    PreFlightCheckError,
+    SheinPreValidationError,
+    SheinConfiguratorAttributesLimitError,
+    RemotePropertyValueNotMapped,
+    SkipSyncBecauseOfStatusException,
+    VariationAlreadyExistsOnWebsite,
+    AmazonProductValidationIssuesException,
+    AmazonTitleTooShortError,
+    AmazonDescriptionTooShortError,
+    AmazonMissingIdentifierError,
+    AmazonMissingVariationIdentifierError,
+    AmazonMissingBrowseNodeError,
+    AmazonMissingVariationThemeError,
+    ConfiguratorPropertyNotFilterable,
+    EbayPropertyMappingMissingError,
+    EbayMissingListingPoliciesError,
+    EbayMissingProductMappingError,
+    EbayMissingVariationMappingsError,
+)
+
+
+def is_retryable_exception(*, exception: Exception) -> bool:
+    return not isinstance(exception, NON_RETRYABLE_EXCEPTIONS)
 
 
 class BaseRemoteTask:
@@ -27,4 +80,8 @@ class BaseRemoteTask:
         except Exception as e:
             tb = traceback.format_exc()
             logger.error(f"Error executing task '{self.task_queue_item.task_name}': {str(e)}\n{tb}")
-            self.task_queue_item.mark_as_failed(error_message=str(e), error_traceback=tb)
+            self.task_queue_item.mark_as_failed(
+                error_message=str(e),
+                error_traceback=tb,
+                retryable=is_retryable_exception(exception=e),
+            )
