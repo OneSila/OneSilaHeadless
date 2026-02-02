@@ -144,8 +144,11 @@ class IntegrationTaskQueue(models.Model):
         self.status = self.PROCESSED
         self.save()
 
-    def mark_as_failed(self, error_message=None, error_traceback=None):
-        self.retry += 1
+    def mark_as_failed(self, *, error_message=None, error_traceback=None, retryable=True):
+        if retryable:
+            self.retry += 1
+        else:
+            self.retry = self.integration.max_retries
         if self.retry < self.integration.max_retries:
             self.status = self.PENDING
             self.sent_to_queue_at = now()
