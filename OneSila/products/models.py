@@ -71,7 +71,7 @@ class Product(TranslatedModelMixin, models.Model):
         - If the product has a direct EAN code, return it.
         - Return None if no EAN code is associated.
         """
-        ean = EanCode.objects.filter(product=self, already_used=False).first()
+        ean = EanCode.objects.filter(product=self).first()
         if ean:
             return ean.ean_code
 
