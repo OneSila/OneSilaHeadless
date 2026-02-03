@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Iterable
-
+from media.models import MediaProductThrough
 from django.db import transaction
 import logging
 
@@ -475,7 +475,12 @@ class AddTaskBase:
             getattr(target.sales_channel_view, "id", target.sales_channel_view),
         )
 
+    def set_local_instance(self):
+        # Hook for tasks that need a local instance before evaluating guards.
+        return
+
     def run(self):
+        self.set_local_instance()
         for sales_channel in self.get_sales_channels():
             for target in self.get_targets(sales_channel=sales_channel):
                 guard_result = self.guard(target=target)
@@ -564,6 +569,9 @@ class ProductScopedAddTask(ChannelScopedAddTask):
             local_instance=self.product,
             sales_channel=sales_channel,
         ).iterator():
+            resolved_remote = getattr(remote_product, "get_real_instance", None)
+            if resolved_remote:
+                remote_product = resolved_remote()
             yield TaskTarget(
                 sales_channel=sales_channel,
                 remote_product=remote_product,
@@ -592,11 +600,31 @@ class ProductPriceAddTask(ProductScopedAddTask):
         guard_result = super().guard(target=target)
         if not guard_result.allowed:
             return guard_result
-        # Guard intent (price):
-        # - Compute effective channel price (currency, discount, rounding).
-        # - Compare against last known remote price payload/hash; if unchanged, skip.
-        # - For configurable products, pricing changes usually belong to variations only.
-        # TODO: add price-specific guards.
+
+        if getattr(self.product, "is_configurable", None) and self.product.is_configurable():
+            return GuardResult(allowed=False, reason="price_configurable_parent")
+
+        from sales_channels.models import RemotePrice
+        from sales_channels.helpers import build_price_data, compute_price_data_hash
+
+        price_data = build_price_data(product=self.product, sales_channel=target.sales_channel)
+        price_hash = compute_price_data_hash(price_data=price_data)
+
+        remote_price = getattr(target.remote_product, "price", None)
+        if remote_price is None:
+            remote_price = RemotePrice.objects.filter(remote_product=target.remote_product).first()
+        if remote_price is not None:
+            resolved_remote = getattr(remote_price, "get_real_instance", None)
+            if resolved_remote:
+                remote_price = resolved_remote()
+
+        if remote_price and remote_price.price_data_hash == price_hash:
+            return GuardResult(allowed=False, reason="price_unchanged")
+
+        if remote_price is not None:
+            remote_price.price_data = price_data
+            remote_price.save()
+
         return guard_result
 
 
@@ -607,11 +635,28 @@ class ProductContentAddTask(ProductScopedAddTask):
         guard_result = super().guard(target=target)
         if not guard_result.allowed:
             return guard_result
-        # Guard intent (content):
-        # - Resolve effective content for the channel view (language + overrides).
-        # - If default content is overridden by channel-specific content, ignore default changes.
-        # - Compare against last known remote content payload/hash; if unchanged, skip.
-        # TODO: add content-specific guards.
+
+        from sales_channels.helpers import build_content_data, compute_content_data_hash
+        from sales_channels.models import RemoteProductContent
+
+        content_data = build_content_data(product=self.product, sales_channel=target.sales_channel)
+        content_hash = compute_content_data_hash(content_data=content_data)
+
+        remote_content = getattr(target.remote_product, "content", None)
+        if remote_content is None:
+            remote_content = RemoteProductContent.objects.filter(remote_product=target.remote_product).first()
+        if remote_content is not None:
+            resolved_remote = getattr(remote_content, "get_real_instance", None)
+            if resolved_remote:
+                remote_content = resolved_remote()
+
+        if remote_content and remote_content.content_data_hash == content_hash:
+            return GuardResult(allowed=False, reason="content_unchanged")
+
+        if remote_content is not None:
+            remote_content.content_data = content_data
+            remote_content.save()
+
         return guard_result
 
 
@@ -619,57 +664,96 @@ class ProductEanCodeAddTask(ProductScopedAddTask):
     sync_type = "product"
 
     def guard(self, *, target: TaskTarget) -> GuardResult:
+        from sales_channels.integrations.amazon.models import AmazonSalesChannel
+
         guard_result = super().guard(target=target)
         if not guard_result.allowed:
             return guard_result
+
         # Guard intent (EAN):
-        # - Only allow when the channel supports EAN updates.
-        # - Skip if the effective value matches the remote value.
-        # TODO: add EAN-code-specific guards.
+        # - Only allow when the channel supports EAN updates (Amazon does not).
+        # - Skip when the remote value already matches the local EAN.
+        sales_channel = target.sales_channel
+        resolved_channel = getattr(sales_channel, "get_real_instance", None)
+        if resolved_channel:
+            sales_channel = resolved_channel()
+
+        if isinstance(sales_channel, AmazonSalesChannel):
+            return GuardResult(allowed=False, reason="ean_update_not_supported")
+
+        from eancodes.models import EanCode
+
+        local_ean = EanCode.objects.filter(product=self.product).first()
+        if local_ean is None or not local_ean.ean_code:
+            return GuardResult(allowed=False, reason="ean_code_missing")
+
+        remote_ean = None
+        if target.remote_product is not None:
+            remote_ean = target.remote_product.eancode.first()
+
+        if remote_ean and remote_ean.ean_code == local_ean.ean_code:
+            return GuardResult(allowed=False, reason="ean_code_unchanged")
+
+        if remote_ean:
+            remote_ean.ean_code = local_ean.ean_code
+            remote_ean.save(update_fields=["ean_code"])
+
         return guard_result
 
 
 class ProductImagesAddTask(ProductScopedAddTask):
     sync_type = "images"
 
+    def __init__(self, *, media_product_through_id=None, **kwargs):
+        self.media_product_through_id = media_product_through_id
+        super().__init__(**kwargs)
+        if media_product_through_id is not None:
+            self.set_extra_task_kwargs(media_product_through_id=media_product_through_id)
+
+    def set_local_instance(self):
+
+        if self.media_product_through_id is None:
+            self.local_instance = None
+        else:
+            self.local_instance = MediaProductThrough.objects.get(id=self.media_product_through_id)
+
     def guard(self, *, target: TaskTarget) -> GuardResult:
         guard_result = super().guard(target=target)
         if not guard_result.allowed:
             return guard_result
-        # Guard intent (images):
-        # - Respect channel-specific overrides; default image changes should not affect
-        #   channels with their own image sets.
-        # - Compare effective image set/hash before/after; if unchanged, skip.
-        # TODO: add image-specific guards.
+
+        if self.local_instance is None:
+            return guard_result
+
+        sales_channel = target.sales_channel
+        local_sales_channel = getattr(self.local_instance, "sales_channel", None)
+
+        if local_sales_channel is not None:
+            if local_sales_channel.id != sales_channel.id:
+                return GuardResult(
+                    allowed=False,
+                    reason="image_sales_channel_mismatch",
+                )
+            return guard_result
+
+        if MediaProductThrough.objects.filter(
+            product=self.local_instance.product,
+            sales_channel=sales_channel,
+        ).exists():
+            return GuardResult(
+                allowed=False,
+                reason="image_sales_channel_override_exists",
+            )
+
         return guard_result
 
 
 class ProductUpdateAddTask(ProductScopedAddTask):
     sync_type = "product"
 
-    def guard(self, *, target: TaskTarget) -> GuardResult:
-        guard_result = super().guard(target=target)
-        if not guard_result.allowed:
-            return guard_result
-        # Guard intent (product update):
-        # - Use for identity/availability changes (active, SKU, identifiers).
-        # - Skip if changes do not impact the channel’s effective payload.
-        # TODO: add product-update guards.
-        return guard_result
-
 
 class ProductFullSyncAddTask(ProductScopedAddTask):
     sync_type = "product"
-
-    def guard(self, *, target: TaskTarget) -> GuardResult:
-        guard_result = super().guard(target=target)
-        if not guard_result.allowed:
-            return guard_result
-        # Guard intent (full sync):
-        # - Use as fallback when multiple changes require a full resync.
-        # - Skip when remote product is not ready or no effective changes are present.
-        # TODO: add full-sync guards.
-        return guard_result
 
 
 class DeleteScopedAddTask(ChannelScopedAddTask):

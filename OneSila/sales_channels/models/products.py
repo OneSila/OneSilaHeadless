@@ -351,7 +351,23 @@ class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='price', on_delete=models.CASCADE,
                                           help_text="The remote product associated with this price.")
-    price_data = models.JSONField(default=dict, blank=True, help_text="Multi-currency price and discount data.")
+    price_data = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Multi-currency price data, e.g. {'EUR': {'price': 10.0, 'discount_price': 8.0}}.",
+    )
+    price_data_hash = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="Hash of the canonical price_data payload.",
+    )
+
+    def save(self, *args, **kwargs):
+        from sales_channels.helpers import compute_price_data_hash
+
+        self.price_data_hash = compute_price_data_hash(price_data=self.price_data)
+        super().save(*args, **kwargs)
 
     class Meta:
         unique_together = ('remote_product',)
@@ -389,6 +405,20 @@ class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='content', on_delete=models.CASCADE,
                                           help_text="The remote product associated with this content.")
+    content_data = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Per-language content payload containing only fields relevant for the integration, "
+            "e.g. {'en': {'name': 'Tee', 'description': '...'}}."
+        ),
+    )
+    content_data_hash = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="Hash of the canonical content_data payload.",
+    )
 
     class Meta:
         unique_together = ('remote_product',)
@@ -401,6 +431,12 @@ class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
     @property
     def frontend_name(self):
         return (_(f"Content for {self.remote_product.local_instance.name}"))
+
+    def save(self, *args, **kwargs):
+        from sales_channels.helpers import compute_content_data_hash
+
+        self.content_data_hash = compute_content_data_hash(content_data=self.content_data)
+        super().save(*args, **kwargs)
 
 
 class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Model):

@@ -2300,9 +2300,28 @@ class EbayInventoryItemPushMixin(EbayInventoryItemPayloadMixin):
 
         api = getattr(self, "api", None) or self.get_api()
         self.api = api
-        return api.sell_inventory_delete_inventory_item_group(
-            inventory_item_group_key=key,
-        )
+        try:
+            return api.sell_inventory_delete_inventory_item_group(
+                inventory_item_group_key=key,
+            )
+        except (EbayApiError, ApiException) as exc:
+            error_ids: set[str] = set()
+            if isinstance(exc, ApiException):
+                error_ids = self._extract_api_exception_error_ids(exc=exc)
+            else:
+                cause = getattr(exc, "__cause__", None)
+                if isinstance(cause, ApiException):
+                    error_ids = self._extract_api_exception_error_ids(exc=cause)
+                else:
+                    error_ids = self._extract_error_ids_from_body(
+                        body=getattr(exc, "detail", None)
+                    )
+
+            if "25705" in error_ids:
+                return {"status": "NOT_FOUND"}
+
+            message = _extract_ebay_api_error_message(exc=exc)
+            raise EbayResponseException(message) from exc
 
     def delete_offers_for_remote_products(self, *, remote_products: Sequence[Any]) -> List[Any]:
         results: List[Any] = []

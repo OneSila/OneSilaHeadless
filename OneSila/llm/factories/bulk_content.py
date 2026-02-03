@@ -5,6 +5,7 @@ from typing import Any
 
 from django.core.exceptions import ValidationError
 
+from core.constants import BASE_CONTENT_FIELD_FLAGS, BASE_CONTENT_FIELD_LIMITS, CONTENT_INTEGRATION_RULES
 from integrations.constants import (
     AMAZON_INTEGRATION,
     EBAY_INTEGRATION,
@@ -25,50 +26,6 @@ from llm.factories.mixins import AskGPTMixin, CalculateCostMixin, CreateTransact
 
 logger = logging.getLogger(__name__)
 
-
-BASE_FIELD_FLAGS = {
-    "name": True,
-    "subtitle": False,
-    "shortDescription": True,
-    "description": True,
-    "bulletPoints": False,
-}
-
-BASE_FIELD_LIMITS = {
-    "name": {"min": 0, "max": 512},
-    "subtitle": {"min": 0, "max": 0},
-    "shortDescription": {"min": 0, "max": 500},
-    "description": {"min": 0, "max": 6000},
-    "bulletPoints": {"min": 0, "max": 255},
-}
-
-INTEGRATION_RULES = {
-    MAGENTO_INTEGRATION: {
-        "flags": {},
-        "limits": {"name": {"max": 255}},
-    },
-    WOOCOMMERCE_INTEGRATION: {
-        "flags": {},
-        "limits": {},
-    },
-    SHOPIFY_INTEGRATION: {
-        "flags": {"shortDescription": False},
-        "limits": {"name": {"max": 70}, "description": {"max": 5000}},
-    },
-    AMAZON_INTEGRATION: {
-        "flags": {"shortDescription": False, "bulletPoints": True},
-        "limits": {"name": {"min": 150, "max": 200}, "description": {"min": 1000, "max": 2000}},
-    },
-    EBAY_INTEGRATION: {
-        "flags": {"subtitle": True},
-        "limits": {"name": {"max": 80}, "subtitle": {"max": 55}, "description": {"max": 4000}},
-    },
-    SHEIN_INTEGRATION: {
-        "flags": {"subtitle": False, "shortDescription": False, "bulletPoints": False},
-        "limits": {"name": {"max": 1000}, "description": {"max": 5000}},
-    },
-    "default": {"flags": {}, "limits": {}},
-}
 
 INTEGRATION_GUIDELINES = {
     AMAZON_INTEGRATION: [
@@ -105,11 +62,11 @@ LLM_FIELDS = ("name", "subtitle", "shortDescription", "description", "bulletPoin
 
 def build_field_rules(*, integration_type: str, sales_channel: Any | None = None) -> dict[str, dict[str, Any]]:
     rules = {
-        "flags": deepcopy(BASE_FIELD_FLAGS),
-        "limits": deepcopy(BASE_FIELD_LIMITS),
+        "flags": deepcopy(BASE_CONTENT_FIELD_FLAGS),
+        "limits": deepcopy(BASE_CONTENT_FIELD_LIMITS),
     }
 
-    overrides = INTEGRATION_RULES.get(integration_type, INTEGRATION_RULES["default"])
+    overrides = CONTENT_INTEGRATION_RULES.get(integration_type, CONTENT_INTEGRATION_RULES["default"])
     for field_name, enabled in overrides.get("flags", {}).items():
         rules["flags"][field_name] = enabled
 

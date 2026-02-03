@@ -284,9 +284,9 @@ def woocommerce__image_assoc__create(sender, instance, **kwargs):
     task_runner = WooCommerceProductImagesAddTask(
         task_func=create_woocommerce_image_association_db_task,
         product=instance.product,
+        media_product_through_id=instance.id,
         sales_channels_filter_kwargs={'id': instance.sales_channel_id} if instance.sales_channel_id else None,
     )
-    task_runner.set_extra_task_kwargs(media_product_through_id=instance.id)
     task_runner.run()
 
 
@@ -297,9 +297,9 @@ def woocommerce__image_assoc__update(sender, instance, **kwargs):
     task_runner = WooCommerceProductImagesAddTask(
         task_func=update_woocommerce_image_association_db_task,
         product=instance.product,
+        media_product_through_id=instance.id,
         sales_channels_filter_kwargs={'id': instance.sales_channel_id} if instance.sales_channel_id else None,
     )
-    task_runner.set_extra_task_kwargs(media_product_through_id=instance.id)
     task_runner.run()
 
 

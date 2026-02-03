@@ -1144,6 +1144,59 @@ class EbayConfigurableProductFactoryTest(EbayProductPushFactoryTestBase):
         )
         self.assertEqual(result["withdraw"], {"status": "NOT_FOUND"})
 
+    def test_configurable_delete_ignores_missing_inventory_group(self) -> None:
+        self._prime_remote_state()
+
+        error_body = json.dumps({
+            "errors": [
+                {
+                    "errorId": 25705,
+                    "message": "The Inventory Item Group named ILFD11000-PARENT could not be found.",
+                }
+            ]
+        }).encode("utf-8")
+        api_exception = ApiException(status=404, reason="Not Found")
+        api_exception.body = error_body
+
+        api_mock = MagicMock()
+        api_mock.sell_inventory_withdraw_offer_by_inventory_item_group.return_value = {
+            "status": "WITHDRAWN"
+        }
+        api_mock.sell_inventory_delete_offer.return_value = {}
+        api_mock.sell_inventory_delete_inventory_item_group.side_effect = api_exception
+        api_mock.sell_inventory_delete_inventory_item.return_value = {}
+
+        with patch.object(EbayProductDeleteFactory, "get_api", return_value=api_mock):
+            factory = EbayProductDeleteFactory(
+                sales_channel=self.sales_channel,
+                local_instance=self.product,
+                view=self.view,
+            )
+            result = factory.run()
+
+        api_mock.sell_inventory_withdraw_offer_by_inventory_item_group.assert_called_once()
+        api_mock.sell_inventory_delete_inventory_item_group.assert_called_once()
+
+        for child in self.children:
+            self.assertFalse(
+                EbayProduct.objects.filter(
+                    local_instance=child,
+                    sales_channel=self.sales_channel,
+                ).exists()
+            )
+            self.assertFalse(
+                EbayProductOffer.objects.filter(
+                    sales_channel_view=self.view,
+                    remote_product__local_instance=child,
+                    remote_product__sales_channel=self.sales_channel,
+                ).exists()
+            )
+
+        self.assertFalse(
+            EbayProduct.objects.filter(pk=self.remote_product.pk).exists()
+        )
+        self.assertEqual(result["group"], {"status": "NOT_FOUND"})
+
     def test_configurable_delete_collects_child_errors(self) -> None:
         self._prime_remote_state()
 

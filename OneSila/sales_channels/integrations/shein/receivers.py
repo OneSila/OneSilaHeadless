@@ -333,6 +333,7 @@ def shein__image_assoc__create(sender, instance, **kwargs):
     task_runner = SheinProductImagesAddTask(
         task_func=shein__image_assoc__create_db_task,
         product=product,
+        media_product_through_id=instance.id,
         number_of_remote_requests=0,
     )
     task_runner.set_extra_task_kwargs(
@@ -357,6 +358,7 @@ def shein__image_assoc__update(sender, instance, **kwargs):
     task_runner = SheinProductImagesAddTask(
         task_func=shein__image_assoc__update_db_task,
         product=product,
+        media_product_through_id=instance.id,
         number_of_remote_requests=0,
     )
     task_runner.set_extra_task_kwargs(
@@ -382,6 +384,7 @@ def shein__image_assoc__delete(sender, instance, **kwargs):
     task_runner = SheinProductImagesAddTask(
         task_func=shein__image_assoc__delete_db_task,
         product=product,
+        media_product_through_id=instance.id,
         number_of_remote_requests=0,
     )
     task_runner.set_extra_task_kwargs(
@@ -409,6 +412,7 @@ def shein__image__delete(sender, instance, **kwargs):
         task_runner = SheinProductImagesAddTask(
             task_func=shein__image__delete_db_task,
             product=product,
+            media_product_through_id=None,
             number_of_remote_requests=0,
         )
         task_runner.set_extra_task_kwargs(

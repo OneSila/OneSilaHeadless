@@ -30,6 +30,10 @@ def _enqueue_sync_requests(*, queryset):
     return success_count, errors
 
 
+def _set_sync_request_status(*, queryset, status):
+    return queryset.update(status=status)
+
+
 @admin.action(description=_("Enqueue selected sync requests"))
 def enqueue_sync_requests_action(modeladmin, request, queryset):
     success_count, errors = _enqueue_sync_requests(queryset=queryset)
@@ -45,6 +49,42 @@ def enqueue_sync_requests_action(modeladmin, request, queryset):
             _("Failed to enqueue %(count)s sync request(s).") % {"count": len(errors)},
             level=messages.ERROR,
         )
+
+
+@admin.action(description=_("Mark selected sync requests as done"))
+def mark_sync_requests_done_action(modeladmin, request, queryset):
+    updated = _set_sync_request_status(queryset=queryset, status=SyncRequest.STATUS_DONE)
+    modeladmin.message_user(
+        request,
+        _("Updated %(count)s sync request(s) to done.") % {"count": updated},
+        level=messages.SUCCESS,
+    )
+
+
+@admin.action(description=_("Mark selected sync requests as skipped"))
+def mark_sync_requests_skipped_action(modeladmin, request, queryset):
+    updated = _set_sync_request_status(
+        queryset=queryset,
+        status=SyncRequest.STATUS_SKIPPED,
+    )
+    modeladmin.message_user(
+        request,
+        _("Updated %(count)s sync request(s) to skipped.") % {"count": updated},
+        level=messages.SUCCESS,
+    )
+
+
+@admin.action(description=_("Mark selected sync requests as pending"))
+def mark_sync_requests_pending_action(modeladmin, request, queryset):
+    updated = _set_sync_request_status(
+        queryset=queryset,
+        status=SyncRequest.STATUS_PENDING,
+    )
+    modeladmin.message_user(
+        request,
+        _("Updated %(count)s sync request(s) to pending.") % {"count": updated},
+        level=messages.SUCCESS,
+    )
 
 @admin.register(RemoteProductConfigurator)
 class RemoteProductConfiguratorAdmin(ModelAdmin):
@@ -143,7 +183,12 @@ class SalesChannelGptFeedAdmin(ModelAdmin):
 
 @admin.register(SyncRequest)
 class SyncRequestAdmin(ModelAdmin):
-    actions = [enqueue_sync_requests_action]
+    actions = [
+        enqueue_sync_requests_action,
+        mark_sync_requests_done_action,
+        mark_sync_requests_skipped_action,
+        mark_sync_requests_pending_action,
+    ]
     list_display = (
         "id",
         "sync_type",
