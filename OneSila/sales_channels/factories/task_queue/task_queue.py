@@ -580,17 +580,50 @@ class ProductScopedAddTask(ChannelScopedAddTask):
 
 class ProductPropertyAddTask(ProductScopedAddTask):
     sync_type = "property"
+    ILFD11000x2
+    def __init__(
+        self,
+        *,
+        product_property=None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.local_instance = product_property
+        if product_property is not None:
+            self.set_extra_task_kwargs(product_property_id=product_property.id)
+
 
     def guard(self, *, target: TaskTarget) -> GuardResult:
-        # Guard intent (property):
-        # - extra check for internal information to skip
-        # - Only meaningful for products where the property is actually used on the channel.
-        # - For marketplaces: must pass integration-specific mapping checks
-        #   (property mapped, used in category, select/multi-select value mapped).
-        # - For variations: if the property change should escalate to parent, do it in create_sync_request.
-        # - Skip when no effective change would happen (e.g., property not relevant to the channel/rule).
-        # TODO: add property-specific guards.
-        return GuardResult(allowed=True)
+        guard_result = super().guard(target=target)
+        if not guard_result.allowed:
+            return guard_result
+
+        product_property = self.local_instance
+        if product_property is None:
+            return GuardResult(allowed=False, reason="product_property_missing")
+
+        property_obj = getattr(product_property, "property", None)
+        if property_obj is None:
+            return GuardResult(allowed=False, reason="property_missing")
+
+        if not property_obj.is_public_information:
+            return GuardResult(allowed=False, reason="property_internal")
+
+        rule = self.product.get_product_rule(sales_channel=target.sales_channel)
+        if not rule:
+            return GuardResult(allowed=False, reason="property_rule_missing")
+
+        from properties.models import ProductPropertiesRuleItem
+
+        is_used = ProductPropertiesRuleItem.objects.filter(
+            rule=rule,
+            property=property_obj,
+        ).exists()
+        if not is_used:
+            return GuardResult(allowed=False, reason="property_not_used_in_rule")
+
+        return guard_result
 
 
 class ProductPriceAddTask(ProductScopedAddTask):

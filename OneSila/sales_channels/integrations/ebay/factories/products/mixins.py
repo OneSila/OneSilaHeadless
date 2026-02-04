@@ -1135,8 +1135,6 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         if isinstance(value, Iterable) and not isinstance(value, (str, bytes, bytearray)):
             filtered = [entry for entry in value if entry not in (None, "")]
             return filtered or None
-        if isinstance(value, (date, datetime)):
-            return value.isoformat()
         return value
 
     def _assign_nested_value(self, *, container: Dict[str, Any], path: str, value: Any) -> None:

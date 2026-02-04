@@ -156,6 +156,7 @@ def shein__product_property__create(sender, instance, **kwargs):
     task_runner = SheinProductPropertyAddTask(
         task_func=shein__product_property__create_db_task,
         product=product,
+        product_property=instance,
         number_of_remote_requests=0,
     )
     task_runner.set_extra_task_kwargs(
@@ -163,6 +164,7 @@ def shein__product_property__create(sender, instance, **kwargs):
             "product_property_id": instance.id,
             "property_id": getattr(property_obj, "id", None),
             "property_code": getattr(property_obj, "code", None),
+            "value": instance.get_serialised_value(kwargs.get("language", None)),
         },
     )
     task_runner.run()
@@ -180,6 +182,7 @@ def shein__product_property__update(sender, instance, **kwargs):
     task_runner = SheinProductPropertyAddTask(
         task_func=shein__product_property__update_db_task,
         product=product,
+        product_property=instance,
         number_of_remote_requests=0,
     )
     task_runner.set_extra_task_kwargs(
@@ -188,6 +191,7 @@ def shein__product_property__update(sender, instance, **kwargs):
             "property_id": getattr(property_obj, "id", None),
             "property_code": getattr(property_obj, "code", None),
             "payload_keys": sorted(kwargs.keys()),
+            "value": instance.get_serialised_value(kwargs.get("language", None)),
         },
     )
     task_runner.run()
@@ -205,6 +209,7 @@ def shein__product_property__delete(sender, instance, **kwargs):
     task_runner = SheinProductPropertyAddTask(
         task_func=shein__product_property__delete_db_task,
         product=product,
+        product_property=instance,
         number_of_remote_requests=0,
     )
     task_runner.set_extra_task_kwargs(
@@ -212,6 +217,7 @@ def shein__product_property__delete(sender, instance, **kwargs):
             "product_property_id": instance.id,
             "property_id": getattr(property_obj, "id", None),
             "property_code": getattr(property_obj, "code", None),
+            "value": instance.get_serialised_value(kwargs.get("language", None)),
         },
     )
     task_runner.run()

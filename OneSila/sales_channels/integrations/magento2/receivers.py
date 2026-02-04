@@ -167,9 +167,9 @@ def sales_channels__magento__product_property__create(sender, instance, **kwargs
     task_runner = MagentoProductPropertyAddTask(
         task_func=create_magento_product_property_db_task,
         product=instance.product,
+        product_property=instance,
     )
     task_runner.set_extra_task_kwargs(
-        product_property_id=instance.id,
         language=language,
     )
     task_runner.run()
@@ -184,9 +184,9 @@ def sales_channels__magento__product_property__update(sender, instance, **kwargs
     task_runner = MagentoProductPropertyAddTask(
         task_func=update_magento_product_property_db_task,
         product=instance.product,
+        product_property=instance,
     )
     task_runner.set_extra_task_kwargs(
-        product_property_id=instance.id,
         language=language,
     )
     task_runner.run()

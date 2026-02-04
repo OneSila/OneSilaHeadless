@@ -155,8 +155,8 @@ def shopify__product_property__create(sender, instance, **kwargs):
     task_runner = ShopifyProductPropertyAddTask(
         task_func=create_shopify_product_property_db_task,
         product=instance.product,
+        product_property=instance,
     )
-    task_runner.set_extra_task_kwargs(product_property_id=instance.id)
     task_runner.run()
 
 
@@ -167,8 +167,8 @@ def shopify__product_property__update(sender, instance, **kwargs):
     task_runner = ShopifyProductPropertyAddTask(
         task_func=update_shopify_product_property_db_task,
         product=instance.product,
+        product_property=instance,
     )
-    task_runner.set_extra_task_kwargs(product_property_id=instance.id)
     task_runner.run()
 
 
