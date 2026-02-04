@@ -3,10 +3,16 @@ from unittest.mock import patch
 from currencies.models import Currency
 from integrations.helpers import get_import_path
 from integrations.models import IntegrationTaskQueue
+from eancodes.models import EanCode
 from media.models import Media, MediaProductThrough
 from products.models import ConfigurableVariation, Product
 from properties.models import ProductProperty, Property
-from sales_channels.integrations.ebay.models import EbayProduct, EbaySalesChannelView
+from sales_channels.integrations.ebay.models import EbayProductCategory, EbayProductType, EbayProductTypeItem, EbayProperty
+from sales_channels.integrations.ebay.models import (
+    EbayCategory,
+    EbayProduct,
+    EbaySalesChannelView,
+)
 from sales_channels.integrations.ebay.tasks_receiver_audit import (
     ebay__content__update_db_task,
     ebay__ean_code__update_db_task,
@@ -23,6 +29,7 @@ from sales_channels.integrations.ebay.tasks_receiver_audit import (
     ebay__variation__remove_db_task,
 )
 from sales_channels.integrations.ebay.tests.tests_factories.mixins import TestCaseEbayMixin
+from sales_channels.tests.tests_receivers.mixins import AddTaskSyncRequestTestMixin
 from sales_channels.models import SalesChannelViewAssign, SyncRequest
 from sales_channels.signals import (
     add_remote_product_variation,
@@ -41,7 +48,7 @@ from sales_channels.signals import (
 )
 
 
-class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
+class EbayMarketplaceSyncRequestTests(AddTaskSyncRequestTestMixin, TestCaseEbayMixin):
     def setUp(self):
         super().setUp()
         self._create_remote_product_patcher = patch(
@@ -57,6 +64,13 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             remote_id="EBAY_GB",
             name="UK",
         )
+        self.category = EbayCategory.objects.create(
+            marketplace_default_tree_id=getattr(self.view, "default_category_tree_id", None) or "0",
+            remote_id="123",
+            name="Category",
+            full_name="Category",
+            has_children=False,
+        )
         self.product = Product.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             type=Product.SIMPLE,
@@ -65,6 +79,8 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             sales_channel=self.sales_channel,
             local_instance=self.product,
         )
+        self.remote_product.successfully_created = True
+        self.remote_product.save(update_fields=["successfully_created"])
         SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,
@@ -72,6 +88,37 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             sales_channel_view=self.view,
             remote_product=self.remote_product,
         )
+        self._init_product_rule()
+
+    def _map_ebay_property(self, *, property_obj):
+        ebay_property = EbayProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            local_instance=property_obj,
+            remote_id="PROP",
+        )
+        ebay_type = EbayProductType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            marketplace=self.view,
+            local_instance=self.rule,
+            remote_id="123",
+        )
+        EbayProductTypeItem.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product_type=ebay_type,
+            ebay_property=ebay_property,
+        )
+        EbayProductCategory.objects.create(
+            product=self.product,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            view=self.view,
+            remote_id="123",
+        )
+        return ebay_property
 
     def _assert_sync_request(self, *, sync_type, task_func):
         sync_request = SyncRequest.objects.get(
@@ -144,6 +191,8 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             type=Property.TYPES.INT,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._add_rule_item(property_obj=property_instance)
+        self._map_ebay_property(property_obj=property_instance)
         product_property = ProductProperty.objects.create(
             product=self.product,
             property=property_instance,
@@ -162,12 +211,15 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             type=Property.TYPES.INT,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._add_rule_item(property_obj=property_instance)
+        self._map_ebay_property(property_obj=property_instance)
         product_property = ProductProperty.objects.create(
             product=self.product,
             property=property_instance,
             value_int=5,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._mark_sync_requests_done()
         update_remote_product_property.send(
             sender=product_property.__class__,
             instance=product_property,
@@ -184,12 +236,15 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             type=Property.TYPES.INT,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._add_rule_item(property_obj=property_instance)
+        self._map_ebay_property(property_obj=property_instance)
         product_property = ProductProperty.objects.create(
             product=self.product,
             property=property_instance,
             value_int=7,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._mark_sync_requests_done()
         delete_remote_product_property.send(
             sender=product_property.__class__,
             instance=product_property,
@@ -241,6 +296,7 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             product=self.product,
             media=image,
             multi_tenant_company=self.multi_tenant_company,
+            is_main_image=True,
         )
         # no need to add signal because is automatically sent above
 
@@ -260,6 +316,7 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             multi_tenant_company=self.multi_tenant_company,
             is_main_image=True,
         )
+        self._mark_sync_requests_done()
         update_remote_image_association.send(
             sender=association.__class__,
             instance=association,
@@ -280,7 +337,9 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             product=self.product,
             media=image,
             multi_tenant_company=self.multi_tenant_company,
+            is_main_image=True,
         )
+        self._mark_sync_requests_done()
         delete_remote_image_association.send(
             sender=association.__class__,
             instance=association,
@@ -300,6 +359,7 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
             product=self.product,
             media=image,
             multi_tenant_company=self.multi_tenant_company,
+            is_main_image=True,
         )
 
         delete_remote_image.send(
@@ -324,6 +384,11 @@ class EbayMarketplaceSyncRequestTests(TestCaseEbayMixin):
         )
 
     def test_ebay_ean_code_update_creates_sync_request(self):
+        EanCode.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=self.product,
+            ean_code="EAN-123",
+        )
         update_remote_product_eancode.send(
             sender=self.product.__class__,
             instance=self.product,

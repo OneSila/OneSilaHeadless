@@ -428,14 +428,19 @@ class AddTaskBase:
             if sync_type == SyncRequest.TYPE_PRODUCT:
                 # Example: incoming is already "product" and there are no other non-product pending.
                 # Reuse the existing product request or create a new pending one.
-                if not existing_product:
-                    existing_product = self._create_product_request(
+                if existing_product:
+                    product_request = existing_product
+                else:
+                    product_request = self._create_sync_request_record(
                         remote_product=base_remote_product,
                         sales_channel=sales_channel,
                         sales_channel_view_id=sales_channel_view_id,
+                        sync_type=sync_type,
                         reason=sync_request_reason,
+                        task_func_path=task_func_path,
+                        task_kwargs=task_kwargs,
+                        status=SyncRequest.STATUS_PENDING,
                     )
-                product_request = existing_product
             else:
                 # Example: incoming is "price" and there are no other pending requests.
                 # Create a pending non-product request and stop (no sibling escalation).

@@ -7,7 +7,7 @@ from integrations.models import IntegrationTaskQueue
 from currencies.models import Currency
 from media.models import Media, MediaProductThrough
 from products.models import Product, ConfigurableVariation
-from properties.models import ProductProperty, Property
+from properties.models import ProductProperty, Property, ProductPropertiesRuleItem
 from sales_channels.models import SalesChannelViewAssign, SyncRequest
 from sales_channels import signals as sc_signals
 from sales_channels.signals import (
@@ -24,7 +24,15 @@ from sales_channels.signals import (
     update_remote_product_property, update_remote_image_association,
 )
 
-from sales_channels.integrations.amazon.models import AmazonSalesChannel, AmazonSalesChannelView, AmazonProduct
+from sales_channels.integrations.amazon.models import (
+    AmazonProduct,
+    AmazonProductType,
+    AmazonProductTypeItem,
+    AmazonProperty,
+    AmazonSalesChannel,
+    AmazonSalesChannelView,
+)
+from sales_channels.tests.tests_receivers.mixins import AddTaskSyncRequestTestMixin
 from sales_channels.integrations.amazon.tasks_receiver_audit import (
     amazon__content__update_db_task,
     amazon__image__delete_db_task,
@@ -41,7 +49,7 @@ from sales_channels.integrations.amazon.tasks_receiver_audit import (
 )
 
 
-class AmazonMarketplaceSyncRequestTests(TestCase):
+class AmazonMarketplaceSyncRequestTests(AddTaskSyncRequestTestMixin, TestCase):
     def setUp(self):
         super().setUp()
         self._create_product_signal_patcher = patch.object(
@@ -69,6 +77,8 @@ class AmazonMarketplaceSyncRequestTests(TestCase):
             sales_channel=self.sales_channel,
             local_instance=self.product,
         )
+        self.remote_product.successfully_created = True
+        self.remote_product.save(update_fields=["successfully_created"])
         self.assign = SalesChannelViewAssign.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             product=self.product,
@@ -76,6 +86,30 @@ class AmazonMarketplaceSyncRequestTests(TestCase):
             sales_channel_view=self.view,
             remote_product=self.remote_product,
         )
+        self._init_product_rule()
+
+    def _map_amazon_property(self, *, property_obj):
+        amazon_property = AmazonProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=property_obj,
+            remote_id="AMZ-PROP",
+            name="Amazon Prop",
+        )
+        amazon_type = AmazonProductType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.rule,
+            product_type_code="TYPE-A",
+        )
+        AmazonProductTypeItem.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            amazon_rule=amazon_type,
+            remote_property=amazon_property,
+            local_instance=ProductPropertiesRuleItem.objects.filter(rule=self.rule, property=property_obj).first(),
+        )
+        return amazon_property
 
     def _assert_sync_request(self, *, sync_type, task_func):
         sync_request = SyncRequest.objects.get(
@@ -94,6 +128,7 @@ class AmazonMarketplaceSyncRequestTests(TestCase):
                 integration_id=self.sales_channel.id,
             ).exists()
         )
+
 
     def test_amazon_content_update_creates_sync_request(self):
         update_remote_product_content.send(
@@ -138,6 +173,9 @@ class AmazonMarketplaceSyncRequestTests(TestCase):
             type=Property.TYPES.INT,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._add_rule_item(property_obj=property_instance)
+        self._map_amazon_property(property_obj=property_instance)
+
         product_property = ProductProperty.objects.create(
             product=self.product,
             property=property_instance,
@@ -156,12 +194,15 @@ class AmazonMarketplaceSyncRequestTests(TestCase):
             type=Property.TYPES.INT,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._add_rule_item(property_obj=property_instance)
+        self._map_amazon_property(property_obj=property_instance)
         product_property = ProductProperty.objects.create(
             product=self.product,
             property=property_instance,
             value_int=6,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._mark_sync_requests_done()
         update_remote_product_property.send(
             sender=product_property.__class__,
             instance=product_property,
@@ -176,12 +217,15 @@ class AmazonMarketplaceSyncRequestTests(TestCase):
             type=Property.TYPES.INT,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._add_rule_item(property_obj=property_instance)
+        self._map_amazon_property(property_obj=property_instance)
         product_property = ProductProperty.objects.create(
             product=self.product,
             property=property_instance,
             value_int=7,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._mark_sync_requests_done()
         delete_remote_product_property.send(
             sender=product_property.__class__,
             instance=product_property,
@@ -230,6 +274,7 @@ class AmazonMarketplaceSyncRequestTests(TestCase):
             product=self.product,
             media=image,
             multi_tenant_company=self.multi_tenant_company,
+            is_main_image=True,
         )
         # no need to add signal because is automatically sent above
 
@@ -248,6 +293,7 @@ class AmazonMarketplaceSyncRequestTests(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             is_main_image=True,
         )
+        self._mark_sync_requests_done()
         update_remote_image_association.send(
             sender=media_product_through.__class__,
             instance=media_product_through,
@@ -266,7 +312,9 @@ class AmazonMarketplaceSyncRequestTests(TestCase):
             product=self.product,
             media=image,
             multi_tenant_company=self.multi_tenant_company,
+            is_main_image=True,
         )
+        self._mark_sync_requests_done()
         delete_remote_image_association.send(
             sender=media_product_through.__class__,
             instance=media_product_through,
@@ -314,6 +362,7 @@ class AmazonImageDeleteSyncRequestTests(TestCase):
             product=self.product,
             media=image,
             multi_tenant_company=self.multi_tenant_company,
+            is_main_image=True,
         )
 
         delete_remote_image.send(

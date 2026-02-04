@@ -61,8 +61,14 @@ class EbayProductImagesAddTask(ProductImagesAddTask, EbayNonLiveMarketplaceViewA
 
 class EbayProductPropertyAddTask(ProductPropertyAddTask, EbayNonLiveMarketplaceViewAddTask):
     def _get_category_id(self, *, view) -> str | None:
+        from sales_channels.integrations.ebay.models import EbaySalesChannelView
+
         product = getattr(self, "product", None)
         if product is None or view is None:
+            return None
+        if not hasattr(view, "sales_channel"):
+            view = EbaySalesChannelView.objects.get(id=view)
+        if view is None:
             return None
 
         direct_remote_id = (

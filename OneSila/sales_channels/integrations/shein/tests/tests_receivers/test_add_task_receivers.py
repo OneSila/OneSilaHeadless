@@ -1,4 +1,5 @@
 from currencies.models import Currency
+from eancodes.models import EanCode
 from integrations.helpers import get_import_path
 from integrations.models import IntegrationTaskQueue
 from media.models import Media, MediaProductThrough
@@ -6,7 +7,15 @@ from products.models import ConfigurableVariation, Product
 from properties.models import ProductProperty, Property
 
 from core.tests import TestCase
-from sales_channels.integrations.shein.models import SheinProduct, SheinSalesChannel
+from sales_channels.integrations.shein.models import (
+    SheinCategory,
+    SheinProduct,
+    SheinProductCategory,
+    SheinProductType,
+    SheinProductTypeItem,
+    SheinProperty,
+    SheinSalesChannel,
+)
 from sales_channels.integrations.shein.tasks_receiver_audit import (
     shein__content__update_db_task,
     shein__ean_code__update_db_task,
@@ -23,6 +32,7 @@ from sales_channels.integrations.shein.tasks_receiver_audit import (
     shein__variation__remove_db_task,
 )
 from sales_channels.models import SyncRequest
+from sales_channels.tests.tests_receivers.mixins import AddTaskSyncRequestTestMixin
 from sales_channels.signals import (
     add_remote_product_variation,
     create_remote_image_association,
@@ -40,7 +50,7 @@ from sales_channels.signals import (
 )
 
 
-class SheinMarketplaceSyncRequestTests(TestCase):
+class SheinMarketplaceSyncRequestTests(AddTaskSyncRequestTestMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = SheinSalesChannel.objects.create(
@@ -55,6 +65,45 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             sales_channel=self.sales_channel,
             local_instance=self.product,
         )
+        self.remote_product.successfully_created = True
+        self.remote_product.save(update_fields=["successfully_created"])
+        self.category = SheinCategory.objects.create(
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.multi_tenant_company,
+            remote_id="CAT-1",
+            name="Category",
+            is_leaf=True,
+            product_type_remote_id="TYPE_A",
+        )
+        self._init_product_rule()
+
+    def _map_shein_property(self, *, property_obj):
+        shein_property = SheinProperty.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=property_obj,
+            remote_id="PROP",
+        )
+        shein_type = SheinProductType.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=self.rule,
+            remote_id="TYPE_A",
+        )
+        SheinProductTypeItem.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product_type=shein_type,
+            property=shein_property,
+        )
+        SheinProductCategory.objects.create(
+            product=self.product,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            remote_id="CAT-1",
+            product_type_remote_id="TYPE_A",
+        )
+        return shein_property
 
     def _assert_sync_request(self, *, sync_type, task_func):
         sync_request = SyncRequest.objects.get(
@@ -138,6 +187,8 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             type=Property.TYPES.INT,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._add_rule_item(property_obj=property_instance)
+        self._map_shein_property(property_obj=property_instance)
         product_property = ProductProperty.objects.create(
             product=self.product,
             property=property_instance,
@@ -157,12 +208,15 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             type=Property.TYPES.INT,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._add_rule_item(property_obj=property_instance)
+        self._map_shein_property(property_obj=property_instance)
         product_property = ProductProperty.objects.create(
             product=self.product,
             property=property_instance,
             value_int=5,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._mark_sync_requests_done()
         update_remote_product_property.send(
             sender=product_property.__class__,
             instance=product_property,
@@ -179,12 +233,15 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             type=Property.TYPES.INT,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._add_rule_item(property_obj=property_instance)
+        self._map_shein_property(property_obj=property_instance)
         product_property = ProductProperty.objects.create(
             product=self.product,
             property=property_instance,
             value_int=7,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._mark_sync_requests_done()
         delete_remote_product_property.send(
             sender=product_property.__class__,
             instance=product_property,
@@ -236,6 +293,7 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             product=self.product,
             media=image,
             multi_tenant_company=self.multi_tenant_company,
+            is_main_image=True,
         )
         # no need to send the signal because is automatically sent
 
@@ -253,8 +311,9 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             product=self.product,
             media=image,
             multi_tenant_company=self.multi_tenant_company,
-            is_main_image=True
+            is_main_image=True,
         )
+        self._mark_sync_requests_done()
         update_remote_image_association.send(
             sender=association.__class__,
             instance=association,
@@ -274,7 +333,9 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             product=self.product,
             media=image,
             multi_tenant_company=self.multi_tenant_company,
+            is_main_image=True,
         )
+        self._mark_sync_requests_done()
         delete_remote_image_association.send(
             sender=association.__class__,
             instance=association,
@@ -294,8 +355,10 @@ class SheinMarketplaceSyncRequestTests(TestCase):
             product=self.product,
             media=image,
             multi_tenant_company=self.multi_tenant_company,
+            is_main_image=True,
         )
 
+        self._mark_sync_requests_done()
         delete_remote_image.send(
             sender=image.__class__,
             instance=image,
@@ -317,6 +380,11 @@ class SheinMarketplaceSyncRequestTests(TestCase):
         )
 
     def test_shein_ean_code_update_creates_sync_request(self):
+        EanCode.objects.create(
+            product=self.product,
+            multi_tenant_company=self.multi_tenant_company,
+            ean_code="EAN-123",
+        )
         update_remote_product_eancode.send(
             sender=self.product.__class__,
             instance=self.product,
