@@ -40,8 +40,10 @@ from sales_channels.integrations.amazon.factories.products.content import (
 )
 from sales_channels.integrations.amazon.helpers import is_safe_content
 from sales_channels.integrations.amazon.models.products import (
-    AmazonProduct,
     AmazonEanCode,
+    AmazonPrice,
+    AmazonProduct,
+    AmazonProductContent,
 )
 from sales_channels.integrations.amazon.models.properties import (
     AmazonProductProperty,
@@ -1035,8 +1037,8 @@ class AmazonProductUpdateFactory(AmazonProductBaseFactory, RemoteProductUpdateFa
 class AmazonProductCreateFactory(AmazonProductBaseFactory, RemoteProductCreateFactory):
     remote_id_map = "sku"
     fixing_identifier_class = AmazonProductBaseFactory
-    remote_product_content_class = None
-    remote_price_class = None
+    remote_product_content_class = AmazonProductContent
+    remote_price_class = AmazonPrice
     remote_product_eancode_class = AmazonEanCode
 
     def set_remote_product_for_logging(self):

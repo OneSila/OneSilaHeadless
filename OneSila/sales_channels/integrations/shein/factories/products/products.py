@@ -28,8 +28,10 @@ from sales_channels.exceptions import PreFlightCheckError, SkipSyncBecauseOfStat
 from sales_channels.integrations.shein.models import (
     SheinCategory,
     SheinInternalProperty,
+    SheinPrice,
     SheinProduct,
     SheinProductCategory,
+    SheinProductContent,
     SheinProductType,
     SheinProductTypeItem,
 )
@@ -1975,6 +1977,8 @@ class SheinProductCreateFactory(SheinProductBaseFactory, RemoteProductCreateFact
     fixing_identifier_class = SheinProductBaseFactory
     action_log = RemoteLog.ACTION_CREATE
     sync_product_factory = SheinProductUpdateFactory
+    remote_price_class = SheinPrice
+    remote_product_content_class = SheinProductContent
 
     def create_remote(self):
         return self.perform_remote_action()

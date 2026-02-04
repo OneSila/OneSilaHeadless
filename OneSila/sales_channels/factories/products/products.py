@@ -1433,6 +1433,14 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
                 sales_channel=self.sales_channel,
                 multi_tenant_company=self.sales_channel.multi_tenant_company
             )
+            from sales_channels.helpers import build_content_data, compute_content_data_hash
+
+            content_data = build_content_data(
+                product=self.local_instance,
+                sales_channel=self.sales_channel,
+            )
+            self.remote_instance.content.content_data = content_data
+            self.remote_instance.content.save()
             logger.debug(f"Created RemoteProductContent for {self.remote_instance}")
         else:
             raise NotImplementedError("No remote_product_content_class found in {self.__class__.__name__}")
@@ -1479,7 +1487,7 @@ class RemoteProductCreateFactory(RemoteProductSyncFactory):
             # Update the price_data JSON field with the current self.prices_data
             if hasattr(self, "prices_data"):
                 remote_price_obj.price_data = self.prices_data
-                remote_price_obj.save(update_fields=["price_data"])
+                remote_price_obj.save()
                 logger.debug(f"Updated price_data for {self.remote_instance} → {self.prices_data}")
         else:
             msg = f"No remote_price_class found in {self.__class__.__name__}"
