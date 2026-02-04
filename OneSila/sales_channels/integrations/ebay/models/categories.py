@@ -44,6 +44,9 @@ class EbayProductCategory(models.Model):
 
     class Meta:
         unique_together = ("product", "view")
+        indexes = [
+            models.Index(fields=["product", "view"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.product} @ {self.view}: {self.remote_id}"

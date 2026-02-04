@@ -621,7 +621,7 @@ class ShopifyProductScopedAddReceiverTests(
             IntegrationTaskQueue.objects.filter(
                 integration_id=self.sales_channel.id,
             ).count(),
-            initial_count + 2, # + 2 because is doing a proudct_propery update and a product resync
+            initial_count + 1,
         )
 
         task = IntegrationTaskQueue.objects.filter(
@@ -633,6 +633,46 @@ class ShopifyProductScopedAddReceiverTests(
         )
         self.assertEqual(task.task_kwargs.get("product_id"), product.id)
         self.assertEqual(task.task_kwargs.get("remote_product_id"), remote_product.id)
+
+    def test_shopify_tags_property_does_not_queue_property_task(self, *, _unused=None):
+        product, _remote_product = self._create_product_and_remote(sku="SHP-TAGS-2")
+        property_instance = Property.objects.create(
+            type=Property.TYPES.TEXT,
+            internal_name=SHOPIFY_TAGS,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product_property = ProductProperty.objects.create(
+            product=product,
+            property=property_instance,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductPropertyTextTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product_property=product_property,
+            language="en",
+            value_text="new-tag",
+        )
+
+        initial_count = IntegrationTaskQueue.objects.filter(
+            integration_id=self.sales_channel.id,
+        ).count()
+
+        with patch.object(
+            transaction,
+            "on_commit",
+            side_effect=lambda func, using=None: func(),
+        ):
+            create_remote_product_property.send(
+                sender=product_property.__class__,
+                instance=product_property,
+            )
+
+        self.assertEqual(
+            IntegrationTaskQueue.objects.filter(
+                integration_id=self.sales_channel.id,
+            ).count(),
+            initial_count,
+        )
 
     def test_shopify_variation_add_queues_task(self, *, _unused=None):
         parent_product = Product.objects.create(

@@ -1,5 +1,6 @@
 from sales_channels.factories.task_queue import (
     ChannelScopedAddTask,
+    GuardResult,
     ProductContentAddTask,
     ProductEanCodeAddTask,
     ProductImagesAddTask,
@@ -9,7 +10,14 @@ from sales_channels.factories.task_queue import (
     SingleViewAddTask,
     ViewScopedAddTask,
 )
-from sales_channels.integrations.ebay.models import EbaySalesChannel
+from sales_channels.integrations.ebay.models import (
+    EbayProductCategory,
+    EbayProperty,
+    EbayPropertySelectValue,
+    EbayProductType,
+    EbayProductTypeItem,
+    EbaySalesChannel,
+)
 from sales_channels.integrations.ebay.tasks import resync_ebay_product_db_task
 from sales_channels.models import SalesChannelViewAssign
 
@@ -52,7 +60,108 @@ class EbayProductImagesAddTask(ProductImagesAddTask, EbayNonLiveMarketplaceViewA
 
 
 class EbayProductPropertyAddTask(ProductPropertyAddTask, EbayNonLiveMarketplaceViewAddTask):
-    pass
+    def _get_category_id(self, *, view) -> str | None:
+        product = getattr(self, "product", None)
+        if product is None or view is None:
+            return None
+
+        direct_remote_id = (
+            EbayProductCategory.objects.filter(
+                product=product,
+                sales_channel=view.sales_channel,
+                view=view,
+            )
+            .exclude(remote_id__in=(None, ""))
+            .values_list("remote_id", flat=True)
+            .first()
+        )
+        if direct_remote_id:
+            candidate = str(direct_remote_id).strip()
+            if candidate:
+                return candidate
+
+
+        product_type_remote_id = (
+            EbayProductType.objects.filter(
+                sales_channel=view.sales_channel,
+                marketplace=view,
+                local_instance=self.rule,
+            )
+            .exclude(remote_id__in=(None, ""))
+            .values_list("remote_id", flat=True)
+            .first()
+        )
+        if product_type_remote_id:
+            candidate = str(product_type_remote_id).strip()
+            if candidate:
+                return candidate
+
+        return None
+
+    def guard(self, *, target):
+        guard_result = super().guard(target=target)
+        if not guard_result.allowed:
+            return guard_result
+
+        if target.sales_channel_view is None:
+            return GuardResult(allowed=False, reason="ebay_view_missing")
+
+        product_property = self.local_instance
+        property_obj = getattr(product_property, "property", None) if product_property else None
+        if property_obj is None:
+            return GuardResult(allowed=False, reason="ebay_property_missing")
+
+        ebay_properties = EbayProperty.objects.filter(
+            local_instance=property_obj,
+            marketplace=target.sales_channel_view,
+        )
+        if not ebay_properties.exists():
+            return GuardResult(allowed=False, reason="ebay_property_not_mapped")
+
+        category_id = self._get_category_id(view=target.sales_channel_view)
+        if not category_id:
+            return GuardResult(allowed=False, reason="ebay_category_missing")
+
+        if not EbayProductTypeItem.objects.filter(
+            ebay_property__in=ebay_properties,
+            product_type__remote_id=category_id,
+            product_type__marketplace=target.sales_channel_view,
+            product_type__sales_channel=target.sales_channel,
+        ).exists():
+            return GuardResult(allowed=False, reason="ebay_aspect_not_allowed_in_category")
+
+        if property_obj.type in {property_obj.TYPES.SELECT, property_obj.TYPES.MULTISELECT}:
+            if ebay_properties.filter(allows_unmapped_values=True).exists():
+                return guard_result
+
+            if property_obj.type == property_obj.TYPES.SELECT:
+                select_value = getattr(product_property, "value_select", None)
+                if select_value is None:
+                    return GuardResult(allowed=False, reason="ebay_select_value_missing")
+                is_mapped = EbayPropertySelectValue.objects.filter(
+                    ebay_property__in=ebay_properties,
+                    marketplace=target.sales_channel_view,
+                    local_instance=select_value,
+                ).exists()
+                if not is_mapped:
+                    return GuardResult(allowed=False, reason="ebay_select_value_unmapped")
+
+            if property_obj.type == property_obj.TYPES.MULTISELECT:
+                values = list(product_property.value_multi_select.all())
+                if not values:
+                    return GuardResult(allowed=False, reason="ebay_multiselect_value_missing")
+
+                mapped_ids = set(
+                    EbayPropertySelectValue.objects.filter(
+                        ebay_property__in=ebay_properties,
+                        marketplace=target.sales_channel_view,
+                        local_instance__in=values,
+                    ).values_list("local_instance_id", flat=True)
+                )
+                if any(value.id not in mapped_ids for value in values):
+                    return GuardResult(allowed=False, reason="ebay_multiselect_value_unmapped")
+
+        return guard_result
 
 
 class EbayProductUpdateAddTask(ProductUpdateAddTask, EbayNonLiveMarketplaceViewAddTask):

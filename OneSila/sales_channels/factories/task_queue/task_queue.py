@@ -580,7 +580,7 @@ class ProductScopedAddTask(ChannelScopedAddTask):
 
 class ProductPropertyAddTask(ProductScopedAddTask):
     sync_type = "property"
-    ILFD11000x2
+
     def __init__(
         self,
         *,
@@ -610,14 +610,14 @@ class ProductPropertyAddTask(ProductScopedAddTask):
         if not property_obj.is_public_information:
             return GuardResult(allowed=False, reason="property_internal")
 
-        rule = self.product.get_product_rule(sales_channel=target.sales_channel)
-        if not rule:
+        self.rule = self.product.get_product_rule(sales_channel=target.sales_channel)
+        if not self.rule:
             return GuardResult(allowed=False, reason="property_rule_missing")
 
         from properties.models import ProductPropertiesRuleItem
 
         is_used = ProductPropertiesRuleItem.objects.filter(
-            rule=rule,
+            rule=self.rule,
             property=property_obj,
         ).exists()
         if not is_used:

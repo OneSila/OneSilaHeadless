@@ -183,6 +183,9 @@ class AmazonPropertySelectValue(RemoteObjectMixin, models.Model):
             'amazon_property__name',
             'amazon_property__code',
         ]
+        indexes = [
+            models.Index(fields=["amazon_property", "marketplace", "local_instance"]),
+        ]
 
     def __str__(self):
         return f"{self.remote_name or self.remote_value} ({self.marketplace})"
@@ -304,6 +307,9 @@ class AmazonProductTypeItem(RemoteObjectMixin, models.Model):
         unique_together = ('local_instance', 'amazon_rule')
         verbose_name = 'Amazon Product Type Item'
         verbose_name_plural = 'Amazon Product Type Items'
+        indexes = [
+            models.Index(fields=["amazon_rule", "remote_property"]),
+        ]
 
     def __str__(self):
         try:

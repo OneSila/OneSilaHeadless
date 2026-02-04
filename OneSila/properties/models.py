@@ -359,3 +359,6 @@ class ProductPropertiesRuleItem(models.Model):
         verbose_name_plural = _("Product Properties Rule Items")
         unique_together = ("property", "rule", "multi_tenant_company")
         ordering = ('sort_order',)
+        indexes = [
+            models.Index(fields=["rule", "property"]),
+        ]

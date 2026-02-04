@@ -226,6 +226,9 @@ class EbayPropertySelectValue(RemoteObjectMixin, models.Model):
         verbose_name_plural = _("eBay Property Values")
         unique_together = ('ebay_property', 'marketplace', 'localized_value')
         search_terms = ['localized_value', 'translated_value', 'ebay_property__localized_name']
+        indexes = [
+            models.Index(fields=["ebay_property", "marketplace", "local_instance"]),
+        ]
 
     def __str__(self):
         return f"{self.localized_value} ({self.marketplace})"
@@ -344,6 +347,9 @@ class EbayProductTypeItem(RemoteObjectMixin, models.Model):
         verbose_name = _("eBay Product Type Item")
         verbose_name_plural = _("eBay Product Type Items")
         unique_together = ('local_instance', 'product_type')
+        indexes = [
+            models.Index(fields=["product_type", "ebay_property"]),
+        ]
 
 
 class EbayProductProperty(RemoteProductProperty):

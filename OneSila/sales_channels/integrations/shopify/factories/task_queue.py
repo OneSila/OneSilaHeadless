@@ -1,6 +1,7 @@
 from sales_channels.factories.task_queue import (
     ChannelScopedAddTask,
     DeleteScopedAddTask,
+    GuardResult,
     ProductContentAddTask,
     ProductDeleteScopedAddTask,
     ProductEanCodeAddTask,
@@ -52,8 +53,19 @@ class ShopifyProductPriceAddTask(ProductPriceAddTask, ShopifyChannelAddTask):
 
 
 class ShopifyProductPropertyAddTask(ProductPropertyAddTask, ShopifyChannelAddTask):
-    # @TODO: Guard against the SHOPIFY_TAG update
-    pass
+    def guard(self, *, target):
+        guard_result = super().guard(target=target)
+        if not guard_result.allowed:
+            return guard_result
+
+        from sales_channels.integrations.shopify.constants import SHOPIFY_TAGS
+
+        product_property = self.local_instance
+        property_obj = getattr(product_property, "property", None) if product_property else None
+        if property_obj and property_obj.internal_name == SHOPIFY_TAGS:
+            return GuardResult(allowed=False, reason="shopify_tags_guard")
+
+        return guard_result
 
 
 class ShopifyProductUpdateAddTask(ProductUpdateAddTask, ShopifyChannelAddTask):
