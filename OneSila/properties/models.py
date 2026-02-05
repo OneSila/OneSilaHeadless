@@ -214,7 +214,10 @@ class ProductProperty(TranslatedModelMixin, models.Model):
         if self.property.type == Property.TYPES.MULTISELECT:
             value = list({value.value for value in self.value_multi_select.all()})
         elif self.property.type == Property.TYPES.SELECT:
-            value = value.value
+            if value:
+                value = value.value
+            else:
+                value = 'Unknown'
         elif hasattr(value, "isoformat"):
             value = value.isoformat()
 
