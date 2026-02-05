@@ -390,7 +390,9 @@ class AddTaskBase:
         #      - The current incoming request is represented by that product request, but we still
         #        create the current one as skipped for transparency.
         # 3. If there are no non-product pending:
-        #    - Create the request as-is (non-product), and proceed to step 2 only if it’s product.
+        #    - If a product request already exists (including on the parent for variations),
+        #      create the incoming non-product as skipped.
+        #    - Otherwise create the request as-is (non-product), and proceed to step 2 only if it’s product.
         pending_same = self._get_pending_requests_for_remote(
             remote_product=base_remote_product,
             sales_channel=sales_channel,
@@ -398,6 +400,21 @@ class AddTaskBase:
         )
         pending_non_product = pending_same.exclude(sync_type=SyncRequest.TYPE_PRODUCT)
         existing_product = pending_same.filter(sync_type=SyncRequest.TYPE_PRODUCT).first()
+        if (
+            existing_product is None
+            and sync_type != SyncRequest.TYPE_PRODUCT
+            and getattr(base_remote_product, "is_variation", False)
+        ):
+            # If a variation already has a pending parent product request, skip non-product
+            # updates directly to that parent to avoid duplicate work.
+            # if is a product it will get dedublicated at _escalate_product_to_parent_if_needed
+            parent = getattr(base_remote_product, "remote_parent_product", None)
+            if parent is not None:
+                existing_product = self._get_pending_product_request(
+                    remote_product=parent,
+                    sales_channel=sales_channel,
+                    sales_channel_view_id=sales_channel_view_id,
+                )
 
         product_request = None
 
@@ -443,17 +460,29 @@ class AddTaskBase:
                     )
             else:
                 # Example: incoming is "price" and there are no other pending requests.
-                # Create a pending non-product request and stop (no sibling escalation).
-                self._create_sync_request_record(
-                    remote_product=base_remote_product,
-                    sales_channel=sales_channel,
-                    sales_channel_view_id=sales_channel_view_id,
-                    sync_type=sync_type,
-                    reason=sync_request_reason,
-                    task_func_path=task_func_path,
-                    task_kwargs=task_kwargs,
-                    status=SyncRequest.STATUS_PENDING,
-                )
+                # If a product request exists, skip to it; otherwise create a pending non-product.
+                if existing_product:
+                    self._create_skipped_request(
+                        remote_product=base_remote_product,
+                        sales_channel=sales_channel,
+                        sales_channel_view_id=sales_channel_view_id,
+                        sync_type=sync_type,
+                        reason=sync_request_reason,
+                        task_func_path=task_func_path,
+                        task_kwargs=task_kwargs,
+                        skipped_for=existing_product,
+                    )
+                else:
+                    self._create_sync_request_record(
+                        remote_product=base_remote_product,
+                        sales_channel=sales_channel,
+                        sales_channel_view_id=sales_channel_view_id,
+                        sync_type=sync_type,
+                        reason=sync_request_reason,
+                        task_func_path=task_func_path,
+                        task_kwargs=task_kwargs,
+                        status=SyncRequest.STATUS_PENDING,
+                    )
                 return
 
         if product_request is None:

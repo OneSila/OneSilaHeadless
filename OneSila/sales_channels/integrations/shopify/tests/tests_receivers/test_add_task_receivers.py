@@ -7,6 +7,7 @@ from integrations.helpers import get_import_path
 from integrations.models import IntegrationTaskQueue
 
 from currencies.models import Currency
+from eancodes.models import EanCode
 from media.models import Media, MediaProductThrough
 from products.models import ConfigurableVariation, Product
 from properties.models import ProductProperty, ProductPropertyTextTranslation, Property
@@ -29,6 +30,7 @@ from sales_channels.signals import (
     update_remote_product_property,
 )
 from sales_channels.tests.helpers import TaskQueueDispatchPatchMixin
+from sales_channels.tests.tests_receivers.mixins import AddTaskSyncRequestTestMixin
 
 from sales_channels.integrations.shopify.constants import SHOPIFY_TAGS
 from sales_channels.integrations.shopify.models import (
@@ -61,6 +63,7 @@ from sales_channels.models import SalesChannelViewAssign
 
 class ShopifyProductScopedAddReceiverTests(
     TaskQueueDispatchPatchMixin,
+    AddTaskSyncRequestTestMixin,
     ShopifySalesChannelTestMixin,
     TransactionTestCase,
 ):
@@ -85,6 +88,10 @@ class ShopifyProductScopedAddReceiverTests(
             multi_tenant_company=self.multi_tenant_company,
         )
         return product, remote_product
+
+    def _setup_rule_for_product(self, *, product):
+        self.product = product
+        self._init_product_rule()
 
     def test_shopify_content_update_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="SHP-CONT-1")
@@ -124,6 +131,11 @@ class ShopifyProductScopedAddReceiverTests(
 
     def test_shopify_ean_code_update_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="SHP-EAN-1")
+        EanCode.objects.create(
+            product=product,
+            multi_tenant_company=self.multi_tenant_company,
+            ean_code="EAN-123",
+        )
 
         initial_count = IntegrationTaskQueue.objects.filter(
             integration_id=self.sales_channel.id,
@@ -446,10 +458,12 @@ class ShopifyProductScopedAddReceiverTests(
 
     def test_shopify_product_property_create_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="SHP-PROP-1")
+        self._setup_rule_for_product(product=product)
         property_instance = Property.objects.create(
             type=Property.TYPES.INT,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._add_rule_item(property_obj=property_instance)
         product_property = ProductProperty.objects.create(
             product=product,
             property=property_instance,
@@ -490,10 +504,12 @@ class ShopifyProductScopedAddReceiverTests(
 
     def test_shopify_product_property_update_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="SHP-PROP-2")
+        self._setup_rule_for_product(product=product)
         property_instance = Property.objects.create(
             type=Property.TYPES.INT,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._add_rule_item(property_obj=property_instance)
         product_property = ProductProperty.objects.create(
             product=product,
             property=property_instance,

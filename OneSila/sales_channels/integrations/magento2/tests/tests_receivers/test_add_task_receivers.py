@@ -5,6 +5,7 @@ from django.db import transaction
 from integrations.helpers import get_import_path
 from integrations.models import IntegrationTaskQueue
 from currencies.models import Currency
+from eancodes.models import EanCode
 from media.models import Media, MediaProductThrough
 from properties.models import Property, PropertySelectValue, ProductPropertiesRule
 from properties.models import ProductProperty
@@ -41,6 +42,7 @@ from sales_channels.signals import (
     update_remote_vat_rate,
 )
 from sales_channels.tests.helpers import TaskQueueDispatchPatchMixin
+from sales_channels.tests.tests_receivers.mixins import AddTaskSyncRequestTestMixin
 from taxes.models import VatRate
 
 from sales_channels.integrations.magento2.tests.mixins import MagentoSalesChannelTestMixin
@@ -621,6 +623,7 @@ class MagentoAddToTaskReceiverTests(
 
 class MagentoProductScopedAddReceiverTests(
     TaskQueueDispatchPatchMixin,
+    AddTaskSyncRequestTestMixin,
     MagentoSalesChannelTestMixin,
     TransactionTestCase,
 ):
@@ -645,6 +648,10 @@ class MagentoProductScopedAddReceiverTests(
             multi_tenant_company=self.multi_tenant_company,
         )
         return product, remote_product
+
+    def _setup_rule_for_product(self, *, product):
+        self.product = product
+        self._init_product_rule()
 
     def test_magento_media_product_through_create_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-IMG-1")
@@ -910,6 +917,11 @@ class MagentoProductScopedAddReceiverTests(
 
     def test_magento_product_eancode_update_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-EAN-1")
+        EanCode.objects.create(
+            product=product,
+            multi_tenant_company=self.multi_tenant_company,
+            ean_code="EAN-123",
+        )
 
         initial_count = IntegrationTaskQueue.objects.filter(
             integration_id=self.sales_channel.id,
@@ -944,10 +956,12 @@ class MagentoProductScopedAddReceiverTests(
 
     def test_magento_product_property_create_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-PROP-1")
+        self._setup_rule_for_product(product=product)
         property_instance = Property.objects.create(
             type=Property.TYPES.INT,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._add_rule_item(property_obj=property_instance)
         product_property = ProductProperty.objects.create(
             product=product,
             property=property_instance,
@@ -990,10 +1004,12 @@ class MagentoProductScopedAddReceiverTests(
 
     def test_magento_product_property_update_queues_task(self, *, _unused=None):
         product, remote_product = self._create_product_and_remote(sku="MAG-PROP-2")
+        self._setup_rule_for_product(product=product)
         property_instance = Property.objects.create(
             type=Property.TYPES.INT,
             multi_tenant_company=self.multi_tenant_company,
         )
+        self._add_rule_item(property_obj=property_instance)
         product_property = ProductProperty.objects.create(
             product=product,
             property=property_instance,
