@@ -329,6 +329,10 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
             EbaySalesChannel,
         )
 
+        link = str(self.link or "").strip()
+        if link:
+            return link
+
         sales_channel = self.sales_channel.get_real_instance()
 
         if isinstance(sales_channel, ShopifySalesChannel):
@@ -338,7 +342,18 @@ class SalesChannelViewAssign(PolymorphicModel, RemoteObjectMixin, models.Model):
         elif isinstance(sales_channel, WoocommerceSalesChannel):
             return f"{self.sales_channel_view.url}/products/{self.product.url_key}"
         elif isinstance(sales_channel, SheinSalesChannel):
-            return self.link or None
+            if not self.remote_product:
+                return None
+
+            skc_name = str(getattr(self.remote_product, "url_skc_name", "") or "").strip()
+            if not skc_name:
+                return None
+
+            base_url = str(self.sales_channel_view.url or "").strip().rstrip("/")
+            if not base_url:
+                return None
+
+            return f"{base_url}/pdsearch/{skc_name}/"
         elif isinstance(sales_channel, AmazonSalesChannel):
             try:
                 asin = AmazonExternalProductId.objects.get(
