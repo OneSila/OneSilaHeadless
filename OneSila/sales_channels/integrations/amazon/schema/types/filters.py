@@ -198,12 +198,14 @@ class AmazonProductIssueFilter(SearchFilterMixin):
 
 @filter(AmazonBrowseNode)
 class AmazonBrowseNodeFilter(SearchFilterMixin):
+    id: auto
     remote_id: auto
     marketplace_id: auto
     name: auto
     context_name: auto
     path_depth: auto
     is_root: auto
+    has_children: auto
     parent_node: Optional["AmazonBrowseNodeFilter"]
 
 

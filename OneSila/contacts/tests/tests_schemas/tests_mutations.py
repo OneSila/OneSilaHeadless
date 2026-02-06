@@ -1,9 +1,5 @@
 from django.test import TestCase, TransactionTestCase
-from model_bakery import baker
-
-from OneSila.schema import schema
-from contacts.models import Company, Supplier, Customer, Influencer, Person, Address, \
-    ShippingAddress, InvoiceAddress
+from contacts.models import Company, Supplier
 
 from core.tests.tests_schemas.tests_queries import TransactionTestCaseMixin
 

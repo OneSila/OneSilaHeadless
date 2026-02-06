@@ -95,3 +95,16 @@ query ($product: GlobalID!) {
   }
 }
 """
+
+AMAZON_BROWSE_NODE_FILTER_BY_SEARCH = """
+query ($search: String!) {
+  amazonBrowseNodes(filters: {search: $search}) {
+    edges {
+      node {
+        id
+        remoteId
+      }
+    }
+  }
+}
+"""

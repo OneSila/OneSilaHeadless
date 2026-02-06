@@ -1,12 +1,14 @@
 from typing import Optional
 
-from django.db.models import Q, Exists, OuterRef
+from django.db.models import Q, Exists, OuterRef, Subquery
 from strawberry import UNSET
 
 from core.managers import QuerySet
 from core.schema.core.types.types import auto
-from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin, lazy
+from core.schema.core.types.filters import filter, SearchFilterMixin, ExcluideDemoDataFilterMixin, lazy, AnnotationMergerMixin
 from strawberry_django import filter_field as custom_filter
+from products.schema.types.content_filters import ProductContentFieldFilterMixin
+from products.schema.types.media_filters import ProductMediaFilterMixin
 from products.models import (
     Product,
     BundleProduct,
@@ -19,34 +21,26 @@ from products.models import (
     ProductTranslationBulletPoint,
 )
 from products_inspector.models import InspectorBlock
-from sales_channels.integrations.amazon.models import AmazonSalesChannel, AmazonProductIssue
+from eancodes.models import EanCode
+from sales_prices.models import SalesPrice, SalesPriceListItem
+from sales_channels.integrations.amazon.models import (
+    AmazonProductIssue,
+    AmazonBrowseNode,
+    AmazonProductBrowseNode,
+)
+from sales_channels.integrations.ebay.models import EbayCategory, EbayProductCategory
+from sales_channels.integrations.shein.models import SheinCategory, SheinProductCategory
 from sales_channels.models import SalesChannelViewAssign
+from sales_channels.models.products import RemoteProduct
 from taxes.schema.types.filters import VatRateFilter
 from strawberry.relay import from_base64
+from core.schema.core.types.filters import TimeStampRangeFilterMixin
 
 
-@filter(Product)
-class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
-    id: auto
-    sku: auto
-    type: auto
-    active: auto
-    vat_rate: Optional[VatRateFilter]
-    inspector: Optional[lazy['InspectorFilter', "products_inspector.schema.types.filters"]]
-
-    @custom_filter
-    def inspector_not_successfully_code_error(
-        self,
-        queryset: QuerySet,
-        value: str,
-        prefix: str
-    ) -> tuple[QuerySet, Q]:
-
-        if value not in (None, UNSET):
-            products_ids = InspectorBlock.objects.filter(successfully_checked=False, error_code=value).values_list('inspector__product_id', flat=True)
-            queryset = queryset.filter(id__in=products_ids)
-
-        return queryset, Q()
+class ProductPropertyGlobalIdFilterMixin(AnnotationMergerMixin):
+    value_select_id: Optional[str]
+    value_select_ids: Optional[list[str]]
+    property_id: Optional[str]
 
     @custom_filter
     def value_select_id(self, queryset: QuerySet, value: str, prefix: str) -> tuple[QuerySet, Q]:
@@ -71,6 +65,350 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
             queryset = queryset.filter(productproperty__value_select_id=select_id)
 
         return queryset, Q()
+
+    @custom_filter
+    def property_id(self, queryset: QuerySet, value: str, prefix: str) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, property_id = from_base64(value)
+        condition = Q(productproperty__property_id=property_id)
+
+        return queryset, condition
+
+
+@filter(Product)
+class ProductFilter(
+    SearchFilterMixin,
+    ExcluideDemoDataFilterMixin,
+    TimeStampRangeFilterMixin,
+    ProductPropertyGlobalIdFilterMixin,
+    ProductContentFieldFilterMixin,
+    ProductMediaFilterMixin,
+):
+    id: auto
+    sku: auto
+    type: auto
+    active: auto
+    allow_backorder: auto
+    vat_rate: Optional[VatRateFilter]
+    created_at: auto
+    updated_at: auto
+    inspector: Optional[lazy['InspectorFilter', "products_inspector.schema.types.filters"]]
+    alias_parent_product: Optional[lazy["ProductFilter", "products.schema.types.filters"]]
+
+    @staticmethod
+    def _present_on_store_qs(*, sales_channel_id: str):
+        return RemoteProduct.objects.filter(
+            sales_channel_id=sales_channel_id,
+            successfully_created=True,
+            local_instance_id=OuterRef("pk"),
+        )
+
+    @staticmethod
+    def _amazon_browser_node_qs(*, amazon_browse_node_id: str):
+        browse_node_qs = AmazonBrowseNode.objects.filter(pk=amazon_browse_node_id)
+        return AmazonProductBrowseNode.objects.filter(
+            product_id=OuterRef("pk"),
+            recommended_browse_node_id=Subquery(browse_node_qs.values("remote_id")[:1]),
+            view__amazonsaleschannelview__remote_id=Subquery(browse_node_qs.values("marketplace_id")[:1]),
+        )
+
+    @staticmethod
+    def _ebay_product_category_qs(*, ebay_category_id: str):
+        category_qs = EbayCategory.objects.filter(pk=ebay_category_id)
+        return EbayProductCategory.objects.filter(
+            product_id=OuterRef("pk"),
+            remote_id=Subquery(category_qs.values("remote_id")[:1]),
+            view__ebaysaleschannelview__default_category_tree_id=Subquery(category_qs.values("marketplace_default_tree_id")[:1]),
+        )
+
+    @staticmethod
+    def _shein_product_category_qs(*, shein_category_id: str):
+        category_qs = SheinCategory.objects.filter(pk=shein_category_id)
+        return SheinProductCategory.objects.filter(
+            product_id=OuterRef("pk"),
+            remote_id=Subquery(category_qs.values("remote_id")[:1]),
+        )
+
+    @custom_filter
+    def has_ean_codes(
+        self,
+        *,
+        queryset: QuerySet,
+        value: bool,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        ean_codes_qs = EanCode.objects.filter(
+            product_id=OuterRef("pk"),
+            ean_code__isnull=False,
+        )
+        queryset = queryset.annotate(
+            has_ean_code=Exists(ean_codes_qs)
+        ).filter(has_ean_code=value)
+
+        return queryset, Q()
+
+    @custom_filter
+    def has_alias_products(
+        self,
+        *,
+        queryset: QuerySet,
+        value: bool,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        alias_products_qs = Product.objects.filter(
+            alias_parent_product_id=OuterRef("pk"),
+        )
+        queryset = queryset.annotate(
+            has_alias_products=Exists(alias_products_qs)
+        ).filter(has_alias_products=value)
+
+        return queryset, Q()
+
+    @custom_filter
+    def has_prices_for_currency(
+        self,
+        *,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, currency_id = from_base64(value)
+        prices_qs = SalesPrice.objects.filter(
+            product_id=OuterRef("pk"),
+            currency_id=currency_id,
+        ).filter(
+            Q(price__isnull=False) | Q(rrp__isnull=False)
+        )
+        queryset = queryset.annotate(
+            has_prices_for_currency=Exists(prices_qs)
+        ).filter(has_prices_for_currency=True)
+
+        return queryset, Q()
+
+    @custom_filter
+    def missing_prices_for_currency(
+        self,
+        *,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, currency_id = from_base64(value)
+        prices_qs = SalesPrice.objects.filter(
+            product_id=OuterRef("pk"),
+            currency_id=currency_id,
+        ).filter(
+            Q(price__isnull=False) | Q(rrp__isnull=False)
+        )
+        queryset = queryset.annotate(
+            has_prices_for_currency=Exists(prices_qs)
+        ).filter(has_prices_for_currency=False)
+
+        return queryset, Q()
+
+    @custom_filter
+    def has_price_list(
+        self,
+        *,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, price_list_id = from_base64(value)
+        items_qs = SalesPriceListItem.objects.filter(
+            product_id=OuterRef("pk"),
+            salespricelist_id=price_list_id,
+        ).filter(
+            Q(price_auto__isnull=False) | Q(price_override__isnull=False)
+        )
+        queryset = queryset.annotate(
+            has_price_list=Exists(items_qs)
+        ).filter(has_price_list=True)
+
+        return queryset, Q()
+
+    @custom_filter
+    def missing_price_list(
+        self,
+        *,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, price_list_id = from_base64(value)
+        items_qs = SalesPriceListItem.objects.filter(
+            product_id=OuterRef("pk"),
+            salespricelist_id=price_list_id,
+        ).filter(
+            Q(price_auto__isnull=False) | Q(price_override__isnull=False)
+        )
+        queryset = queryset.annotate(
+            has_price_list=Exists(items_qs)
+        ).filter(has_price_list=False)
+
+        return queryset, Q()
+
+    @custom_filter
+    def amazon_browser_node_id(
+        self,
+        *,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, amazon_browse_node_id = from_base64(value)
+        queryset = queryset.annotate(
+            has_amazon_browser_node=Exists(
+                self._amazon_browser_node_qs(amazon_browse_node_id=amazon_browse_node_id)
+            )
+        ).filter(has_amazon_browser_node=True)
+
+        return queryset, Q()
+
+    @custom_filter
+    def exclude_amazon_browser_node_id(
+        self,
+        *,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, amazon_browse_node_id = from_base64(value)
+        queryset = queryset.annotate(
+            has_amazon_browser_node=Exists(
+                self._amazon_browser_node_qs(amazon_browse_node_id=amazon_browse_node_id)
+            )
+        ).filter(has_amazon_browser_node=False)
+
+        return queryset, Q()
+
+    @custom_filter
+    def ebay_product_category_id(
+        self,
+        *,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, ebay_category_id = from_base64(value)
+        queryset = queryset.annotate(
+            has_ebay_product_category=Exists(
+                self._ebay_product_category_qs(ebay_category_id=ebay_category_id)
+            )
+        ).filter(has_ebay_product_category=True)
+
+        return queryset, Q()
+
+    @custom_filter
+    def exclude_ebay_product_category_id(
+        self,
+        *,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, ebay_category_id = from_base64(value)
+        queryset = queryset.annotate(
+            has_ebay_product_category=Exists(
+                self._ebay_product_category_qs(ebay_category_id=ebay_category_id)
+            )
+        ).filter(has_ebay_product_category=False)
+
+        return queryset, Q()
+
+    @custom_filter
+    def shein_product_category_id(
+        self,
+        *,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, shein_category_id = from_base64(value)
+        queryset = queryset.annotate(
+            has_shein_product_category=Exists(
+                self._shein_product_category_qs(shein_category_id=shein_category_id)
+            )
+        ).filter(has_shein_product_category=True)
+
+        return queryset, Q()
+
+    @custom_filter
+    def exclude_shein_product_category_id(
+        self,
+        *,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, shein_category_id = from_base64(value)
+        queryset = queryset.annotate(
+            has_shein_product_category=Exists(
+                self._shein_product_category_qs(shein_category_id=shein_category_id)
+            )
+        ).filter(has_shein_product_category=False)
+
+        return queryset, Q()
+
+    @custom_filter
+    def inspector_not_successfully_code_error(
+        self,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        error_blocks_qs = InspectorBlock.objects.filter(
+            inspector__product_id=OuterRef("pk"),
+            successfully_checked=False,
+            error_code=value,
+        )
+
+        queryset = queryset.annotate(
+            has_inspector_not_successfully_code_error=Exists(error_blocks_qs)
+        )
+        return queryset, Q(has_inspector_not_successfully_code_error=True)
 
     @custom_filter
     def amazon_products_with_issues_for_sales_channel(
@@ -112,6 +450,40 @@ class ProductFilter(SearchFilterMixin, ExcluideDemoDataFilterMixin):
                 assigned_to_view=Exists(assigns_qs)
             ).filter(assigned_to_view=True)
 
+        return queryset, Q()
+
+    @custom_filter
+    def present_on_store_sales_channel_id(
+        self,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, sales_channel_id = from_base64(value)
+        queryset = queryset.annotate(
+            present_on_store=Exists(self._present_on_store_qs(sales_channel_id=sales_channel_id))
+        ).filter(present_on_store=True)
+        return queryset, Q()
+
+    @custom_filter
+    def not_present_on_store_sales_channel_id(
+        self,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, sales_channel_id = from_base64(value)
+        queryset = queryset.annotate(
+            present_on_store=Exists(self._present_on_store_qs(sales_channel_id=sales_channel_id))
+        ).filter(present_on_store=False)
         return queryset, Q()
 
     @custom_filter

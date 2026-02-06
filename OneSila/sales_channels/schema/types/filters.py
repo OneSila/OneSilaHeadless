@@ -41,62 +41,62 @@ from sales_channels.models.sales_channels import RemoteLanguage
 
 @filter(ImportCurrency)
 class ImportCurrencyFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(ImportImage)
 class ImportImageFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(ImportProduct)
 class ImportProductFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(ImportProperty)
 class ImportPropertyFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(ImportPropertySelectValue)
 class ImportPropertySelectValueFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(ImportVat)
 class ImportVatFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteCategory)
 class RemoteCategoryFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteCustomer)
 class RemoteCustomerFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteImage)
 class RemoteImageFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteImageProductAssociation)
 class RemoteImageProductAssociationFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteInventory)
 class RemoteInventoryFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteOrder)
 class RemoteOrderFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteProduct)
@@ -123,27 +123,28 @@ class RemoteProductFilter(SearchFilterMixin):
 
 @filter(RemoteProductContent)
 class RemoteProductContentFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteProductProperty)
 class RemoteProductPropertyFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteProperty)
 class RemotePropertyFilter(SearchFilterMixin):
+    id: auto
     local_instance: Optional[lazy['PropertyFilter', "properties.schema.types.filters"]]
 
 
 @filter(RemotePropertySelectValue)
 class RemotePropertySelectValueFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteVat)
 class RemoteVatFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteLog)

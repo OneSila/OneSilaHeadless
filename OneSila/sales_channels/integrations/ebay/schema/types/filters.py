@@ -40,6 +40,7 @@ from sales_channels.schema.types.filter_mixins import (
 
 @filter(EbaySalesChannel)
 class EbaySalesChannelFilter(SearchFilterMixin):
+    id: auto
     active: auto
     hostname: auto
 

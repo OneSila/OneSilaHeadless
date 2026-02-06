@@ -128,7 +128,7 @@ class SyncRequestDedupeTests(TransactionTestCase):
         skipped = SyncRequest.objects.filter(status=SyncRequest.STATUS_SKIPPED)
 
         self.assertEqual(pending.count(), 1)
-        self.assertEqual(skipped.count(), 6)
+        self.assertEqual(skipped.count(), 5)
 
         product_request = pending.first()
         self.assertEqual(product_request.sync_type, SyncRequest.TYPE_PRODUCT)

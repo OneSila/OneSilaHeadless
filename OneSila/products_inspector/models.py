@@ -9,13 +9,14 @@ from products_inspector.managers import InspectorBlockHasImagesManager, Inspecto
     MissingProductTypeInspectorBlockManager, MissingRequiredPropertiesInspectorBlockManager, MissingOptionalPropertiesInspectorBlockManager, \
     MissingStockManager, MissingManualPriceListOverrideManager, VariationMismatchProductTypeManager, \
     ItemsMismatchProductTypeManager, ItemsMissingMandatoryInformationManager, VariationsMissingMandatoryInformationManager, \
-    DuplicateVariationsManager, NonConfigurableRuleInspectorBlockManager
+    DuplicateVariationsManager, NonConfigurableRuleInspectorBlockManager, InspectorManager
 
 
 class Inspector(models.Model):
     product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name='inspector')
     has_missing_information = models.BooleanField(default=True)
     has_missing_optional_information = models.BooleanField(default=True)
+    objects = InspectorManager()
 
     class Meta:
         indexes = [
@@ -285,4 +286,3 @@ class NonConfigurableRuleInspectorBlock(InspectorBlock):
     class Meta:
         proxy = True
         verbose_name = _("Inspector Block Non-Configurable Rule")
-
