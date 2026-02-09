@@ -33,6 +33,32 @@ class SheinProduct(RemoteProduct):
         help_text="SKU identifier returned by publishOrEdit (sku_code).",
     )
 
+    @property
+    def url_skc_name(self) -> str | None:
+        current_skc_name = str(self.skc_name or "").strip()
+        if current_skc_name:
+            return current_skc_name
+
+        if self.is_variation:
+            return None
+
+        child_variation = (
+            self.__class__.objects.filter(
+                sales_channel=self.sales_channel,
+                remote_parent_product=self,
+                is_variation=True,
+            )
+            .exclude(skc_name__isnull=True)
+            .exclude(skc_name="")
+            .only("skc_name")
+            .first()
+        )
+        if not child_variation:
+            return None
+
+        child_skc_name = str(child_variation.skc_name or "").strip()
+        return child_skc_name or None
+
     def _determine_status(self) -> str:
         if self._has_unresolved_errors():
             return self.STATUS_FAILED
