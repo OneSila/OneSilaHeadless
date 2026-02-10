@@ -152,14 +152,30 @@ class RemoteProductSyncRequestMixin:
 
         task_kwargs_key = self.sync_request_task_kwargs_key
         local_instance_id = getattr(self.local_instance, "id", None)
-        if task_kwargs_key and local_instance_id is None:
-            raise ValueError("sync_request_task_kwargs_key requires a local_instance with an id.")
 
         query = SyncRequest.objects.filter(
             Q(status=SyncRequest.STATUS_PENDING, sync_type=self.sync_request_type),
             Q(remote_product__in=targets),
         )
         if task_kwargs_key:
+            # Delete flows may run after local_instance is already removed (SET_NULL),
+            # so try multiple fallbacks before deciding we cannot safely filter.
+            if local_instance_id is None:
+                local_instance_id = getattr(getattr(self, "remote_instance", None), "local_instance_id", None)
+            if local_instance_id is None:
+                local_instance_id = getattr(self, "local_instance_id", None)
+            if local_instance_id is None:
+                local_instance_id = getattr(self, "remote_instance_id", None)
+            if local_instance_id is None and isinstance(getattr(self, "payload", None), dict):
+                local_instance_id = self.payload.get(task_kwargs_key)
+
+            if local_instance_id is None:
+                logger.warning(
+                    "Skipping sync request cleanup with task_kwargs key '%s' because no local instance id is available.",
+                    task_kwargs_key,
+                )
+                return
+
             query = query.filter(
                 **{f"task_kwargs__{task_kwargs_key}": local_instance_id},
             )
