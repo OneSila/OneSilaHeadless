@@ -47,16 +47,6 @@ class EbayProperty(RemoteProperty):
         blank=True,
         help_text="Aspect name translated into the company language.",
     )
-    allows_unmapped_values = models.BooleanField(
-        default=False,
-        help_text="Whether values outside eBay suggestions are accepted.",
-    )
-    type = models.CharField(
-        max_length=16,
-        choices=Property.TYPES.ALL,
-        default=Property.TYPES.TEXT,
-        help_text="Mapped internal property type for this aspect.",
-    )
     raw_data = models.JSONField(
         default=dict,
         blank=True,
@@ -217,6 +207,11 @@ class EbayPropertySelectValue(RemoteObjectMixin, models.Model):
         null=True,
         blank=True,
         help_text="Aspect value translated into the company language.",
+    )
+    bool_value = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Boolean meaning for this option when mapping select/multiselect remote values to boolean.",
     )
 
     objects = EbayPropertySelectValueManager()

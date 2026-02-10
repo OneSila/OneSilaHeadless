@@ -105,16 +105,6 @@ class SheinProperty(RemoteProperty):
         blank=True,
         help_text="Image references associated with the attribute documentation.",
     )
-    allows_unmapped_values = models.BooleanField(
-        default=False,
-        help_text="Whether merchants can submit custom attribute values for this attribute.",
-    )
-    type = models.CharField(
-        max_length=16,
-        choices=Property.TYPES.ALL,
-        default=Property.TYPES.TEXT,
-        help_text="Mapped internal property type derived from Shein metadata.",
-    )
     raw_data = models.JSONField(
         default=dict,
         blank=True,

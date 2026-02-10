@@ -1,6 +1,134 @@
 from core import models
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
+from properties.models import Property
 from .mixins import RemoteObjectMixin
 from polymorphic.models import PolymorphicModel
+
+
+REMOTE_PROPERTY_TYPE_CHANGE_RULES = {
+    Property.TYPES.INT: {
+        Property.TYPES.INT: True,
+        Property.TYPES.FLOAT: False,
+        Property.TYPES.TEXT: False,
+        Property.TYPES.DESCRIPTION: False,
+        Property.TYPES.BOOLEAN: False,
+        Property.TYPES.DATE: False,
+        Property.TYPES.DATETIME: False,
+        Property.TYPES.SELECT: False,
+        Property.TYPES.MULTISELECT: False,
+    },
+    Property.TYPES.FLOAT: {
+        Property.TYPES.INT: True,
+        Property.TYPES.FLOAT: True,
+        Property.TYPES.TEXT: False,
+        Property.TYPES.DESCRIPTION: False,
+        Property.TYPES.BOOLEAN: False,
+        Property.TYPES.DATE: False,
+        Property.TYPES.DATETIME: False,
+        Property.TYPES.SELECT: False,
+        Property.TYPES.MULTISELECT: False,
+    },
+    Property.TYPES.TEXT: {
+        Property.TYPES.INT: True,
+        Property.TYPES.FLOAT: True,
+        Property.TYPES.TEXT: True,
+        Property.TYPES.DESCRIPTION: True,
+        Property.TYPES.BOOLEAN: True,
+        Property.TYPES.DATE: True,
+        Property.TYPES.DATETIME: True,
+        Property.TYPES.SELECT: True,
+        Property.TYPES.MULTISELECT: True,
+    },
+    Property.TYPES.DESCRIPTION: {
+        Property.TYPES.INT: True,
+        Property.TYPES.FLOAT: True,
+        Property.TYPES.TEXT: True,
+        Property.TYPES.DESCRIPTION: True,
+        Property.TYPES.BOOLEAN: True,
+        Property.TYPES.DATE: True,
+        Property.TYPES.DATETIME: True,
+        Property.TYPES.SELECT: True,
+        Property.TYPES.MULTISELECT: True,
+    },
+    Property.TYPES.BOOLEAN: {
+        Property.TYPES.INT: False,
+        Property.TYPES.FLOAT: False,
+        Property.TYPES.TEXT: False,
+        Property.TYPES.DESCRIPTION: False,
+        Property.TYPES.BOOLEAN: True,
+        Property.TYPES.DATE: False,
+        Property.TYPES.DATETIME: False,
+        Property.TYPES.SELECT: True,
+        Property.TYPES.MULTISELECT: False,
+    },
+    Property.TYPES.DATE: {
+        Property.TYPES.INT: False,
+        Property.TYPES.FLOAT: False,
+        Property.TYPES.TEXT: False,
+        Property.TYPES.DESCRIPTION: False,
+        Property.TYPES.BOOLEAN: False,
+        Property.TYPES.DATE: True,
+        Property.TYPES.DATETIME: True,
+        Property.TYPES.SELECT: False,
+        Property.TYPES.MULTISELECT: False,
+    },
+    Property.TYPES.DATETIME: {
+        Property.TYPES.INT: False,
+        Property.TYPES.FLOAT: False,
+        Property.TYPES.TEXT: False,
+        Property.TYPES.DESCRIPTION: False,
+        Property.TYPES.BOOLEAN: False,
+        Property.TYPES.DATE: True,
+        Property.TYPES.DATETIME: True,
+        Property.TYPES.SELECT: False,
+        Property.TYPES.MULTISELECT: False,
+    },
+    "SELECT__allows_custom_values": {
+        Property.TYPES.INT: True,
+        Property.TYPES.FLOAT: True,
+        Property.TYPES.TEXT: True,
+        Property.TYPES.DESCRIPTION: False,
+        Property.TYPES.BOOLEAN: True,
+        Property.TYPES.DATE: True,
+        Property.TYPES.DATETIME: True,
+        Property.TYPES.SELECT: True,
+        Property.TYPES.MULTISELECT: True,
+    },
+    "SELECT__not_allows_custom_values": {
+        Property.TYPES.INT: False,
+        Property.TYPES.FLOAT: False,
+        Property.TYPES.TEXT: False,
+        Property.TYPES.DESCRIPTION: False,
+        Property.TYPES.BOOLEAN: True,
+        Property.TYPES.DATE: False,
+        Property.TYPES.DATETIME: False,
+        Property.TYPES.SELECT: True,
+        Property.TYPES.MULTISELECT: False,
+    },
+    "MULTISELECT__allows_custom_values": {
+        Property.TYPES.INT: True,
+        Property.TYPES.FLOAT: True,
+        Property.TYPES.TEXT: True,
+        Property.TYPES.DESCRIPTION: False,
+        Property.TYPES.BOOLEAN: False,
+        Property.TYPES.DATE: True,
+        Property.TYPES.DATETIME: True,
+        Property.TYPES.SELECT: True,
+        Property.TYPES.MULTISELECT: True,
+    },
+    "MULTISELECT__not_allows_custom_values": {
+        Property.TYPES.INT: False,
+        Property.TYPES.FLOAT: False,
+        Property.TYPES.TEXT: False,
+        Property.TYPES.DESCRIPTION: False,
+        Property.TYPES.BOOLEAN: False,
+        Property.TYPES.DATE: False,
+        Property.TYPES.DATETIME: False,
+        Property.TYPES.SELECT: True,
+        Property.TYPES.MULTISELECT: True,
+    },
+}
 
 
 class RemoteProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
@@ -17,6 +145,36 @@ class RemoteProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
             "Set to True to allow multiple remote properties to map "
             "to the same local property."
         ),
+    )
+    original_type = models.CharField(
+        max_length=16,
+        choices=Property.TYPES.ALL,
+        null=True,
+        blank=True,
+        help_text="Original remote property type before any manual remapping.",
+    )
+    type = models.CharField(
+        max_length=16,
+        choices=Property.TYPES.ALL,
+        null=True,
+        blank=True,
+        help_text="Remote property type stored on the base RemoteProperty model.",
+    )
+    allows_unmapped_values = models.BooleanField(
+        default=False,
+        help_text="Whether this remote property accepts values outside predefined options.",
+    )
+    yes_text_value = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Text value treated as True when mapping text-like remote values to boolean.",
+    )
+    no_text_value = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Text value treated as False when mapping text-like remote values to boolean.",
     )
 
     class Meta:
@@ -36,6 +194,69 @@ class RemoteProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
         except AttributeError:
             return self.safe_str
 
+    def _resolve_sales_channel_app_label(self):
+        if not self.sales_channel_id:
+            return None
+
+        channel = self.sales_channel
+        get_real_instance = getattr(channel, "get_real_instance", None)
+        if callable(get_real_instance):
+            channel = get_real_instance()
+
+        return channel._meta.app_label
+
+    def _resolve_original_type_key(self):
+        if self.original_type == Property.TYPES.SELECT:
+            return "SELECT__allows_custom_values" if self.allows_unmapped_values else "SELECT__not_allows_custom_values"
+        if self.original_type == Property.TYPES.MULTISELECT:
+            return "MULTISELECT__allows_custom_values" if self.allows_unmapped_values else "MULTISELECT__not_allows_custom_values"
+        return self.original_type
+
+    def _type_change_allowed(self, *, target_type):
+        rule_key = self._resolve_original_type_key()
+        allowed_targets = REMOTE_PROPERTY_TYPE_CHANGE_RULES.get(rule_key, {})
+        return bool(allowed_targets.get(target_type))
+
+    def save(self, *args, **kwargs):
+        app_label = self._resolve_sales_channel_app_label()
+
+        if app_label == "amazon" and self.allow_multiple is not True:
+            self.allow_multiple = True
+
+        if app_label in {"magento2", "woocommerce"} and self.local_instance and self.local_instance.type:
+            self.original_type = self.local_instance.type
+            self.type = self.local_instance.type
+
+        if self.original_type and not self.type:
+            self.type = self.original_type
+
+        if self.original_type is None and self.type:
+            self.original_type = self.type
+
+        if self.original_type and self.type and not self._type_change_allowed(target_type=self.type):
+            raise ValidationError(
+                _(
+                    "Remote property original type %(original)s cannot be changed to %(target)s."
+                )
+                % {
+                    "original": self.get_original_type_display(),
+                    "target": self.get_type_display(),
+                }
+            )
+
+        if self.local_instance and self.type and self.local_instance.type != self.type:
+            raise ValidationError(
+                _(
+                    "Remote property type %(remote)s must match local property type %(local)s."
+                )
+                % {
+                    "remote": self.get_type_display(),
+                    "local": self.local_instance.get_type_display(),
+                }
+            )
+
+        super().save(*args, **kwargs)
+
 
 class RemotePropertySelectValue(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
@@ -46,6 +267,11 @@ class RemotePropertySelectValue(PolymorphicModel, RemoteObjectMixin, models.Mode
                                        null=True,
                                        help_text="The local PropertySelectValue associated with this remote value.")
     remote_property = models.ForeignKey(RemoteProperty, on_delete=models.CASCADE, help_text="The remote property associated with this remote value.")
+    bool_value = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Boolean meaning for this option when mapping select/multiselect remote values to boolean.",
+    )
 
     class Meta:
         unique_together = ('sales_channel', 'local_instance')

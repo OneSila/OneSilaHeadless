@@ -1,6 +1,6 @@
 from django.db.models import JSONField, UniqueConstraint, Q
 
-from properties.models import ProductPropertiesRule, ProductPropertiesRuleItem, Property
+from properties.models import ProductPropertiesRule, ProductPropertiesRuleItem
 from sales_channels.models.mixins import RemoteObjectMixin
 from sales_channels.models.properties import (
     RemoteProperty,
@@ -12,7 +12,6 @@ from sales_channels.integrations.amazon.managers import (
     AmazonPropertySelectValueManager,
     AmazonProductTypeManager,
 )
-from django.core.exceptions import ValidationError
 from core import models
 from django.utils.translation import gettext_lazy as _
 from datetime import timedelta
@@ -101,28 +100,9 @@ class AmazonProperty(RemoteProperty):
         blank=True,
     )
 
-    allows_unmapped_values = models.BooleanField(default=False)
-    type = models.CharField(max_length=16, choices=Property.TYPES.ALL, default=Property.TYPES.TEXT)
-
     objects = AmazonPropertyManager()
 
     def save(self, *args, **kwargs):
-
-        if self.allow_multiple is not True:
-            self.allow_multiple = True
-
-        # @TODO: Temporary remove
-        # if self.local_instance and self.local_instance.type != self.type:
-        #     raise ValidationError(
-        #         _(
-        #             "Amazon property type %(remote)s must match local property type %(local)s."
-        #         )
-        #         % {
-        #             "remote": self.get_type_display(),
-        #             "local": self.local_instance.get_type_display(),
-        #         }
-        #     )
-
         if self.code:
             self.main_code = self.code.split("__", 1)[0]
 
@@ -170,6 +150,11 @@ class AmazonPropertySelectValue(RemoteObjectMixin, models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         help_text="Optional link to local PropertySelectValue."
+    )
+    bool_value = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Boolean meaning for this option when mapping select/multiselect remote values to boolean.",
     )
 
     objects = AmazonPropertySelectValueManager()
