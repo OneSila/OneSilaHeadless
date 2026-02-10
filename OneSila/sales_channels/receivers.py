@@ -515,7 +515,7 @@ def sales_channels__product_property__post_create_receiver(sender, instance: Pro
 @receiver(post_update, sender='properties.ProductProperty')
 def sales_channels__product_property__post_update_receiver(sender, instance: ProductProperty, **kwargs):
     from sales_channels.flows.update_configurator import update_configurator_if_needed_flow
-    print(
+    logger.debug(
         "EBAY_PRODUCT_PROPERTY CORE_POST_UPDATE instance_id=%s product_id=%s property_id=%s is_public=%s is_product_type=%s",
         getattr(instance, "id", None),
         getattr(getattr(instance, "product", None), "id", None),
@@ -525,17 +525,17 @@ def sales_channels__product_property__post_update_receiver(sender, instance: Pro
     )
 
     if instance.property.is_product_type:
-        print("EBAY_PRODUCT_PROPERTY CORE_POST_UPDATE -> sync_remote_product (product_type property)")
+        logger.debug("EBAY_PRODUCT_PROPERTY CORE_POST_UPDATE -> sync_remote_product (product_type property)")
         sync_remote_product.send(sender=instance.product.__class__, instance=instance.product)
         return
 
     if instance.property.is_public_information:
-        print("EBAY_PRODUCT_PROPERTY CORE_POST_UPDATE -> update_remote_product_property SEND")
+        logger.debug("EBAY_PRODUCT_PROPERTY CORE_POST_UPDATE -> update_remote_product_property SEND")
         update_remote_product_property.send(sender=instance.__class__, instance=instance)
 
         update_configurator_if_needed_flow(instance.product, instance.property)
     else:
-        print("EBAY_PRODUCT_PROPERTY CORE_POST_UPDATE -> SKIP (not public information)")
+        logger.debug("EBAY_PRODUCT_PROPERTY CORE_POST_UPDATE -> SKIP (not public information)")
 
 
 @receiver(mutation_update, sender='properties.ProductProperty')

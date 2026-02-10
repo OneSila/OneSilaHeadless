@@ -49,6 +49,8 @@ from sales_channels.integrations.ebay.tasks import (
 from sales_channels.models import SalesChannelViewAssign
 from sales_channels.helpers import rebind_ebay_product_type_to_rule
 
+import logging
+logger = logging.getLogger(__name__)
 
 _PENDING_PRODUCT_DELETE_COUNTS: Counter[int] = Counter()
 
@@ -143,7 +145,7 @@ def ebay__product_property__update(sender, instance, **kwargs):
 
     product = instance.product
     property_obj = getattr(instance, "property", None)
-    print(
+    logger.debug(
         "EBAY_PRODUCT_PROPERTY EBAY_RECEIVER_UPDATE instance_id=%s product_id=%s property_id=%s property_code=%s kwargs_keys=%s",
         getattr(instance, "id", None),
         getattr(product, "id", None),
@@ -166,9 +168,9 @@ def ebay__product_property__update(sender, instance, **kwargs):
             "value": instance.get_serialised_value(kwargs.get("language", None)),
         },
     )
-    print("EBAY_PRODUCT_PROPERTY EBAY_RECEIVER_UPDATE -> task_runner.run()")
+    logger.debug("EBAY_PRODUCT_PROPERTY EBAY_RECEIVER_UPDATE -> task_runner.run()")
     task_runner.run()
-    print("EBAY_PRODUCT_PROPERTY EBAY_RECEIVER_UPDATE <- task_runner.run() done")
+    logger.debug("EBAY_PRODUCT_PROPERTY EBAY_RECEIVER_UPDATE <- task_runner.run() done")
 
 
 @receiver(delete_remote_product_property, sender='properties.ProductProperty')
