@@ -132,3 +132,32 @@ EBAY_ACCOUNT_DELETION_VERIFICATION_TOKEN = "replace-with-onesila-ebay-verificati
 
 TEST_WEBHOOK_SECRET = "test-secret"
 TELEGRAM_BOT_TOKEN = "your-telegram-bot-token"
+
+
+# consider adding this to see django request logs:
+LOG_PATH = "/log/path/for/django/file"
+
+LOGGING["handlers"]["django_file"] = {
+      "level": "DEBUG",
+      "class": "logging.FileHandler",
+      "filename": LOG_PATH,
+      "formatter": "verbose",
+  }
+
+LOGGING["loggers"]["django"] = {
+      "handlers": ["console", "django_file"],
+      "level": "DEBUG",
+      "propagate": False,
+  }
+LOGGING["loggers"]["sales_channels"] = {
+      "handlers": ["console", "django_file"],
+      "level": "DEBUG",
+      "propagate": False,
+  }
+
+# Kill SQL spam
+LOGGING["loggers"]["django.db.backends"] = {
+      "handlers": ["console", "django_file"],
+      "level": "WARNING",
+      "propagate": False,
+}
