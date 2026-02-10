@@ -382,14 +382,21 @@ def sales_channels__property__created_receiver(sender, instance: Property, langu
 def sales_channels__property_translation__post_create_receiver(sender, instance: PropertyTranslation, **kwargs):
     """
     Handles post-create events for the PropertyTranslation model.
-    - Send create signal if it's the first translation.
+    - First translation belongs to initial property create flow; do not send update.
+    - Additional translations should trigger update.
     """
-    if instance.property.is_public_information:
-        update_remote_property.send(
-            sender=instance.property.__class__,
-            instance=instance.property,
-            language=instance.language,
-        )
+    if not instance.property.is_public_information:
+        return
+
+    translation_count = PropertyTranslation.objects.filter(property=instance.property).count()
+    if translation_count <= 1:
+        return
+
+    update_remote_property.send(
+        sender=instance.property.__class__,
+        instance=instance.property,
+        language=instance.language,
+    )
 
 
 @receiver(post_update, sender='properties.PropertyTranslation')

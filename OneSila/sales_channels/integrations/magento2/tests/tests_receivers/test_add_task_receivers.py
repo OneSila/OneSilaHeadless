@@ -43,6 +43,7 @@ from sales_channels.signals import (
 )
 from sales_channels.tests.helpers import TaskQueueDispatchPatchMixin
 from sales_channels.tests.tests_receivers.mixins import AddTaskSyncRequestTestMixin
+from strawberry_django.test.client import TestClient
 from taxes.models import VatRate
 
 from sales_channels.integrations.magento2.tests.mixins import MagentoSalesChannelTestMixin
@@ -50,6 +51,7 @@ from sales_channels.integrations.magento2.tasks import (
     add_magento_product_variation_db_task,
     create_magento_attribute_set_task,
     create_magento_image_association_db_task,
+    create_magento_property_db_task,
     create_magento_product_db_task,
     create_magento_vat_rate_db_task,
     delete_magento_attribute_set_task,
@@ -369,6 +371,77 @@ class MagentoAddToTaskReceiverTests(
         )
         self.assertEqual(task.task_kwargs.get("property_id"), self.product_type_property.id)
         self.assertEqual(task.task_kwargs.get("language"), "en")
+
+    def test_magento_property_create_does_not_queue_update_task(self, *, _unused=None):
+        initial_count = IntegrationTaskQueue.objects.filter(
+            integration_id=self.sales_channel.id,
+        ).count()
+
+        mutation = """
+            mutation($data: PropertyInput!) {
+              createProperty(data: $data) {
+                id
+              }
+            }
+        """
+
+        existing_ids = set(
+            Property.objects.values_list("id", flat=True)
+        )
+
+        with patch.object(
+            transaction,
+            "on_commit",
+            side_effect=lambda func, using=None: func(),
+        ):
+            test_client = TestClient("/graphql/")
+            with test_client.login(self.user):
+                resp = test_client.query(
+                    query=mutation,
+                    variables={
+                        "data": {
+                            "name": "Temp Magento Property",
+                            "type": Property.TYPES.TEXT,
+                        }
+                    },
+                    asserts_errors=False,
+                )
+
+            self.assertIsNone(
+                resp.errors,
+                f"GraphQL createProperty failed: {resp.errors}",
+            )
+
+        property_instance = Property.objects.exclude(id__in=existing_ids).order_by("-id").first()
+        self.assertIsNotNone(property_instance)
+
+        tasks = IntegrationTaskQueue.objects.filter(
+            integration_id=self.sales_channel.id,
+            task_kwargs__property_id=property_instance.id,
+        )
+        # self.assertEqual(tasks.count(), 0)
+        self.assertEqual(
+            IntegrationTaskQueue.objects.filter(
+                integration_id=self.sales_channel.id,
+                task_name=get_import_path(create_magento_property_db_task),
+                task_kwargs__property_id=property_instance.id,
+            ).count(),
+            0,
+        )
+        self.assertEqual(
+            IntegrationTaskQueue.objects.filter(
+                integration_id=self.sales_channel.id,
+                task_name=get_import_path(update_magento_property_db_task),
+                task_kwargs__property_id=property_instance.id,
+            ).count(),
+            0,
+        )
+        self.assertEqual(
+            IntegrationTaskQueue.objects.filter(
+                integration_id=self.sales_channel.id,
+            ).count(),
+            initial_count,
+        )
 
     def test_magento_property_select_value_update_queues_task(self, *, _unused=None):
         select_value = PropertySelectValue.objects.create(
