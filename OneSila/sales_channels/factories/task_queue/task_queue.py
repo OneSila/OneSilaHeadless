@@ -498,7 +498,7 @@ class AddTaskBase:
         )
 
     def log_guard_blocked(self, *, target: TaskTarget, guard_result: GuardResult):
-        print(
+        logger.debug(
             "Guard blocked task: reason=%s sync_type=%s sales_channel_id=%s remote_product_id=%s "
             "remote_instance_id=%s sales_channel_view_id=%s",
             guard_result.reason,
