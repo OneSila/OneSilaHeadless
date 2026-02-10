@@ -114,6 +114,30 @@ query products($hasAliasProducts: Boolean!) {
 }
 """
 
+PRODUCTS_FILTER_BY_HAS_MULTIPLE_CONFIGURABLE_PARENTS = """
+query products($hasMultipleConfigurableParents: Boolean!) {
+  products(filters: {hasMultipleConfigurableParents: $hasMultipleConfigurableParents}) {
+    edges { node { id } }
+  }
+}
+"""
+
+PRODUCTS_FILTER_BY_VARIATION_OF_PRODUCT_ID = """
+query products($productId: String!) {
+  products(filters: {variationOfProductId: $productId}) {
+    edges { node { id } }
+  }
+}
+"""
+
+PRODUCTS_FILTER_BY_IS_MULTIPLE_PARENT = """
+query products($isMultipleParent: Boolean!) {
+  products(filters: {isMultipleParent: $isMultipleParent}) {
+    edges { node { id } }
+  }
+}
+"""
+
 PRODUCTS_FILTER_BY_ALIAS_PARENT = """
 query products($parentId: GlobalID!) {
   products(filters: {aliasParentProduct: {id: {exact: $parentId}}}) {

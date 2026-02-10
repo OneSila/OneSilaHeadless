@@ -1,6 +1,6 @@
 from typing import Optional
 
-from django.db.models import Q, Exists, OuterRef, Subquery
+from django.db.models import Q, Exists, OuterRef, Subquery, Count
 from strawberry import UNSET
 
 from core.managers import QuerySet
@@ -35,6 +35,7 @@ from sales_channels.models.products import RemoteProduct
 from taxes.schema.types.filters import VatRateFilter
 from strawberry.relay import from_base64
 from core.schema.core.types.filters import TimeStampRangeFilterMixin
+from products.product_types import CONFIGURABLE
 
 
 class ProductPropertyGlobalIdFilterMixin(AnnotationMergerMixin):
@@ -169,6 +170,96 @@ class ProductFilter(
         queryset = queryset.annotate(
             has_alias_products=Exists(alias_products_qs)
         ).filter(has_alias_products=value)
+
+        return queryset, Q()
+
+    @custom_filter
+    def has_multiple_configurable_parents(
+        self,
+        *,
+        queryset: QuerySet,
+        value: bool,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        multiple_parents_qs = (
+            ConfigurableVariation.objects.filter(
+                variation_id=OuterRef("pk"),
+            )
+            .values("variation_id")
+            .annotate(parent_count=Count("parent_id", distinct=True))
+            .filter(parent_count__gt=1)
+        )
+        queryset = queryset.annotate(
+            has_multiple_configurable_parents=Exists(multiple_parents_qs)
+        ).filter(has_multiple_configurable_parents=value)
+
+        return queryset, Q()
+
+    @custom_filter
+    def variation_of_product_id(
+        self,
+        *,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        _, variation_id = from_base64(value)
+        parent_qs = ConfigurableVariation.objects.filter(
+            parent_id=OuterRef("pk"),
+            variation_id=variation_id,
+        )
+        queryset = queryset.annotate(
+            is_configurable_parent_for_variation=Exists(parent_qs)
+        ).filter(is_configurable_parent_for_variation=True)
+
+        return queryset, Q()
+
+    @custom_filter
+    def is_multiple_parent(
+        self,
+        *,
+        queryset: QuerySet,
+        value: bool,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        shared_variations_qs = (
+            ConfigurableVariation.objects.values("variation_id")
+            .annotate(parent_count=Count("parent_id", distinct=True))
+            .filter(parent_count__gt=1)
+            .values("variation_id")
+        )
+        shared_parent_qs = ConfigurableVariation.objects.filter(
+            parent_id=OuterRef("pk"),
+            variation_id__in=Subquery(shared_variations_qs),
+        )
+
+        queryset = queryset.filter(type=CONFIGURABLE).annotate(
+            is_multiple_parent=Exists(shared_parent_qs)
+        )
+
+        if value:
+            first_shared_variation_qs = (
+                ConfigurableVariation.objects.filter(
+                    parent_id=OuterRef("pk"),
+                    variation_id__in=Subquery(shared_variations_qs),
+                )
+                .order_by("variation_id")
+                .values("variation_id")[:1]
+            )
+            queryset = queryset.filter(is_multiple_parent=True).annotate(
+                first_shared_variation_id=Subquery(first_shared_variation_qs)
+            ).order_by("first_shared_variation_id", "id")
+        else:
+            queryset = queryset.filter(is_multiple_parent=False)
 
         return queryset, Q()
 

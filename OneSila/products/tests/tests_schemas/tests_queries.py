@@ -327,6 +327,163 @@ class ProductFilterGeneralQueryTestCase(ProductFilterQueryMixin, TransactionTest
         )
         self.assertSetEqual(ids, {alias.id, no_alias.id})
 
+    def test_filter_by_has_multiple_configurable_parents(self):
+        from .queries import PRODUCTS_FILTER_BY_HAS_MULTIPLE_CONFIGURABLE_PARENTS
+
+        shared_simple = SimpleProduct.objects.create(
+            sku="shared-simple-1",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        single_parent_simple = SimpleProduct.objects.create(
+            sku="single-parent-simple-1",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        configurable_1 = ConfigurableProduct.objects.create(
+            sku="configurable-1",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        configurable_2 = ConfigurableProduct.objects.create(
+            sku="configurable-2",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ConfigurableVariation.objects.create(
+            parent=configurable_1,
+            variation=shared_simple,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ConfigurableVariation.objects.create(
+            parent=configurable_2,
+            variation=shared_simple,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ConfigurableVariation.objects.create(
+            parent=configurable_1,
+            variation=single_parent_simple,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ids = self._query_ids(
+            query=PRODUCTS_FILTER_BY_HAS_MULTIPLE_CONFIGURABLE_PARENTS,
+            variables={"hasMultipleConfigurableParents": True},
+        )
+        self.assertSetEqual(ids, {shared_simple.id})
+
+    def test_filter_by_variation_of_product_id(self):
+        from .queries import PRODUCTS_FILTER_BY_VARIATION_OF_PRODUCT_ID
+
+        variation = SimpleProduct.objects.create(
+            sku="variation-lookup-1",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        other_variation = SimpleProduct.objects.create(
+            sku="variation-lookup-2",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        parent_1 = ConfigurableProduct.objects.create(
+            sku="variation-parent-1",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        parent_2 = ConfigurableProduct.objects.create(
+            sku="variation-parent-2",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ConfigurableVariation.objects.create(
+            parent=parent_1,
+            variation=variation,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ConfigurableVariation.objects.create(
+            parent=parent_2,
+            variation=variation,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ConfigurableVariation.objects.create(
+            parent=parent_1,
+            variation=other_variation,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ids = self._query_ids(
+            query=PRODUCTS_FILTER_BY_VARIATION_OF_PRODUCT_ID,
+            variables={"productId": self.to_global_id(variation)},
+        )
+        self.assertSetEqual(ids, {parent_1.id, parent_2.id})
+
+    def test_filter_by_is_multiple_parent(self):
+        from .queries import PRODUCTS_FILTER_BY_IS_MULTIPLE_PARENT
+
+        variation_a = SimpleProduct.objects.create(
+            sku="multi-parent-var-a",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        variation_b = SimpleProduct.objects.create(
+            sku="multi-parent-var-b",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        variation_c = SimpleProduct.objects.create(
+            sku="multi-parent-var-c",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        parent_1 = ConfigurableProduct.objects.create(
+            sku="multi-parent-cfg-1",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        parent_2 = ConfigurableProduct.objects.create(
+            sku="multi-parent-cfg-2",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        parent_3 = ConfigurableProduct.objects.create(
+            sku="multi-parent-cfg-3",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ConfigurableProduct.objects.create(
+            sku="multi-parent-cfg-4",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ConfigurableVariation.objects.create(
+            parent=parent_1,
+            variation=variation_a,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ConfigurableVariation.objects.create(
+            parent=parent_1,
+            variation=variation_b,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ConfigurableVariation.objects.create(
+            parent=parent_2,
+            variation=variation_a,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ConfigurableVariation.objects.create(
+            parent=parent_3,
+            variation=variation_b,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ConfigurableVariation.objects.create(
+            parent=parent_3,
+            variation=variation_c,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        resp = self.strawberry_test_client(
+            query=PRODUCTS_FILTER_BY_IS_MULTIPLE_PARENT,
+            variables={"isMultipleParent": True},
+        )
+        self.assertIsNone(resp.errors)
+        ordered_ids = [
+            int(self.from_global_id(edge["node"]["id"])[1])
+            for edge in resp.data["products"]["edges"]
+        ]
+        self.assertListEqual(
+            ordered_ids,
+            [parent_1.id, parent_2.id, parent_3.id],
+        )
+
     def test_filter_by_alias_parent_product(self):
         from .queries import PRODUCTS_FILTER_BY_ALIAS_PARENT
 
