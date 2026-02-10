@@ -183,6 +183,9 @@ class SheinProductCategory(models.Model):
         verbose_name = "Shein Product Category"
         verbose_name_plural = "Shein Product Categories"
         search_terms = ["remote_id", "product_type_remote_id", "product__sku"]
+        indexes = [
+            models.Index(fields=["product", "sales_channel"]),
+        ]
 
     def __str__(self) -> str:
         type_suffix = f" ({self.product_type_remote_id})" if self.product_type_remote_id else ""

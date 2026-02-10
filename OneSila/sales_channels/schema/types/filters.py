@@ -26,6 +26,7 @@ from sales_channels.models import (
     RemoteProduct,
     RemoteProductContent,
     RemoteProductProperty,
+    SyncRequest,
     RemoteProperty,
     RemotePropertySelectValue,
     RemoteVat,
@@ -40,92 +41,110 @@ from sales_channels.models.sales_channels import RemoteLanguage
 
 @filter(ImportCurrency)
 class ImportCurrencyFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(ImportImage)
 class ImportImageFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(ImportProduct)
 class ImportProductFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(ImportProperty)
 class ImportPropertyFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(ImportPropertySelectValue)
 class ImportPropertySelectValueFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(ImportVat)
 class ImportVatFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteCategory)
 class RemoteCategoryFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteCustomer)
 class RemoteCustomerFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteImage)
 class RemoteImageFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteImageProductAssociation)
 class RemoteImageProductAssociationFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteInventory)
 class RemoteInventoryFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteOrder)
 class RemoteOrderFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteProduct)
 class RemoteProductFilter(SearchFilterMixin):
     id: auto
 
+    @custom_filter
+    def has_sync_requests(
+        self,
+        queryset: QuerySet,
+        value: bool,
+        prefix: str,
+    ):
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        pending = SyncRequest.STATUS_PENDING
+        pending_filter = Q(sync_requests__status=pending) | Q(sync_requests__skipped_for__status=pending)
+        if value:
+            return queryset.filter(pending_filter).distinct(), Q()
+
+        return queryset.exclude(pending_filter).distinct(), Q()
+
 
 @filter(RemoteProductContent)
 class RemoteProductContentFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteProductProperty)
 class RemoteProductPropertyFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteProperty)
 class RemotePropertyFilter(SearchFilterMixin):
-    pass
+    id: auto
+    local_instance: Optional[lazy['PropertyFilter', "properties.schema.types.filters"]]
 
 
 @filter(RemotePropertySelectValue)
 class RemotePropertySelectValueFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteVat)
 class RemoteVatFilter(SearchFilterMixin):
-    pass
+    id: auto
 
 
 @filter(RemoteLog)
@@ -179,6 +198,7 @@ class SalesChannelViewAssignFilter(SearchFilterMixin):
     sales_channel: Optional[SalesChannelFilter]
     sales_channel_view: Optional[SalesChannelViewFilter]
     product: Optional[ProductFilter]
+    remote_product: Optional[RemoteProductFilter]
 
     @custom_filter
     def status(
@@ -191,6 +211,26 @@ class SalesChannelViewAssignFilter(SearchFilterMixin):
             return queryset, Q()
 
         return queryset.filter_by_status(status=str(value)), Q()
+
+    @custom_filter
+    def has_sync_requests(
+        self,
+        queryset: QuerySet,
+        value: bool,
+        prefix: str,
+    ):
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        pending = SyncRequest.STATUS_PENDING
+        pending_filter = (
+            Q(remote_product__sync_requests__status=pending)
+            | Q(remote_product__sync_requests__skipped_for__status=pending)
+        )
+        if value:
+            return queryset.filter(pending_filter).distinct(), Q()
+
+        return queryset.exclude(pending_filter).distinct(), Q()
 
 
 @filter(SalesChannelContentTemplate)

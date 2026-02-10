@@ -37,7 +37,11 @@ from sales_channels.integrations.ebay.factories.products.properties import (
     EbayProductPropertyUpdateFactory,
 )
 from sales_channels.integrations.ebay.factories.prices import EbayPriceUpdateFactory
-from sales_channels.integrations.ebay.models.products import EbayProduct
+from sales_channels.integrations.ebay.models.products import (
+    EbayPrice,
+    EbayProduct,
+    EbayProductContent,
+)
 from sales_channels.integrations.ebay.models.properties import (
     EbayProductProperty,
     EbayInternalProperty,
@@ -353,7 +357,41 @@ class EbayProductBaseFactory(EbayInventoryItemPushMixin, RemoteProductSyncFactor
         self.remote_instance = remote_product
         self.remote_parent_product = expected_parent
         self._ensure_offer_record(remote_product=remote_product)
+        self._ensure_content_price_mirrors(remote_product=remote_product)
         return remote_product
+
+    def _ensure_content_price_mirrors(self, *, remote_product: EbayProduct) -> None:
+        if not self.sales_channel.sync_contents:
+            return
+        content, _ = EbayProductContent.objects.get_or_create(
+            remote_product=remote_product,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+        )
+        from sales_channels.helpers import build_content_data, compute_content_data_hash
+
+        content_data = build_content_data(
+            product=self.local_instance,
+            sales_channel=self.sales_channel,
+        )
+        content.content_data = content_data
+        content.save()
+
+        if not self.sales_channel.sync_prices:
+            return
+
+        price, _ = EbayPrice.objects.get_or_create(
+            remote_product=remote_product,
+            sales_channel=self.sales_channel,
+            multi_tenant_company=self.sales_channel.multi_tenant_company,
+        )
+        from sales_channels.helpers import build_price_data
+
+        price.price_data = build_price_data(
+            product=self.local_instance,
+            sales_channel=self.sales_channel,
+        )
+        price.save()
 
     def _post_inventory_push(self) -> None:
         return {
@@ -564,6 +602,7 @@ class EbayProductCreateFactory(EbayProductBaseFactory):
         super().__init__(enable_price_update=enable_price_update, **kwargs)
 
     def run(self) -> Optional[Dict[str, Any]]:
+        run_succeeded = None
         if not self.preflight_check():
             return None
 
@@ -604,13 +643,19 @@ class EbayProductCreateFactory(EbayProductBaseFactory):
             self.update_progress()
             self.final_process()
             self.log_action(self.action_log, result or {}, self.payload, log_identifier)
+            run_succeeded = True
             return result
 
         except Exception as exc:
+            run_succeeded = False
             self.log_error(exc, self.action_log, log_identifier, self.payload, fixing_identifier)
             raise
 
         finally:
+            if run_succeeded is False:
+                self._set_successfully_created(value=False)
+            elif run_succeeded is True:
+                self._set_successfully_created(value=True)
             self.finalize_progress()
 
 
@@ -618,6 +663,7 @@ class EbayProductUpdateFactory(EbayProductBaseFactory):
     """Refresh inventory and offer data for an existing listing."""
 
     def run(self) -> Optional[Dict[str, Any]]:
+        run_succeeded = None
         if not self.preflight_check():
             return None
 
@@ -658,13 +704,19 @@ class EbayProductUpdateFactory(EbayProductBaseFactory):
             self.update_progress()
             self.final_process()
             self.log_action(self.action_log, result or {}, self.payload, log_identifier)
+            run_succeeded = True
             return result
 
         except Exception as exc:
+            run_succeeded = False
             self.log_error(exc, self.action_log, log_identifier, self.payload, fixing_identifier)
             raise
 
         finally:
+            if run_succeeded is False:
+                self._set_successfully_created(value=False)
+            elif run_succeeded is True:
+                self._set_successfully_created(value=True)
             self.finalize_progress()
 
 

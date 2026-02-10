@@ -1,4 +1,5 @@
 from core import models
+from core.managers import Manager
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from products.models import Product
@@ -49,6 +50,7 @@ class AmazonBrowseNode(models.SharedModel):
     )
 
     path_depth = models.PositiveSmallIntegerField(default=0)
+    objects = Manager()
 
     class Meta:
         indexes = [
@@ -57,6 +59,7 @@ class AmazonBrowseNode(models.SharedModel):
             GinIndex(fields=["product_type_definitions"]),
         ]
         unique_together = ("remote_id", "marketplace_id")
+        search_terms = ["remote_id", "name", "context_name", "marketplace_id"]
 
     def __str__(self):
         return f"{self.name} ({self.remote_id})"

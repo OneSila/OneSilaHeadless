@@ -41,6 +41,7 @@ class AbstractImportInstance(abc.ABC):
 
         self.create_only = getattr(import_process, 'create_only', False)
         self.update_only = getattr(import_process, 'update_only', False)
+        self.override_only = getattr(import_process, 'override_only', False)
 
         self.mirror_model_class = None
         self.mirror_model_map = {}
@@ -145,6 +146,18 @@ class ImportOperationMixin:
     translation_get_value = None
     allow_edit = True  # for some imports we don't have what to edit
     allow_translation_edit = False
+
+    def _is_empty_value(self, *, value):
+        if value is None:
+            return True
+        if isinstance(value, str) and value == "":
+            return True
+        return False
+
+    def _should_skip_override(self, *, value):
+        if not getattr(self.import_instance, "override_only", False):
+            return False
+        return not self._is_empty_value(value=value)
 
     def __init__(self, import_instance, import_process, instance=None):
         """
@@ -258,12 +271,17 @@ class ImportOperationMixin:
                 current_val_ids = list(getattr(self.instance, key).values_list('id', flat=True))
                 new_val_ids = list(val.values_list('id', flat=True))
 
+                if getattr(self.import_instance, "override_only", False) and current_val_ids:
+                    continue
+
                 if set(current_val_ids) != set(new_val_ids):
                     getattr(self.instance, key).set(val)
                     logger.debug(f"Updated many-to-many field '{key}': {current_val_ids} -> {new_val_ids}")
 
             else:
                 current_val = getattr(self.instance, key, None)
+                if self._should_skip_override(value=current_val):
+                    continue
                 if current_val != val:
                     setattr(self.instance, key, val)
                     to_save = True
@@ -287,6 +305,9 @@ class ImportOperationMixin:
 
             val = getattr(self.import_instance, key)
             current_val = getattr(self.translation_obj, key, None)
+
+            if self._should_skip_override(value=current_val):
+                continue
 
             if current_val != val:
                 setattr(self.translation_obj, key, val)

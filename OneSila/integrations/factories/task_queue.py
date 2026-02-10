@@ -21,7 +21,8 @@ class TaskQueueFactory:
                  task_args: Optional[Tuple] = None,
                  task_kwargs: Optional[Dict] = None,
                  number_of_remote_requests: Optional[int] = None,
-                 priority: Optional[int] = None):
+                 priority: Optional[int] = None,
+                 sync_request_id: Optional[int] = None):
 
         self.integration_id = integration_id
         self.task_func_path = task_func_path
@@ -29,6 +30,7 @@ class TaskQueueFactory:
         self.task_kwargs = task_kwargs or {}
         self.number_of_remote_requests = number_of_remote_requests
         self.priority = priority
+        self.sync_request_id = sync_request_id
 
         # Initialize without setting until run method
         self.integration = None
@@ -37,6 +39,18 @@ class TaskQueueFactory:
         self.active_requests = None
         self.process_now = None
         self.task_queue_item = None
+        self.sync_request = None
+
+    def set_sync_request(self):
+        if self.sync_request_id is None:
+            return
+
+        from sales_channels.models import SyncRequest
+
+        self.sync_request = SyncRequest.objects.filter(
+            id=self.sync_request_id,
+            status=SyncRequest.STATUS_PENDING,
+        ).first()
 
     def set_integration(self):
         """
@@ -128,6 +142,13 @@ class TaskQueueFactory:
         """
         Run the full process: set attributes, create the task, and dispatch it.
         """
+        self.set_sync_request()
+        if self.sync_request_id is not None and self.sync_request is None:
+            logger.info(
+                "Skipping task queue creation for sync request %s because it is no longer pending.",
+                self.sync_request_id,
+            )
+            return
         self.set_integration()
         self.set_task_func()
         self.set_remote_requests()

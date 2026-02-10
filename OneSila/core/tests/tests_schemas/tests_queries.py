@@ -5,6 +5,8 @@ from model_bakery import baker
 from core.models import MultiTenantCompany
 from strawberry_django.test.client import TestClient
 from django.urls import reverse_lazy
+from django.conf import settings
+from django.utils.translation import get_language_info
 
 from .mutations import LOGOUT_MUTATION, ME_QUERY
 
@@ -107,6 +109,56 @@ class TestLanguageQuery(TransactionTestCaseMixin, TransactionTestCase):
 
         self.assertTrue(resp.errors is None)
         self.assertTrue(resp.data is not None)
+
+    def test_company_content_views(self):
+        from sales_channels.integrations.amazon.models import AmazonSalesChannel
+        from sales_channels.integrations.shopify.models import ShopifySalesChannel
+
+        language_codes = [code for code, _ in settings.LANGUAGES[:2]]
+        self.assertTrue(len(language_codes) >= 1)
+        self.multi_tenant_company.language = language_codes[0]
+        self.multi_tenant_company.languages = language_codes
+        self.multi_tenant_company.save(update_fields=["language", "languages"])
+        self.user.language = language_codes[0]
+        self.user.save(update_fields=["language"])
+
+        amazon_channel = AmazonSalesChannel.objects.create(
+            hostname="My Amazon Store",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        shopify_channel = ShopifySalesChannel.objects.create(
+            hostname="https://www.shop.example.com",
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        query = """
+            query companyContentViews {
+              companyContentViews {
+                key
+                name
+              }
+            }
+        """
+        resp = self.strawberry_test_client(query=query)
+        self.assertTrue(resp.errors is None)
+        self.assertTrue(resp.data is not None)
+
+        result = {
+            item["key"]: item["name"]
+            for item in resp.data["companyContentViews"]
+        }
+
+        for code in language_codes:
+            language_name = get_language_info(code)["name"]
+            self.assertEqual(result[f"0.{code}"], f"Default - {language_name}")
+            self.assertEqual(
+                result[f"{amazon_channel.id}.{code}"],
+                f"My Amazon Store - {language_name}",
+            )
+            self.assertEqual(
+                result[f"{shopify_channel.id}.{code}"],
+                f"shop.example.com - {language_name}",
+            )
 
 
 class TestTimeZoneQuery(TransactionTestCaseMixin, TransactionTestCase):

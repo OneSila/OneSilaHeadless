@@ -29,7 +29,7 @@ from sales_channels.content_templates import (
     build_content_template_context,
     render_sales_channel_content_template,
 )
-from sales_channels.models import SalesChannel, SalesChannelGptFeed
+from sales_channels.models import SalesChannel, SalesChannelGptFeed, SalesChannelViewAssign
 
 
 @type(name='Mutation')
@@ -77,6 +77,47 @@ class SalesChannelsMutation:
     update_sales_channel_view_assign: SalesChannelViewAssignType = update(SalesChannelViewAssignPartialInput)
     delete_sales_channel_view_assign: SalesChannelViewAssignType = delete()
     delete_sales_channel_view_assigns: List[SalesChannelViewAssignType] = delete(is_bulk=True)
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def resync_sales_channel_view_assigns(
+        self,
+        *,
+        assigns: List[SalesChannelViewAssignPartialInput],
+        info: Info,
+    ) -> List[SalesChannelViewAssignType]:
+        """Bulk resync remote products for sales channel assigns."""
+        from sales_channels.signals import manual_sync_remote_product
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+
+        assign_ids = [assign.id.node_id for assign in assigns if getattr(assign, "id", None)]
+        if not assign_ids:
+            raise ValidationError(_("No assignments were provided."))
+
+        qs = SalesChannelViewAssign.objects.filter(
+            id__in=assign_ids,
+            multi_tenant_company=multi_tenant_company,
+            remote_product__isnull=False,
+            remote_product__syncing_current_percentage=100,
+            sales_channel__active=True,
+        ).select_related("remote_product", "sales_channel_view")
+
+        if not qs.exists():
+            raise ValidationError(_("No eligible assignments."))
+
+        synced: list[SalesChannelViewAssign] = []
+        for assign in qs.iterator():
+            manual_sync_remote_product.send(
+                sender=assign.remote_product.__class__,
+                instance=assign.remote_product,
+                view=assign.sales_channel_view,
+            )
+            synced.append(assign)
+
+        if not synced:
+            raise ValidationError(_("No eligible assignments."))
+
+        return synced
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
     def resync_sales_channel_gpt_feed(

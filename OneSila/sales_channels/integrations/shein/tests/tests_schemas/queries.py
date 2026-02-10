@@ -136,3 +136,16 @@ query ($salesChannel: GlobalID!) {
   }
 }
 """
+
+SHEIN_CATEGORY_FILTER_BY_SEARCH = """
+query ($search: String!) {
+  sheinCategories(filters: {search: $search}) {
+    edges {
+      node {
+        id
+        remoteId
+      }
+    }
+  }
+}
+"""

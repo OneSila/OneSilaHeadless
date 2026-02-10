@@ -7,7 +7,7 @@ from eancodes.signals import ean_code_released_for_product
 from products.models import Product
 from products_inspector.constants import HAS_IMAGES_ERROR, MISSING_PRICES_ERROR, INACTIVE_BUNDLE_ITEMS_ERROR, \
     MISSING_BUNDLE_ITEMS_ERROR, MISSING_VARIATION_ERROR, MISSING_EAN_CODE_ERROR, \
-    MISSING_PRODUCT_TYPE_ERROR, MISSING_REQUIRED_PROPERTIES_ERROR, MISSING_OPTIONAL_PROPERTIES_ERROR, MISSING_STOCK_ERROR, \
+    MISSING_PRODUCT_TYPE_ERROR, MISSING_REQUIRED_PROPERTIES_ERROR, MISSING_OPTIONAL_PROPERTIES_ERROR, \
     MISSING_MANUAL_PRICELIST_OVERRIDE_ERROR, VARIATION_MISMATCH_PRODUCT_TYPE_ERROR, \
     ITEMS_MISSING_MANDATORY_INFORMATION_ERROR, VARIATIONS_MISSING_MANDATORY_INFORMATION_ERROR, \
     DUPLICATE_VARIATIONS_ERROR, NON_CONFIGURABLE_RULE_ERROR
@@ -178,13 +178,14 @@ def products_inspector__inspector__trigger_block_product_properties_change(sende
 # MISSING_STOCK_ERROR  --------------------------------------------------
 
 
-@receiver(post_update, sender='products.Product')
-@receiver(post_update, sender='products.SimpleProduct')
-@receiver(post_update, sender='products.BundleProduct')
-@receiver(post_update, sender='products.AliasProduct')
-@trigger_signal_for_dirty_fields('active', 'allow_backorder')
-def products_inspector__inspector__trigger_block_product_active_or_allow_backorder_change(sender, instance, **kwargs):
-    inspector_block_refresh.send(sender=instance.inspector.__class__, instance=instance.inspector, error_code=MISSING_STOCK_ERROR, run_async=False)
+# Deprecated: legacy ERP stock validation, no active implementation behind this block.
+# @receiver(post_update, sender='products.Product')
+# @receiver(post_update, sender='products.SimpleProduct')
+# @receiver(post_update, sender='products.BundleProduct')
+# @receiver(post_update, sender='products.AliasProduct')
+# @trigger_signal_for_dirty_fields('active', 'allow_backorder')
+# def products_inspector__inspector__trigger_block_product_active_or_allow_backorder_change(sender, instance, **kwargs):
+#     inspector_block_refresh.send(sender=instance.inspector.__class__, instance=instance.inspector, error_code=MISSING_STOCK_ERROR, run_async=False)
 
 
 # @receiver(post_create, sender='inventory.Inventory')

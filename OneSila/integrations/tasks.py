@@ -16,7 +16,8 @@ def add_task_to_queue(
     task_args: Optional[Tuple] = None,
     task_kwargs: Optional[Dict] = None,
     number_of_remote_requests: Optional[int] = None,
-    priority: Optional[int] = None
+    priority: Optional[int] = None,
+    sync_request_id: Optional[int] = None,
 ) -> None:
     from integrations.factories.task_queue import TaskQueueFactory
 
@@ -26,7 +27,9 @@ def add_task_to_queue(
         task_args=task_args,
         task_kwargs=task_kwargs,
         number_of_remote_requests=number_of_remote_requests,
-        priority=priority)
+        priority=priority,
+        sync_request_id=sync_request_id,
+    )
 
     fac.run()
 

@@ -279,9 +279,7 @@ class SheinSalesChannelMutation:
         """Create a Shein product for the assigned storefront view."""
         from products.models import Product
         from sales_channels.integrations.shein.models import SheinSalesChannel
-        from sales_channels.integrations.shein.flows.tasks_runner import (
-            run_single_shein_product_task_flow,
-        )
+        from sales_channels.integrations.shein.factories.task_queue import SheinSingleChannelAddTask
         from sales_channels.integrations.shein.tasks import (
             create_shein_product_db_task,
             update_shein_product_db_task,
@@ -323,12 +321,15 @@ class SheinSalesChannelMutation:
 
         count = 1 + getattr(product_obj, "get_configurable_variations", lambda: [])().count()
 
-        run_single_shein_product_task_flow(
+        task_runner = SheinSingleChannelAddTask(
             task_func=create_shein_product_db_task,
             sales_channel=channel,
             number_of_remote_requests=count,
+        )
+        task_runner.set_extra_task_kwargs(
             product_id=product_obj.id,
         )
+        task_runner.run()
 
         return True
 
@@ -339,63 +340,45 @@ class SheinSalesChannelMutation:
             assigns: List[SalesChannelViewAssignPartialInput],
             info: Info,
     ) -> bool:
-        """
-        Bulk create Shein products based on SalesChannelViewAssign ids.
-        Only uses assigns that are PENDING_CREATION and belong to the tenant.
-        Raises if none eligible.
-        """
+        """Bulk create Shein products based on SalesChannelViewAssign ids."""
         from sales_channels.models import SalesChannelViewAssign
-        from sales_channels.integrations.shein.flows.tasks_runner import (
-            run_single_shein_product_task_flow,
-        )
+        from sales_channels.integrations.shein.factories.task_queue import SheinSingleChannelAddTask
         from sales_channels.integrations.shein.tasks import create_shein_product_db_task
-
         multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
-
         assign_ids = [a.id.node_id for a in assigns if getattr(a, "id", None)]
         if not assign_ids:
             raise ValidationError(_("No assignments were provided."))
-
-        qs = (
-            SalesChannelViewAssign.objects
-            .filter(
-                id__in=assign_ids,
-                multi_tenant_company=multi_tenant_company,
-                status=SalesChannelViewAssign.STATUS_PENDING_CREATION,
-                sales_channel__active=True,
-            )
-            .select_related("product", "sales_channel")
-        )
-
+        qs = SalesChannelViewAssign.objects.filter(
+            id__in=assign_ids,
+            multi_tenant_company=multi_tenant_company,
+            status=SalesChannelViewAssign.STATUS_PENDING_CREATION,
+            sales_channel__active=True,
+        ).select_related("product", "sales_channel")
         if not qs.exists():
             raise ValidationError(_("No eligible assignments. We can only create Pending Creation assignments."))
-
         seen_product_ids: set[int] = set()
         triggered = False
         for assign in qs.iterator():
-
             channel = assign.sales_channel.get_real_instance()
             if not isinstance(channel, SheinSalesChannel):
                 continue
-
             product_obj = assign.product
             if product_obj.id in seen_product_ids:
                 continue
-
             seen_product_ids.add(product_obj.id)
             count = 1 + getattr(product_obj, "get_configurable_variations", lambda: [])().count()
-
-            run_single_shein_product_task_flow(
+            task_runner = SheinSingleChannelAddTask(
                 task_func=create_shein_product_db_task,
                 sales_channel=channel,
                 number_of_remote_requests=count,
+            )
+            task_runner.set_extra_task_kwargs(
                 product_id=product_obj.id,
             )
+            task_runner.run()
             triggered = True
-
         if not triggered:
             raise ValidationError(_("No eligible assignments. We can only create Pending Creation assignments."))
-
         return True
 
     @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
@@ -410,9 +393,7 @@ class SheinSalesChannelMutation:
         """Optionally force an update by running the create flow (publishOrEdit) again."""
         from products.models import Product
         from sales_channels.integrations.shein.models import SheinSalesChannel
-        from sales_channels.integrations.shein.flows.tasks_runner import (
-            run_single_shein_product_task_flow,
-        )
+        from sales_channels.integrations.shein.factories.task_queue import SheinSingleChannelAddTask
         from sales_channels.integrations.shein.tasks import (
             create_shein_product_db_task,
             update_shein_product_db_task,
@@ -452,18 +433,75 @@ class SheinSalesChannelMutation:
 
         count = 1 + getattr(product_obj, "get_configurable_variations", lambda: [])().count()
 
-        if force_update:
-            run_single_shein_product_task_flow(
-                task_func=create_shein_product_db_task,
+        task_func = create_shein_product_db_task if force_update else update_shein_product_db_task
+        task_runner = SheinSingleChannelAddTask(
+            task_func=task_func,
+            sales_channel=channel,
+            number_of_remote_requests=count,
+        )
+        task_runner.set_extra_task_kwargs(
+            product_id=product_obj.id,
+        )
+        task_runner.run()
+        return True
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def bulk_update_shein_product_from_assigns(
+        self,
+        *,
+        assigns: List[SalesChannelViewAssignPartialInput],
+        force_update: bool,
+        info: Info,
+    ) -> bool:
+        """Bulk update Shein products based on SalesChannelViewAssign ids."""
+        from sales_channels.integrations.shein.factories.task_queue import SheinSingleChannelAddTask
+        from sales_channels.integrations.shein.tasks import (
+            create_shein_product_db_task,
+            update_shein_product_db_task,
+        )
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        assign_ids = [a.id.node_id for a in assigns if getattr(a, "id", None)]
+        if not assign_ids:
+            raise ValidationError(_("No assignments were provided."))
+        qs = SalesChannelViewAssign.objects.filter(
+            id__in=assign_ids,
+            multi_tenant_company=multi_tenant_company,
+            sales_channel__active=True,
+            remote_product__isnull=False,
+        ).exclude(
+            status=SalesChannelViewAssign.STATUS_PENDING_CREATION,
+        ).select_related("product", "sales_channel")
+
+        if not qs.exists():
+            raise ValidationError(_("No eligible assignments. We can only update non-pending assignments."))
+
+        seen_product_ids: set[int] = set()
+        task_func = create_shein_product_db_task if force_update else update_shein_product_db_task
+        triggered = False
+
+
+
+        for assign in qs.iterator():
+            channel = assign.sales_channel.get_real_instance()
+            if not isinstance(channel, SheinSalesChannel):
+                continue
+            product_obj = assign.product
+            if product_obj.id in seen_product_ids:
+                continue
+            seen_product_ids.add(product_obj.id)
+            count = 1 + getattr(product_obj, "get_configurable_variations", lambda: [])().count()
+            task_runner = SheinSingleChannelAddTask(
+                task_func=task_func,
                 sales_channel=channel,
                 number_of_remote_requests=count,
+            )
+            task_runner.set_extra_task_kwargs(
                 product_id=product_obj.id,
             )
-        else:
-            run_single_shein_product_task_flow(
-                task_func=update_shein_product_db_task,
-                sales_channel=channel,
-                number_of_remote_requests=count,
-                product_id=product_obj.id,
-            )
+            task_runner.run()
+            triggered = True
+
+        if not triggered:
+            raise ValidationError(_("No eligible assignments. We can only update non-pending assignments."))
+
         return True

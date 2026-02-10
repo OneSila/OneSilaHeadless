@@ -12,6 +12,9 @@ from .tests_schemas.queries import (
     PRODUCTS_ASSIGNED_TO_VIEW_QUERY,
     PRODUCTS_NOT_ASSIGNED_TO_VIEW_QUERY,
     PRODUCTS_WITH_VALUE_SELECT_IDS_QUERY,
+    PRODUCTS_WITH_VALUE_SELECT_ID_QUERY,
+    PRODUCTS_WITH_PROPERTY_ID_QUERY,
+    PRODUCTS_WITH_NOT_PROPERTY_ID_QUERY,
 )
 
 
@@ -164,3 +167,42 @@ class ProductFilterValueSelectIdsTestCase(TransactionTestCaseMixin, TransactionT
             [self.to_global_id(self.color_blue), self.to_global_id(self.size_small)],
         )
         self.assertSetEqual(ids, set())
+
+    def test_value_select_id_filters_single(self):
+        resp = self.strawberry_test_client(
+            query=PRODUCTS_WITH_VALUE_SELECT_ID_QUERY,
+            variables={"id": self.to_global_id(self.color_red)},
+        )
+        self.assertIsNone(resp.errors)
+        expected_ids = {self.p1.id, self.p2.id, self.p3.id}
+        found_ids = {
+            int(self.from_global_id(edge["node"]["id"])[1])
+            for edge in resp.data["products"]["edges"]
+        } & expected_ids
+        self.assertSetEqual(found_ids, {self.p1.id, self.p2.id})
+
+    def test_property_id_filters_single(self):
+        resp = self.strawberry_test_client(
+            query=PRODUCTS_WITH_PROPERTY_ID_QUERY,
+            variables={"id": self.to_global_id(self.size_property)},
+        )
+        self.assertIsNone(resp.errors)
+        expected_ids = {self.p1.id, self.p2.id, self.p3.id}
+        found_ids = {
+            int(self.from_global_id(edge["node"]["id"])[1])
+            for edge in resp.data["products"]["edges"]
+        } & expected_ids
+        self.assertSetEqual(found_ids, {self.p1.id, self.p3.id})
+
+    def test_exclude_property_id_filters_single(self):
+        resp = self.strawberry_test_client(
+            query=PRODUCTS_WITH_NOT_PROPERTY_ID_QUERY,
+            variables={"id": self.to_global_id(self.size_property)},
+        )
+        self.assertIsNone(resp.errors)
+        expected_ids = {self.p1.id, self.p2.id, self.p3.id}
+        found_ids = {
+            int(self.from_global_id(edge["node"]["id"])[1])
+            for edge in resp.data["products"]["edges"]
+        } & expected_ids
+        self.assertSetEqual(found_ids, {self.p2.id})

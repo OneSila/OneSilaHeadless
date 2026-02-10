@@ -13,3 +13,9 @@ class LanguageType:
     name: str
     name_local: str
     name_translated: str
+
+
+@strawberry_type
+class ContentViewType:
+    key: str
+    name: str

@@ -110,3 +110,25 @@ def sales_channels__tasks__remove_from_gpt_feed(*, sales_channel_id: int, sku: s
         sales_channel_id=sales_channel_id,
         sku=sku,
     )
+
+
+@db_periodic_task(crontab(day_of_week="0", hour="3", minute="0"))
+def sales_channels__tasks__cleanup_sync_requests__cronjob():
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from .models import SyncRequest
+
+    now = timezone.now()
+    done_cutoff = now - timedelta(days=60)
+    failed_cutoff = now - timedelta(days=120)
+
+    SyncRequest.objects.filter(
+        status=SyncRequest.STATUS_DONE,
+        updated_at__lt=done_cutoff,
+    ).delete()
+    SyncRequest.objects.filter(
+        status=SyncRequest.STATUS_FAILED,
+        updated_at__lt=failed_cutoff,
+    ).delete()

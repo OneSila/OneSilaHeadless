@@ -1,4 +1,35 @@
 from core.managers import MultiTenantQuerySet, MultiTenantManager, QuerySetProxyModelMixin
+from django.db.models import BooleanField, Case, Q, Value, When
+
+
+class InspectorQuerySet(MultiTenantQuerySet):
+    def with_has_any_missing_information(self, *, annotate: bool = True):
+        if not annotate:
+            return self
+
+        return self.annotate(
+            has_any_missing_information=Case(
+                When(
+                    Q(has_missing_information=True) | Q(has_missing_optional_information=True),
+                    then=Value(True),
+                ),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
+        )
+
+    def filter_has_any_missing_information(self, *, value: bool):
+        if value is None:
+            return self
+
+        return self.with_has_any_missing_information(annotate=True).filter(
+            has_any_missing_information=value
+        )
+
+
+class InspectorManager(MultiTenantManager):
+    def get_queryset(self):
+        return InspectorQuerySet(self.model, using=self._db).with_has_any_missing_information(annotate=True)
 
 
 class InspectorBlockQuerySet(MultiTenantQuerySet):
@@ -177,4 +208,3 @@ class NonConfigurableRuleInspectorBlockQuerySet(QuerySetProxyModelMixin, Inspect
 class NonConfigurableRuleInspectorBlockManager(InspectorBlockManager):
     def get_queryset(self):
         return NonConfigurableRuleInspectorBlockQuerySet(self.model, using=self._db)
-

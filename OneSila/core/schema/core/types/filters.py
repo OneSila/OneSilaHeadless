@@ -3,6 +3,7 @@ from typing import Optional
 from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from django.db.models import Q
+from django.utils.dateparse import parse_date
 from strawberry_django.filters import filter_type as strawberry_filter
 from strawberry_django import filter_field as custom_filter
 from strawberry import UNSET
@@ -61,6 +62,63 @@ class ExcluideDemoDataFilterMixin(AnnotationMergerMixin):
                     content_type=supplier_content_type
                 ).values("object_id")
             )
+
+        return queryset, Q()
+
+
+class TimeStampRangeFilterMixin(AnnotationMergerMixin):
+    created_at_range: Optional[str]
+    updated_at_range: Optional[str]
+
+    @custom_filter
+    def created_at_range(
+        self,
+        *,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        try:
+            start_value, end_value = [item.strip() for item in value.split(",", 1)]
+        except ValueError:
+            return queryset, Q()
+
+        start_date = None if start_value in ("", "None") else parse_date(start_value)
+        end_date = None if end_value in ("", "None") else parse_date(end_value)
+
+        if start_date:
+            queryset = queryset.filter(created_at__date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__date__lte=end_date)
+
+        return queryset, Q()
+
+    @custom_filter
+    def updated_at_range(
+        self,
+        *,
+        queryset: QuerySet,
+        value: str,
+        prefix: str
+    ) -> tuple[QuerySet, Q]:
+        if value in (None, UNSET):
+            return queryset, Q()
+
+        try:
+            start_value, end_value = [item.strip() for item in value.split(",", 1)]
+        except ValueError:
+            return queryset, Q()
+
+        start_date = None if start_value in ("", "None") else parse_date(start_value)
+        end_date = None if end_value in ("", "None") else parse_date(end_value)
+
+        if start_date:
+            queryset = queryset.filter(updated_at__date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(updated_at__date__lte=end_date)
 
         return queryset, Q()
 

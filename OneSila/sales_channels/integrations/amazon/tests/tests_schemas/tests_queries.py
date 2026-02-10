@@ -13,6 +13,7 @@ from sales_channels.integrations.amazon.models import (
     AmazonExternalProductId,
     AmazonGtinExemption,
     AmazonVariationTheme,
+    AmazonBrowseNode,
 )
 from products.models import Product
 from properties.models import Property, ProductProperty
@@ -27,6 +28,7 @@ from .queries import (
     AMAZON_EXTERNAL_PRODUCT_ID_FILTER_BY_PRODUCT,
     AMAZON_GTIN_EXEMPTION_FILTER_BY_PRODUCT,
     AMAZON_VARIATION_THEME_FILTER_BY_PRODUCT,
+    AMAZON_BROWSE_NODE_FILTER_BY_SEARCH,
 )
 
 
@@ -298,3 +300,30 @@ class AmazonVariationThemeQueryTest(TransactionTestCaseMixin, TransactionTestCas
         edges = resp.data["amazonVariationThemes"]["edges"]
         self.assertEqual(len(edges), 1)
         self.assertEqual(edges[0]["node"]["id"], self.to_global_id(self.theme))
+
+
+class AmazonBrowseNodeQueryTest(TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.node = AmazonBrowseNode.objects.create(
+            remote_id="100",
+            marketplace_id="ATVPDKIKX0DER",
+            name="Node 100",
+            has_children=False,
+        )
+        AmazonBrowseNode.objects.create(
+            remote_id="200",
+            marketplace_id="ATVPDKIKX0DER",
+            name="Node 200",
+            has_children=False,
+        )
+
+    def test_filter_by_search_remote_id(self):
+        resp = self.strawberry_test_client(
+            query=AMAZON_BROWSE_NODE_FILTER_BY_SEARCH,
+            variables={"search": self.node.remote_id},
+        )
+        self.assertTrue(resp.errors is None)
+        edges = resp.data["amazonBrowseNodes"]["edges"]
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0]["node"]["id"], self.to_global_id(self.node))

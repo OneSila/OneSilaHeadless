@@ -47,7 +47,8 @@ from sales_channels.integrations.amazon.schema.types.types import (
     AmazonVariationThemeType,
     AmazonSalesChannelMappingSyncPayload,
 )
-from sales_channels.schema.types.input import SalesChannelViewPartialInput
+from sales_channels.models import SalesChannelViewAssign
+from sales_channels.schema.types.input import SalesChannelViewPartialInput, SalesChannelViewAssignPartialInput
 from products.schema.types.input import ProductPartialInput
 from core.schema.core.mutations import create, type, List, update, delete
 from strawberry import Info
@@ -468,3 +469,112 @@ class AmazonSalesChannelMutation:
     update_amazon_variation_theme: AmazonVariationThemeType = update(AmazonVariationThemePartialInput)
     delete_amazon_variation_theme: AmazonVariationThemeType = delete()
     delete_amazon_variation_themes: List[AmazonVariationThemeType] = delete()
+
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def bulk_resync_amazon_product_from_assigns(
+        self,
+        *,
+        assigns: List[SalesChannelViewAssignPartialInput],
+        force_full_update: bool,
+        info: Info,
+    ) -> bool:
+        """Bulk resync Amazon products based on SalesChannelViewAssign ids."""
+        from sales_channels.integrations.amazon.models import (
+            AmazonProduct,
+            AmazonSalesChannelView,
+        )
+        from sales_channels.signals import manual_sync_remote_product
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        assign_ids = [a.id.node_id for a in assigns if getattr(a, "id", None)]
+        if not assign_ids:
+            raise ValidationError(_("No assignments were provided."))
+
+        qs = SalesChannelViewAssign.objects.filter(
+            id__in=assign_ids,
+            multi_tenant_company=multi_tenant_company,
+            remote_product__isnull=False,
+            remote_product__syncing_current_percentage=100,
+            sales_channel__active=True,
+        ).select_related("remote_product", "sales_channel_view", "sales_channel")
+        if not qs.exists():
+            raise ValidationError(_("No eligible assignments."))
+
+        triggered = False
+        for assign in qs.iterator():
+            view = assign.sales_channel_view
+            if hasattr(view, "get_real_instance"):
+                view = view.get_real_instance()
+            remote_product = assign.remote_product
+            if hasattr(remote_product, "get_real_instance"):
+                remote_product = remote_product.get_real_instance()
+            if not isinstance(view, AmazonSalesChannelView) or not isinstance(remote_product, AmazonProduct):
+                continue
+
+            manual_sync_remote_product.send(
+                sender=remote_product.__class__,
+                instance=remote_product,
+                view=view,
+                force_validation_only=False,
+                force_full_update=force_full_update,
+            )
+            triggered = True
+
+        if not triggered:
+            raise ValidationError(_("No eligible assignments."))
+
+        return True
+
+    @strawberry_django.mutation(handle_django_errors=False, extensions=default_extensions)
+    def bulk_refresh_amazon_latest_issues_from_assigns(
+        self,
+        *,
+        assigns: List[SalesChannelViewAssignPartialInput],
+        info: Info,
+    ) -> bool:
+        """Bulk refresh listing issues for Amazon assigns."""
+        from sales_channels.integrations.amazon.models import (
+            AmazonProduct,
+            AmazonSalesChannelView,
+        )
+        from sales_channels.integrations.amazon.factories.sales_channels.issues import (
+            FetchRemoteIssuesFactory,
+        )
+
+        multi_tenant_company = get_multi_tenant_company(info, fail_silently=False)
+        assign_ids = [a.id.node_id for a in assigns if getattr(a, "id", None)]
+        if not assign_ids:
+            raise ValidationError(_("No assignments were provided."))
+
+        qs = SalesChannelViewAssign.objects.filter(
+            id__in=assign_ids,
+            multi_tenant_company=multi_tenant_company,
+            remote_product__isnull=False,
+            sales_channel__active=True,
+        ).select_related("remote_product", "sales_channel_view", "sales_channel")
+        if not qs.exists():
+            raise ValidationError(_("No eligible assignments."))
+
+        triggered = False
+        for assign in qs.iterator():
+            view = assign.sales_channel_view
+            if hasattr(view, "get_real_instance"):
+                view = view.get_real_instance()
+            remote_product = assign.remote_product
+            if hasattr(remote_product, "get_real_instance"):
+                remote_product = remote_product.get_real_instance()
+            if not isinstance(view, AmazonSalesChannelView) or not isinstance(remote_product, AmazonProduct):
+                continue
+
+            factory = FetchRemoteIssuesFactory(
+                remote_product=remote_product,
+                view=view,
+            )
+            factory.run()
+            triggered = True
+
+        if not triggered:
+            raise ValidationError(_("No eligible assignments."))
+
+        return True

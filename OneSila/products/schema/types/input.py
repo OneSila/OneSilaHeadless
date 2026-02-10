@@ -1,9 +1,8 @@
 from typing import List, Optional
-from enum import Enum
-
 import strawberry
 
 from core.schema.core.types.input import NodeInput, input, partial, strawberry_input
+from products.schema.types.enums import ContentField
 from products.models import (
     Product,
     BundleProduct,
@@ -19,16 +18,6 @@ from properties.schema.types.input import (
     PropertySelectValuePartialInput,
 )
 from sales_channels.schema.types.input import SalesChannelPartialInput
-
-
-class ContentField(Enum):
-    DESCRIPTION = "description"
-    SHORT_DESCRIPTION = "short_description"
-    SUBTITLE = "subtitle"
-    NAME = "name"
-    BULLET_POINTS = "bullet_points"
-    URL_KEY = "url_key"
-
 
 @input(Product, fields="__all__")
 class ProductInput:
@@ -122,4 +111,3 @@ class ProductTranslationBulkImportInput:
     all_languages: Optional[bool] = False
     fields: List[ContentField]
     products: List[ProductPartialInput]
-

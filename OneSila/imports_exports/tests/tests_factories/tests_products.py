@@ -12,6 +12,7 @@ from properties.models import ProductPropertiesRuleItem, ProductPropertiesRule, 
 from sales_prices.models import SalesPrice
 from currencies.currencies import currencies
 from core.exceptions import ValidationError
+from taxes.models import VatRate
 
 
 class ImportProductInstanceValidateTest(TestCase):
@@ -118,6 +119,79 @@ class ImportProductInstanceValidateTest(TestCase):
         self.assertEqual(len(instance.prices), 2)
         self.assertEqual(len(instance.variations), 2)
         self.assertEqual(len(instance.configurator_select_values), 2)
+
+    def test_override_only_skips_existing_fields(self, *, _unused=None):
+        vat_rate_current = VatRate.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            rate=19,
+        )
+        vat_rate_new = VatRate.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            rate=7,
+        )
+        product = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sku="OVR-VAL-001",
+            type=Product.SIMPLE,
+            active=False,
+            allow_backorder=False,
+            vat_rate=vat_rate_current,
+        )
+        import_process = Import.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            override_only=True,
+        )
+        data = {
+            "sku": "OVR-VAL-001",
+            "type": Product.SIMPLE,
+            "active": True,
+            "allow_backorder": True,
+            "vat_rate": vat_rate_new.rate,
+        }
+
+        ImportProductInstance(data, import_process).process()
+
+        product.refresh_from_db()
+        self.assertFalse(product.active)
+        self.assertFalse(product.allow_backorder)
+        self.assertEqual(product.vat_rate_id, vat_rate_current.id)
+
+    def test_override_only_skips_existing_translation_updates(self, *, _unused=None):
+        product = Product.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sku="OVR-VAL-002",
+            type=Product.SIMPLE,
+        )
+        translation = ProductTranslation.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            product=product,
+            language=self.multi_tenant_company.language,
+            name="Original Name",
+            short_description="Original Short",
+            description="Original Description",
+        )
+        import_process = Import.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            override_only=True,
+        )
+        data = {
+            "sku": "OVR-VAL-002",
+            "type": Product.SIMPLE,
+            "translations": [
+                {
+                    "name": "Updated Name",
+                    "short_description": "Updated Short",
+                    "description": "Updated Description",
+                }
+            ],
+        }
+
+        ImportProductInstance(data, import_process).process()
+
+        translation.refresh_from_db()
+        self.assertEqual(translation.name, "Original Name")
+        self.assertEqual(translation.short_description, "Original Short")
+        self.assertEqual(translation.description, "Original Description")
 
 
 class ImportProductTranslationAndSalesPriceValidateTest(TestCase):

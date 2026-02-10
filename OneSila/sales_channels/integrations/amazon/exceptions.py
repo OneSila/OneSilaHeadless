@@ -71,3 +71,8 @@ class AmazonMissingBrowseNodeError(Exception):
 class AmazonMissingVariationThemeError(Exception):
     """Raised when Amazon variation theme mappings are missing for first assignment."""
     pass
+
+
+class AmazonProductTypeNotMappedError(Exception):
+    """Raised when no Amazon product type mapping exists for the selected rule."""
+    pass

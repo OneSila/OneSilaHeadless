@@ -378,7 +378,7 @@ class MissingStockInspectorBlockFactory(InspectorBlockFactory):
                          save_inspector=save_inspector)
 
     def _check(self):
-        # @TODO THIS NEEDS REFACTOR AFTER WE HAVE INVETORY IN A SIMPLE FORM
+        # Deprecated: legacy ERP stock validation, intentionally no-op.
         pass
 
 

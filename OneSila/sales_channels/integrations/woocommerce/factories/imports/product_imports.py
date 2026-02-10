@@ -462,6 +462,10 @@ class WoocommerceProductImportProcessor(TemporaryDisableInspectorSignalsMixin, I
             import_process=self.import_process,
             instance=local_product
         )
+        if structured_data.get("type") == Product.CONFIGURABLE:
+            parent_importer_instance.update_only = False
+        else:
+            parent_importer_instance.update_only = self.import_process.update_only
         parent_importer_instance.prepare_mirror_model_class(
             mirror_model_class=WoocommerceProduct,
             sales_channel=self.sales_channel,
@@ -540,6 +544,10 @@ class WoocommerceProductImportProcessor(TemporaryDisableInspectorSignalsMixin, I
             import_process=self.import_process,
             instance=local_product
         )
+        if payload.get("type") == Product.CONFIGURABLE:
+            variation_importer_instance.update_only = False
+        else:
+            variation_importer_instance.update_only = self.import_process.update_only
         variation_importer_instance.prepare_mirror_model_class(
             mirror_model_class=WoocommerceProduct,
             sales_channel=self.sales_channel,

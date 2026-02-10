@@ -15,6 +15,7 @@ from sales_channels.integrations.shein.models import (
 )
 
 from .queries import (
+    SHEIN_CATEGORY_FILTER_BY_SEARCH,
     SHEIN_CATEGORY_FILTER_BY_SITE_AND_LEAF,
     SHEIN_INTERNAL_PROPERTY_FILTER_BY_MAPPED_LOCALLY,
     SHEIN_INTERNAL_PROPERTY_OPTION_FILTER_BY_INTERNAL_PROPERTY,
@@ -363,3 +364,13 @@ class SheinCategoryQueryTest(TransactionTestCaseMixin, TransactionTestCase):
         node = edges[0]["node"]
         self.assertEqual(node["id"], self.to_global_id(self.leaf))
         self.assertEqual(node["parentRemoteId"], self.root.remote_id)
+
+    def test_filter_by_search_remote_id(self):
+        resp = self.strawberry_test_client(
+            query=SHEIN_CATEGORY_FILTER_BY_SEARCH,
+            variables={"search": self.leaf.remote_id},
+        )
+        self.assertTrue(resp.errors is None)
+        edges = resp.data["sheinCategories"]["edges"]
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0]["node"]["id"], self.to_global_id(self.leaf))

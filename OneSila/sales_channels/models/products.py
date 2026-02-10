@@ -1,4 +1,4 @@
-from django.db.models import UniqueConstraint, Q
+from django.db.models import UniqueConstraint, Q, Index
 from django.db.utils import NotSupportedError
 from model_bakery.recipe import related
 
@@ -62,6 +62,9 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
                 name='unique_remote_sku_per_channel_with_parent_if_present'
             ),
         ]
+        indexes = [
+            Index(fields=["local_instance", "sales_channel"]),
+        ]
         verbose_name = 'Remote Product'
         verbose_name_plural = 'Remote Products'
 
@@ -112,6 +115,18 @@ class RemoteProduct(PolymorphicModel, RemoteObjectMixin, models.Model):
             error_ids.append(log.id)
 
         return IntegrationLog.objects.filter(id__in=error_ids)
+
+    @property
+    def has_sync_requests(self) -> bool:
+        from sales_channels.models.products import SyncRequest
+
+        if not self.pk:
+            return False
+
+        pending = SyncRequest.STATUS_PENDING
+        return self.sync_requests.filter(
+            Q(status=pending) | Q(skipped_for__status=pending)
+        ).exists()
 
     def __str__(self):
         local_name = self.local_instance.name if self.local_instance else "N/A"
@@ -191,6 +206,140 @@ class RemoteInventory(PolymorphicModel, RemoteObjectMixin, models.Model):
         return f"Inventory for {self.remote_product} - Quantity: {self.quantity}"
 
 
+class SyncRequest(models.Model):
+    """Deduplicated sync request for marketplace operations."""
+
+    STATUS_PENDING = "pending"
+    STATUS_DONE = "done"
+    STATUS_FAILED = "failed"
+    STATUS_SKIPPED = "skipped"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, _("Pending")),
+        (STATUS_DONE, _("Done")),
+        (STATUS_FAILED, _("Failed")),
+        (STATUS_SKIPPED, _("Skipped")),
+    ]
+
+    TYPE_PRODUCT = "product"
+    TYPE_PROPERTY = "property"
+    TYPE_CONTENT = "content"
+    TYPE_PRICE = "price"
+    TYPE_IMAGES = "images"
+
+    TYPE_CHOICES = [
+        (TYPE_PRODUCT, _("Product")),
+        (TYPE_PROPERTY, _("Property")),
+        (TYPE_CONTENT, _("Content")),
+        (TYPE_PRICE, _("Price")),
+        (TYPE_IMAGES, _("Images")),
+    ]
+
+    remote_product = models.ForeignKey(
+        "sales_channels.RemoteProduct",
+        on_delete=models.CASCADE,
+        related_name="sync_requests",
+        help_text="Remote product that needs sync.",
+    )
+    sales_channel = models.ForeignKey(
+        "sales_channels.SalesChannel",
+        on_delete=models.CASCADE,
+        related_name="sync_requests",
+        help_text="Sales channel associated with the sync request.",
+    )
+    sales_channel_view = models.ForeignKey(
+        "sales_channels.SalesChannelView",
+        on_delete=models.CASCADE,
+        related_name="sync_requests",
+        null=True,
+        blank=True,
+        help_text="Marketplace view to sync (nullable for viewless changes).",
+    )
+    sync_type = models.CharField(
+        max_length=16,
+        choices=TYPE_CHOICES,
+        help_text="What kind of sync is required.",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        help_text="Current state of the sync request.",
+    )
+    skipped_for = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        related_name="skipped_requests",
+        null=True,
+        blank=True,
+        help_text="Request that superseded this sync request.",
+    )
+    reason = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Short reason for the sync request.",
+    )
+    task_func_path = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Python import path for the task function.",
+    )
+    task_kwargs = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Serialized task kwargs for enqueueing the sync request.",
+    )
+    number_of_remote_requests = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Optional number of remote requests for queue accounting.",
+    )
+
+    class Meta:
+        verbose_name = _("Sync Request")
+        verbose_name_plural = _("Sync Requests")
+        indexes = [
+            Index(fields=["sales_channel", "sales_channel_view", "remote_product", "status", "sync_type"]),
+            Index(fields=["sales_channel", "remote_product", "status"]),
+            Index(fields=["skipped_for"]),
+        ]
+
+    def __str__(self) -> str:
+        view = self.sales_channel_view_id or "global"
+        return f"SyncRequest {self.sync_type} for {self.remote_product_id} @ {view}"
+
+    def enqueue(self, *, mark_done: bool = True):
+        if not self.task_func_path:
+            raise ValueError("SyncRequest is missing task_func_path.")
+
+        from integrations.tasks import add_task_to_queue
+        from django.db import transaction
+        self.refresh_from_db(fields=["status"])
+        if self.status != self.STATUS_PENDING:
+            return
+
+        task_kwargs = self.task_kwargs or {}
+        integration_id = self.sales_channel_id
+        task_func_path = self.task_func_path
+        number_of_remote_requests = self.number_of_remote_requests
+
+        transaction.on_commit(
+            lambda lb_task_kwargs=task_kwargs, integration_id=integration_id: add_task_to_queue(
+                integration_id=integration_id,
+                task_func_path=task_func_path,
+                task_kwargs=lb_task_kwargs,
+                number_of_remote_requests=number_of_remote_requests,
+                sync_request_id=self.id,
+            )
+        )
+
+        if mark_done and self.status != self.STATUS_DONE:
+            self.status = self.STATUS_DONE
+            self.save(update_fields=["status"])
+
+
 class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
     """
     Polymorphic model representing the remote mirror of a product's price.
@@ -198,7 +347,23 @@ class RemotePrice(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='price', on_delete=models.CASCADE,
                                           help_text="The remote product associated with this price.")
-    price_data = models.JSONField(default=dict, blank=True, help_text="Multi-currency price and discount data.")
+    price_data = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Multi-currency price data, e.g. {'EUR': {'price': 10.0, 'discount_price': 8.0}}.",
+    )
+    price_data_hash = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="Hash of the canonical price_data payload.",
+    )
+
+    def save(self, *args, **kwargs):
+        from sales_channels.helpers import compute_price_data_hash
+
+        self.price_data_hash = compute_price_data_hash(price_data=self.price_data)
+        super().save(*args, **kwargs)
 
     class Meta:
         unique_together = ('remote_product',)
@@ -236,6 +401,20 @@ class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
 
     remote_product = models.OneToOneField('sales_channels.RemoteProduct', related_name='content', on_delete=models.CASCADE,
                                           help_text="The remote product associated with this content.")
+    content_data = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Per-language content payload containing only fields relevant for the integration, "
+            "e.g. {'en': {'name': 'Tee', 'description': '...'}}."
+        ),
+    )
+    content_data_hash = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="Hash of the canonical content_data payload.",
+    )
 
     class Meta:
         unique_together = ('remote_product',)
@@ -248,6 +427,12 @@ class RemoteProductContent(PolymorphicModel, RemoteObjectMixin, models.Model):
     @property
     def frontend_name(self):
         return (_(f"Content for {self.remote_product.local_instance.name}"))
+
+    def save(self, *args, **kwargs):
+        from sales_channels.helpers import compute_content_data_hash
+
+        self.content_data_hash = compute_content_data_hash(content_data=self.content_data)
+        super().save(*args, **kwargs)
 
 
 class RemoteProductConfigurator(PolymorphicModel, RemoteObjectMixin, models.Model):

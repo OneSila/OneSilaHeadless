@@ -434,6 +434,9 @@ class SheinProductTypeItem(RemoteObjectMixin, models.Model):
             )
         ]
         search_terms = ["property__name", "product_type__name"]
+        indexes = [
+            models.Index(fields=["product_type", "property"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.product_type} :: {self.property}"

@@ -1,8 +1,11 @@
 from unittest.mock import patch
 
+from django.db import transaction
 from model_bakery import baker
 from core.tests import TestCase
 from properties.models import Property, PropertySelectValue
+from integrations.helpers import get_import_path
+from integrations.models import IntegrationTaskQueue
 from sales_channels.integrations.amazon.models import (
     AmazonSalesChannel,
     AmazonSalesChannelView,
@@ -26,7 +29,11 @@ from sales_channels.integrations.amazon.tasks import (
     resync_amazon_product_db_task,
     create_amazon_product_db_task,
 )
-from .helpers import DisableWooCommerceSignalsMixin
+from ..helpers import DisableWooCommerceSignalsMixin
+
+
+def _noop_dispatch_task(self, *, _unused=None):
+    return None
 
 
 class AmazonProductTypeReceiversTest(TestCase):
@@ -55,7 +62,7 @@ class AmazonProductTypeReceiversTest(TestCase):
         )
 
 
-class AmazonManualSyncReceiverTest(DisableWooCommerceSignalsMixin, TestCase):
+class AmazonManualSyncReceiverTest(TestCase):
     def setUp(self):
         super().setUp()
         self.sales_channel = AmazonSalesChannel.objects.create(
@@ -76,20 +83,41 @@ class AmazonManualSyncReceiverTest(DisableWooCommerceSignalsMixin, TestCase):
             local_instance=self.product,
         )
 
-    # @patch("sales_channels.integrations.amazon.receivers.run_single_amazon_product_task_flow")
-    # def test_manual_sync_queues_task(self, flow_mock):
-    #     manual_sync_remote_product.send(
-    #         sender=AmazonProduct,
-    #         instance=self.remote_product,
-    #         view=self.view,
-    #         force_validation_only=True,
-    #     )
-    #
-    #     flow_mock.assert_called_once()
-    #     _, kwargs = flow_mock.call_args
-    #     self.assertEqual(kwargs["task_func"], resync_amazon_product_db_task)
-    #     self.assertTrue(kwargs["force_validation_only"])
-    #     self.assertEqual(kwargs["view"], self.view)
+    @patch(
+        "integrations.factories.task_queue.TaskQueueFactory.dispatch_task",
+        new=_noop_dispatch_task,
+    )
+    def test_manual_sync_queues_task(self, *, _unused=None):
+        initial_count = IntegrationTaskQueue.objects.filter(
+            integration_id=self.sales_channel.id,
+        ).count()
+
+        with patch.object(
+            transaction,
+            "on_commit",
+            side_effect=lambda func, using=None: func(),
+        ):
+            manual_sync_remote_product.send(
+                sender=AmazonProduct,
+                instance=self.remote_product,
+                view=self.view,
+                force_validation_only=True,
+            )
+
+        self.assertEqual(
+            IntegrationTaskQueue.objects.filter(
+                integration_id=self.sales_channel.id,
+            ).count(),
+            initial_count + 1,
+        )
+        task = IntegrationTaskQueue.objects.filter(
+            integration_id=self.sales_channel.id,
+        ).latest("id")
+        self.assertEqual(task.task_name, get_import_path(resync_amazon_product_db_task))
+        self.assertEqual(task.task_kwargs.get("product_id"), self.product.id)
+        self.assertEqual(task.task_kwargs.get("remote_product_id"), self.remote_product.id)
+        self.assertEqual(task.task_kwargs.get("view_id"), self.view.id)
+        self.assertTrue(task.task_kwargs.get("force_validation_only"))
 
 
 class AmazonAssignReceiversTest(TestCase):
@@ -122,34 +150,64 @@ class AmazonAssignReceiversTest(TestCase):
             sales_channel_view=self.view,
         )
 
-    @patch("sales_channels.integrations.amazon.receivers.run_single_amazon_product_task_flow")
-    def test_create_from_assign_queues_task(self, flow_mock):
-        create_remote_product.send(
-            sender=SalesChannelViewAssign,
-            instance=self.assign,
-            view=self.view,
+    def test_create_from_assign_queues_task(self, *, _unused=None):
+        initial_count = IntegrationTaskQueue.objects.filter(
+            integration_id=self.sales_channel.id,
+        ).count()
+
+        with patch.object(
+            transaction,
+            "on_commit",
+            side_effect=lambda func, using=None: func(),
+        ):
+            create_remote_product.send(
+                sender=SalesChannelViewAssign,
+                instance=self.assign,
+                view=self.view,
+            )
+
+        self.assertEqual(
+            IntegrationTaskQueue.objects.filter(
+                integration_id=self.sales_channel.id,
+            ).count(),
+            initial_count + 1,
         )
+        task = IntegrationTaskQueue.objects.filter(
+            integration_id=self.sales_channel.id,
+        ).latest("id")
+        self.assertEqual(task.task_name, get_import_path(create_amazon_product_db_task))
+        self.assertEqual(task.task_kwargs.get("product_id"), self.product.id)
+        self.assertEqual(task.task_kwargs.get("view_id"), self.view.id)
 
-        flow_mock.assert_called_once()
-        _, kwargs = flow_mock.call_args
-        self.assertEqual(kwargs["task_func"], create_amazon_product_db_task)
-        self.assertEqual(kwargs["product_id"], self.product.id)
-        self.assertEqual(kwargs["view"], self.view)
+    def test_assign_update_queues_task(self, *, _unused=None):
+        initial_count = IntegrationTaskQueue.objects.filter(
+            integration_id=self.sales_channel.id,
+        ).count()
 
-    @patch("sales_channels.integrations.amazon.receivers.run_single_amazon_product_task_flow")
-    def test_assign_update_queues_task(self, flow_mock):
-        sales_view_assign_updated.send(
-            sender=Product,
-            instance=self.product,
-            sales_channel=self.sales_channel,
-            view=self.view,
+        with patch.object(
+            transaction,
+            "on_commit",
+            side_effect=lambda func, using=None: func(),
+        ):
+            sales_view_assign_updated.send(
+                sender=Product,
+                instance=self.product,
+                sales_channel=self.sales_channel,
+                view=self.view,
+            )
+
+        self.assertEqual(
+            IntegrationTaskQueue.objects.filter(
+                integration_id=self.sales_channel.id,
+            ).count(),
+            initial_count + 1,
         )
-
-        flow_mock.assert_called_once()
-        _, kwargs = flow_mock.call_args
-        self.assertEqual(kwargs["task_func"], create_amazon_product_db_task)
-        self.assertEqual(kwargs["product_id"], self.product.id)
-        self.assertEqual(kwargs["view"], self.view)
+        task = IntegrationTaskQueue.objects.filter(
+            integration_id=self.sales_channel.id,
+        ).latest("id")
+        self.assertEqual(task.task_name, get_import_path(create_amazon_product_db_task))
+        self.assertEqual(task.task_kwargs.get("product_id"), self.product.id)
+        self.assertEqual(task.task_kwargs.get("view_id"), self.view.id)
 
 
 class AmazonPropertyReceiversTest(TestCase):

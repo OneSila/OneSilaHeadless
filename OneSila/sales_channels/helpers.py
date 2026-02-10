@@ -416,6 +416,7 @@ def mark_remote_products_for_feed_updates(*, product_ids: Iterable[int]) -> None
 
 
 def run_generic_sales_channel_factory(sales_channel_id, factory_class, local_instance_id=None, local_instance_class=None, factory_kwargs=None, sales_channel_class=MagentoSalesChannel):
+    # Tasks only carry primitive IDs, so resolve those IDs into model instances here before instantiating factories.
     sales_channel = sales_channel_class.objects.get(id=sales_channel_id)
 
     local_instance = None
@@ -429,6 +430,156 @@ def run_generic_sales_channel_factory(sales_channel_id, factory_class, local_ins
 
     factory = factory_class(**factory_kwargs)
     factory.run()
+
+
+# ############# PRICE DATA SECTION #############
+
+
+def compute_price_data_hash(*, price_data):
+    import hashlib
+    import json
+
+    canonical = json.dumps(price_data or {}, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def build_price_data(*, product, sales_channel):
+    from sales_channels.models import RemoteCurrency
+
+    price_data = {}
+    for remote_currency in RemoteCurrency.objects.filter(
+        sales_channel=sales_channel,
+        local_instance__isnull=False,
+    ):
+        local_currency = remote_currency.local_instance
+        full_price, discount_price = product.get_price_for_sales_channel(
+            sales_channel, currency=local_currency
+        )
+        price_data[local_currency.iso_code] = {
+            "price": float(full_price) if full_price is not None else None,
+            "discount_price": float(discount_price) if discount_price is not None else None,
+        }
+
+    return price_data
+
+
+# ############# CONTENT DATA SECTION #############
+
+
+def compute_content_data_hash(*, content_data):
+    import hashlib
+    import json
+
+    payload = content_data or {}
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _content_is_empty(value):
+    if value is None:
+        return True
+    if not isinstance(value, str):
+        return False
+    cleaned = value.strip()
+    return cleaned in {"", "<p><br></p>", "<p></p>"}
+
+
+def _resolve_content_integration_type(*, sales_channel):
+    from integrations.constants import INTEGRATIONS_TYPES_MAP, MAGENTO_INTEGRATION
+
+    return INTEGRATIONS_TYPES_MAP.get(sales_channel.__class__, MAGENTO_INTEGRATION)
+
+
+def _resolve_content_rules(*, sales_channel):
+    from core.constants import BASE_CONTENT_FIELD_FLAGS, CONTENT_INTEGRATION_RULES
+
+    integration_type = _resolve_content_integration_type(sales_channel=sales_channel)
+    rules = CONTENT_INTEGRATION_RULES.get(integration_type, CONTENT_INTEGRATION_RULES["default"])
+    flags = {**BASE_CONTENT_FIELD_FLAGS, **rules.get("flags", {})}
+    return flags
+
+
+def _get_content_translation(*, product, language, sales_channel):
+    from products.models import ProductTranslation
+
+    specific = ProductTranslation.objects.filter(
+        product=product,
+        language=language,
+        sales_channel=sales_channel,
+    ).first()
+    default = ProductTranslation.objects.filter(
+        product=product,
+        language=language,
+        sales_channel__isnull=True,
+    ).first()
+    return specific, default
+
+
+def build_content_data(*, product, sales_channel):
+    from sales_channels.models import RemoteLanguage
+
+    resolved = getattr(sales_channel, "get_real_instance", None)
+    if resolved:
+        sales_channel = resolved()
+
+    flags = _resolve_content_rules(sales_channel=sales_channel)
+    content_data = {}
+
+    remote_languages = RemoteLanguage.objects.filter(
+        sales_channel=sales_channel,
+        local_instance__isnull=False,
+    )
+    for remote_language in remote_languages:
+        language = remote_language.local_instance
+        specific, default = _get_content_translation(
+            product=product,
+            language=language,
+            sales_channel=sales_channel,
+        )
+        if not specific and not default:
+            continue
+
+        payload = {}
+        if flags.get("name"):
+            value = specific.name if specific and not _content_is_empty(specific.name) else (
+                default.name if default else None
+            )
+            if not _content_is_empty(value):
+                payload["name"] = value
+        if flags.get("subtitle"):
+            value = specific.subtitle if specific and not _content_is_empty(specific.subtitle) else (
+                default.subtitle if default else None
+            )
+            if not _content_is_empty(value):
+                payload["subtitle"] = value
+        if flags.get("shortDescription"):
+            value = (
+                specific.short_description if specific and not _content_is_empty(specific.short_description) else (
+                    default.short_description if default else None
+                )
+            )
+            if not _content_is_empty(value):
+                payload["shortDescription"] = value
+        if flags.get("description"):
+            value = specific.description if specific and not _content_is_empty(specific.description) else (
+                default.description if default else None
+            )
+            if not _content_is_empty(value):
+                payload["description"] = value
+        if flags.get("bulletPoints"):
+            if specific and specific.bullet_points.exists():
+                points = [bp.text for bp in specific.bullet_points.all() if not _content_is_empty(bp.text)]
+            elif default:
+                points = [bp.text for bp in default.bullet_points.all() if not _content_is_empty(bp.text)]
+            else:
+                points = []
+            if points:
+                payload["bulletPoints"] = points
+
+        if payload:
+            content_data[str(language)] = payload
+
+    return content_data
 
 
 def run_remote_product_dependent_sales_channel_factory(
@@ -450,6 +601,7 @@ def run_remote_product_dependent_sales_channel_factory(
     :param remote_product_id: ID of the remote product (optional).
     :param factory_kwargs: Additional keyword arguments for the factory (optional).
     """
+    # Tasks only carry primitive IDs; resolve remote_product and local_instance here to satisfy factory expectations.
     sales_channel = sales_channel_class.objects.get(id=sales_channel_id)
 
     # Retrieve the remote product if remote_product_id is provided
