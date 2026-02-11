@@ -59,13 +59,13 @@ class SheinRemoteCurrencyPartialInput(NodeInput):
     pass
 
 
-@partial(SheinProperty, fields="__all__")
+@partial(SheinProperty, exclude=["remote_id"])
 class SheinPropertyPartialInput(NodeInput):
     """Partial input for updating Shein remote properties."""
     pass
 
 
-@partial(SheinPropertySelectValue, fields="__all__")
+@partial(SheinPropertySelectValue, exclude=["remote_id"])
 class SheinPropertySelectValuePartialInput(NodeInput):
     """Partial input for updating Shein property select values."""
     pass

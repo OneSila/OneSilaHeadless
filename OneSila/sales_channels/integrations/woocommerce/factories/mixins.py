@@ -11,6 +11,7 @@ from properties.models import Property, ProductProperty
 from django.db.models import Q
 from sales_channels.factories.prices.prices import ToUpdateCurrenciesMixin
 from django.utils.translation import gettext as _
+from sales_channels.factories.value_mixins import RemoteValueMixin
 
 import logging
 logger = logging.getLogger(__name__)
@@ -85,69 +86,76 @@ class WoocommerceProductTypeMixin:
             raise AttributeError(f"{self.__class__.__name__} {e=}") from e
 
 
-class WoocommerceRemoteValueConversionMixin:
+class WoocommerceRemoteValueConversionMixin(RemoteValueMixin):
     """ Convert OneSila payloads to WooCommerce expected format."""
 
-    def get_remote_value(self):
-        # Get the local property type and value in the remote format
-        property_type = self.local_property.type
-        value = self.local_instance.get_value()
-
-        if property_type == Property.TYPES.INT:
-            return self.get_int_value(value)
-        elif property_type == Property.TYPES.FLOAT:
-            return self.get_float_value(value)
-        elif property_type == Property.TYPES.BOOLEAN:
-            return self.get_boolean_value(value)
-        elif property_type == Property.TYPES.SELECT:
-            return self.get_select_value(value)
-        elif property_type == Property.TYPES.MULTISELECT:
-            return self.get_multi_select_value(value)
-        elif property_type == Property.TYPES.TEXT:
-            return self.get_text_value(value)
-        elif property_type == Property.TYPES.DESCRIPTION:
-            return self.get_description_value(value)
-        elif property_type == Property.TYPES.DATE:
-            return self.get_date_value(value)
-        elif property_type == Property.TYPES.DATETIME:
-            return self.get_datetime_value(value)
-        else:
-            raise NotImplementedError(f"Property type {property_type} is not supported.")
-
-    def get_int_value(self, value):
+    def get_int_value(self, *, value, product_property=None, remote_property=None, language_code=None):
         """Handles int value types."""
+        _ = product_property
+        _ = remote_property
+        _ = language_code
         return str(value)
 
-    def get_float_value(self, value):
+    def get_float_value(self, *, value, product_property=None, remote_property=None, language_code=None):
         """Handles float value types."""
+        _ = product_property
+        _ = remote_property
+        _ = language_code
         return str(value)
 
-    def get_boolean_value(self, value: bool) -> str:
+    def get_boolean_value(self, *, value, product_property=None, remote_property=None, language_code=None) -> str:
         """Converts boolean values to translated strings for WooCommerce."""
+        _ = product_property
+        _ = remote_property
+        _ = language_code
         return _("Yes") if value else _("No")
 
-    def get_select_value(self, value):
+    def get_select_value(self, *, product_property=None, remote_property=None, language_code=None):
         """Handles select and multiselect values."""
+        _ = remote_property
+        _ = language_code
+        prop_instance = product_property or self.local_instance
+        value = prop_instance.get_value()
+        if value is None:
+            return None
         return value.value
 
-    def get_multi_select_value(self, value):
+    def get_select_value_multiple(self, *, product_property=None, remote_property=None, language_code=None):
         """Handles multi-select values."""
+        _ = remote_property
+        _ = language_code
+        prop_instance = product_property or self.local_instance
+        value = prop_instance.get_value()
+        if value is None:
+            return []
         return list({v.value for v in value.all()})
 
-    def get_text_value(self, value):
+    def get_text_value(self, *, value, product_property=None, remote_property=None, language_code=None):
         """Handles text values."""
+        _ = product_property
+        _ = remote_property
+        _ = language_code
         return value
 
-    def get_description_value(self, value):
+    def get_description_value(self, *, value, product_property=None, remote_property=None, language_code=None):
         """Handles description values."""
+        _ = product_property
+        _ = remote_property
+        _ = language_code
         return value
 
-    def get_date_value(self, value):
+    def format_date(self, *, value, product_property=None, remote_property=None, language_code=None):
         """Handles date values."""
+        _ = product_property
+        _ = remote_property
+        _ = language_code
         return value
 
-    def get_datetime_value(self, value):
+    def format_datetime(self, *, value, product_property=None, remote_property=None, language_code=None):
         """Handles datetime values."""
+        _ = product_property
+        _ = remote_property
+        _ = language_code
         return value
 
 

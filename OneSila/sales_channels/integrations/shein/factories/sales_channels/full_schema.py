@@ -825,6 +825,7 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             return None
 
         attribute_mode = self._safe_int(value=attribute.get("attribute_mode"))
+        property_type = SheinProperty.determine_property_type(attribute_mode=attribute_mode)
         raw_attribute = self._strip_attribute_values(attribute=attribute)
 
         defaults = {
@@ -840,18 +841,19 @@ class SheinCategoryTreeSyncFactory(SheinSignatureMixin):
             "attribute_doc": self._safe_string(attribute.get("attribute_doc")) or "",
             "attribute_doc_images": self._ensure_list(value=attribute.get("attribute_doc_image_list")),
             "allows_unmapped_values": SheinProperty.allows_custom_values(attribute_mode=attribute_mode),
+            "original_type": property_type,
             "raw_data": raw_attribute,
         }
 
-        property_obj, created = SheinProperty.objects.update_or_create(
+        property_obj, _ = SheinProperty.objects.update_or_create(
             multi_tenant_company=self.sales_channel.multi_tenant_company,
             sales_channel=self.sales_channel,
             remote_id=remote_id,
             defaults=defaults,
         )
 
-        if created:
-            property_obj.type = SheinProperty.determine_property_type(attribute_mode=attribute_mode)
+        if not property_obj.type:
+            property_obj.type = property_obj.original_type or property_type
             property_obj.save(update_fields=["type"])
 
         return property_obj

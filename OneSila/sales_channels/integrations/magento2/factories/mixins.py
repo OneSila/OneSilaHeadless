@@ -6,6 +6,7 @@ from magento.models import AttributeSet
 from django.conf import settings
 from sales_channels.integrations.magento2.models.sales_channels import MagentoRemoteLanguage
 from sales_channels.models.sales_channels import RemoteLanguage, SalesChannelViewAssign
+from sales_channels.factories.value_mixins import RemoteValueMixin
 
 
 class GetMagentoAPIMixin:
@@ -89,57 +90,53 @@ class MagentoTranslationMixin:
         return frontend_labels
 
 
-class RemoteValueMixin(MagentoTranslationMixin):
+class MagentoRemoteValueMixin(MagentoTranslationMixin, RemoteValueMixin):
     """ Convert OneSila payloads to Magento expected format."""
 
-    def get_remote_value(self):
-        # Get the local property type and value
-        property_type = self.local_property.type
-        value = self.local_instance.get_value()
-
-        # Handle direct value types (int, float, boolean)
-        if property_type in [Property.TYPES.INT, Property.TYPES.FLOAT]:
-            return self.get_direct_value(value)
-
-        if property_type == Property.TYPES.BOOLEAN:
-            return self.get_boolean_value(value)
-
-        # Handle SELECT and MULTISELECT types
-        elif property_type == Property.TYPES.SELECT:
-            return self.get_select_value(multiple=False)
-        elif property_type == Property.TYPES.MULTISELECT:
-            return self.get_select_value(multiple=True)
-
-        elif property_type in [Property.TYPES.TEXT, Property.TYPES.DESCRIPTION]:
-            return self.get_translated_values()
-
-        # Handle DATE and DATETIME types with formatting
-        elif property_type == Property.TYPES.DATE:
-            return self.format_date(value)
-        elif property_type == Property.TYPES.DATETIME:
-            return self.format_datetime(value)
-
-        # Default case if type is not recognized
-        return None
-
-    def get_direct_value(self, value):
-        """Handles direct value types: int, float, boolean."""
+    def get_int_value(self, *, value, product_property=None, remote_property=None, language_code=None):
+        _ = product_property
+        _ = remote_property
+        _ = language_code
         return value
 
-    def get_boolean_value(self, value: bool) -> int:
+    def get_float_value(self, *, value, product_property=None, remote_property=None, language_code=None):
+        _ = product_property
+        _ = remote_property
+        _ = language_code
+        return value
+
+    def get_boolean_value(self, *, value, product_property=None, remote_property=None, language_code=None) -> int:
         """Converts boolean values to 1 (True) or 0 (False) as required by Magento."""
+        _ = product_property
+        _ = remote_property
+        _ = language_code
         return 1 if value else 0
 
-    def get_select_value(self, multiple):
-        """Handles select and multiselect values."""
-        if multiple:
-            return ','.join(self.remote_select_values)
-        else:
-            # For single select
-            return self.remote_select_values[0]
+    def _get_remote_select_values(self):
+        if not hasattr(self, "remote_select_values"):
+            return []
+        return self.remote_select_values
 
-    def get_translated_values(self):
+    def get_select_value(self, *, product_property=None, remote_property=None, language_code=None):
+        _ = product_property
+        _ = remote_property
+        _ = language_code
+        """Handles select and multiselect values."""
+        remote_select_values = self._get_remote_select_values()
+        return remote_select_values[0] if remote_select_values else None
+
+    def get_select_value_multiple(self, *, product_property=None, remote_property=None, language_code=None):
+        _ = product_property
+        _ = remote_property
+        _ = language_code
+        remote_select_values = self._get_remote_select_values()
+        return ",".join(remote_select_values) if remote_select_values else None
+
+    def get_translated_values(self, *, product_property=None, language_code=None, fallback_value=None):
         """Retrieves translations and returns them as a dict or a single value."""
+        _ = product_property
+        _ = language_code
+        _ = fallback_value
         # Retrieve all translations for the current property
         translations = ProductPropertyTextTranslation.objects.filter(product_property=self.local_instance)
         translation_count = translations.count()
@@ -181,16 +178,22 @@ class RemoteValueMixin(MagentoTranslationMixin):
 
         return translated_values
 
-    def format_date(self, date_value):
+    def format_date(self, *, value, product_property=None, remote_property=None, language_code=None):
         """Formats date values to include time as '00:00:00' in Magento compatible format."""
-        if date_value:
+        _ = product_property
+        _ = remote_property
+        _ = language_code
+        if value:
             # Formatting date to include time as 00:00:00
-            return date_value.strftime('%d-%m-%Y 00:00:00')
+            return value.strftime('%d-%m-%Y 00:00:00')
 
-    def format_datetime(self, datetime_value):
+    def format_datetime(self, *, value, product_property=None, remote_property=None, language_code=None):
         """Formats datetime values to Magento compatible string format."""
-        if datetime_value:
-            return datetime_value.strftime('%d-%m-%Y %H:%M:%S')
+        _ = product_property
+        _ = remote_property
+        _ = language_code
+        if value:
+            return value.strftime('%d-%m-%Y %H:%M:%S')
 
 
 class EnsureMagentoAttributeSetAttributesMixin:

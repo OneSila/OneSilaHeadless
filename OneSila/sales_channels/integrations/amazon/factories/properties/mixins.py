@@ -10,15 +10,15 @@ from sales_channels.integrations.amazon.factories.mixins import GetAmazonAPIMixi
 from properties.models import Property, ProductProperty
 import json
 import re
-from properties.models import ProductProperty
+from sales_channels.factories.value_mixins import RemoteValueMixin
 
 TOKEN_RE = re.compile(r"%([a-z_]+):([^%]+)%")
 
 
-class AmazonRemoteValueMixin:
+class AmazonRemoteValueMixin(RemoteValueMixin):
     """Utility methods to obtain remote values for product properties."""
 
-    def _get_select_remote_value(self, prop_instance: ProductProperty, remote_property: AmazonProperty):
+    def _get_select_remote_value(self, *, prop_instance: ProductProperty, remote_property: AmazonProperty, multiple: bool):
 
         # @TODO: MAKE SURE THE VALUES ARE FILTERED BY THE RIGHT LANGUAGE
         if prop_instance.property.type == Property.TYPES.MULTISELECT:
@@ -49,28 +49,51 @@ class AmazonRemoteValueMixin:
                 remote_values.append(val.value)
             else:
                 remote_values.append(remote_val.remote_value)
-        if prop_instance.property.type == Property.TYPES.SELECT:
+        if not multiple:
             return remote_values[0] if remote_values else None
         return remote_values
 
-    def get_remote_value_for_property(self, prop_instance: ProductProperty, remote_property: AmazonProperty):
-        value = prop_instance.get_value()
-        ptype = prop_instance.property.type
-        if ptype in [Property.TYPES.INT, Property.TYPES.FLOAT]:
-            return value
-        if ptype == Property.TYPES.BOOLEAN:
-            return True if value in [True, "true", "True", "1", 1] else False
-        if ptype in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
-            return self._get_select_remote_value(prop_instance, remote_property)
+    def get_select_value(self, *, product_property=None, remote_property=None, language_code=None):
+        _ = language_code
+        prop_instance = product_property or self.local_instance
+        if prop_instance is None or remote_property is None:
+            return None
+        return self._get_select_remote_value(
+            prop_instance=prop_instance,
+            remote_property=remote_property,
+            multiple=False,
+        )
 
+    def get_select_value_multiple(self, *, product_property=None, remote_property=None, language_code=None):
+        _ = language_code
+        prop_instance = product_property or self.local_instance
+        if prop_instance is None or remote_property is None:
+            return []
+        return self._get_select_remote_value(
+            prop_instance=prop_instance,
+            remote_property=remote_property,
+            multiple=True,
+        )
+
+    def get_text_value(self, *, value, product_property=None, remote_property=None, language_code=None):
+        _ = product_property
+        _ = remote_property
+        _ = language_code
         # @TODO: MAKE SURE THE TEXT / DESCRIPTION ARE IN THE RIGHT LANGUAGE OF THE MARKETPLACE
-        if ptype in [Property.TYPES.TEXT, Property.TYPES.DESCRIPTION]:
-            return value
-        if ptype == Property.TYPES.DATE:
-            return value.isoformat() if value else None
-        if ptype == Property.TYPES.DATETIME:
-            return value.isoformat() if value else None
         return value
+
+    def get_description_value(self, *, value, product_property=None, remote_property=None, language_code=None):
+        _ = product_property
+        _ = remote_property
+        _ = language_code
+        # @TODO: MAKE SURE THE TEXT / DESCRIPTION ARE IN THE RIGHT LANGUAGE OF THE MARKETPLACE
+        return value
+
+    def get_remote_value_for_property(self, prop_instance: ProductProperty, remote_property: AmazonProperty):
+        return self.get_remote_value(
+            product_property=prop_instance,
+            remote_property=remote_property,
+        )
 
 
 class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):

@@ -11,6 +11,7 @@ from sales_channels.factories.properties.properties import (
     RemoteProductPropertyDeleteFactory,
     RemoteProductPropertyUpdateFactory,
 )
+from sales_channels.factories.value_mixins import RemoteValueMixin
 from sales_channels.integrations.shein.factories.mixins import SheinSignatureMixin
 
 from sales_channels.integrations.shein.models import (
@@ -116,7 +117,7 @@ class SheinRemotePropertySelectValueEnsureFactory:
         )
 
 
-class SheinProductPropertyValueMixin(SheinSignatureMixin):
+class SheinProductPropertyValueMixin(SheinSignatureMixin, RemoteValueMixin):
     """Shared helpers to render Shein-ready attribute payloads."""
 
     remote_property_factory = SheinRemotePropertyEnsureFactory
@@ -161,35 +162,87 @@ class SheinProductPropertyValueMixin(SheinSignatureMixin):
         *,
         product_property: ProductProperty,
         language_code: Optional[str],
+        remote_property: Optional[SheinProperty] = None,
     ) -> Any:
-        prop_type = product_property.property.type
-        value = product_property.get_value(language=language_code)
+        return self.get_remote_value(
+            product_property=product_property,
+            remote_property=remote_property,
+            language_code=language_code,
+        )
 
-        if value in (None, "", []):
+    def get_property_value(
+        self,
+        *,
+        product_property=None,
+        local_property=None,
+        remote_property=None,
+        language_code: Optional[str] = None,
+    ):
+        _ = local_property
+        _ = remote_property
+        prop_instance = product_property or getattr(self, "local_instance", None)
+        if prop_instance is None:
+            return None
+        return prop_instance.get_value(language=language_code)
+
+    def get_int_value(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
+        _ = product_property
+        _ = remote_property
+        _ = language_code
+        try:
+            return int(value)
+        except (TypeError, ValueError):
             return None
 
-        if prop_type == Property.TYPES.DATE:
-            return value.isoformat() if isinstance(value, date) else None
+    def get_float_value(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
+        normalized_value = super().get_float_value(
+            value=value,
+            product_property=product_property,
+            remote_property=remote_property,
+            language_code=language_code,
+        )
+        if (
+            remote_property
+            and getattr(remote_property, "original_type", None) is not None
+            and getattr(remote_property, "type", None) is not None
+            and getattr(remote_property, "original_type", None) != getattr(remote_property, "type", None)
+        ):
+            return normalized_value
 
-        if prop_type == Property.TYPES.DATETIME:
-            return value.isoformat() if isinstance(value, datetime) else None
+        try:
+            return float(normalized_value)
+        except (TypeError, ValueError):
+            return None
 
-        if prop_type == Property.TYPES.BOOLEAN:
-            return bool(value)
+    def get_boolean_value(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
+        _ = product_property
+        _ = remote_property
+        _ = language_code
+        return bool(value)
 
-        if prop_type == Property.TYPES.INT:
-            try:
-                return int(value)
-            except (TypeError, ValueError):
-                return None
-
-        if prop_type == Property.TYPES.FLOAT:
-            try:
-                return float(value)
-            except (TypeError, ValueError):
-                return None
-
+    def get_text_value(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
+        _ = product_property
+        _ = remote_property
+        _ = language_code
         return value
+
+    def get_description_value(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
+        _ = product_property
+        _ = remote_property
+        _ = language_code
+        return value
+
+    def format_date(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
+        _ = product_property
+        _ = remote_property
+        _ = language_code
+        return value.isoformat() if isinstance(value, date) else None
+
+    def format_datetime(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
+        _ = product_property
+        _ = remote_property
+        _ = language_code
+        return value.isoformat() if isinstance(value, datetime) else None
 
     def _prepare_translation_payload(self, *, value) -> list[dict[str, str]]:
         translations = getattr(value, "propertyselectvaluetranslation_set", None)
@@ -413,6 +466,7 @@ class SheinProductPropertyValueMixin(SheinSignatureMixin):
             attribute_extra_value = self._coerce_basic_value(
                 product_property=product_property,
                 language_code=language_code,
+                remote_property=shein_property,
             )
 
         payload = self._clean_payload(

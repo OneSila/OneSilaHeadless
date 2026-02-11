@@ -19,6 +19,7 @@ from products.models import ProductTranslation
 from properties.models import ProductProperty, Property, PropertySelectValue
 from sales_channels.integrations.ebay.factories.mixins import GetEbayAPIMixin
 from sales_channels.factories.mixins import PreFlightCheckError
+from sales_channels.factories.value_mixins import RemoteValueMixin
 from sales_channels.exceptions import RemotePropertyValueNotMapped
 from sales_channels.models.sales_channels import SalesChannelViewAssign
 from sales_channels.content_templates import (
@@ -124,7 +125,7 @@ def _extract_ebay_api_error_message(*, exc: Exception) -> str:
     return str(exc)
 
 
-class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
+class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
     """Utilities for building full eBay inventory item payloads."""
 
     remote_model_class = EbayMediaThroughProduct
@@ -1002,6 +1003,132 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
             f"Map the value{plural} before retrying."
         )
 
+    def get_select_value(
+        self,
+        *,
+        product_property=None,
+        remote_property=None,
+        language_code: str | None = None,
+    ):
+        if product_property is None or remote_property is None:
+            return None
+
+        select_value = product_property.value_select
+        if select_value is None:
+            return None
+
+        remote_value = EbayPropertySelectValue.objects.filter(
+            sales_channel=self.sales_channel,
+            marketplace=remote_property.marketplace,
+            ebay_property=remote_property,
+            local_instance=select_value,
+        ).first()
+        if remote_value:
+            resolved = (
+                remote_value.localized_value
+                or remote_value.translated_value
+                or remote_value.remote_id
+            )
+            if resolved not in (None, ""):
+                return resolved
+
+        if not remote_property.allows_unmapped_values:
+            label = self._select_value_label(
+                select_value=select_value,
+                language_code=language_code,
+            ) or str(select_value)
+            self._raise_unmapped_select_values(
+                remote_property=remote_property,
+                values=[label],
+            )
+
+        remote_value = self._get_or_create_custom_select_value(
+            remote_property=remote_property,
+            select_value=select_value,
+            language_code=language_code,
+        )
+        return (
+            remote_value.localized_value
+            or remote_value.translated_value
+            or remote_value.remote_id
+        )
+
+    def get_select_value_multiple(
+        self,
+        *,
+        product_property=None,
+        remote_property=None,
+        language_code: str | None = None,
+    ):
+        if product_property is None or remote_property is None:
+            return []
+
+        select_values = list(product_property.value_multi_select.all())
+        if not select_values:
+            return None
+
+        remote_values = {
+            value.local_instance_id: value
+            for value in EbayPropertySelectValue.objects.filter(
+                sales_channel=self.sales_channel,
+                marketplace=remote_property.marketplace,
+                ebay_property=remote_property,
+                local_instance__in=select_values,
+            )
+        }
+
+        if not remote_property.allows_unmapped_values:
+            missing_labels = [
+                self._select_value_label(
+                    select_value=value,
+                    language_code=language_code,
+                ) or str(value)
+                for value in select_values
+                if value.id not in remote_values
+            ]
+            if missing_labels:
+                self._raise_unmapped_select_values(
+                    remote_property=remote_property,
+                    values=missing_labels,
+                )
+
+        values: List[str] = []
+        for select_value in select_values:
+            remote_value = remote_values.get(select_value.id)
+            if remote_value:
+                resolved = (
+                    remote_value.localized_value
+                    or remote_value.translated_value
+                    or remote_value.remote_id
+                )
+            else:
+                remote_value = self._get_or_create_custom_select_value(
+                    remote_property=remote_property,
+                    select_value=select_value,
+                    language_code=language_code,
+                )
+                resolved = (
+                    remote_value.localized_value
+                    or remote_value.translated_value
+                    or remote_value.remote_id
+                )
+            if resolved not in (None, ""):
+                values.append(resolved)
+
+        return values or None
+
+    def get_text_value(self, *, value, product_property=None, remote_property=None, language_code: str | None = None):
+        _ = product_property
+        _ = remote_property
+        _ = language_code
+        return value
+
+    def get_description_value(self, *, value, product_property=None, remote_property=None, language_code: str | None = None):
+        _ = product_property
+        _ = remote_property
+        _ = language_code
+        return value
+
     def _render_property_value(
         self,
         *,
@@ -1010,110 +1137,22 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin):
         language_code: str | None,
     ) -> Any:
         local_property = product_property.property
-        if local_property.type == Property.TYPES.SELECT:
-            select_value = product_property.value_select
-            if select_value is None:
+        value = self.get_remote_value(
+            product_property=product_property,
+            remote_property=remote_property,
+            language_code=language_code,
+        )
+
+        if local_property.type in [Property.TYPES.TEXT, Property.TYPES.DESCRIPTION]:
+            if value in (None, ""):
                 return None
-            remote_value = EbayPropertySelectValue.objects.filter(
-                sales_channel=self.sales_channel,
-                marketplace=remote_property.marketplace,
-                ebay_property=remote_property,
-                local_instance=select_value,
-            ).first()
-            if remote_value:
-                resolved = (
-                    remote_value.localized_value
-                    or remote_value.translated_value
-                    or remote_value.remote_id
-                )
-                if resolved not in (None, ""):
-                    return resolved
+            return str(value)
 
-            if not remote_property.allows_unmapped_values:
-                label = self._select_value_label(
-                    select_value=select_value,
-                    language_code=language_code,
-                ) or str(select_value)
-                self._raise_unmapped_select_values(
-                    remote_property=remote_property,
-                    values=[label],
-                )
-
-            remote_value = self._get_or_create_custom_select_value(
-                remote_property=remote_property,
-                select_value=select_value,
-                language_code=language_code,
-            )
-            return (
-                remote_value.localized_value
-                or remote_value.translated_value
-                or remote_value.remote_id
-            )
-
-        if local_property.type == Property.TYPES.MULTISELECT:
-            select_values = list(product_property.value_multi_select.all())
-            if not select_values:
-                return None
-
-            remote_values = {
-                value.local_instance_id: value
-                for value in EbayPropertySelectValue.objects.filter(
-                    sales_channel=self.sales_channel,
-                    marketplace=remote_property.marketplace,
-                    ebay_property=remote_property,
-                    local_instance__in=select_values,
-                )
-            }
-
-            if not remote_property.allows_unmapped_values:
-                missing_labels = [
-                    self._select_value_label(
-                        select_value=value,
-                        language_code=language_code,
-                    ) or str(value)
-                    for value in select_values
-                    if value.id not in remote_values
-                ]
-                if missing_labels:
-                    self._raise_unmapped_select_values(
-                        remote_property=remote_property,
-                        values=missing_labels,
-                    )
-
-            values: List[str] = []
-            for select_value in select_values:
-                remote_value = remote_values.get(select_value.id)
-                if remote_value:
-                    resolved = (
-                        remote_value.localized_value
-                        or remote_value.translated_value
-                        or remote_value.remote_id
-                    )
-                else:
-                    remote_value = self._get_or_create_custom_select_value(
-                        remote_property=remote_property,
-                        select_value=select_value,
-                        language_code=language_code,
-                    )
-                    resolved = (
-                        remote_value.localized_value
-                        or remote_value.translated_value
-                        or remote_value.remote_id
-                    )
-                if resolved not in (None, ""):
-                    values.append(resolved)
-
-            return values or None
-
-        value = product_property.get_serialised_value(language=language_code)
         if isinstance(value, Iterable) and not isinstance(value, (str, bytes, bytearray)):
             filtered = [str(entry) for entry in value if entry not in (None, "")]
             return filtered or None
-        if isinstance(value, (date, datetime)):
-            return value.isoformat()
-        if value in (None, ""):
-            return None
-        return str(value)
+
+        return value
 
     def _render_basic_property_value(
         self,

@@ -99,7 +99,7 @@ class RemotePropertySaveRulesTestCase(DisableMagentoAndWooConnectionsMixin, Test
         with self.assertRaises(ValidationError):
             remote_property.save()
 
-    def test_save_raises_error_when_original_type_cannot_change_to_target_type(self):
+    def test_save_allows_type_change_from_int_to_float_when_rule_permits_it(self):
         local_property = baker.make(
             Property,
             multi_tenant_company=self.multi_tenant_company,
@@ -115,8 +115,9 @@ class RemotePropertySaveRulesTestCase(DisableMagentoAndWooConnectionsMixin, Test
             type=Property.TYPES.FLOAT,
         )
 
-        with self.assertRaises(ValidationError):
-            remote_property.save()
+        remote_property.save()
+
+        self.assertIsNotNone(remote_property.pk)
 
     def test_save_allows_type_change_when_rule_permits_it(self):
         local_property = baker.make(

@@ -7,7 +7,7 @@ from sales_channels.factories.properties.properties import RemotePropertyCreateF
     RemoteProductPropertyDeleteFactory, RemoteProductPropertyUpdateFactory
 from sales_channels.integrations.magento2.constants import PROPERTY_FRONTEND_INPUT_MAP
 from sales_channels.integrations.magento2.factories.mixins import GetMagentoAPIMixin, \
-    MagentoEntityNotFoundGeneralErrorMixin, EnsureMagentoAttributeSetAttributesMixin, RemoteValueMixin, \
+    MagentoEntityNotFoundGeneralErrorMixin, EnsureMagentoAttributeSetAttributesMixin, MagentoRemoteValueMixin, \
     MagentoTranslationMixin
 from sales_channels.integrations.magento2.models import MagentoProperty, MagentoPropertySelectValue
 from magento.models.product import ProductAttribute, Product
@@ -216,7 +216,7 @@ class MagentoPropertySelectValueDeleteFactory(GetMagentoAPIMixin, RemoteProperty
         return response
 
 
-class MagentoProductPropertyCreateFactory(GetMagentoAPIMixin, RemoteProductPropertyCreateFactory, RemoteValueMixin):
+class MagentoProductPropertyCreateFactory(GetMagentoAPIMixin, RemoteProductPropertyCreateFactory, MagentoRemoteValueMixin):
     remote_model_class = MagentoProductProperty
     remote_property_factory = MagentoPropertyCreateFactory
     remote_property_select_value_factory = MagentoPropertySelectValueCreateFactory
@@ -253,7 +253,7 @@ class MagentoProductPropertyCreateFactory(GetMagentoAPIMixin, RemoteProductPrope
         update_factory.run()
 
 
-class MagentoProductPropertyUpdateFactory(GetMagentoAPIMixin, RemoteValueMixin, RemoteProductPropertyUpdateFactory):
+class MagentoProductPropertyUpdateFactory(GetMagentoAPIMixin, MagentoRemoteValueMixin, RemoteProductPropertyUpdateFactory):
     remote_model_class = MagentoProductProperty
     create_factory_class = MagentoProductPropertyCreateFactory
     remote_property_factory = MagentoPropertyCreateFactory

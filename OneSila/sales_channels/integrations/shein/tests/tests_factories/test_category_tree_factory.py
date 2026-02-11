@@ -366,11 +366,13 @@ class SheinCategoryTreeFactoryTests(TestCase):
         color_property = SheinProperty.objects.get(remote_id="27")
         self.assertEqual(color_property.value_mode, SheinProperty.ValueModes.MULTI_SELECT)
         self.assertEqual(color_property.type, Property.TYPES.MULTISELECT)
+        self.assertEqual(color_property.original_type, Property.TYPES.MULTISELECT)
         self.assertEqual(color_property.attribute_doc, "Select a color")
 
         size_property = SheinProperty.objects.get(remote_id="87")
         self.assertEqual(size_property.value_mode, SheinProperty.ValueModes.SALES_SINGLE_SELECT)
         self.assertEqual(size_property.type, Property.TYPES.SELECT)
+        self.assertEqual(size_property.original_type, Property.TYPES.SELECT)
         self.assertTrue(size_property.is_sample)
 
         color_values = SheinPropertySelectValue.objects.filter(remote_property=color_property)
@@ -404,6 +406,24 @@ class SheinCategoryTreeFactoryTests(TestCase):
         self.assertEqual(remote_language.local_instance, PUBLISH_STANDARD_INFO["default_language"])
         self.assertEqual(remote_language.remote_name, "English")
         self.assertEqual(SheinRemoteLanguage.objects.count(), 1)
+
+    def test_sync_property_definition_does_not_override_existing_type(self) -> None:
+        factory = SheinCategoryTreeSyncFactory(sales_channel=self.sales_channel)
+        attribute = copy.deepcopy(ATTRIBUTE_TEMPLATE_RESPONSE["info"]["data"][0]["attribute_infos"][0])
+
+        property_obj = factory._sync_property_definition(attribute=attribute)
+        self.assertIsNotNone(property_obj)
+        self.assertEqual(property_obj.type, Property.TYPES.MULTISELECT)
+        self.assertEqual(property_obj.original_type, Property.TYPES.MULTISELECT)
+
+        property_obj.type = Property.TYPES.SELECT
+        property_obj.save(update_fields=["type"])
+
+        property_obj = factory._sync_property_definition(attribute=attribute)
+        self.assertIsNotNone(property_obj)
+        property_obj.refresh_from_db()
+        self.assertEqual(property_obj.type, Property.TYPES.SELECT)
+        self.assertEqual(property_obj.original_type, Property.TYPES.MULTISELECT)
 
     def test_run_updates_import_process_percentage_when_provided(self) -> None:
         import_process = baker.make(

@@ -196,6 +196,7 @@ class EbayPropertySelectValue(RemoteObjectMixin, models.Model):
         'properties.PropertySelectValue',
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
         help_text="Optional link to the local PropertySelectValue.",
     )
     localized_value = models.CharField(

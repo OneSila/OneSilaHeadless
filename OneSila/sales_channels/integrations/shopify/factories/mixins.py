@@ -1,7 +1,8 @@
 import json
 import shopify
 from django.conf import settings
-from properties.models import Property, ProductPropertyTextTranslation
+from properties.models import Property
+from sales_channels.factories.value_mixins import RemoteValueMixin
 
 
 class GetShopifyApiMixin:
@@ -38,60 +39,8 @@ class GetShopifyApiMixin:
         self.api = None
 
 
-class RemoteValueMixin:
-    def get_remote_value(self):
-        property_type = self.local_property.type
-        value = self.local_instance.get_value()
-
-        if property_type in [Property.TYPES.INT, Property.TYPES.FLOAT]:
-            return value
-
-        if property_type == Property.TYPES.BOOLEAN:
-            return self.get_boolean_value(value)
-
-        if property_type == Property.TYPES.SELECT:
-            return self.get_select_value(multiple=False)
-
-        if property_type == Property.TYPES.MULTISELECT:
-            return self.get_select_value(multiple=True)
-
-        if property_type in [Property.TYPES.TEXT, Property.TYPES.DESCRIPTION]:
-            return self.get_translated_values()
-
-        if property_type == Property.TYPES.DATE:
-            return self.format_date(value)
-
-        if property_type == Property.TYPES.DATETIME:
-            return self.format_datetime(value)
-
-        return None
-
-    def get_boolean_value(self, value):
-        return True if value in [True, 'true', '1', 1] else False
-
-    def get_select_value(self, multiple):
-        if self.local_property.type == Property.TYPES.MULTISELECT:
-            values = self.local_instance.value_multi_select.all()
-        else:
-            values = [self.local_instance.value_select]
-
-        return [v.value for v in values] if multiple else values[0].value if values else None
-
-    def get_translated_values(self):
-        # This can stay as-is unless Shopify wants language mappings (not usually needed)
-        default_translation = ProductPropertyTextTranslation.objects.filter(product_property=self.local_instance).first()
-        if default_translation:
-            return (
-                default_translation.value_text if self.local_property.type == Property.TYPES.TEXT
-                else default_translation.value_description
-            )
-        return None
-
-    def format_date(self, date_value):
-        return date_value.isoformat()[:10] if date_value else None  # YYYY-MM-DD
-
-    def format_datetime(self, datetime_value):
-        return datetime_value.isoformat() if datetime_value else None  # full ISO
+class ShopifyRemoteValueMixin(RemoteValueMixin):
+    pass
 
 
 class ShopifyMetafieldMixin:
