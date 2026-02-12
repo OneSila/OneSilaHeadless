@@ -206,7 +206,7 @@ class SheinMediaProductThroughBase(SheinSignatureMixin):
         product = self.product_instance or getattr(self.remote_product, "local_instance", None)
         is_variation = False
         if product is not None and hasattr(product, "configurables"):
-            is_variation = product.is_simple() and product.configurables.exists()
+            is_variation = product.configurables.exists()
 
         non_square_throughs = [through for through in remaining_throughs if through != square_through]
         detail_throughs = list(non_square_throughs)
