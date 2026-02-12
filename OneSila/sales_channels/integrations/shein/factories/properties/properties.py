@@ -385,7 +385,10 @@ class SheinProductPropertyValueMixin(SheinSignatureMixin, RemoteValueMixin):
         attribute_extra_value: Any = None
         custom_attribute_value: Any = None
 
-        if product_property.property.type in (Property.TYPES.SELECT, Property.TYPES.MULTISELECT):
+        if (
+            product_property.property.type in (Property.TYPES.SELECT, Property.TYPES.MULTISELECT)
+            and shein_property.original_type in (Property.TYPES.SELECT, Property.TYPES.MULTISELECT)
+        ):
             remote_ids, custom_values = self._collect_select_payload(
                 product_property=product_property,
                 shein_property=shein_property,

@@ -47,6 +47,53 @@ Allow users to remap a remote integration field type to a different OneSila prop
   - `MULTISELECT__allows_custom_values`
   - `MULTISELECT__not_allows_custom_values`
 
+### Compatibility Matrix (Rows = Original Remote Type, Cols = Target `RemoteProperty.type`)
+Legend:
+- `OK` = supported without hard preflight in current backend conversion layer
+- `PF` = supported, but guarded by backend preflight checks
+- `X` = not compatible (hard blocked)
+
+| Original \\ Target | INT | FLOAT | TEXT | DESCRIPTION | BOOLEAN | DATE | DATETIME | SELECT | MULTISELECT |
+|---|---|---|---|---|---|---|---|---|---|
+| `INT` | OK | PF | PF | PF | X | X | X | PF | X |
+| `FLOAT` | OK | OK | PF | PF | X | X | X | PF | X |
+| `TEXT` | OK | OK | OK | PF | OK | OK | OK | OK | OK |
+| `DESCRIPTION` | OK | OK | OK | OK | OK | OK | OK | OK | OK |
+| `BOOLEAN` | X | X | PF | PF | OK | X | X | X | X |
+| `DATE` | X | X | X | X | X | OK | OK | X | X |
+| `DATETIME` | X | X | X | X | X | OK | OK | X | X |
+| `SELECT__allows_custom_values` | OK | OK | OK | OK | OK | OK | OK | OK | OK |
+| `SELECT__not_allows_custom_values` | X | X | X | X | PF | X | X | OK | X |
+| `MULTISELECT__allows_custom_values` | OK | OK | OK | OK | OK | OK | OK | OK | OK |
+| `MULTISELECT__not_allows_custom_values` | X | X | X | X | PF | X | X | OK | OK |
+
+### Preflight Scenarios (Current)
+| Scenario | Trigger | Behavior |
+|---|---|---|
+| `INT -> FLOAT` | Local float value has decimals (for example `12.5`) | `PreFlightCheckError` (expects whole number) |
+| `INT -> TEXT` / `INT -> DESCRIPTION` | Local textual value is not whole-number-compatible | `PreFlightCheckError` |
+| `INT -> SELECT` | Selected option value is not whole-number-compatible | `PreFlightCheckError` |
+| `FLOAT -> TEXT` / `FLOAT -> DESCRIPTION` | Local textual value not numeric-convertible | `PreFlightCheckError` |
+| `FLOAT -> SELECT` | Selected option value not numeric-convertible | `PreFlightCheckError` |
+| `TEXT -> DESCRIPTION` | Text length exceeds `255` | `PreFlightCheckError` |
+| `BOOLEAN -> TEXT` / `BOOLEAN -> DESCRIPTION` | Input text is not equal to configured `yes_text_value` / `no_text_value` (or default `Yes`/`No`) | `PreFlightCheckError` |
+| `SELECT__not_allows_custom_values -> BOOLEAN` | No remote select option mapped with `bool_value=True/False` | `PreFlightCheckError` |
+| `MULTISELECT__not_allows_custom_values -> BOOLEAN` | No remote select option mapped with `bool_value=True/False` | `PreFlightCheckError` |
+
+### Boolean Mapping Priority (SELECT/MULTISELECT -> BOOLEAN)
+| Original key | Step 1 | Step 2 | Step 3 |
+|---|---|---|---|
+| `SELECT__allows_custom_values` | Use mapped remote select value by `bool_value` | Fallback to `yes_text_value` / `no_text_value` | Fallback to raw `True`/`False` |
+| `MULTISELECT__allows_custom_values` | Use mapped remote select value by `bool_value` | Fallback to `yes_text_value` / `no_text_value` | Fallback to raw `True`/`False` |
+| `SELECT__not_allows_custom_values` | Use mapped remote select value by `bool_value` | `PreFlightCheckError` if missing | X |
+| `MULTISELECT__not_allows_custom_values` | Use mapped remote select value by `bool_value` | `PreFlightCheckError` if missing | X |
+
+### Known Limitation Scenarios
+| Scenario | Current behavior |
+|---|---|
+| `MULTISELECT__not_allows_custom_values -> SELECT` | Compatible, but only one option is sent (single-select target). |
+| `SELECT/MULTISELECT` with custom disabled and missing option map | Integration-level mapping errors can still happen (`RemotePropertyValueNotMapped`) when exporters require mapped options. |
+
 ### Disclaimers and UX copy
 Frontend already prepared detailed compatibility/disclaimer copy per original->target mapping.
 This copy should be treated as user-facing explanation, while backend matrix is the enforcement layer.

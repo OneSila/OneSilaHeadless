@@ -1010,6 +1010,15 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
         remote_property=None,
         language_code: str | None = None,
     ):
+        if self._is_textual_or_numeric_original_type(
+            product_property=product_property,
+            remote_property=remote_property,
+        ):
+            return super().get_select_value(
+                product_property=product_property,
+                remote_property=remote_property,
+                language_code=language_code,
+            )
         if product_property is None or remote_property is None:
             return None
 
@@ -1060,6 +1069,15 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
         remote_property=None,
         language_code: str | None = None,
     ):
+        if self._is_textual_original_type(
+            product_property=product_property,
+            remote_property=remote_property,
+        ):
+            return super().get_select_value_multiple(
+                product_property=product_property,
+                remote_property=remote_property,
+                language_code=language_code,
+            )
         if product_property is None or remote_property is None:
             return []
 

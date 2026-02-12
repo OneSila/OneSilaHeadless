@@ -258,31 +258,36 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
                 value_float=value_float,
             )
         elif target_type == Property.TYPES.BOOLEAN:
+            value_boolean = True if value_override is None else bool(value_override)
             product_property = baker.make(
                 ProductProperty,
                 multi_tenant_company=self.multi_tenant_company,
                 product=product,
                 property=local_property,
-                value_boolean=True,
+                value_boolean=value_boolean,
             )
         elif target_type == Property.TYPES.DATE:
+            value_date = date(2026, 2, 11) if value_override is None else value_override
             product_property = baker.make(
                 ProductProperty,
                 multi_tenant_company=self.multi_tenant_company,
                 product=product,
                 property=local_property,
-                value_date=date(2026, 2, 11),
+                value_date=value_date,
             )
         elif target_type == Property.TYPES.DATETIME:
+            value_datetime = datetime(2026, 2, 11, 10, 30, 0) if value_override is None else value_override
             product_property = baker.make(
                 ProductProperty,
                 multi_tenant_company=self.multi_tenant_company,
                 product=product,
                 property=local_property,
-                value_datetime=datetime(2026, 2, 11, 10, 30, 0),
+                value_datetime=value_datetime,
             )
         elif target_type in (Property.TYPES.TEXT, Property.TYPES.DESCRIPTION):
             text_value = "42" if value_override is None else str(value_override)
+            value_text = text_value if target_type == Property.TYPES.TEXT else text_value[:255]
+            value_description = text_value
             product_property = baker.make(
                 ProductProperty,
                 multi_tenant_company=self.multi_tenant_company,
@@ -294,10 +299,11 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
                 multi_tenant_company=self.multi_tenant_company,
                 product_property=product_property,
                 language="en",
-                value_text=text_value,
-                value_description=text_value,
+                value_text=value_text,
+                value_description=value_description,
             )
         elif target_type == Property.TYPES.SELECT:
+            select_label = "12" if value_override is None else str(value_override)
             select_value = baker.make(
                 PropertySelectValue,
                 multi_tenant_company=self.multi_tenant_company,
@@ -308,7 +314,7 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
                 multi_tenant_company=self.multi_tenant_company,
                 propertyselectvalue=select_value,
                 language="en",
-                value="Option A",
+                value=select_label,
             )
             product_property = baker.make(
                 ProductProperty,
@@ -356,7 +362,16 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
 
         return product_property, select_values
 
-    def _build_amazon_property(self, *, local_property, original_type, target_type, allows_unmapped):
+    def _build_amazon_property(
+        self,
+        *,
+        local_property,
+        original_type,
+        target_type,
+        allows_unmapped,
+        yes_text_value=None,
+        no_text_value=None,
+    ):
         suffix = self._next_suffix()
         return baker.prepare(
             AmazonProperty,
@@ -367,9 +382,20 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             original_type=original_type,
             type=target_type,
             allows_unmapped_values=allows_unmapped,
+            yes_text_value=yes_text_value,
+            no_text_value=no_text_value,
         )
 
-    def _build_ebay_property(self, *, local_property, original_type, target_type, allows_unmapped):
+    def _build_ebay_property(
+        self,
+        *,
+        local_property,
+        original_type,
+        target_type,
+        allows_unmapped,
+        yes_text_value=None,
+        no_text_value=None,
+    ):
         suffix = self._next_suffix()
         return baker.prepare(
             EbayProperty,
@@ -382,9 +408,20 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             original_type=original_type,
             type=target_type,
             allows_unmapped_values=allows_unmapped,
+            yes_text_value=yes_text_value,
+            no_text_value=no_text_value,
         )
 
-    def _build_shein_property(self, *, local_property, original_type, target_type, allows_unmapped):
+    def _build_shein_property(
+        self,
+        *,
+        local_property,
+        original_type,
+        target_type,
+        allows_unmapped,
+        yes_text_value=None,
+        no_text_value=None,
+    ):
         suffix = self._next_suffix()
         return baker.prepare(
             SheinProperty,
@@ -397,6 +434,8 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             original_type=original_type,
             type=target_type,
             allows_unmapped_values=allows_unmapped,
+            yes_text_value=yes_text_value,
+            no_text_value=no_text_value,
         )
 
     def _build_magento_property(self, *, local_property, original_type, target_type):
@@ -482,11 +521,103 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
                 value_en=f"Shein Option {idx}",
             )
 
+    def _create_boolean_select_mappings(self, *, amazon_property, ebay_property, shein_property):
+        suffix = self._next_suffix()
+
+        amazon_true = f"amazon-bool-true-{suffix}"
+        amazon_false = f"amazon-bool-false-{suffix}"
+        ebay_true = f"ebay-bool-true-{suffix}"
+        ebay_false = f"ebay-bool-false-{suffix}"
+        shein_true = str(900000 + (suffix * 10) + 1)
+        shein_false = str(900000 + (suffix * 10) + 2)
+
+        baker.make(
+            AmazonPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.amazon_channel,
+            amazon_property=amazon_property,
+            marketplace=self.amazon_view,
+            local_instance=None,
+            remote_value=amazon_true,
+            remote_name="Amazon Boolean True",
+            bool_value=True,
+        )
+        baker.make(
+            AmazonPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.amazon_channel,
+            amazon_property=amazon_property,
+            marketplace=self.amazon_view,
+            local_instance=None,
+            remote_value=amazon_false,
+            remote_name="Amazon Boolean False",
+            bool_value=False,
+        )
+
+        baker.make(
+            EbayPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.ebay_channel,
+            ebay_property=ebay_property,
+            marketplace=self.ebay_marketplace,
+            local_instance=None,
+            localized_value=ebay_true,
+            translated_value="eBay Boolean True",
+            bool_value=True,
+        )
+        baker.make(
+            EbayPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.ebay_channel,
+            ebay_property=ebay_property,
+            marketplace=self.ebay_marketplace,
+            local_instance=None,
+            localized_value=ebay_false,
+            translated_value="eBay Boolean False",
+            bool_value=False,
+        )
+
+        baker.make(
+            SheinPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.shein_channel,
+            remote_property=shein_property,
+            local_instance=None,
+            remote_id=shein_true,
+            value="Shein Boolean True",
+            value_en="Shein Boolean True",
+            bool_value=True,
+        )
+        baker.make(
+            SheinPropertySelectValue,
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.shein_channel,
+            remote_property=shein_property,
+            local_instance=None,
+            remote_id=shein_false,
+            value="Shein Boolean False",
+            value_en="Shein Boolean False",
+            bool_value=False,
+        )
+
+        return {
+            True: {
+                "amazon": amazon_true,
+                "ebay": ebay_true,
+                "shein": shein_true,
+            },
+            False: {
+                "amazon": amazon_false,
+                "ebay": ebay_false,
+                "shein": shein_false,
+            },
+        }
+
     def _print_assert_payload(self, *, integration, payload, expected):
         print(f"\\n[{integration}]")
         print(self._format_payload_debug(payload, expected))
 
-    def _assert_amazon_payload(self, *, product_property, amazon_property):
+    def _assert_amazon_payload(self, *, product_property, amazon_property, expected_value=None):
         current_listing_map = dict(self.amazon_product_type.listing_offer_required_properties or {})
         allowed_properties = list(current_listing_map.get(self.amazon_view.api_region_code, []))
         if amazon_property.main_code not in allowed_properties:
@@ -523,8 +654,10 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
         )
         self.assertIsInstance(payload, dict, self._format_payload_debug(payload, expected))
         self.assertIn("value", payload, self._format_payload_debug(payload, expected))
+        if expected_value is not None:
+            self.assertEqual(payload.get("value"), expected_value, self._format_payload_debug(payload, expected))
 
-    def _assert_ebay_payload(self, *, product_property, ebay_property):
+    def _assert_ebay_payload(self, *, product_property, ebay_property, expected_value=None):
         runner = _EbayPayloadRunner(sales_channel=self.ebay_channel)
         remote_value = runner._prepare_property_remote_value(
             product_property=product_property,
@@ -537,8 +670,10 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             expected=expected,
         )
         self.assertIsInstance(remote_value, str, self._format_payload_debug(remote_value, expected))
+        if expected_value is not None:
+            self.assertEqual(remote_value, expected_value, self._format_payload_debug(remote_value, expected))
 
-    def _assert_shein_payload(self, *, product_property, shein_property):
+    def _assert_shein_payload(self, *, product_property, shein_property, expected_value=None, expected_attribute_value_id=None):
         product_type = baker.make(
             SheinProductType,
             multi_tenant_company=self.multi_tenant_company,
@@ -570,6 +705,10 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
         )
         self.assertIsInstance(payload, dict, self._format_payload_debug(payload, expected))
         self.assertIn("attribute_id", payload, self._format_payload_debug(payload, expected))
+        if expected_value is not None:
+            self.assertEqual(payload.get("attribute_extra_value"), expected_value, self._format_payload_debug(payload, expected))
+        if expected_attribute_value_id is not None:
+            self.assertEqual(payload.get("attribute_value_id"), expected_attribute_value_id, self._format_payload_debug(payload, expected))
 
     def _assert_magento_payload(self, *, product_property, remote_property=None):
         runner = _MagentoValueRunner(
@@ -629,12 +768,19 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
         *,
         target_type,
         value_override=None,
+        yes_text_value=None,
+        no_text_value=None,
+        expected_amazon_value=None,
+        expected_ebay_value=None,
+        expected_shein_value=None,
+        expected_shein_attribute_value_id=None,
         amazon_accepted=None,
         ebay_accepted=None,
         shein_accepted=None,
         magento_accepted=None,
         woo_accepted=None,
         shopify_accepted=None,
+        create_boolean_mappings=False,
     ):
         original_key = self.ORIGINAL_KEY
         if amazon_accepted is None:
@@ -664,18 +810,24 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             original_type=original_type,
             target_type=target_type,
             allows_unmapped=allows_unmapped,
+            yes_text_value=yes_text_value,
+            no_text_value=no_text_value,
         )
         ebay_property = self._build_ebay_property(
             local_property=local_property,
             original_type=original_type,
             target_type=target_type,
             allows_unmapped=allows_unmapped,
+            yes_text_value=yes_text_value,
+            no_text_value=no_text_value,
         )
         shein_property = self._build_shein_property(
             local_property=local_property,
             original_type=original_type,
             target_type=target_type,
             allows_unmapped=allows_unmapped,
+            yes_text_value=yes_text_value,
+            no_text_value=no_text_value,
         )
 
         self._persist_remote_property_for_payload_asserts(
@@ -705,11 +857,31 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             shein_property=shein_property,
         )
 
+        if (
+            create_boolean_mappings
+            and target_type == Property.TYPES.BOOLEAN
+            and original_type in (Property.TYPES.SELECT, Property.TYPES.MULTISELECT)
+        ):
+            mapped_values = self._create_boolean_select_mappings(
+                amazon_property=amazon_property,
+                ebay_property=ebay_property,
+                shein_property=shein_property,
+            )
+            desired_bool = True if value_override is None else bool(value_override)
+            expected_values = mapped_values[desired_bool]
+            if expected_amazon_value is None:
+                expected_amazon_value = expected_values["amazon"]
+            if expected_ebay_value is None:
+                expected_ebay_value = expected_values["ebay"]
+            if expected_shein_value is None:
+                expected_shein_value = expected_values["shein"]
+
         self._assert_payload_acceptance(
             accepted=amazon_accepted,
             assertion_callable=lambda: self._assert_amazon_payload(
                 product_property=product_property,
                 amazon_property=amazon_property,
+                expected_value=expected_amazon_value,
             ),
         )
         self._assert_payload_acceptance(
@@ -717,6 +889,7 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             assertion_callable=lambda: self._assert_ebay_payload(
                 product_property=product_property,
                 ebay_property=ebay_property,
+                expected_value=expected_ebay_value,
             ),
         )
         self._assert_payload_acceptance(
@@ -724,6 +897,8 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             assertion_callable=lambda: self._assert_shein_payload(
                 product_property=product_property,
                 shein_property=shein_property,
+                expected_value=expected_shein_value,
+                expected_attribute_value_id=expected_shein_attribute_value_id,
             ),
         )
 
@@ -826,8 +1001,17 @@ class RemotePropertyTypeIntMatrixTestCase(BaseRemotePropertyTypeCase):
         )
 
     def test_int_to_select(self):
-        # @TODO: Handle original numeric type (INT/FLOAT) remapped to SELECT with explicit option mapping/preflight rules.
-        self._run_case(target_type=Property.TYPES.SELECT)
+        self._run_case(
+            target_type=Property.TYPES.SELECT,
+            value_override="12",
+        )
+        self._run_case(
+            target_type=Property.TYPES.SELECT,
+            value_override="12.5",
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_int_to_multiselect(self):
         self._run_case(
@@ -844,25 +1028,69 @@ class RemotePropertyTypeFloatMatrixTestCase(BaseRemotePropertyTypeCase):
         self._run_case(target_type=Property.TYPES.INT)
 
     def test_float_to_text(self):
-        self._run_case(target_type=Property.TYPES.TEXT)
+        self._run_case(target_type=Property.TYPES.TEXT, value_override="12.4")
+        self._run_case(
+            target_type=Property.TYPES.TEXT,
+            value_override="not-a-number",
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_float_to_description(self):
-        self._run_case(target_type=Property.TYPES.DESCRIPTION)
+        self._run_case(target_type=Property.TYPES.DESCRIPTION, value_override="12,04")
+        self._run_case(
+            target_type=Property.TYPES.DESCRIPTION,
+            value_override="not-a-number",
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_float_to_boolean(self):
-        self._run_case(target_type=Property.TYPES.BOOLEAN)
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_float_to_date(self):
-        self._run_case(target_type=Property.TYPES.DATE)
+        self._run_case(
+            target_type=Property.TYPES.DATE,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_float_to_datetime(self):
-        self._run_case(target_type=Property.TYPES.DATETIME)
+        self._run_case(
+            target_type=Property.TYPES.DATETIME,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_float_to_select(self):
-        self._run_case(target_type=Property.TYPES.SELECT)
+        self._run_case(
+            target_type=Property.TYPES.SELECT,
+            value_override="12.5",
+        )
+        self._run_case(
+            target_type=Property.TYPES.SELECT,
+            value_override="abc",
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_float_to_multiselect(self):
-        self._run_case(target_type=Property.TYPES.MULTISELECT)
+        self._run_case(
+            target_type=Property.TYPES.MULTISELECT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
 class RemotePropertyTypeTextMatrixTestCase(BaseRemotePropertyTypeCase):
     ORIGINAL_KEY = Property.TYPES.TEXT
@@ -874,10 +1102,48 @@ class RemotePropertyTypeTextMatrixTestCase(BaseRemotePropertyTypeCase):
         self._run_case(target_type=Property.TYPES.FLOAT)
 
     def test_text_to_description(self):
-        self._run_case(target_type=Property.TYPES.DESCRIPTION)
+        self._run_case(target_type=Property.TYPES.DESCRIPTION, value_override="short description")
+        self._run_case(
+            target_type=Property.TYPES.DESCRIPTION,
+            value_override="x" * 300,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_text_to_boolean(self):
-        self._run_case(target_type=Property.TYPES.BOOLEAN)
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=True,
+            yes_text_value="Y",
+            no_text_value="N",
+            expected_amazon_value="Y",
+            expected_ebay_value="Y",
+            expected_shein_value="Y",
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=False,
+            yes_text_value="Y",
+            no_text_value="N",
+            expected_amazon_value="N",
+            expected_ebay_value="N",
+            expected_shein_value="N",
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=True,
+            expected_amazon_value="Yes",
+            expected_ebay_value="Yes",
+            expected_shein_value="Yes",
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=False,
+            expected_amazon_value="No",
+            expected_ebay_value="No",
+            expected_shein_value="No",
+        )
 
     def test_text_to_date(self):
         self._run_case(target_type=Property.TYPES.DATE)
@@ -901,10 +1167,41 @@ class RemotePropertyTypeDescriptionMatrixTestCase(BaseRemotePropertyTypeCase):
         self._run_case(target_type=Property.TYPES.FLOAT)
 
     def test_description_to_text(self):
-        self._run_case(target_type=Property.TYPES.TEXT)
+        self._run_case(target_type=Property.TYPES.TEXT, value_override="x" * 250)
 
     def test_description_to_boolean(self):
-        self._run_case(target_type=Property.TYPES.BOOLEAN)
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=True,
+            yes_text_value="Y",
+            no_text_value="N",
+            expected_amazon_value="Y",
+            expected_ebay_value="Y",
+            expected_shein_value="Y",
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=False,
+            yes_text_value="Y",
+            no_text_value="N",
+            expected_amazon_value="N",
+            expected_ebay_value="N",
+            expected_shein_value="N",
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=True,
+            expected_amazon_value="Yes",
+            expected_ebay_value="Yes",
+            expected_shein_value="Yes",
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=False,
+            expected_amazon_value="No",
+            expected_ebay_value="No",
+            expected_shein_value="No",
+        )
 
     def test_description_to_date(self):
         self._run_case(target_type=Property.TYPES.DATE)
@@ -922,82 +1219,274 @@ class RemotePropertyTypeBooleanMatrixTestCase(BaseRemotePropertyTypeCase):
     ORIGINAL_KEY = Property.TYPES.BOOLEAN
 
     def test_boolean_to_int(self):
-        self._run_case(target_type=Property.TYPES.INT)
+        self._run_case(
+            target_type=Property.TYPES.INT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_boolean_to_float(self):
-        self._run_case(target_type=Property.TYPES.FLOAT)
+        self._run_case(
+            target_type=Property.TYPES.FLOAT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_boolean_to_text(self):
-        self._run_case(target_type=Property.TYPES.TEXT)
+        self._run_case(
+            target_type=Property.TYPES.TEXT,
+            value_override="Y",
+            yes_text_value="Y",
+            no_text_value="N",
+            expected_amazon_value=True,
+            expected_ebay_value="True",
+            expected_shein_value=True,
+        )
+        self._run_case(
+            target_type=Property.TYPES.TEXT,
+            value_override="N",
+            yes_text_value="Y",
+            no_text_value="N",
+            expected_amazon_value=False,
+            expected_ebay_value="False",
+            expected_shein_value=False,
+        )
+        self._run_case(
+            target_type=Property.TYPES.TEXT,
+            value_override="Yes",
+            expected_amazon_value=True,
+            expected_ebay_value="True",
+            expected_shein_value=True,
+        )
+        self._run_case(
+            target_type=Property.TYPES.TEXT,
+            value_override="No",
+            expected_amazon_value=False,
+            expected_ebay_value="False",
+            expected_shein_value=False,
+        )
+        self._run_case(
+            target_type=Property.TYPES.TEXT,
+            value_override="MAYBE",
+            yes_text_value="Y",
+            no_text_value="N",
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_boolean_to_description(self):
-        self._run_case(target_type=Property.TYPES.DESCRIPTION)
+        self._run_case(
+            target_type=Property.TYPES.DESCRIPTION,
+            value_override="Y",
+            yes_text_value="Y",
+            no_text_value="N",
+            expected_amazon_value=True,
+            expected_ebay_value="True",
+            expected_shein_value=True,
+        )
+        self._run_case(
+            target_type=Property.TYPES.DESCRIPTION,
+            value_override="N",
+            yes_text_value="Y",
+            no_text_value="N",
+            expected_amazon_value=False,
+            expected_ebay_value="False",
+            expected_shein_value=False,
+        )
+        self._run_case(
+            target_type=Property.TYPES.DESCRIPTION,
+            value_override="Yes",
+            expected_amazon_value=True,
+            expected_ebay_value="True",
+            expected_shein_value=True,
+        )
+        self._run_case(
+            target_type=Property.TYPES.DESCRIPTION,
+            value_override="No",
+            expected_amazon_value=False,
+            expected_ebay_value="False",
+            expected_shein_value=False,
+        )
+        self._run_case(
+            target_type=Property.TYPES.DESCRIPTION,
+            value_override="MAYBE",
+            yes_text_value="Y",
+            no_text_value="N",
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_boolean_to_date(self):
-        self._run_case(target_type=Property.TYPES.DATE)
+        self._run_case(
+            target_type=Property.TYPES.DATE,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_boolean_to_datetime(self):
-        self._run_case(target_type=Property.TYPES.DATETIME)
+        self._run_case(
+            target_type=Property.TYPES.DATETIME,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_boolean_to_select(self):
-        self._run_case(target_type=Property.TYPES.SELECT)
+        self._run_case(
+            target_type=Property.TYPES.SELECT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_boolean_to_multiselect(self):
-        self._run_case(target_type=Property.TYPES.MULTISELECT)
+        self._run_case(
+            target_type=Property.TYPES.MULTISELECT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
 class RemotePropertyTypeDateMatrixTestCase(BaseRemotePropertyTypeCase):
     ORIGINAL_KEY = Property.TYPES.DATE
 
     def test_date_to_int(self):
-        self._run_case(target_type=Property.TYPES.INT)
+        self._run_case(
+            target_type=Property.TYPES.INT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_date_to_float(self):
-        self._run_case(target_type=Property.TYPES.FLOAT)
+        self._run_case(
+            target_type=Property.TYPES.FLOAT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_date_to_text(self):
-        self._run_case(target_type=Property.TYPES.TEXT)
+        self._run_case(
+            target_type=Property.TYPES.TEXT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_date_to_description(self):
-        self._run_case(target_type=Property.TYPES.DESCRIPTION)
+        self._run_case(
+            target_type=Property.TYPES.DESCRIPTION,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_date_to_boolean(self):
-        self._run_case(target_type=Property.TYPES.BOOLEAN)
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_date_to_datetime(self):
-        self._run_case(target_type=Property.TYPES.DATETIME)
+        self._run_case(
+            target_type=Property.TYPES.DATETIME,
+            value_override=datetime(2026, 4, 12, 18, 34, 0),
+            expected_amazon_value="2026-04-12",
+            expected_ebay_value="2026-04-12",
+            expected_shein_value="2026-04-12",
+        )
 
     def test_date_to_select(self):
-        self._run_case(target_type=Property.TYPES.SELECT)
+        self._run_case(
+            target_type=Property.TYPES.SELECT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_date_to_multiselect(self):
-        self._run_case(target_type=Property.TYPES.MULTISELECT)
+        self._run_case(
+            target_type=Property.TYPES.MULTISELECT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
 class RemotePropertyTypeDatetimeMatrixTestCase(BaseRemotePropertyTypeCase):
     ORIGINAL_KEY = Property.TYPES.DATETIME
 
     def test_datetime_to_int(self):
-        self._run_case(target_type=Property.TYPES.INT)
+        self._run_case(
+            target_type=Property.TYPES.INT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_datetime_to_float(self):
-        self._run_case(target_type=Property.TYPES.FLOAT)
+        self._run_case(
+            target_type=Property.TYPES.FLOAT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_datetime_to_text(self):
-        self._run_case(target_type=Property.TYPES.TEXT)
+        self._run_case(
+            target_type=Property.TYPES.TEXT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_datetime_to_description(self):
-        self._run_case(target_type=Property.TYPES.DESCRIPTION)
+        self._run_case(
+            target_type=Property.TYPES.DESCRIPTION,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_datetime_to_boolean(self):
-        self._run_case(target_type=Property.TYPES.BOOLEAN)
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_datetime_to_date(self):
-        self._run_case(target_type=Property.TYPES.DATE)
+        self._run_case(
+            target_type=Property.TYPES.DATE,
+            value_override=date(2026, 4, 12),
+            expected_amazon_value="2026-04-12T00:00:00",
+            expected_ebay_value="2026-04-12T00:00:00",
+            expected_shein_value="2026-04-12T00:00:00",
+        )
 
     def test_datetime_to_select(self):
-        self._run_case(target_type=Property.TYPES.SELECT)
+        self._run_case(
+            target_type=Property.TYPES.SELECT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_datetime_to_multiselect(self):
-        self._run_case(target_type=Property.TYPES.MULTISELECT)
+        self._run_case(
+            target_type=Property.TYPES.MULTISELECT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
 class RemotePropertyTypeSelectCustomValuesAllowedMatrixTestCase(BaseRemotePropertyTypeCase):
     ORIGINAL_KEY = "SELECT__allows_custom_values"
@@ -1015,7 +1504,48 @@ class RemotePropertyTypeSelectCustomValuesAllowedMatrixTestCase(BaseRemoteProper
         self._run_case(target_type=Property.TYPES.DESCRIPTION)
 
     def test_select_custom_values_allowed_to_boolean(self):
-        self._run_case(target_type=Property.TYPES.BOOLEAN)
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=True,
+            create_boolean_mappings=True,
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=False,
+            create_boolean_mappings=True,
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=True,
+            yes_text_value="Y",
+            no_text_value="N",
+            expected_amazon_value="Y",
+            expected_ebay_value="Y",
+            expected_shein_value="Y",
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=False,
+            yes_text_value="Y",
+            no_text_value="N",
+            expected_amazon_value="N",
+            expected_ebay_value="N",
+            expected_shein_value="N",
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=True,
+            expected_amazon_value=True,
+            expected_ebay_value="True",
+            expected_shein_value=True,
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=False,
+            expected_amazon_value=False,
+            expected_ebay_value="False",
+            expected_shein_value=False,
+        )
 
     def test_select_custom_values_allowed_to_date(self):
         self._run_case(target_type=Property.TYPES.DATE)
@@ -1031,28 +1561,81 @@ class RemotePropertyTypeSelectCustomValuesNotAllowedMatrixTestCase(BaseRemotePro
     INCLUDE_MANAGED_INTEGRATIONS = False
 
     def test_select_custom_values_not_allowed_to_int(self):
-        self._run_case(target_type=Property.TYPES.INT)
+        self._run_case(
+            target_type=Property.TYPES.INT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_select_custom_values_not_allowed_to_float(self):
-        self._run_case(target_type=Property.TYPES.FLOAT)
+        self._run_case(
+            target_type=Property.TYPES.FLOAT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_select_custom_values_not_allowed_to_text(self):
-        self._run_case(target_type=Property.TYPES.TEXT)
+        self._run_case(
+            target_type=Property.TYPES.TEXT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_select_custom_values_not_allowed_to_description(self):
-        self._run_case(target_type=Property.TYPES.DESCRIPTION)
+        self._run_case(
+            target_type=Property.TYPES.DESCRIPTION,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_select_custom_values_not_allowed_to_boolean(self):
-        self._run_case(target_type=Property.TYPES.BOOLEAN)
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=True,
+            create_boolean_mappings=True,
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=False,
+            create_boolean_mappings=True,
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=True,
+            yes_text_value="Y",
+            no_text_value="N",
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_select_custom_values_not_allowed_to_date(self):
-        self._run_case(target_type=Property.TYPES.DATE)
+        self._run_case(
+            target_type=Property.TYPES.DATE,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_select_custom_values_not_allowed_to_datetime(self):
-        self._run_case(target_type=Property.TYPES.DATETIME)
+        self._run_case(
+            target_type=Property.TYPES.DATETIME,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_select_custom_values_not_allowed_to_multiselect(self):
-        self._run_case(target_type=Property.TYPES.MULTISELECT)
+        self._run_case(
+            target_type=Property.TYPES.MULTISELECT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
 class RemotePropertyTypeMultiselectCustomValuesAllowedMatrixTestCase(BaseRemotePropertyTypeCase):
     ORIGINAL_KEY = "MULTISELECT__allows_custom_values"
@@ -1070,7 +1653,48 @@ class RemotePropertyTypeMultiselectCustomValuesAllowedMatrixTestCase(BaseRemoteP
         self._run_case(target_type=Property.TYPES.DESCRIPTION)
 
     def test_multiselect_custom_values_allowed_to_boolean(self):
-        self._run_case(target_type=Property.TYPES.BOOLEAN)
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=True,
+            create_boolean_mappings=True,
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=False,
+            create_boolean_mappings=True,
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=True,
+            yes_text_value="Y",
+            no_text_value="N",
+            expected_amazon_value="Y",
+            expected_ebay_value="Y",
+            expected_shein_value="Y",
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=False,
+            yes_text_value="Y",
+            no_text_value="N",
+            expected_amazon_value="N",
+            expected_ebay_value="N",
+            expected_shein_value="N",
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=True,
+            expected_amazon_value=True,
+            expected_ebay_value="True",
+            expected_shein_value=True,
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=False,
+            expected_amazon_value=False,
+            expected_ebay_value="False",
+            expected_shein_value=False,
+        )
 
     def test_multiselect_custom_values_allowed_to_date(self):
         self._run_case(target_type=Property.TYPES.DATE)
@@ -1086,25 +1710,78 @@ class RemotePropertyTypeMultiselectCustomValuesNotAllowedMatrixTestCase(BaseRemo
     INCLUDE_MANAGED_INTEGRATIONS = False
 
     def test_multiselect_custom_values_not_allowed_to_int(self):
-        self._run_case(target_type=Property.TYPES.INT)
+        self._run_case(
+            target_type=Property.TYPES.INT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_multiselect_custom_values_not_allowed_to_float(self):
-        self._run_case(target_type=Property.TYPES.FLOAT)
+        self._run_case(
+            target_type=Property.TYPES.FLOAT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_multiselect_custom_values_not_allowed_to_text(self):
-        self._run_case(target_type=Property.TYPES.TEXT)
+        self._run_case(
+            target_type=Property.TYPES.TEXT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_multiselect_custom_values_not_allowed_to_description(self):
-        self._run_case(target_type=Property.TYPES.DESCRIPTION)
+        self._run_case(
+            target_type=Property.TYPES.DESCRIPTION,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_multiselect_custom_values_not_allowed_to_boolean(self):
-        self._run_case(target_type=Property.TYPES.BOOLEAN)
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=True,
+            create_boolean_mappings=True,
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=False,
+            create_boolean_mappings=True,
+        )
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            value_override=True,
+            yes_text_value="Y",
+            no_text_value="N",
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_multiselect_custom_values_not_allowed_to_date(self):
-        self._run_case(target_type=Property.TYPES.DATE)
+        self._run_case(
+            target_type=Property.TYPES.DATE,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_multiselect_custom_values_not_allowed_to_datetime(self):
-        self._run_case(target_type=Property.TYPES.DATETIME)
+        self._run_case(
+            target_type=Property.TYPES.DATETIME,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_multiselect_custom_values_not_allowed_to_select(self):
-        self._run_case(target_type=Property.TYPES.SELECT)
+        self._run_case(
+            target_type=Property.TYPES.SELECT,
+            expected_amazon_value="amazon-1",
+            expected_ebay_value="ebay-1",
+            expected_shein_attribute_value_id=2001,
+        )

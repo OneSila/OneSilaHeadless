@@ -54,7 +54,15 @@ class AmazonRemoteValueMixin(RemoteValueMixin):
         return remote_values
 
     def get_select_value(self, *, product_property=None, remote_property=None, language_code=None):
-        _ = language_code
+        if self._is_textual_or_numeric_original_type(
+            product_property=product_property,
+            remote_property=remote_property,
+        ):
+            return super().get_select_value(
+                product_property=product_property,
+                remote_property=remote_property,
+                language_code=language_code,
+            )
         prop_instance = product_property or self.local_instance
         if prop_instance is None or remote_property is None:
             return None
@@ -65,7 +73,15 @@ class AmazonRemoteValueMixin(RemoteValueMixin):
         )
 
     def get_select_value_multiple(self, *, product_property=None, remote_property=None, language_code=None):
-        _ = language_code
+        if self._is_textual_original_type(
+            product_property=product_property,
+            remote_property=remote_property,
+        ):
+            return super().get_select_value_multiple(
+                product_property=product_property,
+                remote_property=remote_property,
+                language_code=language_code,
+            )
         prop_instance = product_property or self.local_instance
         if prop_instance is None or remote_property is None:
             return []
