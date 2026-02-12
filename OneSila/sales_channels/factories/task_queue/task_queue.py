@@ -556,7 +556,7 @@ class RuleScopedAddTask(ChannelScopedAddTask):
         specialized_channel_ids = set()
 
         if self.rule.sales_channel_id:
-            filter_kwargs["id"] = self.rule.sales_channel_id
+            filter_kwargs["id"] = self.rule.sales_channel.id
         else:
             specialized_channel_ids = set(
                 ProductPropertiesRule.objects.filter(

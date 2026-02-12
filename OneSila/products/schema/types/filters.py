@@ -231,15 +231,20 @@ class ProductFilter(
         if value in (None, UNSET):
             return queryset, Q()
 
-        shared_variations_qs = (
-            ConfigurableVariation.objects.values("variation_id")
-            .annotate(parent_count=Count("parent_id", distinct=True))
-            .filter(parent_count__gt=1)
-            .values("variation_id")
-        )
-        shared_parent_qs = ConfigurableVariation.objects.filter(
+        parent_variations_qs = ConfigurableVariation.objects.filter(
+            multi_tenant_company_id=OuterRef("multi_tenant_company_id"),
             parent_id=OuterRef("pk"),
-            variation_id__in=Subquery(shared_variations_qs),
+        )
+        other_parent_same_variation_qs = ConfigurableVariation.objects.filter(
+            multi_tenant_company_id=OuterRef("multi_tenant_company_id"),
+            variation_id=OuterRef("variation_id"),
+        ).exclude(
+            parent_id=OuterRef("parent_id"),
+        )
+        shared_parent_qs = parent_variations_qs.annotate(
+            has_other_parent=Exists(other_parent_same_variation_qs)
+        ).filter(
+            has_other_parent=True
         )
 
         queryset = queryset.filter(type=CONFIGURABLE).annotate(
@@ -248,10 +253,10 @@ class ProductFilter(
 
         if value:
             first_shared_variation_qs = (
-                ConfigurableVariation.objects.filter(
-                    parent_id=OuterRef("pk"),
-                    variation_id__in=Subquery(shared_variations_qs),
+                parent_variations_qs.annotate(
+                    has_other_parent=Exists(other_parent_same_variation_qs)
                 )
+                .filter(has_other_parent=True)
                 .order_by("variation_id")
                 .values("variation_id")[:1]
             )
