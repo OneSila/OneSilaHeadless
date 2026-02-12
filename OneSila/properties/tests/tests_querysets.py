@@ -67,6 +67,64 @@ class PropertyQuerySetTest(TestCase):
         self.assertIn(prop_unused, qs_unused)
         self.assertNotIn(prop_used, qs_unused)
 
+    def test_with_usage_count_counts_product_properties(self):
+        prop_used = Property.objects.create(
+            type=Property.TYPES.BOOLEAN,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        prop_unused = Property.objects.create(
+            type=Property.TYPES.BOOLEAN,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        product_one = Product.objects.create(
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product_two = Product.objects.create(
+            type=Product.SIMPLE,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ProductProperty.objects.create(
+            product=product_one,
+            property=prop_used,
+            value_boolean=True,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=product_two,
+            property=prop_used,
+            value_boolean=False,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        other_mtc = baker.make(MultiTenantCompany)
+        other_prop_used = Property.objects.create(
+            type=Property.TYPES.BOOLEAN,
+            multi_tenant_company=other_mtc,
+        )
+        other_product = Product.objects.create(
+            type=Product.SIMPLE,
+            multi_tenant_company=other_mtc,
+        )
+        ProductProperty.objects.create(
+            product=other_product,
+            property=other_prop_used,
+            value_boolean=True,
+            multi_tenant_company=other_mtc,
+        )
+
+        qs = Property.objects.filter(
+            multi_tenant_company=self.multi_tenant_company,
+        ).with_usage_count(
+            multi_tenant_company_id=self.multi_tenant_company.id,
+        )
+        usage_by_id = {prop.id: prop.usage_count for prop in qs}
+
+        self.assertEqual(usage_by_id[prop_used.id], 2)
+        self.assertEqual(usage_by_id[prop_unused.id], 0)
+
     def test_with_translated_name_single_query(self):
         props = []
         for i in range(2):

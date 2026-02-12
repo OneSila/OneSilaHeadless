@@ -12,9 +12,11 @@ from .tests_schemas.queries import (
     PROPERTIES_MISSING_MAIN_TRANSLATION_QUERY,
     PROPERTIES_MISSING_TRANSLATIONS_QUERY,
     PROPERTIES_USED_IN_PRODUCTS_QUERY,
+    PROPERTIES_USAGE_COUNT_QUERY,
     PROPERTY_SELECT_VALUES_MISSING_MAIN_TRANSLATION_QUERY,
     PROPERTY_SELECT_VALUES_MISSING_TRANSLATIONS_QUERY,
     PROPERTY_SELECT_VALUES_USED_IN_PRODUCTS_QUERY,
+    PROPERTY_SELECT_VALUES_USAGE_COUNT_QUERY,
 )
 
 
@@ -294,3 +296,93 @@ class PropertySelectValueFilterUsedInProductsTestCase(TransactionTestCaseMixin, 
             {"usedInProducts": False},
         )
         self.assertSetEqual(ids, {self.v_select_unused.id})
+
+
+class PropertyAndSelectValueUsageCountGraphQLTestCase(TransactionTestCaseMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+
+        self.p_high = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        self.p_low = Property.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+
+        self.v_high = PropertySelectValue.objects.create(
+            property=self.p_high,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        self.v_low = PropertySelectValue.objects.create(
+            property=self.p_high,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        product_one = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product_two = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        product_three = SimpleProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+        ProductProperty.objects.create(
+            product=product_one,
+            property=self.p_high,
+            value_select=self.v_high,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=product_two,
+            property=self.p_high,
+            value_select=self.v_high,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+        ProductProperty.objects.create(
+            product=product_three,
+            property=self.p_low,
+            value_select=self.v_low,
+            multi_tenant_company=self.multi_tenant_company,
+        )
+
+    def test_properties_usage_count_field_and_order(self):
+        resp = self.strawberry_test_client(
+            query=PROPERTIES_USAGE_COUNT_QUERY,
+            variables={"order": {"usageCount": "DESC"}},
+        )
+        self.assertIsNone(resp.errors)
+
+        nodes = resp.data["properties"]["edges"]
+        usage_by_id = {
+            int(self.from_global_id(edge["node"]["id"])[1]): edge["node"]["usageCount"]
+            for edge in nodes
+        }
+
+        self.assertEqual(usage_by_id[self.p_high.id], 2)
+        self.assertEqual(usage_by_id[self.p_low.id], 1)
+
+        ordered_ids = [int(self.from_global_id(edge["node"]["id"])[1]) for edge in nodes]
+        self.assertLess(ordered_ids.index(self.p_high.id), ordered_ids.index(self.p_low.id))
+
+    def test_property_select_values_usage_count_field_and_order(self):
+        resp = self.strawberry_test_client(
+            query=PROPERTY_SELECT_VALUES_USAGE_COUNT_QUERY,
+            variables={"order": {"usageCount": "DESC"}},
+        )
+        self.assertIsNone(resp.errors)
+
+        nodes = resp.data["propertySelectValues"]["edges"]
+        usage_by_id = {
+            int(self.from_global_id(edge["node"]["id"])[1]): edge["node"]["usageCount"]
+            for edge in nodes
+        }
+
+        self.assertEqual(usage_by_id[self.v_high.id], 2)
+        self.assertEqual(usage_by_id[self.v_low.id], 1)
+
+        ordered_ids = [int(self.from_global_id(edge["node"]["id"])[1]) for edge in nodes]
+        self.assertLess(ordered_ids.index(self.v_high.id), ordered_ids.index(self.v_low.id))

@@ -15,6 +15,29 @@ class PropertyOrder:
     type: auto
     created_at: auto
 
+    @order_field
+    def usage_count(
+        self,
+        *,
+        queryset,
+        info,
+        value: Ordering,
+        prefix: str,
+    ) -> tuple[models.QuerySet, list[str]]:
+        user = get_current_user(info)
+        if user is None:
+            return queryset, [value.resolve(f"{prefix}id")]
+
+        queryset = (
+            queryset.with_usage_count(multi_tenant_company_id=user.multi_tenant_company_id)
+            .with_translated_name()
+        )
+        return queryset, [
+            value.resolve(f"{prefix}usage_count"),
+            f"{prefix}translated_name",
+            f"{prefix}id",
+        ]
+
 
 @order(PropertySelectValue)
 class PropertySelectValueOrder:

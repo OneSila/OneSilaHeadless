@@ -10,7 +10,69 @@ from django.db import transaction, IntegrityError
 from .helpers import generate_unique_internal_name, _is_code_like, _norm_code, _tokens
 
 
+def build_property_usage_count_expression(*, multi_tenant_company_id):
+    from .models import ProductProperty
+
+    usage_qs = ProductProperty._base_manager.filter(
+        multi_tenant_company_id=multi_tenant_company_id,
+        property_id=OuterRef("pk"),
+    ).values("property_id").annotate(
+        usage_count=Count("id"),
+    ).values("usage_count")[:1]
+
+    return Coalesce(
+        Subquery(usage_qs, output_field=IntegerField()),
+        Value(0),
+        output_field=IntegerField(),
+    )
+
+
+def build_property_select_value_usage_count_expression(*, multi_tenant_company_id):
+    from .models import ProductProperty
+
+    select_usage_qs = ProductProperty._base_manager.filter(
+        multi_tenant_company_id=multi_tenant_company_id,
+        value_select_id=OuterRef("pk"),
+    ).values("value_select_id").annotate(
+        usage_count=Count("id"),
+    ).values("usage_count")[:1]
+
+    m2m_field = ProductProperty._meta.get_field("value_multi_select")
+    through = m2m_field.remote_field.through
+    src_fk_name = m2m_field.m2m_field_name()
+    tgt_fk_name = m2m_field.m2m_reverse_field_name()
+
+    multi_usage_qs = through._base_manager.filter(
+        **{
+            f"{src_fk_name}__multi_tenant_company_id": multi_tenant_company_id,
+            f"{tgt_fk_name}_id": OuterRef("pk"),
+        }
+    ).values(tgt_fk_name).annotate(
+        usage_count=Count("id"),
+    ).values("usage_count")[:1]
+
+    select_count = Coalesce(
+        Subquery(select_usage_qs, output_field=IntegerField()),
+        Value(0),
+        output_field=IntegerField(),
+    )
+    multi_count = Coalesce(
+        Subquery(multi_usage_qs, output_field=IntegerField()),
+        Value(0),
+        output_field=IntegerField(),
+    )
+
+    return ExpressionWrapper(select_count + multi_count, output_field=IntegerField())
+
+
 class PropertyQuerySet(MultiTenantQuerySet):
+    def with_usage_count(self, *, multi_tenant_company_id: int):
+        return self.annotate(
+            usage_count=build_property_usage_count_expression(
+                multi_tenant_company_id=multi_tenant_company_id,
+            )
+        )
+
     def with_product_usage(self, *, multi_tenant_company_id: int):
         from .models import ProductProperty
 
@@ -216,42 +278,10 @@ class PropertySelectValueQuerySet(MultiTenantQuerySet):
         return self.annotate(has_usage=exists_expr)
 
     def with_usage_count(self, *, multi_tenant_company_id: int):
-        from .models import ProductProperty
-
-        select_usage_qs = ProductProperty._base_manager.filter(
-            multi_tenant_company_id=multi_tenant_company_id,
-            value_select_id=OuterRef("pk"),
-        ).values("value_select_id").annotate(
-            usage_count=Count("id"),
-        ).values("usage_count")[:1]
-
-        m2m_field = ProductProperty._meta.get_field("value_multi_select")
-        through = m2m_field.remote_field.through
-        src_fk_name = m2m_field.m2m_field_name()
-        tgt_fk_name = m2m_field.m2m_reverse_field_name()
-
-        multi_usage_qs = through._base_manager.filter(
-            **{
-                f"{src_fk_name}__multi_tenant_company_id": multi_tenant_company_id,
-                f"{tgt_fk_name}_id": OuterRef("pk"),
-            }
-        ).values(tgt_fk_name).annotate(
-            usage_count=Count("id"),
-        ).values("usage_count")[:1]
-
-        select_count = Coalesce(
-            Subquery(select_usage_qs, output_field=IntegerField()),
-            Value(0),
-            output_field=IntegerField(),
-        )
-        multi_count = Coalesce(
-            Subquery(multi_usage_qs, output_field=IntegerField()),
-            Value(0),
-            output_field=IntegerField(),
-        )
-
         return self.annotate(
-            usage_count=ExpressionWrapper(select_count + multi_count, output_field=IntegerField()),
+            usage_count=build_property_select_value_usage_count_expression(
+                multi_tenant_company_id=multi_tenant_company_id,
+            ),
         )
 
     def used_in_products(self, *, multi_tenant_company_id: int, used: bool):

@@ -45,3 +45,19 @@ query PropertySelectValues($usedInProducts: Boolean!) {
   }
 }
 """
+
+PROPERTIES_USAGE_COUNT_QUERY = """
+query Properties($order: PropertyOrder) {
+  properties(order: $order) {
+    edges { node { id usageCount } }
+  }
+}
+"""
+
+PROPERTY_SELECT_VALUES_USAGE_COUNT_QUERY = """
+query PropertySelectValues($order: PropertySelectValueOrder) {
+  propertySelectValues(order: $order) {
+    edges { node { id usageCount } }
+  }
+}
+"""
