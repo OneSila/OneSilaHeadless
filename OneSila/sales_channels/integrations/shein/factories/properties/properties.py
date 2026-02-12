@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
 from typing import Any, Iterable, Optional, Sequence
 
 from properties.models import ProductProperty, Property, PropertySelectValue
@@ -184,65 +183,6 @@ class SheinProductPropertyValueMixin(SheinSignatureMixin, RemoteValueMixin):
         if prop_instance is None:
             return None
         return prop_instance.get_value(language=language_code)
-
-    def get_int_value(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
-        _ = product_property
-        _ = remote_property
-        _ = language_code
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return None
-
-    def get_float_value(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
-        normalized_value = super().get_float_value(
-            value=value,
-            product_property=product_property,
-            remote_property=remote_property,
-            language_code=language_code,
-        )
-        if (
-            remote_property
-            and getattr(remote_property, "original_type", None) is not None
-            and getattr(remote_property, "type", None) is not None
-            and getattr(remote_property, "original_type", None) != getattr(remote_property, "type", None)
-        ):
-            return normalized_value
-
-        try:
-            return float(normalized_value)
-        except (TypeError, ValueError):
-            return None
-
-    def get_boolean_value(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
-        _ = product_property
-        _ = remote_property
-        _ = language_code
-        return bool(value)
-
-    def get_text_value(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
-        _ = product_property
-        _ = remote_property
-        _ = language_code
-        return value
-
-    def get_description_value(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
-        _ = product_property
-        _ = remote_property
-        _ = language_code
-        return value
-
-    def format_date(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
-        _ = product_property
-        _ = remote_property
-        _ = language_code
-        return value.isoformat() if isinstance(value, date) else None
-
-    def format_datetime(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
-        _ = product_property
-        _ = remote_property
-        _ = language_code
-        return value.isoformat() if isinstance(value, datetime) else None
 
     def _prepare_translation_payload(self, *, value) -> list[dict[str, str]]:
         translations = getattr(value, "propertyselectvaluetranslation_set", None)
@@ -430,6 +370,11 @@ class SheinProductPropertyValueMixin(SheinSignatureMixin, RemoteValueMixin):
             raise PreFlightCheckError(
                 f"Mapped Shein property '{shein_property_label}' does not match the product property being synced."
             )
+
+        self.validate_remote_mapping_compatibility(
+            product_property=product_property,
+            remote_property=shein_property,
+        )
 
         language_code = self._normalize_language()
         allow_custom_values = bool(

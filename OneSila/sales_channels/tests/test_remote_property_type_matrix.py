@@ -4,7 +4,6 @@ import json
 from datetime import date, datetime
 from types import SimpleNamespace
 
-from django.core.exceptions import ValidationError
 from model_bakery import baker
 
 from core.tests import TestCase
@@ -17,7 +16,6 @@ from properties.models import (
     PropertySelectValue,
     PropertySelectValueTranslation,
 )
-from sales_channels.constants import REMOTE_PROPERTY_TYPE_CHANGE_RULES
 from sales_channels.exceptions import PreFlightCheckError
 from sales_channels.integrations.amazon.factories.properties.mixins import AmazonProductPropertyBaseMixin
 from sales_channels.integrations.amazon.models import AmazonSalesChannel
@@ -284,6 +282,7 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
                 value_datetime=datetime(2026, 2, 11, 10, 30, 0),
             )
         elif target_type in (Property.TYPES.TEXT, Property.TYPES.DESCRIPTION):
+            text_value = "42" if value_override is None else str(value_override)
             product_property = baker.make(
                 ProductProperty,
                 multi_tenant_company=self.multi_tenant_company,
@@ -295,8 +294,8 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
                 multi_tenant_company=self.multi_tenant_company,
                 product_property=product_property,
                 language="en",
-                value_text="42",
-                value_description="42.50 long description",
+                value_text=text_value,
+                value_description=text_value,
             )
         elif target_type == Property.TYPES.SELECT:
             select_value = baker.make(
@@ -424,6 +423,29 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             allows_unmapped_values=True,
         )
 
+    def _persist_remote_property_for_payload_asserts(
+        self,
+        *,
+        remote_property,
+        original_type,
+        target_type,
+        allows_unmapped,
+    ):
+        # Persist with a save-compatible state first, then patch desired matrix state in DB.
+        remote_property.original_type = target_type
+        remote_property.type = target_type
+        remote_property.allows_unmapped_values = allows_unmapped
+        remote_property.save()
+
+        remote_property.__class__.objects.filter(pk=remote_property.pk).update(
+            original_type=original_type,
+            type=target_type,
+            allows_unmapped_values=allows_unmapped,
+        )
+        remote_property.original_type = original_type
+        remote_property.type = target_type
+        remote_property.allows_unmapped_values = allows_unmapped
+
     def _create_select_value_mappings(self, *, target_type, select_values, amazon_property, ebay_property, shein_property):
         if target_type not in (Property.TYPES.SELECT, Property.TYPES.MULTISELECT):
             return
@@ -549,12 +571,15 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
         self.assertIsInstance(payload, dict, self._format_payload_debug(payload, expected))
         self.assertIn("attribute_id", payload, self._format_payload_debug(payload, expected))
 
-    def _assert_magento_payload(self, *, product_property):
+    def _assert_magento_payload(self, *, product_property, remote_property=None):
         runner = _MagentoValueRunner(
             sales_channel=self.magento_channel,
             local_instance=product_property,
         )
-        value = runner.get_remote_value(product_property=product_property)
+        value = runner.get_remote_value(
+            product_property=product_property,
+            remote_property=remote_property,
+        )
         expected = {"not_none": True}
         self._print_assert_payload(
             integration="MAGENTO",
@@ -563,9 +588,12 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
         )
         self.assertIsNotNone(value, self._format_payload_debug(value, expected))
 
-    def _assert_woo_payload(self, *, product_property):
+    def _assert_woo_payload(self, *, product_property, remote_property=None):
         runner = _WooValueRunner(local_instance=product_property)
-        value = runner.get_remote_value(product_property=product_property)
+        value = runner.get_remote_value(
+            product_property=product_property,
+            remote_property=remote_property,
+        )
         expected = {"not_none": True}
         self._print_assert_payload(
             integration="WOO",
@@ -574,10 +602,13 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
         )
         self.assertIsNotNone(value, self._format_payload_debug(value, expected))
 
-    def _assert_shopify_payload(self, *, product_property):
+    def _assert_shopify_payload(self, *, product_property, remote_property=None):
         _ = self.shopify_channel
         runner = _ShopifyValueRunner(local_instance=product_property)
-        value = runner.get_remote_value(product_property=product_property)
+        value = runner.get_remote_value(
+            product_property=product_property,
+            remote_property=remote_property,
+        )
         expected = {"not_none": True}
         self._print_assert_payload(
             integration="SHOPIFY",
@@ -586,9 +617,38 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
         )
         self.assertIsNotNone(value, self._format_payload_debug(value, expected))
 
-    def _run_case(self, *, target_type, value_override=None, expect_remote_preflight=False):
+    def _assert_payload_acceptance(self, *, accepted, assertion_callable):
+        if accepted:
+            assertion_callable()
+            return
+        with self.assertRaises(PreFlightCheckError):
+            assertion_callable()
+
+    def _run_case(
+        self,
+        *,
+        target_type,
+        value_override=None,
+        amazon_accepted=None,
+        ebay_accepted=None,
+        shein_accepted=None,
+        magento_accepted=None,
+        woo_accepted=None,
+        shopify_accepted=None,
+    ):
         original_key = self.ORIGINAL_KEY
-        expected_allowed = bool(REMOTE_PROPERTY_TYPE_CHANGE_RULES[original_key][target_type])
+        if amazon_accepted is None:
+            amazon_accepted = True
+        if ebay_accepted is None:
+            ebay_accepted = True
+        if shein_accepted is None:
+            shein_accepted = True
+        if magento_accepted is None:
+            magento_accepted = True
+        if woo_accepted is None:
+            woo_accepted = True
+        if shopify_accepted is None:
+            shopify_accepted = True
 
         product_property, select_values = self._build_local_product_property(
             target_type=target_type,
@@ -618,73 +678,94 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             allows_unmapped=allows_unmapped,
         )
 
-        if expected_allowed:
-            amazon_property.save()
-            ebay_property.save()
-            shein_property.save()
+        self._persist_remote_property_for_payload_asserts(
+            remote_property=amazon_property,
+            original_type=original_type,
+            target_type=target_type,
+            allows_unmapped=allows_unmapped,
+        )
+        self._persist_remote_property_for_payload_asserts(
+            remote_property=ebay_property,
+            original_type=original_type,
+            target_type=target_type,
+            allows_unmapped=allows_unmapped,
+        )
+        self._persist_remote_property_for_payload_asserts(
+            remote_property=shein_property,
+            original_type=original_type,
+            target_type=target_type,
+            allows_unmapped=allows_unmapped,
+        )
 
-            self._create_select_value_mappings(
-                target_type=target_type,
-                select_values=select_values,
+        self._create_select_value_mappings(
+            target_type=target_type,
+            select_values=select_values,
+            amazon_property=amazon_property,
+            ebay_property=ebay_property,
+            shein_property=shein_property,
+        )
+
+        self._assert_payload_acceptance(
+            accepted=amazon_accepted,
+            assertion_callable=lambda: self._assert_amazon_payload(
+                product_property=product_property,
                 amazon_property=amazon_property,
+            ),
+        )
+        self._assert_payload_acceptance(
+            accepted=ebay_accepted,
+            assertion_callable=lambda: self._assert_ebay_payload(
+                product_property=product_property,
                 ebay_property=ebay_property,
+            ),
+        )
+        self._assert_payload_acceptance(
+            accepted=shein_accepted,
+            assertion_callable=lambda: self._assert_shein_payload(
+                product_property=product_property,
                 shein_property=shein_property,
+            ),
+        )
+
+        if self.INCLUDE_MANAGED_INTEGRATIONS:
+            magento_property = self._build_magento_property(
+                local_property=local_property,
+                original_type=original_type,
+                target_type=target_type,
+            )
+            woo_property = self._build_woo_property(
+                local_property=local_property,
+                original_type=original_type,
+                target_type=target_type,
+            )
+            shopify_remote_property = SimpleNamespace(
+                original_type=original_type,
+                type=target_type,
+                allows_unmapped_values=True,
+                name=getattr(local_property, "name", None),
             )
 
-            if expect_remote_preflight:
-                with self.assertRaises(PreFlightCheckError):
-                    self._assert_amazon_payload(
-                        product_property=product_property,
-                        amazon_property=amazon_property,
-                    )
-                with self.assertRaises(PreFlightCheckError):
-                    self._assert_ebay_payload(
-                        product_property=product_property,
-                        ebay_property=ebay_property,
-                    )
-                with self.assertRaises(PreFlightCheckError):
-                    self._assert_shein_payload(
-                        product_property=product_property,
-                        shein_property=shein_property,
-                    )
-            else:
-                self._assert_amazon_payload(
+            self._assert_payload_acceptance(
+                accepted=magento_accepted,
+                assertion_callable=lambda: self._assert_magento_payload(
                     product_property=product_property,
-                    amazon_property=amazon_property,
-                )
-                self._assert_ebay_payload(
+                    remote_property=magento_property if not magento_accepted else None,
+                ),
+            )
+            self._assert_payload_acceptance(
+                accepted=woo_accepted,
+                assertion_callable=lambda: self._assert_woo_payload(
                     product_property=product_property,
-                    ebay_property=ebay_property,
-                )
-                self._assert_shein_payload(
+                    remote_property=woo_property if not woo_accepted else None,
+                ),
+            )
+            self._assert_payload_acceptance(
+                accepted=shopify_accepted,
+                assertion_callable=lambda: self._assert_shopify_payload(
                     product_property=product_property,
-                    shein_property=shein_property,
-                )
-
-            if self.INCLUDE_MANAGED_INTEGRATIONS:
-                magento_property = self._build_magento_property(
-                    local_property=local_property,
-                    original_type=original_type,
-                    target_type=target_type,
-                )
-                woo_property = self._build_woo_property(
-                    local_property=local_property,
-                    original_type=original_type,
-                    target_type=target_type,
-                )
-                magento_property.save()
-                woo_property.save()
-
-                self._assert_magento_payload(product_property=product_property)
-                self._assert_woo_payload(product_property=product_property)
-                self._assert_shopify_payload(product_property=product_property)
-        else:
-            with self.assertRaises(ValidationError):
-                amazon_property.save()
-            with self.assertRaises(ValidationError):
-                ebay_property.save()
-            with self.assertRaises(ValidationError):
-                shein_property.save()
+                    remote_property=shopify_remote_property if not shopify_accepted else None,
+                ),
+            )
 
 
 class RemotePropertyTypeIntMatrixTestCase(BaseRemotePropertyTypeCase):
@@ -695,29 +776,66 @@ class RemotePropertyTypeIntMatrixTestCase(BaseRemotePropertyTypeCase):
         self._run_case(
             target_type=Property.TYPES.FLOAT,
             value_override=12.5,
-            expect_remote_preflight=True,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
         )
 
     def test_int_to_text(self):
-        self._run_case(target_type=Property.TYPES.TEXT)
+        self._run_case(target_type=Property.TYPES.TEXT, value_override="12")
+        self._run_case(
+            target_type=Property.TYPES.TEXT,
+            value_override="12.5",
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_int_to_description(self):
-        self._run_case(target_type=Property.TYPES.DESCRIPTION)
+        self._run_case(target_type=Property.TYPES.DESCRIPTION, value_override="12")
+        self._run_case(
+            target_type=Property.TYPES.DESCRIPTION,
+            value_override="12.5",
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_int_to_boolean(self):
-        self._run_case(target_type=Property.TYPES.BOOLEAN)
+        self._run_case(
+            target_type=Property.TYPES.BOOLEAN,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_int_to_date(self):
-        self._run_case(target_type=Property.TYPES.DATE)
+        self._run_case(
+            target_type=Property.TYPES.DATE,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_int_to_datetime(self):
-        self._run_case(target_type=Property.TYPES.DATETIME)
+        self._run_case(
+            target_type=Property.TYPES.DATETIME,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
     def test_int_to_select(self):
+        # @TODO: Handle original numeric type (INT/FLOAT) remapped to SELECT with explicit option mapping/preflight rules.
         self._run_case(target_type=Property.TYPES.SELECT)
 
     def test_int_to_multiselect(self):
-        self._run_case(target_type=Property.TYPES.MULTISELECT)
+        self._run_case(
+            target_type=Property.TYPES.MULTISELECT,
+            amazon_accepted=False,
+            ebay_accepted=False,
+            shein_accepted=False,
+        )
 
 class RemotePropertyTypeFloatMatrixTestCase(BaseRemotePropertyTypeCase):
     ORIGINAL_KEY = Property.TYPES.FLOAT

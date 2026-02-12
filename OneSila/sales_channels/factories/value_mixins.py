@@ -4,7 +4,8 @@ from decimal import Decimal, InvalidOperation
 from datetime import date, datetime
 from typing import Any, Optional
 
-from properties.models import ProductPropertyTextTranslation, Property
+from properties.models import Property
+from sales_channels.constants import REMOTE_PROPERTY_TYPE_CHANGE_RULES
 from sales_channels.exceptions import PreFlightCheckError
 
 
@@ -21,6 +22,11 @@ class RemoteValueMixin:
         local_property = self.get_local_property(product_property=product_property)
         if local_property is None:
             return None
+
+        self.validate_remote_mapping_compatibility(
+            product_property=product_property,
+            remote_property=remote_property,
+        )
 
         property_type = self.get_property_type(local_property=local_property, remote_property=remote_property)
         value = self.get_property_value(
@@ -166,39 +172,110 @@ class RemoteValueMixin:
                 return str(internal_name)
         return "Unknown property"
 
+    def _raise_value_expectation_preflight_error(
+        self,
+        *,
+        product_property=None,
+        remote_property=None,
+        expected_description: str,
+        provided_description: str,
+        provided_value,
+    ):
+        label = self._remote_property_label(
+            product_property=product_property,
+            remote_property=remote_property,
+        )
+        raise PreFlightCheckError(
+            f"Property '{label}' expects {expected_description} in the integration, "
+            f"but OneSila provided {provided_description} '{provided_value}'."
+        )
+
+    def _resolve_remote_mapping_rule_key(self, *, remote_property):
+        original_type = getattr(remote_property, "original_type", None)
+        if original_type == Property.TYPES.SELECT:
+            allows_unmapped_values = bool(getattr(remote_property, "allows_unmapped_values", False))
+            return "SELECT__allows_custom_values" if allows_unmapped_values else "SELECT__not_allows_custom_values"
+        if original_type == Property.TYPES.MULTISELECT:
+            allows_unmapped_values = bool(getattr(remote_property, "allows_unmapped_values", False))
+            return "MULTISELECT__allows_custom_values" if allows_unmapped_values else "MULTISELECT__not_allows_custom_values"
+        return original_type
+
+    def validate_remote_mapping_compatibility(self, *, product_property=None, remote_property=None):
+        if remote_property is None:
+            return
+
+        original_type = getattr(remote_property, "original_type", None)
+        target_type = getattr(remote_property, "type", None)
+        if original_type in (None, "") or target_type in (None, ""):
+            return
+
+        rule_key = self._resolve_remote_mapping_rule_key(remote_property=remote_property)
+        allowed_targets = REMOTE_PROPERTY_TYPE_CHANGE_RULES.get(rule_key, {})
+        if bool(allowed_targets.get(target_type)):
+            return
+
+        label = self._remote_property_label(
+            product_property=product_property,
+            remote_property=remote_property,
+        )
+        raise PreFlightCheckError(
+            f"Property '{label}' is mapped to a non-compatible type ({original_type} -> {target_type})."
+        )
+
+    def _resolve_original_and_target_types(self, *, product_property=None, remote_property=None):
+        local_property = self.get_local_property(product_property=product_property)
+        local_type = getattr(local_property, "type", None)
+
+        if remote_property is None:
+            return local_type, local_type
+
+        original_type = getattr(remote_property, "original_type", None) or local_type
+        target_type = getattr(remote_property, "type", None) or local_type
+        return original_type, target_type
+
     def get_float_value(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
-        _ = product_property
         _ = language_code
-        if remote_property and (
-            getattr(remote_property, "original_type", None) == Property.TYPES.INT
-            and getattr(remote_property, "type", None) == Property.TYPES.FLOAT
-        ):
-            if value is None:
-                return None
-            try:
-                decimal_value = Decimal(str(value))
-            except (InvalidOperation, TypeError, ValueError):
+        if value is None:
+            return None
+
+        original_type, target_type = self._resolve_original_and_target_types(
+            product_property=product_property,
+            remote_property=remote_property,
+        )
+
+        match (original_type, target_type):
+            case (Property.TYPES.FLOAT, Property.TYPES.FLOAT):
+                return value
+
+            case (Property.TYPES.INT, Property.TYPES.FLOAT):
+                print('--------------------------------------------------------------------------- AICI')
+                try:
+                    decimal_value = Decimal(str(value))
+                except (InvalidOperation, TypeError, ValueError):
+                    decimal_value = None
+
+                if decimal_value is not None and decimal_value == decimal_value.to_integral_value():
+                    print('--------------------------------------------------------------------------- AICI GOOD')
+                    return int(decimal_value)
+
+                print('--------------------------------------------------------------------------- AICI BAD')
+
+                self._raise_value_expectation_preflight_error(
+                    product_property=product_property,
+                    remote_property=remote_property,
+                    expected_description="a whole number",
+                    provided_description="a decimal value",
+                    provided_value=value,
+                )
+
+            case _:
                 label = self._remote_property_label(
                     product_property=product_property,
                     remote_property=remote_property,
                 )
                 raise PreFlightCheckError(
-                    f"Property '{label}' expects a whole number in the integration, but received non-numeric value '{value}'."
+                    f"Property '{label}' is mapped to a non-compatible type ({original_type} -> {target_type}) for float conversion."
                 )
-
-            if decimal_value == decimal_value.to_integral_value():
-                return int(decimal_value)
-
-            label = self._remote_property_label(
-                product_property=product_property,
-                remote_property=remote_property,
-            )
-            raise PreFlightCheckError(
-                f"Property '{label}' expects a whole number in the integration (original INT), "
-                f"but OneSila provided a decimal value '{value}'."
-            )
-
-        return value
 
     def get_boolean_value(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
         _ = product_property
@@ -264,38 +341,101 @@ class RemoteValueMixin:
         )
 
     def get_text_value(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
-        _ = remote_property
-        return self.get_translated_values(
+        if value is None:
+            return None
+
+        translated_value = self.get_translated_values(
             product_property=product_property,
             language_code=language_code,
             fallback_value=value,
         )
+        if translated_value in (None, ""):
+            return translated_value
+
+        original_type, target_type = self._resolve_original_and_target_types(
+            product_property=product_property,
+            remote_property=remote_property,
+        )
+        match (original_type, target_type):
+            case (Property.TYPES.TEXT, Property.TYPES.TEXT):
+                return translated_value
+
+            case (Property.TYPES.INT, Property.TYPES.TEXT):
+                try:
+                    decimal_value = Decimal(str(translated_value).strip())
+                except (InvalidOperation, TypeError, ValueError):
+                    decimal_value = None
+
+                if decimal_value is not None and decimal_value == decimal_value.to_integral_value():
+                    return int(decimal_value)
+
+                self._raise_value_expectation_preflight_error(
+                    product_property=product_property,
+                    remote_property=remote_property,
+                    expected_description="a whole number",
+                    provided_description="a decimal text value",
+                    provided_value=translated_value,
+                )
+
+            case _:
+                label = self._remote_property_label(
+                    product_property=product_property,
+                    remote_property=remote_property,
+                )
+                raise PreFlightCheckError(
+                    f"Property '{label}' is mapped to a non-compatible type ({original_type} -> {target_type}) for text conversion."
+                )
 
     def get_description_value(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
-        _ = remote_property
-        return self.get_translated_values(
+        if value is None:
+            return None
+
+        translated_value = self.get_translated_values(
             product_property=product_property,
             language_code=language_code,
             fallback_value=value,
         )
+        if translated_value in (None, ""):
+            return translated_value
+
+        original_type, target_type = self._resolve_original_and_target_types(
+            product_property=product_property,
+            remote_property=remote_property,
+        )
+        match (original_type, target_type):
+            case (Property.TYPES.DESCRIPTION, Property.TYPES.DESCRIPTION):
+                return translated_value
+
+            case (Property.TYPES.INT, Property.TYPES.DESCRIPTION):
+                try:
+                    decimal_value = Decimal(str(translated_value).strip())
+                except (InvalidOperation, TypeError, ValueError):
+                    decimal_value = None
+
+                if decimal_value is not None and decimal_value == decimal_value.to_integral_value():
+                    return int(decimal_value)
+
+                self._raise_value_expectation_preflight_error(
+                    product_property=product_property,
+                    remote_property=remote_property,
+                    expected_description="a whole number",
+                    provided_description="a decimal description value",
+                    provided_value=translated_value,
+                )
+
+            case _:
+                label = self._remote_property_label(
+                    product_property=product_property,
+                    remote_property=remote_property,
+                )
+                raise PreFlightCheckError(
+                    f"Property '{label}' is mapped to a non-compatible type ({original_type} -> {target_type}) for description conversion."
+                )
 
     def get_translated_values(self, *, product_property=None, language_code: Optional[str] = None, fallback_value=None):
+        _ = product_property
         _ = language_code
-        prop_instance = product_property or getattr(self, "local_instance", None)
-        local_property = self.get_local_property(product_property=product_property)
-        if prop_instance is None or local_property is None:
-            return fallback_value
-
-        if local_property.type not in [Property.TYPES.TEXT, Property.TYPES.DESCRIPTION]:
-            return fallback_value
-
-        default_translation = ProductPropertyTextTranslation.objects.filter(product_property=prop_instance).first()
-        if not default_translation:
-            return fallback_value
-
-        if local_property.type == Property.TYPES.TEXT:
-            return default_translation.value_text
-        return default_translation.value_description
+        return fallback_value
 
     def format_date(self, *, value, product_property=None, remote_property=None, language_code: Optional[str] = None):
         _ = product_property

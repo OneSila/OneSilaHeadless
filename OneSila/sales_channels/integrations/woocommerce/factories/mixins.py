@@ -105,9 +105,9 @@ class WoocommerceRemoteValueConversionMixin(RemoteValueMixin):
 
     def get_boolean_value(self, *, value, product_property=None, remote_property=None, language_code=None) -> str:
         """Converts boolean values to translated strings for WooCommerce."""
-        _ = product_property
-        _ = remote_property
-        _ = language_code
+        __ = product_property
+        __ = remote_property
+        __ = language_code
         return _("Yes") if value else _("No")
 
     def get_select_value(self, *, product_property=None, remote_property=None, language_code=None):
@@ -129,35 +129,6 @@ class WoocommerceRemoteValueConversionMixin(RemoteValueMixin):
         if value is None:
             return []
         return list({v.value for v in value.all()})
-
-    def get_text_value(self, *, value, product_property=None, remote_property=None, language_code=None):
-        """Handles text values."""
-        _ = product_property
-        _ = remote_property
-        _ = language_code
-        return value
-
-    def get_description_value(self, *, value, product_property=None, remote_property=None, language_code=None):
-        """Handles description values."""
-        _ = product_property
-        _ = remote_property
-        _ = language_code
-        return value
-
-    def format_date(self, *, value, product_property=None, remote_property=None, language_code=None):
-        """Handles date values."""
-        _ = product_property
-        _ = remote_property
-        _ = language_code
-        return value
-
-    def format_datetime(self, *, value, product_property=None, remote_property=None, language_code=None):
-        """Handles datetime values."""
-        _ = product_property
-        _ = remote_property
-        _ = language_code
-        return value
-
 
 class WooCommerceProductAttributeMixin(WoocommerceSalesChannelLanguageMixin, WoocommerceProductTypeMixin, SerialiserMixin, WoocommerceRemoteValueConversionMixin):
     """

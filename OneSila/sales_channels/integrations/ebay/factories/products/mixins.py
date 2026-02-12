@@ -1117,18 +1117,6 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
 
         return values or None
 
-    def get_text_value(self, *, value, product_property=None, remote_property=None, language_code: str | None = None):
-        _ = product_property
-        _ = remote_property
-        _ = language_code
-        return value
-
-    def get_description_value(self, *, value, product_property=None, remote_property=None, language_code: str | None = None):
-        _ = product_property
-        _ = remote_property
-        _ = language_code
-        return value
-
     def _render_property_value(
         self,
         *,

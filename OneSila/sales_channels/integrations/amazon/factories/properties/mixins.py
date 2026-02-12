@@ -75,24 +75,17 @@ class AmazonRemoteValueMixin(RemoteValueMixin):
             multiple=True,
         )
 
-    def get_text_value(self, *, value, product_property=None, remote_property=None, language_code=None):
-        _ = product_property
-        _ = remote_property
-        _ = language_code
-        # @TODO: MAKE SURE THE TEXT / DESCRIPTION ARE IN THE RIGHT LANGUAGE OF THE MARKETPLACE
-        return value
-
-    def get_description_value(self, *, value, product_property=None, remote_property=None, language_code=None):
-        _ = product_property
-        _ = remote_property
-        _ = language_code
-        # @TODO: MAKE SURE THE TEXT / DESCRIPTION ARE IN THE RIGHT LANGUAGE OF THE MARKETPLACE
-        return value
-
-    def get_remote_value_for_property(self, prop_instance: ProductProperty, remote_property: AmazonProperty):
+    def get_remote_value_for_property(
+        self,
+        *,
+        prop_instance: ProductProperty,
+        remote_property: AmazonProperty,
+        language_code: str | None = None,
+    ):
         return self.get_remote_value(
             product_property=prop_instance,
             remote_property=remote_property,
+            language_code=language_code,
         )
 
 
@@ -158,7 +151,11 @@ class AmazonProductPropertyBaseMixin(GetAmazonAPIMixin, AmazonRemoteValueMixin):
                 except ProductProperty.DoesNotExist:
                     return None
 
-                return self.get_remote_value_for_property(prop_instance, self.remote_property)
+                return self.get_remote_value_for_property(
+                    prop_instance=prop_instance,
+                    remote_property=self.remote_property,
+                    language_code=self.view.language_tag_local,
+                )
             return value
 
         def _walk(node):
