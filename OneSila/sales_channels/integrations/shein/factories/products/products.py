@@ -589,6 +589,74 @@ class SheinProductBaseFactory(
         labels = {label_by_id.get(str(value), str(value)) for value in approved_value_ids}
         return sorted(labels)
 
+    def _get_allowed_values_display(
+        self,
+        *,
+        type_item: SheinProductTypeItem,
+        approved_value_ids: set[str],
+    ) -> str:
+        cache = getattr(self, "_approved_values_display_cache", {})
+        key = (type_item.id, tuple(sorted(approved_value_ids)))
+        if key not in cache:
+            approved_value_labels = self._get_approved_value_labels(
+                type_item=type_item,
+                approved_value_ids=approved_value_ids,
+            )
+            cache[key] = ", ".join(approved_value_labels or sorted(approved_value_ids))
+            self._approved_values_display_cache = cache
+        return cache[key]
+
+    def _validate_approved_values_for_category(
+        self,
+        *,
+        type_item: SheinProductTypeItem,
+        product_property: ProductProperty,
+        attribute_value_id: Any,
+    ) -> None:
+        approved_value_ids = {
+            str(value)
+            for value in (type_item.approved_value_ids or [])
+            if value not in (None, "")
+        }
+        if (
+            not approved_value_ids
+            or attribute_value_id in (None, "", [])
+            or self.skip_property_values_category_validation
+        ):
+            return
+
+        details = describe_local_instance(local_instance=product_property)
+        allowed_values = self._get_allowed_values_display(
+            type_item=type_item,
+            approved_value_ids=approved_value_ids,
+        )
+        if isinstance(attribute_value_id, (list, tuple, set)):
+            invalid_values = [
+                str(value)
+                for value in attribute_value_id
+                if str(value) not in approved_value_ids
+            ]
+            if invalid_values:
+                raise PreFlightCheckError(
+                    "Shein value(s) {} for {} are not approved for category {} (allowed: {}).".format(
+                        ", ".join(invalid_values),
+                        details,
+                        type_item.product_type.category_id,
+                        allowed_values,
+                    )
+                )
+            return
+
+        if str(attribute_value_id) not in approved_value_ids:
+            raise PreFlightCheckError(
+                "Shein value {} for {} is not approved for category {} (allowed: {}).".format(
+                    attribute_value_id,
+                    details,
+                    type_item.product_type.category_id,
+                    allowed_values,
+                )
+            )
+
     def _build_property_payloads(self):
         for product_property in self._collect_product_properties():
             type_item = self._resolve_type_item_for_property(product_property=product_property)
@@ -612,44 +680,11 @@ class SheinProductBaseFactory(
             except (TypeError, ValueError):
                 continue
 
-            approved_value_ids = {str(value) for value in (type_item.approved_value_ids or []) if value not in (None, "")}
-            attribute_value_id = payload.get("attribute_value_id")
-            if (
-                approved_value_ids
-                and attribute_value_id not in (None, "", [])
-                and not self.skip_property_values_category_validation
-            ):
-                approved_value_labels = self._get_approved_value_labels(
-                    type_item=type_item,
-                    approved_value_ids=approved_value_ids,
-                )
-                allowed_values = ", ".join(approved_value_labels or sorted(approved_value_ids))
-                if isinstance(attribute_value_id, (list, tuple, set)):
-                    invalid_values = [
-                        str(value)
-                        for value in attribute_value_id
-                        if str(value) not in approved_value_ids
-                    ]
-                    if invalid_values:
-                        details = describe_local_instance(local_instance=product_property)
-                        raise PreFlightCheckError(
-                            "Shein value(s) {} for {} are not approved for category {} (allowed: {}).".format(
-                                ", ".join(invalid_values),
-                                details,
-                                type_item.product_type.category_id,
-                                allowed_values,
-                            )
-                        )
-                elif str(attribute_value_id) not in approved_value_ids:
-                    details = describe_local_instance(local_instance=product_property)
-                    raise PreFlightCheckError(
-                        "Shein value {} for {} is not approved for category {} (allowed: {}).".format(
-                            attribute_value_id,
-                            details,
-                            type_item.product_type.category_id,
-                            allowed_values,
-                        )
-                    )
+            self._validate_approved_values_for_category(
+                type_item=type_item,
+                product_property=product_property,
+                attribute_value_id=payload.get("attribute_value_id"),
+            )
 
             attribute_type = payload.get("attribute_type")
             payload.pop("attribute_type", None)
@@ -1110,6 +1145,12 @@ class SheinProductBaseFactory(
             raise PreFlightCheckError(
                 f"Invalid Shein sale attribute payload for configurator property{details}."
             )
+
+        self._validate_approved_values_for_category(
+            type_item=type_item,
+            product_property=product_property,
+            attribute_value_id=raw_payload.get("attribute_value_id"),
+        )
         return self._clean_sale_attribute_payload(payload=raw_payload)
 
     def _find_sample_property_for_id(

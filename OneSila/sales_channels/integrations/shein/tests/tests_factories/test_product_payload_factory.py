@@ -775,6 +775,122 @@ class SheinProductPayloadFactoryTests(TestCase):
             [red_small.sku, blue_large.sku],
         )
 
+    def test_shein_configurable_payload_rejects_unapproved_secondary_sale_attribute_values(self) -> None:
+        parent = baker.make(
+            Product,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Product.CONFIGURABLE,
+            active=True,
+            sku="PARENT-2-INVALID-SIZE",
+        )
+        rule, shein_product_type = self._create_product_type_rule(parent)
+
+        color_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        size_property = baker.make(
+            Property,
+            multi_tenant_company=self.multi_tenant_company,
+            type=Property.TYPES.SELECT,
+        )
+        red = baker.make(PropertySelectValue, multi_tenant_company=self.multi_tenant_company, property=color_property)
+        blue = baker.make(PropertySelectValue, multi_tenant_company=self.multi_tenant_company, property=color_property)
+        small = baker.make(PropertySelectValue, multi_tenant_company=self.multi_tenant_company, property=size_property)
+        large = baker.make(PropertySelectValue, multi_tenant_company=self.multi_tenant_company, property=size_property)
+
+        ProductPropertiesRuleItem.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=rule,
+            property=color_property,
+            type=ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
+            sort_order=0,
+        )
+        ProductPropertiesRuleItem.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            rule=rule,
+            property=size_property,
+            type=ProductPropertiesRuleItem.REQUIRED_IN_CONFIGURATOR,
+            sort_order=1,
+        )
+
+        shein_color, color_type_item = self._link_shein_property(
+            property_obj=color_property,
+            shein_product_type=shein_product_type,
+            remote_id="COLOR",
+            is_main=True,
+        )
+        shein_size, size_type_item = self._link_shein_property(
+            property_obj=size_property,
+            shein_product_type=shein_product_type,
+            remote_id="SIZE",
+            is_main=False,
+        )
+        self._link_shein_value(shein_property=shein_color, local_value=red, remote_value="R-1")
+        self._link_shein_value(shein_property=shein_color, local_value=blue, remote_value="B-1")
+        self._link_shein_value(shein_property=shein_size, local_value=small, remote_value="S-1")
+        self._link_shein_value(shein_property=shein_size, local_value=large, remote_value="L-1")
+
+        color_type_item.approved_value_ids = ["R-1", "B-1"]
+        color_type_item.save(update_fields=["approved_value_ids"])
+        size_type_item.approved_value_ids = ["S-1"]
+        size_type_item.save(update_fields=["approved_value_ids"])
+
+        red_small = self._create_variation(
+            parent=parent,
+            sku="RED-S-INVALID",
+            color_property=color_property,
+            color_value=red,
+            size_property=size_property,
+            size_value=small,
+        )
+        blue_large = self._create_variation(
+            parent=parent,
+            sku="BLUE-L-INVALID",
+            color_property=color_property,
+            color_value=blue,
+            size_property=size_property,
+            size_value=large,
+        )
+        self._assign_supplier_code(product=red_small, value="SUP-RED-INVALID")
+        self._assign_supplier_code(product=blue_large, value="SUP-BLUE-INVALID")
+
+        remote_product = SheinProduct.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            local_instance=parent,
+            remote_sku=parent.sku,
+        )
+        SalesChannelViewAssign.objects.create(
+            multi_tenant_company=self.multi_tenant_company,
+            sales_channel=self.sales_channel,
+            product=parent,
+            sales_channel_view=self.view,
+            remote_product=remote_product,
+        )
+
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=parent,
+            remote_instance=remote_product,
+            get_value_only=True,
+            skip_checks=True,
+        )
+        factory.remote_rule = type("Rule", (), {"category_id": shein_product_type.category_id, "remote_id": shein_product_type.remote_id})()
+
+        with (
+            patch.object(SheinProductCreateFactory, "_build_property_payloads"),
+            patch.object(SheinProductCreateFactory, "_build_prices"),
+            patch.object(SheinProductCreateFactory, "_build_media"),
+            patch.object(SheinProductCreateFactory, "_build_translations"),
+        ):
+            with self.assertRaises(PreFlightCheckError) as raised:
+                factory.build_payload()
+
+        self.assertIn("not approved for category", str(raised.exception))
+        self.assertIn("L-1", str(raised.exception))
+
     def test_shein_raises_when_more_than_three_configurator_attributes(self) -> None:
         parent = baker.make(
             Product,

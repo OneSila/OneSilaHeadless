@@ -3,6 +3,7 @@ from imagekit.processors import ResizeToFill, ResizeToFit
 from imagekit.utils import get_field_info
 
 import os
+from typing import Optional, Tuple
 
 
 class OneSilaThumbnail(ImageSpec):
@@ -82,25 +83,99 @@ register.generator('mediapp:image:imagewebspec', ImageWebSpec)
 register.generator('mediapp:image:onesilathumbnail', OneSilaThumbnail)
 
 
-class SheinMainImageSpec(ImageSpec):
-    processors = [ResizeToFill(1340, 1785)]
+class _DynamicSheinImageSpec(ImageSpec):
     format = 'JPEG'
     options = {'quality': 85}
     maximum_size = 3_000_000
 
+    def __init__(self, source):
+        self.source = source
+        self.processors = [self._build_processor()]
+        super().__init__(source)
 
-class SheinDetailImageSpec(ImageSpec):
-    processors = [ResizeToFill(1340, 1785)]
-    format = 'JPEG'
-    options = {'quality': 85}
-    maximum_size = 3_000_000
+    def _build_processor(self):
+        raise NotImplementedError("Subclasses must implement _build_processor().")
+
+    @staticmethod
+    def _clamp(value, minimum, maximum):
+        return max(minimum, min(int(round(value)), maximum))
+
+    def _source_dimensions(self) -> Tuple[Optional[int], Optional[int]]:
+        width = getattr(self.source, 'width', None)
+        height = getattr(self.source, 'height', None)
+        if width and height:
+            return int(width), int(height)
+
+        name = getattr(self.source, 'name', None)
+        storage = getattr(self.source, 'storage', None)
+        if not name or storage is None:
+            return None, None
+
+        try:
+            from PIL import Image as PILImage
+
+            with storage.open(name, 'rb') as fh:
+                with PILImage.open(fh) as image:
+                    return int(image.width), int(image.height)
+        except Exception:
+            return None, None
+
+    def _square_fit_processor(self, *, width, height, min_side=900, max_side=2200):
+        side = max(width, height)
+        side = self._clamp(side, min_side, max_side)
+        return ResizeToFit(side, side, upscale=True, mat_color='white')
 
 
-class SheinSquareImageSpec(ImageSpec):
-    processors = [ResizeToFill(900, 900)]
-    format = 'JPEG'
-    options = {'quality': 85}
-    maximum_size = 3_000_000
+class _DynamicSheinMainDetailSpec(_DynamicSheinImageSpec):
+    _PORTRAIT_WIDTH = 1340
+    _PORTRAIT_HEIGHT = 1785
+    _PORTRAIT_RATIO = _PORTRAIT_WIDTH / _PORTRAIT_HEIGHT
+
+    def _build_processor(self):
+        width, height = self._source_dimensions()
+        if not width or not height:
+            return ResizeToFit(
+                self._PORTRAIT_WIDTH,
+                self._PORTRAIT_HEIGHT,
+                upscale=True,
+                mat_color='white',
+            )
+
+        source_ratio = width / height
+        distance_square = abs(source_ratio - 1.0)
+        distance_portrait = abs(source_ratio - self._PORTRAIT_RATIO)
+
+        if distance_square <= distance_portrait:
+            return self._square_fit_processor(width=width, height=height)
+
+        return ResizeToFit(
+            self._PORTRAIT_WIDTH,
+            self._PORTRAIT_HEIGHT,
+            upscale=True,
+            mat_color='white',
+        )
+
+
+class SheinMainImageSpec(_DynamicSheinMainDetailSpec):
+    pass
+
+
+class SheinDetailImageSpec(_DynamicSheinMainDetailSpec):
+    pass
+
+
+class SheinSquareImageSpec(_DynamicSheinImageSpec):
+    def _build_processor(self):
+        width, height = self._source_dimensions()
+        if not width or not height:
+            return ResizeToFit(900, 900, upscale=True, mat_color='white')
+
+        is_square = width == height
+        if is_square and 900 <= width <= 2200:
+            # Keep already-compliant square dimensions as-is.
+            return ResizeToFit(width, height, upscale=False)
+
+        return self._square_fit_processor(width=width, height=height)
 
 
 class SheinColorBlockImageSpec(ImageSpec):
@@ -110,11 +185,25 @@ class SheinColorBlockImageSpec(ImageSpec):
     maximum_size = 3_000_000
 
 
-class SheinDetailPageImageSpec(ImageSpec):
-    processors = [ResizeToFill(900, 1200)]
-    format = 'JPEG'
-    options = {'quality': 85}
-    maximum_size = 3_000_000
+class SheinDetailPageImageSpec(_DynamicSheinImageSpec):
+    _RATIO = 3 / 4
+    _MIN_WIDTH = 900
+    _MAX_WIDTH = 2200
+    _MIN_HEIGHT = 1200
+
+    def _build_processor(self):
+        width, height = self._source_dimensions()
+        if not width or not height:
+            return ResizeToFit(900, 1200, upscale=True, mat_color='white')
+
+        target_width = self._clamp(width, self._MIN_WIDTH, self._MAX_WIDTH)
+        target_height = int(round(target_width / self._RATIO))
+
+        if target_height < self._MIN_HEIGHT:
+            target_height = self._MIN_HEIGHT
+            target_width = int(round(target_height * self._RATIO))
+
+        return ResizeToFit(target_width, target_height, upscale=True, mat_color='white')
 
 
 register.generator('mediapp:image:sheinmain', SheinMainImageSpec)
