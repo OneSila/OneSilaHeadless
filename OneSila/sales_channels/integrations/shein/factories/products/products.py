@@ -2011,7 +2011,7 @@ class SheinProductUpdateFactory(SheinProductBaseFactory, RemoteProductUpdateFact
     def update_remote(self):
         return self.perform_remote_action()
 
-    def set_remote_id(self):
+    def set_remote_id(self, response_data):
         pass
 
 
