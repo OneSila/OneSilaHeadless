@@ -2024,6 +2024,26 @@ class SheinProductCreateFactory(SheinProductBaseFactory, RemoteProductCreateFact
     remote_price_class = SheinPrice
     remote_product_content_class = SheinProductContent
 
+    def run_sync_flow(self):
+        """Run update flow preserving create-time runtime flags."""
+        if self.sync_product_factory is None:
+            raise ValueError("sync_product_factory must be specified in the RemoteProductCreateFactory.")
+
+        sync_factory = self.sync_product_factory(
+            sales_channel=self.sales_channel,
+            local_instance=self.local_instance,
+            remote_instance=self.remote_instance,
+            parent_local_instance=self.parent_local_instance,
+            remote_parent_product=self.remote_parent_product,
+            api=self.api,
+            is_switched=True,
+            get_value_only=self.get_value_only,
+            skip_checks=self.skip_checks,
+            skip_price_update=self.skip_price_update,
+            skip_property_values_category_validation=self.skip_property_values_category_validation,
+        )
+        sync_factory.run()
+
     def create_remote(self):
         return self.perform_remote_action()
 
