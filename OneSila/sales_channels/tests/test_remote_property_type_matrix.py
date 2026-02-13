@@ -613,10 +613,6 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             },
         }
 
-    def _print_assert_payload(self, *, integration, payload, expected):
-        print(f"\\n[{integration}]")
-        print(self._format_payload_debug(payload, expected))
-
     def _assert_amazon_payload(self, *, product_property, amazon_property, expected_value=None):
         current_listing_map = dict(self.amazon_product_type.listing_offer_required_properties or {})
         allowed_properties = list(current_listing_map.get(self.amazon_view.api_region_code, []))
@@ -647,11 +643,6 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
         )
         _, payload = runner.build_payload()
         expected = {"type": "dict", "contains_key": "value"}
-        self._print_assert_payload(
-            integration="AMAZON",
-            payload=payload,
-            expected=expected,
-        )
         self.assertIsInstance(payload, dict, self._format_payload_debug(payload, expected))
         self.assertIn("value", payload, self._format_payload_debug(payload, expected))
         if expected_value is not None:
@@ -664,11 +655,6 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             remote_property=ebay_property,
         )
         expected = {"type": "str"}
-        self._print_assert_payload(
-            integration="EBAY",
-            payload=remote_value,
-            expected=expected,
-        )
         self.assertIsInstance(remote_value, str, self._format_payload_debug(remote_value, expected))
         if expected_value is not None:
             self.assertEqual(remote_value, expected_value, self._format_payload_debug(remote_value, expected))
@@ -698,11 +684,6 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             product_type_item=product_type_item,
         )
         expected = {"type": "dict", "contains_key": "attribute_id"}
-        self._print_assert_payload(
-            integration="SHEIN",
-            payload=payload,
-            expected=expected,
-        )
         self.assertIsInstance(payload, dict, self._format_payload_debug(payload, expected))
         self.assertIn("attribute_id", payload, self._format_payload_debug(payload, expected))
         if expected_value is not None:
@@ -720,11 +701,6 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             remote_property=remote_property,
         )
         expected = {"not_none": True}
-        self._print_assert_payload(
-            integration="MAGENTO",
-            payload=value,
-            expected=expected,
-        )
         self.assertIsNotNone(value, self._format_payload_debug(value, expected))
 
     def _assert_woo_payload(self, *, product_property, remote_property=None):
@@ -734,11 +710,6 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             remote_property=remote_property,
         )
         expected = {"not_none": True}
-        self._print_assert_payload(
-            integration="WOO",
-            payload=value,
-            expected=expected,
-        )
         self.assertIsNotNone(value, self._format_payload_debug(value, expected))
 
     def _assert_shopify_payload(self, *, product_property, remote_property=None):
@@ -749,11 +720,6 @@ class BaseRemotePropertyTypeCase(DisableMagentoAndWooConnectionsMixin, TestCase)
             remote_property=remote_property,
         )
         expected = {"not_none": True}
-        self._print_assert_payload(
-            integration="SHOPIFY",
-            payload=value,
-            expected=expected,
-        )
         self.assertIsNotNone(value, self._format_payload_debug(value, expected))
 
     def _assert_payload_acceptance(self, *, accepted, assertion_callable):

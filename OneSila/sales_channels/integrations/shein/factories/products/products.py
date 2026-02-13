@@ -1179,20 +1179,6 @@ class SheinProductBaseFactory(
         type_item = self._resolve_type_item_for_property(product_property=sample_property)
         return bool(type_item and getattr(type_item, "is_main_attribute", False))
 
-    def _resolve_primary_secondary_attributes(
-        self,
-        *,
-        configurator_items: list[ProductPropertiesRuleItem],
-        variation_properties: dict[int, dict[int, ProductProperty]],
-        varying_map: dict[int, set],
-    ) -> tuple[Optional[ProductPropertiesRuleItem], Optional[ProductPropertiesRuleItem]]:
-        primary, sku_items = self._resolve_primary_and_sku_attributes(
-            configurator_items=configurator_items,
-            variation_properties=variation_properties,
-            varying_map=varying_map,
-        )
-        return primary, (sku_items[0] if sku_items else None)
-
     def _resolve_primary_and_sku_attributes(
         self,
         *,
