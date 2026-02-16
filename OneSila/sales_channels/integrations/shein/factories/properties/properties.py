@@ -125,6 +125,56 @@ class SheinProductPropertyValueMixin(SheinSignatureMixin, RemoteValueMixin):
     def get_api(self):
         return getattr(self, "api", None)
 
+    def get_select_values(self):
+        self.remote_select_values = []
+        if self.local_property.type not in [Property.TYPES.SELECT, Property.TYPES.MULTISELECT]:
+            return
+
+        select_values = (
+            self.local_instance.value_multi_select.all()
+            if self.local_property.type == Property.TYPES.MULTISELECT
+            else [self.local_instance.value_select]
+        )
+
+        for value in select_values:
+            if value is None:
+                continue
+
+            lookup_payload = {
+                "local_instance": value,
+                "sales_channel": self.sales_channel,
+            }
+            product_type_item = getattr(self, "product_type_item", None)
+            mapped_remote_property = (
+                getattr(product_type_item, "property", None)
+                or getattr(self, "remote_property", None)
+            )
+            if mapped_remote_property is not None:
+                lookup_payload["remote_property"] = mapped_remote_property
+            elif getattr(self, "local_property", None) is not None:
+                lookup_payload["remote_property__local_instance"] = self.local_property
+
+            try:
+                remote_select_value = SheinPropertySelectValue.objects.get(**lookup_payload)
+            except SheinPropertySelectValue.MultipleObjectsReturned:
+                remote_select_value = (
+                    SheinPropertySelectValue.objects
+                    .filter(**lookup_payload)
+                    .order_by("-id")
+                    .first()
+                )
+            except SheinPropertySelectValue.DoesNotExist:
+                select_value_create_factory = self.remote_property_select_value_factory(
+                    local_instance=value,
+                    sales_channel=self.sales_channel,
+                    api=self.api,
+                )
+                select_value_create_factory.run()
+                remote_select_value = select_value_create_factory.remote_instance
+
+            if remote_select_value is not None:
+                self.remote_select_values.append(remote_select_value.remote_id)
+
     def _normalize_identifier(self, *, value: Any) -> Optional[int | str]:
         if value is None:
             return None
@@ -163,7 +213,8 @@ class SheinProductPropertyValueMixin(SheinSignatureMixin, RemoteValueMixin):
         language_code: Optional[str],
         remote_property: Optional[SheinProperty] = None,
     ) -> Any:
-        return self.get_remote_value(
+        return RemoteValueMixin.get_remote_value(
+            self,
             product_property=product_property,
             remote_property=remote_property,
             language_code=language_code,
@@ -510,6 +561,10 @@ class SheinProductPropertyUpdateFactory(
     ):
         self.product_type_item = product_type_item
         self.create_remote_custom_values = True
+        self.remote_property = getattr(product_type_item, "property", None)
+        self._remote_instance_additional_filters = {}
+        if remote_product is not None:
+            self._remote_instance_additional_filters["remote_product"] = remote_product
         super().__init__(
             sales_channel,
             local_instance,
@@ -520,6 +575,16 @@ class SheinProductPropertyUpdateFactory(
             skip_checks=skip_checks,
             language=language,
         )
+
+    def preflight_process(self):
+        if self.remote_property is None and self.product_type_item is not None:
+            self.remote_property = getattr(self.product_type_item, "property", None)
+
+        if self.remote_property is None:
+            super().preflight_process()
+            return
+
+        self.get_select_values()
 
     def create_remote_instance(self):  # type: ignore[override]
         if self.create_factory_class is None:

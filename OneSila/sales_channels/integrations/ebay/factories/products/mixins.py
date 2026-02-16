@@ -451,37 +451,38 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
                 if product_property is None:
                     continue
 
-                remote_property = remote_property_map.get(property_obj.id)
-                if remote_property is None:
+                remote_properties = remote_property_map.get(property_obj.id) or []
+                if not remote_properties:
                     continue
 
-                remote_values = self._render_property_value(
-                    product_property=product_property,
-                    remote_property=remote_property,
-                    language_code=language_code,
-                )
-                if remote_values in (None, ""):
-                    continue
+                for remote_property in remote_properties:
+                    remote_values = self._render_property_value(
+                        product_property=product_property,
+                        remote_property=remote_property,
+                        language_code=language_code,
+                    )
+                    if remote_values in (None, ""):
+                        continue
 
-                aspect_name = (
-                    remote_property.localized_name
-                    or remote_property.translated_name
-                    or remote_property.remote_id
-                )
-                if not aspect_name:
-                    continue
+                    aspect_name = (
+                        remote_property.localized_name
+                        or remote_property.translated_name
+                        or remote_property.remote_id
+                    )
+                    if not aspect_name:
+                        continue
 
-                if isinstance(remote_values, (list, tuple, set)):
-                    normalized_values = [
-                        str(value) for value in remote_values if value not in (None, "")
-                    ]
-                else:
-                    normalized_values = [str(remote_values)]
+                    if isinstance(remote_values, (list, tuple, set)):
+                        normalized_values = [
+                            str(value) for value in remote_values if value not in (None, "")
+                        ]
+                    else:
+                        normalized_values = [str(remote_values)]
 
-                if not normalized_values:
-                    continue
+                    if not normalized_values:
+                        continue
 
-                collected_values.setdefault(aspect_name, set()).update(normalized_values)
+                    collected_values.setdefault(aspect_name, set()).update(normalized_values)
 
         return collected_values
 
@@ -1529,47 +1530,62 @@ class EbayInventoryItemPayloadMixin(GetEbayAPIMixin, RemoteValueMixin):
         property_map = self._get_remote_property_map()
 
         for property_id, product_property in product_properties.items():
-            remote_property = property_map.get(property_id)
-            if remote_property is None:
+            remote_properties = property_map.get(property_id) or []
+            if not remote_properties:
                 continue
 
-            values = self._render_property_value(
-                product_property=product_property,
-                remote_property=remote_property,
-                language_code=language_code,
-            )
-            if not values:
-                continue
+            for remote_property in remote_properties:
+                values = self._render_property_value(
+                    product_property=product_property,
+                    remote_property=remote_property,
+                    language_code=language_code,
+                )
+                if not values:
+                    continue
 
-            aspect_name = (
-                remote_property.localized_name
-                or remote_property.translated_name
-                or remote_property.remote_id
-            )
+                aspect_name = (
+                    remote_property.localized_name
+                    or remote_property.translated_name
+                    or remote_property.remote_id
+                )
 
-            if not aspect_name:
-                continue
+                if not aspect_name:
+                    continue
 
-            if isinstance(values, str):
-                values_list = [values]
-            else:
-                values_list = [str(value) for value in values if value not in (None, "")]
+                if isinstance(values, str):
+                    values_list = [values]
+                elif isinstance(values, float):
+                    values_list = [str(values)]
+                else:
+                    values_list = [str(value) for value in values if value not in (None, "")]
 
-            if not values_list:
-                continue
+                if not values_list:
+                    continue
 
-            aspects[aspect_name] = values_list
+                existing_values = aspects.get(aspect_name, [])
+                merged_values = existing_values + [
+                    value for value in values_list
+                    if value not in existing_values
+                ]
+                aspects[aspect_name] = merged_values
 
         return aspects
 
-    def _get_remote_property_map(self) -> Dict[int, EbayProperty]:
-        return {
-            remote_property.local_instance_id: remote_property
-            for remote_property in EbayProperty.objects.filter(sales_channel=self.sales_channel)
+    def _get_remote_property_map(self) -> Dict[int, List[EbayProperty]]:
+        property_map: Dict[int, List[EbayProperty]] = {}
+        queryset = (
+            EbayProperty.objects.filter(sales_channel=self.sales_channel)
             .filter(Q(marketplace=self.view) | Q(marketplace__isnull=True))
             .select_related("local_instance")
-            if getattr(remote_property, "local_instance_id", None) is not None
-        }
+        )
+
+        for remote_property in queryset:
+            local_instance_id = getattr(remote_property, "local_instance_id", None)
+            if local_instance_id is None:
+                continue
+            property_map.setdefault(local_instance_id, []).append(remote_property)
+
+        return property_map
 
     def _ensure_offer_for_remote(self, *, remote_product: Any) -> EbayProductOffer | None:
         return self._ensure_offer_record(remote_product=remote_product)

@@ -96,7 +96,7 @@ class RemoteProperty(PolymorphicModel, RemoteObjectMixin, models.Model):
     def save(self, *args, **kwargs):
         app_label = self._resolve_sales_channel_app_label()
 
-        if app_label == "amazon" and self.allow_multiple is not True:
+        if app_label in {"amazon", "shein", "ebay"} and self.allow_multiple is not True:
             self.allow_multiple = True
 
         if app_label in {"magento2", "woocommerce"} and self.local_instance and self.local_instance.type:
@@ -144,6 +144,13 @@ class RemotePropertySelectValue(PolymorphicModel, RemoteObjectMixin, models.Mode
                                        blank=True,
                                        help_text="The local PropertySelectValue associated with this remote value.")
     remote_property = models.ForeignKey(RemoteProperty, on_delete=models.CASCADE, help_text="The remote property associated with this remote value.")
+    allow_multiple = models.BooleanField(
+        default=False,
+        help_text=(
+            "Set to True to allow multiple remote values to map "
+            "to the same local property select value."
+        ),
+    )
     bool_value = models.BooleanField(
         null=True,
         blank=True,
@@ -151,9 +158,23 @@ class RemotePropertySelectValue(PolymorphicModel, RemoteObjectMixin, models.Mode
     )
 
     class Meta:
-        unique_together = ('sales_channel', 'local_instance')
+        constraints = [
+            models.UniqueConstraint(
+                fields=("sales_channel", "local_instance"),
+                condition=models.Q(allow_multiple=False),
+                name="uniq_remotepropselval_by_channel_local_not_multi",
+            )
+        ]
         verbose_name = 'Remote Property Select Value'
         verbose_name_plural = 'Remote Property Select Values'
+
+    def save(self, *args, **kwargs):
+        if self.remote_property_id:
+            remote_property_allow_multiple = bool(getattr(self.remote_property, "allow_multiple", False))
+            if self.allow_multiple != remote_property_allow_multiple:
+                self.allow_multiple = remote_property_allow_multiple
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         local_value = self.local_instance.value if self.local_instance else "N/A"

@@ -109,6 +109,35 @@ class EbayInternalProperty(RemoteObjectMixin, models.Model):
         ]
         search_terms = ['code', 'name']
 
+    @property
+    def allowed_types(self) -> list[str]:
+        defaults_map = {entry["code"]: entry for entry in EBAY_INTERNAL_PROPERTY_DEFAULTS}
+        default_allowed_types = list(defaults_map.get(self.code, {}).get("allowed_types") or [])
+        if default_allowed_types:
+            return default_allowed_types
+        return [self.type] if self.type else []
+
+    def clean(self):
+        super().clean()
+
+        normalized_allowed_types = list(self.allowed_types or [])
+        errors = {}
+
+        if self.local_instance_id and normalized_allowed_types and self.local_instance.type not in normalized_allowed_types:
+            errors["local_instance"] = _(
+                "Local property type %(type)s is not allowed for this internal field. Allowed types: %(allowed_types)s."
+            ) % {
+                "type": self.local_instance.type,
+                "allowed_types": ", ".join(normalized_allowed_types),
+            }
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.code} ({self.sales_channel})"
 

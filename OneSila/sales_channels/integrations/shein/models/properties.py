@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Optional
 
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from core import models
@@ -20,10 +21,17 @@ from sales_channels.models.properties import (
     RemoteProductProperty,
     RemotePropertySelectValue,
 )
+from sales_channels.integrations.shein.constants import SHEIN_INTERNAL_PROPERTY_DEFINITIONS
+
+
+_SHEIN_INTERNAL_PROPERTY_DEFAULTS_BY_CODE = {
+    entry["code"]: entry for entry in SHEIN_INTERNAL_PROPERTY_DEFINITIONS
+}
 
 
 class SheinProperty(RemoteProperty):
     """Remote attribute shared across Shein product types."""
+    allow_multiple = True
 
     class ValueModes(models.TextChoices):
         MANUAL_INTEGER = "manual_integer", _("Manual positive integer input")
@@ -489,6 +497,34 @@ class SheinInternalProperty(RemoteObjectMixin, models.Model):
 
     def __str__(self) -> str:  # pragma: no cover - display helper
         return f"{self.code} ({self.sales_channel})"
+
+    @property
+    def allowed_types(self) -> list[str]:
+        default_allowed_types = list(_SHEIN_INTERNAL_PROPERTY_DEFAULTS_BY_CODE.get(self.code, {}).get("allowed_types") or [])
+        if default_allowed_types:
+            return default_allowed_types
+        return [self.type] if self.type else []
+
+    def clean(self):
+        super().clean()
+
+        normalized_allowed_types = list(self.allowed_types or [])
+        errors = {}
+
+        if self.local_instance_id and normalized_allowed_types and self.local_instance.type not in normalized_allowed_types:
+            errors["local_instance"] = _(
+                "Local property type %(type)s is not allowed for this internal field. Allowed types: %(allowed_types)s."
+            ) % {
+                "type": self.local_instance.type,
+                "allowed_types": ", ".join(normalized_allowed_types),
+            }
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class SheinInternalPropertyOption(models.Model):

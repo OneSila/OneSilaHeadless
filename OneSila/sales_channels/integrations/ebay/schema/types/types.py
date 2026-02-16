@@ -232,6 +232,10 @@ class EbayInternalPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
     def mapped_remotely(self, info) -> bool:
         return self.mapped_remotely
 
+    @field()
+    def allowed_types(self, info) -> List[str]:
+        return list(self.allowed_types)
+
 
 @type(
     EbayInternalPropertyOption,

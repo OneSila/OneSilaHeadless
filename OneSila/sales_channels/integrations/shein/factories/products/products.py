@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, List, Optional
 
 from currencies.models import Currency
@@ -549,20 +550,26 @@ class SheinProductBaseFactory(
                 values.setdefault(property_id, set()).add(serialized)
         return values
 
+    def _resolve_type_items_for_property(
+        self,
+        *,
+        product_property: ProductProperty,
+    ) -> list[SheinProductTypeItem]:
+        return list(
+            SheinProductTypeItem.objects.filter(
+                product_type__sales_channel=self.sales_channel,
+                product_type__remote_id=self.selected_product_type_id,
+                property__local_instance=product_property.property,
+            ).select_related("property")
+        )
+
     def _resolve_type_item_for_property(
         self,
         *,
         product_property: ProductProperty,
     ) -> Optional[SheinProductTypeItem]:
-        return (
-            SheinProductTypeItem.objects.filter(
-                product_type__sales_channel=self.sales_channel,
-                product_type__remote_id=self.selected_product_type_id,
-                property__local_instance=product_property.property,
-            )
-            .select_related("property")
-            .first()
-        )
+        type_items = self._resolve_type_items_for_property(product_property=product_property)
+        return type_items[0] if type_items else None
 
     def _get_approved_value_labels(
         self,
@@ -659,50 +666,51 @@ class SheinProductBaseFactory(
 
     def _build_property_payloads(self):
         for product_property in self._collect_product_properties():
-            type_item = self._resolve_type_item_for_property(product_property=product_property)
-            if not type_item:
+            type_items = self._resolve_type_items_for_property(product_property=product_property)
+            if not type_items:
                 continue
 
-            factory = SheinProductPropertyUpdateFactory(
-                sales_channel=self.sales_channel,
-                local_instance=product_property,
-                remote_product=self.remote_instance,
-                product_type_item=type_item,
-                get_value_only=True,
-                skip_checks=True,
-            )
-            factory.run()
-            if not factory.remote_value:
-                continue
-
-            try:
-                payload = json.loads(factory.remote_value)
-            except (TypeError, ValueError):
-                continue
-
-            self._validate_approved_values_for_category(
-                type_item=type_item,
-                product_property=product_property,
-                attribute_value_id=payload.get("attribute_value_id"),
-            )
-
-            attribute_type = payload.get("attribute_type")
-            payload.pop("attribute_type", None)
-
-            if attribute_type == SheinProductTypeItem.AttributeType.SALES:
-                cleaned_payload = {k: v for k, v in payload.items() if v not in (None, "", [], {})}
-                if not cleaned_payload:
+            for type_item in type_items:
+                factory = SheinProductPropertyUpdateFactory(
+                    sales_channel=self.sales_channel,
+                    local_instance=product_property,
+                    remote_product=self.remote_instance,
+                    product_type_item=type_item,
+                    get_value_only=True,
+                    skip_checks=True,
+                )
+                factory.run()
+                if not factory.remote_value:
                     continue
-                if type_item.is_main_attribute and not self.sale_attribute:
-                    self.sale_attribute = cleaned_payload
+
+                try:
+                    payload = json.loads(factory.remote_value)
+                except (TypeError, ValueError):
+                    continue
+
+                self._validate_approved_values_for_category(
+                    type_item=type_item,
+                    product_property=product_property,
+                    attribute_value_id=payload.get("attribute_value_id"),
+                )
+
+                attribute_type = payload.get("attribute_type")
+                payload.pop("attribute_type", None)
+
+                if attribute_type == SheinProductTypeItem.AttributeType.SALES:
+                    cleaned_payload = {k: v for k, v in payload.items() if v not in (None, "", [], {})}
+                    if not cleaned_payload:
+                        continue
+                    if type_item.is_main_attribute and not self.sale_attribute:
+                        self.sale_attribute = cleaned_payload
+                    else:
+                        self.sale_attribute_list.append(cleaned_payload)
+                elif attribute_type == SheinProductTypeItem.AttributeType.SIZE:
+                    for entry in self._expand_attribute_payloads(payload=payload):
+                        self.size_attribute_list.append(entry)
                 else:
-                    self.sale_attribute_list.append(cleaned_payload)
-            elif attribute_type == SheinProductTypeItem.AttributeType.SIZE:
-                for entry in self._expand_attribute_payloads(payload=payload):
-                    self.size_attribute_list.append(entry)
-            else:
-                for entry in self._expand_attribute_payloads(payload=payload):
-                    self.product_attribute_list.append(entry)
+                    for entry in self._expand_attribute_payloads(payload=payload):
+                        self.product_attribute_list.append(entry)
 
     def _build_prices(self):
         assigns = list(
@@ -988,9 +996,14 @@ class SheinProductBaseFactory(
         if unit_value in (None, "", []) or quantity_value in (None, "", []):
             return None
         try:
-            quantity = int(quantity_value)
-        except (TypeError, ValueError):
+            quantity_decimal = Decimal(str(quantity_value))
+        except (InvalidOperation, TypeError, ValueError):
             return None
+        if quantity_decimal != quantity_decimal.to_integral_value():
+            raise PreFlightCheckError(
+                f"Shein quantity_info__quantity must be a whole number. Received: {quantity_value}."
+            )
+        quantity = int(quantity_decimal)
         if quantity <= 0:
             return None
         try:

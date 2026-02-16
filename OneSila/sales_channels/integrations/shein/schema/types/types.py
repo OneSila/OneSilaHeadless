@@ -435,6 +435,10 @@ class SheinInternalPropertyType(relay.Node, GetQuerysetMultiTenantMixin):
             return bool(remote_id)
         return annotated_value
 
+    @field()
+    def allowed_types(self, info) -> List[str]:
+        return list(self.allowed_types)
+
 
 @type(
     SheinInternalPropertyOption,
