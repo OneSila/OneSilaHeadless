@@ -118,7 +118,7 @@ query ($salesChannel: GlobalID!, $mappedLocally: Boolean!) {
 """
 
 SHEIN_INTERNAL_PROPERTY_ALLOWED_TYPES_QUERY = """
-query ($id: ID!) {
+query ($id: GlobalID!) {
   sheinInternalProperty(id: $id) {
     id
     code

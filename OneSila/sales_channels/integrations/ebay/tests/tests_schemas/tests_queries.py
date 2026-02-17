@@ -47,7 +47,7 @@ class EbayCategoryQueryTest(TransactionTestCaseMixin, TransactionTestCase):
 
 
 EBAY_INTERNAL_PROPERTY_ALLOWED_TYPES_QUERY = """
-query ($id: ID!) {
+query ($id: GlobalID!) {
   ebayInternalProperty(id: $id) {
     id
     code

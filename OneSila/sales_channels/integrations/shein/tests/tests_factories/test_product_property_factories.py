@@ -93,6 +93,7 @@ class SheinProductPropertyFactoryTest(TestCase):
         shein_property = SheinProperty.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
+            original_type=Property.TYPES.SELECT,
             remote_id="2147484187",
             local_instance=local_property,
             allows_unmapped_values=False,
@@ -155,6 +156,7 @@ class SheinProductPropertyFactoryTest(TestCase):
         shein_property = SheinProperty.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.sales_channel,
+            original_type=Property.TYPES.SELECT,
             remote_id="2147489999",
             local_instance=local_property,
             allows_unmapped_values=True,
@@ -252,6 +254,7 @@ class SheinProductPropertyFactoryTest(TestCase):
         )
         shein_property = SheinProperty.objects.create(
             multi_tenant_company=self.multi_tenant_company,
+            original_type=Property.TYPES.SELECT,
             sales_channel=self.sales_channel,
             remote_id="500",
             local_instance=local_property,

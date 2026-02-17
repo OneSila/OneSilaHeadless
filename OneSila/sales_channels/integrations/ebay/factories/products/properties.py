@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from sales_channels.factories.properties.properties import (
     RemoteProductPropertyCreateFactory,
@@ -129,9 +129,29 @@ class EbayProductPropertyUpdateFactory(
             view=view,
         )
 
-    def get_remote_value(self):
-        remote_property = getattr(self.remote_instance, "remote_property", None)
-        return self._compute_remote_value(remote_property=remote_property)
+    def get_remote_value(
+        self,
+        *,
+        product_property=None,
+        remote_property=None,
+        language_code: Optional[str] = None,
+    ):
+        if any(
+            value is not None
+            for value in (
+                product_property,
+                remote_property,
+                language_code,
+            )
+        ):
+            return super().get_remote_value(
+                product_property=product_property,
+                remote_property=remote_property,
+                language_code=language_code,
+            )
+
+        remote_property_to_compute = remote_property or getattr(self.remote_instance, "remote_property", None)
+        return self._compute_remote_value(remote_property=remote_property_to_compute)
 
     def update_remote(self) -> Any:
         return self.send_inventory_payload()

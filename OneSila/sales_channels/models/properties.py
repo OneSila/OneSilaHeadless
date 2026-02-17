@@ -160,6 +160,10 @@ class RemotePropertySelectValue(PolymorphicModel, RemoteObjectMixin, models.Mode
     class Meta:
         constraints = [
             models.UniqueConstraint(
+                fields=("remote_property", "local_instance"),
+                name="uniq_rpsv_remoteprop_localinst",
+            ),
+            models.UniqueConstraint(
                 fields=("sales_channel", "local_instance"),
                 condition=models.Q(allow_multiple=False),
                 name="uniq_remotepropselval_by_channel_local_not_multi",

@@ -75,6 +75,7 @@ class EbayInternalProperty(RemoteObjectMixin, models.Model):
         'properties.Property',
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
         help_text="Local property associated with this internal eBay field.",
     )
     code = models.CharField(

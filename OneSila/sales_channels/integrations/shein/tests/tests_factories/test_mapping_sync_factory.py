@@ -183,12 +183,14 @@ class SheinSalesChannelMappingSyncFactoryTest(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.source_sales_channel,
             code="brand_code",
+            name="Brand",
             local_instance=self.local_property,
         )
         target_internal = SheinInternalProperty.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.target_sales_channel,
             code="brand_code",
+            name="Brand",
         )
 
         result = SheinSalesChannelMappingSyncFactory(
@@ -205,12 +207,14 @@ class SheinSalesChannelMappingSyncFactoryTest(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.source_sales_channel,
             code="brand_code",
+            name="Brand",
             local_instance=self.local_property,
         )
         target_internal = SheinInternalProperty.objects.create(
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.target_sales_channel,
             code="brand_code",
+            name="Brand",
             local_instance=self.local_property,
         )
         SheinInternalPropertyOption.objects.create(
@@ -232,6 +236,7 @@ class SheinSalesChannelMappingSyncFactoryTest(TestCase):
             multi_tenant_company=self.multi_tenant_company,
             sales_channel=self.target_sales_channel,
             code="style_code",
+            name="Style code",
         )
         SheinInternalPropertyOption.objects.create(
             multi_tenant_company=self.multi_tenant_company,
