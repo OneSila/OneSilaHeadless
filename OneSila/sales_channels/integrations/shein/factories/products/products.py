@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 import re
@@ -67,6 +68,18 @@ class SheinProductBaseFactory(
     supplier_barcode_type = "EAN"
     _EAN_DIGITS_RE = re.compile(r"\D+")
 
+    def get_identifiers(self, *, fixing_caller: str = "run"):
+        frame = inspect.currentframe()
+        caller = frame.f_back.f_code.co_name
+        class_name = SheinProductBaseFactory.__name__
+
+        fixing_class = getattr(self, "fixing_identifier_class", None)
+        fixing_identifier = None
+        if fixing_caller and fixing_class:
+            fixing_identifier = f"{fixing_class.__name__}:{fixing_caller}"
+
+        return f"{class_name}:{caller}", fixing_identifier
+
     def process_content_translation(
         self,
         *,
@@ -91,7 +104,7 @@ class SheinProductBaseFactory(
         get_value_only: bool = False,
         skip_checks: bool = False,
         skip_price_update: bool = False,
-        skip_property_values_category_validation: bool = False,
+        skip_property_values_category_validation: bool = True, # shein is weird, sometimes it let you even if the value is not in the approved list
     ) -> None:
         self.get_value_only = get_value_only
         self.skip_checks = skip_checks

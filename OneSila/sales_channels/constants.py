@@ -1,6 +1,7 @@
 from properties.models import Property
 
-
+# the key is the original type in the remote property
+# the values with Ture/False are the local types
 REMOTE_PROPERTY_TYPE_CHANGE_RULES = {
     Property.TYPES.INT: {
         Property.TYPES.INT: True,
