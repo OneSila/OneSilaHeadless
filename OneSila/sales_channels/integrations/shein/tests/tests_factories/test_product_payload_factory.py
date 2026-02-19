@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from core.tests import TestCase
 from model_bakery import baker
@@ -629,6 +629,33 @@ class SheinProductPayloadFactoryTests(TestCase):
         self.assertNotIn("spu_name", payload)
         self.assertIn("site_list", payload)
         self.assertIn("sale_attribute_list", payload)
+
+    def test_shein_create_run_sync_flow_preserves_runtime_flags(self) -> None:
+        factory = SheinProductCreateFactory(
+            sales_channel=self.sales_channel,
+            local_instance=self.product,
+            remote_instance=self.remote_product,
+            get_value_only=True,
+            skip_checks=True,
+            skip_price_update=True,
+            skip_property_values_category_validation=True,
+        )
+
+        sync_factory_callable = Mock()
+        sync_factory_instance = Mock()
+        sync_factory_callable.return_value = sync_factory_instance
+        factory.sync_product_factory = sync_factory_callable
+
+        factory.run_sync_flow()
+
+        sync_factory_callable.assert_called_once()
+        kwargs = sync_factory_callable.call_args.kwargs
+        self.assertTrue(kwargs["is_switched"])
+        self.assertTrue(kwargs["get_value_only"])
+        self.assertTrue(kwargs["skip_checks"])
+        self.assertTrue(kwargs["skip_price_update"])
+        self.assertTrue(kwargs["skip_property_values_category_validation"])
+        sync_factory_instance.run.assert_called_once()
 
     def test_shein_configurable_payload_builds_skc_and_sku_lists_with_single_attribute(self) -> None:
         parent = baker.make(
