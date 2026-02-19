@@ -947,6 +947,7 @@ class SheinProductPayloadFactoryTests(TestCase):
             remote_instance=remote_product,
             get_value_only=True,
             skip_checks=True,
+            skip_property_values_category_validation=False
         )
         factory.remote_rule = type("Rule", (), {"category_id": shein_product_type.category_id, "remote_id": shein_product_type.remote_id})()
 
